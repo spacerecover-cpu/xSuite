@@ -10,7 +10,7 @@ import { Database } from '../../types/database.types';
 import { logger } from '../../lib/logger';
 
 type Employee = Database['public']['Tables']['employees']['Row'] & {
-  profiles: Database['public']['Tables']['profiles']['Row'];
+  profiles: Database['public']['Tables']['profiles']['Row'] | null;
   departments: Database['public']['Tables']['departments']['Row'] | null;
   positions: Database['public']['Tables']['positions']['Row'] | null;
 };
@@ -38,7 +38,7 @@ export const EmployeesList: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setEmployees(data || []);
+      setEmployees((data || []) as Employee[]);
     } catch (error) {
       logger.error('Error loading employees:', error);
     } finally {
@@ -46,7 +46,7 @@ export const EmployeesList: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | null) => {
     switch (status) {
       case 'active':
         return 'green';
@@ -63,7 +63,7 @@ export const EmployeesList: React.FC = () => {
 
   const filteredEmployees = employees.filter(emp =>
     emp.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.employee_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.employee_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     emp.departments?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -187,10 +187,10 @@ export const EmployeesList: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-3">
                     <Badge color={getStatusColor(employee.employment_status)}>
-                      {employee.employment_status.replace('_', ' ')}
+                      {(employee.employment_status ?? 'unknown').replace('_', ' ')}
                     </Badge>
                     <Badge color="blue">
-                      {employee.employment_type.replace('_', ' ')}
+                      {(employee.employment_type ?? 'unknown').replace('_', ' ')}
                     </Badge>
                   </div>
                 </div>

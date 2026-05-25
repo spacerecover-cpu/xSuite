@@ -13,6 +13,7 @@ import {
   type ReviewWithDetails,
 } from '../../lib/performanceService';
 import { useAuth } from '../../contexts/AuthContext';
+import type { Database } from '../../types/database.types';
 import toast from 'react-hot-toast';
 
 interface ReviewFormData {
@@ -26,6 +27,36 @@ interface ReviewFormData {
   goals_next_period: string;
   comments: string;
   status: string;
+}
+
+const GOALS_NEXT_DIVIDER = '\n\n---\nNext period:\n';
+
+function parseReviewPeriod(period: string | null | undefined): { start: string; end: string } {
+  if (!period) return { start: '', end: '' };
+  const match = period.match(/^(\S+)\s+to\s+(\S+)$/);
+  if (match) return { start: match[1], end: match[2] };
+  return { start: '', end: '' };
+}
+
+function buildReviewPeriod(start: string, end: string): string | null {
+  if (!start && !end) return null;
+  return `${start} to ${end}`;
+}
+
+function splitGoals(goals: string | null | undefined): { achieved: string; next: string } {
+  if (!goals) return { achieved: '', next: '' };
+  const idx = goals.indexOf(GOALS_NEXT_DIVIDER);
+  if (idx === -1) return { achieved: goals, next: '' };
+  return {
+    achieved: goals.slice(0, idx),
+    next: goals.slice(idx + GOALS_NEXT_DIVIDER.length),
+  };
+}
+
+function buildGoals(achieved: string, next: string): string | null {
+  if (!achieved && !next) return null;
+  if (!next) return achieved || null;
+  return `${achieved}${GOALS_NEXT_DIVIDER}${next}`;
 }
 
 interface Props {
@@ -95,15 +126,17 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
 
   useEffect(() => {
     if (review) {
+      const { start, end } = parseReviewPeriod(review.review_period);
+      const { achieved, next } = splitGoals(review.goals);
       reset({
         employee_id: review.employee_id,
-        review_period_start: review.review_period_start,
-        review_period_end: review.review_period_end,
+        review_period_start: start,
+        review_period_end: end,
         overall_rating: review.overall_rating?.toString() || '',
         strengths: review.strengths || '',
-        areas_for_improvement: review.areas_for_improvement || '',
-        goals_achieved: review.goals_achieved || '',
-        goals_next_period: review.goals_next_period || '',
+        areas_for_improvement: review.improvements || '',
+        goals_achieved: achieved,
+        goals_next_period: next,
         comments: review.comments || '',
         status: review.status || 'draft',
       });
@@ -135,16 +168,14 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
       const payload = {
         employee_id: data.employee_id,
         reviewer_id: review?.reviewer_id || user!.id,
-        review_period_start: data.review_period_start,
-        review_period_end: data.review_period_end,
+        review_period: buildReviewPeriod(data.review_period_start, data.review_period_end),
         overall_rating: rating || null,
         strengths: data.strengths || null,
-        areas_for_improvement: data.areas_for_improvement || null,
-        goals_achieved: data.goals_achieved || null,
-        goals_next_period: data.goals_next_period || null,
+        improvements: data.areas_for_improvement || null,
+        goals: buildGoals(data.goals_achieved, data.goals_next_period),
         comments: data.comments || null,
         status: data.status,
-      };
+      } as Database['public']['Tables']['performance_reviews']['Insert'];
       return isEditing ? updateReview(review!.id, payload) : createReview(payload);
     },
     onSuccess: () => {

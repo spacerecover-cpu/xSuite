@@ -12,7 +12,13 @@ interface ConvertToInvoiceModalProps {
     dueDate: string;
     notes?: string;
   }) => Promise<void>;
-  quote: Record<string, unknown> | null;
+  quote: {
+    quote_number?: string | null;
+    total_amount?: number | null;
+    customers?: { customer_name?: string | null } | null;
+    companies?: { company_name?: string | null } | null;
+    [key: string]: unknown;
+  } | null;
   isConverting?: boolean;
 }
 
@@ -131,7 +137,7 @@ export const ConvertToInvoiceModal: React.FC<ConvertToInvoiceModalProps> = ({
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
               required
-              icon={<Calendar className="w-4 h-4" />}
+              leftIcon={<Calendar className="w-4 h-4" />}
             />
             <p className="text-xs text-slate-500 mt-1">
               Payment due date for this invoice

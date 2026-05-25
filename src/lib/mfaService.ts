@@ -32,7 +32,11 @@ export const mfaService = {
   async getAssuranceLevel(): Promise<AssuranceLevel> {
     const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (error) throw error;
-    return data;
+    return {
+      currentLevel: (data?.currentLevel ?? 'aal1') as 'aal1' | 'aal2',
+      nextLevel: (data?.nextLevel ?? 'aal1') as 'aal1' | 'aal2',
+      currentAuthenticationMethods: (data?.currentAuthenticationMethods ?? []) as Array<{ method: string; timestamp: number }>,
+    };
   },
 
   async listFactors(): Promise<MFAFactor[]> {

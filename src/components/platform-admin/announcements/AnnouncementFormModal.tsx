@@ -26,7 +26,7 @@ export const AnnouncementFormModal: React.FC<AnnouncementFormModalProps> = ({
 }) => {
   const { admin } = usePlatformAdmin();
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { success: showSuccess, error: showError } = useToast();
 
   const [titleEn, setTitleEn] = useState('');
   const [titleAr, setTitleAr] = useState('');
@@ -157,7 +157,7 @@ export const AnnouncementFormModal: React.FC<AnnouncementFormModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-7xl">
+    <Modal isOpen={isOpen} onClose={onClose} maxWidth="7xl">
       <form onSubmit={handleSubmit} className="flex flex-col h-[90vh]">
         <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-200">
           <h2 className="text-2xl font-bold text-slate-900">
@@ -349,7 +349,7 @@ export const AnnouncementFormModal: React.FC<AnnouncementFormModalProps> = ({
         </div>
 
         <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-200">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button

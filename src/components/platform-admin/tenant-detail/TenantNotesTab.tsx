@@ -18,7 +18,7 @@ export const TenantNotesTab: React.FC<TenantNotesTabProps> = ({ tenantId }) => {
   const [noteContent, setNoteContent] = useState('');
   const { admin } = usePlatformAdmin();
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { success: showSuccess, error: showError } = useToast();
 
   const { data: notes = [], isLoading } = useQuery({
     queryKey: platformAdminKeys.tenantNotes(tenantId),
@@ -36,9 +36,9 @@ export const TenantNotesTab: React.FC<TenantNotesTabProps> = ({ tenantId }) => {
       setNoteContent('');
       showSuccess('Note added successfully');
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       showError('Failed to add note');
-      logger.error(error);
+      logger.error(error.message);
     },
   });
 
@@ -93,7 +93,7 @@ export const TenantNotesTab: React.FC<TenantNotesTabProps> = ({ tenantId }) => {
         ) : (
           <div className="space-y-4">
             {notes.map((note) => {
-              const activityData = (note.activity_data || {}) as Record<string, unknown>;
+              const activityData = (note.activity_details || {}) as Record<string, unknown>;
               return (
                 <div key={note.id} className="border border-slate-200 rounded-lg p-4 bg-slate-50">
                   <div className="flex items-start justify-between mb-2">

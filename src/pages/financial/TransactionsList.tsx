@@ -31,6 +31,9 @@ import {
   XCircle,
 } from 'lucide-react';
 
+// NOTE: financial_transactions does not have status/reference_number columns or
+// related_invoice/related_payment/related_expense joins in v1.0.0.
+// `type` is mapped from `transaction_type`. Status defaults to 'completed' (B6 deferred).
 interface TransactionDisplay {
   id: string;
   transaction_date: string;
@@ -89,7 +92,18 @@ export const TransactionsList: React.FC = () => {
         search: searchTerm || undefined,
         dateFrom: getDateFromFilter(),
       });
-      return (data || []) as TransactionDisplay[];
+      // Adapt live schema (transaction_type, no status/reference_number) to display shape.
+      return (data || []).map((row): TransactionDisplay => ({
+        id: row.id ?? '',
+        transaction_date: row.transaction_date ?? '',
+        amount: row.amount,
+        type: (row.transaction_type as TransactionDisplay['type']) ?? 'expense',
+        description: row.description ?? '',
+        reference_number: null,
+        status: 'completed',
+        category: row.category ? { name: row.category.name } : undefined,
+        bank_account: row.bank_account ? { account_name: row.bank_account.name } : undefined,
+      }));
     },
   });
 

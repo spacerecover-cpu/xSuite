@@ -23,7 +23,7 @@ const navItems: NavItem[] = [
 export const PlatformAdminLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { profile, signOut } = useAuth();
+  const { profile, user, signOut } = useAuth();
 
   const handleSignOut = async () => {
     await signOut();
@@ -68,11 +68,11 @@ export const PlatformAdminLayout: React.FC = () => {
           <div className="p-4 border-t border-slate-800">
             <div className="flex items-center gap-3 px-4 py-3 mb-2 bg-slate-800 rounded-lg">
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center font-semibold">
-                {profile?.email?.[0].toUpperCase()}
+                {user?.email?.[0]?.toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white truncate">{profile?.full_name || 'Admin'}</p>
-                <p className="text-xs text-slate-400 truncate">{profile?.email}</p>
+                <p className="text-xs text-slate-400 truncate">{user?.email}</p>
               </div>
             </div>
 
@@ -121,7 +121,7 @@ function getBreadcrumbs(pathname: string): Array<{ label: string; path?: string 
     return [{ label: 'Platform Admin' }];
   }
 
-  const breadcrumbs = [
+  const breadcrumbs: Array<{ label: string; path?: string }> = [
     { label: 'Platform Admin', path: '/platform-admin' },
   ];
 

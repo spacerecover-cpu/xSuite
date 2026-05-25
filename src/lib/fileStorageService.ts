@@ -187,7 +187,7 @@ export const updateCompanyBranding = async (
       .limit(1)
       .maybeSingle();
 
-    const currentBranding = currentSettings?.branding || {};
+    const currentBranding = (currentSettings?.branding as Record<string, unknown> | null) || {};
 
     const updatedBranding = {
       ...currentBranding,
@@ -230,8 +230,9 @@ export const getCompanyLogo = async (
 
     if (!data?.branding) return null;
 
+    const branding = data.branding as Record<string, string | undefined>;
     const fieldName = type === 'primary' ? 'logo_url' : 'logo_light_url';
-    return data.branding[fieldName] || null;
+    return branding[fieldName] || null;
   } catch (error) {
     logger.error('Get logo error:', error);
     return null;
@@ -250,8 +251,9 @@ export const getCompanyQRCode = async (
 
     if (!data?.branding) return null;
 
+    const branding = data.branding as Record<string, string | undefined>;
     const fieldName = `qr_code_${type}_url`;
-    return data.branding[fieldName] || null;
+    return branding[fieldName] || null;
   } catch (error) {
     logger.error('Get QR code error:', error);
     return null;

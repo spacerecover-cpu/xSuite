@@ -86,21 +86,21 @@ export const userManagementService = {
       const { data: currentUser } = await supabase.auth.getUser();
       if (currentUser.user && oldProfile) {
         await supabase.rpc('log_audit_trail', {
-          p_action_type: 'update',
-          p_table_name: 'profiles',
+          p_action: 'update',
+          p_record_type: 'profiles',
           p_record_id: userId,
           p_old_values: {
             full_name: oldProfile.full_name,
             role: oldProfile.role,
             phone: oldProfile.phone,
             is_active: oldProfile.is_active,
-          },
+          } as never,
           p_new_values: {
             full_name: userData.full_name,
             role: userData.role,
             phone: userData.phone,
             is_active: userData.is_active,
-          },
+          } as never,
         });
       }
 

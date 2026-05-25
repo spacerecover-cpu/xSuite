@@ -14,16 +14,14 @@ interface Props {
 }
 
 export function AdjustmentFormModal({ onClose }: Props) {
-  const { showToast } = useToast();
+  const toast = useToast();
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({
     employee_id: '',
-    adjustment_type: 'bonus',
+    type: 'bonus',
     amount: '',
-    is_deduction: false,
     description: '',
-    effective_date: new Date().toISOString().split('T')[0],
   });
 
   const { data: employees = [] } = useQuery({
@@ -45,11 +43,11 @@ export function AdjustmentFormModal({ onClose }: Props) {
     mutationFn: (data: Parameters<typeof payrollService.createPayrollAdjustment>[0]) => payrollService.createPayrollAdjustment(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: payrollKeys.adjustments({}) });
-      showToast('Adjustment created successfully', 'success');
+      toast.success('Adjustment created successfully');
       onClose();
     },
     onError: (error: unknown) => {
-      showToast(error instanceof Error ? error.message : 'Failed to create adjustment', 'error');
+      toast.error(error instanceof Error ? error.message : 'Failed to create adjustment');
     },
   });
 
@@ -57,17 +55,16 @@ export function AdjustmentFormModal({ onClose }: Props) {
     e.preventDefault();
 
     if (!formData.employee_id || !formData.amount || !formData.description.trim()) {
-      showToast('Please fill in all required fields', 'error');
+      toast.error('Please fill in all required fields');
       return;
     }
 
     saveMutation.mutate({
+      tenant_id: '' as string,
       employee_id: formData.employee_id,
-      adjustment_type: formData.adjustment_type,
+      type: formData.type,
       amount: parseFloat(formData.amount),
-      is_deduction: formData.is_deduction,
       description: formData.description.trim(),
-      effective_date: formData.effective_date,
     });
   };
 
@@ -76,18 +73,17 @@ export function AdjustmentFormModal({ onClose }: Props) {
   };
 
   const employeeOptions = employees.map((emp) => ({
-    value: emp.id,
-    label: `${emp.first_name} ${emp.last_name} (${emp.employee_number})`,
+    id: emp.id,
+    name: `${emp.first_name} ${emp.last_name}${emp.employee_number ? ` (${emp.employee_number})` : ''}`,
   }));
 
   return (
     <Modal isOpen onClose={onClose} title="Add Payroll Adjustment">
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Employee <span className="text-danger">*</span>
-          </label>
           <SearchableSelect
+            label="Employee"
+            required
             options={employeeOptions}
             value={formData.employee_id}
             onChange={(value) => handleChange('employee_id', value)}
@@ -101,8 +97,8 @@ export function AdjustmentFormModal({ onClose }: Props) {
               Type <span className="text-danger">*</span>
             </label>
             <select
-              value={formData.adjustment_type}
-              onChange={(e) => handleChange('adjustment_type', e.target.value)}
+              value={formData.type}
+              onChange={(e) => handleChange('type', e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="bonus">Bonus</option>
@@ -110,50 +106,23 @@ export function AdjustmentFormModal({ onClose }: Props) {
               <option value="advance">Salary Advance</option>
               <option value="penalty">Penalty</option>
               <option value="reimbursement">Reimbursement</option>
+              <option value="deduction">Deduction</option>
               <option value="other">Other</option>
             </select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Effective Date <span className="text-danger">*</span>
+              Amount (OMR) <span className="text-danger">*</span>
             </label>
             <Input
-              type="date"
-              value={formData.effective_date}
-              onChange={(e) => handleChange('effective_date', e.target.value)}
+              type="number"
+              step="0.001"
+              value={formData.amount}
+              onChange={(e) => handleChange('amount', e.target.value)}
+              placeholder="0.000"
             />
           </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Amount (OMR) <span className="text-danger">*</span>
-          </label>
-          <Input
-            type="number"
-            step="0.001"
-            value={formData.amount}
-            onChange={(e) => handleChange('amount', e.target.value)}
-            placeholder="0.000"
-          />
-        </div>
-
-        <div>
-          <label className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              checked={formData.is_deduction}
-              onChange={(e) => handleChange('is_deduction', e.target.checked)}
-              className="w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
-            />
-            <div>
-              <span className="text-sm font-medium text-slate-700">This is a deduction</span>
-              <p className="text-xs text-slate-500">
-                Check this if the amount should be deducted from the employee's salary
-              </p>
-            </div>
-          </label>
         </div>
 
         <div>

@@ -12,15 +12,17 @@ import { format } from 'date-fns';
 import { AdjustmentFormModal } from '../../components/payroll/AdjustmentFormModal';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 
+type AdjustmentRow = Awaited<ReturnType<typeof payrollService.getPayrollAdjustments>>[number];
+
 export default function PayrollAdjustmentsPage() {
-  const { showToast } = useToast();
+  const toast = useToast();
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showFormModal, setShowFormModal] = useState(false);
-  const [approvingAdjustment, setApprovingAdjustment] = useState<any>(null);
-  const [cancellingAdjustment, setCancellingAdjustment] = useState<any>(null);
+  const [approvingAdjustment, setApprovingAdjustment] = useState<AdjustmentRow | null>(null);
+  const [cancellingAdjustment, setCancellingAdjustment] = useState<AdjustmentRow | null>(null);
 
   const { data: adjustments = [], isLoading } = useQuery({
     queryKey: payrollKeys.adjustments({ status: statusFilter === 'all' ? undefined : statusFilter }),
@@ -34,11 +36,11 @@ export default function PayrollAdjustmentsPage() {
     mutationFn: (id: string) => payrollService.approvePayrollAdjustment(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: payrollKeys.adjustments({}) });
-      showToast('Adjustment approved successfully', 'success');
+      toast.success('Adjustment approved successfully');
       setApprovingAdjustment(null);
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to approve adjustment', 'error');
+      toast.error(error.message || 'Failed to approve adjustment');
     },
   });
 
@@ -46,11 +48,11 @@ export default function PayrollAdjustmentsPage() {
     mutationFn: (id: string) => payrollService.cancelPayrollAdjustment(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: payrollKeys.adjustments({}) });
-      showToast('Adjustment cancelled', 'success');
+      toast.success('Adjustment cancelled');
       setCancellingAdjustment(null);
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to cancel adjustment', 'error');
+      toast.error(error.message || 'Failed to cancel adjustment');
     },
   });
 
@@ -62,7 +64,7 @@ export default function PayrollAdjustmentsPage() {
       adj.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getStatusBadgeVariant = (status: string) => {
+  const getStatusBadgeVariant = (status: string | null): 'default' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' => {
     switch (status) {
       case 'pending':
         return 'warning';
@@ -77,11 +79,16 @@ export default function PayrollAdjustmentsPage() {
     }
   };
 
-  const getAdjustmentTypeLabel = (type: string) => {
+  const getAdjustmentTypeLabel = (type: string | null) => {
+    if (!type) return '';
     return type
       .split('_')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
+  };
+
+  const isDeductionType = (type: string | null) => {
+    return type === 'deduction' || type === 'penalty' || type === 'advance';
   };
 
   if (isLoading) {
@@ -185,8 +192,8 @@ export default function PayrollAdjustmentsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <Badge variant={adjustment.is_deduction ? 'danger' : 'success'}>
-                        {getAdjustmentTypeLabel(adjustment.adjustment_type)}
+                      <Badge variant={isDeductionType(adjustment.type) ? 'danger' : 'success'}>
+                        {getAdjustmentTypeLabel(adjustment.type)}
                       </Badge>
                     </td>
                     <td className="px-6 py-4">
@@ -194,14 +201,14 @@ export default function PayrollAdjustmentsPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {adjustment.is_deduction ? (
+                        {isDeductionType(adjustment.type) ? (
                           <TrendingDown className="w-4 h-4 text-danger" />
                         ) : (
                           <TrendingUp className="w-4 h-4 text-success" />
                         )}
                         <span
                           className={`text-sm font-medium ${
-                            adjustment.is_deduction ? 'text-danger' : 'text-success'
+                            isDeductionType(adjustment.type) ? 'text-danger' : 'text-success'
                           }`}
                         >
                           {formatCurrency(adjustment.amount)}
@@ -210,12 +217,12 @@ export default function PayrollAdjustmentsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-slate-700">
-                        {format(new Date(adjustment.effective_date), 'MMM dd, yyyy')}
+                        {format(new Date(adjustment.created_at), 'MMM dd, yyyy')}
                       </span>
                     </td>
                     <td className="px-6 py-4">
                       <Badge variant={getStatusBadgeVariant(adjustment.status)}>
-                        {adjustment.status}
+                        {adjustment.status ?? 'unknown'}
                       </Badge>
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -259,12 +266,12 @@ export default function PayrollAdjustmentsPage() {
           onConfirm={() => approveMutation.mutate(approvingAdjustment.id)}
           title="Approve Adjustment"
           message={`Are you sure you want to approve this ${getAdjustmentTypeLabel(
-            approvingAdjustment.adjustment_type
+            approvingAdjustment.type
           )} of ${formatCurrency(approvingAdjustment.amount)} for ${
             approvingAdjustment.employee?.first_name
           } ${approvingAdjustment.employee?.last_name}?`}
           confirmText="Approve"
-          variant="success"
+          variant="info"
         />
       )}
 

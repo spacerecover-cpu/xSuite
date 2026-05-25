@@ -225,7 +225,6 @@ export const DOCUMENT_TRANSLATIONS = {
     ibanLabel: 'آيبان:',
     swiftLabel: 'سويفت:',
     paymentTermsTitle: 'شروط الدفع',
-    relatedInvoice: 'الفاتورة المرتبطة',
     amountPaid: 'المبلغ المدفوع',
     amountPaidLabel: 'المبلغ المدفوع:',
     balanceDueLabel: 'الرصيد المستحق:',
@@ -1414,7 +1413,8 @@ export function getTranslation(
   languageCode: LanguageCode | null
 ): string | null {
   if (!languageCode) return null;
-  return DOCUMENT_TRANSLATIONS[languageCode]?.[key] || null;
+  const translations = DOCUMENT_TRANSLATIONS[languageCode] as Record<string, string> | undefined;
+  return translations?.[key] || null;
 }
 
 export function isRTLLanguage(languageCode: LanguageCode | null): boolean {

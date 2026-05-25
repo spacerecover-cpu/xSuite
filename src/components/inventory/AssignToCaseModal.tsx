@@ -109,9 +109,8 @@ export function AssignToCaseModal({
   };
 
   const caseOptions = cases.map((c) => ({
-    value: c.id,
-    label: `${c.case_no} - ${c.title}${c.customer_name ? ` (${c.customer_name})` : ''}`,
-    searchText: `${c.case_no} ${c.title} ${c.customer_name || ''}`,
+    id: c.id,
+    name: `${c.case_no} - ${c.title}${c.customer_name ? ` (${c.customer_name})` : ''}`,
   }));
 
   return (
@@ -153,11 +152,12 @@ export function AssignToCaseModal({
               Select Case <span className="text-danger">*</span>
             </label>
             <SearchableSelect
+              label=""
               options={caseOptions}
               value={selectedCaseId}
               onChange={setSelectedCaseId}
               placeholder="Search cases..."
-              disabled={loadingCases || (availability && !availability.available)}
+              disabled={loadingCases || (!!availability && !availability.available)}
             />
             {loadingCases && (
               <p className="text-xs text-slate-500 mt-1">Loading...</p>
@@ -186,7 +186,7 @@ export function AssignToCaseModal({
                 rows={3}
                 className="w-full mt-2 px-2 py-2 border border-slate-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder="Assignment notes..."
-                disabled={loading || (availability && !availability.available)}
+                disabled={loading || (!!availability && !availability.available)}
               />
             )}
           </div>
@@ -202,7 +202,7 @@ export function AssignToCaseModal({
           <div className="flex space-x-2 pt-2">
             <Button
               onClick={onClose}
-              variant="outline"
+              variant="secondary"
               size="sm"
               disabled={loading}
               className="flex-1"

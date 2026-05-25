@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
-import Cropper from 'react-easy-crop';
-import { Point, Area } from 'react-easy-crop/types';
+import Cropper, { Point, Area } from 'react-easy-crop';
 import { Modal } from './Modal';
 import { Button } from './Button';
 import { ZoomIn, ZoomOut, RotateCw } from 'lucide-react';

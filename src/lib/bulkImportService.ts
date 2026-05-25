@@ -126,7 +126,7 @@ export class BulkInventoryImporter {
     try {
       const [brands, deviceTypes, capacities, interfaces, locations, countries, statusTypes, conditionTypes] =
         await Promise.all([
-          supabase.from('catalog_device_brands').select('id, name, aliases').eq('is_active', true),
+          supabase.from('catalog_device_brands').select('id, name').eq('is_active', true),
           supabase.from('catalog_device_types').select('id, name').eq('is_active', true),
           supabase.from('catalog_device_capacities').select('id, name, gb_value').eq('is_active', true),
           supabase.from('catalog_interfaces').select('id, name').eq('is_active', true),
@@ -139,12 +139,6 @@ export class BulkInventoryImporter {
       brands.data?.forEach((brand) => {
         const nameLower = brand.name.toLowerCase().trim();
         this.cache.brands.set(nameLower, brand.id);
-
-        if (brand.aliases && Array.isArray(brand.aliases)) {
-          brand.aliases.forEach((alias: string) => {
-            this.cache.brands.set(alias.toLowerCase().trim(), brand.id);
-          });
-        }
       });
 
       deviceTypes.data?.forEach((type) => {
@@ -517,7 +511,7 @@ export class BulkInventoryImporter {
     try {
       const { data, error } = await supabase
         .from('inventory_items')
-        .insert(records)
+        .insert(records as never)
         .select('id');
 
       if (error) {

@@ -214,7 +214,7 @@ export const ClientPortalSettings: React.FC = () => {
     setTimeout(() => setCopiedUrl(false), 2000);
   };
 
-  const updateField = (field: keyof PortalSettings, value: string | boolean) => {
+  const updateField = (field: keyof PortalSettings, value: string | boolean | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setUrlError(null);
   };
@@ -346,6 +346,7 @@ export const ClientPortalSettings: React.FC = () => {
         <CollapsibleSection
           title="Portal Base Configuration"
           icon={Globe}
+          color="rgb(var(--color-primary))"
           isOpen={openSections.has('base_config')}
           onToggle={() => toggleSection('base_config')}
         >
@@ -409,7 +410,7 @@ export const ClientPortalSettings: React.FC = () => {
             </div>
 
             <div className="flex gap-3">
-              <Button onClick={handleTestUrl} variant="outline" disabled={testingUrl}>
+              <Button onClick={handleTestUrl} variant="secondary" disabled={testingUrl}>
                 {testingUrl ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -495,6 +496,7 @@ export const ClientPortalSettings: React.FC = () => {
         <CollapsibleSection
           title="Security & Authentication"
           icon={Lock}
+          color="rgb(var(--color-primary))"
           isOpen={openSections.has('security')}
           onToggle={() => toggleSection('security')}
         >
@@ -555,6 +557,7 @@ export const ClientPortalSettings: React.FC = () => {
         <CollapsibleSection
           title="Portal Features"
           icon={SettingsIcon}
+          color="rgb(var(--color-primary))"
           isOpen={openSections.has('features')}
           onToggle={() => toggleSection('features')}
         >
@@ -632,6 +635,7 @@ export const ClientPortalSettings: React.FC = () => {
         <CollapsibleSection
           title="Contact & Support"
           icon={Mail}
+          color="rgb(var(--color-primary))"
           isOpen={openSections.has('contact')}
           onToggle={() => toggleSection('contact')}
         >
@@ -667,6 +671,7 @@ export const ClientPortalSettings: React.FC = () => {
         <CollapsibleSection
           title="Legal & Compliance"
           icon={FileText}
+          color="rgb(var(--color-primary))"
           isOpen={openSections.has('legal')}
           onToggle={() => toggleSection('legal')}
         >

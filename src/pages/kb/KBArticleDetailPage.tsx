@@ -46,9 +46,6 @@ function VersionItem({
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-xs text-gray-500">{formatDate(version.created_at || '')}</div>
-            {version.change_notes && (
-              <div className="text-xs text-gray-700 truncate">{version.change_notes}</div>
-            )}
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -107,8 +104,8 @@ export const KBArticleDetailPage: React.FC = () => {
   const restoreMutation = useMutation({
     mutationFn: (version: KBArticleVersion) =>
       updateKBArticle(id!, {
-        title: version.title,
-        content: version.content,
+        title: version.title ?? undefined,
+        content: version.content ?? undefined,
         author_id: profile!.id,
         change_notes: `Restored from version ${version.version_number}`,
       }),

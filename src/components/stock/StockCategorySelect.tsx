@@ -22,11 +22,11 @@ export function StockCategorySelect({
     queryFn: () => getStockCategories(type),
   });
 
-  const parentCategories = categories.filter((c) => !c.parent_category_id);
-  const childCategories = categories.filter((c) => c.parent_category_id);
+  const parentCategories = categories.filter((c) => !c.parent_id);
+  const childCategories = categories.filter((c) => c.parent_id);
 
   const getChildren = (parentId: string): StockCategory[] =>
-    childCategories.filter((c) => c.parent_category_id === parentId);
+    childCategories.filter((c) => c.parent_id === parentId);
 
   const renderOptions = () => {
     const options: React.ReactNode[] = [];
@@ -56,7 +56,7 @@ export function StockCategorySelect({
     }
 
     const orphans = childCategories.filter(
-      (c) => !parentCategories.find((p) => p.id === c.parent_category_id)
+      (c) => !parentCategories.find((p) => p.id === c.parent_id)
     );
     for (const orphan of orphans) {
       options.push(

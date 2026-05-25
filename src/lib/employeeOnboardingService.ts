@@ -166,7 +166,7 @@ export async function updateTask(id: string, updates: OnboardingTaskUpdate) {
 export async function completeTask(id: string) {
   return updateTask(id, {
     status: 'completed',
-    completed_date: new Date().toISOString().split('T')[0],
+    completed_at: new Date().toISOString(),
   });
 }
 
@@ -177,24 +177,19 @@ export async function assignChecklistToEmployee(
 ) {
   const items = await getChecklistItems(checklistId);
 
+  void startDate;
   const tasks = items.map(item => ({
     employee_id: employeeId,
     checklist_item_id: item.id,
-    task_name: item.task_name,
-    task_description: item.task_description,
+    title: item.title,
+    description: item.description,
     status: 'pending' as const,
-    due_date: item.due_days_from_start
-      ? new Date(
-          new Date(startDate).getTime() + item.due_days_from_start * 24 * 60 * 60 * 1000
-        )
-          .toISOString()
-          .split('T')[0]
-      : null,
+    due_date: null,
   }));
 
   const { data, error } = await supabase
     .from('onboarding_tasks')
-    .insert(tasks)
+    .insert(tasks as never)
     .select();
 
   if (error) throw error;

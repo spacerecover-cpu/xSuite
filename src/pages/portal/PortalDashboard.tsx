@@ -122,7 +122,7 @@ export const PortalDashboard: React.FC = () => {
     enabled: !!customer?.id,
   });
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | null) => {
     switch (status) {
       case 'received':
       case 'diagnosis':
@@ -143,7 +143,8 @@ export const PortalDashboard: React.FC = () => {
     }
   };
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityColor = (priority: string | null) => {
+    if (!priority) return '#64748b';
     const priorityItem = casePriorities.find(
       p => p.name.toLowerCase() === priority.toLowerCase()
     );
@@ -228,9 +229,10 @@ export const PortalDashboard: React.FC = () => {
           </div>
           <div className="space-y-3">
             {pendingQuotes.map((quote) => {
-              const caseRel = Array.isArray((quote as { cases?: unknown }).cases)
-                ? (quote as { cases: Array<{ case_no: string; title: string }> }).cases[0]
-                : (quote as { cases: { case_no: string; title: string } }).cases;
+              const casesField = (quote as { cases?: unknown }).cases;
+              const caseRel = Array.isArray(casesField)
+                ? (casesField[0] as { case_no: string | null; title: string | null } | undefined)
+                : (casesField as { case_no: string | null; title: string | null } | null | undefined);
               return (
                 <div
                   key={quote.id}

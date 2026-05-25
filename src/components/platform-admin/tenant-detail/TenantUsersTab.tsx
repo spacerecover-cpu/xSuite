@@ -12,15 +12,25 @@ interface TenantUsersTabProps {
   tenantId: string;
 }
 
+interface TenantUserRow {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  role: string | null;
+  last_login_at: string | null;
+  created_at: string;
+}
+
 export const TenantUsersTab: React.FC<TenantUsersTabProps> = ({ tenantId }) => {
-  const { data: users = [], isLoading } = useQuery({
+  const { data: usersRaw = [], isLoading } = useQuery({
     queryKey: platformAdminKeys.tenantUsers(tenantId),
     queryFn: () => getTenantUsers(tenantId),
   });
+  const users = usersRaw as unknown as TenantUserRow[];
 
-  const getRoleBadgeVariant = (role: string) => {
+  const getRoleBadgeVariant = (role: string | null): 'danger' | 'warning' | 'info' | 'default' => {
     switch (role) {
-      case 'admin': return 'error';
+      case 'admin': return 'danger';
       case 'manager': return 'warning';
       case 'engineer': return 'info';
       case 'viewer': return 'default';
@@ -47,40 +57,50 @@ export const TenantUsersTab: React.FC<TenantUsersTabProps> = ({ tenantId }) => {
 
   return (
     <Card>
-      <Table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Last Login</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((user) => (
-            <tr key={user.id}>
-              <td className="font-medium">{user.full_name || 'N/A'}</td>
-              <td className="text-slate-600">{user.email}</td>
-              <td>
-                <Badge variant={getRoleBadgeVariant(user.role)}>
-                  {user.role?.toUpperCase()}
-                </Badge>
-              </td>
-              <td className="text-slate-600">
-                {user.last_sign_in_at
-                  ? formatDistanceToNow(new Date(user.last_sign_in_at)) + ' ago'
+      <Table
+        data={users}
+        columns={[
+          {
+            key: 'full_name',
+            header: 'Name',
+            render: (user) => <span className="font-medium">{user.full_name || 'N/A'}</span>,
+          },
+          {
+            key: 'email',
+            header: 'Email',
+            render: (user) => <span className="text-slate-600">{user.email}</span>,
+          },
+          {
+            key: 'role',
+            header: 'Role',
+            render: (user) => (
+              <Badge variant={getRoleBadgeVariant(user.role)}>
+                {user.role?.toUpperCase() ?? '-'}
+              </Badge>
+            ),
+          },
+          {
+            key: 'last_login_at',
+            header: 'Last Login',
+            render: (user) => (
+              <span className="text-slate-600">
+                {user.last_login_at
+                  ? formatDistanceToNow(new Date(user.last_login_at)) + ' ago'
                   : 'Never'}
-              </td>
-              <td>
-                <Badge variant={user.last_sign_in_at ? 'success' : 'default'}>
-                  {user.last_sign_in_at ? 'Active' : 'Inactive'}
-                </Badge>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
+              </span>
+            ),
+          },
+          {
+            key: 'status',
+            header: 'Status',
+            render: (user) => (
+              <Badge variant={user.last_login_at ? 'success' : 'default'}>
+                {user.last_login_at ? 'Active' : 'Inactive'}
+              </Badge>
+            ),
+          },
+        ]}
+      />
     </Card>
   );
 };

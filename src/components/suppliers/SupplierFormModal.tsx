@@ -40,10 +40,10 @@ interface SupplierFormModalProps {
 }
 
 export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier }: SupplierFormModalProps) {
-  const { showToast } = useToast();
+  const toast = useToast();
   const [loading, setLoading] = useState(false);
-  const [categories, setCategories] = useState<Array<{ id: number; name: string; is_active?: boolean }>>([]);
-  const [paymentTerms, setPaymentTerms] = useState<Array<{ id: number; name: string; days: number; is_active?: boolean }>>([]);
+  const [categories, setCategories] = useState<Array<{ id: string; name: string; is_active?: boolean }>>([]);
+  const [paymentTerms, setPaymentTerms] = useState<Array<{ id: string; name: string; days: number | null; is_active?: boolean }>>([]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -136,36 +136,57 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const supplierData = {
-        ...formData,
-        category_id: formData.category_id ? parseInt(formData.category_id) : null,
-        payment_terms_id: formData.payment_terms_id ? parseInt(formData.payment_terms_id) : null,
+      // Only persist columns that exist on suppliers; UI-only fields (state,
+      // zip_code, country, description, primary_contact_*, preferred_shipping_method,
+      // is_approved) are dropped here.
+      const supplierUpdate = {
+        name: formData.name,
+        supplier_number: formData.supplier_number,
+        email: formData.email || null,
+        phone: formData.phone || null,
+        address: formData.address || null,
+        website: formData.website || null,
+        tax_number: formData.tax_id || null,
+        category_id: formData.category_id || null,
+        payment_terms_id: formData.payment_terms_id || null,
+        contact_person: formData.primary_contact_name || null,
+        contact_email: formData.primary_contact_email || null,
+        contact_phone: formData.primary_contact_phone || null,
+        notes: formData.description || null,
+        is_active: formData.is_active,
         updated_by: user.id,
         updated_at: new Date().toISOString(),
       };
 
-      if (supplier) {
+      if (supplier && supplier.id) {
         const { error } = await supabase
           .from('suppliers')
-          .update(supplierData)
+          .update(supplierUpdate)
           .eq('id', supplier.id);
 
         if (error) throw error;
-        showToast('Supplier updated successfully', 'success');
+        toast.success('Supplier updated successfully');
       } else {
+        const { data: tenantId, error: tenantErr } = await supabase.rpc('get_current_tenant_id');
+        if (tenantErr || !tenantId) throw new Error('Unable to resolve current tenant');
+
         const { error } = await supabase
           .from('suppliers')
-          .insert([{ ...supplierData, created_by: user.id }]);
+          .insert({
+            ...supplierUpdate,
+            tenant_id: tenantId,
+            created_by: user.id,
+          });
 
         if (error) throw error;
-        showToast('Supplier created successfully', 'success');
+        toast.success('Supplier created successfully');
       }
 
       onSuccess();
       onClose();
     } catch (error: unknown) {
       logger.error('Error saving supplier:', error);
-      showToast(error instanceof Error ? error.message : 'Failed to save supplier', 'error');
+      toast.error(error instanceof Error ? error.message : 'Failed to save supplier');
     } finally {
       setLoading(false);
     }
@@ -449,7 +470,7 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
           <Button type="submit" disabled={loading}>

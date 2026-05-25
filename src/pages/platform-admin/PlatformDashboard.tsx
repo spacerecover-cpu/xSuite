@@ -61,67 +61,60 @@ export const PlatformDashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div onClick={() => navigate('/platform-admin/tenants')} className="cursor-pointer">
+          <StatsCard
+            title="Total Tenants"
+            value={String(stats?.totalTenants ?? 0)}
+            icon={Users}
+            color="blue"
+          />
+        </div>
         <StatsCard
-          label="Total Tenants"
-          value={stats?.totalTenants || 0}
+          title="Active Tenants"
+          value={String(stats?.activeTenants ?? 0)}
           icon={Users}
-          color="text-primary"
-          bgColor="bg-info-muted"
-          onClick={() => navigate('/platform-admin/tenants')}
+          color="green"
         />
         <StatsCard
-          label="Active Tenants"
-          value={stats?.activeTenants || 0}
-          icon={Users}
-          color="text-success"
-          bgColor="bg-success-muted"
-        />
-        <StatsCard
-          label="Monthly Recurring Revenue"
+          title="Monthly Recurring Revenue"
           value={formatCurrency(stats?.mrr || 0)}
           icon={DollarSign}
-          color="text-success"
-          bgColor="bg-success-muted"
+          color="green"
         />
         <StatsCard
-          label="Annual Recurring Revenue"
+          title="Annual Recurring Revenue"
           value={formatCurrency(stats?.arr || 0)}
           icon={TrendingUp}
-          color="text-primary"
-          bgColor="bg-info-muted"
+          color="blue"
         />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
-          label="Total Users"
-          value={stats?.totalUsers || 0}
+          title="Total Users"
+          value={String(stats?.totalUsers ?? 0)}
           icon={Users}
-          color="text-slate-600"
-          bgColor="bg-slate-50"
         />
         <StatsCard
-          label="Active Users Today"
-          value={stats?.activeUsersToday || 0}
+          title="Active Users Today"
+          value={String(stats?.activeUsersToday ?? 0)}
           icon={Users}
-          color="text-success"
-          bgColor="bg-success-muted"
+          color="green"
         />
         <StatsCard
-          label="Trial Tenants"
-          value={stats?.trialTenants || 0}
+          title="Trial Tenants"
+          value={String(stats?.trialTenants ?? 0)}
           icon={Users}
-          color="text-warning"
-          bgColor="bg-warning-muted"
+          color="orange"
         />
-        <StatsCard
-          label="Open Support Tickets"
-          value={stats?.openTickets || 0}
-          icon={Ticket}
-          color="text-accent-foreground"
-          bgColor="bg-accent/20"
-          onClick={() => navigate('/platform-admin/tickets')}
-        />
+        <div onClick={() => navigate('/platform-admin/tickets')} className="cursor-pointer">
+          <StatsCard
+            title="Open Support Tickets"
+            value={String(stats?.openTickets ?? 0)}
+            icon={Ticket}
+            color="purple"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -218,8 +211,8 @@ export const PlatformDashboard: React.FC = () => {
                   <tr key={tenant.id} className="hover:bg-slate-50">
                     <td className="px-6 py-4">
                       <div>
-                        <p className="font-medium text-slate-900">{tenant.company_name}</p>
-                        <p className="text-sm text-slate-600">{tenant.email}</p>
+                        <p className="font-medium text-slate-900">{tenant.name}</p>
+                        <p className="text-sm text-slate-600">{tenant.slug}</p>
                       </div>
                     </td>
                     <td className="px-6 py-4">

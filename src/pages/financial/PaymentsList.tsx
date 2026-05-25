@@ -25,11 +25,9 @@ import {
   XCircle,
   CheckCircle,
   AlertCircle,
-  Briefcase,
   Download,
   MoreVertical,
   Printer,
-  ExternalLink,
   TrendingUp,
   BarChart3,
 } from 'lucide-react';
@@ -199,7 +197,7 @@ export const PaymentsList: React.FC = () => {
     const headers = ['Payment #', 'Date', 'Customer', 'Amount', 'Method', 'Reference', 'Status'];
     const rows = payments.map(p => [
       p.payment_number,
-      formatDate(p.payment_date),
+      p.payment_date ? formatDate(p.payment_date) : '',
       p.customer?.customer_name || 'N/A',
       p.amount,
       p.payment_method?.name || 'N/A',
@@ -263,7 +261,7 @@ export const PaymentsList: React.FC = () => {
 
   const totalPayments = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
   const completedPayments = payments.filter(p => p.status === 'completed');
-  const todayPayments = payments.filter(p => new Date(p.payment_date).toDateString() === new Date().toDateString());
+  const todayPayments = payments.filter(p => p.payment_date && new Date(p.payment_date).toDateString() === new Date().toDateString());
   const pendingPayments = payments.filter(p => p.status === 'pending');
 
   if (isLoading) {
@@ -472,7 +470,7 @@ export const PaymentsList: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {payments.map((payment: { id: string; payment_number: string; payment_date: string; amount: number; status: string; customer?: { customer_name?: string }; payment_method?: { name?: string }; bank_account?: { account_name?: string }; reference?: string }) => (
+                {payments.map((payment) => (
                   <tr
                     key={payment.id}
                     className="hover:bg-slate-50 transition-colors"
@@ -481,24 +479,11 @@ export const PaymentsList: React.FC = () => {
                       <span className="font-semibold text-primary">{payment.payment_number}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                      {formatDate(payment.payment_date)}
+                      {payment.payment_date ? formatDate(payment.payment_date) : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {payment.case ? (
-                        <div className="flex items-center gap-2">
-                          <Briefcase className="w-4 h-4 text-slate-400" />
-                          <div>
-                            <span className="text-sm font-medium text-primary">
-                              {payment.case.case_no}
-                            </span>
-                            <p className="text-xs text-slate-500 truncate max-w-[150px]">
-                              {payment.case.title}
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-slate-400">-</span>
-                      )}
+                      {/* payments has no case_id column in v1.0.0 (linkage flows via invoice.case_id). */}
+                      <span className="text-sm text-slate-400">-</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
@@ -524,12 +509,12 @@ export const PaymentsList: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <Badge
                         variant="custom"
-                        color={getStatusColor(payment.status)}
+                        color={getStatusColor(payment.status ?? '')}
                         size="sm"
                         className="flex items-center gap-1"
                       >
-                        {getStatusIcon(payment.status)}
-                        {payment.status}
+                        {getStatusIcon(payment.status ?? '')}
+                        {payment.status ?? 'unknown'}
                       </Badge>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -583,18 +568,7 @@ export const PaymentsList: React.FC = () => {
                                   <Eye className="w-4 h-4" />
                                   View Full Details
                                 </button>
-                                {payment.case_id && (
-                                  <button
-                                    onClick={() => {
-                                      window.location.href = `/cases/${payment.case_id}`;
-                                      setOpenDropdown(null);
-                                    }}
-                                    className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                                  >
-                                    <ExternalLink className="w-4 h-4" />
-                                    View Related Case
-                                  </button>
-                                )}
+                                {/* payments has no case_id column in v1.0.0 — case linkage is via invoice. */}
                                 <div className="border-t border-slate-200 my-1" />
                                 {payment.status === 'completed' && (
                                   <button

@@ -25,11 +25,7 @@ const getEmployeeName = (record: RecordRow): string => {
 
 const getEmployeeNumber = (record: RecordRow): string => record.employee?.employee_number ?? '';
 
-const getDepartmentName = (record: RecordRow): string => {
-  const department = record.employee?.department;
-  if (!department) return '';
-  return Array.isArray(department) ? (department[0]?.name ?? '') : (department.name ?? '');
-};
+const getDepartmentName = (_record: RecordRow): string => '';
 
 export default function PayrollPeriodDetailPage() {
   const { id } = useParams<{ id: string }>();

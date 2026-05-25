@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { supabase } from '../../lib/supabaseClient';
+import { bankingService } from '../../lib/bankingService';
 import { useAccountingLocale } from '../../hooks/useAccountingLocale';
 import { AlertCircle, ArrowRight } from 'lucide-react';
 
@@ -34,16 +34,7 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
 
   const { data: accounts = [] } = useQuery({
     queryKey: ['active_accounts'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('bank_accounts')
-        .select('id, account_name:name, account_type, current_balance')
-        .eq('is_active', true)
-        .is('deleted_at', null)
-        .order('name');
-      if (error) throw error;
-      return data || [];
-    },
+    queryFn: async () => bankingService.getAccounts({ is_active: true }),
   });
 
   const fromAccount = accounts.find(a => a.id === formData.from_account_id);
@@ -128,7 +119,7 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
               required
             >
               <option value="">Select Source</option>
-              {accounts.map((acc: { id: string; account_name: string; current_balance: number; currency?: string }) => (
+              {accounts.map((acc) => (
                 <option key={acc.id} value={acc.id}>
                   {acc.account_name} - Balance: {formatCurrencyValue(acc.current_balance)}
                 </option>
@@ -156,7 +147,7 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
               <option value="">Select Destination</option>
               {accounts
                 .filter(a => a.id !== formData.from_account_id)
-                .map((acc: { id: string; account_name: string; current_balance: number; currency?: string }) => (
+                .map((acc) => (
                   <option key={acc.id} value={acc.id}>
                     {acc.account_name} - Balance: {formatCurrencyValue(acc.current_balance)}
                   </option>

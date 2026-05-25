@@ -284,7 +284,7 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
           </Button>
           <Button
             type="submit"
-            variant="outline"
+            variant="primary"
             disabled={isSubmitting || amount <= 0}
             className="flex items-center gap-2"
           >

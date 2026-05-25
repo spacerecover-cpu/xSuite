@@ -12,6 +12,9 @@ import {
 } from '../../lib/importExportService';
 import { supabase } from '../../lib/supabaseClient';
 import { logger } from '../../lib/logger';
+import type { Database } from '../../types/database.types';
+
+type TableName = keyof Database['public']['Tables'];
 
 interface ExportWizardProps {
   entityType: EntityType;
@@ -33,8 +36,19 @@ export const ExportWizard: React.FC<ExportWizardProps> = ({ entityType, onClose 
 
   const exportMutation = useMutation({
     mutationFn: async () => {
-      // Fetch data from database first (skip job creation if table doesn't exist)
-      let query = supabase.from(config.tableName).select('*');
+      // Fetch data from database first. The dynamic table name expands into a
+      // 200+ table union that triggers TS2589 (excessively deep) — narrow the
+      // builder type once via an unknown-cast so subsequent filter calls don't
+      // re-trigger union expansion.
+      type LooseBuilder = {
+        select: (cols: string) => LooseBuilder;
+        gte: (column: string, value: string) => LooseBuilder;
+        lte: (column: string, value: string) => LooseBuilder;
+        then: <T>(onFulfilled: (value: { data: unknown[] | null; error: { message: string } | null }) => T) => Promise<T>;
+      };
+      type LooseClient = { from: (table: string) => LooseBuilder };
+      const sb = supabase as unknown as LooseClient;
+      let query: LooseBuilder = sb.from(config.tableName as TableName).select('*');
 
       // Apply date filters if specified
       if (dateFrom) {
@@ -44,14 +58,14 @@ export const ExportWizard: React.FC<ExportWizardProps> = ({ entityType, onClose 
         query = query.lte('created_at', dateTo);
       }
 
-      const { data, error } = await query;
+      const { data, error } = (await query) as unknown as { data: unknown[] | null; error: { message: string } | null };
       if (error) {
         logger.error('Export error:', error);
         throw new Error(`Failed to export ${config.label}: ${error.message}`);
       }
 
       // Generate CSV
-      const csvContent = exportToCSV(data || [], selectedColumns.length > 0 ? selectedColumns : undefined);
+      const csvContent = exportToCSV((data || []) as unknown as Record<string, any>[], selectedColumns.length > 0 ? selectedColumns : undefined);
 
       // Create blob and download
       const blob = new Blob([csvContent], { type: 'text/csv' });

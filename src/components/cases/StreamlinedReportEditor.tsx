@@ -47,7 +47,12 @@ interface StreamlinedReportEditorProps {
     diagnostic_notes?: string;
   };
   reportId?: string;
-  existingReport?: Record<string, unknown>;
+  existingReport?: {
+    id?: string;
+    report_type?: string;
+    report_template_id?: string;
+    [key: string]: unknown;
+  };
   onSuccess: () => void;
 }
 
@@ -176,11 +181,12 @@ export function StreamlinedReportEditor({
       ]);
 
       if (reportData) {
-        const reportConfig = REPORT_TYPES[reportData.report_type || reportType];
+        const effectiveReportType = (reportData.report_type as ReportType | undefined) || reportType;
+        const reportConfig = REPORT_TYPES[effectiveReportType];
         setReportTitle(reportConfig.name);
 
         if (reportData.report_template_id) {
-          await loadSectionsFromDatabase(reportData.report_template_id);
+          await loadSectionsFromDatabase(reportData.report_template_id as string);
 
           const loadedSections: Record<string, string> = {};
           sectionsData.forEach((section: { section_key: string; section_content?: string }) => {

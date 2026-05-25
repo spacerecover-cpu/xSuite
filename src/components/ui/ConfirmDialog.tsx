@@ -87,7 +87,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
             <div className="flex gap-3 justify-end">
               <Button
-                variant="outline"
+                variant="ghost"
                 onClick={onClose}
                 disabled={isLoading}
               >

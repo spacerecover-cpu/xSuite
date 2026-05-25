@@ -5,8 +5,9 @@ import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { SearchableSelect } from '../../components/ui/SearchableSelect';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase, getTenantId } from '../../lib/supabaseClient';
 import { logger } from '../../lib/logger';
+import type { Database, Json } from '../../types/database.types';
 
 interface DonorSearchCriteria {
   brand_id: string;
@@ -18,24 +19,8 @@ interface DonorSearchCriteria {
   interface_id: string;
 }
 
-interface DonorDrive {
-  id: string;
-  inventory_code: string;
-  name: string;
-  brand_name: string;
-  model: string;
-  capacity_name: string;
-  pcb_number: string;
-  dcm: string;
-  firmware_version: string;
-  interface_name: string;
-  quantity_available: number;
-  reserved_quantity: number;
-  true_available: number;
-  condition_rating: number;
-  usable_donor_parts: Record<string, boolean> | null;
-  compatibility_score: number;
-}
+type DonorDrive = Database['public']['Functions']['search_donor_drives']['Returns'][number];
+type SearchTemplateRow = Database['public']['Tables']['inventory_search_templates']['Row'];
 
 export default function DonorSearchPage() {
   const [criteria, setCriteria] = useState<DonorSearchCriteria>({
@@ -50,10 +35,10 @@ export default function DonorSearchPage() {
 
   const [results, setResults] = useState<DonorDrive[]>([]);
   const [loading, setLoading] = useState(false);
-  const [brands, setBrands] = useState<any[]>([]);
-  const [capacities, setCapacities] = useState<any[]>([]);
-  const [interfaces, setInterfaces] = useState<any[]>([]);
-  const [searchTemplates, setSearchTemplates] = useState<any[]>([]);
+  const [brands, setBrands] = useState<Array<{ id: string; name: string }>>([]);
+  const [capacities, setCapacities] = useState<Array<{ id: string; name: string }>>([]);
+  const [interfaces, setInterfaces] = useState<Array<{ id: string; name: string }>>([]);
+  const [searchTemplates, setSearchTemplates] = useState<SearchTemplateRow[]>([]);
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [templateName, setTemplateName] = useState('');
   const [templateDescription, setTemplateDescription] = useState('');
@@ -84,7 +69,7 @@ export default function DonorSearchPage() {
       const { data } = await supabase
         .from('inventory_search_templates')
         .select('*')
-        .order('usage_count', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (data) setSearchTemplates(data);
     } catch (error) {
@@ -95,19 +80,21 @@ export default function DonorSearchPage() {
   const handleSearch = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('search_donor_drives', {
-        p_brand_id: criteria.brand_id ? parseInt(criteria.brand_id) : null,
-        p_model: criteria.model || null,
-        p_capacity_id: criteria.capacity_id ? parseInt(criteria.capacity_id) : null,
-        p_pcb_number: criteria.pcb_number || null,
-        p_dcm: criteria.dcm || null,
-        p_firmware: criteria.firmware_version || null,
-        p_interface_id: criteria.interface_id ? parseInt(criteria.interface_id) : null,
-        p_limit: 50,
-      });
+      const p_criteria: Json = {
+        brand_id: criteria.brand_id || null,
+        model: criteria.model || null,
+        capacity_id: criteria.capacity_id || null,
+        pcb_number: criteria.pcb_number || null,
+        dcm: criteria.dcm || null,
+        firmware: criteria.firmware_version || null,
+        interface_id: criteria.interface_id || null,
+        limit: 50,
+      };
+
+      const { data, error } = await supabase.rpc('search_donor_drives', { p_criteria });
 
       if (error) throw error;
-      setResults(data || []);
+      setResults(data ?? []);
     } catch (error) {
       logger.error('Error searching donor drives:', error);
       setResults([]);
@@ -134,11 +121,14 @@ export default function DonorSearchPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      const tenantId = getTenantId();
+      if (!tenantId) return;
+
       await supabase.from('inventory_search_templates').insert({
         name: templateName,
-        description: templateDescription,
-        search_criteria: criteria,
+        criteria: { ...criteria, description: templateDescription } as Json,
         created_by: user.id,
+        tenant_id: tenantId,
       });
 
       setShowSaveTemplate(false);
@@ -150,24 +140,24 @@ export default function DonorSearchPage() {
     }
   };
 
-  const handleLoadTemplate = async (template: { id: string; search_criteria: DonorSearchCriteria; usage_count: number }) => {
-    setCriteria(template.search_criteria);
-
-    await supabase
-      .from('inventory_search_templates')
-      .update({ usage_count: template.usage_count + 1 })
-      .eq('id', template.id);
+  const handleLoadTemplate = async (template: SearchTemplateRow) => {
+    const raw = template.criteria as Record<string, unknown> | null;
+    if (raw && typeof raw === 'object') {
+      const loaded: DonorSearchCriteria = {
+        brand_id: typeof raw.brand_id === 'string' ? raw.brand_id : '',
+        model: typeof raw.model === 'string' ? raw.model : '',
+        capacity_id: typeof raw.capacity_id === 'string' ? raw.capacity_id : '',
+        pcb_number: typeof raw.pcb_number === 'string' ? raw.pcb_number : '',
+        dcm: typeof raw.dcm === 'string' ? raw.dcm : '',
+        firmware_version: typeof raw.firmware_version === 'string' ? raw.firmware_version : '',
+        interface_id: typeof raw.interface_id === 'string' ? raw.interface_id : '',
+      };
+      setCriteria(loaded);
+    }
   };
 
-  const getCompatibilityColor = (score: number) => {
-    if (score >= 80) return 'bg-success-muted text-success border-success/30';
-    if (score >= 50) return 'bg-info-muted text-info border-info/30';
-    if (score >= 30) return 'bg-warning-muted text-warning border-warning/30';
-    return 'bg-gray-100 text-gray-800 border-gray-300';
-  };
-
-  const renderUsableParts = (parts: Record<string, boolean> | null) => {
-    if (!parts) return null;
+  const renderUsableParts = (parts: Json | null) => {
+    if (!parts || typeof parts !== 'object' || Array.isArray(parts)) return null;
     const usableParts = Object.entries(parts)
       .filter(([, value]) => value === true)
       .map(([key]) => key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()));
@@ -177,7 +167,7 @@ export default function DonorSearchPage() {
     return (
       <div className="flex flex-wrap gap-1">
         {usableParts.map((part, index) => (
-          <Badge key={index} variant="outline" className="text-xs">
+          <Badge key={index} variant="default" className="text-xs">
             {part}
           </Badge>
         ))}
@@ -198,7 +188,7 @@ export default function DonorSearchPage() {
         </div>
         <Button
           onClick={() => setShowSaveTemplate(true)}
-          variant="outline"
+          variant="secondary"
           disabled={activeCriteriaCount === 0}
         >
           <Save className="w-4 h-4 mr-2" />
@@ -222,7 +212,6 @@ export default function DonorSearchPage() {
                 className="px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center space-x-2"
               >
                 <span>{template.name}</span>
-                <span className="text-xs text-slate-500">({template.usage_count} uses)</span>
               </button>
             ))}
           </div>
@@ -240,7 +229,7 @@ export default function DonorSearchPage() {
               </Badge>
             )}
           </h3>
-          <Button variant="outline" size="sm" onClick={handleClearCriteria}>
+          <Button variant="secondary" size="sm" onClick={handleClearCriteria}>
             <X className="w-4 h-4 mr-2" />
             Clear All
           </Button>
@@ -344,20 +333,10 @@ export default function DonorSearchPage() {
               >
                 <div className="grid grid-cols-12 gap-4 items-start">
                   <div className="col-span-12 lg:col-span-3">
-                    <div className="flex items-center space-x-2 mb-3">
-                      <Badge className={`${getCompatibilityColor(drive.compatibility_score)} border`}>
-                        {drive.compatibility_score}% Match
-                      </Badge>
-                      {drive.condition_rating && (
-                        <Badge variant="outline">
-                          {drive.condition_rating}/5
-                        </Badge>
-                      )}
-                    </div>
                     <div className="bg-info-muted border-l-4 border-info rounded px-3 py-2 mb-2">
                       <div className="text-xs font-semibold text-info uppercase tracking-wider mb-0.5">Inventory ID</div>
                       <div className="text-base font-bold text-info font-mono tracking-wide">
-                        {drive.inventory_code}
+                        {drive.item_number ?? drive.id.slice(0, 8)}
                       </div>
                     </div>
                     <div className="text-xs text-slate-500">{drive.name}</div>
@@ -365,17 +344,13 @@ export default function DonorSearchPage() {
 
                   <div className="col-span-12 lg:col-span-4">
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                      <dt className="text-slate-500">Brand:</dt>
-                      <dd className="font-medium text-slate-900">{drive.brand_name || 'N/A'}</dd>
-
                       <dt className="text-slate-500">Model:</dt>
                       <dd className="font-medium text-slate-900">{drive.model || 'N/A'}</dd>
 
-                      <dt className="text-slate-500">Capacity:</dt>
-                      <dd className="font-medium text-slate-900">{drive.capacity_name || 'N/A'}</dd>
-
-                      <dt className="text-slate-500">Interface:</dt>
-                      <dd className="font-medium text-slate-900">{drive.interface_name || 'N/A'}</dd>
+                      <dt className="text-slate-500">Serial:</dt>
+                      <dd className="font-medium text-slate-900 font-mono text-xs">
+                        {drive.serial_number || 'N/A'}
+                      </dd>
                     </dl>
                   </div>
 
@@ -386,9 +361,6 @@ export default function DonorSearchPage() {
                         {drive.pcb_number || 'N/A'}
                       </dd>
 
-                      <dt className="text-slate-500">DCM:</dt>
-                      <dd className="font-medium text-slate-900">{drive.dcm || 'N/A'}</dd>
-
                       <dt className="text-slate-500">Firmware:</dt>
                       <dd className="font-medium text-slate-900">{drive.firmware_version || 'N/A'}</dd>
                     </dl>
@@ -397,17 +369,11 @@ export default function DonorSearchPage() {
                   <div className="col-span-12 lg:col-span-2">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-slate-500">Available:</span>
-                        <span className={`font-bold ${drive.true_available > 0 ? 'text-success' : 'text-danger'}`}>
-                          {drive.true_available}
+                        <span className="text-slate-500">Quantity:</span>
+                        <span className={`font-bold ${(drive.quantity ?? 0) > 0 ? 'text-success' : 'text-danger'}`}>
+                          {drive.quantity ?? 0}
                         </span>
                       </div>
-                      {drive.reserved_quantity > 0 && (
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-slate-500">Reserved:</span>
-                          <span className="font-medium text-warning">{drive.reserved_quantity}</span>
-                        </div>
-                      )}
                       <Button size="sm" className="w-full">
                         View Details
                       </Button>
@@ -416,7 +382,7 @@ export default function DonorSearchPage() {
 
                   <div className="col-span-12 border-t border-slate-100 pt-3">
                     <div className="text-xs text-slate-600 mb-2">Usable Donor Parts:</div>
-                    {renderUsableParts(drive.usable_donor_parts)}
+                    {renderUsableParts(drive.donor_parts_available)}
                   </div>
                 </div>
               </div>
@@ -466,7 +432,7 @@ export default function DonorSearchPage() {
                 />
               </div>
               <div className="flex justify-end space-x-3 pt-4 border-t border-slate-200">
-                <Button variant="outline" onClick={() => setShowSaveTemplate(false)}>
+                <Button variant="secondary" onClick={() => setShowSaveTemplate(false)}>
                   Cancel
                 </Button>
                 <Button onClick={handleSaveTemplate} disabled={!templateName.trim()}>

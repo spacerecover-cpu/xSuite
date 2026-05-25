@@ -22,16 +22,15 @@ interface ChecklistFormData {
   description: string;
   for_position_id: string;
   is_default: boolean;
-  is_active: boolean;
 }
 
 interface ChecklistItemDraft {
   id?: string;
-  task_name: string;
-  task_description: string;
+  title: string;
+  description: string;
   assigned_to_role: string;
-  due_days_from_start: string;
-  order_index: number;
+  is_required: boolean;
+  sort_order: number;
   isNew?: boolean;
 }
 
@@ -56,16 +55,15 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
         description: checklist.description || '',
         for_position_id: checklist.for_position_id || '',
         is_default: checklist.is_default || false,
-        is_active: checklist.is_active !== false,
       });
       setItems(
         (checklist.onboarding_checklist_items || []).map(item => ({
           id: item.id,
-          task_name: item.task_name,
-          task_description: item.task_description || '',
+          title: item.title,
+          description: item.description || '',
           assigned_to_role: item.assigned_to_role || '',
-          due_days_from_start: item.due_days_from_start?.toString() || '0',
-          order_index: item.order_index || 0,
+          is_required: item.is_required ?? true,
+          sort_order: item.sort_order || 0,
         }))
       );
     } else {
@@ -74,7 +72,6 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
         description: '',
         for_position_id: '',
         is_default: false,
-        is_active: true,
       });
       setItems([]);
     }
@@ -88,11 +85,11 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
   const mutation = useMutation({
     mutationFn: async (data: ChecklistFormData) => {
       const payload = {
+        tenant_id: '' as string,
         name: data.name,
         description: data.description || null,
         for_position_id: data.for_position_id || null,
         is_default: data.is_default,
-        is_active: data.is_active,
       };
 
       let checklistId = checklist?.id;
@@ -101,17 +98,19 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
         await updateChecklist(checklistId, payload);
       } else {
         const created = await createChecklist(payload);
+        if (!created) throw new Error('Failed to create checklist');
         checklistId = created.id;
       }
 
       for (const item of items) {
         const itemPayload = {
-          task_name: item.task_name,
-          task_description: item.task_description || null,
+          tenant_id: '' as string,
+          title: item.title,
+          description: item.description || null,
           assigned_to_role: item.assigned_to_role || null,
-          due_days_from_start: parseInt(item.due_days_from_start) || 0,
-          order_index: item.order_index,
-          checklist_id: checklistId!,
+          is_required: item.is_required,
+          sort_order: item.sort_order,
+          checklist_id: checklistId,
         };
 
         if (item.id && !item.isNew) {
@@ -135,11 +134,11 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
     setItems(prev => [
       ...prev,
       {
-        task_name: '',
-        task_description: '',
+        title: '',
+        description: '',
         assigned_to_role: '',
-        due_days_from_start: '1',
-        order_index: prev.length,
+        is_required: true,
+        sort_order: prev.length,
         isNew: true,
       },
     ]);
@@ -159,7 +158,7 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
     setItems(prev => prev.filter((_, i) => i !== index));
   };
 
-  const updateItem = (index: number, field: keyof ChecklistItemDraft, value: string) => {
+  const updateItem = (index: number, field: keyof ChecklistItemDraft, value: string | boolean | number) => {
     setItems(prev =>
       prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
     );
@@ -216,14 +215,6 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
               />
               Default checklist
             </label>
-            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-              <input
-                type="checkbox"
-                {...register('is_active')}
-                className="rounded border-slate-300 text-primary"
-              />
-              Active
-            </label>
           </div>
         </div>
 
@@ -252,13 +243,13 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
                     <GripVertical className="w-4 h-4 text-slate-300 mt-2 flex-shrink-0" />
                     <div className="flex-1 space-y-2">
                       <Input
-                        value={item.task_name}
-                        onChange={e => updateItem(index, 'task_name', e.target.value)}
-                        placeholder="Task name *"
+                        value={item.title}
+                        onChange={e => updateItem(index, 'title', e.target.value)}
+                        placeholder="Task title *"
                       />
                       <Input
-                        value={item.task_description}
-                        onChange={e => updateItem(index, 'task_description', e.target.value)}
+                        value={item.description}
+                        onChange={e => updateItem(index, 'description', e.target.value)}
                         placeholder="Description (optional)"
                       />
                       <div className="grid grid-cols-2 gap-2">
@@ -268,17 +259,15 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
                           placeholder="Assigned role (optional)"
                           className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                         />
-                        <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                           <input
-                            type="number"
-                            value={item.due_days_from_start}
-                            onChange={e => updateItem(index, 'due_days_from_start', e.target.value)}
-                            placeholder="Days"
-                            min="0"
-                            className="w-20 border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                            type="checkbox"
+                            checked={item.is_required}
+                            onChange={e => updateItem(index, 'is_required', e.target.checked)}
+                            className="rounded border-slate-300 text-primary"
                           />
-                          <span className="text-xs text-slate-500">days from start</span>
-                        </div>
+                          Required
+                        </label>
                       </div>
                     </div>
                     <button

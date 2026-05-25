@@ -9,7 +9,7 @@ import { PageHeader } from '../../components/shared/PageHeader';
 import { useToast } from '../../hooks/useToast';
 
 export const PayrollSettingsPage: React.FC = () => {
-  const { showToast } = useToast();
+  const toast = useToast();
   const queryClient = useQueryClient();
 
   const { data: settings, isLoading } = useQuery({
@@ -65,10 +65,10 @@ export const PayrollSettingsPage: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payroll-settings'] });
-      showToast('Payroll settings updated successfully', 'success');
+      toast.success('Payroll settings updated successfully');
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to update settings', 'error');
+      toast.error(error.message || 'Failed to update settings');
     },
   });
 
@@ -76,10 +76,10 @@ export const PayrollSettingsPage: React.FC = () => {
     mutationFn: () => payrollService.resetPayrollSettings(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payroll-settings'] });
-      showToast('Settings reset to defaults', 'success');
+      toast.success('Settings reset to defaults');
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to reset settings', 'error');
+      toast.error(error.message || 'Failed to reset settings');
     },
   });
 

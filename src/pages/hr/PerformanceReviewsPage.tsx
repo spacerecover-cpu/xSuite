@@ -61,12 +61,7 @@ function ReviewCard({
   const posTitle = (emp as { positions?: { title: string } | null } | null)?.positions?.title;
   const reviewerName = review.reviewer?.full_name || 'Unknown Reviewer';
 
-  const periodStart = review.review_period_start
-    ? new Date(review.review_period_start).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
-    : '';
-  const periodEnd = review.review_period_end
-    ? new Date(review.review_period_end).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
-    : '';
+  const period = review.review_period || '';
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow">
@@ -96,7 +91,7 @@ function ReviewCard({
       <div className="text-xs text-slate-500 mb-3 space-y-1">
         <div className="flex items-center gap-2">
           <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-          <span>Period: {periodStart} – {periodEnd}</span>
+          <span>Period: {period || '—'}</span>
         </div>
         <div className="flex items-center gap-2">
           <Users className="w-3.5 h-3.5 flex-shrink-0" />
@@ -111,10 +106,10 @@ function ReviewCard({
         </div>
       )}
 
-      {review.areas_for_improvement && (
+      {review.improvements && (
         <div className="mb-3">
           <p className="text-xs font-medium text-slate-600 mb-1">Areas for Improvement</p>
-          <p className="text-xs text-slate-500 line-clamp-2">{review.areas_for_improvement}</p>
+          <p className="text-xs text-slate-500 line-clamp-2">{review.improvements}</p>
         </div>
       )}
 

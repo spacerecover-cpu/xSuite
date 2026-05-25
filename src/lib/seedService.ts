@@ -26,7 +26,7 @@ interface TableSeedResult {
 
 async function getTableCount(tableName: string): Promise<number> {
   try {
-    const { count, error } = await supabase
+    const { count, error } = await (supabase as never as { from: (t: string) => { select: (s: string, o: { count: 'exact'; head: true }) => Promise<{ count: number | null; error: unknown }> } })
       .from(tableName)
       .select('*', { count: 'exact', head: true });
 
@@ -625,7 +625,7 @@ export async function seedCaseServiceData(): Promise<SeedResult> {
 
       const { error: serviceTypeError, count } = await supabase
         .from('catalog_service_types')
-        .insert(serviceTypeRecords)
+        .insert(serviceTypeRecords as never)
         .select();
 
       if (serviceTypeError) {
@@ -717,7 +717,7 @@ export async function seedCaseServiceData(): Promise<SeedResult> {
 
       const { error: priorityError, count } = await supabase
         .from('master_case_priorities')
-        .insert(casePriorityRecords)
+        .insert(casePriorityRecords as never)
         .select();
 
       if (priorityError) {
@@ -997,7 +997,7 @@ export async function seedTemplates(): Promise<SeedResult> {
               is_default: template.is_default,
               is_active: true,
               created_by: user.id,
-            });
+            } as never);
 
           if (error) {
             logger.error(`Error seeding template ${template.name}:`, error);
@@ -1073,7 +1073,7 @@ export async function getSeedStatistics() {
     const counts: Record<string, number> = {};
 
     for (const table of tables) {
-      const { count, error } = await supabase
+      const { count, error } = await (supabase as never as { from: (t: string) => { select: (s: string, o: { count: 'exact'; head: true }) => Promise<{ count: number | null; error: unknown }> } })
         .from(table)
         .select('*', { count: 'exact', head: true });
 

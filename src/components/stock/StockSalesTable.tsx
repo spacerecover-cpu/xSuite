@@ -89,7 +89,7 @@ export const StockSalesTable: React.FC<StockSalesTableProps> = ({
         <tbody className="divide-y divide-slate-100">
           {sales.map((sale) => {
             const statusCfg =
-              paymentStatusConfig[sale.payment_status ?? 'pending'] ??
+              paymentStatusConfig[sale.status ?? 'pending'] ??
               paymentStatusConfig['pending'];
             const itemCount = sale.stock_sale_items?.length ?? 0;
 
@@ -136,9 +136,7 @@ export const StockSalesTable: React.FC<StockSalesTableProps> = ({
                   </Badge>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap text-slate-600 capitalize">
-                  {sale.payment_method
-                    ? sale.payment_method.replace(/_/g, ' ')
-                    : '—'}
+                  <span className="text-slate-400">—</span>
                 </td>
                 <td className="px-4 py-3 text-center">
                   <Button

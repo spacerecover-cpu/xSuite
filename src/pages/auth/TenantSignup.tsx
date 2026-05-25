@@ -54,7 +54,7 @@ export const TenantSignup = () => {
         }
       } catch (error) {
         toast.error('Failed to load subscription plans');
-        logger.error(error);
+        logger.error(error instanceof Error ? error.message : String(error));
       } finally {
         setPlansLoading(false);
       }
@@ -75,7 +75,7 @@ export const TenantSignup = () => {
         setCountries(data || []);
       } catch (error) {
         toast.error('Failed to load countries');
-        logger.error(error);
+        logger.error(error instanceof Error ? error.message : String(error));
       }
     };
     loadCountries();
@@ -118,7 +118,7 @@ export const TenantSignup = () => {
       navigate('/login');
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'Failed to create account');
-      logger.error(error);
+      logger.error(error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(false);
     }
@@ -257,7 +257,7 @@ export const TenantSignup = () => {
           <FormField
             label="Company Slug"
             required
-            helpText="Used for your unique URL: acme.xsuite.space"
+            hint="Used for your unique URL: acme.xsuite.space"
           >
             <Input
               value={formData.slug}

@@ -33,7 +33,9 @@ export const AddStockSaleToInvoiceModal: React.FC<AddStockSaleToInvoiceModalProp
     queryKey: ['stock-sales-pending', customerId],
     queryFn: () => getStockSales({ customer_id: customerId, status: 'pending' }),
     enabled: isOpen && !!customerId,
-    select: (data) => data.filter((s) => !s.invoice_id),
+    // NOTE: stock_sales has no invoice_id column in v1.0.0 — addSaleToInvoice throws (see stockService.ts).
+    // Until B8 wires sale↔invoice linkage via invoice_line_items, list all pending sales.
+    select: (data) => data,
   });
 
   const linkMutation = useMutation({
@@ -149,15 +151,16 @@ export const AddStockSaleToInvoiceModal: React.FC<AddStockSaleToInvoiceModalProp
         )}
 
         <div className="flex justify-end gap-3 pt-2">
-          <Button variant="outline" onClick={handleClose}>
+          <Button variant="ghost" onClick={handleClose}>
             Cancel
           </Button>
           <Button
             onClick={() => linkMutation.mutate()}
             disabled={selected.size === 0 || linkMutation.isPending}
-            isLoading={linkMutation.isPending}
           >
-            Link {selected.size > 0 ? `${selected.size} Sale${selected.size !== 1 ? 's' : ''}` : 'Sales'} to Invoice
+            {linkMutation.isPending
+              ? 'Linking...'
+              : `Link ${selected.size > 0 ? `${selected.size} Sale${selected.size !== 1 ? 's' : ''}` : 'Sales'} to Invoice`}
           </Button>
         </div>
       </div>

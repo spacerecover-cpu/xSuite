@@ -436,7 +436,9 @@ export const ServerBulkDrivesModal: React.FC<ServerBulkDrivesModalProps> = ({
                       </td>
                       <td className="px-3 py-2">
                         <input
-                          ref={(el) => (serialInputRefs.current[drive.id] = el)}
+                          ref={(el) => {
+                            serialInputRefs.current[drive.id] = el;
+                          }}
                           type="text"
                           value={drive.serial_no}
                           onChange={(e) => updateDrive(drive.id, 'serial_no', e.target.value)}

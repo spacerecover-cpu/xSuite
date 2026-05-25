@@ -193,11 +193,12 @@ export const ReportsDashboard: React.FC = () => {
 
       const statusCounts: Record<string, { count: number; amount: number }> = {};
       (data || []).forEach((invoice) => {
-        if (!statusCounts[invoice.status]) {
-          statusCounts[invoice.status] = { count: 0, amount: 0 };
+        const status = invoice.status ?? 'unknown';
+        if (!statusCounts[status]) {
+          statusCounts[status] = { count: 0, amount: 0 };
         }
-        statusCounts[invoice.status].count += 1;
-        statusCounts[invoice.status].amount += invoice.total_amount || 0;
+        statusCounts[status].count += 1;
+        statusCounts[status].amount += invoice.total_amount || 0;
       });
 
       return statusCounts;
@@ -243,8 +244,9 @@ export const ReportsDashboard: React.FC = () => {
       if (error) throw error;
 
       const customerRevenue: Record<string, { name: string; amount: number }> = {};
-      (data || []).forEach((invoice: { customer_id: string; amount_paid?: number; customers_enhanced?: { customer_name?: string } | null }) => {
+      (data || []).forEach((invoice) => {
         const customerId = invoice.customer_id;
+        if (!customerId) return;
         const customerName = invoice.customers_enhanced?.customer_name || 'Unknown';
         if (!customerRevenue[customerId]) {
           customerRevenue[customerId] = { name: customerName, amount: 0 };
@@ -564,7 +566,7 @@ export const ReportsDashboard: React.FC = () => {
                         {report.name}
                       </h3>
                       <p className="text-xs text-slate-600 mb-3">{report.description}</p>
-                      <Button size="sm" variant="outline" className="text-xs">
+                      <Button size="sm" variant="ghost" className="text-xs">
                         <Download className="w-3 h-3 mr-1" />
                         Generate
                       </Button>

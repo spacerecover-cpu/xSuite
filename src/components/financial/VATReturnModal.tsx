@@ -251,7 +251,7 @@ export const VATReturnModal: React.FC<VATReturnModalProps> = ({
           </Button>
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             onClick={() => handleSubmit(false)}
             disabled={isSubmitting || !summary}
             className="flex items-center gap-2"

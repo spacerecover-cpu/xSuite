@@ -146,7 +146,7 @@ export default function DeleteInventoryConfirmationModal({
           <Button
             onClick={handleDelete}
             disabled={loading || loadingStatusTypes}
-            variant="destructive"
+            variant="danger"
             className="w-full bg-danger hover:bg-danger/90 text-danger-foreground py-3 text-base font-medium"
           >
             {loading ? (
@@ -165,7 +165,7 @@ export default function DeleteInventoryConfirmationModal({
           <Button
             onClick={onClose}
             disabled={loading}
-            variant="outline"
+            variant="secondary"
             className="w-full py-3 text-base font-medium"
           >
             <X className="w-4 h-4 mr-2" />

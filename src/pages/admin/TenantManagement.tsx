@@ -8,6 +8,7 @@ import { DataTable } from '../../components/shared/DataTable';
 import { tenantService } from '../../lib/tenantService';
 import { useToast } from '../../hooks/useToast';
 import type { Database } from '../../types/database.types';
+import type { Column } from '../../components/shared/DataTable';
 import { logger } from '../../lib/logger';
 
 type TenantWithPlan = Database['public']['Tables']['tenants']['Row'] & {
@@ -24,7 +25,7 @@ export const TenantManagement = () => {
   const [tenants, setTenants] = useState<TenantWithPlan[]>([]);
   const [tenantStats, setTenantStats] = useState<Record<string, TenantStats>>({});
   const [loading, setLoading] = useState(true);
-  const { showToast } = useToast();
+  const toast = useToast();
 
   const loadTenants = async () => {
     try {
@@ -37,8 +38,8 @@ export const TenantManagement = () => {
       }
       setTenantStats(stats);
     } catch (error) {
-      showToast('Failed to load tenants', 'error');
-      logger.error(error);
+      toast.error('Failed to load tenants');
+      logger.error('TenantManagement.loadTenants failed', error);
     } finally {
       setLoading(false);
     }
@@ -55,22 +56,22 @@ export const TenantManagement = () => {
 
     try {
       await tenantService.suspendTenant(tenantId);
-      showToast('Tenant suspended successfully', 'success');
+      toast.success('Tenant suspended successfully');
       loadTenants();
     } catch (error) {
-      showToast('Failed to suspend tenant', 'error');
-      logger.error(error);
+      toast.error('Failed to suspend tenant');
+      logger.error('TenantManagement.handleSuspend failed', error);
     }
   };
 
   const handleReactivate = async (tenantId: string) => {
     try {
       await tenantService.reactivateTenant(tenantId);
-      showToast('Tenant reactivated successfully', 'success');
+      toast.success('Tenant reactivated successfully');
       loadTenants();
     } catch (error) {
-      showToast('Failed to reactivate tenant', 'error');
-      logger.error(error);
+      toast.error('Failed to reactivate tenant');
+      logger.error('TenantManagement.handleReactivate failed', error);
     }
   };
 
@@ -83,17 +84,17 @@ export const TenantManagement = () => {
       case 'suspended':
         return <Badge variant="warning"><Pause className="w-3 h-3 mr-1" />Suspended</Badge>;
       case 'cancelled':
-        return <Badge variant="error"><XCircle className="w-3 h-3 mr-1" />Cancelled</Badge>;
+        return <Badge variant="danger"><XCircle className="w-3 h-3 mr-1" />Cancelled</Badge>;
       default:
         return <Badge>{status}</Badge>;
     }
   };
 
-  const columns = [
+  const columns: Column<TenantWithPlan>[] = [
     {
       header: 'Tenant',
-      accessorKey: 'name',
-      cell: (tenant: TenantWithPlan) => (
+      key: 'name',
+      render: (tenant) => (
         <div>
           <div className="font-medium text-gray-900">{tenant.name}</div>
           <div className="text-sm text-gray-500">{tenant.slug}</div>
@@ -102,20 +103,20 @@ export const TenantManagement = () => {
     },
     {
       header: 'Plan',
-      accessorKey: 'plan',
-      cell: (tenant: TenantWithPlan) => (
+      key: 'plan',
+      render: (tenant) => (
         <span className="font-medium">{tenant.plan?.name || 'N/A'}</span>
       ),
     },
     {
       header: 'Status',
-      accessorKey: 'status',
-      cell: (tenant: TenantWithPlan) => getStatusBadge(tenant.status),
+      key: 'status',
+      render: (tenant) => getStatusBadge(tenant.status),
     },
     {
       header: 'Users',
-      accessorKey: 'users',
-      cell: (tenant: TenantWithPlan) => (
+      key: 'users',
+      render: (tenant) => (
         <div className="flex items-center gap-2">
           <Users className="w-4 h-4 text-gray-400" />
           <span>{tenantStats[tenant.id]?.users || 0}</span>
@@ -124,8 +125,8 @@ export const TenantManagement = () => {
     },
     {
       header: 'Cases',
-      accessorKey: 'cases',
-      cell: (tenant: TenantWithPlan) => (
+      key: 'cases',
+      render: (tenant) => (
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-gray-400" />
           <span>{tenantStats[tenant.id]?.cases || 0}</span>
@@ -134,8 +135,8 @@ export const TenantManagement = () => {
     },
     {
       header: 'Customers',
-      accessorKey: 'customers',
-      cell: (tenant: TenantWithPlan) => (
+      key: 'customers',
+      render: (tenant) => (
         <div className="flex items-center gap-2">
           <Building2 className="w-4 h-4 text-gray-400" />
           <span>{tenantStats[tenant.id]?.customers || 0}</span>
@@ -144,8 +145,8 @@ export const TenantManagement = () => {
     },
     {
       header: 'Created',
-      accessorKey: 'created_at',
-      cell: (tenant: TenantWithPlan) => (
+      key: 'created_at',
+      render: (tenant) => (
         <span className="text-sm text-gray-500">
           {new Date(tenant.created_at).toLocaleDateString()}
         </span>
@@ -153,8 +154,8 @@ export const TenantManagement = () => {
     },
     {
       header: 'Actions',
-      accessorKey: 'id',
-      cell: (tenant: TenantWithPlan) => (
+      key: 'id',
+      render: (tenant) => (
         <div className="flex gap-2">
           {tenant.status === 'suspended' ? (
             <Button
@@ -190,7 +191,7 @@ export const TenantManagement = () => {
     <div className="space-y-6">
       <PageHeader
         title="Tenant Management"
-        subtitle="Manage all SaaS customers and their subscriptions"
+        description="Manage all SaaS customers and their subscriptions"
         icon={Building2}
       />
 
@@ -239,11 +240,14 @@ export const TenantManagement = () => {
       </div>
 
       <Card>
-        <DataTable
-          columns={columns}
-          data={tenants}
-          loading={loading}
-        />
+        {loading ? (
+          <div className="p-8 text-center text-slate-500">Loading...</div>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={tenants}
+          />
+        )}
       </Card>
     </div>
   );

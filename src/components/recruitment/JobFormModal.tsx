@@ -14,6 +14,7 @@ import {
   JOB_STATUSES,
   type JobWithDetails,
 } from '../../lib/recruitmentService';
+import type { Database } from '../../types/database.types';
 import toast from 'react-hot-toast';
 
 interface JobFormData {
@@ -26,8 +27,22 @@ interface JobFormData {
   salary_range_max: string;
   openings: string;
   status: string;
-  closing_date: string;
+  closes_at: string;
   description: string;
+}
+
+function parseSalaryRange(range: string | null | undefined): { min: string; max: string } {
+  if (!range) return { min: '', max: '' };
+  const parts = range.split('-').map(s => s.trim());
+  return { min: parts[0] || '', max: parts[1] || '' };
+}
+
+function buildSalaryRange(min: string, max: string): string | null {
+  const trimmedMin = min.trim();
+  const trimmedMax = max.trim();
+  if (!trimmedMin && !trimmedMax) return null;
+  if (trimmedMin && trimmedMax) return `${trimmedMin}-${trimmedMax}`;
+  return trimmedMin || trimmedMax;
 }
 
 interface Props {
@@ -51,7 +66,7 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
       salary_range_max: '',
       openings: '1',
       status: 'open',
-      closing_date: '',
+      closes_at: '',
       description: '',
     },
   });
@@ -60,17 +75,18 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
 
   useEffect(() => {
     if (job) {
+      const { min, max } = parseSalaryRange(job.salary_range);
       reset({
         title: job.title,
         department_id: job.department_id || '',
         position_id: job.position_id || '',
         employment_type: job.employment_type || 'full_time',
         location: job.location || '',
-        salary_range_min: job.salary_range_min?.toString() || '',
-        salary_range_max: job.salary_range_max?.toString() || '',
+        salary_range_min: min,
+        salary_range_max: max,
         openings: job.openings?.toString() || '1',
         status: job.status || 'open',
-        closing_date: job.closing_date || '',
+        closes_at: job.closes_at ? job.closes_at.slice(0, 10) : '',
         description: job.description || '',
       });
     } else {
@@ -84,7 +100,7 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
         salary_range_max: '',
         openings: '1',
         status: 'open',
-        closing_date: '',
+        closes_at: '',
         description: '',
       });
     }
@@ -108,13 +124,12 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
         position_id: data.position_id || null,
         employment_type: data.employment_type || null,
         location: data.location || null,
-        salary_range_min: data.salary_range_min ? parseFloat(data.salary_range_min) : null,
-        salary_range_max: data.salary_range_max ? parseFloat(data.salary_range_max) : null,
+        salary_range: buildSalaryRange(data.salary_range_min, data.salary_range_max),
         openings: data.openings ? parseInt(data.openings) : 1,
         status: data.status,
-        closing_date: data.closing_date || null,
+        closes_at: data.closes_at || null,
         description: data.description || null,
-      };
+      } as Database['public']['Tables']['recruitment_jobs']['Insert'];
       return isEditing ? updateJob(job!.id, payload) : createJob(payload);
     },
     onSuccess: () => {
@@ -233,7 +248,7 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Closing Date</label>
-          <Input {...register('closing_date')} type="date" />
+          <Input {...register('closes_at')} type="date" />
         </div>
 
         <div>

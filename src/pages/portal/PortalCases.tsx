@@ -23,18 +23,16 @@ interface Case {
 
 interface CaseDevice {
   id: string;
-  media_type: string | null;
-  brand: string | null;
   model: string | null;
-  serial_no: string | null;
-  capacity_gb: number;
-  condition_text: string | null;
+  serial_number: string | null;
+  symptoms: string | null;
+  diagnosis: string | null;
 }
 
 interface CaseHistory {
   id: string;
   action: string;
-  details_json: Record<string, unknown> | null;
+  details: string | null;
   created_at: string;
 }
 
@@ -100,35 +98,35 @@ export const PortalCases: React.FC = () => {
     enabled: !!selectedCase?.id,
   });
 
-  const { data: caseDevices = [] } = useQuery({
+  const { data: caseDevices = [] } = useQuery<CaseDevice[]>({
     queryKey: ['portal_case_devices', selectedCase?.id],
     queryFn: async () => {
       if (!selectedCase?.id) return [];
 
       const { data, error } = await supabase
         .from('case_devices')
-        .select('*')
+        .select('id, model, serial_number, symptoms, diagnosis')
         .eq('case_id', selectedCase.id);
 
       if (error) throw error;
-      return data as CaseDevice[];
+      return data ?? [];
     },
     enabled: !!selectedCase?.id,
   });
 
-  const { data: caseHistory = [] } = useQuery({
+  const { data: caseHistory = [] } = useQuery<CaseHistory[]>({
     queryKey: ['portal_case_history', selectedCase?.id],
     queryFn: async () => {
       if (!selectedCase?.id) return [];
 
       const { data, error } = await supabase
         .from('case_job_history')
-        .select('*')
+        .select('id, action, details, created_at')
         .eq('case_id', selectedCase.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as CaseHistory[];
+      return data ?? [];
     },
     enabled: !!selectedCase?.id,
   });
@@ -327,33 +325,21 @@ export const PortalCases: React.FC = () => {
                   {caseDevices.map((device) => (
                     <div key={device.id} className="p-4 bg-slate-50 rounded-lg border border-slate-200">
                       <div className="grid grid-cols-2 gap-3 text-sm">
-                        {device.media_type && (
-                          <div>
-                            <span className="text-slate-500">Type:</span>
-                            <span className="ml-2 font-medium text-slate-900">{device.media_type}</span>
-                          </div>
-                        )}
-                        {device.brand && (
-                          <div>
-                            <span className="text-slate-500">Brand:</span>
-                            <span className="ml-2 font-medium text-slate-900">{device.brand}</span>
-                          </div>
-                        )}
                         {device.model && (
                           <div>
                             <span className="text-slate-500">Model:</span>
                             <span className="ml-2 font-medium text-slate-900">{device.model}</span>
                           </div>
                         )}
-                        {device.capacity_gb > 0 && (
+                        {device.serial_number && (
                           <div>
-                            <span className="text-slate-500">Capacity:</span>
-                            <span className="ml-2 font-medium text-slate-900">{device.capacity_gb} GB</span>
+                            <span className="text-slate-500">Serial:</span>
+                            <span className="ml-2 font-medium text-slate-900">{device.serial_number}</span>
                           </div>
                         )}
                       </div>
-                      {device.condition_text && (
-                        <p className="text-sm text-slate-600 mt-2">{device.condition_text}</p>
+                      {device.symptoms && (
+                        <p className="text-sm text-slate-600 mt-2">{device.symptoms}</p>
                       )}
                     </div>
                   ))}

@@ -89,7 +89,7 @@ export const CouponsManagementPage: React.FC = () => {
         <div className="text-center py-12">
           <Tag className="w-12 h-12 text-slate-300 mx-auto mb-4" />
           <p className="text-slate-500 mb-4">No coupons found</p>
-          <Button variant="outline" onClick={() => { setEditingCoupon(undefined); setShowFormModal(true); }}>
+          <Button variant="ghost" onClick={() => { setEditingCoupon(undefined); setShowFormModal(true); }}>
             <Plus className="w-4 h-4 mr-2" />
             Create your first coupon
           </Button>

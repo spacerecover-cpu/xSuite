@@ -84,7 +84,7 @@ const StockLocationsPage: React.FC = () => {
     setEditingId(loc.id);
     setForm({
       name: loc.name,
-      code: loc.code,
+      code: loc.code ?? '',
       description: loc.description ?? '',
       is_active: loc.is_active ?? true,
       is_default: loc.is_default ?? false,

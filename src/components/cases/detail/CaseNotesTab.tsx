@@ -80,7 +80,7 @@ export const CaseNotesTab: React.FC<CaseNotesTabProps> = ({
                     </div>
                   </div>
                   {note.private && (
-                    <Badge variant="outline" size="sm">Private</Badge>
+                    <Badge variant="secondary" size="sm">Private</Badge>
                   )}
                 </div>
                 <p className="text-slate-700 text-sm whitespace-pre-wrap leading-relaxed pl-10">{note.note_text}</p>

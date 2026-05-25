@@ -32,6 +32,9 @@ const documentTitles: Record<DocumentType, string> = {
   case_label: 'Case Label',
   quote: 'Quote',
   invoice: 'Invoice',
+  payment_receipt: 'Payment Receipt',
+  payslip: 'Payslip',
+  chain_of_custody: 'Chain of Custody',
 };
 
 export const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({

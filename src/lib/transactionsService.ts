@@ -121,7 +121,7 @@ export const createTransaction = async (
 
   const { data, error } = await supabase
     .from('financial_transactions')
-    .insert([transaction])
+    .insert([transaction as never])
     .select()
     .maybeSingle();
 
@@ -383,6 +383,11 @@ const updateBankAccountBalance = async (
 
   if (fetchError) {
     logger.error('Error fetching bank account:', fetchError);
+    return;
+  }
+
+  if (!account) {
+    logger.error('Bank account not found:', accountId);
     return;
   }
 

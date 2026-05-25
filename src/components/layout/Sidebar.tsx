@@ -90,7 +90,7 @@ export const Sidebar: React.FC = () => {
       .upsert({
         user_id: profile.id,
         collapsed_sections: collapsed,
-      }, {
+      } as never, {
         onConflict: 'user_id'
       });
   };
@@ -136,7 +136,7 @@ export const Sidebar: React.FC = () => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  const roleColors = getRoleColor(profile?.role);
+  const roleColors = getRoleColor(profile?.role ?? undefined);
 
   return (
     <aside
@@ -596,7 +596,7 @@ export const Sidebar: React.FC = () => {
                 <div className="relative flex justify-center">
                   <div
                     onClick={() => navigate('/profile')}
-                    className={`rounded-xl bg-gradient-to-br ${getRoleAvatarBg(profile?.role)} flex items-center justify-center text-white font-bold text-sm cursor-pointer transition-all duration-200`}
+                    className={`rounded-xl bg-gradient-to-br ${getRoleAvatarBg(profile?.role ?? undefined)} flex items-center justify-center text-white font-bold text-sm cursor-pointer transition-all duration-200`}
                     style={{ width: '34px', height: '34px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}
                     title={profile.full_name}
                   >
@@ -624,7 +624,7 @@ export const Sidebar: React.FC = () => {
                   onMouseLeave={() => setUserCardHovered(false)}
                 >
                   <div
-                    className={`rounded-xl bg-gradient-to-br ${getRoleAvatarBg(profile?.role)} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}
+                    className={`rounded-xl bg-gradient-to-br ${getRoleAvatarBg(profile?.role ?? undefined)} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}
                     style={{ width: '34px', height: '34px', boxShadow: '0 2px 6px rgba(0,0,0,0.12)' }}
                   >
                     {getInitials(profile.full_name)}

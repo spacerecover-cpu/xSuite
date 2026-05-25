@@ -154,7 +154,7 @@ export function buildStockLabelDocument(
   }
 
   return {
-    pageSize: [283, 170] as [number, number],
+    pageSize: { width: 283, height: 170 },
     pageMargins: [12, 12, 12, 12],
     defaultStyle: {
       font: fontFamily,

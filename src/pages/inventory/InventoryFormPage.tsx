@@ -10,6 +10,7 @@ import {
   getInventoryStatusTypes,
   getInventoryConditionTypes,
   type InventoryItem,
+  type InventoryItemInsert,
   type InventoryItemCategory,
   type InventoryStatusType,
   type InventoryConditionType,
@@ -99,10 +100,11 @@ export default function InventoryFormPage() {
     try {
       const { data: user } = await supabase.auth.getUser();
 
-      const payload: Partial<InventoryItem> = {
+      const payload = {
         ...formData,
+        name: formData.name ?? '',
         created_by: user?.user?.id ?? null,
-      };
+      } as InventoryItemInsert;
 
       await createInventoryItem(payload);
 

@@ -271,7 +271,7 @@ export const ChainOfCustodyTab: React.FC<ChainOfCustodyTabProps> = ({ caseId, ca
               </div>
             </div>
             <div className="relative">
-              <Button onClick={() => setShowExportMenu(!showExportMenu)} variant="outline" size="sm">
+              <Button onClick={() => setShowExportMenu(!showExportMenu)} variant="ghost" size="sm">
                 <Download className="w-4 h-4 mr-2" />
                 Export Report
               </Button>
@@ -313,7 +313,7 @@ export const ChainOfCustodyTab: React.FC<ChainOfCustodyTabProps> = ({ caseId, ca
             </div>
             <Button
               onClick={() => setShowFilters(!showFilters)}
-              variant="outline"
+              variant="ghost"
               size="sm"
               className={showFilters ? 'bg-primary/10 border-primary/40' : ''}
             >

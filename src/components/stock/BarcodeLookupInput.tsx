@@ -47,7 +47,7 @@ export const BarcodeLookupInput: React.FC<Props> = ({
       }
 
       if (serial && onSerialFound) {
-        if (!item && serial.stock_item_id) {
+        if (!item && serial.item_id) {
           const itemForSerial = await getStockItemByBarcode(barcode).catch(() => null);
           onSerialFound(serial, itemForSerial);
         } else {

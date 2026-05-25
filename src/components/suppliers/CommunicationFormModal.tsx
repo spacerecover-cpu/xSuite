@@ -26,7 +26,7 @@ interface CommunicationFormModalProps {
 }
 
 export default function CommunicationFormModal({ isOpen, onClose, onSuccess, supplierId, communication }: CommunicationFormModalProps) {
-  const { showToast } = useToast();
+  const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     type: 'email',
@@ -67,35 +67,44 @@ export default function CommunicationFormModal({ isOpen, onClose, onSuccess, sup
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const commData = {
-        ...formData,
-        supplier_id: supplierId,
-        created_by: user.id,
-        follow_up_date: formData.follow_up_required && formData.follow_up_date ? formData.follow_up_date : null,
-      };
-
-      if (communication) {
+      // Map UI fields to actual DB columns (type, subject, content, sent_by)
+      if (communication && communication.id) {
         const { error } = await supabase
           .from('supplier_communications')
-          .update(commData)
+          .update({
+            type: formData.type,
+            subject: formData.subject || null,
+            content: formData.notes || null,
+            sent_by: user.id,
+          })
           .eq('id', communication.id);
 
         if (error) throw error;
-        showToast('Communication updated successfully', 'success');
+        toast.success('Communication updated successfully');
       } else {
+        const { data: tenantId, error: tenantErr } = await supabase.rpc('get_current_tenant_id');
+        if (tenantErr || !tenantId) throw new Error('Unable to resolve current tenant');
+
         const { error } = await supabase
           .from('supplier_communications')
-          .insert([commData]);
+          .insert({
+            tenant_id: tenantId,
+            supplier_id: supplierId,
+            type: formData.type,
+            subject: formData.subject || null,
+            content: formData.notes || null,
+            sent_by: user.id,
+          });
 
         if (error) throw error;
-        showToast('Communication logged successfully', 'success');
+        toast.success('Communication logged successfully');
       }
 
       onSuccess();
       onClose();
     } catch (error: unknown) {
       logger.error('Error saving communication:', error);
-      showToast(error instanceof Error ? error.message : 'Failed to save communication', 'error');
+      toast.error(error instanceof Error ? error.message : 'Failed to save communication');
     } finally {
       setLoading(false);
     }
@@ -205,7 +214,7 @@ export default function CommunicationFormModal({ isOpen, onClose, onSuccess, sup
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
           <Button type="submit" disabled={loading}>

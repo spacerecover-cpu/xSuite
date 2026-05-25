@@ -39,14 +39,17 @@ export interface DeviceDiagnostics {
 }
 
 export interface ComponentStatus {
-  id: number;
+  id: string;
+  name: string;
+  color: string | null;
+  is_active: boolean;
+  sort_order: number | null;
+  created_at: string;
   status_name: string;
   status_code: string;
   color_indicator: string;
   icon_type: string;
   description?: string;
-  sort_order: number;
-  is_active: boolean;
 }
 
 export const diagnosticsService = {
@@ -62,14 +65,20 @@ export const diagnosticsService = {
       throw error;
     }
 
-    return data || [];
+    return (data || []).map((row) => ({
+      ...row,
+      status_name: row.name,
+      status_code: row.name.toLowerCase().replace(/\s+/g, '_'),
+      color_indicator: row.color ?? 'gray',
+      icon_type: 'circle',
+    }));
   },
 
   async getDeviceDiagnostics(caseDeviceId: string): Promise<DeviceDiagnostics | null> {
     const { data, error } = await supabase
       .from('device_diagnostics')
       .select('*')
-      .eq('case_device_id', caseDeviceId)
+      .eq('device_id', caseDeviceId)
       .maybeSingle();
 
     if (error) {
@@ -77,21 +86,24 @@ export const diagnosticsService = {
       throw error;
     }
 
-    return data;
+    if (!data) return null;
+    return { ...data, case_device_id: data.device_id } as unknown as DeviceDiagnostics;
   },
 
   async createDeviceDiagnostics(diagnostics: DeviceDiagnostics): Promise<DeviceDiagnostics> {
     const { data: currentUser } = await supabase.auth.getUser();
 
+    const { case_device_id, ...rest } = diagnostics;
     const diagnosticsData = {
-      ...diagnostics,
+      ...rest,
+      device_id: case_device_id,
       diagnosed_by: diagnostics.diagnosed_by || currentUser.user?.id,
       diagnostic_date: diagnostics.diagnostic_date || new Date().toISOString(),
     };
 
     const { data, error } = await supabase
       .from('device_diagnostics')
-      .insert([diagnosticsData])
+      .insert([diagnosticsData as never])
       .select()
       .maybeSingle();
 
@@ -100,13 +112,19 @@ export const diagnosticsService = {
       throw error;
     }
 
-    return data;
+    if (!data) throw new Error('Failed to create device diagnostics');
+    return { ...data, case_device_id: data.device_id } as unknown as DeviceDiagnostics;
   },
 
   async updateDeviceDiagnostics(id: string, diagnostics: Partial<DeviceDiagnostics>): Promise<DeviceDiagnostics> {
+    const { case_device_id, ...rest } = diagnostics;
+    const updatePayload = case_device_id !== undefined
+      ? { ...rest, device_id: case_device_id }
+      : rest;
+
     const { data, error } = await supabase
       .from('device_diagnostics')
-      .update(diagnostics)
+      .update(updatePayload as never)
       .eq('id', id)
       .select()
       .maybeSingle();
@@ -116,7 +134,8 @@ export const diagnosticsService = {
       throw error;
     }
 
-    return data;
+    if (!data) throw new Error('Failed to update device diagnostics');
+    return { ...data, case_device_id: data.device_id } as unknown as DeviceDiagnostics;
   },
 
   async upsertDeviceDiagnostics(diagnostics: DeviceDiagnostics): Promise<DeviceDiagnostics> {
@@ -146,16 +165,9 @@ export const diagnosticsService = {
       .from('device_diagnostics')
       .select(`
         *,
-        case_device:case_devices(
-          id,
-          device_type:device_types(name),
-          brand:brands(name),
-          model,
-          serial_no
-        ),
         diagnosed_by_user:profiles(full_name)
       `)
-      .eq('case_device_id', caseDeviceId)
+      .eq('device_id', caseDeviceId)
       .maybeSingle();
 
     if (error) {

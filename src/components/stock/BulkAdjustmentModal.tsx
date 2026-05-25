@@ -27,8 +27,8 @@ export const BulkAdjustmentModal: React.FC<Props> = ({ selectedItems, onClose })
     selectedItems.map((item) => ({
       id: item.id,
       name: item.name,
-      currentQty: item.current_quantity,
-      newQty: item.current_quantity,
+      currentQty: item.current_quantity ?? 0,
+      newQty: item.current_quantity ?? 0,
     }))
   );
 

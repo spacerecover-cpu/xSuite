@@ -71,13 +71,16 @@ export function useDocumentTranslations(): UseDocumentTranslationsReturn {
           setHasError(true);
           setErrorMessage('Failed to load translation settings from database');
           setIsReady(false);
-        } else if (data?.localization?.document_language_settings) {
-          setSettings(data.localization.document_language_settings);
-          setIsReady(true);
-          setHasError(false);
         } else {
-          setIsReady(true);
-          setHasError(false);
+          const localization = data?.localization as { document_language_settings?: DocumentLanguageSettings } | null | undefined;
+          if (localization?.document_language_settings) {
+            setSettings(localization.document_language_settings);
+            setIsReady(true);
+            setHasError(false);
+          } else {
+            setIsReady(true);
+            setHasError(false);
+          }
         }
       } catch (error) {
         logger.error('Error fetching language settings:', error);

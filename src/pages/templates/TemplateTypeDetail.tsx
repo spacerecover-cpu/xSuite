@@ -9,7 +9,6 @@ import {
   Eye,
   Star,
   Calendar,
-  DollarSign,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
@@ -19,33 +18,31 @@ import { Modal } from '../../components/ui/Modal';
 import { formatDate } from '../../lib/format';
 import { sanitizeHtml } from '../../lib/sanitizeHtml';
 import { LineItemTemplateFormModal } from '../../components/templates/LineItemTemplateFormModal';
-import { useCurrency } from '../../hooks/useCurrency';
 import { logger } from '../../lib/logger';
+import { useAuth } from '../../contexts/AuthContext';
+import type { Database } from '../../types/database.types';
+
+type DocumentTemplateInsert = Database['public']['Tables']['document_templates']['Insert'];
+type DocumentTemplateUpdate = Database['public']['Tables']['document_templates']['Update'];
 
 interface Template {
   id: string;
   name: string;
   description: string | null;
   content: string | null;
-  subject_line: string | null;
-  is_default: boolean;
-  is_active: boolean;
-  usage_count: number;
-  last_used_at: string | null;
+  is_default: boolean | null;
+  is_active: boolean | null;
   created_at: string;
   updated_at: string;
-  version: number;
-  default_price?: number;
-  unit_of_measure?: string;
-  item_category?: string;
+  template_type_id: string | null;
+  category_id: string | null;
 }
 
 interface TemplateType {
   id: string;
   name: string;
-  code: string;
-  description: string;
-  supports_line_items: boolean;
+  code: string | null;
+  description: string | null;
 }
 
 export const TemplateTypeDetail: React.FC = () => {
@@ -58,7 +55,7 @@ export const TemplateTypeDetail: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showFormModal, setShowFormModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const { formatCurrency } = useCurrency();
+  const { profile } = useAuth();
 
   useEffect(() => {
     if (typeCode) {
@@ -67,26 +64,35 @@ export const TemplateTypeDetail: React.FC = () => {
   }, [typeCode]);
 
   const loadData = async () => {
+    if (!typeCode) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const { data: typeData } = await supabase
         .from('master_template_types')
-        .select('*')
+        .select('id, name, code, description')
         .eq('code', typeCode)
         .maybeSingle();
 
       if (typeData) {
-        setTemplateType(typeData);
+        setTemplateType({
+          id: typeData.id,
+          name: typeData.name,
+          code: typeData.code,
+          description: typeData.description,
+        });
 
         const { data: templatesData } = await supabase
           .from('document_templates')
-          .select('*')
+          .select('id, name, description, content, is_default, is_active, created_at, updated_at, template_type_id, category_id')
           .eq('template_type_id', typeData.id)
           .eq('is_active', true)
           .order('is_default', { ascending: false })
           .order('name');
 
-        setTemplates(templatesData || []);
+        setTemplates(templatesData ?? []);
       }
     } catch (error) {
       logger.error('Error loading templates:', error);
@@ -116,20 +122,20 @@ export const TemplateTypeDetail: React.FC = () => {
 
   const handleDuplicateTemplate = async (template: Template) => {
     try {
+      if (!templateType?.id || !profile?.tenant_id) return;
+      const insertPayload: DocumentTemplateInsert = {
+        template_type_id: templateType.id,
+        tenant_id: profile.tenant_id,
+        name: `${template.name} (Copy)`,
+        description: template.description,
+        content: template.content,
+        category_id: template.category_id,
+        is_default: false,
+        is_active: true,
+      };
       const { error } = await supabase
         .from('document_templates')
-        .insert({
-          template_type_id: templateType?.id,
-          name: `${template.name} (Copy)`,
-          description: template.description,
-          content: template.content,
-          subject_line: template.subject_line,
-          default_price: template.default_price || 0,
-          unit_of_measure: template.unit_of_measure || 'service',
-          item_category: template.item_category,
-          is_default: false,
-          is_active: true,
-        });
+        .insert(insertPayload);
 
       if (!error) {
         await loadData();
@@ -142,16 +148,22 @@ export const TemplateTypeDetail: React.FC = () => {
   const handleSaveTemplate = async (templateData: Record<string, unknown>) => {
     try {
       if (selectedTemplate) {
+        const updatePayload = templateData as DocumentTemplateUpdate;
         const { error } = await supabase
           .from('document_templates')
-          .update(templateData)
+          .update(updatePayload)
           .eq('id', selectedTemplate.id);
 
         if (error) throw error;
       } else {
+        if (!profile?.tenant_id) throw new Error('No active tenant');
+        const insertPayload = {
+          ...(templateData as Omit<DocumentTemplateInsert, 'tenant_id'>),
+          tenant_id: profile.tenant_id,
+        } as DocumentTemplateInsert;
         const { error } = await supabase
           .from('document_templates')
-          .insert(templateData);
+          .insert(insertPayload);
 
         if (error) throw error;
       }
@@ -243,9 +255,9 @@ export const TemplateTypeDetail: React.FC = () => {
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-600">Total Usage</p>
+              <p className="text-sm text-slate-600">Last Updated</p>
               <p className="text-2xl font-bold text-slate-900 mt-1">
-                {templates.reduce((sum, t) => sum + t.usage_count, 0)}
+                {templates.length > 0 ? formatDate(templates[0].updated_at) : '—'}
               </p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -268,42 +280,15 @@ export const TemplateTypeDetail: React.FC = () => {
                       Default
                     </Badge>
                   )}
-                  <Badge variant="secondary">v{template.version}</Badge>
                 </div>
 
                 {template.description && (
                   <p className="text-sm text-slate-600 mb-3">{template.description}</p>
                 )}
 
-                {template.subject_line && (
-                  <p className="text-sm text-slate-700 mb-2">
-                    <span className="font-medium">Subject:</span> {template.subject_line}
-                  </p>
-                )}
-
-                {templateType?.supports_line_items && (
-                  <div className="flex items-center gap-4 text-sm text-slate-700 mb-2">
-                    {template.default_price !== undefined && (
-                      <span className="flex items-center">
-                        <DollarSign className="w-4 h-4 mr-1" />
-                        <span className="font-medium">{formatCurrency(template.default_price)}</span>
-                      </span>
-                    )}
-                    {template.unit_of_measure && (
-                      <span className="text-slate-600">per {template.unit_of_measure}</span>
-                    )}
-                    {template.item_category && (
-                      <Badge variant="secondary">{template.item_category}</Badge>
-                    )}
-                  </div>
-                )}
-
                 <div className="flex items-center gap-4 text-xs text-slate-500">
-                  <span>Used {template.usage_count} times</span>
-                  {template.last_used_at && (
-                    <span>Last used {formatDate(template.last_used_at)}</span>
-                  )}
                   <span>Created {formatDate(template.created_at)}</span>
+                  <span>Updated {formatDate(template.updated_at)}</span>
                 </div>
               </div>
 
@@ -375,12 +360,6 @@ export const TemplateTypeDetail: React.FC = () => {
           title={selectedTemplate.name}
         >
           <div className="prose max-w-none">
-            {selectedTemplate.subject_line && (
-              <div className="mb-4 p-3 bg-slate-50 rounded-lg">
-                <p className="text-sm font-medium text-slate-700 mb-1">Subject:</p>
-                <p className="text-sm text-slate-900">{selectedTemplate.subject_line}</p>
-              </div>
-            )}
             <div
               className="border border-slate-200 rounded-lg p-4 prose max-w-none"
               dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedTemplate.content || '') }}
@@ -402,7 +381,7 @@ export const TemplateTypeDetail: React.FC = () => {
             </p>
             <div className="flex justify-end gap-3">
               <Button
-                variant="outline"
+                variant="secondary"
                 onClick={() => setShowDeleteConfirm(false)}
               >
                 Cancel
@@ -426,9 +405,9 @@ export const TemplateTypeDetail: React.FC = () => {
             setSelectedTemplate(null);
           }}
           onSave={handleSaveTemplate}
-          initialData={selectedTemplate}
+          initialData={selectedTemplate ? { ...selectedTemplate } : undefined}
           templateTypeId={templateType.id}
-          isLineItemType={templateType.supports_line_items}
+          isLineItemType={false}
         />
       )}
     </div>

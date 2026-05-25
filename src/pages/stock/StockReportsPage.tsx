@@ -585,11 +585,12 @@ export const StockReportsPage: React.FC = () => {
               </thead>
               <tbody>
                 {lowStockItems.map((item) => {
+                  const currentQty = item.current_quantity ?? 0;
                   const suggested = Math.max(
                     0,
-                    (item.reorder_quantity ?? item.minimum_quantity) - item.current_quantity
+                    (item.reorder_quantity ?? item.minimum_quantity ?? 0) - currentQty
                   );
-                  const isOut = item.current_quantity === 0;
+                  const isOut = currentQty === 0;
                   return (
                     <tr
                       key={item.id}

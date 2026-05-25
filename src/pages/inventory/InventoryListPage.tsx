@@ -106,7 +106,7 @@ export default function InventoryListPage() {
         await Promise.all([
           getInventoryItems({
             category_id: selectedCategory || undefined,
-            status_type_id: selectedStatus || undefined,
+            status_id: selectedStatus || undefined,
             search: searchTerm || undefined,
           }),
           getInventoryCategories(),
@@ -202,7 +202,7 @@ export default function InventoryListPage() {
   const handleStatusChange = async (itemId: string, newStatusId: string) => {
     setUpdatingStatus(true);
     try {
-      await updateInventoryItem(itemId, { status_type_id: newStatusId });
+      await updateInventoryItem(itemId, { status_id: newStatusId });
       setEditingStatusId(null);
       await loadData();
     } catch (error) {
@@ -244,7 +244,7 @@ export default function InventoryListPage() {
     if (!deletingItemId) return;
 
     try {
-      await updateInventoryItem(deletingItemId, { status_type_id: statusId });
+      await updateInventoryItem(deletingItemId, { status_id: statusId });
       setDeletingItemId(null);
       await loadData();
       toast.success('Item status changed successfully');
@@ -639,18 +639,22 @@ export default function InventoryListPage() {
 
                       <td className="px-6 py-4 relative">
                         <div className="status-dropdown">
-                          <Badge
-                            variant="custom"
-                            size="sm"
-                            style={{
-                              backgroundColor: item.status_type?.color_code ? `${item.status_type.color_code}15` : '#f1f5f9',
-                              color: item.status_type?.color_code || '#475569',
-                              cursor: 'pointer',
-                            }}
-                            onClick={(e) => handleStatusClick(item.id, e)}
+                          <span
+                            onClick={(e: React.MouseEvent) => handleStatusClick(item.id, e)}
+                            className="inline-block cursor-pointer"
                           >
-                            {item.status_type?.name || item.status}
-                          </Badge>
+                            <Badge
+                              variant="custom"
+                              size="sm"
+                              style={{
+                                backgroundColor: item.status_type?.color_code ? `${item.status_type.color_code}15` : '#f1f5f9',
+                                color: item.status_type?.color_code || '#475569',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {item.status_type?.name || item.status}
+                            </Badge>
+                          </span>
 
                           {editingStatusId === item.id && (
                             <div className="absolute z-10 mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg">
@@ -665,7 +669,7 @@ export default function InventoryListPage() {
                                     <div className="flex items-center gap-2">
                                       <div
                                         className="w-3 h-3 rounded-full"
-                                        style={{ backgroundColor: status.color_code }}
+                                        style={{ backgroundColor: status.color_code ?? undefined }}
                                       />
                                       {status.name}
                                     </div>

@@ -32,11 +32,10 @@ interface Quote {
 
 interface QuoteItem {
   id: string;
-  item_name: string;
-  description: string | null;
-  quantity: number;
+  description: string;
+  quantity: number | null;
   unit_price: number;
-  line_total: number;
+  total_price: number;
 }
 
 export const PortalQuotes: React.FC = () => {
@@ -85,19 +84,19 @@ export const PortalQuotes: React.FC = () => {
     enabled: !!customer?.id,
   });
 
-  const { data: quoteItems = [] } = useQuery({
+  const { data: quoteItems = [] } = useQuery<QuoteItem[]>({
     queryKey: ['portal_quote_items', selectedQuote?.id],
     queryFn: async () => {
       if (!selectedQuote?.id) return [];
 
       const { data, error } = await supabase
         .from('case_quote_items')
-        .select('*')
+        .select('id, description, quantity, unit_price, total_price')
         .eq('quote_id', selectedQuote.id)
         .order('sort_order');
 
       if (error) throw error;
-      return data as QuoteItem[];
+      return data ?? [];
     },
     enabled: !!selectedQuote?.id,
   });
@@ -123,7 +122,7 @@ export const PortalQuotes: React.FC = () => {
     mutationFn: async ({ quoteId, response }: { quoteId: string; response: string }) => {
       const { data, error } = await supabase.rpc('reject_quote', {
         p_quote_id: quoteId,
-        p_reason: response || null,
+        p_reason: response || undefined,
       });
 
       if (error) throw error;
@@ -383,17 +382,14 @@ export const PortalQuotes: React.FC = () => {
                       {quoteItems.map((item, index) => (
                         <tr key={item.id} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                           <td className="p-3">
-                            <p className="font-medium text-slate-900">{item.item_name}</p>
-                            {item.description && (
-                              <p className="text-xs text-slate-600 mt-1">{item.description}</p>
-                            )}
+                            <p className="font-medium text-slate-900">{item.description}</p>
                           </td>
-                          <td className="p-3 text-center text-slate-700">{item.quantity}</td>
+                          <td className="p-3 text-center text-slate-700">{item.quantity ?? 1}</td>
                           <td className="p-3 text-right text-slate-700">
                             {Number(item.unit_price).toLocaleString()}
                           </td>
                           <td className="p-3 text-right font-medium text-slate-900">
-                            {Number(item.line_total).toLocaleString()}
+                            {Number(item.total_price).toLocaleString()}
                           </td>
                         </tr>
                       ))}

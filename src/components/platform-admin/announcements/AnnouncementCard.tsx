@@ -26,7 +26,7 @@ const typeConfig = {
 
 export const AnnouncementCard: React.FC<AnnouncementCardProps> = ({ announcement, onEdit }) => {
   const queryClient = useQueryClient();
-  const { showSuccess, showError } = useToast();
+  const { success: showSuccess, error: showError } = useToast();
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -71,14 +71,14 @@ export const AnnouncementCard: React.FC<AnnouncementCardProps> = ({ announcement
 
   const getStatusBadge = () => {
     const now = new Date();
-    const startsAt = new Date(announcement.start_date);
+    const startsAt = announcement.start_date ? new Date(announcement.start_date) : null;
     const endsAt = announcement.end_date ? new Date(announcement.end_date) : null;
 
     if (!announcement.is_active) {
       return <Badge variant="default">Inactive</Badge>;
     }
 
-    if (startsAt > now) {
+    if (startsAt && startsAt > now) {
       return <Badge variant="info">Scheduled</Badge>;
     }
 
@@ -187,7 +187,7 @@ export const AnnouncementCard: React.FC<AnnouncementCardProps> = ({ announcement
 
             <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
               <span>
-                {new Date(announcement.start_date).toLocaleDateString()}
+                {announcement.start_date ? new Date(announcement.start_date).toLocaleDateString() : '-'}
                 {announcement.end_date && ` - ${new Date(announcement.end_date).toLocaleDateString()}`}
               </span>
             </div>

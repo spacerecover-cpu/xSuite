@@ -123,6 +123,7 @@ export const tenantService = {
       .maybeSingle();
 
     if (error) throw error;
+    if (!data) throw new Error('Failed to update tenant');
     return data;
   },
 

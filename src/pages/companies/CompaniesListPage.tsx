@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
+import type { Database } from '../../types/database.types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
@@ -14,7 +15,7 @@ import { logger } from '../../lib/logger';
 
 interface Company {
   id: string;
-  company_number: string;
+  company_number: string | null;
   name: string;
   company_name: string | null;
   tax_number: string | null;
@@ -26,7 +27,7 @@ interface Company {
   city_id: string | null;
   address: string | null;
   notes: string | null;
-  is_active: boolean;
+  is_active: boolean | null;
   created_at: string;
   master_industries: { id: string; name: string } | null;
   geo_countries: { name: string } | null;
@@ -88,6 +89,7 @@ export const CompaniesListPage: React.FC = () => {
     city_id: '',
     address: '',
     notes: '',
+    primary_contact_id: '',
   });
 
   const { data: companies = [], isLoading, error: companiesError } = useQuery({
@@ -121,7 +123,7 @@ export const CompaniesListPage: React.FC = () => {
         })
       );
 
-      return companiesWithContacts as Company[];
+      return companiesWithContacts as unknown as Company[];
     },
     staleTime: 30000,
     refetchOnMount: true,
@@ -193,7 +195,7 @@ export const CompaniesListPage: React.FC = () => {
         .maybeSingle();
 
       if (error) throw error;
-      return data;
+      return data as { location: { default_country_id?: string } | null } | null;
     },
   });
 
@@ -207,26 +209,42 @@ export const CompaniesListPage: React.FC = () => {
 
       if (numberError) throw numberError;
 
+      const companyPayload = {
+        company_number: companyNumber,
+        name: company.company_name,
+        company_name: company.company_name,
+        tax_number: company.tax_number || null,
+        industry_id: company.industry_id || null,
+        email: company.email || null,
+        phone: company.phone || null,
+        website: company.website || null,
+        country_id: company.country_id || null,
+        city_id: company.city_id || null,
+        address: company.address || null,
+        notes: company.notes || null,
+        created_by: profile?.id,
+      } as Database['public']['Tables']['companies']['Insert'];
+
       const { data: newCompany, error: createError } = await supabase
         .from('companies')
-        .insert({
-          company_number: companyNumber,
-          name: company.company_name,
-          tax_number: company.tax_number || null,
-          industry_id: company.industry_id || null,
-          email: company.email || null,
-          phone: company.phone || null,
-          website: company.website || null,
-          country_id: company.country_id || null,
-          city_id: company.city_id || null,
-          address: company.address || null,
-          notes: company.notes || null,
-          created_by: profile?.id,
-        })
+        .insert(companyPayload)
         .select()
-        .single();
+        .maybeSingle();
 
       if (createError) throw createError;
+      if (!newCompany) throw new Error('Failed to create company');
+
+      if (company.primary_contact_id) {
+        const relationshipPayload = {
+          customer_id: company.primary_contact_id,
+          company_id: newCompany.id,
+          is_primary: true,
+        } as Database['public']['Tables']['customer_company_relationships']['Insert'];
+
+        await supabase
+          .from('customer_company_relationships')
+          .insert(relationshipPayload);
+      }
 
       return newCompany;
     },
@@ -281,6 +299,7 @@ export const CompaniesListPage: React.FC = () => {
       city_id: '',
       address: '',
       notes: '',
+      primary_contact_id: '',
     });
   };
 
@@ -306,7 +325,7 @@ export const CompaniesListPage: React.FC = () => {
     const displayName = company.name || company.company_name || '';
     const matchesSearch =
       displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.company_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      company.company_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       company.tax_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       company.email?.toLowerCase().includes(searchTerm.toLowerCase());
 

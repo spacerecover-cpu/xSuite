@@ -195,7 +195,7 @@ export async function generateCustomerCopy(caseId: string, download: boolean = t
     const data = await fetchReceiptData(caseId);
 
     const languageSettings = data.companySettings.localization?.document_language_settings;
-    let languageCode = (languageSettings?.secondary_language as LanguageCode) || null;
+    let languageCode: LanguageCode | null = (languageSettings?.secondary_language as LanguageCode) || null;
     let mode = languageSettings?.mode || 'english_only';
 
     const fontsLoaded = await initializePDFFonts(languageCode);
@@ -244,7 +244,7 @@ export async function generateCheckoutForm(caseId: string, download: boolean = t
     const data = await fetchReceiptData(caseId);
 
     const languageSettings = data.companySettings.localization?.document_language_settings;
-    let languageCode = (languageSettings?.secondary_language as LanguageCode) || null;
+    let languageCode: LanguageCode | null = (languageSettings?.secondary_language as LanguageCode) || null;
     let mode = languageSettings?.mode || 'english_only';
 
     const fontsLoaded = await initializePDFFonts(languageCode);
@@ -293,7 +293,7 @@ export async function generateCaseLabel(caseId: string, download: boolean = true
     const data = await fetchReceiptData(caseId);
 
     const languageSettings = data.companySettings.localization?.document_language_settings;
-    let languageCode = (languageSettings?.secondary_language as LanguageCode) || null;
+    let languageCode: LanguageCode | null = (languageSettings?.secondary_language as LanguageCode) || null;
     let mode = languageSettings?.mode || 'english_only';
 
     const fontsLoaded = await initializePDFFonts(languageCode);

@@ -38,15 +38,16 @@ export const ClientsList: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as Customer[];
+      return data as unknown as Customer[];
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (customer: typeof formData) => {
+      // tenant_id is populated by the customers_enhanced trigger.
       const { error } = await supabase
         .from('customers_enhanced')
-        .insert(customer);
+        .insert(customer as never);
       if (error) throw error;
     },
     onSuccess: () => {

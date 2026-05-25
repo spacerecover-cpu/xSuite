@@ -17,6 +17,7 @@ export function useCaseQueries(
   const { data: caseData, isLoading, error: caseError } = useQuery({
     queryKey: ['case', id],
     queryFn: async () => {
+      if (!id) throw new Error('Case id is required');
       const { data: caseRecord, error } = await supabase
         .from('cases')
         .select(`
@@ -144,6 +145,7 @@ export function useCaseQueries(
   const { data: devices = [] } = useQuery({
     queryKey: ['case_devices', id],
     queryFn: async () => {
+      if (!id) return [];
       // Removed profiles!created_by FK join (no FK constraint exists).
       // Catalog joins are kept because their FKs are present in the DB.
       const { data, error } = await supabase
@@ -183,6 +185,7 @@ export function useCaseQueries(
   const { data: cloneDrives = [] } = useQuery({
     queryKey: ['clone_drives', id],
     queryFn: async () => {
+      if (!id) return [];
       const { data, error } = await supabase
         .from('clone_drives')
         .select(`
@@ -210,6 +213,7 @@ export function useCaseQueries(
   const { data: attachments = [] } = useQuery({
     queryKey: ['case_attachments', id],
     queryFn: async () => {
+      if (!id) return [];
       // FK profiles!uploaded_by join removed (no FK constraint).
       const { data, error } = await supabase
         .from('case_attachments')
@@ -263,6 +267,7 @@ export function useCaseQueries(
   const { data: reports = [] } = useQuery({
     queryKey: ['case_reports', id, filters.reportTypeFilter, filters.reportStatusFilter, filters.showLatestOnly],
     queryFn: async () => {
+      if (!id) return [];
       // FK profiles!created_by join removed (no FK constraint).
       let query = supabase
         .from('case_reports')
@@ -294,6 +299,7 @@ export function useCaseQueries(
   const { data: caseEngineers = [] } = useQuery({
     queryKey: ['case_engineers', id],
     queryFn: async () => {
+      if (!id) return [];
       // FK profiles!user_id join removed (no FK constraint).
       const { data, error } = await supabase
         .from('case_engineers')
@@ -315,6 +321,7 @@ export function useCaseQueries(
   const { data: portalSettings } = useQuery({
     queryKey: ['case_portal_visibility', id],
     queryFn: async () => {
+      if (!id) return null;
       const { data, error } = await supabase
         .from('case_portal_visibility')
         .select('*')
@@ -330,6 +337,7 @@ export function useCaseQueries(
   const { data: notes = [] } = useQuery({
     queryKey: ['case_notes', id],
     queryFn: async () => {
+      if (!id) return [];
       // FK profiles!created_by join removed (no FK constraint).
       const { data, error } = await supabase
         .from('case_internal_notes')
@@ -351,6 +359,7 @@ export function useCaseQueries(
   const { data: history = [] } = useQuery({
     queryKey: ['case_history', id],
     queryFn: async () => {
+      if (!id) return [];
       // FK profiles!performed_by join removed (no FK constraint).
       const { data, error } = await supabase
         .from('case_job_history')

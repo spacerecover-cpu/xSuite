@@ -170,7 +170,7 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
       onClose={onClose}
       title={getTitle()}
       icon={ArrowRightLeft}
-      maxWidth="2xl"
+      size="2xl"
     >
       <div className="space-y-4">
         {error && (
@@ -205,8 +205,8 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
               </label>
               <SearchableSelect
                 options={profiles.map((p) => ({
-                  value: p.id,
-                  label: `${p.full_name} (${p.role})`,
+                  id: p.id,
+                  name: `${p.full_name} (${p.role})`,
                 }))}
                 value={selectedRecipient}
                 onChange={(value) => {
@@ -403,7 +403,7 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
         )}
 
         <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-          <Button onClick={onClose} variant="outline" disabled={isLoading}>
+          <Button onClick={onClose} variant="ghost" disabled={isLoading}>
             Cancel
           </Button>
           <Button

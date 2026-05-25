@@ -21,11 +21,11 @@ export const TenantBillingTab: React.FC<TenantBillingTabProps> = ({ tenantId, su
     queryFn: () => getTenantBillingHistory(tenantId),
   });
 
-  const getStatusBadgeVariant = (status: string) => {
+  const getStatusBadgeVariant = (status: string | null): 'success' | 'warning' | 'danger' | 'default' => {
     switch (status) {
       case 'paid': return 'success';
       case 'pending': return 'warning';
-      case 'failed': return 'error';
+      case 'failed': return 'danger';
       case 'refunded': return 'default';
       default: return 'default';
     }
@@ -48,7 +48,7 @@ export const TenantBillingTab: React.FC<TenantBillingTabProps> = ({ tenantId, su
             <div>
               <p className="text-sm text-slate-500">Plan</p>
               <p className="text-sm font-medium text-slate-900 mt-1">
-                {subscription.plan_code?.toUpperCase()}
+                {subscription.plan_id}
               </p>
             </div>
             <div>
@@ -58,9 +58,9 @@ export const TenantBillingTab: React.FC<TenantBillingTabProps> = ({ tenantId, su
               </Badge>
             </div>
             <div>
-              <p className="text-sm text-slate-500">Amount</p>
+              <p className="text-sm text-slate-500">Last Payment</p>
               <p className="text-sm font-medium text-slate-900 mt-1">
-                ${subscription.amount} / {subscription.billing_interval}
+                ${subscription.last_payment_amount ?? 0} / {subscription.billing_interval}
               </p>
             </div>
             <div>
@@ -103,46 +103,55 @@ export const TenantBillingTab: React.FC<TenantBillingTabProps> = ({ tenantId, su
             <p className="text-slate-500">No invoices found</p>
           </div>
         ) : (
-          <Table>
-            <thead>
-              <tr>
-                <th>Invoice #</th>
-                <th>Date</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map((invoice) => (
-                <tr key={invoice.id}>
-                  <td className="font-medium">{invoice.invoice_number}</td>
-                  <td className="text-slate-600">
-                    {new Date(invoice.invoice_date).toLocaleDateString()}
-                  </td>
-                  <td className="font-medium">${invoice.amount}</td>
-                  <td>
-                    <Badge variant={getStatusBadgeVariant(invoice.status)}>
-                      {invoice.status}
-                    </Badge>
-                  </td>
-                  <td>
-                    {invoice.invoice_url && (
-                      <a
-                        href={invoice.invoice_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:text-primary/90 text-sm flex items-center gap-1"
-                      >
-                        Download
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
+          <Table
+            data={invoices}
+            columns={[
+              {
+                key: 'invoice_number',
+                header: 'Invoice #',
+                render: (invoice) => <span className="font-medium">{invoice.invoice_number}</span>,
+              },
+              {
+                key: 'invoice_date',
+                header: 'Date',
+                render: (invoice) => (
+                  <span className="text-slate-600">
+                    {invoice.invoice_date ? new Date(invoice.invoice_date).toLocaleDateString() : '-'}
+                  </span>
+                ),
+              },
+              {
+                key: 'total',
+                header: 'Amount',
+                render: (invoice) => <span className="font-medium">${invoice.total}</span>,
+              },
+              {
+                key: 'status',
+                header: 'Status',
+                render: (invoice) => (
+                  <Badge variant={getStatusBadgeVariant(invoice.status)}>
+                    {invoice.status ?? '-'}
+                  </Badge>
+                ),
+              },
+              {
+                key: 'actions',
+                header: 'Actions',
+                render: (invoice) =>
+                  invoice.invoice_pdf_url ? (
+                    <a
+                      href={invoice.invoice_pdf_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:text-primary/90 text-sm flex items-center gap-1"
+                    >
+                      Download
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  ) : null,
+              },
+            ]}
+          />
         )}
       </Card>
     </div>

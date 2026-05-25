@@ -200,7 +200,7 @@ export async function getOrCreateCompanySettings(): Promise<CompanySettings> {
 
     if (error) {
       logger.error('Error fetching company settings:', error);
-      return { id: 1, ...DEFAULT_COMPANY_SETTINGS };
+      return { id: '', ...DEFAULT_COMPANY_SETTINGS };
     }
 
     if (data) {
@@ -230,7 +230,7 @@ export async function getOrCreateCompanySettings(): Promise<CompanySettings> {
         }
       }
       logger.error('Error creating company settings:', insertError);
-      return { id: 1, ...DEFAULT_COMPANY_SETTINGS };
+      return { id: '', ...DEFAULT_COMPANY_SETTINGS };
     }
 
     cachedSettings = newData as CompanySettings;
@@ -238,7 +238,7 @@ export async function getOrCreateCompanySettings(): Promise<CompanySettings> {
     return cachedSettings;
   } catch (err) {
     logger.error('Unexpected error in getOrCreateCompanySettings:', err);
-    return { id: 1, ...DEFAULT_COMPANY_SETTINGS };
+    return { id: '', ...DEFAULT_COMPANY_SETTINGS };
   }
 }
 
@@ -314,5 +314,5 @@ export async function updateCompanySettings(updates: Partial<CompanySettings>): 
 }
 
 export function getDefaultCompanySettings(): CompanySettings {
-  return { id: 1, ...DEFAULT_COMPANY_SETTINGS };
+  return { id: '', ...DEFAULT_COMPANY_SETTINGS };
 }

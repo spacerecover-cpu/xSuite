@@ -78,7 +78,7 @@ export const TenantActivityTab: React.FC<TenantActivityTabProps> = ({ tenantId }
               <div className="space-y-6">
                 {filteredActivities.map((activity) => {
                   const Icon = activityTypeIcons[activity.activity_type] || activityTypeIcons.default;
-                  const activityData = activity.activity_data as Record<string, unknown> | null;
+                  const activityData = activity.activity_details as Record<string, unknown> | null;
 
                   return (
                     <div key={activity.id} className="relative flex gap-4">
@@ -91,14 +91,14 @@ export const TenantActivityTab: React.FC<TenantActivityTabProps> = ({ tenantId }
                             <p className="text-sm font-medium text-slate-900">
                               {activityTypeLabels[activity.activity_type] || activity.activity_type}
                             </p>
-                            {activityData?.description && (
-                              <p className="text-sm text-slate-600 mt-1">{activityData.description as string}</p>
+                            {typeof activityData?.description === 'string' && (
+                              <p className="text-sm text-slate-600 mt-1">{activityData.description}</p>
                             )}
-                            {activityData?.note && (
-                              <p className="text-sm text-slate-600 mt-1 italic">"{activityData.note as string}"</p>
+                            {typeof activityData?.note === 'string' && (
+                              <p className="text-sm text-slate-600 mt-1 italic">"{activityData.note}"</p>
                             )}
-                            {activityData?.admin_name && (
-                              <p className="text-xs text-slate-500 mt-1">by {activityData.admin_name as string}</p>
+                            {typeof activityData?.admin_name === 'string' && (
+                              <p className="text-xs text-slate-500 mt-1">by {activityData.admin_name}</p>
                             )}
                           </div>
                           <span className="text-xs text-slate-500 whitespace-nowrap">

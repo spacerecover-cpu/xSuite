@@ -27,9 +27,9 @@ const StockTransfersPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
-  const { data: transfers = [], isLoading, refetch } = useQuery({
+  const { data: transfers = [], isLoading } = useQuery({
     queryKey: stockKeys.transfers(),
-    queryFn: getStockTransfers,
+    queryFn: () => getStockTransfers(),
   });
 
   const filtered = transfers.filter((t) => {
@@ -114,7 +114,7 @@ const StockTransfersPage: React.FC = () => {
                     <td className="px-4 py-3 text-slate-700">{t.from_location?.name ?? '—'}</td>
                     <td className="px-4 py-3 text-slate-700">{t.to_location?.name ?? '—'}</td>
                     <td className="px-4 py-3 text-center font-mono text-slate-600">
-                      {t.items?.length ?? 0}
+                      {t.stock_transfer_items?.length ?? 0}
                     </td>
                     <td className="px-4 py-3 text-slate-500">{formatDate(t.created_at)}</td>
                     <td className="px-4 py-3 text-center">
@@ -136,13 +136,7 @@ const StockTransfersPage: React.FC = () => {
       </div>
 
       {showModal && (
-        <StockTransferModal
-          onClose={() => setShowModal(false)}
-          onSuccess={() => {
-            setShowModal(false);
-            refetch();
-          }}
-        />
+        <StockTransferModal onClose={() => setShowModal(false)} />
       )}
     </div>
   );

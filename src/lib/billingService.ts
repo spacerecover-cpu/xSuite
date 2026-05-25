@@ -2,13 +2,10 @@ import { supabase } from './supabaseClient';
 import type { Database } from '../types/database.types';
 
 type TenantSubscription = Database['public']['Tables']['tenant_subscriptions']['Row'];
-type TenantSubscriptionInsert = Database['public']['Tables']['tenant_subscriptions']['Insert'];
 type SubscriptionPlan = Database['public']['Tables']['subscription_plans']['Row'];
 type PlanFeature = Database['public']['Tables']['plan_features']['Row'];
 type BillingInvoice = Database['public']['Tables']['billing_invoices']['Row'];
 type BillingInvoiceItem = Database['public']['Tables']['billing_invoice_items']['Row'];
-type UsageRecord = Database['public']['Tables']['usage_records']['Row'];
-type UsageSnapshot = Database['public']['Tables']['usage_snapshots']['Row'];
 type TenantPaymentMethod = Database['public']['Tables']['tenant_payment_methods']['Row'];
 type BillingCoupon = Database['public']['Tables']['billing_coupons']['Row'];
 type CouponRedemption = Database['public']['Tables']['coupon_redemptions']['Row'];
@@ -363,7 +360,7 @@ export async function reactivateSubscription(tenantId: string): Promise<void> {
 
 export async function applyCoupon(tenantId: string, couponCode: string): Promise<void> {
   const couponValidation = await validateCoupon(couponCode);
-  if (!couponValidation.valid) {
+  if (!couponValidation.valid || !couponValidation.coupon) {
     throw new Error(couponValidation.message || 'Invalid coupon code');
   }
 
@@ -375,7 +372,7 @@ export async function applyCoupon(tenantId: string, couponCode: string): Promise
   const { error } = await supabase.from('coupon_redemptions').insert({
     tenant_id: tenantId,
     coupon_id: couponValidation.coupon.id,
-    applied_to_subscription: subscription.id,
+    subscription_id: subscription.id,
   });
 
   if (error) throw error;
@@ -585,7 +582,7 @@ export async function validateCoupon(
     return { valid: false, message: 'Coupon has expired' };
   }
 
-  if (data.max_redemptions && data.redemptions_count >= data.max_redemptions) {
+  if (data.max_redemptions && (data.redemptions_count ?? 0) >= data.max_redemptions) {
     return { valid: false, message: 'Coupon has reached maximum redemptions' };
   }
 

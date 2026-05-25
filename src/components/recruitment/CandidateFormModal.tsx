@@ -12,6 +12,7 @@ import {
   type CandidateWithJob,
   type JobWithDetails,
 } from '../../lib/recruitmentService';
+import type { Database } from '../../types/database.types';
 import toast from 'react-hot-toast';
 
 interface CandidateFormData {
@@ -23,6 +24,17 @@ interface CandidateFormData {
   rating: string;
   notes: string;
   cover_letter: string;
+}
+
+function splitName(name: string | null | undefined): { first: string; last: string } {
+  if (!name) return { first: '', last: '' };
+  const trimmed = name.trim();
+  const firstSpace = trimmed.indexOf(' ');
+  if (firstSpace === -1) return { first: trimmed, last: '' };
+  return {
+    first: trimmed.slice(0, firstSpace),
+    last: trimmed.slice(firstSpace + 1),
+  };
 }
 
 interface Props {
@@ -60,10 +72,11 @@ export const CandidateFormModal: React.FC<Props> = ({ isOpen, onClose, candidate
 
   useEffect(() => {
     if (candidate) {
+      const { first, last } = splitName(candidate.name);
       reset({
-        first_name: candidate.first_name,
-        last_name: candidate.last_name,
-        email: candidate.email,
+        first_name: first,
+        last_name: last,
+        email: candidate.email ?? '',
         phone: candidate.phone || '',
         current_stage: candidate.current_stage || 'applied',
         rating: candidate.rating?.toString() || '',
@@ -86,9 +99,9 @@ export const CandidateFormModal: React.FC<Props> = ({ isOpen, onClose, candidate
 
   const mutation = useMutation({
     mutationFn: (data: CandidateFormData) => {
+      const fullName = `${data.first_name.trim()} ${data.last_name.trim()}`.trim();
       const payload = {
-        first_name: data.first_name,
-        last_name: data.last_name,
+        name: fullName,
         email: data.email,
         phone: data.phone || null,
         current_stage: data.current_stage,
@@ -97,7 +110,7 @@ export const CandidateFormModal: React.FC<Props> = ({ isOpen, onClose, candidate
         cover_letter: data.cover_letter || null,
         job_id: job.id,
         applied_date: new Date().toISOString().split('T')[0],
-      };
+      } as Database['public']['Tables']['recruitment_candidates']['Insert'];
       return isEditing
         ? updateCandidate(candidate!.id, payload)
         : createCandidate(payload);

@@ -99,6 +99,7 @@ export const timesheetService = {
       .select()
       .maybeSingle();
     if (error) throw error;
+    if (!data) throw new Error('Failed to create timesheet');
     return data;
   },
 
@@ -110,6 +111,7 @@ export const timesheetService = {
       .select()
       .maybeSingle();
     if (error) throw error;
+    if (!data) throw new Error('Failed to update timesheet');
     return data;
   },
 
@@ -130,6 +132,7 @@ export const timesheetService = {
       .select()
       .maybeSingle();
     if (error) throw error;
+    if (!data) throw new Error('Failed to submit timesheet');
     return data;
   },
 
@@ -147,6 +150,7 @@ export const timesheetService = {
       .select()
       .maybeSingle();
     if (error) throw error;
+    if (!data) throw new Error('Failed to approve timesheet');
     return data;
   },
 
@@ -164,6 +168,7 @@ export const timesheetService = {
       .select()
       .maybeSingle();
     if (error) throw error;
+    if (!data) throw new Error('Failed to reject timesheet');
     return data;
   },
 

@@ -85,9 +85,9 @@ export default function ReportFormModal({
         });
         setSectionData(sectionMap);
 
-        // Load template
+        // Load available templates for this report type
         if (report.report_template_id) {
-          loadTemplate(report.report_type);
+          loadAvailableTemplates(report.report_type);
         }
       }
     } catch (error) {
@@ -162,7 +162,7 @@ export default function ReportFormModal({
       if (selectedTemplate.template_structure && selectedTemplate.template_structure.sections) {
         selectedTemplate.template_structure.sections.forEach((section) => {
           populatedSections[section.key] = {
-            content: section.default_content || '',
+            content: '',
             section,
           };
         });
@@ -473,7 +473,7 @@ export default function ReportFormModal({
           {/* Actions */}
           {selectedType && template && (
             <div className="flex justify-end gap-3 pt-4 border-t">
-              <Button type="button" variant="outline" onClick={handleClose}>
+              <Button type="button" variant="ghost" onClick={handleClose}>
                 Cancel
               </Button>
               <Button type="submit" disabled={loading}>

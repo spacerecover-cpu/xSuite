@@ -152,7 +152,7 @@ export const formatCurrencyWithLocale = (
   amount: number,
   locale: AccountingLocale
 ): string => {
-  const formattedNumber = amount.toFixed(locale.decimal_places);
+  const formattedNumber = amount.toFixed(locale.decimal_places ?? 2);
   const [integerPart, decimalPart] = formattedNumber.split('.');
   const formattedInteger = parseInt(integerPart).toLocaleString('en-US');
   const fullNumber = decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger;

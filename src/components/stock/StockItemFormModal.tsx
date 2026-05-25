@@ -85,29 +85,22 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
       setCategoryId(item.category_id ?? null);
       setItemType((item.item_type as 'internal' | 'saleable' | 'both') ?? 'internal');
       setBrand(item.brand ?? '');
-      setModel(item.model ?? '');
-      setCapacity(item.capacity ?? '');
-      setUnitOfMeasure(item.unit_of_measure ?? 'pcs');
+      setModel('');
+      setCapacity('');
+      setUnitOfMeasure(item.unit ?? 'pcs');
       setBarcode(item.barcode ?? '');
-      setImageUrl(item.image_url ?? '');
+      setImageUrl(item.photos?.[0] ?? '');
       setIsActive(item.is_active ?? true);
-      setIsFeatured(item.is_featured ?? false);
+      setIsFeatured(false);
       setCostPrice(item.cost_price != null ? String(item.cost_price) : '');
       setSellingPrice(item.selling_price != null ? String(item.selling_price) : '');
-      setTaxInclusive(item.tax_inclusive ?? false);
-      setWarrantyMonths(item.warranty_months != null ? String(item.warranty_months) : '');
+      setTaxInclusive(false);
+      setWarrantyMonths('');
       setMinimumQuantity(String(item.minimum_quantity ?? 0));
       setReorderQuantity(item.reorder_quantity != null ? String(item.reorder_quantity) : '');
-      setLocation(item.location ?? '');
+      setLocation('');
       setNotes(item.notes ?? '');
-
-      const specs = item.specifications as Record<string, string> | null;
-      if (specs && typeof specs === 'object' && !Array.isArray(specs)) {
-        const rows = Object.entries(specs).map(([k, v]) => ({ key: k, value: String(v) }));
-        setSpecRows(rows.length > 0 ? rows : [{ key: '', value: '' }]);
-      } else {
-        setSpecRows([{ key: '', value: '' }]);
-      }
+      setSpecRows([{ key: '', value: '' }]);
     } else {
       setName('');
       setDescription('');
@@ -134,12 +127,6 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
     setActiveTab('basic');
   }, [isOpen, item]);
 
-  const buildSpecifications = (): Record<string, string> | null => {
-    const filled = specRows.filter((r) => r.key.trim() !== '');
-    if (filled.length === 0) return null;
-    return Object.fromEntries(filled.map((r) => [r.key.trim(), r.value.trim()]));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
@@ -148,29 +135,24 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
     }
     setIsSubmitting(true);
     try {
-      const payload: StockItemInsert = {
+      const trimmedImage = imageUrl.trim();
+      // tenant_id is populated by the set_stock_items_tenant_and_audit trigger.
+      const payload = {
         name: name.trim(),
         description: description.trim() || null,
         category_id: categoryId,
         item_type: itemType,
         brand: brand.trim() || null,
-        model: model.trim() || null,
-        capacity: capacity.trim() || null,
-        unit_of_measure: unitOfMeasure.trim() || 'pcs',
+        unit: unitOfMeasure.trim() || 'pcs',
         barcode: barcode.trim() || null,
-        image_url: imageUrl.trim() || null,
+        photos: trimmedImage ? [trimmedImage] : null,
         is_active: isActive,
-        is_featured: isFeatured,
         cost_price: costPrice !== '' ? parseFloat(costPrice) : null,
         selling_price: isSaleable && sellingPrice !== '' ? parseFloat(sellingPrice) : null,
-        tax_inclusive: taxInclusive,
-        warranty_months: warrantyMonths !== '' ? parseInt(warrantyMonths, 10) : null,
         minimum_quantity: parseInt(minimumQuantity, 10) || 0,
         reorder_quantity: reorderQuantity !== '' ? parseInt(reorderQuantity, 10) : null,
-        location: location.trim() || null,
         notes: notes.trim() || null,
-        specifications: buildSpecifications(),
-      };
+      } as StockItemInsert;
 
       if (item) {
         await updateStockItem(item.id, payload);

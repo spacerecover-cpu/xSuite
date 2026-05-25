@@ -62,13 +62,15 @@ interface CloneDriveCardProps {
   onDelete?: (clone: CloneDrive) => void;
 }
 
-const statusConfig: Record<string, { label: string; color: string }> = {
-  active: { label: 'Active', color: 'bg-info-muted text-info border-info/20' },
-  delivered: { label: 'Delivered', color: 'bg-success-muted text-success border-success/20' },
-  preserved: { label: 'Preserved', color: 'bg-primary/10 text-primary border-primary/20' },
-  archived: { label: 'Archived', color: 'bg-slate-100 text-slate-700 border-slate-200' },
-  overwritten: { label: 'Overwritten', color: 'bg-warning-muted text-warning border-warning/20' },
-  deleted: { label: 'Deleted', color: 'bg-danger-muted text-danger border-danger/20' },
+type BadgeVariant = 'default' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'custom';
+
+const statusConfig: Record<string, { label: string; color: BadgeVariant }> = {
+  active: { label: 'Active', color: 'info' },
+  delivered: { label: 'Delivered', color: 'success' },
+  preserved: { label: 'Preserved', color: 'info' },
+  archived: { label: 'Archived', color: 'secondary' },
+  overwritten: { label: 'Overwritten', color: 'warning' },
+  deleted: { label: 'Deleted', color: 'danger' },
 };
 
 export const CloneDriveCard: React.FC<CloneDriveCardProps> = ({

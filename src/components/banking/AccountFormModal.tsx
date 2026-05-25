@@ -154,7 +154,7 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
       }
 
       const accountData: Partial<BankAccount> = {
-        name: formData.account_name.trim(),
+        account_name: formData.account_name.trim(),
         account_type: formData.account_type,
         bank_name: formData.account_type === 'bank' ? formData.bank_name.trim() : formData.account_type,
         branch_code: formData.branch_code?.trim() || undefined,
@@ -318,9 +318,9 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
                   required
                 >
                   <option value="">Select Employee</option>
-                  {employees.map((emp: { id: string; first_name?: string; last_name?: string; employee_number?: string }) => (
+                  {employees.map((emp) => (
                     <option key={emp.id} value={emp.id}>
-                      {emp.full_name}
+                      {emp.full_name ?? '(Unnamed)'}
                     </option>
                   ))}
                 </select>
@@ -363,7 +363,7 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             >
               <option value="">{defaultCurrency ? `${defaultCurrency.code} (Default)` : 'Select Currency'}</option>
-              {currencies.map((curr: { code: string; name: string; symbol?: string }) => (
+              {currencies.map((curr) => (
                 <option key={curr.id} value={curr.id}>
                   {curr.code} - {curr.name} ({curr.symbol})
                 </option>

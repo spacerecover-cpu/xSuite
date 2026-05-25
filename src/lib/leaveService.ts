@@ -66,6 +66,7 @@ export const leaveService = {
       .select()
       .maybeSingle();
     if (error) throw error;
+    if (!data) throw new Error('Failed to create leave type');
     return data;
   },
 
@@ -77,6 +78,7 @@ export const leaveService = {
       .select()
       .maybeSingle();
     if (error) throw error;
+    if (!data) throw new Error('Failed to update leave type');
     return data;
   },
 
@@ -133,6 +135,7 @@ export const leaveService = {
       .select()
       .maybeSingle();
     if (error) throw error;
+    if (!data) throw new Error('Failed to create leave request');
     return data;
   },
 
@@ -144,6 +147,7 @@ export const leaveService = {
       .select()
       .maybeSingle();
     if (error) throw error;
+    if (!data) throw new Error('Failed to update leave request');
     return data;
   },
 
@@ -161,6 +165,7 @@ export const leaveService = {
       .select()
       .maybeSingle();
     if (error) throw error;
+    if (!data) throw new Error('Failed to approve leave request');
     return data;
   },
 
@@ -178,6 +183,7 @@ export const leaveService = {
       .select()
       .maybeSingle();
     if (error) throw error;
+    if (!data) throw new Error('Failed to reject leave request');
     return data;
   },
 
@@ -218,6 +224,7 @@ export const leaveService = {
       .select()
       .maybeSingle();
     if (error) throw error;
+    if (!data) throw new Error('Failed to upsert leave balance');
     return data;
   },
 
@@ -229,6 +236,7 @@ export const leaveService = {
       .select()
       .maybeSingle();
     if (error) throw error;
+    if (!data) throw new Error('Failed to update leave balance');
     return data;
   },
 

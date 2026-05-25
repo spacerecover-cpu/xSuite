@@ -7,7 +7,7 @@ import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
-import { getReportStatusConfig } from '../../lib/reportTypes';
+import { getReportStatusConfig, type ReportStatus } from '../../lib/reportTypes';
 import { reportPDFService } from '../../lib/reportPDFService';
 import { format } from 'date-fns';
 import { sanitizeHtml } from '../../lib/sanitizeHtml';
@@ -92,7 +92,7 @@ export default function PortalReports() {
   const handleDownload = async (report: PortalReport) => {
     try {
       setDownloadingReportId(report.id);
-      await reportPDFService.downloadReportPDF(report.id, `${report.report_number}.pdf`);
+      await reportPDFService.downloadReportPDF(report.id);
       await refetch();
     } catch (error) {
       logger.error('Error downloading report:', error);
@@ -184,7 +184,12 @@ export default function PortalReports() {
 
           <div className="space-y-3">
             {caseReports.map((report) => {
-              const statusConfig = getReportStatusConfig(report.status);
+              const status = (['draft', 'review', 'approved', 'sent'] as const).includes(
+                report.status as ReportStatus
+              )
+                ? (report.status as ReportStatus)
+                : 'draft';
+              const statusConfig = getReportStatusConfig(status);
 
               return (
                 <div
@@ -226,7 +231,7 @@ export default function PortalReports() {
 
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={() => handleView(report.id)}
                       >
@@ -234,7 +239,7 @@ export default function PortalReports() {
                         View
                       </Button>
                       <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={() => handleDownload(report)}
                         disabled={downloadingReportId === report.id}
@@ -274,9 +279,9 @@ interface ReportData {
 
 interface ReportSection {
   id: string;
-  section_title: string;
-  section_content: string | null;
-  section_order: number;
+  title: string | null;
+  content: string | null;
+  sort_order: number | null;
 }
 
 function PortalReportViewModal({ reportId, onClose }: PortalReportViewModalProps) {
@@ -301,13 +306,13 @@ function PortalReportViewModal({ reportId, onClose }: PortalReportViewModalProps
           .maybeSingle(),
         supabase
           .from('case_report_sections')
-          .select('id, section_title, section_content, section_order')
+          .select('id, title, content, sort_order')
           .eq('report_id', reportId)
-          .order('section_order'),
+          .order('sort_order'),
       ]);
 
       if (reportRes.data) setReport(reportRes.data as ReportData);
-      if (sectionsRes.data) setSections(sectionsRes.data as ReportSection[]);
+      if (sectionsRes.data) setSections(sectionsRes.data ?? []);
     } catch (error) {
       logger.error('Error loading report:', error);
     } finally {
@@ -334,10 +339,10 @@ function PortalReportViewModal({ reportId, onClose }: PortalReportViewModalProps
     >
       <div className="space-y-6">
         {sections.map((section) => {
-          const safeHtml = sanitizeHtml(section.section_content || 'No content');
+          const safeHtml = sanitizeHtml(section.content || 'No content');
           return (
             <div key={section.id} className="border-l-4 border-primary pl-4">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">{section.section_title}</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">{section.title ?? 'Section'}</h3>
               <div
                 className="prose max-w-none text-gray-700"
                 /* eslint-disable-next-line react/no-danger */

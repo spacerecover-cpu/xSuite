@@ -59,12 +59,11 @@ export function StockTransactionModal({
     if (!form.quantity || isNaN(qty) || qty <= 0) {
       next.quantity = 'Quantity must be a positive number';
     }
-    if (
-      mode === 'usage' &&
-      item &&
-      qty > item.current_quantity - item.reserved_quantity
-    ) {
-      next.quantity = `Only ${item.current_quantity - item.reserved_quantity} units available`;
+    if (mode === 'usage' && item) {
+      const itemAvailable = (item.current_quantity ?? 0) - (item.quantity_reserved ?? 0);
+      if (qty > itemAvailable) {
+        next.quantity = `Only ${itemAvailable} units available`;
+      }
     }
     if (
       mode === 'receipt' &&
@@ -116,7 +115,7 @@ export function StockTransactionModal({
   };
 
   const available =
-    item ? item.current_quantity - item.reserved_quantity : 0;
+    item ? (item.current_quantity ?? 0) - (item.quantity_reserved ?? 0) : 0;
 
   const titleText = mode === 'receipt' ? 'Receive Stock' : 'Record Usage';
   const TitleIcon = mode === 'receipt' ? PackagePlus : PackageMinus;
@@ -139,8 +138,8 @@ export function StockTransactionModal({
             <p className="text-xs text-slate-400 font-mono mt-0.5">{item.sku}</p>
           )}
           <div className="flex gap-4 mt-2 text-xs text-slate-600">
-            <span>In stock: <strong>{item.current_quantity}</strong></span>
-            <span>Reserved: <strong>{item.reserved_quantity}</strong></span>
+            <span>In stock: <strong>{item.current_quantity ?? 0}</strong></span>
+            <span>Reserved: <strong>{item.quantity_reserved ?? 0}</strong></span>
             {mode === 'usage' && (
               <span>Available: <strong>{available}</strong></span>
             )}

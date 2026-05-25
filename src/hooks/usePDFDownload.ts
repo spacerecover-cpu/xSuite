@@ -83,7 +83,7 @@ export function usePDFDownload() {
           setResourceError('Failed to load company settings');
           setSettingsReady(false);
         } else {
-          setCompanySettings(data || null);
+          setCompanySettings((data as unknown as CompanySettings) || null);
           setSettingsReady(true);
           setSettingsError(false);
         }

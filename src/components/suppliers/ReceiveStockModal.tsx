@@ -67,8 +67,8 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
   });
 
   const stockOptions = stockItems.map((item) => ({
-    value: item.id,
-    label: `${item.name}${item.sku ? ` (${item.sku})` : ''}${item.brand ? ` — ${item.brand}` : ''}`,
+    id: item.id,
+    name: `${item.name}${item.sku ? ` (${item.sku})` : ''}${item.brand ? ` — ${item.brand}` : ''}`,
   }));
 
   const updateRow = (index: number, updates: Partial<ReceiveRow>) => {
@@ -145,10 +145,9 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="md:col-span-3">
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Stock Item <span className="text-slate-400">(required)</span>
-                  </label>
                   <SearchableSelect
+                    label="Stock Item"
+                    required
                     options={stockOptions}
                     value={row.stockItemId}
                     onChange={(val) => updateRow(index, { stockItemId: val })}
@@ -194,7 +193,7 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
                   />
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     onClick={() => addSerial(index)}
                   >
@@ -226,16 +225,17 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
         </div>
 
         <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button
             onClick={() => mutation.mutate()}
             disabled={validCount === 0 || mutation.isPending}
-            isLoading={mutation.isPending}
           >
             <PackageCheck className="w-4 h-4 mr-2" />
-            Receive {validCount > 0 ? `${validCount} Item${validCount !== 1 ? 's' : ''}` : 'Stock'}
+            {mutation.isPending
+              ? 'Receiving...'
+              : `Receive ${validCount > 0 ? `${validCount} Item${validCount !== 1 ? 's' : ''}` : 'Stock'}`}
           </Button>
         </div>
       </div>

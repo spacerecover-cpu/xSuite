@@ -273,7 +273,7 @@ export const RolePermissions: React.FC = () => {
             {hasChanges && selectedRole !== 'admin' && (
               <div className="flex items-center gap-2">
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   onClick={handleResetChanges}
                   disabled={saving}
                   className="gap-2"

@@ -21,7 +21,7 @@ interface LoanFormModalProps {
 
 export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose }) => {
   const { formatCurrency } = useCurrency();
-  const { showToast } = useToast();
+  const toast = useToast();
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({
@@ -59,11 +59,11 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
     mutationFn: (data: Parameters<typeof payrollService.createEmployeeLoan>[0]) => payrollService.createEmployeeLoan(data),
     onSuccess: (loan) => {
       queryClient.invalidateQueries({ queryKey: payrollKeys.loans() });
-      showToast(`Loan ${loan.loan_number} created successfully`, 'success');
+      toast.success(`Loan ${loan.loan_number ?? ''} created successfully`);
       onClose();
     },
     onError: (error: unknown) => {
-      showToast(error instanceof Error ? error.message : 'Failed to create loan', 'error');
+      toast.error(error instanceof Error ? error.message : 'Failed to create loan');
     },
   });
 
@@ -99,30 +99,32 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
     e.preventDefault();
 
     if (!formData.employee_id) {
-      showToast('Please select an employee', 'error');
+      toast.error('Please select an employee');
       return;
     }
 
     if (!formData.principal_amount || parseFloat(formData.principal_amount) <= 0) {
-      showToast('Please enter a valid principal amount', 'error');
+      toast.error('Please enter a valid principal amount');
       return;
     }
 
     if (parseInt(formData.installments_count) < 1) {
-      showToast('Number of installments must be at least 1', 'error');
+      toast.error('Number of installments must be at least 1');
       return;
     }
 
+    const principal = parseFloat(formData.principal_amount);
     const loanData = {
+      tenant_id: '' as string,
       employee_id: formData.employee_id,
       loan_type: formData.loan_type,
-      principal_amount: parseFloat(formData.principal_amount),
+      amount: principal,
       interest_rate: parseFloat(formData.interest_rate) || 0,
       total_amount: calculatedValues.totalAmount,
       installment_amount: calculatedValues.installmentAmount,
-      installments_count: parseInt(formData.installments_count),
-      installments_paid: 0,
-      remaining_balance: calculatedValues.totalAmount,
+      installments: parseInt(formData.installments_count),
+      paid_installments: 0,
+      remaining_amount: calculatedValues.totalAmount,
       start_date: formData.start_date,
       end_date: calculatedValues.endDate,
       status: 'pending',
@@ -141,13 +143,12 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Employee <span className="text-danger">*</span>
-            </label>
             <SearchableSelect
+              label="Employee"
+              required
               options={employees.map((emp) => ({
-                value: emp.id,
-                label: `${emp.first_name} ${emp.last_name} (${emp.employee_number})`,
+                id: emp.id,
+                name: `${emp.first_name} ${emp.last_name}${emp.employee_number ? ` (${emp.employee_number})` : ''}`,
               }))}
               value={formData.employee_id}
               onChange={(value) => handleChange('employee_id', value)}

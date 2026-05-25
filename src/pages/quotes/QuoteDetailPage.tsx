@@ -8,6 +8,7 @@ import {
   duplicateQuote,
   updateQuote,
 } from '../../lib/quotesService';
+import type { Quote } from '../../lib/quotesService';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -109,7 +110,7 @@ export const QuoteDetailPage: React.FC = () => {
   });
 
   const handleDownloadPDF = async () => {
-    if (!quote) return;
+    if (!quote?.id) return;
 
     setIsGenerating(true);
     try {
@@ -127,18 +128,21 @@ export const QuoteDetailPage: React.FC = () => {
     }
   };
 
-  const handleEditQuote = async (quoteData: Record<string, unknown> & { title: string; status: string; valid_until: string; client_reference?: string; tax_rate: number; discount_amount: number; discount_type: string; terms_and_conditions?: string; bank_account_id?: string }, items: Array<{ description: string; quantity: number; unit_price: number; tax_rate?: number; discount_percent?: number; sort_order?: number }>) => {
+  const handleEditQuote = async (
+    quoteData: Record<string, unknown>,
+    items: Array<{ description: string; quantity: number; unit_price: number; unit?: string }>,
+  ): Promise<void> => {
     try {
       await updateQuote(id!, {
-        title: quoteData.title,
-        status: quoteData.status,
-        valid_until: quoteData.valid_until,
-        client_reference: quoteData.client_reference,
-        tax_rate: quoteData.tax_rate,
-        discount_amount: quoteData.discount_amount,
-        discount_type: quoteData.discount_type,
-        terms_and_conditions: quoteData.terms_and_conditions,
-        bank_account_id: quoteData.bank_account_id,
+        title: typeof quoteData.title === 'string' ? quoteData.title : undefined,
+        status: typeof quoteData.status === 'string' ? (quoteData.status as Quote['status']) : 'draft',
+        valid_until: typeof quoteData.valid_until === 'string' ? quoteData.valid_until : undefined,
+        client_reference: typeof quoteData.client_reference === 'string' ? quoteData.client_reference : undefined,
+        tax_rate: typeof quoteData.tax_rate === 'number' ? quoteData.tax_rate : undefined,
+        discount_amount: typeof quoteData.discount_amount === 'number' ? quoteData.discount_amount : undefined,
+        discount_type: typeof quoteData.discount_type === 'string' ? (quoteData.discount_type as Quote['discount_type']) : undefined,
+        terms_and_conditions: typeof quoteData.terms_and_conditions === 'string' ? quoteData.terms_and_conditions : undefined,
+        bank_account_id: typeof quoteData.bank_account_id === 'string' ? quoteData.bank_account_id : undefined,
       }, items);
 
       queryClient.invalidateQueries({ queryKey: ['quote', id] });
@@ -472,10 +476,6 @@ export const QuoteDetailPage: React.FC = () => {
 
         <PageHeader
           title={`Quote ${quote.quote_number || 'Draft'}`}
-          breadcrumbs={[
-            { label: 'Quotes', href: '/quotes' },
-            { label: quote.quote_number || 'Draft' },
-          ]}
         />
 
         <div className="flex flex-col xl:grid xl:grid-cols-3 gap-6 mb-6">
@@ -485,7 +485,7 @@ export const QuoteDetailPage: React.FC = () => {
                 quote={quote}
                 companySettings={companySettings}
                 currencyFormat={currencyFormat}
-                t={t}
+                t={(key: string, fallback: string) => t(key as Parameters<typeof t>[0], fallback)}
                 elementId="quote-print-content"
               />
             </div>
@@ -615,12 +615,12 @@ export const QuoteDetailPage: React.FC = () => {
                       .from('quote_items')
                       .select('*')
                       .eq('quote_id', id!);
-                    const current = (existingItems ?? []).map((i: { description: string; quantity: number; unit_price: number }) => ({
+                    const current = (existingItems ?? []).map((i) => ({
                       description: i.description,
-                      quantity: i.quantity,
+                      quantity: i.quantity ?? 0,
                       unit_price: i.unit_price,
                     }));
-                    await updateQuote(id!, quote as Record<string, unknown>, [...current, ...newItems]);
+                    await updateQuote(id!, quote as unknown as Partial<Quote>, [...current, ...newItems]);
                     queryClient.invalidateQueries({ queryKey: ['quote', id] });
                     toast.success(`${newItems.length} device${newItems.length !== 1 ? 's' : ''} added to quote`);
                   }}
@@ -635,7 +635,7 @@ export const QuoteDetailPage: React.FC = () => {
                 <div>
                   <span className="text-slate-600">Created:</span>
                   <span className="ml-2 text-slate-900 font-medium">
-                    {new Date(quote.created_at).toLocaleDateString()}
+                    {quote.created_at ? new Date(quote.created_at).toLocaleDateString() : 'N/A'}
                   </span>
                 </div>
                 {quote.valid_until && (
@@ -765,7 +765,7 @@ export const QuoteDetailPage: React.FC = () => {
           caseId={quote.case_id}
           customerId={quote.customer_id}
           companyId={quote.company_id}
-          initialData={quote}
+          initialData={quote as unknown as Record<string, unknown>}
           clientReference={quote.client_reference}
         />
       )}
@@ -776,7 +776,7 @@ export const QuoteDetailPage: React.FC = () => {
           isOpen={showConvertModal}
           onClose={() => setShowConvertModal(false)}
           onConvert={handleConvertToInvoice}
-          quote={quote}
+          quote={quote as unknown as React.ComponentProps<typeof ConvertToInvoiceModal>['quote']}
           isConverting={isConverting}
         />
       )}

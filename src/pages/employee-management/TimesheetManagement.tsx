@@ -91,8 +91,11 @@ function TimesheetEntryModal({ entry, employees, onClose, onSave, currentUserId,
       if (isNaN(hours) || hours <= 0) throw new Error('Please enter valid hours (greater than 0)');
       if (hours > 24) throw new Error('Hours cannot exceed 24');
 
+      // tenant_id is populated by the timesheets trigger. The table also
+      // has a legacy NOT NULL `date` column kept in sync with `work_date`.
       const payload = {
         employee_id: form.employee_id,
+        date: form.work_date,
         work_date: form.work_date,
         project_name: form.project_name || null,
         task_description: form.task_description || null,
@@ -102,9 +105,9 @@ function TimesheetEntryModal({ entry, employees, onClose, onSave, currentUserId,
       };
 
       if (entry) {
-        return timesheetService.updateTimesheet(entry.id, payload);
+        return timesheetService.updateTimesheet(entry.id, payload as Parameters<typeof timesheetService.updateTimesheet>[1]);
       }
-      return timesheetService.createTimesheet(payload);
+      return timesheetService.createTimesheet(payload as Parameters<typeof timesheetService.createTimesheet>[0]);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: timesheetKeys.all });
@@ -277,7 +280,7 @@ function ApproveRejectModal({ entry, action, onClose, onDone, currentUserId }: A
           {action === 'approve' ? 'Approve' : 'Reject'} timesheet for{' '}
           <span className="font-semibold text-slate-800">{empName}</span> on{' '}
           <span className="font-semibold text-slate-800">
-            {format(parseISO(entry.work_date), 'MMM d, yyyy')}
+            {format(parseISO(entry.work_date ?? ''), 'MMM d, yyyy')}
           </span>{' '}
           ({entry.hours}h)?
         </p>
@@ -412,6 +415,7 @@ export function TimesheetManagement() {
     const m: Record<string, number> = {};
     timesheets.forEach(t => {
       const d = t.work_date;
+      if (!d) return;
       m[d] = (m[d] ?? 0) + t.hours;
     });
     return m;
@@ -629,7 +633,7 @@ export function TimesheetManagement() {
                           </td>
                         )}
                         <td className="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">
-                          {format(parseISO(entry.work_date), 'MMM d, yyyy')}
+                          {format(parseISO(entry.work_date ?? ''), 'MMM d, yyyy')}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-700 max-w-[150px] truncate">
                           {entry.project_name ?? <span className="text-slate-400">—</span>}
@@ -945,7 +949,7 @@ export function TimesheetManagement() {
                                   <tbody>
                                     {row.entries.map(e => (
                                       <tr key={e.id} className="border-b border-slate-50 last:border-0">
-                                        <td className="px-3 py-2 text-slate-600">{format(parseISO(e.work_date), 'MMM d')}</td>
+                                        <td className="px-3 py-2 text-slate-600">{format(parseISO(e.work_date ?? ''), 'MMM d')}</td>
                                         <td className="px-3 py-2 text-slate-600">{e.project_name ?? '—'}</td>
                                         <td className="px-3 py-2 text-slate-500 max-w-[200px] truncate">{e.task_description ?? '—'}</td>
                                         <td className="px-3 py-2 text-center font-medium text-primary">{e.hours}h</td>

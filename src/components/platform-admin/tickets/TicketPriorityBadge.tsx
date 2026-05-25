@@ -6,12 +6,12 @@ interface TicketPriorityBadgeProps {
 }
 
 export const TicketPriorityBadge: React.FC<TicketPriorityBadgeProps> = ({ priority }) => {
-  const getVariant = () => {
+  const getVariant = (): 'default' | 'info' | 'warning' | 'danger' => {
     switch (priority) {
       case 'low': return 'default';
       case 'medium': return 'info';
       case 'high': return 'warning';
-      case 'urgent': return 'error';
+      case 'urgent': return 'danger';
       default: return 'default';
     }
   };

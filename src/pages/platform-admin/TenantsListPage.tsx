@@ -86,7 +86,7 @@ export const TenantsListPage: React.FC = () => {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              icon={Search}
+              leftIcon={<Search className="w-4 h-4" />}
             />
           </div>
 
@@ -182,13 +182,13 @@ export const TenantsListPage: React.FC = () => {
                   <tr key={tenant.id} className="hover:bg-slate-50">
                     <td className="px-6 py-4">
                       <div>
-                        <p className="font-medium text-slate-900">{tenant.company_name}</p>
-                        <p className="text-sm text-slate-600">{tenant.email}</p>
+                        <p className="font-medium text-slate-900">{tenant.name}</p>
+                        <p className="text-sm text-slate-600">{tenant.slug}</p>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <Badge variant="default">
-                        {tenant.subscription?.plan_code || 'No Plan'}
+                        {tenant.subscription?.plan_id || 'No Plan'}
                       </Badge>
                     </td>
                     <td className="px-6 py-4">
@@ -213,17 +213,17 @@ export const TenantsListPage: React.FC = () => {
                           <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden max-w-20">
                             <div
                               className={`h-full ${
-                                tenant.health.health_score >= 70
+                                (tenant.health.health_score ?? 0) >= 70
                                   ? 'bg-success'
-                                  : tenant.health.health_score >= 50
+                                  : (tenant.health.health_score ?? 0) >= 50
                                   ? 'bg-warning'
                                   : 'bg-danger'
                               }`}
-                              style={{ width: `${tenant.health.health_score}%` }}
+                              style={{ width: `${tenant.health.health_score ?? 0}%` }}
                             />
                           </div>
                           <span className="text-sm font-medium text-slate-700">
-                            {tenant.health.health_score}
+                            {tenant.health.health_score ?? 0}
                           </span>
                         </div>
                       ) : (

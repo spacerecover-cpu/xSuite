@@ -85,7 +85,7 @@ export const AdminPanel: React.FC = () => {
       if (auditError) throw auditError;
 
       if (auditData && auditData.length > 0) {
-        const userIds = [...new Set(auditData.map(a => a.user_id))];
+        const userIds = [...new Set(auditData.map(a => a.performed_by).filter((id): id is string => !!id))];
 
         const { data: profilesData } = await supabase
           .from('profiles')
@@ -98,7 +98,7 @@ export const AdminPanel: React.FC = () => {
 
         const enrichedData = auditData.map(audit => ({
           ...audit,
-          profiles: profilesMap.get(audit.user_id) || { full_name: 'Unknown' }
+          profiles: (audit.performed_by ? profilesMap.get(audit.performed_by) : null) || { full_name: 'Unknown' }
         }));
 
         setRecentActivity(enrichedData);
@@ -174,31 +174,23 @@ export const AdminPanel: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatsCard
           title="Total Users"
-          value={stats.totalUsers}
+          value={String(stats.totalUsers)}
           icon={Users}
-          trend={`${stats.activeUsers} active`}
-          trendDirection="up"
         />
         <StatsCard
           title="Active Sessions"
-          value={stats.activeUsers}
+          value={String(stats.activeUsers)}
           icon={Activity}
-          trend="Currently online"
-          trendDirection="neutral"
         />
         <StatsCard
           title="System Logs"
-          value={stats.totalLogs}
+          value={String(stats.totalLogs)}
           icon={FileText}
-          trend="All time"
-          trendDirection="neutral"
         />
         <StatsCard
           title="Recent Errors"
-          value={stats.recentErrors}
+          value={String(stats.recentErrors)}
           icon={AlertTriangle}
-          trend="Last 24 hours"
-          trendDirection={stats.recentErrors > 0 ? 'down' : 'up'}
         />
       </div>
 
@@ -251,7 +243,7 @@ export const AdminPanel: React.FC = () => {
                     <p className="text-sm text-slate-900">
                       <span className="font-medium">{activity.profiles?.full_name || 'Unknown'}</span>
                       {' '}
-                      {activity.action_type}d {activity.table_name}
+                      {activity.action}d {activity.record_type}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
                       <Clock className="w-3 h-3 text-slate-400" />

@@ -34,7 +34,7 @@ export const ChangeClientModal: React.FC<ChangeClientModalProps> = ({
     queryFn: async () => {
       const { data, error } = await supabase
         .from('customers_enhanced')
-        .select('id, customer_number, customer_name, email, mobile_number, city, country')
+        .select('id, customer_number, customer_name, email, mobile_number, city_id, country_id')
         .eq('is_active', true)
         .order('customer_name');
 

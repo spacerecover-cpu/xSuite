@@ -58,7 +58,7 @@ export function CompleteAssignmentModal({
       isOpen={isOpen}
       onClose={handleClose}
       title="Mark as Working & Free for Reuse"
-      className="!max-w-lg"
+      size="md"
     >
       <div className="space-y-2">
         <div className="bg-success-muted border border-success/30 rounded-lg p-2">
@@ -145,7 +145,7 @@ export function CompleteAssignmentModal({
         <div className="flex justify-end space-x-2 pt-2 border-t border-slate-200">
           <Button
             onClick={handleClose}
-            variant="outline"
+            variant="secondary"
             disabled={loading}
           >
             Cancel

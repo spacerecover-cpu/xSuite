@@ -17,7 +17,7 @@ import { logger } from '../../lib/logger';
 
 interface Company {
   id: string;
-  company_number: string;
+  company_number: string | null;
   name: string;
   company_name: string | null;
   tax_number: string | null;
@@ -29,7 +29,7 @@ interface Company {
   city_id: string | null;
   address: string | null;
   notes: string | null;
-  is_active: boolean;
+  is_active: boolean | null;
   created_at: string;
   master_industries: { id: string; name: string } | null;
   geo_countries: { name: string } | null;
@@ -53,13 +53,14 @@ interface Contact {
 
 interface Communication {
   id: string;
-  communication_type: string;
+  type: string;
   subject: string | null;
   content: string | null;
   direction: string | null;
+  status: string | null;
   created_at: string;
-  created_by: string | null;
-  profiles: {
+  sent_by: string | null;
+  profiles?: {
     full_name: string;
   } | null;
 }
@@ -86,6 +87,7 @@ export const CompanyProfilePage: React.FC = () => {
   const { data: company, isLoading } = useQuery({
     queryKey: ['company', id],
     queryFn: async () => {
+      if (!id) return null;
       const { data, error } = await supabase
         .from('companies')
         .select(`
@@ -98,7 +100,7 @@ export const CompanyProfilePage: React.FC = () => {
         .maybeSingle();
 
       if (error) throw error;
-      return data as Company | null;
+      return data as unknown as Company | null;
     },
     enabled: !!id,
   });
@@ -106,6 +108,7 @@ export const CompanyProfilePage: React.FC = () => {
   const { data: contacts = [] } = useQuery({
     queryKey: ['company_contacts', id],
     queryFn: async () => {
+      if (!id) return [];
       const { data, error } = await supabase
         .from('customer_company_relationships')
         .select(`
@@ -126,7 +129,7 @@ export const CompanyProfilePage: React.FC = () => {
         logger.error('Error fetching contacts:', error);
         return [];
       }
-      return (data as Contact[]) || [];
+      return ((data as unknown) as Contact[]) || [];
     },
     enabled: !!id,
   });
@@ -134,22 +137,27 @@ export const CompanyProfilePage: React.FC = () => {
   const { data: communications = [] } = useQuery({
     queryKey: ['company_communications', id],
     queryFn: async () => {
+      if (!id) return [];
+      // Fetch communications for all customers linked to this company
+      const customerIds = contacts.map(c => c.customers_enhanced?.id).filter((v): v is string => Boolean(v));
+      if (customerIds.length === 0) return [];
+
       const { data, error } = await supabase
         .from('customer_communications')
         .select(`
           *,
           profiles (full_name)
         `)
-        .eq('company_id', id)
+        .in('customer_id', customerIds)
         .order('created_at', { ascending: false });
 
       if (error) {
         logger.error('Error fetching communications:', error);
         return [];
       }
-      return (data as Communication[]) || [];
+      return ((data as unknown) as Communication[]) || [];
     },
-    enabled: !!id,
+    enabled: !!id && contacts.length > 0,
   });
 
   const { data: companyInsights = {
@@ -222,8 +230,8 @@ export const CompanyProfilePage: React.FC = () => {
 
         return {
           totalCases: cases?.length || 0,
-          completedCases: cases?.filter(c => completedStatuses.includes(c.status.toLowerCase())).length || 0,
-          pendingCases: cases?.filter(c => pendingStatuses.includes(c.status.toLowerCase())).length || 0,
+          completedCases: cases?.filter(c => c.status && completedStatuses.includes(c.status.toLowerCase())).length || 0,
+          pendingCases: cases?.filter(c => c.status && pendingStatuses.includes(c.status.toLowerCase())).length || 0,
           totalRevenue,
           totalQuotes,
           approvedQuotes,
@@ -293,6 +301,7 @@ export const CompanyProfilePage: React.FC = () => {
 
   const updateMutation = useMutation({
     mutationFn: async (updatedData: typeof editFormData) => {
+      if (!id) throw new Error('Company id is required');
       const { data, error } = await supabase
         .from('companies')
         .update({
@@ -310,7 +319,7 @@ export const CompanyProfilePage: React.FC = () => {
         })
         .eq('id', id)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data;
@@ -608,15 +617,15 @@ export const CompanyProfilePage: React.FC = () => {
                         <div key={comm.id} className="flex gap-3 pb-3 border-b border-slate-100 last:border-0 last:pb-0">
                           <div
                             className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: getCommunicationColor(comm.communication_type) + '20' }}
+                            style={{ backgroundColor: getCommunicationColor(comm.type) + '20' }}
                           >
-                            <div style={{ color: getCommunicationColor(comm.communication_type) }}>
-                              {getCommunicationIcon(comm.communication_type)}
+                            <div style={{ color: getCommunicationColor(comm.type) }}>
+                              {getCommunicationIcon(comm.type)}
                             </div>
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-slate-900 truncate">
-                              {comm.subject || comm.communication_type}
+                              {comm.subject || comm.type}
                             </p>
                             <p className="text-xs text-slate-500">{formatDate(comm.created_at)}</p>
                           </div>
@@ -793,18 +802,18 @@ export const CompanyProfilePage: React.FC = () => {
                       <div className="flex items-start gap-3">
                         <div
                           className="w-10 h-10 rounded-lg flex items-center justify-center text-white"
-                          style={{ backgroundColor: getCommunicationColor(comm.communication_type) }}
+                          style={{ backgroundColor: getCommunicationColor(comm.type) }}
                         >
-                          {getCommunicationIcon(comm.communication_type)}
+                          {getCommunicationIcon(comm.type)}
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <Badge
                               variant="custom"
-                              color={getCommunicationColor(comm.communication_type)}
+                              color={getCommunicationColor(comm.type)}
                               size="sm"
                             >
-                              {comm.communication_type}
+                              {comm.type}
                             </Badge>
                             {comm.direction && (
                               <Badge variant="default" size="sm">

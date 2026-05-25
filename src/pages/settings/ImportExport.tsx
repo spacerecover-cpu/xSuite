@@ -102,7 +102,7 @@ export const ImportExport: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <PageHeader
         title="Import / Export"
-        subtitle="Migrate data from your legacy ERP system or export current data"
+        description="Migrate data from your legacy ERP system or export current data"
         icon={Database}
       />
 

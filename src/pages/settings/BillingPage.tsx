@@ -30,6 +30,13 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 
+type BadgeVariant = 'default' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'custom';
+
+function mapBadgeVariant(legacy: 'default' | 'success' | 'warning' | 'error'): BadgeVariant {
+  if (legacy === 'error') return 'danger';
+  return legacy;
+}
+
 export default function BillingPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -154,17 +161,17 @@ export default function BillingPage() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Current Plan</h3>
-                <Badge variant={getSubscriptionStatusColor(status)}>
+                <Badge variant={mapBadgeVariant(getSubscriptionStatusColor(status))}>
                   {getSubscriptionStatusLabel(status)}
                 </Badge>
               </div>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => navigate('/settings/plans')}>
+              <Button variant="secondary" onClick={() => navigate('/settings/plans')}>
                 Change Plan
               </Button>
               {isActive && !isCancelled && (
-                <Button variant="outline" onClick={() => setShowCancelDialog(true)}>
+                <Button variant="secondary" onClick={() => setShowCancelDialog(true)}>
                   Cancel
                 </Button>
               )}
@@ -304,10 +311,12 @@ export default function BillingPage() {
                         {invoice.invoice_number}
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-600">
-                        {format(new Date(invoice.invoice_date), 'MMM d, yyyy')}
+                        {invoice.invoice_date
+                          ? format(new Date(invoice.invoice_date), 'MMM d, yyyy')
+                          : '—'}
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-900">
-                        {formatPrice(invoice.amount_cents)}
+                        {formatPrice(Math.round(Number(invoice.total ?? 0) * 100))}
                       </td>
                       <td className="py-3 px-4">
                         <Badge
@@ -316,7 +325,7 @@ export default function BillingPage() {
                               ? 'success'
                               : invoice.status === 'pending'
                               ? 'warning'
-                              : 'error'
+                              : 'danger'
                           }
                         >
                           {invoice.status}
@@ -327,7 +336,11 @@ export default function BillingPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => window.open(invoice.invoice_pdf_url!, '_blank')}
+                            onClick={() => {
+                              if (invoice.invoice_pdf_url) {
+                                window.open(invoice.invoice_pdf_url, '_blank');
+                              }
+                            }}
                           >
                             <Download className="w-4 h-4" />
                           </Button>
@@ -345,7 +358,7 @@ export default function BillingPage() {
       <ConfirmDialog
         isOpen={showCancelDialog}
         onClose={() => setShowCancelDialog(false)}
-        onConfirm={() => cancelMutation.mutate()}
+        onConfirm={() => cancelMutation.mutate(undefined)}
         title="Cancel Subscription"
         message="Are you sure you want to cancel your subscription? You will continue to have access until the end of your billing period."
         confirmText="Cancel Subscription"

@@ -43,12 +43,12 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
   const [newAnomaly, setNewAnomaly] = useState('');
 
   const checkTypes = [
-    { value: 'scheduled', label: 'Scheduled Check' },
-    { value: 'random', label: 'Random Verification' },
-    { value: 'pre_transfer', label: 'Pre-Transfer Verification' },
-    { value: 'post_transfer', label: 'Post-Transfer Verification' },
-    { value: 'incident_response', label: 'Incident Response' },
-    { value: 'audit', label: 'Audit Verification' },
+    { id: 'scheduled', name: 'Scheduled Check' },
+    { id: 'random', name: 'Random Verification' },
+    { id: 'pre_transfer', name: 'Pre-Transfer Verification' },
+    { id: 'post_transfer', name: 'Post-Transfer Verification' },
+    { id: 'incident_response', name: 'Incident Response' },
+    { id: 'audit', name: 'Audit Verification' },
   ];
 
   const addAnomaly = () => {
@@ -213,7 +213,7 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Device (Optional)</label>
               <SearchableSelect
-                options={devices.map((d) => ({ value: d.id, label: d.name }))}
+                options={devices.map((d) => ({ id: d.id, name: d.name }))}
                 value={selectedDevice}
                 onChange={setSelectedDevice}
                 placeholder="Select device..."
@@ -244,9 +244,9 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
               <label className="block text-sm font-medium text-slate-700 mb-2">Hash Algorithm</label>
               <SearchableSelect
                 options={[
-                  { value: 'SHA-256', label: 'SHA-256' },
-                  { value: 'SHA-512', label: 'SHA-512' },
-                  { value: 'MD5', label: 'MD5' },
+                  { id: 'SHA-256', name: 'SHA-256' },
+                  { id: 'SHA-512', name: 'SHA-512' },
+                  { id: 'MD5', name: 'MD5' },
                 ]}
                 value={hashAlgorithm}
                 onChange={setHashAlgorithm}
@@ -402,7 +402,7 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-          <Button onClick={onClose} variant="outline" disabled={performCheckMutation.isPending}>
+          <Button onClick={onClose} variant="ghost" disabled={performCheckMutation.isPending}>
             Cancel
           </Button>
           <Button onClick={handleSubmit} disabled={performCheckMutation.isPending}>

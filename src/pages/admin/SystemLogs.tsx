@@ -9,14 +9,12 @@ import { logger } from '../../lib/logger';
 
 interface SystemLog {
   id: string;
-  level: 'error' | 'warning' | 'info' | 'debug';
-  module: string;
-  action: string;
+  level: string;
+  category: string | null;
   message: string;
   user_id: string | null;
-  metadata: Record<string, unknown> | null;
+  details: Record<string, unknown> | null;
   ip_address: string | null;
-  user_agent: string | null;
   created_at: string;
 }
 
@@ -45,7 +43,23 @@ export const SystemLogs: React.FC = () => {
 
       const { data, error } = await query;
       if (error) throw error;
-      setLogs(data || []);
+      const normalized: SystemLog[] = (data || []).map((row) => ({
+        id: row.id,
+        level: row.level,
+        category: row.category,
+        message: row.message,
+        user_id: row.user_id,
+        details: (row.details && typeof row.details === 'object' && !Array.isArray(row.details))
+          ? (row.details as Record<string, unknown>)
+          : null,
+        ip_address: row.ip_address == null
+          ? null
+          : typeof row.ip_address === 'string'
+            ? row.ip_address
+            : String(row.ip_address),
+        created_at: row.created_at,
+      }));
+      setLogs(normalized);
     } catch (error) {
       logger.error('Error fetching logs:', error);
     } finally {
@@ -57,8 +71,7 @@ export const SystemLogs: React.FC = () => {
     const searchLower = searchQuery.toLowerCase();
     return (
       log.message.toLowerCase().includes(searchLower) ||
-      log.module.toLowerCase().includes(searchLower) ||
-      log.action.toLowerCase().includes(searchLower)
+      (log.category?.toLowerCase().includes(searchLower) ?? false)
     );
   });
 
@@ -94,13 +107,12 @@ export const SystemLogs: React.FC = () => {
 
   const exportLogs = () => {
     const csv = [
-      ['Timestamp', 'Level', 'Module', 'Action', 'Message', 'IP Address'].join(','),
+      ['Timestamp', 'Level', 'Category', 'Message', 'IP Address'].join(','),
       ...filteredLogs.map((log) =>
         [
           format(new Date(log.created_at), 'yyyy-MM-dd HH:mm:ss'),
           log.level,
-          log.module,
-          log.action,
+          log.category ?? '',
           `"${log.message.replace(/"/g, '""')}"`,
           log.ip_address || '',
         ].join(',')
@@ -123,7 +135,7 @@ export const SystemLogs: React.FC = () => {
             <h1 className="text-3xl font-bold text-slate-900">System Logs</h1>
             <p className="text-slate-600 mt-1">Application logs and events</p>
           </div>
-          <Button onClick={exportLogs} className="gap-2" variant="outline">
+          <Button onClick={exportLogs} className="gap-2" variant="secondary">
             <Download className="w-4 h-4" />
             Export CSV
           </Button>
@@ -143,28 +155,28 @@ export const SystemLogs: React.FC = () => {
 
           <div className="flex gap-2">
             <Button
-              variant={levelFilter === 'all' ? 'primary' : 'outline'}
+              variant={levelFilter === 'all' ? 'primary' : 'secondary'}
               onClick={() => setLevelFilter('all')}
               className="text-sm"
             >
               All
             </Button>
             <Button
-              variant={levelFilter === 'error' ? 'primary' : 'outline'}
+              variant={levelFilter === 'error' ? 'primary' : 'secondary'}
               onClick={() => setLevelFilter('error')}
               className="text-sm"
             >
               Errors
             </Button>
             <Button
-              variant={levelFilter === 'warning' ? 'primary' : 'outline'}
+              variant={levelFilter === 'warning' ? 'primary' : 'secondary'}
               onClick={() => setLevelFilter('warning')}
               className="text-sm"
             >
               Warnings
             </Button>
             <Button
-              variant={levelFilter === 'info' ? 'primary' : 'outline'}
+              variant={levelFilter === 'info' ? 'primary' : 'secondary'}
               onClick={() => setLevelFilter('info')}
               className="text-sm"
             >
@@ -185,8 +197,9 @@ export const SystemLogs: React.FC = () => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <Badge color={getLevelColor(log.level)}>{log.level}</Badge>
-                    <span className="text-sm font-medium text-slate-900">{log.module}</span>
-                    <span className="text-sm text-slate-500">• {log.action}</span>
+                    {log.category && (
+                      <span className="text-sm font-medium text-slate-900">{log.category}</span>
+                    )}
                     <span className="text-xs text-slate-400 ml-auto">
                       {format(new Date(log.created_at), 'MMM dd, yyyy HH:mm:ss')}
                     </span>

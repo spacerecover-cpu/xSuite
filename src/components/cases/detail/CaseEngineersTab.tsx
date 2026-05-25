@@ -37,8 +37,10 @@ export const CaseEngineersTab: React.FC<CaseEngineersTabProps> = ({ caseId, case
     mutationFn: async ({ engineerId, role }: { engineerId: string; role: string }) => {
       const { error } = await supabase.from('case_engineers').insert({
         case_id: caseId,
-        engineer_id: engineerId,
+        user_id: engineerId,
         role_text: role || null,
+        // tenant_id is populated by the set_tenant_and_audit_fields trigger.
+        tenant_id: undefined as unknown as string,
       });
       if (error) throw error;
     },

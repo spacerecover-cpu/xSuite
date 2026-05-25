@@ -25,6 +25,9 @@ import {
   BulkLookupResults,
 } from '../../lib/importExportService';
 import { logger } from '../../lib/logger';
+import type { Database } from '../../types/database.types';
+
+type TableName = keyof Database['public']['Tables'];
 
 interface ImportWizardProps {
   entityType: EntityType;
@@ -239,9 +242,21 @@ export const ImportWizard: React.FC<ImportWizardProps> = ({ entityType, onClose 
           return record;
         });
 
-        // Insert batch into database
-        const { data, error } = await supabase
-          .from(config.tableName)
+        // Insert batch into database. The dynamic table name expands into a
+        // 200+ table union that triggers TS2589 — cast supabase to a loose
+        // shape limited to the methods we use.
+        type LooseInsertBuilder = {
+          insert: (rows: unknown[]) => {
+            select: () => Promise<{
+              data: unknown[] | null;
+              error: { message: string; details?: string; hint?: string; code?: string } | null;
+            }>;
+          };
+        };
+        type LooseClient = { from: (table: string) => LooseInsertBuilder };
+        const sb = supabase as unknown as LooseClient;
+        const { data, error } = await sb
+          .from(config.tableName as TableName)
           .insert(recordsToInsert)
           .select();
 

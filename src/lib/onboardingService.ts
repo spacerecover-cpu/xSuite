@@ -111,16 +111,16 @@ export const onboardingService = {
       .from('customers_enhanced')
       .insert({
         tenant_id: tenantId,
-        name: 'Demo Customer',
+        customer_name: 'Demo Customer',
         email: 'demo@example.com',
         phone: '+1234567890',
-        type: 'individual',
-        status: 'active',
+        is_active: true,
       })
       .select()
       .maybeSingle();
 
     if (customerError) throw customerError;
+    if (!demoCustomer) throw new Error('Failed to create demo customer');
 
     const { error: caseError } = await supabase
       .from('cases')
@@ -133,7 +133,7 @@ export const onboardingService = {
         status_id: null,
         subject: 'Demo Data Recovery Case',
         description: 'This is a sample case to help you get started. Feel free to delete it.',
-      });
+      } as never);
 
     if (caseError) throw caseError;
   },

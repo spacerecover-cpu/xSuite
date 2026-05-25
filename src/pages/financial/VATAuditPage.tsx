@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { formatDate } from '../../lib/format';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useTaxConfig } from '../../contexts/TenantConfigContext';
 import { fetchDefaultLocale } from '../../lib/financialService';
 import { Input } from '../../components/ui/Input';
 import { VATReturnModal } from '../../components/financial/VATReturnModal';
@@ -65,6 +66,7 @@ interface AuditLog {
 export const VATAuditPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
+  const taxConfig = useTaxConfig();
   const [activeTab, setActiveTab] = useState<'vat' | 'audit'>('vat');
   const [searchTerm, setSearchTerm] = useState('');
   const [recordTypeFilter, setRecordTypeFilter] = useState<string>('all');
@@ -183,7 +185,9 @@ export const VATAuditPage: React.FC = () => {
     },
   });
 
-  const { data: locale } = useQuery({
+  // locale fetch retained for future use (date format, decimals). Tax rate/name now
+  // come from useTaxConfig(). The query intentionally keeps the cache warm.
+  useQuery({
     queryKey: ['default_locale'],
     queryFn: fetchDefaultLocale,
   });
@@ -340,9 +344,9 @@ export const VATAuditPage: React.FC = () => {
                     <div>
                       <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Tax Rate</p>
                       <p className="text-2xl font-bold text-slate-900 mt-1">
-                        {locale ? (locale.tax_rate * 100).toFixed(2) : '0'}%
+                        {(taxConfig.defaultRate * 100).toFixed(2)}%
                       </p>
-                      <p className="text-xs text-slate-600 mt-1 font-medium">{locale?.tax_name || 'VAT'}</p>
+                      <p className="text-xs text-slate-600 mt-1 font-medium">{taxConfig.label || 'VAT'}</p>
                     </div>
                     <div className="w-10 h-10 bg-slate-500 rounded-lg flex items-center justify-center">
                       <FileCheck className="w-5 h-5 text-white" />
@@ -548,7 +552,6 @@ export const VATAuditPage: React.FC = () => {
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-9 text-sm w-64"
-                      size="sm"
                     />
                   </div>
                 </div>

@@ -96,8 +96,7 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
           (i) =>
             i.name.toLowerCase().includes(lower) ||
             (i.brand ?? '').toLowerCase().includes(lower) ||
-            (i.sku ?? '').toLowerCase().includes(lower) ||
-            (i.model ?? '').toLowerCase().includes(lower)
+            (i.sku ?? '').toLowerCase().includes(lower)
         )
       );
     }
@@ -110,14 +109,14 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
     }
     const { data } = await supabase
       .from('customers_enhanced')
-      .select('id, full_name, email')
+      .select('id, customer_name, email')
       .is('deleted_at', null)
-      .or(`full_name.ilike.%${term}%,email.ilike.%${term}%`)
+      .or(`customer_name.ilike.%${term}%,email.ilike.%${term}%`)
       .limit(20);
     setCustomers(
       (data ?? []).map((c) => ({
         id: c.id,
-        name: c.full_name ?? c.email ?? c.id,
+        name: c.customer_name ?? c.email ?? c.id,
       }))
     );
   }, []);
@@ -130,12 +129,13 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
   }, [customerSearch, searchCustomers]);
 
   const handleSelectItem = (item: StockItemWithCategory) => {
+    const maxQty = item.current_quantity ?? 0;
     setCart((prev) => {
       const existing = prev.find((l) => l.item.id === item.id);
       if (existing) {
         return prev.map((l) =>
           l.item.id === item.id
-            ? { ...l, quantity: Math.min(l.quantity + 1, item.current_quantity) }
+            ? { ...l, quantity: Math.min(l.quantity + 1, maxQty) }
             : l
         );
       }
@@ -154,7 +154,7 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
           if (l.item.id !== itemId) return l;
           const newQty = l.quantity + delta;
           if (newQty < 1) return null;
-          if (newQty > l.item.current_quantity) return l;
+          if (newQty > (l.item.current_quantity ?? 0)) return l;
           return { ...l, quantity: newQty };
         })
         .filter((l): l is CartLine => l !== null)

@@ -123,7 +123,7 @@ export const useSidebarBadges = (): SidebarBadgeCounts => {
 
         if (error) throw error;
         return (data ?? []).filter(
-          (item) => item.current_quantity <= item.minimum_quantity
+          (item) => (item.current_quantity ?? 0) <= (item.minimum_quantity ?? 0)
         ).length;
       } catch {
         return 0;

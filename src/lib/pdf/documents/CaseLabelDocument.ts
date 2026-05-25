@@ -60,7 +60,7 @@ export function buildCaseLabelDocument(
         margin: [0, 5, 0, 3],
       },
       {
-        text: caseData.case_number,
+        text: caseData.case_number ?? caseData.case_no,
         fontSize: 28,
         bold: true,
         color: PDF_COLORS.primary,
@@ -113,7 +113,7 @@ export function buildCaseLabelDocument(
         margin: [0, 0, 0, 2],
       },
       {
-        text: safeString(caseData.customer_name || caseData.contact_name),
+        text: safeString(caseData.customer?.customer_name || caseData.contact_name),
         fontSize: 12,
         bold: true,
         color: PDF_COLORS.text,
@@ -271,7 +271,7 @@ export function buildCaseLabelDocument(
       };
 
   return {
-    pageSize: [283, 425] as [number, number],
+    pageSize: { width: 283, height: 425 },
     pageMargins: [15, 15, 15, 15],
     defaultStyle: {
       font: fontFamily,

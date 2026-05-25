@@ -37,7 +37,7 @@ export const BackupDeviceRecommendation: React.FC<BackupDeviceRecommendationProp
     const selectedItems = items.filter((i) => selected.has(i.id));
     const lineItems = selectedItems.map((item) => ({
       name: `${item.brand ? `${item.brand} ` : ''}${item.name}`,
-      description: [item.capacity, item.model].filter(Boolean).join(' — '),
+      description: item.description ?? '',
       unit_price: item.selling_price ?? item.cost_price ?? 0,
       quantity: 1,
     }));
@@ -90,7 +90,7 @@ export const BackupDeviceRecommendation: React.FC<BackupDeviceRecommendationProp
               <div className="divide-y divide-slate-100 border border-slate-100 rounded-lg overflow-hidden">
                 {items.map((item) => {
                   const isSelected = selected.has(item.id);
-                  const available = item.current_quantity - item.reserved_quantity;
+                  const available = (item.current_quantity ?? 0) - (item.quantity_reserved ?? 0);
                   return (
                     <div
                       key={item.id}
@@ -111,8 +111,8 @@ export const BackupDeviceRecommendation: React.FC<BackupDeviceRecommendationProp
                           {item.name}
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
-                          {item.capacity && (
-                            <span className="text-xs text-slate-500">{item.capacity}</span>
+                          {item.description && (
+                            <span className="text-xs text-slate-500">{item.description}</span>
                           )}
                           <span className="text-xs text-slate-400">
                             {available > 0 ? `${available} in stock` : 'Out of stock'}

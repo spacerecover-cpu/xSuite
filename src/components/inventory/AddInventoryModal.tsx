@@ -4,7 +4,7 @@ import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { SearchableSelect } from '../ui/SearchableSelect';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase, getTenantId } from '../../lib/supabaseClient';
 import { useCurrency } from '../../hooks/useCurrency';
 import { logger } from '../../lib/logger';
 import type { Database } from '../../types/database.types';
@@ -251,7 +251,15 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({ isOpen, onClose, 
 
     setSubmitting(true);
     try {
+      const tenantId = getTenantId();
+      if (!tenantId) {
+        setErrors({ submit: 'No tenant context. Please log in again.' });
+        setSubmitting(false);
+        return;
+      }
+
       const itemData: InventoryItemInsert = {
+        tenant_id: tenantId,
         category_id: formData.category_id || null,
         status_id: formData.status_id || null,
         brand_id: formData.brand_id || null,
@@ -259,7 +267,7 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({ isOpen, onClose, 
         serial_number: formData.serial_number.trim() || null,
         capacity_id: formData.capacity_id || null,
         name: formData.model.trim(),
-        donor_parts_available: formData.donor_parts_available,
+        donor_parts_available: { ...formData.donor_parts_available },
         interface_id: formData.interface_id || null,
         pcb_number: formData.pcb_number.trim() || null,
         head_map: formData.head_map.trim() || null,

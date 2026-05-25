@@ -34,15 +34,15 @@ export const AnnouncementsPage: React.FC = () => {
     switch (activeTab) {
       case 'active':
         return announcements.filter(a => {
-          const startsAt = new Date(a.start_date);
+          const startsAt = a.start_date ? new Date(a.start_date) : null;
           const endsAt = a.end_date ? new Date(a.end_date) : null;
-          return a.is_active && startsAt <= now && (!endsAt || endsAt > now);
+          return a.is_active && (!startsAt || startsAt <= now) && (!endsAt || endsAt > now);
         });
 
       case 'scheduled':
         return announcements.filter(a => {
-          const startsAt = new Date(a.start_date);
-          return a.is_active && startsAt > now;
+          const startsAt = a.start_date ? new Date(a.start_date) : null;
+          return a.is_active && startsAt && startsAt > now;
         });
 
       case 'expired':

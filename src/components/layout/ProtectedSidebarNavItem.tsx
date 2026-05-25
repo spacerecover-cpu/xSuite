@@ -9,7 +9,7 @@ interface ProtectedSidebarNavItemProps {
   icon: LucideIcon;
   label: string;
   badge?: number;
-  badgeColor?: 'blue' | 'green' | 'orange' | 'red' | 'teal';
+  badgeColor?: 'blue' | 'green' | 'orange' | 'red' | 'purple';
   isCollapsed: boolean;
   moduleKey?: string;
 }

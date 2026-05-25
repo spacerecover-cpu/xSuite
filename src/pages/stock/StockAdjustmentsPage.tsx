@@ -125,14 +125,13 @@ export const StockAdjustmentsPage: React.FC = () => {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: (id: string) =>
-      supabase
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
         .from('stock_adjustment_sessions')
         .update({ deleted_at: new Date().toISOString(), status: 'cancelled' })
-        .eq('id', id)
-        .then(({ error }) => {
-          if (error) throw error;
-        }),
+        .eq('id', id);
+      if (error) throw error;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: stockKeys.adjustments() });
       toast.success('Adjustment cancelled');
@@ -164,14 +163,15 @@ export const StockAdjustmentsPage: React.FC = () => {
   );
 
   const addItem = (item: StockItemWithCategory) => {
+    const qty = item.current_quantity ?? 0;
     setAdjustmentItems((prev) => [
       ...prev,
       {
         stock_item_id: item.id,
         name: item.name,
         sku: item.sku,
-        system_quantity: item.current_quantity,
-        counted_quantity: item.current_quantity,
+        system_quantity: qty,
+        counted_quantity: qty,
         notes: '',
       },
     ]);
@@ -201,18 +201,18 @@ export const StockAdjustmentsPage: React.FC = () => {
     }
     setSaving(true);
     try {
+      // tenant_id is supplied by createStockAdjustment via requireTenantId().
       await createMutation.mutateAsync({
-        adjustment_date: form.adjustment_date,
         reason: form.reason,
         notes: form.notes || null,
-        created_by: user?.id ?? null,
+        started_by: user?.id ?? null,
         items: adjustmentItems.map((i) => ({
           stock_item_id: i.stock_item_id,
           system_quantity: i.system_quantity,
           counted_quantity: i.counted_quantity,
           notes: i.notes || undefined,
         })),
-      });
+      } as Parameters<typeof createMutation.mutateAsync>[0]);
     } finally {
       setSaving(false);
     }
@@ -306,15 +306,15 @@ export const StockAdjustmentsPage: React.FC = () => {
                     className="border-b border-slate-100 hover:bg-slate-50 transition-colors"
                   >
                     <td className="px-4 py-3 font-mono font-medium text-primary">
-                      {adj.adjustment_number ?? '—'}
+                      {adj.session_number ?? '—'}
                     </td>
                     <td className="px-4 py-3 text-slate-700">
-                      {formatDate(adj.adjustment_date)}
+                      {formatDate(adj.created_at)}
                     </td>
                     <td className="px-4 py-3 text-slate-700">{adj.reason ?? '—'}</td>
                     <td className="px-4 py-3">
-                      <Badge variant={getStatusVariant(adj.status)} size="sm">
-                        {adj.status.charAt(0).toUpperCase() + adj.status.slice(1)}
+                      <Badge variant={getStatusVariant(adj.status ?? 'draft')} size="sm">
+                        {(adj.status ?? 'draft').charAt(0).toUpperCase() + (adj.status ?? 'draft').slice(1)}
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-slate-500 max-w-xs truncate">

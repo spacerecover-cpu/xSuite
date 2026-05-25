@@ -40,7 +40,7 @@ export async function getReviews(filters?: {
 
   const { data, error } = await query;
   if (error) throw error;
-  return (data || []) as ReviewWithDetails[];
+  return (data || []) as unknown as ReviewWithDetails[];
 }
 
 export async function getReview(id: string) {

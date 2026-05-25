@@ -30,9 +30,16 @@ export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ c
     try {
       setLoading(true);
 
+      const role = profile.role;
+      if (role === 'manager' || role === 'viewer') {
+        setPermissions(null);
+        setAccessibleModules([]);
+        return;
+      }
+
       const [userPermissions, modules] = await Promise.all([
-        rolePermissionsService.getRolePermissions(profile.role),
-        rolePermissionsService.getAccessibleModules(profile.role),
+        rolePermissionsService.getRolePermissions(role),
+        rolePermissionsService.getAccessibleModules(role),
       ]);
 
       setPermissions(userPermissions);

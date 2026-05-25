@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
+import type { Database } from '../../types/database.types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
@@ -15,30 +16,29 @@ import { useAuth } from '../../contexts/AuthContext';
 
 interface Customer {
   id: string;
-  customer_number: string;
+  customer_number: string | null;
   customer_name: string;
   email: string | null;
   mobile_number: string | null;
-  phone_number: string | null;
+  phone: string | null;
   customer_group_id: string | null;
-  country: string | null;
-  city: string | null;
-  address_line1: string | null;
-  address_line2: string | null;
-  postal_code: string | null;
-  portal_enabled: boolean;
-  portal_token: string;
+  country_id: string | null;
+  city_id: string | null;
+  address: string | null;
+  portal_enabled: boolean | null;
   profile_photo_url: string | null;
   notes: string | null;
-  is_active: boolean;
+  is_active: boolean | null;
   created_at: string;
   customer_groups: { id: string; name: string } | null;
+  geo_countries: { id: string; name: string } | null;
+  geo_cities: { id: string; name: string } | null;
   customer_company_relationships?: Array<{
     companies: {
       id: string;
-      company_name: string;
-      company_number: string;
-    };
+      company_name: string | null;
+      company_number: string | null;
+    } | null;
   }>;
 }
 
@@ -125,6 +125,8 @@ export const CustomersListPage: React.FC = () => {
         .select(`
           *,
           customer_groups (id, name),
+          geo_countries (id, name),
+          geo_cities (id, name),
           customer_company_relationships (
             companies (id, company_name, company_number)
           )
@@ -132,7 +134,7 @@ export const CustomersListPage: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as Customer[];
+      return (data ?? []) as unknown as Customer[];
     },
   });
 
@@ -200,7 +202,7 @@ export const CustomersListPage: React.FC = () => {
         .maybeSingle();
 
       if (error) throw error;
-      return data;
+      return data as { location: { default_country_id?: string } | null } | null;
     },
   });
 
@@ -214,35 +216,39 @@ export const CustomersListPage: React.FC = () => {
 
       if (numberError) throw numberError;
 
+      const customerPayload = {
+        customer_number: customerNumber,
+        customer_name: customer.name,
+        email: customer.email || null,
+        mobile_number: customer.mobile_number || null,
+        phone: customer.phone_number || null,
+        customer_group_id: customer.customer_group_id || null,
+        country_id: customer.country_id || null,
+        city_id: customer.city_id || null,
+        address: customer.address || null,
+        portal_enabled: customer.portal_enabled,
+        notes: customer.notes || null,
+        created_by: profile?.id,
+      } as Database['public']['Tables']['customers_enhanced']['Insert'];
+
       const { data: newCustomer, error: createError } = await supabase
         .from('customers_enhanced')
-        .insert({
-          customer_number: customerNumber,
-          customer_name: customer.name,
-          email: customer.email || null,
-          mobile_number: customer.mobile_number || null,
-          phone: customer.phone_number || null,
-          customer_group_id: customer.customer_group_id || null,
-          country_id: customer.country_id || null,
-          city_id: customer.city_id || null,
-          address: customer.address || null,
-          portal_enabled: customer.portal_enabled,
-          notes: customer.notes || null,
-          created_by: profile?.id,
-        })
+        .insert(customerPayload)
         .select()
-        .single();
+        .maybeSingle();
 
       if (createError) throw createError;
 
       if (customer.company_id && newCustomer) {
+        const relationshipPayload = {
+          customer_id: newCustomer.id,
+          company_id: customer.company_id,
+          is_primary: false,
+        } as Database['public']['Tables']['customer_company_relationships']['Insert'];
+
         const { error: relError } = await supabase
           .from('customer_company_relationships')
-          .insert({
-            customer_id: newCustomer.id,
-            company_id: customer.company_id,
-            is_primary: false,
-          });
+          .insert(relationshipPayload);
 
         if (relError) throw relError;
       }
@@ -260,26 +266,25 @@ export const CustomersListPage: React.FC = () => {
     mutationFn: async (data: typeof editFormData) => {
       if (!editingCustomer) throw new Error('No customer selected');
 
-      const selectedCountry = countries.find((c) => c.id === data.country_id);
-      const selectedCity = cities.find((c) => c.id === data.city_id);
+      const updatePayload = {
+        customer_name: data.customer_name,
+        email: data.email || null,
+        mobile_number: data.mobile_number || null,
+        phone: data.phone_number || null,
+        customer_group_id: data.customer_group_id || null,
+        country_id: data.country_id || null,
+        city_id: data.city_id || null,
+        address: data.address_line1 || null,
+        portal_enabled: data.portal_enabled,
+        notes: data.notes || null,
+      } as Database['public']['Tables']['customers_enhanced']['Update'];
 
       const { data: updatedCustomer, error } = await supabase
         .from('customers_enhanced')
-        .update({
-          customer_name: data.customer_name,
-          email: data.email || null,
-          mobile_number: data.mobile_number || null,
-          phone_number: data.phone_number || null,
-          customer_group_id: data.customer_group_id || null,
-          country: selectedCountry?.name || null,
-          city: selectedCity?.name || null,
-          address_line1: data.address_line1 || null,
-          portal_enabled: data.portal_enabled,
-          notes: data.notes || null,
-        })
+        .update(updatePayload)
         .eq('id', editingCustomer.id)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return updatedCustomer;
@@ -297,17 +302,21 @@ export const CustomersListPage: React.FC = () => {
 
       if (numberError) throw numberError;
 
+      const companyPayload = {
+        company_number: companyNumber,
+        name: companyData.company_name,
+        company_name: companyData.company_name,
+        created_by: profile?.id,
+      } as Database['public']['Tables']['companies']['Insert'];
+
       const { data: newCompany, error: createError } = await supabase
         .from('companies')
-        .insert({
-          company_number: companyNumber,
-          company_name: companyData.company_name,
-          created_by: profile?.id,
-        })
+        .insert(companyPayload)
         .select()
-        .single();
+        .maybeSingle();
 
       if (createError) throw createError;
+      if (!newCompany) throw new Error('Failed to create company');
 
       return newCompany;
     },
@@ -365,7 +374,7 @@ export const CustomersListPage: React.FC = () => {
   const filteredCustomers = customers.filter((customer) => {
     const matchesSearch =
       customer.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.customer_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.customer_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.mobile_number?.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -664,10 +673,10 @@ export const CustomersListPage: React.FC = () => {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {(customer.city || customer.country) ? (
+                        {(customer.geo_cities?.name || customer.geo_countries?.name) ? (
                           <div className="text-sm text-slate-700 flex items-center gap-1">
                             <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{[customer.city, customer.country].filter(Boolean).join(', ')}</span>
+                            <span>{[customer.geo_cities?.name, customer.geo_countries?.name].filter(Boolean).join(', ')}</span>
                           </div>
                         ) : (
                           <span className="text-slate-400">-</span>
@@ -683,7 +692,7 @@ export const CustomersListPage: React.FC = () => {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {customer.customer_company_relationships && customer.customer_company_relationships.length > 0 ? (
+                        {customer.customer_company_relationships && customer.customer_company_relationships.length > 0 && customer.customer_company_relationships[0].companies ? (
                           <div className="flex items-center gap-1 text-sm text-slate-700">
                             <Building2 className="w-3.5 h-3.5 text-slate-400" />
                             <span className="truncate max-w-[150px]">

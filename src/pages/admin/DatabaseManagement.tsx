@@ -10,12 +10,11 @@ import { logger } from '../../lib/logger';
 
 interface Backup {
   id: string;
-  backup_type: 'full' | 'incremental' | 'manual';
-  file_path: string | null;
-  file_size_bytes: number;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
-  error_message: string | null;
-  created_by: string;
+  backup_type: string | null;
+  file_url: string | null;
+  file_size: number | null;
+  status: string | null;
+  created_by: string | null;
   created_at: string;
   completed_at: string | null;
 }
@@ -49,7 +48,7 @@ export const DatabaseManagement: React.FC = () => {
   };
 
   const handleCreateBackup = async () => {
-    if (!profile) return;
+    if (!profile || !profile.tenant_id) return;
 
     setCreating(true);
     try {
@@ -57,6 +56,7 @@ export const DatabaseManagement: React.FC = () => {
         backup_type: 'manual',
         status: 'in_progress',
         created_by: profile.id,
+        tenant_id: profile.tenant_id,
       });
 
       if (error) throw error;
@@ -82,8 +82,8 @@ export const DatabaseManagement: React.FC = () => {
       if (latestBackup) {
         await supabase.from('database_backups').update({
           status: 'completed',
-          file_path: `snapshots/${profile.tenant_id}/${new Date().toISOString().slice(0, 10)}.json`,
-          file_size_bytes: JSON.stringify(counts).length,
+          file_url: `snapshots/${profile.tenant_id}/${new Date().toISOString().slice(0, 10)}.json`,
+          file_size: JSON.stringify(counts).length,
           completed_at: new Date().toISOString(),
         }).eq('id', latestBackup.id);
       }
@@ -219,12 +219,12 @@ export const DatabaseManagement: React.FC = () => {
                     </td>
                     <td className="py-3">
                       <div className="flex items-center gap-2">
-                        {getStatusIcon(backup.status)}
-                        <Badge color={getStatusColor(backup.status)}>{backup.status}</Badge>
+                        {getStatusIcon(backup.status ?? '')}
+                        <Badge color={getStatusColor(backup.status ?? '')}>{backup.status ?? ''}</Badge>
                       </div>
                     </td>
                     <td className="py-3 text-sm text-slate-600">
-                      {formatBytes(backup.file_size_bytes)}
+                      {formatBytes(backup.file_size ?? 0)}
                     </td>
                     <td className="py-3">
                       <div className="flex items-center gap-2 text-sm text-slate-600">
@@ -234,7 +234,7 @@ export const DatabaseManagement: React.FC = () => {
                     </td>
                     <td className="py-3 text-right">
                       {backup.status === 'completed' && (
-                        <Button variant="outline" size="sm" className="gap-2">
+                        <Button variant="secondary" size="sm" className="gap-2">
                           <Download className="w-3 h-3" />
                           Download
                         </Button>

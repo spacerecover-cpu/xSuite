@@ -23,7 +23,7 @@ export const TenantSupportTab: React.FC<TenantSupportTabProps> = ({ tenantId }) 
 
   const tenantTickets = tickets.filter(t => t.tenant_id === tenantId).slice(0, 10);
 
-  const getStatusBadgeVariant = (status: string) => {
+  const getStatusBadgeVariant = (status: string | null): 'info' | 'warning' | 'default' | 'success' => {
     switch (status) {
       case 'open': return 'info';
       case 'in_progress': return 'warning';
@@ -34,12 +34,12 @@ export const TenantSupportTab: React.FC<TenantSupportTabProps> = ({ tenantId }) 
     }
   };
 
-  const getPriorityBadgeVariant = (priority: string) => {
+  const getPriorityBadgeVariant = (priority: string | null): 'default' | 'info' | 'warning' | 'danger' => {
     switch (priority) {
       case 'low': return 'default';
       case 'medium': return 'info';
       case 'high': return 'warning';
-      case 'urgent': return 'error';
+      case 'urgent': return 'danger';
       default: return 'default';
     }
   };
@@ -69,49 +69,56 @@ export const TenantSupportTab: React.FC<TenantSupportTabProps> = ({ tenantId }) 
             <p className="text-slate-500">No support tickets found</p>
           </div>
         ) : (
-          <Table>
-            <thead>
-              <tr>
-                <th>Ticket #</th>
-                <th>Subject</th>
-                <th>Priority</th>
-                <th>Status</th>
-                <th>Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tenantTickets.map((ticket) => (
-                <tr
-                  key={ticket.id}
-                  onClick={() => navigate(`/platform-admin/tickets/${ticket.id}`)}
-                  className="cursor-pointer hover:bg-slate-50"
-                >
-                  <td className="font-medium">{ticket.ticket_number}</td>
-                  <td className="text-slate-900">{ticket.subject}</td>
-                  <td>
-                    <Badge variant={getPriorityBadgeVariant(ticket.priority)}>
-                      {ticket.priority}
-                    </Badge>
-                  </td>
-                  <td>
-                    <Badge variant={getStatusBadgeVariant(ticket.status)}>
-                      {ticket.status?.replace('_', ' ')}
-                    </Badge>
-                  </td>
-                  <td className="text-slate-600">
+          <Table
+            data={tenantTickets}
+            onRowClick={(ticket) => navigate(`/platform-admin/tickets/${ticket.id}`)}
+            columns={[
+              {
+                key: 'ticket_number',
+                header: 'Ticket #',
+                render: (ticket) => <span className="font-medium">{ticket.ticket_number}</span>,
+              },
+              {
+                key: 'subject',
+                header: 'Subject',
+                render: (ticket) => <span className="text-slate-900">{ticket.subject}</span>,
+              },
+              {
+                key: 'priority',
+                header: 'Priority',
+                render: (ticket) => (
+                  <Badge variant={getPriorityBadgeVariant(ticket.priority)}>
+                    {ticket.priority ?? '-'}
+                  </Badge>
+                ),
+              },
+              {
+                key: 'status',
+                header: 'Status',
+                render: (ticket) => (
+                  <Badge variant={getStatusBadgeVariant(ticket.status)}>
+                    {ticket.status?.replace('_', ' ') ?? '-'}
+                  </Badge>
+                ),
+              },
+              {
+                key: 'created_at',
+                header: 'Created',
+                render: (ticket) => (
+                  <span className="text-slate-600">
                     {new Date(ticket.created_at).toLocaleDateString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
+                  </span>
+                ),
+              },
+            ]}
+          />
         )}
       </Card>
 
       {tenantTickets.length === 10 && (
         <div className="text-center">
           <Button
-            variant="outline"
+            variant="ghost"
             onClick={() => navigate(`/platform-admin/tickets?tenant=${tenantId}`)}
           >
             View All Tickets

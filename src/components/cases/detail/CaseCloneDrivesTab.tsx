@@ -3,10 +3,30 @@ import { Copy } from 'lucide-react';
 import { Card } from '../../ui/Card';
 import { CloneDriveCard } from '../CloneDriveCard';
 
+interface CloneDriveData {
+  id: string;
+  case_id?: string | null;
+  patient_device_id?: string | null;
+  storage_path?: string | null;
+  clone_date?: string | null;
+  status?: string | null;
+  image_size_gb?: number | null;
+  physical_location?: { name?: string | null } | null;
+  cloned_by_user?: { full_name?: string | null } | null;
+  [key: string]: unknown;
+}
+
+interface DeviceData {
+  id: string;
+  device_type?: { name?: string | null } | null;
+  serial_number?: string | null;
+  [key: string]: unknown;
+}
+
 interface CaseCloneDrivesTabProps {
-  caseData: Record<string, unknown>;
-  devices: Record<string, unknown>[];
-  cloneDrives: Record<string, unknown>[];
+  caseData: { case_no?: string | null; [key: string]: unknown };
+  devices: DeviceData[];
+  cloneDrives: CloneDriveData[];
   onSetViewCloneModal: (clone: Record<string, unknown>) => void;
   onSetSelectedClone: (clone: Record<string, unknown>) => void;
   onSetShowMarkAsDeliveredModal: (v: boolean) => void;
@@ -50,23 +70,24 @@ export const CaseCloneDrivesTab: React.FC<CaseCloneDrivesTabProps> = ({
                   ? `${patientDevice.device_type?.name || 'Device'} ${patientDevice.serial_number ? `(${patientDevice.serial_number})` : ''}`
                   : 'Unknown Device';
 
+                const cloneForCard = {
+                  ...(clone as unknown as Record<string, unknown>),
+                  physical_location_name: clone.physical_location?.name ?? undefined,
+                  cloned_by_name: clone.cloned_by_user?.full_name ?? undefined,
+                } as unknown as React.ComponentProps<typeof CloneDriveCard>['clone'];
                 return (
                   <CloneDriveCard
                     key={clone.id}
-                    clone={{
-                      ...clone,
-                      physical_location_name: clone.physical_location?.name,
-                      cloned_by_name: clone.cloned_by_user?.full_name,
-                    }}
-                    caseNo={caseData.case_no}
+                    clone={cloneForCard}
+                    caseNo={caseData.case_no ?? undefined}
                     patientDeviceName={patientDeviceName}
-                    onView={(c) => onSetViewCloneModal(c)}
+                    onView={(c) => onSetViewCloneModal(c as unknown as Record<string, unknown>)}
                     onMarkAsDelivered={(c) => {
-                      onSetSelectedClone(c);
+                      onSetSelectedClone(c as unknown as Record<string, unknown>);
                       onSetShowMarkAsDeliveredModal(true);
                     }}
                     onPreserve={(c) => {
-                      onSetSelectedClone(c);
+                      onSetSelectedClone(c as unknown as Record<string, unknown>);
                       onSetShowPreserveLongTermModal(true);
                     }}
                   />

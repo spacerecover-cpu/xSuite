@@ -55,12 +55,12 @@ export const StockReturnModal: React.FC<Props> = ({ sale, onClose }) => {
   const [lines, setLines] = useState<ReturnLineState[]>(
     (sale.stock_sale_items ?? []).map((item) => ({
       sale_item_id: item.id,
-      stock_item_id: item.stock_item_id,
+      stock_item_id: item.item_id,
       name: item.stock_items?.name ?? 'Unknown Item',
       sku: item.stock_items?.sku ?? null,
       maxQuantity: item.quantity,
       quantity: item.quantity,
-      serial_number: item.serial_number ?? null,
+      serial_number: null,
       condition: 'good',
       restock: true,
       refund_amount: item.unit_price * item.quantity,

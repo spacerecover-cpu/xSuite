@@ -271,11 +271,12 @@ export const generateInvoiceSummaryReport = async (
   const byType: Record<string, { count: number; amount: number }> = {};
 
   invoices.forEach(inv => {
-    if (!byStatus[inv.status]) {
-      byStatus[inv.status] = { count: 0, amount: 0 };
+    const status = inv.status ?? 'unknown';
+    if (!byStatus[status]) {
+      byStatus[status] = { count: 0, amount: 0 };
     }
-    byStatus[inv.status].count += 1;
-    byStatus[inv.status].amount += inv.total_amount || 0;
+    byStatus[status].count += 1;
+    byStatus[status].amount += inv.total_amount || 0;
 
     const type = inv.invoice_type === 'proforma' ? 'Proforma' : 'Tax Invoice';
     if (!byType[type]) {

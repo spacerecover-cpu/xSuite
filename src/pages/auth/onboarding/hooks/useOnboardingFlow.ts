@@ -88,7 +88,7 @@ export function useOnboardingFlow() {
       .then(({ data, error }) => {
         if (error) {
           toast.error('Failed to load countries');
-          logger.error(error);
+          logger.error(error.message);
         } else {
           setCountries(data || []);
         }
@@ -201,7 +201,7 @@ export function useOnboardingFlow() {
       navigate('/login');
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'Failed to create account');
-      logger.error(error);
+      logger.error(error instanceof Error ? error.message : String(error));
     } finally {
       setSubmitting(false);
     }

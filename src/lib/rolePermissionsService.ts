@@ -63,10 +63,11 @@ class RolePermissionsService {
 
     const grouped: ModulesByCategory = {};
     modules.forEach((module) => {
-      if (!grouped[module.category]) {
-        grouped[module.category] = [];
+      const cat = module.category ?? 'other';
+      if (!grouped[cat]) {
+        grouped[cat] = [];
       }
-      grouped[module.category].push(module);
+      grouped[cat].push(module);
     });
 
     return grouped;
@@ -77,15 +78,24 @@ class RolePermissionsService {
       return this.getAllModules();
     }
 
-    const { data, error } = await supabase
-      .rpc('get_accessible_modules', { p_role: role });
+    const { data, error } = await supabase.rpc('get_accessible_modules');
 
     if (error) {
       logger.error('Error fetching accessible modules:', error);
       throw new Error('Failed to fetch accessible modules');
     }
 
-    return data || [];
+    return (data || []).map((row) => ({
+      id: row.module_id,
+      slug: row.module_slug,
+      name: row.module_name,
+      description: null,
+      category: null,
+      icon: null,
+      sort_order: null,
+      order_index: null,
+      is_active: true,
+    }));
   }
 
   async getRolePermissions(role: 'owner' | 'admin' | 'technician' | 'sales' | 'accounts' | 'hr'): Promise<RolePermissions> {
@@ -118,8 +128,7 @@ class RolePermissionsService {
 
     const { data, error } = await supabase
       .rpc('check_module_access', {
-        p_role: role,
-        p_module_key: moduleKey,
+        p_module_slug: moduleKey,
       });
 
     if (error) {
@@ -143,7 +152,16 @@ class RolePermissionsService {
       throw new Error('Failed to fetch role permissions');
     }
 
-    return data || [];
+    return (data || []).map((row) => ({
+      id: row.id,
+      role: row.role as RoleModulePermission['role'],
+      module_id: row.module_id,
+      can_access: row.can_access ?? false,
+      module: row.module ? {
+        ...row.module,
+        category: row.module.category ?? null,
+      } as Module : undefined,
+    }));
   }
 
   async getRolePermissionsWithModules(
@@ -193,7 +211,7 @@ class RolePermissionsService {
 
       const { error: upsertError } = await supabase
         .from('role_module_permissions')
-        .upsert(updates, {
+        .upsert(updates as never, {
           onConflict: 'role,module_id',
         });
 
@@ -205,11 +223,11 @@ class RolePermissionsService {
       this.clearCache();
 
       await supabase.rpc('log_audit_trail', {
-        p_action_type: 'update',
-        p_table_name: 'role_module_permissions',
+        p_action: 'update',
+        p_record_type: 'role_module_permissions',
         p_record_id: role,
-        p_old_values: {},
-        p_new_values: { permissions: updates },
+        p_old_values: {} as never,
+        p_new_values: { permissions: updates } as never,
       });
 
       return { success: true };

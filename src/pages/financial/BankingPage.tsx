@@ -606,39 +606,43 @@ export const BankingPage: React.FC = () => {
                           </td>
                         </tr>
                       ) : (
-                        bankTransactions.map((transaction: Record<string, unknown> & { id: string; transaction_date: string; description: string; reference?: string; debit_amount: number; credit_amount: number; balance: number; is_reconciled: boolean }) => (
+                        bankTransactions.map((transaction) => {
+                          // bank_transactions has amount+type, not separate debit/credit columns.
+                          const isDebit = transaction.type === 'debit' || transaction.type === 'expense' || transaction.type === 'withdrawal';
+                          const isCredit = transaction.type === 'credit' || transaction.type === 'income' || transaction.type === 'deposit';
+                          return (
                           <tr key={transaction.id} className="hover:bg-slate-50 transition-colors">
                             <td className="py-2 px-4 text-xs text-slate-600">
                               {new Date(transaction.transaction_date).toLocaleDateString()}
                             </td>
                             <td className="py-2 px-4">
-                              <p className="text-xs font-medium text-slate-900">{transaction.description}</p>
+                              <p className="text-xs font-medium text-slate-900">{transaction.description ?? ''}</p>
                               {transaction.reference && (
                                 <p className="text-xs text-slate-500">{transaction.reference}</p>
                               )}
                             </td>
                             <td className="py-2 px-4 text-right">
-                              {transaction.debit_amount > 0 ? (
+                              {isDebit && transaction.amount > 0 ? (
                                 <span className="text-xs font-semibold text-danger flex items-center justify-end gap-1">
                                   <TrendingDown className="w-3 h-3" />
-                                  {formatCurrencyValue(transaction.debit_amount)}
+                                  {formatCurrencyValue(transaction.amount)}
                                 </span>
                               ) : (
                                 <span className="text-xs text-slate-400">-</span>
                               )}
                             </td>
                             <td className="py-2 px-4 text-right">
-                              {transaction.credit_amount > 0 ? (
+                              {isCredit && transaction.amount > 0 ? (
                                 <span className="text-xs font-semibold text-success flex items-center justify-end gap-1">
                                   <TrendingUp className="w-3 h-3" />
-                                  {formatCurrencyValue(transaction.credit_amount)}
+                                  {formatCurrencyValue(transaction.amount)}
                                 </span>
                               ) : (
                                 <span className="text-xs text-slate-400">-</span>
                               )}
                             </td>
                             <td className="py-2 px-4 text-right text-xs font-semibold text-slate-900">
-                              {formatCurrencyValue(transaction.balance)}
+                              -
                             </td>
                             <td className="py-2 px-4 text-center">
                               {transaction.is_reconciled ? (
@@ -648,7 +652,8 @@ export const BankingPage: React.FC = () => {
                               )}
                             </td>
                           </tr>
-                        ))
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -668,7 +673,7 @@ export const BankingPage: React.FC = () => {
                               <p className="font-semibold text-sm">{receipt.receipt_number}</p>
                               <p className="text-xs text-slate-600">{receipt.description}</p>
                               <p className="text-xs text-slate-500 mt-1">
-                                {new Date(receipt.receipt_date).toLocaleDateString()}
+                                {receipt.receipt_date ? new Date(receipt.receipt_date).toLocaleDateString() : 'N/A'}
                               </p>
                             </div>
                             <div className="text-right">
@@ -758,15 +763,17 @@ export const BankingPage: React.FC = () => {
       <RecordReceiptModal
         isOpen={showReceiptModal}
         onClose={() => setShowReceiptModal(false)}
-        onSave={(receiptData, allocations) =>
-          createReceiptMutation.mutateAsync({ receiptData, allocations })
-        }
+        onSave={async (receiptData, allocations) => {
+          await createReceiptMutation.mutateAsync({ receiptData, allocations });
+        }}
       />
 
       <TransferFundsModal
         isOpen={showTransferModal}
         onClose={() => setShowTransferModal(false)}
-        onSave={(data) => createTransferMutation.mutateAsync(data)}
+        onSave={async (data) => {
+          await createTransferMutation.mutateAsync(data);
+        }}
       />
 
       <ConfirmDialog
@@ -775,7 +782,7 @@ export const BankingPage: React.FC = () => {
         onConfirm={confirmDeleteAccount}
         title="Delete Account"
         message={`Are you sure you want to delete the account "${deletingAccount?.account_name}"? This action cannot be undone.`}
-        confirmLabel="Delete"
+        confirmText="Delete"
         variant="danger"
       />
     </div>

@@ -72,6 +72,58 @@ Case Reference: #{{caseNumber}}
 Best regards,
 {{companyName}} Team`,
   },
+
+  chain_of_custody: {
+    subject: 'Chain of Custody - Case #{{caseNumber}}',
+    body: `Dear {{customerName}},
+
+Please find attached the Chain of Custody document for your case.
+
+Case Reference: #{{caseNumber}}
+
+Best regards,
+{{companyName}} Team`,
+  },
+
+  quote: {
+    subject: 'Quote - {{caseNumber}}',
+    body: `Dear {{customerName}},
+
+Please find attached your quote.
+
+Best regards,
+{{companyName}} Team`,
+  },
+
+  invoice: {
+    subject: 'Invoice - {{caseNumber}}',
+    body: `Dear {{customerName}},
+
+Please find attached your invoice.
+
+Best regards,
+{{companyName}} Team`,
+  },
+
+  payment_receipt: {
+    subject: 'Payment Receipt - {{caseNumber}}',
+    body: `Dear {{customerName}},
+
+Please find attached your payment receipt.
+
+Best regards,
+{{companyName}} Team`,
+  },
+
+  payslip: {
+    subject: 'Payslip - {{caseNumber}}',
+    body: `Dear {{customerName}},
+
+Please find attached your payslip.
+
+Best regards,
+{{companyName}} Team`,
+  },
 };
 
 export function getEmailTemplate(
@@ -99,6 +151,11 @@ export function getDocumentTypeLabel(documentType: DocumentType): string {
     customer_copy: 'Customer Copy',
     checkout_form: 'Checkout Form',
     case_label: 'Case Label',
+    chain_of_custody: 'Chain of Custody',
+    quote: 'Quote',
+    invoice: 'Invoice',
+    payment_receipt: 'Payment Receipt',
+    payslip: 'Payslip',
   };
   return labels[documentType];
 }

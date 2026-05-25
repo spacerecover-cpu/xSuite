@@ -5,9 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { getActiveAnnouncementsForUser, dismissAnnouncement } from '../../lib/platformAdminService';
 import { platformAdminKeys } from '../../lib/queryKeys';
-import type { Database } from '../../types/database.types';
-
-type PlatformAnnouncement = Database['public']['Tables']['platform_announcements']['Row'];
 
 const typeConfig = {
   info: { icon: Info, color: 'bg-info text-info-foreground' },

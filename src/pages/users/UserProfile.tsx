@@ -138,7 +138,7 @@ export const UserProfile: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-xl font-semibold text-slate-900">{profile.full_name}</h3>
-                <Badge color={getRoleBadgeColor(profile.role)}>{profile.role}</Badge>
+                <Badge color={getRoleBadgeColor(profile.role ?? '')}>{profile.role}</Badge>
               </div>
             </div>
 
@@ -190,7 +190,7 @@ export const UserProfile: React.FC = () => {
                     Role
                   </div>
                 </label>
-                <Input type="text" value={profile.role} disabled />
+                <Input type="text" value={profile.role ?? ''} disabled />
               </div>
 
               {profile.last_login && (

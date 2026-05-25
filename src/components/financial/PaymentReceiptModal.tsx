@@ -133,7 +133,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
           payment={payment}
           companySettings={companySettings}
           currencyFormat={currencyFormat}
-          t={t}
+          t={(key: string, fallback: string) => t(key as Parameters<typeof t>[0], fallback)}
           elementId="receipt-print-frame"
         />
       </div>

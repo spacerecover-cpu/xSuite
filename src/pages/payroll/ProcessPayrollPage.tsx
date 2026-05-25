@@ -11,7 +11,7 @@ import { format, addDays, startOfMonth, endOfMonth } from 'date-fns';
 
 export default function ProcessPayrollPage() {
   const navigate = useNavigate();
-  const { showToast } = useToast();
+  const toast = useToast();
   const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
   const [periodName, setPeriodName] = useState(`Payroll - ${format(new Date(), 'MMMM yyyy')}`);
@@ -21,23 +21,22 @@ export default function ProcessPayrollPage() {
   const [createdPeriodId, setCreatedPeriodId] = useState<string | null>(null);
 
   const createPeriodMutation = useMutation({
-    mutationFn: (data: { period_name: string; period_type: string; start_date: string; end_date: string; payment_date: string }) => payrollService.createPayrollPeriod(data),
+    mutationFn: (data: Parameters<typeof payrollService.createPayrollPeriod>[0]) => payrollService.createPayrollPeriod(data),
     onSuccess: (period) => {
       setCreatedPeriodId(period.id);
       setStep(2);
       queryClient.invalidateQueries({ queryKey: payrollKeys.periods({}) });
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to create payroll period', 'error');
+      toast.error(error.message || 'Failed to create payroll period');
     },
   });
 
   const processPayrollMutation = useMutation({
     mutationFn: (periodId: string) => payrollService.processPayroll(periodId, { includePendingAdjustments: true }),
     onSuccess: (result) => {
-      showToast(
-        `Payroll processed successfully! ${result.recordsCreated} employee records created.`,
-        'success'
+      toast.success(
+        `Payroll processed successfully! ${result.recordsCreated} employee records created.`
       );
       queryClient.invalidateQueries({ queryKey: payrollKeys.periods({}) });
       if (createdPeriodId) {
@@ -45,12 +44,13 @@ export default function ProcessPayrollPage() {
       }
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to process payroll', 'error');
+      toast.error(error.message || 'Failed to process payroll');
     },
   });
 
   const handleCreatePeriod = () => {
     createPeriodMutation.mutate({
+      tenant_id: '' as string,
       period_name: periodName,
       period_type: 'monthly',
       start_date: startDate,

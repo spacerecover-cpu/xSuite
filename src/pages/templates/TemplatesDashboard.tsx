@@ -34,9 +34,8 @@ interface TemplateCategory {
 interface TemplateType {
   id: string;
   name: string;
-  code: string;
-  category_id: string;
-  description: string;
+  code: string | null;
+  description: string | null;
   template_count: number;
 }
 
@@ -73,29 +72,34 @@ export const TemplatesDashboard: React.FC = () => {
 
       const { data: templatesData } = await supabase
         .from('document_templates')
-        .select('id, template_type_id')
+        .select('id, template_type_id, category_id')
         .eq('is_active', true);
 
       const typeCounts: Record<string, number> = {};
-      templatesData?.forEach((t) => {
-        typeCounts[t.template_type_id] = (typeCounts[t.template_type_id] || 0) + 1;
-      });
-
-      const enrichedTypes = typesData?.map(type => ({
-        ...type,
-        template_count: typeCounts[type.id] || 0,
-      })) || [];
-
       const categoryCounts: Record<string, number> = {};
-      enrichedTypes.forEach(type => {
-        if (type.category_id) {
-          categoryCounts[type.category_id] =
-            (categoryCounts[type.category_id] || 0) + type.template_count;
+      templatesData?.forEach((t) => {
+        if (t.template_type_id) {
+          typeCounts[t.template_type_id] = (typeCounts[t.template_type_id] || 0) + 1;
+        }
+        if (t.category_id) {
+          categoryCounts[t.category_id] = (categoryCounts[t.category_id] || 0) + 1;
         }
       });
 
-      const enrichedCategories = categoriesData?.map(cat => ({
-        ...cat,
+      const enrichedTypes: TemplateType[] = typesData?.map(type => ({
+        id: type.id,
+        name: type.name,
+        code: type.code,
+        description: type.description,
+        template_count: typeCounts[type.id] || 0,
+      })) || [];
+
+      const enrichedCategories: TemplateCategory[] = categoriesData?.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        description: '',
+        icon: 'FileText',
+        color: '#3b82f6',
         template_count: categoryCounts[cat.id] || 0,
       })) || [];
 
@@ -139,8 +143,7 @@ export const TemplatesDashboard: React.FC = () => {
   const filteredTypes = templateTypes.filter(type => {
     const matchesSearch = type.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          type.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = !selectedCategory || type.category_id === selectedCategory;
-    return matchesSearch && matchesCategory;
+    return matchesSearch;
   });
 
   const totalTemplates = templateTypes.reduce((sum, type) => sum + type.template_count, 0);
@@ -175,7 +178,7 @@ export const TemplatesDashboard: React.FC = () => {
         </div>
         <div className="flex gap-3">
           <Button
-            variant="outline"
+            variant="secondary"
             onClick={handleSeedTemplates}
             disabled={isSeeding}
           >

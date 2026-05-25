@@ -46,7 +46,7 @@ export const PlanDetailPage: React.FC = () => {
     return (
       <div className="text-center py-12">
         <p className="text-slate-500 mb-4">Plan not found</p>
-        <Button variant="outline" onClick={() => navigate('/platform-admin/plans')}>
+        <Button variant="ghost" onClick={() => navigate('/platform-admin/plans')}>
           Back to Plans
         </Button>
       </div>
@@ -435,7 +435,7 @@ const PlanFeaturesTab: React.FC<{
     <div>
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-slate-600">{features.length} features configured</p>
-        <Button variant="outline" size="sm" onClick={onAddFeature}>
+        <Button variant="ghost" size="sm" onClick={onAddFeature}>
           <Plus className="w-4 h-4 mr-1" />
           Add Feature
         </Button>
@@ -444,7 +444,7 @@ const PlanFeaturesTab: React.FC<{
       {features.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
           <p className="text-slate-500 mb-4">No features configured for this plan</p>
-          <Button variant="outline" onClick={onAddFeature}>
+          <Button variant="ghost" onClick={onAddFeature}>
             <Plus className="w-4 h-4 mr-2" />
             Add first feature
           </Button>

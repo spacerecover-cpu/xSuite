@@ -13,33 +13,32 @@ import { logger } from '../../lib/logger';
 
 interface Supplier {
   id: string;
-  supplier_number: string;
+  supplier_number: string | null;
   name: string;
   email: string | null;
   phone: string | null;
   country: string | null;
   city: string | null;
-  is_active: boolean;
+  is_active: boolean | null;
   is_approved: boolean;
   created_at: string;
-  category_id: number | null;
+  category_id: string | null;
   category: { name: string } | null;
-  payment_terms: { name: string; days: number } | null;
+  payment_terms: { name: string; days: number | null } | null;
 }
 
 interface Category {
-  id: number;
+  id: string;
   name: string;
 }
 
 export default function SuppliersListPage() {
   const navigate = useNavigate();
-  const { showToast } = useToast();
+  const toast = useToast();
   const { formatCurrency } = useCurrency();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [approvalFilter, setApprovalFilter] = useState<string>('all');
@@ -79,11 +78,29 @@ export default function SuppliersListPage() {
 
       if (error) throw error;
 
-      setSuppliers(data || []);
-      calculateStats(data || []);
+      // DB rows don't have UI-only `is_approved`, `country`, `city` strings.
+      // Default them so the local Supplier shape is satisfied.
+      const rows: Supplier[] = (data ?? []).map((row) => ({
+        id: row.id,
+        supplier_number: row.supplier_number,
+        name: row.name,
+        email: row.email,
+        phone: row.phone,
+        country: null,
+        city: null,
+        is_active: row.is_active,
+        is_approved: false,
+        created_at: row.created_at,
+        category_id: row.category_id,
+        category: row.category,
+        payment_terms: row.payment_terms,
+      }));
+
+      setSuppliers(rows);
+      calculateStats(rows);
     } catch (error: unknown) {
       logger.error('Error loading suppliers:', error);
-      showToast(error instanceof Error ? error.message : 'Failed to load suppliers', 'error');
+      toast.error(error instanceof Error ? error.message : 'Failed to load suppliers');
     } finally {
       setLoading(false);
     }
@@ -93,12 +110,12 @@ export default function SuppliersListPage() {
     try {
       const { data, error } = await supabase
         .from('master_supplier_categories')
-        .select('*')
+        .select('id, name')
         .eq('is_active', true)
         .order('name');
 
       if (error) throw error;
-      setCategories(data || []);
+      setCategories(data ?? []);
     } catch (error) {
       logger.error('Error loading categories:', error);
     }
@@ -134,7 +151,6 @@ export default function SuppliersListPage() {
 
   const handleModalClose = () => {
     setShowAddModal(false);
-    setSelectedSupplier(null);
   };
 
   const handleModalSuccess = () => {
@@ -548,7 +564,7 @@ export default function SuppliersListPage() {
           isOpen={showAddModal}
           onClose={handleModalClose}
           onSuccess={handleModalSuccess}
-          supplier={selectedSupplier}
+          supplier={null}
         />
       )}
     </div>

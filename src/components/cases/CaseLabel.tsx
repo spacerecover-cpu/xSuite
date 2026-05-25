@@ -11,29 +11,31 @@ interface CaseLabelProps {
 
 interface CaseData {
   id: string;
-  case_no: string;
-  priority: string;
+  case_no: string | null;
+  priority: string | null;
   created_at: string;
-  customer_id: string;
+  customer_id: string | null;
   customer?: {
     customer_name: string;
     mobile_number: string | null;
-    customer_number: string;
-  };
+    customer_number: string | null;
+  } | null;
   devices?: Array<{
     device_type: { name: string } | null;
+    device_type_id?: string | null;
     serial_number: string | null;
   }>;
+  [key: string]: unknown;
 }
 
 interface CompanySettings {
   basic_info?: {
     company_name?: string;
-  };
+  } | null;
   branding?: {
     qr_code_label_url?: string;
     qr_code_label_caption?: string;
-  };
+  } | null;
 }
 
 export const CaseLabel: React.FC<CaseLabelProps> = ({ caseId, caseNumber: _caseNumber }) => {
@@ -57,8 +59,17 @@ export const CaseLabel: React.FC<CaseLabelProps> = ({ caseId, caseNumber: _caseN
         if (prioritiesResult.error) throw prioritiesResult.error;
 
         const caseInfo = caseResult.data;
-        setCompanySettings(settingsResult.data);
-        setCasePriorities(prioritiesResult.data || []);
+        setCompanySettings(
+          settingsResult.data
+            ? {
+                basic_info: settingsResult.data.basic_info as CompanySettings['basic_info'],
+                branding: settingsResult.data.branding as CompanySettings['branding'],
+              }
+            : null
+        );
+        setCasePriorities(
+          (prioritiesResult.data || []).map((p) => ({ name: p.name, color: p.color ?? '' }))
+        );
 
         const [customerResult, devicesResult] = await Promise.all([
           caseInfo.customer_id
@@ -125,7 +136,8 @@ export const CaseLabel: React.FC<CaseLabelProps> = ({ caseId, caseNumber: _caseN
     );
   }
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityColor = (priority: string | null) => {
+    if (!priority) return '#6b7280';
     const priorityItem = casePriorities.find(
       p => p.name.toLowerCase() === priority.toLowerCase()
     );

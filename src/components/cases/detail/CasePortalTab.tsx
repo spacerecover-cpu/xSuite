@@ -82,7 +82,7 @@ function decodePortalSettings(
 
   const decoded: PortalSettings = { ...base };
   for (const k of flagKeys) {
-    (decoded as Record<string, unknown>)[k] = flagNames.includes(k as string);
+    (decoded as unknown as Record<string, unknown>)[k] = flagNames.includes(k as string);
   }
   decoded.custom_message = (raw.custom_message as string) || '';
   return decoded;

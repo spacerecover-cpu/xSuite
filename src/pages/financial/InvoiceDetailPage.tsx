@@ -11,7 +11,7 @@ import { InvoiceDocument } from '../../components/documents/InvoiceDocument';
 import { useCurrency } from '../../hooks/useCurrency';
 import { usePDFDownload } from '../../hooks/usePDFDownload';
 import { useToast } from '../../hooks/useToast';
-import { FileText, ArrowLeft, CreditCard as Edit, DollarSign, AlertCircle, RefreshCw, CheckCircle, ArrowRight, ExternalLink, Lock, ShoppingBag } from 'lucide-react';
+import { FileText, ArrowLeft, CreditCard as Edit, DollarSign, AlertCircle, RefreshCw, CheckCircle, ArrowRight, Lock, ShoppingBag } from 'lucide-react';
 import { RecordReceiptModal } from '../../components/banking/RecordReceiptModal';
 import { AddStockSaleToInvoiceModal } from '../../components/financial/AddStockSaleToInvoiceModal';
 import { logger } from '../../lib/logger';
@@ -109,8 +109,10 @@ export const InvoiceDetailPage: React.FC = () => {
 
     try {
       const history = await getConversionHistory(id);
+      // getConversionHistory returns null in v1.0.0 (B8 to reconstruct from converted_from_quote_id chain).
+      const items: unknown[] = Array.isArray(history) ? history : [];
       setConversionHistory(
-        (history ?? []).filter(
+        items.filter(
           (item): item is Record<string, unknown> =>
             typeof item === 'object' && item !== null
         )
@@ -154,12 +156,14 @@ export const InvoiceDetailPage: React.FC = () => {
   }
 
   const StatusIcon = statusConfig[invoice.status as keyof typeof statusConfig]?.icon || FileText;
-  const isConverted = invoice.invoice_type === 'proforma' && (invoice.status === 'converted' || invoice.converted_to_invoice_id);
-  const canEdit = ['draft', 'sent'].includes(invoice.status) && !isConverted;
-  const canRecordPayment = invoice.invoice_type === 'tax_invoice' && ['sent', 'partial', 'overdue'].includes(invoice.status);
-  const canConvert = invoice.invoice_type === 'proforma' && invoice.status !== 'converted' && !invoice.converted_to_invoice_id;
-  const hasConversionHistory = invoice.invoice_type === 'tax_invoice' && invoice.proforma_invoice_id;
-  const wasConvertedFromProforma = invoice.invoice_type === 'tax_invoice' && invoice.proforma_invoice_id;
+  // v1.0.0: invoices has no `converted_to_invoice_id`/`proforma_invoice_id`/`converted_at` columns.
+  // Conversion state is inferred from status and `converted_from_quote_id` (proforma→tax via RPC).
+  const isConverted = invoice.invoice_type === 'proforma' && invoice.status === 'converted';
+  const canEdit = ['draft', 'sent'].includes(invoice.status ?? '') && !isConverted;
+  const canRecordPayment = invoice.invoice_type === 'tax_invoice' && ['sent', 'partial', 'overdue'].includes(invoice.status ?? '');
+  const canConvert = invoice.invoice_type === 'proforma' && invoice.status !== 'converted';
+  const hasConversionHistory = invoice.invoice_type === 'tax_invoice' && !!invoice.converted_from_quote_id;
+  const wasConvertedFromProforma = invoice.invoice_type === 'tax_invoice' && !!invoice.converted_from_quote_id;
 
   return (
     <>
@@ -452,40 +456,23 @@ export const InvoiceDetailPage: React.FC = () => {
                   </Badge>
                 </div>
 
-                {isConverted && invoice.converted_to_invoice_id && (
+                {isConverted && (
                   <div className="mt-4 p-3 bg-info-muted border border-info/30 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <Lock className="w-4 h-4 text-primary" />
                       <span className="text-sm font-medium text-info">Read-Only (Converted)</span>
                     </div>
-                    <button
-                      onClick={() => navigate(`/invoices/${invoice.converted_to_invoice_id}`)}
-                      className="flex items-center gap-2 text-sm text-info hover:text-info/80 font-medium transition-colors"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      View Tax Invoice
-                    </button>
-                    {invoice.converted_at && (
-                      <p className="text-xs text-info mt-1">
-                        Converted on {new Date(invoice.converted_at).toLocaleDateString()}
-                      </p>
-                    )}
+                    {/* v1.0.0: no `converted_to_invoice_id` column. Link via conversion history (B8). */}
                   </div>
                 )}
 
-                {wasConvertedFromProforma && invoice.proforma_invoice_id && (
+                {wasConvertedFromProforma && (
                   <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <ArrowRight className="w-4 h-4 text-slate-600" />
                       <span className="text-sm font-medium text-slate-700">Created from Proforma</span>
                     </div>
-                    <button
-                      onClick={() => navigate(`/invoices/${invoice.proforma_invoice_id}`)}
-                      className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 font-medium transition-colors"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      View Original Proforma
-                    </button>
+                    {/* v1.0.0: no `proforma_invoice_id` column. The proforma quote_id is in `converted_from_quote_id` (B8 to wire navigation). */}
                   </div>
                 )}
               </div>

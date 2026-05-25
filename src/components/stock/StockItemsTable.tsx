@@ -37,7 +37,7 @@ function MarginCell({ margin }: { margin: number | null }) {
   );
 }
 
-function ItemTypeBadge({ itemType }: { itemType: string }) {
+function ItemTypeBadge({ itemType }: { itemType: string | null }) {
   if (itemType === 'internal') {
     return <Badge variant="default" size="sm">Internal</Badge>;
   }
@@ -165,7 +165,10 @@ export function StockItemsTable({
             </tr>
           ) : (
             items.map((item, idx) => {
-              const available = item.current_quantity - item.reserved_quantity;
+              const currentQty = item.current_quantity ?? 0;
+              const reservedQty = item.quantity_reserved ?? 0;
+              const minQty = item.minimum_quantity ?? 0;
+              const available = currentQty - reservedQty;
               const margin = computeMargin(item.cost_price, item.selling_price);
 
               return (
@@ -193,7 +196,6 @@ export function StockItemsTable({
                       {item.brand && (
                         <p className="text-xs text-slate-500 truncate">
                           {item.brand}
-                          {item.capacity ? ` · ${item.capacity}` : ''}
                         </p>
                       )}
                     </div>
@@ -213,13 +215,13 @@ export function StockItemsTable({
 
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <span className="text-sm font-medium tabular-nums text-slate-900">
-                      {item.current_quantity}
+                      {currentQty}
                     </span>
                   </td>
 
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <span className="text-sm tabular-nums text-slate-600">
-                      {item.reserved_quantity}
+                      {reservedQty}
                     </span>
                   </td>
 
@@ -228,7 +230,7 @@ export function StockItemsTable({
                       className={`text-sm font-medium tabular-nums ${
                         available <= 0
                           ? 'text-danger'
-                          : available <= item.minimum_quantity
+                          : available <= minQty
                           ? 'text-warning'
                           : 'text-slate-900'
                       }`}

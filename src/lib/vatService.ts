@@ -130,7 +130,7 @@ export const createVATReturn = async (
 ) => {
   const { data, error } = await supabase
     .from('vat_returns')
-    .insert([vatReturn])
+    .insert([vatReturn as never])
     .select()
     .maybeSingle();
 
@@ -198,7 +198,7 @@ export const createVATRecord = async (
 ) => {
   const { data, error } = await supabase
     .from('vat_records')
-    .insert([record])
+    .insert([record as never])
     .select()
     .maybeSingle();
 

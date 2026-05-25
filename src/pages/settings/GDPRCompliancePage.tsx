@@ -93,14 +93,14 @@ export const GDPRCompliancePage: React.FC = () => {
     if (!customerSearch.trim()) return;
     const { data } = await supabase
       .from('customers_enhanced')
-      .select('id, first_name, last_name, email')
-      .or(`email.ilike.%${customerSearch}%,first_name.ilike.%${customerSearch}%,last_name.ilike.%${customerSearch}%`)
+      .select('id, customer_name, email')
+      .or(`email.ilike.%${customerSearch}%,customer_name.ilike.%${customerSearch}%`)
       .is('deleted_at', null)
       .limit(1)
       .maybeSingle();
     if (data) {
       setSelectedCustomerId(data.id);
-      toast.success(`Found: ${data.first_name} ${data.last_name} (${data.email})`);
+      toast.success(`Found: ${data.customer_name} (${data.email ?? 'no email'})`);
     } else {
       toast.error('No customer found');
     }

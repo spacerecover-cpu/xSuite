@@ -61,16 +61,20 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
 
     setIsSubmitting(true);
     try {
+      // financial_transactions has no status/reference_number/notes columns — capture extras
+      // in description as a stop-gap until a migration adds them (B6 deferred).
+      const ref = referenceNumber.trim();
+      const extraNotes = notes.trim();
+      const descParts = [description.trim()];
+      if (ref) descParts.push(`Ref: ${ref}`);
+      if (extraNotes) descParts.push(extraNotes);
       await onSave({
         transaction_date: transactionDate,
         amount,
-        type,
-        description: description.trim(),
-        reference_number: referenceNumber.trim() || undefined,
+        transaction_type: type,
+        description: descParts.join(' | '),
         category_id: categoryId || null,
         bank_account_id: bankAccountId || null,
-        status: 'completed',
-        notes: notes.trim() || undefined,
       });
       handleClose();
     } catch (error) {

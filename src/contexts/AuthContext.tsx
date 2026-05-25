@@ -60,9 +60,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) throw error;
 
-      profileCache.current = data;
-      setProfile(data);
-      setPasswordResetRequired(data?.password_reset_required || false);
+      const profileData = data as unknown as Profile | null;
+      profileCache.current = profileData;
+      setProfile(profileData);
+      setPasswordResetRequired(profileData?.password_reset_required || false);
 
       if (data?.tenant_id) {
         localStorage.setItem('tenant_id', data.tenant_id);

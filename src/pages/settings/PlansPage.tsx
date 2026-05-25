@@ -209,7 +209,7 @@ export default function PlansPage() {
                 {isEnterprise ? (
                   <Button
                     className="w-full"
-                    variant={isProfessional ? 'default' : 'outline'}
+                    variant={isProfessional ? 'primary' : 'secondary'}
                     onClick={() =>
                       (window.location.href = 'mailto:sales@xsuite.space?subject=Enterprise Plan Inquiry')
                     }
@@ -220,7 +220,7 @@ export default function PlansPage() {
                 ) : (
                   <Button
                     className="w-full"
-                    variant={isProfessional ? 'default' : 'outline'}
+                    variant={isProfessional ? 'primary' : 'secondary'}
                     disabled={isCurrentPlan || createSubscriptionMutation.isPending}
                     onClick={() => createSubscriptionMutation.mutate({ planId: plan.id })}
                   >

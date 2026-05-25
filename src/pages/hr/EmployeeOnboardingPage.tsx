@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { UserCheck, ClipboardList, AlertTriangle, CheckCircle2, Plus, ChevronDown, ChevronRight, Clock, User, CreditCard as Edit2, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { UserCheck, ClipboardList, AlertTriangle, CheckCircle2, Plus, ChevronDown, ChevronRight, Clock, User, CreditCard as Edit2, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../../components/ui/Button';
-import { Badge } from '../../components/ui/Badge';
 import { employeeOnboardingKeys } from '../../lib/queryKeys';
 import {
   getChecklists,
@@ -11,7 +10,6 @@ import {
   completeTask,
   updateTask,
   deleteChecklist,
-  updateChecklist,
   type ChecklistWithItems,
   type EmployeeWithTasks,
   type TaskWithDetails,
@@ -80,10 +78,10 @@ function TaskRow({
             task.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-800'
           }`}
         >
-          {task.task_name}
+          {task.title}
         </p>
-        {task.task_description && (
-          <p className="text-xs text-slate-500 mt-0.5">{task.task_description}</p>
+        {task.description && (
+          <p className="text-xs text-slate-500 mt-0.5">{task.description}</p>
         )}
         <div className="flex items-center gap-3 mt-1">
           {task.due_date && (
@@ -202,12 +200,10 @@ function ChecklistCard({
   checklist,
   onEdit,
   onDelete,
-  onToggleActive,
 }: {
   checklist: ChecklistWithItems;
   onEdit: (c: ChecklistWithItems) => void;
   onDelete: (id: string) => void;
-  onToggleActive: (id: string, active: boolean) => void;
 }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow">
@@ -227,9 +223,6 @@ function ChecklistCard({
               Default
             </span>
           )}
-          <Badge variant={checklist.is_active ? 'success' : 'default'}>
-            {checklist.is_active ? 'Active' : 'Inactive'}
-          </Badge>
         </div>
       </div>
 
@@ -239,17 +232,6 @@ function ChecklistCard({
           <span>{checklist.item_count || 0} tasks</span>
         </div>
         <div className="flex gap-1">
-          <button
-            onClick={() => onToggleActive(checklist.id, !checklist.is_active)}
-            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-            title={checklist.is_active ? 'Deactivate' : 'Activate'}
-          >
-            {checklist.is_active ? (
-              <ToggleRight className="w-4 h-4 text-success" />
-            ) : (
-              <ToggleLeft className="w-4 h-4" />
-            )}
-          </button>
           <button
             onClick={() => onEdit(checklist)}
             className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
@@ -310,14 +292,6 @@ export const EmployeeOnboardingPage: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: employeeOnboardingKeys.all });
       toast.success('Checklist deleted');
-    },
-  });
-
-  const toggleActiveMutation = useMutation({
-    mutationFn: ({ id, active }: { id: string; active: boolean }) =>
-      updateChecklist(id, { is_active: active }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: employeeOnboardingKeys.all });
     },
   });
 
@@ -448,7 +422,6 @@ export const EmployeeOnboardingPage: React.FC = () => {
                       deleteChecklistMutation.mutate(id);
                     }
                   }}
-                  onToggleActive={(id, active) => toggleActiveMutation.mutate({ id, active })}
                 />
               ))}
             </div>

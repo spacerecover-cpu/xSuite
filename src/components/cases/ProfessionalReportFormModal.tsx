@@ -521,13 +521,15 @@ DOM: ${deviceData.dom || 'N/A'}`;
                 )}
 
                 {/* Content Editor */}
-                <div className="flex-1 overflow-hidden flex flex-col">
-                  <RichTextEditor
-                    value={sectionContents[activeSectionKey] || ''}
-                    onChange={(content) => handleSectionContentChange(activeSectionKey, content)}
-                    placeholder={`Enter ${activeSectionData.section_name.toLowerCase()} content...`}
-                  />
-                </div>
+                {activeSectionKey && (
+                  <div className="flex-1 overflow-hidden flex flex-col">
+                    <RichTextEditor
+                      value={sectionContents[activeSectionKey] || ''}
+                      onChange={(content) => handleSectionContentChange(activeSectionKey, content)}
+                      placeholder={`Enter ${activeSectionData.section_name.toLowerCase()} content...`}
+                    />
+                  </div>
+                )}
               </>
             ) : (
               <div className="flex-1 flex items-center justify-center">

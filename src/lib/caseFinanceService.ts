@@ -119,20 +119,7 @@ export async function getCasePayments(caseId: string): Promise<CasePayment[]> {
     .order('payment_date', { ascending: false });
 
   if (error) {
-    const directPayments = await supabase
-      .from('payments')
-      .select(`
-        id,
-        payment_number,
-        payment_date,
-        amount,
-        payment_method:master_payment_methods(name),
-        customer:customers_enhanced(customer_name)
-      `)
-      .eq('case_id', caseId)
-      .order('payment_date', { ascending: false });
-
-    return (directPayments.data || []).map(p => ({ ...p, invoice: null })) as CasePayment[];
+    return [];
   }
 
   return (data || []) as CasePayment[];

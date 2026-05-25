@@ -18,7 +18,7 @@ type EmployeeLoan = Database['public']['Tables']['employee_loans']['Row'] & {
   employee: {
     first_name: string;
     last_name: string;
-    employee_number: string;
+    employee_number: string | null;
   };
 };
 
@@ -40,11 +40,11 @@ export const EmployeeLoansPage: React.FC = () => {
   const filteredLoans = loans.filter((loan) => {
     const matchesSearch =
       !searchTerm ||
-      loan.loan_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      loan.loan_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       `${loan.employee.first_name} ${loan.employee.last_name}`
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
-      loan.employee.employee_number.toLowerCase().includes(searchTerm.toLowerCase());
+      loan.employee.employee_number?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesType = typeFilter === 'all' || loan.loan_type === typeFilter;
 
@@ -76,7 +76,7 @@ export const EmployeeLoansPage: React.FC = () => {
     }
   };
 
-  const getTypeVariant = (type: string): 'info' | 'warning' | 'default' => {
+  const getTypeVariant = (type: string | null): 'info' | 'warning' | 'default' => {
     switch (type) {
       case 'salary_advance':
         return 'info';
@@ -89,7 +89,8 @@ export const EmployeeLoansPage: React.FC = () => {
     }
   };
 
-  const formatType = (type: string) => {
+  const formatType = (type: string | null) => {
+    if (!type) return '';
     return type
       .split('_')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))

@@ -155,7 +155,7 @@ export const CaseBackupDevicesTab: React.FC<CaseBackupDevicesTabProps> = ({
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {sales.map((sale) => {
-                    const statusCfg = paymentStatusConfig[sale.payment_status ?? 'pending'];
+                    const statusCfg = paymentStatusConfig[sale.status ?? 'pending'];
                     const itemNames = sale.stock_sale_items
                       ?.map((i) => i.stock_items?.name ?? 'Item')
                       .join(', ');
@@ -169,7 +169,7 @@ export const CaseBackupDevicesTab: React.FC<CaseBackupDevicesTabProps> = ({
                         </td>
                         <td className="py-3 text-center">
                           <Badge variant={statusCfg?.color ?? 'secondary'} size="sm">
-                            {statusCfg?.label ?? sale.payment_status}
+                            {statusCfg?.label ?? sale.status}
                           </Badge>
                         </td>
                         <td className="py-3 text-right">
@@ -198,7 +198,7 @@ export const CaseBackupDevicesTab: React.FC<CaseBackupDevicesTabProps> = ({
               <h3 className="text-lg font-semibold text-slate-900">Stock Used for This Case</h3>
             </div>
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={() => setShowUsageModal(true)}
             >
@@ -242,7 +242,7 @@ export const CaseBackupDevicesTab: React.FC<CaseBackupDevicesTabProps> = ({
                           {Math.abs(tx.quantity ?? 0)}
                         </td>
                         <td className="py-3 text-slate-600">
-                          {formatDate(tx.transaction_date)}
+                          {formatDate(tx.created_at)}
                         </td>
                         <td className="py-3 text-slate-500 max-w-xs truncate">
                           {tx.notes ?? '—'}

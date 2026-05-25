@@ -287,13 +287,13 @@ export default function ReportViewModal({
         <div className="flex-shrink-0 flex items-center justify-end gap-2 mt-4 pt-4 border-t">
           <div className="flex items-center gap-2">
             {report.status === 'draft' && onEdit && (
-              <Button variant="outline" onClick={onEdit}>
+              <Button variant="ghost" onClick={onEdit}>
                 <Edit className="w-4 h-4 mr-2" />
                 Edit
               </Button>
             )}
             {report.is_latest_version && onNewVersion && (
-              <Button variant="outline" onClick={onNewVersion}>
+              <Button variant="ghost" onClick={onNewVersion}>
                 <FileText className="w-4 h-4 mr-2" />
                 New Version
               </Button>

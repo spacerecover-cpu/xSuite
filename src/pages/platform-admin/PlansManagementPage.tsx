@@ -96,7 +96,7 @@ export const PlansManagementPage: React.FC = () => {
       ) : filteredPlans.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-slate-500 mb-4">No plans found</p>
-          <Button variant="outline" onClick={() => setShowCreateModal(true)}>
+          <Button variant="ghost" onClick={() => setShowCreateModal(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Create your first plan
           </Button>

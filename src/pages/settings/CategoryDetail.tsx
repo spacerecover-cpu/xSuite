@@ -154,6 +154,15 @@ export const CategoryDetail: React.FC = () => {
     enabled: activeTable === 'geo_countries',
   });
 
+  const defaultCountryId: string | null = (() => {
+    const loc = companySettings?.location;
+    if (loc && typeof loc === 'object' && !Array.isArray(loc)) {
+      const dc = (loc as Record<string, unknown>).default_country_id;
+      if (typeof dc === 'string') return dc;
+    }
+    return null;
+  })();
+
   const items = allItems.filter((item) => {
     if (!searchQuery.trim()) return true;
     const searchLower = searchQuery.toLowerCase();
@@ -188,7 +197,8 @@ export const CategoryDetail: React.FC = () => {
           .limit(1)
           .maybeSingle();
 
-        const nextSortOrder = (maxOrderData?.sort_order ?? 0) + 1;
+        const maxOrderRow = maxOrderData as { sort_order: number | null } | null;
+        const nextSortOrder = (maxOrderRow?.sort_order ?? 0) + 1;
 
         const { error } = await supabase
           .from(activeTable)
@@ -244,11 +254,14 @@ export const CategoryDetail: React.FC = () => {
 
   const setDefaultCountryMutation = useMutation({
     mutationFn: async (countryId: string) => {
+      const currentLocation = (companySettings?.location && typeof companySettings.location === 'object' && !Array.isArray(companySettings.location))
+        ? (companySettings.location as Record<string, unknown>)
+        : {};
       const { error } = await supabase
         .from('company_settings')
         .update({
           location: {
-            ...companySettings?.location,
+            ...currentLocation,
             default_country_id: countryId,
           },
         })
@@ -434,7 +447,7 @@ export const CategoryDetail: React.FC = () => {
       header: 'Actions',
       width: activeTable === 'geo_countries' ? '160px' : '120px',
       render: (row: MasterDataItem) => {
-        const isDefaultCountry = activeTable === 'geo_countries' && companySettings?.location?.default_country_id === row.id.toString();
+        const isDefaultCountry = activeTable === 'geo_countries' && defaultCountryId === row.id.toString();
         return (
           <div className="flex gap-1.5">
             {activeTable === 'geo_countries' && (
@@ -569,12 +582,12 @@ export const CategoryDetail: React.FC = () => {
                 {TABLE_LABELS[activeTable]} ({searchQuery ? `${items.length} of ${allItems.length}` : items.length})
               </h2>
               <p className="text-slate-500 text-xs md:text-sm mt-1">Manage your {TABLE_LABELS[activeTable].toLowerCase()}</p>
-              {activeTable === 'geo_countries' && companySettings?.location?.default_country_id && (
+              {activeTable === 'geo_countries' && defaultCountryId && (
                 <div className="flex items-center gap-2 mt-2">
                   <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                   <span className="text-sm text-slate-600">
                     Default: <span className="font-semibold text-slate-900">
-                      {allItems.find((item) => item.id.toString() === companySettings.location.default_country_id)?.name || 'None'}
+                      {allItems.find((item) => item.id.toString() === defaultCountryId)?.name || 'None'}
                     </span>
                   </span>
                 </div>
@@ -589,7 +602,6 @@ export const CategoryDetail: React.FC = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full sm:w-64 pl-10 pr-10 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 text-sm"
-                  style={{ focusRing: category.backgroundColor }}
                   onFocus={(e) => e.target.style.borderColor = category.backgroundColor}
                   onBlur={(e) => e.target.style.borderColor = ''}
                 />

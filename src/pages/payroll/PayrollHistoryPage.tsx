@@ -115,13 +115,13 @@ export default function PayrollHistoryPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm font-medium text-slate-900">
-                      {formatCurrency(period.total_gross)}
+                      {formatCurrency(period.total_gross ?? 0)}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">
-                      {formatCurrency(period.total_deductions)}
+                      {formatCurrency(period.total_deductions ?? 0)}
                     </td>
                     <td className="px-6 py-4 text-sm font-bold text-slate-900">
-                      {formatCurrency(period.total_net)}
+                      {formatCurrency(period.total_net ?? 0)}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${

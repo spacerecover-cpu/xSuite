@@ -111,7 +111,7 @@ export const AssignChecklistModal: React.FC<Props> = ({
             className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="">Select checklist...</option>
-            {checklists.filter(c => c.is_active).map(c => (
+            {checklists.map(c => (
               <option key={c.id} value={c.id}>
                 {c.name} ({c.item_count} items)
               </option>

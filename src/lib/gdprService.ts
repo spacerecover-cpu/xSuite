@@ -37,7 +37,7 @@ export const gdprService = {
 
     const { error } = await supabase
       .from('data_subject_requests')
-      .update(update)
+      .update(update as never)
       .eq('id', id);
     if (error) throw error;
   },

@@ -35,7 +35,7 @@ export const OnboardingWizard = ({ tenantId, onComplete }: OnboardingWizardProps
       }
     } catch (error) {
       toast.error('Failed to save progress');
-      logger.error(error);
+      logger.error('Onboarding step failed', error);
     } finally {
       setLoading(false);
     }
@@ -158,7 +158,7 @@ const StepContent = ({ stepId, tenantId, onNext, onSkip: _onSkip, loading }: Ste
       onNext();
     } catch (error) {
       toast.error('Failed to load sample data');
-      logger.error(error);
+      logger.error('Loading sample data failed', error);
     } finally {
       setLoadingSampleData(false);
     }

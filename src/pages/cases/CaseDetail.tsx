@@ -135,14 +135,14 @@ export const CaseDetail: React.FC = () => {
     modals.setShowPDFPreviewModal(true);
   };
 
-  const handleRecordPayment = (invoice: Record<string, unknown>): void => {
+  const handleRecordPayment = (invoice: { id: string; invoice_type: string | null }): void => {
     // Only allow payment recording for tax invoices, not proforma invoices
     if (invoice.invoice_type !== 'tax_invoice') {
       toast.error('Payments can only be recorded against Tax Invoices, not Proforma Invoices. Please convert this to a Tax Invoice first.');
       return;
     }
     void (async () => {
-      const invoiceId = typeof invoice.id === 'string' ? invoice.id : '';
+      const invoiceId = invoice.id;
       if (!invoiceId) return;
       const fullInvoice = await invoiceService.fetchInvoiceById(invoiceId);
       modals.setSelectedInvoiceForPayment(fullInvoice);
@@ -432,8 +432,8 @@ export const CaseDetail: React.FC = () => {
             if (Object.keys(customerUpdates).length > 0) {
               updateCustomerInfoMutation.mutate(customerUpdates);
             }
-            if (deviceUpdates.device_password !== undefined && devices[0]) {
-              updateDeviceInfoMutation.mutate({ deviceId: devices[0].id, updates: { device_password: deviceUpdates.device_password } });
+            if (deviceUpdates.password !== undefined && devices[0]) {
+              updateDeviceInfoMutation.mutate({ deviceId: devices[0].id, updates: { password: deviceUpdates.password } });
             }
           }}
           onUpdateStatus={(newStatus) => updateCaseStatusMutation.mutate(newStatus)}
@@ -509,7 +509,6 @@ export const CaseDetail: React.FC = () => {
           {activeTab === 'quotes' && (
             <CaseFinancesTab
               caseId={id!}
-              caseData={caseData}
               quotes={quotes || []}
               invoices={invoices || []}
               caseFinancialSummary={caseFinancialSummary}
@@ -537,10 +536,11 @@ export const CaseDetail: React.FC = () => {
               attachments={(attachments || []).map((a) => ({
                 id: a.id,
                 file_name: a.file_name,
-                file_path: a.file_url,
-                file_size: a.file_size ?? undefined,
-                file_type: a.file_type ?? undefined,
-                created_at: a.created_at ?? undefined,
+                file_url: a.file_url,
+                file_size: a.file_size,
+                file_type: a.file_type,
+                category: a.category,
+                created_at: a.created_at,
               }))}
               uploadedBy={profile?.id || ''}
             />

@@ -38,10 +38,10 @@ interface PurchaseOrderFormModalProps {
 }
 
 export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, purchaseOrder, supplierId }: PurchaseOrderFormModalProps) {
-  const { showToast } = useToast();
+  const toast = useToast();
   const [loading, setLoading] = useState(false);
-  const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string; supplier_number: string }>>([]);
-  const [statuses, setStatuses] = useState<Array<{ id: number; name: string; sort_order?: number; is_active?: boolean }>>([]);
+  const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string; supplier_number: string | null }>>([]);
+  const [statuses, setStatuses] = useState<Array<{ id: string; name: string; sort_order?: number | null; is_active?: boolean }>>([]);
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { description: '', quantity: 1, unit_price: 0, total: 0 }
   ]);
@@ -93,7 +93,7 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
       if (statusesRes.data) {
         setStatuses(statusesRes.data);
         if (!purchaseOrder && statusesRes.data.length > 0) {
-          setFormData(prev => ({ ...prev, status_id: statusesRes.data[0].id.toString() }));
+          setFormData(prev => ({ ...prev, status_id: statusesRes.data[0].id }));
         }
       }
     } catch (error) {
@@ -145,7 +145,7 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
     e.preventDefault();
 
     if (lineItems.length === 0 || lineItems.every(item => !item.description)) {
-      showToast('Please add at least one line item', 'error');
+      toast.error('Please add at least one line item');
       return;
     }
 
@@ -157,40 +157,53 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
 
       const totals = calculateTotals();
 
-      const poData = {
-        ...formData,
+      // Only persist columns that exist on purchase_orders. UI-only fields
+      // (shipping_method, internal_notes) and child rows (line_items)
+      // are intentionally not part of the parent row update.
+      const poUpdate = {
+        po_number: formData.po_number,
         supplier_id: formData.supplier_id,
-        status_id: parseInt(formData.status_id),
+        status_id: formData.status_id,
+        order_date: formData.order_date,
+        expected_delivery_date: formData.expected_delivery || null,
+        shipping_address: formData.shipping_address || null,
+        notes: formData.notes || null,
         subtotal: totals.subtotal,
         tax_amount: totals.tax,
         total_amount: totals.total,
-        line_items: lineItems.filter(item => item.description),
         updated_by: user.id,
         updated_at: new Date().toISOString(),
       };
 
-      if (purchaseOrder) {
+      if (purchaseOrder && purchaseOrder.id) {
         const { error } = await supabase
           .from('purchase_orders')
-          .update(poData)
+          .update(poUpdate)
           .eq('id', purchaseOrder.id);
 
         if (error) throw error;
-        showToast('Purchase order updated successfully', 'success');
+        toast.success('Purchase order updated successfully');
       } else {
+        const { data: tenantId, error: tenantErr } = await supabase.rpc('get_current_tenant_id');
+        if (tenantErr || !tenantId) throw new Error('Unable to resolve current tenant');
+
         const { error } = await supabase
           .from('purchase_orders')
-          .insert([{ ...poData, created_by: user.id }]);
+          .insert({
+            ...poUpdate,
+            tenant_id: tenantId,
+            created_by: user.id,
+          });
 
         if (error) throw error;
-        showToast('Purchase order created successfully', 'success');
+        toast.success('Purchase order created successfully');
       }
 
       onSuccess();
       onClose();
     } catch (error: unknown) {
       logger.error('Error saving purchase order:', error);
-      showToast(error instanceof Error ? error.message : 'Failed to save purchase order', 'error');
+      toast.error(error instanceof Error ? error.message : 'Failed to save purchase order');
     } finally {
       setLoading(false);
     }
@@ -420,7 +433,7 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
           <Button type="submit" disabled={loading}>

@@ -41,7 +41,7 @@ export async function getPortalSettings(): Promise<PortalSettings | null> {
     }
 
     if (data?.portal_settings && Object.keys(data.portal_settings as object).length > 0) {
-      cachedPortalSettings = data.portal_settings as PortalSettings;
+      cachedPortalSettings = data.portal_settings as unknown as PortalSettings;
       cacheTimestamp = now;
       return cachedPortalSettings;
     }
@@ -144,7 +144,7 @@ export async function updatePortalSettings(
     }
 
     const updatedSettings = {
-      ...(currentData?.portal_settings || {}),
+      ...((currentData?.portal_settings as object | null) || {}),
       ...settings,
     };
 

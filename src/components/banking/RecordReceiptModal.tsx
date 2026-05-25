@@ -23,13 +23,6 @@ interface RecordReceiptModalProps {
   invoiceId?: string;
 }
 
-interface InvoiceAllocation {
-  invoice_id: string;
-  allocated_amount: number;
-  invoice_number: string;
-  outstanding_balance: number;
-}
-
 export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
   isOpen,
   onClose,
@@ -97,14 +90,7 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
   const { data: accounts = [] } = useQuery({
     queryKey: ['active_accounts'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('bank_accounts')
-        .select('id, account_name:name, account_type, current_balance')
-        .eq('is_active', true)
-        .is('deleted_at', null)
-        .order('name');
-      if (error) throw error;
-      return data || [];
+      return bankingService.getAccounts({ is_active: true });
     },
   });
 
@@ -312,7 +298,7 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
               required
             >
               <option value="">Select Account</option>
-              {accounts.map((acc: { id: string; account_name: string }) => (
+              {accounts.map((acc) => (
                 <option key={acc.id} value={acc.id}>
                   {acc.account_name} ({acc.account_type}) - Balance: {formatCurrencyValue(acc.current_balance)}
                 </option>
@@ -331,9 +317,9 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
                 setSelectedInvoices(new Set());
                 setAllocations(new Map());
               }}
-              options={cases.map((caseItem: { id: string; case_no?: string; customer?: { customer_name?: string } }) => ({
+              options={cases.map((caseItem) => ({
                 id: caseItem.id,
-                name: `${caseItem.case_number} - ${caseItem.title} (${caseItem.client_name})`,
+                name: `${caseItem.case_number ?? ''} - ${caseItem.title ?? ''} (${caseItem.client_name})`,
               }))}
               placeholder="Search by case number or title..."
               required
@@ -366,8 +352,8 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
 
             <div className="grid grid-cols-1 gap-3 max-h-80 overflow-y-auto">
               {invoices
-                .filter((invoice: { id: string }) => singleInvoiceMode ? invoice.id === invoiceId : true)
-                .map((invoice: { id: string; invoice_number?: string; total_amount?: number; amount_paid?: number; balance_due?: number; status?: string }) => {
+                .filter((invoice) => singleInvoiceMode ? invoice.id === invoiceId : true)
+                .map((invoice) => {
                 const outstanding = invoice.balance_due || 0;
                 const isSelected = selectedInvoices.has(invoice.id);
                 const allocation = allocations.get(invoice.id) || 0;
@@ -392,7 +378,7 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
                             <p className="text-sm font-bold text-slate-900">
                               {invoice.invoice_number}
                             </p>
-                            {getStatusBadge(invoice.status)}
+                            {getStatusBadge(invoice.status ?? 'draft')}
                             {isSelected && (
                               <CheckCircle className="w-4 h-4 text-primary ml-auto" />
                             )}
@@ -403,8 +389,8 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
                             )}
                           </div>
                           <p className="text-xs text-slate-500 mb-2">
-                            Invoice Date: {new Date(invoice.invoice_date).toLocaleDateString()} | Due:{' '}
-                            {new Date(invoice.due_date).toLocaleDateString()}
+                            Invoice Date: {invoice.invoice_date ? new Date(invoice.invoice_date).toLocaleDateString() : 'N/A'} | Due:{' '}
+                            {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'N/A'}
                           </p>
                           <div className="grid grid-cols-3 gap-3 text-xs">
                             <div>

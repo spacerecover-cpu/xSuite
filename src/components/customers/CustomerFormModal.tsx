@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
+import type { Database } from '../../types/database.types';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Modal } from '../ui/Modal';
@@ -174,7 +175,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         .limit(1)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      return data as { location: { default_country_id?: string } | null } | null;
     },
   });
 
@@ -211,36 +212,39 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       const { data: customerNumber, error: numberError } = await supabase.rpc('get_next_customer_number');
       if (numberError) throw numberError;
 
+      const customerPayload = {
+        customer_number: customerNumber,
+        customer_name: customer.customer_name,
+        email: customer.email || null,
+        mobile_number: customer.mobile_number || null,
+        phone: customer.phone_number || null,
+        customer_group_id: customer.customer_group_id || null,
+        country_id: customer.country_id || null,
+        city_id: customer.city_id || null,
+        address: customer.address || null,
+        portal_enabled: customer.portal_enabled,
+        notes: customer.notes || null,
+        created_by: profile?.id,
+      } as Database['public']['Tables']['customers_enhanced']['Insert'];
+
       const { data: newCustomer, error: createError } = await supabase
         .from('customers_enhanced')
-        .insert({
-          customer_number: customerNumber,
-          customer_name: customer.customer_name,
-          email: customer.email || null,
-          mobile_number: customer.mobile_number || null,
-          phone: customer.phone_number || null,
-          customer_group_id: customer.customer_group_id || null,
-          country_id: customer.country_id || null,
-          city_id: customer.city_id || null,
-          address: customer.address || null,
-          portal_enabled: customer.portal_enabled,
-          notes: customer.notes || null,
-          created_by: profile?.id,
-        })
+        .insert(customerPayload)
         .select()
-        .single();
+        .maybeSingle();
 
       if (createError) throw createError;
 
       if (customer.company_id && newCustomer) {
+        const relationshipPayload = {
+          customer_id: newCustomer.id,
+          company_id: customer.company_id,
+          is_primary: false,
+        } as Database['public']['Tables']['customer_company_relationships']['Insert'];
+
         const { error: relError } = await supabase
           .from('customer_company_relationships')
-          .insert({
-            tenant_id: newCustomer.tenant_id,
-            customer_id: newCustomer.id,
-            company_id: customer.company_id,
-            is_primary: false,
-          });
+          .insert(relationshipPayload);
         if (relError) throw relError;
       }
 
@@ -250,7 +254,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       queryClient.invalidateQueries({ queryKey: ['customers_enhanced'] });
       queryClient.invalidateQueries({ queryKey: ['customers_for_cases'] });
       resetForm();
-      if (onSuccess) onSuccess(newCustomer);
+      if (onSuccess && newCustomer) onSuccess(newCustomer as unknown as Record<string, unknown>);
       onClose();
     },
   });
@@ -260,17 +264,20 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       const { data: companyNumber, error: numberError } = await supabase.rpc('get_next_company_number');
       if (numberError) throw numberError;
 
+      const companyPayload = {
+        company_number: companyNumber,
+        name: companyData.company_name,
+        created_by: profile?.id,
+      } as Database['public']['Tables']['companies']['Insert'];
+
       const { data: newCompany, error: createError } = await supabase
         .from('companies')
-        .insert({
-          company_number: companyNumber,
-          name: companyData.company_name,
-          created_by: profile?.id,
-        })
+        .insert(companyPayload)
         .select()
-        .single();
+        .maybeSingle();
 
       if (createError) throw createError;
+      if (!newCompany) throw new Error('Failed to create company');
       return newCompany;
     },
     onSuccess: async (newCompany) => {
@@ -323,10 +330,11 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   };
 
   React.useEffect(() => {
-    if (isOpen && companySettings?.location?.default_country_id) {
+    const defaultCountryId = companySettings?.location?.default_country_id;
+    if (isOpen && defaultCountryId) {
       setFormData((prev) => ({
         ...prev,
-        country_id: companySettings.location.default_country_id,
+        country_id: defaultCountryId,
       }));
     }
   }, [isOpen, companySettings]);

@@ -77,7 +77,7 @@ export function MarkDefectiveModal({
       isOpen={isOpen}
       onClose={handleClose}
       title="Mark as Defective"
-      className="!max-w-lg"
+      size="md"
     >
       <div className="space-y-2">
         <div className="bg-danger-muted border border-danger/30 rounded-lg p-2">
@@ -205,7 +205,7 @@ export function MarkDefectiveModal({
         <div className="flex justify-end space-x-2 pt-2 border-t border-slate-200">
           <Button
             onClick={handleClose}
-            variant="outline"
+            variant="secondary"
             disabled={loading}
           >
             Cancel

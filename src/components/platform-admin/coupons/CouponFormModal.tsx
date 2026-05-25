@@ -33,9 +33,9 @@ export const CouponFormModal: React.FC<CouponFormModalProps> = ({ isOpen, onClos
 
   const mutation = useMutation({
     mutationFn: () => {
-      const payload = {
+      const basePayload = {
         code: formData.code.toUpperCase(),
-        name: formData.name || null,
+        name: formData.name || formData.code.toUpperCase(),
         discount_type: formData.discount_type,
         discount_value: formData.discount_value,
         is_active: formData.is_active,
@@ -46,9 +46,9 @@ export const CouponFormModal: React.FC<CouponFormModalProps> = ({ isOpen, onClos
       };
 
       if (isEditing) {
-        return updateCoupon(coupon.id, payload);
+        return updateCoupon(coupon.id, basePayload);
       }
-      return createCoupon(payload);
+      return createCoupon(basePayload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: platformAdminKeys.coupons() });
@@ -188,7 +188,7 @@ export const CouponFormModal: React.FC<CouponFormModalProps> = ({ isOpen, onClos
           </label>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="ghost" onClick={onClose}>
               Cancel
             </Button>
             <Button type="submit" disabled={mutation.isPending}>

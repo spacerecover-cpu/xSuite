@@ -48,16 +48,15 @@ export const PortalLayout: React.FC = () => {
       try {
         const settings = await getPortalSettings();
         if (cancelled || !settings) return;
-        const s = settings as Record<string, unknown>;
         setBranding({
-          logoUrl: typeof s.portal_custom_logo_url === 'string' && s.portal_custom_logo_url
-            ? s.portal_custom_logo_url
+          logoUrl: typeof settings.portal_custom_logo_url === 'string' && settings.portal_custom_logo_url
+            ? settings.portal_custom_logo_url
             : null,
-          supportEmail: typeof s.portal_support_email === 'string' && s.portal_support_email
-            ? s.portal_support_email
+          supportEmail: typeof settings.portal_support_email === 'string' && settings.portal_support_email
+            ? settings.portal_support_email
             : null,
-          supportPhone: typeof s.portal_support_phone === 'string' && s.portal_support_phone
-            ? s.portal_support_phone
+          supportPhone: typeof settings.portal_support_phone === 'string' && settings.portal_support_phone
+            ? settings.portal_support_phone
             : null,
         });
       } catch (err) {

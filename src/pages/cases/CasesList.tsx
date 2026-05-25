@@ -328,7 +328,7 @@ export const CasesList: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-info uppercase tracking-wide">Active Cases</p>
-              <p className="text-2xl font-bold text-info mt-1">{allCasesForStats.filter(c => !getStatusesByType('completed').includes(c.status) && !getStatusesByType('delivered').includes(c.status) && !getStatusesByType('cancelled').includes(c.status)).length}</p>
+              <p className="text-2xl font-bold text-info mt-1">{allCasesForStats.filter(c => c.status !== null && !getStatusesByType('completed').includes(c.status) && !getStatusesByType('delivered').includes(c.status) && !getStatusesByType('cancelled').includes(c.status)).length}</p>
             </div>
             <div className="w-10 h-10 bg-info rounded-lg flex items-center justify-center">
               <Briefcase className="w-5 h-5 text-info-foreground" />
@@ -352,7 +352,7 @@ export const CasesList: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-warning uppercase tracking-wide">In Diagnosis</p>
-              <p className="text-2xl font-bold text-warning mt-1">{allCasesForStats.filter(c => getStatusesByType('diagnosis').includes(c.status)).length}</p>
+              <p className="text-2xl font-bold text-warning mt-1">{allCasesForStats.filter(c => c.status !== null && getStatusesByType('diagnosis').includes(c.status)).length}</p>
             </div>
             <div className="w-10 h-10 bg-warning rounded-lg flex items-center justify-center">
               <Search className="w-5 h-5 text-warning-foreground" />
@@ -364,7 +364,7 @@ export const CasesList: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-success uppercase tracking-wide">Ready</p>
-              <p className="text-2xl font-bold text-success mt-1">{allCasesForStats.filter(c => getStatusesByType('ready').includes(c.status)).length}</p>
+              <p className="text-2xl font-bold text-success mt-1">{allCasesForStats.filter(c => c.status !== null && getStatusesByType('ready').includes(c.status)).length}</p>
             </div>
             <div className="w-10 h-10 bg-success rounded-lg flex items-center justify-center">
               <CheckCircle className="w-5 h-5 text-success-foreground" />

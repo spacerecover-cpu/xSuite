@@ -88,7 +88,8 @@ export const CustomerPurchasesTab: React.FC<CustomerPurchasesTabProps> = ({ cust
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {sales.map((sale) => {
-                    const statusCfg = paymentStatusConfig[sale.payment_status ?? 'pending'];
+                    const saleStatus = sale.status ?? 'pending';
+                    const statusCfg = paymentStatusConfig[saleStatus];
                     const itemNames = sale.stock_sale_items
                       ?.map((i) => i.stock_items?.name ?? 'Item')
                       .join(', ');
@@ -102,7 +103,7 @@ export const CustomerPurchasesTab: React.FC<CustomerPurchasesTabProps> = ({ cust
                         </td>
                         <td className="py-3 text-center">
                           <Badge variant={statusCfg?.color ?? 'secondary'} size="sm">
-                            {statusCfg?.label ?? sale.payment_status}
+                            {statusCfg?.label ?? saleStatus}
                           </Badge>
                         </td>
                         <td className="py-3 text-right">
@@ -162,7 +163,10 @@ export const CustomerPurchasesTab: React.FC<CustomerPurchasesTabProps> = ({ cust
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {warranties.map((w) => {
-                    const item = w as unknown as typeof w & { stock_items?: { name: string; brand: string | null } };
+                    const item = w as unknown as typeof w & {
+                      stock_items?: { name: string; brand: string | null };
+                      serial_number?: string | null;
+                    };
                     const color = getWarrantyColor(w.daysRemaining);
                     const daysLabel = w.daysRemaining !== undefined
                       ? `${w.daysRemaining} day${w.daysRemaining !== 1 ? 's' : ''} left`
@@ -175,7 +179,7 @@ export const CustomerPurchasesTab: React.FC<CustomerPurchasesTabProps> = ({ cust
                             <div className="text-xs text-slate-500">{item.stock_items.brand}</div>
                           )}
                         </td>
-                        <td className="py-3 font-mono text-slate-600 text-xs">{w.serial_number ?? '—'}</td>
+                        <td className="py-3 font-mono text-slate-600 text-xs">{item.serial_number ?? '—'}</td>
                         <td className="py-3 text-slate-600">{formatDate(w.warranty_start_date ?? w.created_at)}</td>
                         <td className="py-3 text-slate-600">{formatDate(w.warranty_end_date ?? '')}</td>
                         <td className="py-3 text-center">
@@ -221,8 +225,12 @@ export const CustomerPurchasesTab: React.FC<CustomerPurchasesTabProps> = ({ cust
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {serialNumbers.map((sn) => {
-                    const snItem = sn as unknown as typeof sn & { stock_items?: { name: string; brand: string | null } };
-                    const warrantyEnd = sn.warranty_end_date ? new Date(sn.warranty_end_date) : null;
+                    const snItem = sn as unknown as typeof sn & {
+                      stock_items?: { name: string; brand: string | null };
+                      warranty_end_date?: string | null;
+                      purchase_date?: string | null;
+                    };
+                    const warrantyEnd = snItem.warranty_end_date ? new Date(snItem.warranty_end_date) : null;
                     const daysLeft = warrantyEnd
                       ? Math.ceil((warrantyEnd.getTime() - Date.now()) / 86400000)
                       : null;
@@ -238,9 +246,9 @@ export const CustomerPurchasesTab: React.FC<CustomerPurchasesTabProps> = ({ cust
                           )}
                         </td>
                         <td className="py-3 font-mono text-slate-700 text-xs">{sn.serial_number}</td>
-                        <td className="py-3 text-slate-600">{formatDate(sn.purchase_date ?? sn.created_at)}</td>
+                        <td className="py-3 text-slate-600">{formatDate(snItem.purchase_date ?? sn.created_at)}</td>
                         <td className="py-3 text-slate-600">
-                          {sn.warranty_end_date ? formatDate(sn.warranty_end_date) : '—'}
+                          {snItem.warranty_end_date ? formatDate(snItem.warranty_end_date) : '—'}
                         </td>
                         <td className="py-3 text-center">
                           <Badge variant={warrantyColor} size="sm">

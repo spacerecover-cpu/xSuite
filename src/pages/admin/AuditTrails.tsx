@@ -9,14 +9,15 @@ import { logger } from '../../lib/logger';
 
 interface AuditTrail {
   id: string;
-  user_id: string;
-  action_type: 'create' | 'update' | 'delete' | 'view';
-  table_name: string;
+  performed_by: string | null;
+  action: string;
+  record_type: string;
   record_id: string | null;
   old_values: Record<string, unknown> | null;
   new_values: Record<string, unknown> | null;
   ip_address: string | null;
   user_agent: string | null;
+  performed_at: string;
   created_at: string;
   user_name?: string;
 }
@@ -38,22 +39,26 @@ export const AuditTrails: React.FC = () => {
         .from('audit_trails')
         .select(`
           *,
-          profiles:user_id (full_name)
+          profiles:performed_by (full_name)
         `)
-        .order('created_at', { ascending: false })
+        .order('performed_at', { ascending: false })
         .limit(100);
 
       if (actionFilter !== 'all') {
-        query = query.eq('action_type', actionFilter);
+        query = query.eq('action', actionFilter);
       }
 
       const { data, error } = await query;
       if (error) throw error;
 
-      const formattedData = (data || []).map((trail: { profiles?: { full_name?: string } | null } & AuditTrail) => ({
-        ...trail,
-        user_name: trail.profiles?.full_name || 'Unknown User',
-      }));
+      const formattedData = (data || []).map((trail) => {
+        const t = trail as unknown as AuditTrail & { profiles?: { full_name?: string } | null; ip_address: unknown };
+        return {
+          ...t,
+          ip_address: typeof t.ip_address === 'string' ? t.ip_address : t.ip_address ? String(t.ip_address) : null,
+          user_name: t.profiles?.full_name || 'Unknown User',
+        };
+      });
 
       setTrails(formattedData);
     } catch (error) {
@@ -67,8 +72,8 @@ export const AuditTrails: React.FC = () => {
     const searchLower = searchQuery.toLowerCase();
     return (
       trail.user_name?.toLowerCase().includes(searchLower) ||
-      trail.table_name.toLowerCase().includes(searchLower) ||
-      trail.action_type.toLowerCase().includes(searchLower)
+      trail.record_type.toLowerCase().includes(searchLower) ||
+      trail.action.toLowerCase().includes(searchLower)
     );
   });
 
@@ -126,28 +131,28 @@ export const AuditTrails: React.FC = () => {
 
           <div className="flex gap-2">
             <Button
-              variant={actionFilter === 'all' ? 'primary' : 'outline'}
+              variant={actionFilter === 'all' ? 'primary' : 'secondary'}
               onClick={() => setActionFilter('all')}
               className="text-sm"
             >
               All
             </Button>
             <Button
-              variant={actionFilter === 'create' ? 'primary' : 'outline'}
+              variant={actionFilter === 'create' ? 'primary' : 'secondary'}
               onClick={() => setActionFilter('create')}
               className="text-sm"
             >
               Create
             </Button>
             <Button
-              variant={actionFilter === 'update' ? 'primary' : 'outline'}
+              variant={actionFilter === 'update' ? 'primary' : 'secondary'}
               onClick={() => setActionFilter('update')}
               className="text-sm"
             >
               Update
             </Button>
             <Button
-              variant={actionFilter === 'delete' ? 'primary' : 'outline'}
+              variant={actionFilter === 'delete' ? 'primary' : 'secondary'}
               onClick={() => setActionFilter('delete')}
               className="text-sm"
             >
@@ -162,16 +167,16 @@ export const AuditTrails: React.FC = () => {
           {filteredTrails.map((trail) => (
             <div key={trail.id} className="p-4 hover:bg-slate-50 transition-colors">
               <div className="flex items-start gap-3">
-                <div className={`mt-1 p-2 rounded-lg bg-${getActionColor(trail.action_type)}-100`}>
-                  {getActionIcon(trail.action_type)}
+                <div className={`mt-1 p-2 rounded-lg bg-${getActionColor(trail.action)}-100`}>
+                  {getActionIcon(trail.action)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-sm font-medium text-slate-900">{trail.user_name}</span>
-                    <Badge color={getActionColor(trail.action_type)}>{trail.action_type}</Badge>
-                    <span className="text-sm text-slate-600">{trail.table_name}</span>
+                    <Badge color={getActionColor(trail.action)}>{trail.action}</Badge>
+                    <span className="text-sm text-slate-600">{trail.record_type}</span>
                     <span className="text-xs text-slate-400 ml-auto">
-                      {format(new Date(trail.created_at), 'MMM dd, yyyy HH:mm:ss')}
+                      {format(new Date(trail.performed_at), 'MMM dd, yyyy HH:mm:ss')}
                     </span>
                   </div>
                   {trail.record_id && (

@@ -3,12 +3,11 @@ import { supabase } from '../../lib/supabaseClient';
 
 export interface BackupRecord {
   id: string;
-  backup_type: string;
-  file_path: string | null;
-  file_size_bytes: number;
-  status: string;
-  error_message: string | null;
-  created_by: string;
+  backup_type: string | null;
+  file_url: string | null;
+  file_size: number | null;
+  status: string | null;
+  created_by: string | null;
   created_at: string;
   completed_at: string | null;
 }
@@ -17,7 +16,7 @@ export const backupService = {
   async getBackups(): Promise<BackupRecord[]> {
     const { data, error } = await supabase
       .from('database_backups')
-      .select('*')
+      .select('id, backup_type, file_url, file_size, status, created_by, created_at, completed_at')
       .order('created_at', { ascending: false })
       .limit(50);
     if (error) throw error;
@@ -32,19 +31,17 @@ export const backupService = {
         backup_type: 'tenant_export',
         status: 'in_progress',
         created_by: userId,
+        tenant_id: tenantId,
       })
-      .select()
+      .select('id, backup_type, file_url, file_size, status, created_by, created_at, completed_at')
       .maybeSingle();
 
     if (insertError) throw insertError;
     if (!backup) throw new Error('Failed to create backup record');
 
-    try {
-      // Export tenant data using the RPC function if available
-      const { data: exportData, error: exportError } = await supabase.rpc('export_customer_data', {
-        p_customer_id: '00000000-0000-0000-0000-000000000000', // placeholder
-      }).maybeSingle();
+    const backupRecord = backup as BackupRecord;
 
+    try {
       // For tenant-level backup, we collect key table counts as a health check
       const { count: casesCount } = await supabase
         .from('cases')
@@ -71,24 +68,23 @@ export const backupService = {
         .from('database_backups')
         .update({
           status: 'completed',
-          file_path: filePath,
-          file_size_bytes: JSON.stringify(backupSummary).length,
+          file_url: filePath,
+          file_size: JSON.stringify(backupSummary).length,
           completed_at: new Date().toISOString(),
         })
-        .eq('id', (backup as BackupRecord).id);
+        .eq('id', backupRecord.id);
 
       if (updateError) throw updateError;
 
-      return { ...(backup as BackupRecord), status: 'completed', file_path: filePath };
+      return { ...backupRecord, status: 'completed', file_url: filePath };
     } catch (err) {
       // Mark backup as failed
       await supabase
         .from('database_backups')
         .update({
           status: 'failed',
-          error_message: err instanceof Error ? err.message : 'Unknown error',
         })
-        .eq('id', (backup as BackupRecord).id);
+        .eq('id', backupRecord.id);
 
       throw err;
     }

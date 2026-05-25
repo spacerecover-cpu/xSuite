@@ -7,9 +7,19 @@ import { useToast } from '@/hooks/useToast';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatDate } from '@/lib/format';
 
+interface CaseAttachment {
+  id: string;
+  file_name: string;
+  file_url: string;
+  file_size?: number | null;
+  file_type?: string | null;
+  category?: string | null;
+  created_at?: string | null;
+}
+
 interface CaseFilesTabProps {
   caseId: string;
-  attachments: Array<{ id: string; file_name: string; file_path: string; file_size?: number; file_type?: string; created_at?: string }>;
+  attachments: CaseAttachment[];
   uploadedBy: string;
 }
 
@@ -66,11 +76,13 @@ export const CaseFilesTab: React.FC<CaseFilesTabProps> = ({ caseId, attachments,
         const { error: dbError } = await supabase.from('case_attachments').insert({
           case_id: caseId,
           file_name: file.name,
-          file_path: filePath,
+          file_url: filePath,
           file_size: file.size,
-          mime_type: file.type || null,
+          file_type: file.type || null,
           category: 'other',
           uploaded_by: uploadedBy || null,
+          // tenant_id is populated by the set_tenant_and_audit_fields trigger.
+          tenant_id: undefined as unknown as string,
         });
 
         if (dbError) {
@@ -93,11 +105,11 @@ export const CaseFilesTab: React.FC<CaseFilesTabProps> = ({ caseId, attachments,
     }
   };
 
-  const handleDownload = async (attachment: { id: string; file_path: string; file_name: string }) => {
+  const handleDownload = async (attachment: { id: string; file_url: string; file_name: string }) => {
     try {
       const { data, error } = await supabase.storage
         .from(BUCKET)
-        .createSignedUrl(attachment.file_path, 3600);
+        .createSignedUrl(attachment.file_url, 3600);
 
       if (error) throw error;
 
@@ -114,12 +126,12 @@ export const CaseFilesTab: React.FC<CaseFilesTabProps> = ({ caseId, attachments,
     }
   };
 
-  const handleDelete = async (attachment: { id: string; file_path: string; file_name: string }) => {
+  const handleDelete = async (attachment: { id: string; file_url: string; file_name: string }) => {
     if (!window.confirm(`Delete "${attachment.file_name}"? This cannot be undone.`)) return;
 
     setDeletingId(attachment.id);
     try {
-      await supabase.storage.from(BUCKET).remove([attachment.file_path]);
+      await supabase.storage.from(BUCKET).remove([attachment.file_url]);
 
       const { error } = await supabase
         .from('case_attachments')
@@ -209,7 +221,7 @@ export const CaseFilesTab: React.FC<CaseFilesTabProps> = ({ caseId, attachments,
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {attachments.map((file) => {
-                const FileIcon = getFileIcon(file.mime_type);
+                const FileIcon = getFileIcon(file.file_type ?? null);
                 return (
                   <div
                     key={file.id}
@@ -224,9 +236,9 @@ export const CaseFilesTab: React.FC<CaseFilesTabProps> = ({ caseId, attachments,
                           {file.file_name}
                         </p>
                         <p className="text-xs text-slate-500">
-                          {file.category} • {formatFileSize(file.file_size)}
+                          {file.category ?? '—'} • {formatFileSize(file.file_size ?? null)}
                         </p>
-                        <p className="text-xs text-slate-400 mt-0.5">{formatDate(file.created_at)}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{file.created_at ? formatDate(file.created_at) : '—'}</p>
                       </div>
                       <div className="flex gap-1">
                         <Button

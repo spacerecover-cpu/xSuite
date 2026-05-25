@@ -115,7 +115,7 @@ export async function loadPlanCache(): Promise<void> {
     const featureMap = new Map<string, { enabled: boolean; limit: number | null }>();
     features?.forEach((f) => {
       featureMap.set(f.feature_key, {
-        enabled: f.is_enabled,
+        enabled: f.is_enabled ?? false,
         limit: f.limit_value,
       });
     });
@@ -156,7 +156,7 @@ export async function hasFeature(featureKey: FeatureKey): Promise<boolean> {
   const requiredPlan = FEATURE_REQUIREMENTS[featureKey];
   if (!requiredPlan) return true;
 
-  const currentLevel = PLAN_HIERARCHY[planCache.planCode] || 0;
+  const currentLevel = PLAN_HIERARCHY[planCache.planCode ?? 'starter'] || 0;
   const requiredLevel = PLAN_HIERARCHY[requiredPlan] || 0;
 
   return currentLevel >= requiredLevel;

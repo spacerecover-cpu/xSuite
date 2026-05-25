@@ -122,24 +122,24 @@ export const PaymentViewModal: React.FC<PaymentViewModalProps> = ({
               <div className="flex items-center gap-2 mt-3">
                 <Calendar className="w-4 h-4 text-slate-500" />
                 <p className="text-sm text-slate-600">
-                  {formatDate(payment.payment_date)}
+                  {payment.payment_date ? formatDate(payment.payment_date) : 'N/A'}
                 </p>
               </div>
             </div>
             <div className="text-right">
               <p className="text-sm text-slate-600 mb-1">Amount</p>
               <p className="text-3xl font-bold text-success">
-                {formatCurrency(payment.amount)}
+                {formatCurrency(payment.amount ?? 0)}
               </p>
               <div className="mt-2">
                 <Badge
                   variant="custom"
-                  color={getStatusColor(payment.status)}
+                  color={getStatusColor(payment.status ?? '')}
                   size="md"
                   className="flex items-center gap-1.5"
                 >
-                  {getStatusIcon(payment.status)}
-                  <span className="capitalize">{payment.status}</span>
+                  {getStatusIcon(payment.status ?? '')}
+                  <span className="capitalize">{payment.status ?? 'unknown'}</span>
                 </Badge>
               </div>
             </div>
@@ -292,7 +292,7 @@ export const PaymentViewModal: React.FC<PaymentViewModalProps> = ({
 
         <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-500">
           <p>
-            Created on {formatDate(payment.created_at)} by {createdByName}
+            Created on {payment.created_at ? formatDate(payment.created_at) : 'N/A'} by {createdByName}
           </p>
           {payment.updated_at && payment.updated_at !== payment.created_at && (
             <p className="mt-1">Last updated: {formatDate(payment.updated_at)}</p>

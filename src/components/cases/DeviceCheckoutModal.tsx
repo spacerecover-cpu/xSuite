@@ -68,7 +68,13 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
     setError('');
 
     try {
-      const { error: dbError } = await supabase.rpc('log_case_checkout', {
+      // log_case_checkout exists in the DB but is missing from the generated
+      // types. Cast via unknown to bypass the literal-union check on the rpc name.
+      const rpc = supabase.rpc as unknown as (
+        name: string,
+        params: Record<string, unknown>
+      ) => Promise<{ error: unknown }>;
+      const { error: dbError } = await rpc('log_case_checkout', {
         p_case_id: caseId,
         p_collector_name: collectorName.trim(),
         p_collector_mobile: collectorMobile.trim(),

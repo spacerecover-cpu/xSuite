@@ -15,7 +15,7 @@ interface DocumentUploadModalProps {
 }
 
 export default function DocumentUploadModal({ isOpen, onClose, onSuccess, supplierId }: DocumentUploadModalProps) {
-  const { showToast } = useToast();
+  const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [formData, setFormData] = useState({
@@ -37,7 +37,7 @@ export default function DocumentUploadModal({ isOpen, onClose, onSuccess, suppli
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
-        showToast('File size must be less than 10MB', 'error');
+        toast.error('File size must be less than 10MB');
         return;
       }
       setSelectedFile(file);
@@ -48,7 +48,7 @@ export default function DocumentUploadModal({ isOpen, onClose, onSuccess, suppli
     e.preventDefault();
 
     if (!selectedFile) {
-      showToast('Please select a file to upload', 'error');
+      toast.error('Please select a file to upload');
       return;
     }
 
@@ -70,28 +70,30 @@ export default function DocumentUploadModal({ isOpen, onClose, onSuccess, suppli
 
       if (uploadError) throw uploadError;
 
+      const { data: tenantId, error: tenantErr } = await supabase.rpc('get_current_tenant_id');
+      if (tenantErr || !tenantId) throw new Error('Unable to resolve current tenant');
+
+      // Map UI fields to actual DB columns (name, file_url, file_type, file_size, uploaded_by)
       const { error: dbError } = await supabase
         .from('supplier_documents')
-        .insert([{
+        .insert({
+          tenant_id: tenantId,
           supplier_id: supplierId,
-          document_type: formData.document_type,
-          file_name: selectedFile.name,
-          file_path: filePath,
+          name: selectedFile.name,
+          file_url: filePath,
+          file_type: selectedFile.type || null,
           file_size: selectedFile.size,
-          mime_type: selectedFile.type,
-          description: formData.description || null,
           uploaded_by: user.id,
-          uploaded_at: new Date().toISOString(),
-        }]);
+        });
 
       if (dbError) throw dbError;
 
-      showToast('Document uploaded successfully', 'success');
+      toast.success('Document uploaded successfully');
       onSuccess();
       onClose();
     } catch (error: unknown) {
       logger.error('Error uploading document:', error);
-      showToast(error instanceof Error ? error.message : 'Failed to upload document', 'error');
+      toast.error(error instanceof Error ? error.message : 'Failed to upload document');
     } finally {
       setLoading(false);
     }
@@ -183,7 +185,7 @@ export default function DocumentUploadModal({ isOpen, onClose, onSuccess, suppli
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
           <Button type="submit" disabled={loading || !selectedFile}>

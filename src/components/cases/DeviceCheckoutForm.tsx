@@ -11,27 +11,28 @@ interface DeviceCheckoutFormProps {
 
 interface CaseData {
   id: string;
-  case_no: string;
-  customer_id: string;
-  checkout_date: string;
-  checkout_collector_name: string;
-  checkout_collector_mobile: string;
-  checkout_collector_id: string | null;
-  recovery_outcome: string;
-  service_type_id: string;
+  case_no: string | null;
+  customer_id: string | null;
+  // The following fields are not (yet) present on the cases table — the UI
+  // tolerates missing values via `??` / falsy guards below.
+  checkout_date?: string | null;
+  checkout_collector_name?: string | null;
+  checkout_collector_mobile?: string | null;
+  checkout_collector_id?: string | null;
+  recovery_outcome?: string | null;
+  service_type_id: string | null;
   customer?: {
     customer_name: string;
     email: string | null;
     mobile_number: string | null;
-    company_id: string | null;
-  };
+  } | null;
   company?: {
-    name?: string;
-    company_name?: string;
-  };
+    name?: string | null;
+    company_name?: string | null;
+  } | null;
   service_type?: {
     name: string;
-  };
+  } | null;
   devices?: Array<{
     id: string;
     device_type: { name: string } | null;
@@ -43,14 +44,15 @@ interface CaseData {
   }>;
   created_by_profile?: {
     full_name: string;
-  };
+  } | null;
+  [key: string]: unknown;
 }
 
 interface CompanySettings {
   basic_info?: {
     company_name?: string;
     legal_name?: string;
-  };
+  } | null;
   location?: {
     address_line1?: string;
     address_line2?: string;
@@ -58,21 +60,21 @@ interface CompanySettings {
     country?: string;
     building_name?: string;
     unit_number?: string;
-  };
+  } | null;
   contact_info?: {
     phone_primary?: string;
     email_general?: string;
-  };
+  } | null;
   online_presence?: {
     website?: string;
-  };
+  } | null;
   branding?: {
     logo_url?: string;
     brand_tagline?: string;
-  };
+  } | null;
   legal_compliance?: {
     terms_conditions_url?: string;
-  };
+  } | null;
 }
 
 export const DeviceCheckoutForm: React.FC<DeviceCheckoutFormProps> = ({ caseId }) => {
@@ -101,13 +103,24 @@ export const DeviceCheckoutForm: React.FC<DeviceCheckoutFormProps> = ({ caseId }
         if (settingsResult.error) throw settingsResult.error;
 
         const caseInfo = caseResult.data;
-        setCompanySettings(settingsResult.data);
+        setCompanySettings(
+          settingsResult.data
+            ? {
+                basic_info: settingsResult.data.basic_info as CompanySettings['basic_info'],
+                location: settingsResult.data.location as CompanySettings['location'],
+                contact_info: settingsResult.data.contact_info as CompanySettings['contact_info'],
+                online_presence: settingsResult.data.online_presence as CompanySettings['online_presence'],
+                branding: settingsResult.data.branding as CompanySettings['branding'],
+                legal_compliance: settingsResult.data.legal_compliance as CompanySettings['legal_compliance'],
+              }
+            : null
+        );
 
         const [customerResult, companyResult, serviceTypeResult, devicesResult, createdByResult] = await Promise.all([
           caseInfo.customer_id
             ? supabase
                 .from('customers_enhanced')
-                .select('customer_name, email, mobile_number, company_id')
+                .select('customer_name, email, mobile_number')
                 .eq('id', caseInfo.customer_id)
                 .single()
             : Promise.resolve({ data: null }),
@@ -285,8 +298,8 @@ export const DeviceCheckoutForm: React.FC<DeviceCheckoutFormProps> = ({ caseId }
             {t('collectionInformation', 'Collection Information')}
           </h3>
           <div className="space-y-1 text-xs">
-            <div className="flex"><span className="text-slate-500 w-32">{t('checkoutDateLabel', 'Checkout Date:')}</span><span className="text-slate-800">{formatDate(caseData.checkout_date)}</span></div>
-            <div className="flex"><span className="text-slate-500 w-32">{t('recoveryOutcomeLabel', 'Recovery Outcome:')}</span><span className="text-slate-800">{getRecoveryOutcomeText(caseData.recovery_outcome)}</span></div>
+            <div className="flex"><span className="text-slate-500 w-32">{t('checkoutDateLabel', 'Checkout Date:')}</span><span className="text-slate-800">{caseData.checkout_date ? formatDate(caseData.checkout_date) : '-'}</span></div>
+            <div className="flex"><span className="text-slate-500 w-32">{t('recoveryOutcomeLabel', 'Recovery Outcome:')}</span><span className="text-slate-800">{getRecoveryOutcomeText(caseData.recovery_outcome ?? '')}</span></div>
             {isCollectorSameAsCustomer ? (
               <>
                 <div className="flex"><span className="text-slate-500 w-32">{t('collectedByLabel', 'Collected By:')}</span><span className="text-slate-800">{caseData.customer?.customer_name || '-'}</span></div>

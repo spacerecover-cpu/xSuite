@@ -25,7 +25,7 @@ export const PrintPaymentReceiptPage: React.FC = () => {
     const fetchSettings = async () => {
       try {
         const { data, error } = await supabase
-          .from('general_settings')
+          .from('company_settings')
           .select('*')
           .maybeSingle();
 
@@ -95,7 +95,7 @@ export const PrintPaymentReceiptPage: React.FC = () => {
         payment={payment}
         companySettings={companySettings}
         currencyFormat={currencyFormat}
-        t={t}
+        t={(key: string, fallback: string) => t(key as Parameters<typeof t>[0], fallback)}
       />
 
       <style>{`

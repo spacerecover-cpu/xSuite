@@ -10,7 +10,7 @@ import { logger } from '../../lib/logger';
 interface ContactData {
   id?: string;
   name?: string;
-  position?: string;
+  title?: string;
   email?: string;
   phone?: string;
   mobile?: string;
@@ -27,11 +27,11 @@ interface ContactFormModalProps {
 }
 
 export default function ContactFormModal({ isOpen, onClose, onSuccess, supplierId, contact }: ContactFormModalProps) {
-  const { showToast } = useToast();
+  const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    position: '',
+    title: '',
     email: '',
     phone: '',
     mobile: '',
@@ -43,7 +43,7 @@ export default function ContactFormModal({ isOpen, onClose, onSuccess, supplierI
     if (isOpen && contact) {
       setFormData({
         name: contact.name || '',
-        position: contact.position || '',
+        title: contact.title || '',
         email: contact.email || '',
         phone: contact.phone || '',
         mobile: contact.mobile || '',
@@ -53,7 +53,7 @@ export default function ContactFormModal({ isOpen, onClose, onSuccess, supplierI
     } else if (isOpen) {
       setFormData({
         name: '',
-        position: '',
+        title: '',
         email: '',
         phone: '',
         mobile: '',
@@ -71,34 +71,50 @@ export default function ContactFormModal({ isOpen, onClose, onSuccess, supplierI
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const contactData = {
-        ...formData,
-        supplier_id: supplierId,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (contact) {
+      if (contact && contact.id) {
         const { error } = await supabase
           .from('supplier_contacts')
-          .update(contactData)
+          .update({
+            name: formData.name,
+            title: formData.title || null,
+            email: formData.email || null,
+            phone: formData.phone || null,
+            mobile: formData.mobile || null,
+            notes: formData.notes || null,
+            is_primary: formData.is_primary,
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', contact.id);
 
         if (error) throw error;
-        showToast('Contact updated successfully', 'success');
+        toast.success('Contact updated successfully');
       } else {
+        const { data: tenantId, error: tenantErr } = await supabase.rpc('get_current_tenant_id');
+        if (tenantErr || !tenantId) throw new Error('Unable to resolve current tenant');
+
         const { error } = await supabase
           .from('supplier_contacts')
-          .insert([{ ...contactData, created_at: new Date().toISOString() }]);
+          .insert({
+            tenant_id: tenantId,
+            supplier_id: supplierId,
+            name: formData.name,
+            title: formData.title || null,
+            email: formData.email || null,
+            phone: formData.phone || null,
+            mobile: formData.mobile || null,
+            notes: formData.notes || null,
+            is_primary: formData.is_primary,
+          });
 
         if (error) throw error;
-        showToast('Contact added successfully', 'success');
+        toast.success('Contact added successfully');
       }
 
       onSuccess();
       onClose();
     } catch (error: unknown) {
       logger.error('Error saving contact:', error);
-      showToast(error instanceof Error ? error.message : 'Failed to save contact', 'error');
+      toast.error(error instanceof Error ? error.message : 'Failed to save contact');
     } finally {
       setLoading(false);
     }
@@ -126,8 +142,8 @@ export default function ContactFormModal({ isOpen, onClose, onSuccess, supplierI
             Position / Title
           </label>
           <Input
-            value={formData.position}
-            onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
             placeholder="Sales Manager"
           />
         </div>
@@ -197,7 +213,7 @@ export default function ContactFormModal({ isOpen, onClose, onSuccess, supplierI
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
           <Button type="submit" disabled={loading}>

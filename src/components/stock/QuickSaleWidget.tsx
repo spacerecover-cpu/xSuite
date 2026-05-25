@@ -86,7 +86,7 @@ export const QuickSaleWidget: React.FC<QuickSaleWidgetProps> = ({
           <div className="space-y-2">
             {sales.map((sale) => {
               const statusCfg =
-                paymentStatusConfig[sale.payment_status ?? 'pending'] ??
+                paymentStatusConfig[sale.status ?? 'pending'] ??
                 paymentStatusConfig['pending'];
 
               return (

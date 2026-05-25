@@ -31,7 +31,9 @@ export const SaleableItemsGrid: React.FC<SaleableItemsGridProps> = ({
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {items.map((item) => {
         const isSelected = selectedIds.includes(item.id);
-        const inStock = item.current_quantity > 0;
+        const currentQty = item.current_quantity ?? 0;
+        const inStock = currentQty > 0;
+        const primaryPhoto = item.photos?.[0] ?? null;
 
         return (
           <div
@@ -50,9 +52,9 @@ export const SaleableItemsGrid: React.FC<SaleableItemsGridProps> = ({
             )}
 
             <div className="aspect-video bg-slate-100 rounded-t-md overflow-hidden flex items-center justify-center">
-              {item.image_url ? (
+              {primaryPhoto ? (
                 <img
-                  src={item.image_url}
+                  src={primaryPhoto}
                   alt={item.name}
                   className="w-full h-full object-cover"
                 />
@@ -69,7 +71,7 @@ export const SaleableItemsGrid: React.FC<SaleableItemsGridProps> = ({
               </p>
 
               <p className="text-xs text-slate-500 truncate">
-                {[item.brand, item.capacity, item.model].filter(Boolean).join(' · ')}
+                {[item.brand, item.sku].filter(Boolean).join(' · ')}
               </p>
 
               <div className="flex items-center justify-between gap-2">
@@ -79,7 +81,7 @@ export const SaleableItemsGrid: React.FC<SaleableItemsGridProps> = ({
 
                 {inStock ? (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-success-muted text-success ring-1 ring-success/30 whitespace-nowrap">
-                    In Stock {item.current_quantity}
+                    In Stock {currentQty}
                   </span>
                 ) : (
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-danger-muted text-danger ring-1 ring-danger/30 whitespace-nowrap">
