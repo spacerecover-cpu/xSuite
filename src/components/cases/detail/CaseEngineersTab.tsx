@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Users, Trash2, Plus, X } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../../ui/Button';
 import { Badge } from '../../ui/Badge';
 import { Card } from '../../ui/Card';
@@ -12,9 +12,10 @@ import { formatDate } from '@/lib/format';
 
 interface CaseEngineerAssignment {
   id: string;
+  user_id?: string | null;
   role_text?: string | null;
   created_at: string;
-  engineer: {
+  engineer?: {
     full_name: string;
     role: string;
   };
@@ -32,6 +33,34 @@ export const CaseEngineersTab: React.FC<CaseEngineersTabProps> = ({ caseId, case
   const [selectedEngineerId, setSelectedEngineerId] = useState<string | null>(null);
   const [roleText, setRoleText] = useState('');
   const [removingId, setRemovingId] = useState<string | null>(null);
+
+  // Resolve engineer names from profiles (FK join was removed, so we look up here).
+  const engineerUserIds = useMemo(
+    () => Array.from(new Set(caseEngineers.map((e) => e.user_id).filter((v): v is string => !!v))),
+    [caseEngineers],
+  );
+
+  const { data: engineerProfiles = [] } = useQuery({
+    queryKey: ['profiles_by_ids', 'case_engineers', engineerUserIds.slice().sort().join(',')],
+    queryFn: async () => {
+      if (engineerUserIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, role')
+        .in('id', engineerUserIds);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: engineerUserIds.length > 0,
+  });
+
+  const profileMap = useMemo(() => {
+    const map = new Map<string, { full_name: string; role: string }>();
+    for (const p of engineerProfiles) {
+      map.set(p.id, { full_name: p.full_name ?? 'Unknown', role: p.role ?? '' });
+    }
+    return map;
+  }, [engineerProfiles]);
 
   const addEngineerMutation = useMutation({
     mutationFn: async ({ engineerId, role }: { engineerId: string; role: string }) => {
@@ -116,40 +145,49 @@ export const CaseEngineersTab: React.FC<CaseEngineersTabProps> = ({ caseId, case
             </div>
           ) : (
             <div className="space-y-3">
-              {caseEngineers.map((assignment) => (
-                <div key={assignment.id} className="border border-slate-200 rounded-lg p-4 flex items-center gap-4 bg-white hover:border-primary/40 transition-colors">
-                  <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold text-sm flex-shrink-0">
-                    {assignment.engineer.full_name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-slate-900">{assignment.engineer.full_name}</p>
-                    {assignment.role_text && (
-                      <p className="text-sm text-slate-500">{assignment.role_text}</p>
-                    )}
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Assigned {formatDate(assignment.created_at)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="custom" color="rgb(var(--color-primary))" size="sm">
-                      {assignment.engineer.role}
-                    </Badge>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => handleRemove(assignment.id, assignment.engineer.full_name)}
-                      disabled={removingId === assignment.id}
-                      title="Remove engineer"
-                    >
-                      {removingId === assignment.id ? (
-                        <div className="w-3 h-3 border border-danger border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <Trash2 className="w-3 h-3 text-danger" />
+              {caseEngineers.map((assignment) => {
+                const resolved =
+                  (assignment.user_id ? profileMap.get(assignment.user_id) : undefined) ??
+                  assignment.engineer ??
+                  { full_name: 'Unknown', role: '' };
+                const fullName = resolved.full_name || 'Unknown';
+                return (
+                  <div key={assignment.id} className="border border-slate-200 rounded-lg p-4 flex items-center gap-4 bg-white hover:border-primary/40 transition-colors">
+                    <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold text-sm flex-shrink-0">
+                      {fullName.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-900">{fullName}</p>
+                      {assignment.role_text && (
+                        <p className="text-sm text-slate-500">{assignment.role_text}</p>
                       )}
-                    </Button>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Assigned {formatDate(assignment.created_at)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {resolved.role && (
+                        <Badge variant="custom" color="rgb(var(--color-primary))" size="sm">
+                          {resolved.role}
+                        </Badge>
+                      )}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleRemove(assignment.id, fullName)}
+                        disabled={removingId === assignment.id}
+                        title="Remove engineer"
+                      >
+                        {removingId === assignment.id ? (
+                          <div className="w-3 h-3 border border-danger border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3 h-3 text-danger" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

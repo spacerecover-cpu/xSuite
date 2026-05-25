@@ -79,6 +79,16 @@ export const CaseBackupDevicesTab: React.FC<CaseBackupDevicesTabProps> = ({
     setSelectedItems((prev) =>
       prev.includes(item.id) ? prev.filter((id) => id !== item.id) : [...prev, item.id]
     );
+    setUsageItem(item);
+  };
+
+  const openUsageModal = () => {
+    if (!usageItem) {
+      const firstSelectedId = selectedItems[0];
+      const fallback = recommendedItems.find((i) => i.id === firstSelectedId) ?? recommendedItems[0] ?? null;
+      setUsageItem(fallback);
+    }
+    setShowUsageModal(true);
   };
 
   return (
@@ -200,7 +210,9 @@ export const CaseBackupDevicesTab: React.FC<CaseBackupDevicesTabProps> = ({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setShowUsageModal(true)}
+              onClick={openUsageModal}
+              disabled={recommendedItems.length === 0}
+              title={recommendedItems.length === 0 ? 'No saleable items in stock' : 'Record usage of a stock item against this case'}
             >
               <Wrench className="w-4 h-4 mr-2" />
               Record Usage

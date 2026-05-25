@@ -9,6 +9,11 @@ import { useToast } from '@/hooks/useToast';
 interface PortalSettings {
   id?: string;
   case_id: string;
+  // Real columns on case_portal_visibility (top-level booleans):
+  is_visible: boolean;
+  show_diagnostics: boolean;
+  show_timeline: boolean;
+  // Encoded into visible_fields text[] on save (no per-flag column exists):
   show_device_details: boolean;
   show_technical_details: boolean;
   show_device_password: boolean;
@@ -32,6 +37,9 @@ interface CasePortalTabProps {
 
 const defaultSettings = (caseId: string): PortalSettings => ({
   case_id: caseId,
+  is_visible: true,
+  show_diagnostics: false,
+  show_timeline: true,
   show_device_details: false,
   show_technical_details: false,
   show_device_password: false,
@@ -59,7 +67,8 @@ function decodePortalSettings(
   const base = defaultSettings(caseId);
   if (!raw) return base;
 
-  const visibleFields = (raw as unknown as { visible_fields?: unknown }).visible_fields;
+  const rawRec = raw as unknown as Record<string, unknown>;
+  const visibleFields = rawRec.visible_fields;
   const flagNames: string[] = Array.isArray(visibleFields)
     ? (visibleFields as unknown[]).filter((v): v is string => typeof v === 'string')
     : [];
@@ -84,6 +93,12 @@ function decodePortalSettings(
   for (const k of flagKeys) {
     (decoded as unknown as Record<string, unknown>)[k] = flagNames.includes(k as string);
   }
+  // Top-level real columns. Null/undefined falls back to the defaultSettings
+  // value (is_visible defaults true so an unset row still appears in the
+  // portal, matching prior behavior).
+  if (typeof rawRec.is_visible === 'boolean') decoded.is_visible = rawRec.is_visible;
+  if (typeof rawRec.show_diagnostics === 'boolean') decoded.show_diagnostics = rawRec.show_diagnostics;
+  if (typeof rawRec.show_timeline === 'boolean') decoded.show_timeline = rawRec.show_timeline;
   decoded.custom_message = (raw.custom_message as string) || '';
   return decoded;
 }
@@ -101,21 +116,28 @@ export const CasePortalTab: React.FC<CasePortalTabProps> = ({ caseId, portalSett
 
   const saveMutation = useMutation({
     mutationFn: async (data: PortalSettings) => {
-      // case_portal_visibility schema only has: is_visible, visible_fields
-      // (jsonb), show_diagnostics, show_timeline, custom_message. None of
-      // the UI's show_* booleans exist as columns; stuff them into
-      // visible_fields jsonb so the save round-trips without 400ing.
-      // Proper schema/UI alignment is part of the schema-drift sprint.
-      const { id: _id, case_id: _cid, custom_message, ...flags } = data;
+      // case_portal_visibility real columns: is_visible, visible_fields
+      // (text[]), show_diagnostics, show_timeline, custom_message. The
+      // three booleans (is_visible / show_diagnostics / show_timeline) and
+      // custom_message map directly to columns. All other show_*/auto_*
+      // UI flags have no dedicated column and are encoded into the
+      // visible_fields text[] (the encoded subset round-trips via
+      // decodePortalSettings on next load).
+      const {
+        id: _id,
+        case_id: _cid,
+        custom_message,
+        is_visible,
+        show_diagnostics,
+        show_timeline,
+        ...encodedFlags
+      } = data;
       const { data: { user } } = await supabase.auth.getUser();
       const { data: profile } = user
         ? await supabase.from('profiles').select('tenant_id').eq('id', user.id).maybeSingle()
         : { data: null };
       if (!profile?.tenant_id) throw new Error('No active tenant');
-      // visible_fields is text[] in the DB (not jsonb). Encode enabled
-      // boolean flags as a string array of flag names so the upsert payload
-      // matches the column type.
-      const visibleFlagNames = Object.entries(flags as Record<string, unknown>)
+      const visibleFlagNames = Object.entries(encodedFlags as Record<string, unknown>)
         .filter(([, v]) => v === true)
         .map(([k]) => k);
       const { error } = await supabase
@@ -123,7 +145,9 @@ export const CasePortalTab: React.FC<CasePortalTabProps> = ({ caseId, portalSett
         .upsert({
           tenant_id: profile.tenant_id,
           case_id: caseId,
-          is_visible: true,
+          is_visible,
+          show_diagnostics,
+          show_timeline,
           visible_fields: visibleFlagNames,
           custom_message,
         }, { onConflict: 'case_id' });
@@ -181,6 +205,60 @@ export const CasePortalTab: React.FC<CasePortalTabProps> = ({ caseId, portalSett
               <Save className="w-4 h-4 mr-2" />
               {saveMutation.isPending ? 'Saving...' : 'Save Settings'}
             </Button>
+          </div>
+
+          <div className="mb-6 p-4 bg-info-muted/40 rounded-lg border border-info/20">
+            <div className="flex items-start justify-between">
+              <div className="pr-4">
+                <p className="font-semibold text-slate-900 text-sm flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-primary" />
+                  Show this case in customer portal
+                </p>
+                <p className="text-xs text-slate-600 mt-1">
+                  Master switch. When off, the customer cannot see this case at all, regardless of the per-field toggles below.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={settings.is_visible}
+                aria-label="Show case in portal"
+                onClick={() => toggle('is_visible')}
+                className={`w-10 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 flex-shrink-0 ${settings.is_visible ? 'bg-primary' : 'bg-slate-300'}`}
+              >
+                <div className={`w-4 h-4 bg-white rounded-full shadow mt-1 transition-transform ${settings.is_visible ? 'translate-x-5' : 'translate-x-1'}`} />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+              {([
+                { key: 'show_diagnostics' as const, label: 'Diagnostics Section', description: 'Show diagnostic findings panel in the portal' },
+                { key: 'show_timeline' as const, label: 'Case Timeline', description: 'Show the case progress timeline in the portal' },
+              ]).map(({ key, label, description }) => {
+                const isOn = !!settings[key];
+                return (
+                  <div
+                    key={key}
+                    className="flex items-start justify-between p-3 bg-white rounded-lg border border-info/20"
+                  >
+                    <label htmlFor={`top-${key}`} className="flex-1 pr-4 cursor-pointer">
+                      <p className="font-medium text-slate-900 text-sm">{label}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{description}</p>
+                    </label>
+                    <button
+                      id={`top-${key}`}
+                      type="button"
+                      role="switch"
+                      aria-checked={isOn}
+                      aria-label={label}
+                      onClick={() => toggle(key)}
+                      className={`w-10 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 flex-shrink-0 ${isOn ? 'bg-primary' : 'bg-slate-300'}`}
+                    >
+                      <div className={`w-4 h-4 bg-white rounded-full shadow mt-1 transition-transform ${isOn ? 'translate-x-5' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           <div className="mb-6">

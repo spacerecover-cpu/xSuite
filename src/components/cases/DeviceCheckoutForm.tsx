@@ -13,8 +13,10 @@ interface CaseData {
   id: string;
   case_no: string | null;
   customer_id: string | null;
-  // The following fields are not (yet) present on the cases table — the UI
-  // tolerates missing values via `??` / falsy guards below.
+  // These fields are NOT columns on the `cases` table. They are persisted to
+  // `chain_of_custody` (the DEVICE_CHECKED_OUT entry) by the
+  // `log_case_checkout` RPC. We populate them after fetch by reading the
+  // most recent DEVICE_CHECKED_OUT chain_of_custody row for this case.
   checkout_date?: string | null;
   checkout_collector_name?: string | null;
   checkout_collector_mobile?: string | null;
@@ -86,7 +88,7 @@ export const DeviceCheckoutForm: React.FC<DeviceCheckoutFormProps> = ({ caseId }
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [caseResult, settingsResult] = await Promise.all([
+        const [caseResult, settingsResult, custodyResult] = await Promise.all([
           supabase
             .from('cases')
             .select('*')
@@ -97,15 +99,51 @@ export const DeviceCheckoutForm: React.FC<DeviceCheckoutFormProps> = ({ caseId }
             .select('*')
             .limit(1)
             .maybeSingle(),
+          // Pull the most recent DEVICE_CHECKED_OUT chain_of_custody entry so
+          // we can hydrate the (cases-table-absent) checkout_* / recovery_outcome
+          // fields that `log_case_checkout` persisted into metadata.
+          supabase
+            .from('chain_of_custody')
+            .select('created_at, metadata, description')
+            .eq('case_id', caseId)
+            .eq('action', 'DEVICE_CHECKED_OUT')
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
         ]);
 
         if (caseResult.error) throw caseResult.error;
         if (settingsResult.error) throw settingsResult.error;
+        // custodyResult error is non-fatal — the form should still render.
 
         const caseInfo = caseResult.data;
         if (!caseInfo) {
           throw new Error('Case not found');
         }
+
+        // Pull checkout fields out of chain_of_custody metadata.
+        // `log_case_checkout` (DB function) writes these into chain_of_custody
+        // when called from DeviceCheckoutModal. Shape is { collector_name,
+        // collector_mobile, collector_id, recovery_outcome, ... }.
+        const custodyRow = custodyResult.data;
+        const custodyMeta =
+          custodyRow && custodyRow.metadata && typeof custodyRow.metadata === 'object' && !Array.isArray(custodyRow.metadata)
+            ? (custodyRow.metadata as Record<string, unknown>)
+            : {};
+        const pickStr = (v: unknown): string | null =>
+          typeof v === 'string' && v.length > 0 ? v : null;
+        const checkoutFromCustody = {
+          checkout_date: custodyRow?.created_at ?? null,
+          checkout_collector_name:
+            pickStr(custodyMeta.collector_name) ?? pickStr(custodyMeta.checkout_collector_name),
+          checkout_collector_mobile:
+            pickStr(custodyMeta.collector_mobile) ?? pickStr(custodyMeta.checkout_collector_mobile),
+          checkout_collector_id:
+            pickStr(custodyMeta.collector_id) ?? pickStr(custodyMeta.checkout_collector_id),
+          recovery_outcome: pickStr(custodyMeta.recovery_outcome),
+        };
+
         setCompanySettings(
           settingsResult.data
             ? {
@@ -183,6 +221,7 @@ export const DeviceCheckoutForm: React.FC<DeviceCheckoutFormProps> = ({ caseId }
 
         setCaseData({
           ...caseInfo,
+          ...checkoutFromCustody,
           customer: customerResult.data,
           company: companyResult.data,
           service_type: serviceTypeResult.data,

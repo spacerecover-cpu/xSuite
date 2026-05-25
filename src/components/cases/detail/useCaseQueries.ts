@@ -279,6 +279,7 @@ export function useCaseQueries(
           report_number,
           title,
           status,
+          content,
           created_at,
           generated_at,
           created_by
@@ -294,7 +295,25 @@ export function useCaseQueries(
       const { data, error } = await query;
 
       if (error) throw error;
-      return data;
+
+      // report_type, version_number, is_latest_version, and approval/send
+      // metadata live inside the `content` JSONB column (not as top-level
+      // table columns). Filter client-side based on the filters that target
+      // those fields.
+      const rows = data ?? [];
+      const filtered = rows.filter((r) => {
+        const content = (r.content && typeof r.content === 'object' && !Array.isArray(r.content))
+          ? (r.content as Record<string, unknown>)
+          : {};
+        if (filters.reportTypeFilter !== 'all') {
+          if (content.report_type !== filters.reportTypeFilter) return false;
+        }
+        if (filters.showLatestOnly) {
+          if (content.is_latest_version !== true) return false;
+        }
+        return true;
+      });
+      return filtered;
     },
     enabled: !!id,
   });

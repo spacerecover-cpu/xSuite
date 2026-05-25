@@ -11,7 +11,10 @@ interface Device {
   device_type: { name: string } | null;
   brand: { name: string } | null;
   model: string | null;
-  serial_no: string | null;
+  // case_devices column is `serial_number`; previously named `serial_no` here
+  // which silently rendered blank S/N text because CaseDetail.tsx casts via
+  // `as unknown` before passing devices into this modal.
+  serial_number: string | null;
 }
 
 interface DeviceCheckoutModalProps {
@@ -145,8 +148,8 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
                     )}
                   </div>
                   <div className="text-sm text-slate-600">
-                    {device.serial_no && (
-                      <span className="font-mono">S/N: {device.serial_no}</span>
+                    {device.serial_number && (
+                      <span className="font-mono">S/N: {device.serial_number}</span>
                     )}
                   </div>
                 </div>

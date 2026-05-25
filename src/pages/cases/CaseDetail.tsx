@@ -25,6 +25,14 @@ import ReportViewModal from '../../components/cases/ReportViewModal';
 import { reportsService } from '../../lib/reportsService';
 import { PDFPreviewModal } from '../../components/cases/PDFPreviewModal';
 import { EmailDocumentModal } from '../../components/cases/EmailDocumentModal';
+import { QuoteFormModal } from '../../components/cases/QuoteFormModal';
+import { InvoiceFormModal } from '../../components/cases/InvoiceFormModal';
+import { ConvertToInvoiceModal } from '../../components/cases/ConvertToInvoiceModal';
+import { RecordPaymentModal } from '../../components/financial/RecordPaymentModal';
+import { createQuote as createQuoteService, type Quote as QuoteShape, type QuoteItem as QuoteItemShape } from '../../lib/quotesService';
+import { createInvoice as createInvoiceService, updateInvoice as updateInvoiceService, convertProformaToTaxInvoice, type Invoice as InvoiceShape, type InvoiceItem as InvoiceItemShape } from '../../lib/invoiceService';
+import type { Payment as PaymentShape } from '../../lib/paymentsService';
+import type { Database } from '../../types/database.types';
 import {
   CaseOverviewTab,
   CaseDevicesTab,
@@ -81,8 +89,19 @@ export const CaseDetail: React.FC = () => {
     updateAssignedEngineerMutation, updateCaseInfoMutation,
     updateDeviceInfoMutation, updateCustomerInfoMutation, markAsDeliveredMutation,
     preserveLongTermMutation, duplicateCaseMutation, deleteCaseMutation,
+    createPaymentMutation,
     queryClient, navigate, profile, toast,
   } = useCaseMutations({ id, caseData, devices, modals });
+
+  const [isConvertingProforma, setIsConvertingProforma] = useState(false);
+
+  const invalidateCaseFinanceQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['quotes', 'case', id] });
+    queryClient.invalidateQueries({ queryKey: ['invoices', 'case', id] });
+    queryClient.invalidateQueries({ queryKey: ['case_financial_summary', id] });
+    queryClient.invalidateQueries({ queryKey: ['quotes'] });
+    queryClient.invalidateQueries({ queryKey: ['invoices'] });
+  };
 
   const handleWhatsApp = async () => {
     if (!caseData) return;
@@ -128,6 +147,8 @@ export const CaseDetail: React.FC = () => {
     modals.setEmailPdfBlob(blob);
     modals.setEmailPdfFilename(filename);
     modals.setShowEmailModal(true);
+    // Close PDF preview so the email modal isn't stacked behind it.
+    modals.setShowPDFPreviewModal(false);
   };
 
   const handleOpenCheckoutPreview = () => {
@@ -439,7 +460,7 @@ export const CaseDetail: React.FC = () => {
           onUpdateStatus={(newStatus) => updateCaseStatusMutation.mutate(newStatus)}
           onUpdatePriority={(newPriority) => updateCasePriorityMutation.mutate(newPriority)}
           onUpdateEngineer={(engineerId) => updateAssignedEngineerMutation.mutate(engineerId)}
-          profile={(profile ?? {}) as unknown as Record<string, unknown>}
+          profile={profile ? { role: profile.role, case_access_level: profile.case_access_level } : null}
         />
       )}
 
@@ -483,15 +504,26 @@ export const CaseDetail: React.FC = () => {
           {/* Reports Tab */}
           {activeTab === 'reports' && (
             <CaseReportsTab
-              reports={(reports || []).map((r) => ({
-                id: r.id,
-                title: r.title,
-                report_number: r.report_number ?? '',
-                report_type: 'evaluation' as const,
-                status: (r.status ?? 'draft') as 'draft' | 'review' | 'approved' | 'sent',
-                version_number: 1,
-                created_at: r.created_at,
-              }))}
+              reports={(reports || []).map((r) => {
+                const content = (r.content && typeof r.content === 'object' && !Array.isArray(r.content))
+                  ? (r.content as Record<string, unknown>)
+                  : {};
+                const validReportTypes: readonly string[] = ['evaluation', 'service', 'server', 'malware', 'forensic', 'data_destruction', 'prevention'];
+                const reportType = (typeof content.report_type === 'string' && validReportTypes.includes(content.report_type) ? content.report_type : 'evaluation') as
+                  'evaluation' | 'service' | 'server' | 'malware' | 'forensic' | 'data_destruction' | 'prevention';
+                return {
+                  id: r.id,
+                  title: r.title,
+                  report_number: r.report_number ?? '',
+                  report_type: reportType,
+                  status: (r.status ?? 'draft') as 'draft' | 'review' | 'approved' | 'sent',
+                  version_number: typeof content.version_number === 'number' ? content.version_number : 1,
+                  visible_to_customer: content.visible_to_customer === true,
+                  approved_at: typeof content.approved_at === 'string' ? content.approved_at : null,
+                  sent_to_customer_at: typeof content.sent_to_customer_at === 'string' ? content.sent_to_customer_at : null,
+                  created_at: r.created_at,
+                };
+              })}
               reportTypeFilter={modals.reportTypeFilter}
               reportStatusFilter={modals.reportStatusFilter}
               showLatestOnly={modals.showLatestOnly}
@@ -552,12 +584,9 @@ export const CaseDetail: React.FC = () => {
               caseId={id!}
               caseEngineers={(caseEngineers || []).map((e) => ({
                 id: e.id,
+                user_id: e.user_id,
                 role_text: e.role_text ?? undefined,
                 created_at: e.created_at,
-                engineer: {
-                  full_name: '',
-                  role: '',
-                },
               }))}
             />
           )}
@@ -570,7 +599,7 @@ export const CaseDetail: React.FC = () => {
                 id: n.id,
                 note_text: n.content,
                 created_at: n.created_at,
-                author: { full_name: '' },
+                created_by: n.created_by,
               }))}
               newNote={modals.newNote}
               onNoteChange={modals.setNewNote}
@@ -918,6 +947,220 @@ export const CaseDetail: React.FC = () => {
           customerName={caseData.customer?.customer_name || 'Customer'}
           customerEmail={caseData.customer?.email ?? undefined}
           companyName="Data Recovery"
+        />
+      )}
+
+      {/* Quote Form Modal — create / edit */}
+      {modals.showQuoteModal && (
+        <QuoteFormModal
+          isOpen={modals.showQuoteModal}
+          onClose={() => {
+            modals.setShowQuoteModal(false);
+            modals.setEditingQuote(null);
+          }}
+          caseId={id!}
+          customerId={caseData?.customer_id ?? null}
+          companyId={caseData?.company_id ?? null}
+          initialData={modals.editingQuote ?? undefined}
+          clientReference={caseData?.client_reference ?? undefined}
+          onSave={async (quoteData, items) => {
+            try {
+              const editing = modals.editingQuote as { id?: string } | null;
+              if (editing?.id) {
+                const editingQuoteId: string = editing.id;
+                // Edit path — patch quote + replace line items inline
+                const updatePayload: Database['public']['Tables']['quotes']['Update'] = {
+                  status: typeof quoteData.status === 'string' ? quoteData.status : 'draft',
+                  valid_until: typeof quoteData.valid_until === 'string' ? quoteData.valid_until : null,
+                  tax_rate: typeof quoteData.tax_rate === 'number' ? quoteData.tax_rate : 0,
+                  discount_amount: typeof quoteData.discount_amount === 'number' ? quoteData.discount_amount : 0,
+                  terms: typeof quoteData.terms_and_conditions === 'string' ? quoteData.terms_and_conditions : null,
+                  notes: typeof quoteData.notes === 'string' ? quoteData.notes : null,
+                  updated_at: new Date().toISOString(),
+                };
+                const { error: upErr } = await supabase
+                  .from('quotes')
+                  .update(updatePayload)
+                  .eq('id', editingQuoteId);
+                if (upErr) throw upErr;
+
+                await supabase
+                  .from('quote_items')
+                  .update({ deleted_at: new Date().toISOString() })
+                  .eq('quote_id', editingQuoteId);
+
+                const itemsToInsert = items.map((item, index) => ({
+                  quote_id: editingQuoteId,
+                  description: item.description,
+                  quantity: item.quantity,
+                  unit_price: item.unit_price,
+                  total: Math.round(item.quantity * item.unit_price * 100) / 100,
+                  sort_order: index,
+                })) as Database['public']['Tables']['quote_items']['Insert'][];
+                if (itemsToInsert.length > 0) {
+                  const { error: itemsErr } = await supabase
+                    .from('quote_items')
+                    .insert(itemsToInsert);
+                  if (itemsErr) throw itemsErr;
+                }
+                toast.success('Quote updated successfully');
+              } else {
+                // Create path — use service so number generation + totals are centralised
+                const newQuote: QuoteShape = {
+                  case_id: id!,
+                  customer_id: caseData?.customer_id ?? null,
+                  company_id: caseData?.company_id ?? null,
+                  status: (typeof quoteData.status === 'string' ? quoteData.status : 'draft') as QuoteShape['status'],
+                  valid_until: typeof quoteData.valid_until === 'string' ? quoteData.valid_until : undefined,
+                  tax_rate: typeof quoteData.tax_rate === 'number' ? quoteData.tax_rate : 0,
+                  discount_amount: typeof quoteData.discount_amount === 'number' ? quoteData.discount_amount : 0,
+                  discount_type: (typeof quoteData.discount_type === 'string' ? quoteData.discount_type : 'fixed') as QuoteShape['discount_type'],
+                  terms: typeof quoteData.terms_and_conditions === 'string' ? quoteData.terms_and_conditions : undefined,
+                  notes: typeof quoteData.notes === 'string' ? quoteData.notes : undefined,
+                };
+                const quoteItems: QuoteItemShape[] = items.map((item, index) => ({
+                  description: item.description,
+                  quantity: item.quantity,
+                  unit_price: item.unit_price,
+                  sort_order: index,
+                }));
+                await createQuoteService(newQuote, quoteItems);
+                toast.success('Quote created successfully');
+              }
+              invalidateCaseFinanceQueries();
+            } catch (error: unknown) {
+              const msg = error instanceof Error ? error.message : 'Failed to save quote';
+              toast.error(msg);
+              throw error;
+            }
+          }}
+        />
+      )}
+
+      {/* Invoice Form Modal — create / edit */}
+      {modals.showInvoiceModal && (
+        <InvoiceFormModal
+          isOpen={modals.showInvoiceModal}
+          onClose={() => {
+            modals.setShowInvoiceModal(false);
+            modals.setEditingInvoice(null);
+          }}
+          caseId={id!}
+          customerId={caseData?.customer_id ?? null}
+          companyId={caseData?.company_id ?? null}
+          initialData={modals.editingInvoice ?? undefined}
+          quotes={(quotes || []).map((q) => ({
+            id: q.id,
+            quote_number: q.quote_number ?? null,
+            title: null,
+            total_amount: q.total_amount ?? null,
+          }))}
+          clientReference={caseData?.client_reference ?? undefined}
+          onSave={async (invoiceData, items) => {
+            try {
+              const editing = modals.editingInvoice as { id?: string } | null;
+              const payload = invoiceData as Partial<InvoiceShape>;
+              const lineItems = items as InvoiceItemShape[];
+              if (editing?.id) {
+                await updateInvoiceService(editing.id, {
+                  title: payload.title,
+                  invoice_type: payload.invoice_type,
+                  invoice_date: payload.invoice_date,
+                  due_date: payload.due_date,
+                  status: payload.status,
+                  notes: payload.notes,
+                  internal_notes: payload.internal_notes,
+                  discount_amount: payload.discount_amount,
+                  discount_type: payload.discount_type,
+                  tax_rate: payload.tax_rate,
+                  client_reference: payload.client_reference,
+                  bank_account_id: payload.bank_account_id,
+                  terms_and_conditions: payload.terms_and_conditions,
+                  quote_id: payload.quote_id,
+                }, lineItems);
+                toast.success('Invoice updated successfully');
+              } else {
+                await createInvoiceService({
+                  title: payload.title,
+                  case_id: id!,
+                  customer_id: payload.customer_id ?? caseData?.customer_id ?? null,
+                  company_id: payload.company_id ?? caseData?.company_id ?? null,
+                  invoice_type: payload.invoice_type ?? 'tax_invoice',
+                  invoice_date: payload.invoice_date ?? new Date().toISOString().split('T')[0],
+                  due_date: payload.due_date ?? new Date().toISOString().split('T')[0],
+                  status: payload.status ?? 'draft',
+                  notes: payload.notes,
+                  discount_amount: payload.discount_amount,
+                  discount_type: payload.discount_type,
+                  tax_rate: payload.tax_rate,
+                  client_reference: payload.client_reference,
+                  bank_account_id: payload.bank_account_id,
+                  terms_and_conditions: payload.terms_and_conditions,
+                  quote_id: payload.quote_id,
+                }, lineItems);
+                toast.success('Invoice created successfully');
+              }
+              invalidateCaseFinanceQueries();
+            } catch (error: unknown) {
+              const msg = error instanceof Error ? error.message : 'Failed to save invoice';
+              toast.error(msg);
+              throw error;
+            }
+          }}
+        />
+      )}
+
+      {/* Convert Proforma to Tax Invoice Modal */}
+      {modals.showConvertProformaModal && modals.convertingInvoice && (
+        <ConvertToInvoiceModal
+          isOpen={modals.showConvertProformaModal}
+          onClose={() => {
+            modals.setShowConvertProformaModal(false);
+            modals.setConvertingInvoice(null);
+          }}
+          quote={modals.convertingInvoice as React.ComponentProps<typeof ConvertToInvoiceModal>['quote']}
+          isConverting={isConvertingProforma}
+          onConvert={async (data) => {
+            const convertingId = (modals.convertingInvoice as { id?: string } | null)?.id;
+            if (!convertingId) return;
+            try {
+              setIsConvertingProforma(true);
+              await convertProformaToTaxInvoice(
+                convertingId,
+                data.dueDate,
+                data.notes
+              );
+              invalidateCaseFinanceQueries();
+              toast.success(`Converted to ${data.invoiceType === 'proforma' ? 'Proforma' : 'Tax'} Invoice`);
+              modals.setShowConvertProformaModal(false);
+              modals.setConvertingInvoice(null);
+            } catch (error: unknown) {
+              const msg = error instanceof Error ? error.message : 'Failed to convert';
+              toast.error(msg);
+            } finally {
+              setIsConvertingProforma(false);
+            }
+          }}
+        />
+      )}
+
+      {/* Record Payment Modal */}
+      {modals.showRecordPaymentModal && (
+        <RecordPaymentModal
+          isOpen={modals.showRecordPaymentModal}
+          onClose={() => {
+            modals.setShowRecordPaymentModal(false);
+            modals.setSelectedInvoiceForPayment(null);
+          }}
+          preselectedCaseId={id ?? undefined}
+          preselectedInvoiceId={(modals.selectedInvoiceForPayment as { id?: string } | null)?.id ?? undefined}
+          onSave={async (paymentData, allocations) => {
+            await createPaymentMutation.mutateAsync({
+              paymentData: paymentData as Omit<PaymentShape, 'id' | 'payment_number' | 'created_at' | 'updated_at'>,
+              allocations,
+            });
+            invalidateCaseFinanceQueries();
+          }}
         />
       )}
     </div>

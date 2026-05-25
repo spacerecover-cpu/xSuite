@@ -173,9 +173,16 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
   const updateAssignedEngineerMutation = useMutation({
     mutationFn: async (newEngineerId: string | null) => {
       const caseId = requireCaseId(id);
+      // Schema retains both `assigned_engineer_id` and `assigned_to`. The detail
+      // page reads `assigned_engineer_id` (see useCaseQueries.ts) so we MUST
+      // write it; mirroring to `assigned_to` keeps legacy callers in sync.
       const { data, error } = await supabase
         .from('cases')
-        .update({ assigned_to: newEngineerId, updated_at: new Date().toISOString() })
+        .update({
+          assigned_engineer_id: newEngineerId,
+          assigned_to: newEngineerId,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', caseId)
         .select();
 
