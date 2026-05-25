@@ -7448,6 +7448,7 @@ export type Database = {
         Row: {
           color: string | null
           created_at: string
+          customer_visible: boolean
           id: string
           is_active: boolean
           is_default: boolean | null
@@ -7459,6 +7460,7 @@ export type Database = {
         Insert: {
           color?: string | null
           created_at?: string
+          customer_visible?: boolean
           id?: string
           is_active?: boolean
           is_default?: boolean | null
@@ -7470,6 +7472,7 @@ export type Database = {
         Update: {
           color?: string | null
           created_at?: string
+          customer_visible?: boolean
           id?: string
           is_active?: boolean
           is_default?: boolean | null
