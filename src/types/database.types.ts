@@ -841,12 +841,15 @@ export type Database = {
           category: string | null
           created_at: string
           created_by: string | null
+          credit_amount: number | null
+          debit_amount: number | null
           deleted_at: string | null
           description: string | null
           id: string
           is_reconciled: boolean | null
           reconciled_at: string | null
           reference: string | null
+          running_balance: number | null
           tenant_id: string
           transaction_date: string
           type: string
@@ -858,12 +861,15 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by?: string | null
+          credit_amount?: number | null
+          debit_amount?: number | null
           deleted_at?: string | null
           description?: string | null
           id?: string
           is_reconciled?: boolean | null
           reconciled_at?: string | null
           reference?: string | null
+          running_balance?: number | null
           tenant_id: string
           transaction_date: string
           type: string
@@ -875,12 +881,15 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by?: string | null
+          credit_amount?: number | null
+          debit_amount?: number | null
           deleted_at?: string | null
           description?: string | null
           id?: string
           is_reconciled?: boolean | null
           reconciled_at?: string | null
           reference?: string | null
+          running_balance?: number | null
           tenant_id?: string
           transaction_date?: string
           type?: string
@@ -4428,6 +4437,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           deleted_at: string | null
+          error_message: string | null
           file_size: number | null
           file_url: string | null
           id: string
@@ -4442,6 +4452,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
+          error_message?: string | null
           file_size?: number | null
           file_url?: string | null
           id?: string
@@ -4456,6 +4467,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
+          error_message?: string | null
           file_size?: number | null
           file_url?: string | null
           id?: string
@@ -4581,51 +4593,72 @@ export type Database = {
           content: string | null
           created_at: string
           created_by: string | null
+          default_price: number | null
           deleted_at: string | null
           description: string | null
           id: string
           is_active: boolean | null
           is_default: boolean | null
+          item_category: string | null
+          last_used_at: string | null
           name: string
+          subject_line: string | null
           template_type_id: string | null
           tenant_id: string
           type_id: string | null
+          unit_of_measure: string | null
           updated_at: string
+          usage_count: number
           variables: Json | null
+          version: number
         }
         Insert: {
           category_id?: string | null
           content?: string | null
           created_at?: string
           created_by?: string | null
+          default_price?: number | null
           deleted_at?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
           is_default?: boolean | null
+          item_category?: string | null
+          last_used_at?: string | null
           name: string
+          subject_line?: string | null
           template_type_id?: string | null
           tenant_id: string
           type_id?: string | null
+          unit_of_measure?: string | null
           updated_at?: string
+          usage_count?: number
           variables?: Json | null
+          version?: number
         }
         Update: {
           category_id?: string | null
           content?: string | null
           created_at?: string
           created_by?: string | null
+          default_price?: number | null
           deleted_at?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
           is_default?: boolean | null
+          item_category?: string | null
+          last_used_at?: string | null
           name?: string
+          subject_line?: string | null
           template_type_id?: string | null
           tenant_id?: string
           type_id?: string | null
+          unit_of_measure?: string | null
           updated_at?: string
+          usage_count?: number
           variables?: Json | null
+          version?: number
         }
         Relationships: [
           {
@@ -5384,8 +5417,11 @@ export type Database = {
           deleted_at: string | null
           description: string | null
           id: string
+          notes: string | null
           reference_id: string | null
+          reference_number: string | null
           reference_type: string | null
+          status: string
           tenant_id: string
           transaction_date: string | null
           transaction_type: string
@@ -5401,8 +5437,11 @@ export type Database = {
           deleted_at?: string | null
           description?: string | null
           id?: string
+          notes?: string | null
           reference_id?: string | null
+          reference_number?: string | null
           reference_type?: string | null
+          status?: string
           tenant_id: string
           transaction_date?: string | null
           transaction_type: string
@@ -5418,8 +5457,11 @@ export type Database = {
           deleted_at?: string | null
           description?: string | null
           id?: string
+          notes?: string | null
           reference_id?: string | null
+          reference_number?: string | null
           reference_type?: string | null
+          status?: string
           tenant_id?: string
           transaction_date?: string | null
           transaction_type?: string
@@ -6386,30 +6428,39 @@ export type Database = {
           created_by: string | null
           criteria: Json
           deleted_at: string | null
+          description: string | null
           id: string
+          last_used_at: string | null
           name: string
           tenant_id: string
           updated_at: string
+          usage_count: number
         }
         Insert: {
           created_at?: string
           created_by?: string | null
           criteria?: Json
           deleted_at?: string | null
+          description?: string | null
           id?: string
+          last_used_at?: string | null
           name: string
           tenant_id: string
           updated_at?: string
+          usage_count?: number
         }
         Update: {
           created_at?: string
           created_by?: string | null
           criteria?: Json
           deleted_at?: string | null
+          description?: string | null
           id?: string
+          last_used_at?: string | null
           name?: string
           tenant_id?: string
           updated_at?: string
+          usage_count?: number
         }
         Relationships: [
           {
@@ -6605,7 +6656,9 @@ export type Database = {
           bank_account_id: string | null
           case_id: string | null
           company_id: string | null
+          converted_at: string | null
           converted_from_quote_id: string | null
+          converted_to_invoice_id: string | null
           created_at: string
           created_by: string | null
           currency: string | null
@@ -6621,6 +6674,7 @@ export type Database = {
           is_proforma: boolean | null
           notes: string | null
           paid_at: string | null
+          proforma_invoice_id: string | null
           sent_at: string | null
           status: string | null
           status_id: string | null
@@ -6640,7 +6694,9 @@ export type Database = {
           bank_account_id?: string | null
           case_id?: string | null
           company_id?: string | null
+          converted_at?: string | null
           converted_from_quote_id?: string | null
+          converted_to_invoice_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string | null
@@ -6656,6 +6712,7 @@ export type Database = {
           is_proforma?: boolean | null
           notes?: string | null
           paid_at?: string | null
+          proforma_invoice_id?: string | null
           sent_at?: string | null
           status?: string | null
           status_id?: string | null
@@ -6675,7 +6732,9 @@ export type Database = {
           bank_account_id?: string | null
           case_id?: string | null
           company_id?: string | null
+          converted_at?: string | null
           converted_from_quote_id?: string | null
+          converted_to_invoice_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string | null
@@ -6691,6 +6750,7 @@ export type Database = {
           is_proforma?: boolean | null
           notes?: string | null
           paid_at?: string | null
+          proforma_invoice_id?: string | null
           sent_at?: string | null
           status?: string | null
           status_id?: string | null
@@ -6727,6 +6787,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "invoices_converted_from_quote_id_fkey"
+            columns: ["converted_from_quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_converted_to_invoice_id_fkey"
+            columns: ["converted_to_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "invoices_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
@@ -6738,6 +6812,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers_enhanced"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_proforma_invoice_id_fkey"
+            columns: ["proforma_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
           {
@@ -6811,6 +6892,7 @@ export type Database = {
       kb_article_versions: {
         Row: {
           article_id: string
+          change_notes: string | null
           content: string | null
           created_at: string
           created_by: string | null
@@ -6823,6 +6905,7 @@ export type Database = {
         }
         Insert: {
           article_id: string
+          change_notes?: string | null
           content?: string | null
           created_at?: string
           created_by?: string | null
@@ -6835,6 +6918,7 @@ export type Database = {
         }
         Update: {
           article_id?: string
+          change_notes?: string | null
           content?: string | null
           created_at?: string
           created_by?: string | null
@@ -7862,33 +7946,10 @@ export type Database = {
       }
       master_template_categories: {
         Row: {
-          created_at: string
-          id: string
-          is_active: boolean
-          name: string
-          sort_order: number | null
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          name: string
-          sort_order?: number | null
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          name?: string
-          sort_order?: number | null
-        }
-        Relationships: []
-      }
-      master_template_types: {
-        Row: {
-          code: string | null
+          color: string | null
           created_at: string
           description: string | null
+          icon: string | null
           id: string
           is_active: boolean
           name: string
@@ -7896,9 +7957,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          code?: string | null
+          color?: string | null
           created_at?: string
           description?: string | null
+          icon?: string | null
           id?: string
           is_active?: boolean
           name: string
@@ -7906,9 +7968,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          code?: string | null
+          color?: string | null
           created_at?: string
           description?: string | null
+          icon?: string | null
           id?: string
           is_active?: boolean
           name?: string
@@ -7916,6 +7979,53 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      master_template_types: {
+        Row: {
+          category_id: string | null
+          code: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number | null
+          supports_line_items: boolean
+          updated_at: string
+        }
+        Insert: {
+          category_id?: string | null
+          code?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number | null
+          supports_line_items?: boolean
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string | null
+          code?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number | null
+          supports_line_items?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "master_template_types_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "master_template_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       master_template_variables: {
         Row: {
@@ -8588,6 +8698,7 @@ export type Database = {
         Row: {
           amount: number
           bank_account_id: string | null
+          case_id: string | null
           created_at: string
           created_by: string | null
           currency: string | null
@@ -8607,6 +8718,7 @@ export type Database = {
         Insert: {
           amount: number
           bank_account_id?: string | null
+          case_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string | null
@@ -8626,6 +8738,7 @@ export type Database = {
         Update: {
           amount?: number
           bank_account_id?: string | null
+          case_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string | null
@@ -8648,6 +8761,13 @@ export type Database = {
             columns: ["bank_account_id"]
             isOneToOne: false
             referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
             referencedColumns: ["id"]
           },
           {
@@ -8696,8 +8816,10 @@ export type Database = {
           created_by: string | null
           deleted_at: string | null
           description: string | null
+          effective_date: string | null
           employee_id: string
           id: string
+          is_deduction: boolean
           period_id: string | null
           status: string | null
           tenant_id: string
@@ -8712,8 +8834,10 @@ export type Database = {
           created_by?: string | null
           deleted_at?: string | null
           description?: string | null
+          effective_date?: string | null
           employee_id: string
           id?: string
+          is_deduction?: boolean
           period_id?: string | null
           status?: string | null
           tenant_id: string
@@ -8728,8 +8852,10 @@ export type Database = {
           created_by?: string | null
           deleted_at?: string | null
           description?: string | null
+          effective_date?: string | null
           employee_id?: string
           id?: string
+          is_deduction?: boolean
           period_id?: string | null
           status?: string | null
           tenant_id?: string
@@ -10836,13 +10962,18 @@ export type Database = {
       salary_components: {
         Row: {
           calculation_type: string | null
+          code: string | null
+          component_type: string | null
           created_at: string
+          default_amount: number | null
           deleted_at: string | null
           id: string
           is_active: boolean | null
           is_mandatory: boolean | null
+          is_recurring: boolean
           is_taxable: boolean | null
           name: string
+          name_ar: string | null
           percentage: number | null
           sort_order: number | null
           tenant_id: string
@@ -10851,13 +10982,18 @@ export type Database = {
         }
         Insert: {
           calculation_type?: string | null
+          code?: string | null
+          component_type?: string | null
           created_at?: string
+          default_amount?: number | null
           deleted_at?: string | null
           id?: string
           is_active?: boolean | null
           is_mandatory?: boolean | null
+          is_recurring?: boolean
           is_taxable?: boolean | null
           name: string
+          name_ar?: string | null
           percentage?: number | null
           sort_order?: number | null
           tenant_id: string
@@ -10866,13 +11002,18 @@ export type Database = {
         }
         Update: {
           calculation_type?: string | null
+          code?: string | null
+          component_type?: string | null
           created_at?: string
+          default_amount?: number | null
           deleted_at?: string | null
           id?: string
           is_active?: boolean | null
           is_mandatory?: boolean | null
+          is_recurring?: boolean
           is_taxable?: boolean | null
           name?: string
+          name_ar?: string | null
           percentage?: number | null
           sort_order?: number | null
           tenant_id?: string
@@ -11211,6 +11352,7 @@ export type Database = {
         Row: {
           barcode: string | null
           brand: string | null
+          capacity: string | null
           category_id: string | null
           cost_price: number | null
           created_at: string
@@ -11220,11 +11362,15 @@ export type Database = {
           description: string | null
           dimensions: string | null
           id: string
+          image_url: string | null
           is_active: boolean | null
+          is_featured: boolean
           is_saleable: boolean | null
           item_type: string | null
+          location: string | null
           location_id: string | null
           minimum_quantity: number | null
+          model: string | null
           name: string
           notes: string | null
           photos: string[] | null
@@ -11235,17 +11381,22 @@ export type Database = {
           reorder_quantity: number | null
           selling_price: number | null
           sku: string | null
+          specifications: Json | null
           supplier_id: string | null
+          tax_inclusive: boolean
           tax_rate: number | null
           tenant_id: string
           unit: string | null
+          unit_of_measure: string | null
           updated_at: string
           updated_by: string | null
+          warranty_months: number | null
           weight: number | null
         }
         Insert: {
           barcode?: string | null
           brand?: string | null
+          capacity?: string | null
           category_id?: string | null
           cost_price?: number | null
           created_at?: string
@@ -11255,11 +11406,15 @@ export type Database = {
           description?: string | null
           dimensions?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean | null
+          is_featured?: boolean
           is_saleable?: boolean | null
           item_type?: string | null
+          location?: string | null
           location_id?: string | null
           minimum_quantity?: number | null
+          model?: string | null
           name: string
           notes?: string | null
           photos?: string[] | null
@@ -11270,17 +11425,22 @@ export type Database = {
           reorder_quantity?: number | null
           selling_price?: number | null
           sku?: string | null
+          specifications?: Json | null
           supplier_id?: string | null
+          tax_inclusive?: boolean
           tax_rate?: number | null
           tenant_id: string
           unit?: string | null
+          unit_of_measure?: string | null
           updated_at?: string
           updated_by?: string | null
+          warranty_months?: number | null
           weight?: number | null
         }
         Update: {
           barcode?: string | null
           brand?: string | null
+          capacity?: string | null
           category_id?: string | null
           cost_price?: number | null
           created_at?: string
@@ -11290,11 +11450,15 @@ export type Database = {
           description?: string | null
           dimensions?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean | null
+          is_featured?: boolean
           is_saleable?: boolean | null
           item_type?: string | null
+          location?: string | null
           location_id?: string | null
           minimum_quantity?: number | null
+          model?: string | null
           name?: string
           notes?: string | null
           photos?: string[] | null
@@ -11305,12 +11469,16 @@ export type Database = {
           reorder_quantity?: number | null
           selling_price?: number | null
           sku?: string | null
+          specifications?: Json | null
           supplier_id?: string | null
+          tax_inclusive?: boolean
           tax_rate?: number | null
           tenant_id?: string
           unit?: string | null
+          unit_of_measure?: string | null
           updated_at?: string
           updated_by?: string | null
+          warranty_months?: number | null
           weight?: number | null
         }
         Relationships: [
@@ -11346,7 +11514,9 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean | null
+          is_default: boolean
           name: string
+          sort_order: number
           tenant_id: string
           updated_at: string
         }
@@ -11358,7 +11528,9 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          is_default?: boolean
           name: string
+          sort_order?: number
           tenant_id: string
           updated_at?: string
         }
@@ -11370,7 +11542,9 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          is_default?: boolean
           name?: string
+          sort_order?: number
           tenant_id?: string
           updated_at?: string
         }
@@ -11526,6 +11700,7 @@ export type Database = {
           created_at: string
           discount: number | null
           id: string
+          invoice_line_item_id: string | null
           item_id: string
           quantity: number
           sale_id: string
@@ -11539,6 +11714,7 @@ export type Database = {
           created_at?: string
           discount?: number | null
           id?: string
+          invoice_line_item_id?: string | null
           item_id: string
           quantity: number
           sale_id: string
@@ -11552,6 +11728,7 @@ export type Database = {
           created_at?: string
           discount?: number | null
           id?: string
+          invoice_line_item_id?: string | null
           item_id?: string
           quantity?: number
           sale_id?: string
@@ -11562,6 +11739,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "stock_sale_items_invoice_line_item_id_fkey"
+            columns: ["invoice_line_item_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_line_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "stock_sale_items_item_id_fkey"
             columns: ["item_id"]
@@ -11594,7 +11778,10 @@ export type Database = {
           deleted_at: string | null
           discount_amount: number | null
           id: string
+          invoice_id: string | null
           notes: string | null
+          payment_method_id: string | null
+          payment_status: string
           sale_date: string | null
           sale_number: string | null
           status: string | null
@@ -11612,7 +11799,10 @@ export type Database = {
           deleted_at?: string | null
           discount_amount?: number | null
           id?: string
+          invoice_id?: string | null
           notes?: string | null
+          payment_method_id?: string | null
+          payment_status?: string
           sale_date?: string | null
           sale_number?: string | null
           status?: string | null
@@ -11630,7 +11820,10 @@ export type Database = {
           deleted_at?: string | null
           discount_amount?: number | null
           id?: string
+          invoice_id?: string | null
           notes?: string | null
+          payment_method_id?: string | null
+          payment_status?: string
           sale_date?: string | null
           sale_number?: string | null
           status?: string | null
@@ -11660,6 +11853,20 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers_enhanced"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_sales_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_sales_payment_method_id_fkey"
+            columns: ["payment_method_id"]
+            isOneToOne: false
+            referencedRelation: "master_payment_methods"
             referencedColumns: ["id"]
           },
           {
@@ -13126,6 +13333,7 @@ export type Database = {
           paypal_customer_id: string | null
           paypal_subscription_id: string | null
           plan_id: string | null
+          require_mfa_for_admins: boolean
           settings: Json
           slug: string
           status: string
@@ -13161,6 +13369,7 @@ export type Database = {
           paypal_customer_id?: string | null
           paypal_subscription_id?: string | null
           plan_id?: string | null
+          require_mfa_for_admins?: boolean
           settings?: Json
           slug: string
           status?: string
@@ -13196,6 +13405,7 @@ export type Database = {
           paypal_customer_id?: string | null
           paypal_subscription_id?: string | null
           plan_id?: string | null
+          require_mfa_for_admins?: boolean
           settings?: Json
           slug?: string
           status?: string
@@ -14191,17 +14401,31 @@ export type Database = {
       is_staff_user: { Args: never; Returns: boolean }
       is_tenant_admin: { Args: never; Returns: boolean }
       is_tenant_owner: { Args: never; Returns: boolean }
-      log_audit_trail: {
-        Args: {
-          p_action: string
-          p_changed_fields?: string[]
-          p_new_values?: Json
-          p_old_values?: Json
-          p_record_id: string
-          p_record_type: string
-        }
-        Returns: undefined
-      }
+      log_audit_trail:
+        | {
+            Args: {
+              p_action: string
+              p_changed_fields?: string[]
+              p_new_values?: Json
+              p_old_values?: Json
+              p_record_id: string
+              p_record_type: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_action: string
+              p_changed_fields?: string[]
+              p_ip_address?: unknown
+              p_new_values?: Json
+              p_old_values?: Json
+              p_record_id: string
+              p_record_type: string
+              p_user_agent?: string
+            }
+            Returns: undefined
+          }
       log_case_checkout: {
         Args: {
           p_case_id: string

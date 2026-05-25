@@ -859,14 +859,16 @@ export async function searchChainOfCustody(params: {
   return results;
 }
 
-export function generateHash(data: string): string {
-  let hash = 0;
-  for (let i = 0; i < data.length; i++) {
-    const char = data.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash).toString(16).padStart(16, '0');
+// Forensic-grade SHA-256 hash for chain-of-custody evidence integrity.
+// Aligns with NIST SP 800-86 (Guide to Integrating Forensic Techniques into
+// Incident Response) which mandates SHA-256 minimum for digital evidence.
+// Returns a 64-character lowercase hex string.
+export async function generateHash(data: string): Promise<string> {
+  const bytes = new TextEncoder().encode(data);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 export function getCategoryColor(category: ActionCategory): string {
