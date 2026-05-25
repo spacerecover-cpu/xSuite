@@ -273,9 +273,12 @@ export const CompaniesListPage: React.FC = () => {
         })
         .eq('id', id)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      if (!updatedCompany) {
+        throw new Error('Update succeeded but no row was returned');
+      }
       return updatedCompany;
     },
     onSuccess: () => {

@@ -91,7 +91,7 @@ export const DeviceCheckoutForm: React.FC<DeviceCheckoutFormProps> = ({ caseId }
             .from('cases')
             .select('*')
             .eq('id', caseId)
-            .single(),
+            .maybeSingle(),
           supabase
             .from('company_settings')
             .select('*')
@@ -103,6 +103,9 @@ export const DeviceCheckoutForm: React.FC<DeviceCheckoutFormProps> = ({ caseId }
         if (settingsResult.error) throw settingsResult.error;
 
         const caseInfo = caseResult.data;
+        if (!caseInfo) {
+          throw new Error('Case not found');
+        }
         setCompanySettings(
           settingsResult.data
             ? {
@@ -122,21 +125,21 @@ export const DeviceCheckoutForm: React.FC<DeviceCheckoutFormProps> = ({ caseId }
                 .from('customers_enhanced')
                 .select('customer_name, email, mobile_number')
                 .eq('id', caseInfo.customer_id)
-                .single()
+                .maybeSingle()
             : Promise.resolve({ data: null }),
           caseInfo.company_id
             ? supabase
                 .from('companies')
                 .select('name, company_name')
                 .eq('id', caseInfo.company_id)
-                .single()
+                .maybeSingle()
             : Promise.resolve({ data: null }),
           caseInfo.service_type_id
             ? supabase
                 .from('catalog_service_types')
                 .select('name')
                 .eq('id', caseInfo.service_type_id)
-                .single()
+                .maybeSingle()
             : Promise.resolve({ data: null }),
           supabase
             .from('case_devices')
@@ -147,7 +150,7 @@ export const DeviceCheckoutForm: React.FC<DeviceCheckoutFormProps> = ({ caseId }
                 .from('profiles')
                 .select('full_name')
                 .eq('id', caseInfo.created_by)
-                .single()
+                .maybeSingle()
             : Promise.resolve({ data: null }),
         ]);
 
@@ -155,16 +158,16 @@ export const DeviceCheckoutForm: React.FC<DeviceCheckoutFormProps> = ({ caseId }
           (devicesResult.data || []).map(async (device) => {
             const [deviceTypeResult, brandResult, capacityResult, roleResult] = await Promise.all([
               device.device_type_id
-                ? supabase.from('catalog_device_types').select('name').eq('id', device.device_type_id).single()
+                ? supabase.from('catalog_device_types').select('name').eq('id', device.device_type_id).maybeSingle()
                 : Promise.resolve({ data: null }),
               device.brand_id
-                ? supabase.from('catalog_device_brands').select('name').eq('id', device.brand_id).single()
+                ? supabase.from('catalog_device_brands').select('name').eq('id', device.brand_id).maybeSingle()
                 : Promise.resolve({ data: null }),
               device.capacity_id
-                ? supabase.from('catalog_device_capacities').select('name').eq('id', device.capacity_id).single()
+                ? supabase.from('catalog_device_capacities').select('name').eq('id', device.capacity_id).maybeSingle()
                 : Promise.resolve({ data: null }),
               device.device_role_id
-                ? supabase.from('catalog_device_roles').select('name').eq('id', device.device_role_id).single()
+                ? supabase.from('catalog_device_roles').select('name').eq('id', device.device_role_id).maybeSingle()
                 : Promise.resolve({ data: null }),
             ]);
 

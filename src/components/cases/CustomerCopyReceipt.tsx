@@ -107,7 +107,7 @@ export const CustomerCopyReceipt: React.FC<CustomerCopyReceiptProps> = ({
             .from('cases')
             .select('*')
             .eq('id', caseId)
-            .single(),
+            .maybeSingle(),
           supabase
             .from('company_settings')
             .select('*')
@@ -119,6 +119,9 @@ export const CustomerCopyReceipt: React.FC<CustomerCopyReceiptProps> = ({
         if (settingsResult.error) throw settingsResult.error;
 
         const caseInfo = caseResult.data;
+        if (!caseInfo) {
+          throw new Error('Case not found');
+        }
         setCompanySettings(settingsResult.data as unknown as CompanySettings | null);
 
         const [customerResult, serviceTypeResult, devicesResult, createdByResult] = await Promise.all([

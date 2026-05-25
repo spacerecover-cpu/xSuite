@@ -49,7 +49,7 @@ export const CaseLabel: React.FC<CaseLabelProps> = ({ caseId, caseNumber: _caseN
     const fetchData = async () => {
       try {
         const [caseResult, settingsResult, prioritiesResult] = await Promise.all([
-          supabase.from('cases').select('*').eq('id', caseId).single(),
+          supabase.from('cases').select('*').eq('id', caseId).maybeSingle(),
           supabase.from('company_settings').select('*').limit(1).maybeSingle(),
           supabase.from('master_case_priorities').select('name, color').eq('is_active', true).order('sort_order'),
         ]);
@@ -59,6 +59,9 @@ export const CaseLabel: React.FC<CaseLabelProps> = ({ caseId, caseNumber: _caseN
         if (prioritiesResult.error) throw prioritiesResult.error;
 
         const caseInfo = caseResult.data;
+        if (!caseInfo) {
+          throw new Error('Case not found');
+        }
         setCompanySettings(
           settingsResult.data
             ? {
@@ -77,7 +80,7 @@ export const CaseLabel: React.FC<CaseLabelProps> = ({ caseId, caseNumber: _caseN
                 .from('customers_enhanced')
                 .select('customer_name, mobile_number, customer_number')
                 .eq('id', caseInfo.customer_id)
-                .single()
+                .maybeSingle()
             : Promise.resolve({ data: null }),
           supabase
             .from('case_devices')
@@ -93,7 +96,7 @@ export const CaseLabel: React.FC<CaseLabelProps> = ({ caseId, caseNumber: _caseN
               .from('catalog_device_types')
               .select('name')
               .eq('id', device.device_type_id)
-              .single();
+              .maybeSingle();
 
             return {
               ...device,

@@ -154,9 +154,9 @@ Six required-status checks block PRs that re-introduce schema drift. Full design
 
 ### Current cleanup state
 
-- Baseline tsc error count: **762** (locked in `docs/superpowers/specs/tsc-baseline.count`)
-- Ratchet target: tsc count must not increase. CI fails any PR that would raise the count.
-- Long-term goal: drive to 0 via ongoing PRs.
+- **tsc baseline: 0 errors.** CI fails any PR that introduces a tsc error.
+- Schema discipline cleanup completed in `v1.1.0-schema-discipline` (762 → 0 errors swept across ~190 files).
+- Baseline file `docs/superpowers/specs/tsc-baseline.count` removed; `scripts/check-tsc.sh` enforces zero.
 
 ### Naming standards
 
@@ -184,7 +184,7 @@ The schema-drift detector (`scripts/check-schema-drift.sh`) regenerates types an
 
 | Job | Catches |
 |---|---|
-| `typecheck` | TS errors including stale column reads (TS2339, TS2551) — ratchet at 762 |
+| `typecheck` | TS errors including stale column reads (TS2339, TS2551) — must equal 0 |
 | `schema-drift` | Live DB diverging from `database.types.ts` |
 | `lint` | `.from('<legacy_name>')` and embed names in `.select()` |
 | `tenant-table-requirements` | New tenant-scoped table missing RLS, trigger, or index |

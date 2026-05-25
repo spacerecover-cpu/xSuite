@@ -35,8 +35,19 @@ export async function getReviews(filters?: {
 
   if (filters?.status) query = query.eq('status', filters.status);
   if (filters?.employeeId) query = query.eq('employee_id', filters.employeeId);
-  if (filters?.fromDate) query = query.gte('review_period_start', filters.fromDate);
-  if (filters?.toDate) query = query.lte('review_period_end', filters.toDate);
+  // NOTE: performance_reviews v1.0.0 stores `review_period` as a single free-text column
+  // (format "YYYY-MM-DD to YYYY-MM-DD"); the prior `review_period_start`/`review_period_end`
+  // columns were dropped. fromDate/toDate filters use ilike on the year fragment so they
+  // approximate range filtering without crashing. Exact-range filtering requires either a
+  // migration to restore the two timestamp columns, or client-side parsing of review_period.
+  if (filters?.fromDate) {
+    const yearFrom = filters.fromDate.slice(0, 4);
+    query = query.ilike('review_period', `%${yearFrom}%`);
+  }
+  if (filters?.toDate) {
+    const yearTo = filters.toDate.slice(0, 4);
+    query = query.ilike('review_period', `%${yearTo}%`);
+  }
 
   const { data, error } = await query;
   if (error) throw error;

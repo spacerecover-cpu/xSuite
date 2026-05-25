@@ -11,9 +11,8 @@ import { InvoiceDocument } from '../../components/documents/InvoiceDocument';
 import { useCurrency } from '../../hooks/useCurrency';
 import { usePDFDownload } from '../../hooks/usePDFDownload';
 import { useToast } from '../../hooks/useToast';
-import { FileText, ArrowLeft, CreditCard as Edit, DollarSign, AlertCircle, RefreshCw, CheckCircle, ArrowRight, Lock, ShoppingBag } from 'lucide-react';
+import { FileText, ArrowLeft, CreditCard as Edit, DollarSign, AlertCircle, RefreshCw, CheckCircle, ArrowRight, Lock } from 'lucide-react';
 import { RecordReceiptModal } from '../../components/banking/RecordReceiptModal';
-import { AddStockSaleToInvoiceModal } from '../../components/financial/AddStockSaleToInvoiceModal';
 import { logger } from '../../lib/logger';
 import { supabase } from '../../lib/supabaseClient';
 import type { PaymentReceipt } from '../../lib/bankingService';
@@ -61,7 +60,6 @@ export const InvoiceDetailPage: React.FC = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showConversionHistoryModal, setShowConversionHistoryModal] = useState(false);
   const [conversionHistory, setConversionHistory] = useState<Array<Record<string, unknown>>>([]);
-  const [showStockSaleModal, setShowStockSaleModal] = useState(false);
 
   const { data: invoice, isLoading } = useQuery({
     queryKey: ['invoice', id],
@@ -529,17 +527,6 @@ export const InvoiceDetailPage: React.FC = () => {
                   </Button>
                 )}
 
-                {canEdit && invoice?.customer_id && (
-                  <Button
-                    onClick={() => setShowStockSaleModal(true)}
-                    variant="secondary"
-                    className="w-full"
-                  >
-                    <ShoppingBag className="w-4 h-4 mr-2" />
-                    Add Stock Sale
-                  </Button>
-                )}
-
                 {canRecordPayment && (
                   <Button
                     onClick={() => setShowPaymentModal(true)}
@@ -678,19 +665,6 @@ export const InvoiceDetailPage: React.FC = () => {
             }
 
             handlePaymentRecorded();
-          }}
-        />
-      )}
-
-      {/* Add Stock Sale Modal */}
-      {showStockSaleModal && id && invoice?.customer_id && (
-        <AddStockSaleToInvoiceModal
-          isOpen={showStockSaleModal}
-          onClose={() => setShowStockSaleModal(false)}
-          invoiceId={id}
-          customerId={invoice.customer_id}
-          onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ['invoice', id] });
           }}
         />
       )}

@@ -370,11 +370,14 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
         .from('cases')
         .insert(newCaseData)
         .select()
-        .single();
+        .maybeSingle();
 
       if (caseError) {
         logger.error('Error creating duplicate case:', caseError);
         throw new Error(`Failed to duplicate case: ${caseError.message}`);
+      }
+      if (!newCase) {
+        throw new Error('Failed to duplicate case: insert returned no row');
       }
 
       if (devices && devices.length > 0) {

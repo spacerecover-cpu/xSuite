@@ -73,7 +73,7 @@ export function usePDFDownload() {
         const fetchPromise = supabase
           .from('company_settings')
           .select('basic_info, location, contact_info, branding, online_presence, banking_info')
-          .single();
+          .maybeSingle();
 
         const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 

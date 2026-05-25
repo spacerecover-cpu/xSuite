@@ -614,9 +614,10 @@ export async function getCurrentPlatformAdmin(): Promise<{
 }
 
 export async function getTenantUsers(tenantId: string) {
+  // profiles.last_sign_in_at does not exist in v1.0.0 schema; the column is `last_login_at`.
   const { data } = await supabase
     .from('profiles')
-    .select('id, email, full_name, role, last_sign_in_at, created_at')
+    .select('id, email, full_name, role, last_login_at, created_at')
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false });
 

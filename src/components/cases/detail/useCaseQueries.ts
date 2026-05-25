@@ -40,11 +40,14 @@ export function useCaseQueries(
           company_id
         `)
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         logger.error('Error fetching case:', error);
         throw error;
+      }
+      if (!caseRecord) {
+        throw new Error(`Case ${id} not found`);
       }
 
       const [customerData, contactData, serviceTypeData, createdByData, assignedEngineerData, companyData] = await Promise.all([

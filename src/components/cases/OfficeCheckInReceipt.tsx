@@ -108,7 +108,7 @@ export const OfficeCheckInReceipt: React.FC<OfficeCheckInReceiptProps> = ({
             .from('cases')
             .select('*')
             .eq('id', caseId)
-            .single(),
+            .maybeSingle(),
           supabase
             .from('company_settings')
             .select('*')
@@ -120,6 +120,9 @@ export const OfficeCheckInReceipt: React.FC<OfficeCheckInReceiptProps> = ({
         if (settingsResult.error) throw settingsResult.error;
 
         const caseInfo = caseResult.data;
+        if (!caseInfo) {
+          throw new Error('Case not found');
+        }
         setCompanySettings((settingsResult.data ?? null) as unknown as CompanySettings | null);
 
         const [customerResult, companyResult, serviceTypeResult, devicesResult, createdByResult] = await Promise.all([

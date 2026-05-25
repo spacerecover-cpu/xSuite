@@ -659,18 +659,12 @@ export async function cancelStockSale(id: string): Promise<void> {
     .eq('id', id);
 }
 
-export async function addSaleToInvoice(_saleId: string, _invoiceId: string): Promise<StockSale> {
-  // NOTE: stock_sales v1.0.0 has no invoice_id or payment_method columns. Sale↔invoice linkage
-  // happens through invoice_line_items referencing the sale, not the other way around.
-  // Throw instead of silently flipping status — otherwise the modal shows a success toast
-  // when no linkage was actually made, misleading the user.
-  throw new Error(
-    'addSaleToInvoice: not implemented in v1.0.0 schema. ' +
-    'TODO(B8): rewire AddStockSaleToInvoiceModal to insert invoice_line_items rows ' +
-    'and link via stock_sale_items.invoice_line_item_id (when added). ' +
-    'See stockService.ts.'
-  );
-}
+// NOTE: addSaleToInvoice was removed in C2 cleanup (2026-05-25). The v1.0.0 schema does not
+// support sale↔invoice linkage (no invoice_id on stock_sales, no invoice_line_item_id on
+// stock_sale_items). The "Add Stock Sale" button in InvoiceDetailPage and the
+// AddStockSaleToInvoiceModal component were removed alongside this function. If sale↔invoice
+// linkage is needed, restore via migration adding stock_sale_items.invoice_line_item_id,
+// then reintroduce a service that inserts invoice_line_items rows.
 
 // ============================================================
 // Serial Numbers
