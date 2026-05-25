@@ -13163,6 +13163,33 @@ export type Database = {
         }
         Relationships: []
       }
+      system_settings_internal: {
+        Row: {
+          created_at: string
+          description: string | null
+          is_secret: boolean
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          is_secret?: boolean
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          is_secret?: boolean
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
       tax_rates: {
         Row: {
           created_at: string
@@ -14755,6 +14782,7 @@ export type Database = {
       get_next_supplier_number: { Args: never; Returns: string }
       get_next_ticket_number: { Args: never; Returns: string }
       get_next_transfer_number: { Args: never; Returns: string }
+      get_system_setting: { Args: { p_key: string }; Returns: string }
       get_tenant_storage_bytes: {
         Args: { p_tenant_id: string }
         Returns: number
