@@ -10,6 +10,8 @@ import { quotesService } from '../../lib/quotesService';
 import { invoiceService } from '../../lib/invoiceService';
 import { useCurrency } from '../../hooks/useCurrency';
 import { CaseBackupDevicesTab } from '../../components/cases/CaseBackupDevicesTab';
+import { CaseStageBanner } from '../../components/cases/detail/CaseStageBanner';
+import type { CasePhase } from '../../lib/caseStateMachineService';
 import { openWhatsAppChat, isValidWhatsAppNumber, logWhatsAppCommunication } from '../../lib/whatsappUtils';
 import { DeviceCheckoutModal } from '../../components/cases/DeviceCheckoutModal';
 import { DuplicateCaseConfirmationModal } from '../../components/cases/DuplicateCaseConfirmationModal';
@@ -362,6 +364,20 @@ export const CaseDetail: React.FC = () => {
               </Button>
             )}
           </div>
+        </div>
+
+        {/* Stage banner: shows current phase + Next Action CTA + allowed transitions */}
+        <div className="mb-6">
+          <CaseStageBanner
+            caseId={id!}
+            currentStatusId={caseData.status_id ?? null}
+            currentStatusName={caseData.status ?? null}
+            currentPhase={(() => {
+              if (!caseData.status_id) return null;
+              const match = caseStatuses.find((s) => s.id === caseData.status_id);
+              return (match?.type as CasePhase | undefined) ?? null;
+            })()}
+          />
         </div>
 
         {/* Quick Info Cards */}

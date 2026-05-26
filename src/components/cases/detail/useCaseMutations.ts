@@ -119,16 +119,33 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
   });
 
   const updateCaseStatusMutation = useMutation({
+    // The state-machine guard trigger blocks direct UPDATE cases.status,
+    // so this mutation now routes through transition_case_status RPC which
+    // validates the phase edge + role allowlist, writes case_job_history,
+    // and emits notification_events. Caller still passes the status NAME
+    // (legacy API surface) — we resolve to status_id internally.
     mutationFn: async (newStatus: string) => {
       const caseId = requireCaseId(id);
-      const { data, error } = await supabase
-        .from('cases')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', caseId)
-        .select();
 
+      const { data: target, error: lookupError } = await supabase
+        .from('master_case_statuses')
+        .select('id')
+        .eq('name', newStatus)
+        .maybeSingle();
+      if (lookupError) {
+        logger.error('Failed to resolve status name', lookupError, newStatus);
+        throw lookupError;
+      }
+      if (!target?.id) {
+        throw new Error(`Unknown case status: ${newStatus}`);
+      }
+
+      const { data, error } = await supabase.rpc('transition_case_status', {
+        p_case_id: caseId,
+        p_to_status_id: target.id,
+      });
       if (error) {
-        logger.error('Error updating status:', error);
+        logger.error('transition_case_status failed', error, { caseId, newStatus });
         throw error;
       }
       return data;
@@ -298,12 +315,22 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
       if (error) throw error;
 
       if (updateCaseStatus && id) {
-        const { error: caseError } = await supabase
-          .from('cases')
-          .update({ status: 'Delivered' })
-          .eq('id', id);
+        // Direct cases.status UPDATE is blocked by the state-machine guard
+        // trigger. Route through transition_case_status RPC instead.
+        const { data: deliveredStatus, error: lookupError } = await supabase
+          .from('master_case_statuses')
+          .select('id')
+          .eq('name', 'Delivered')
+          .maybeSingle();
+        if (lookupError) throw lookupError;
+        if (!deliveredStatus?.id) throw new Error('Delivered status missing');
 
-        if (caseError) throw caseError;
+        const { error: rpcError } = await supabase.rpc('transition_case_status', {
+          p_case_id: id,
+          p_to_status_id: deliveredStatus.id,
+          p_notes: 'Auto-set when clone marked as delivered',
+        });
+        if (rpcError) throw rpcError;
       }
     },
     onSuccess: () => {

@@ -4,6 +4,7 @@ import { ChevronRight } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { StockAlertsDropdown } from '../stock/StockAlertsDropdown';
 import { AnnouncementBanner } from '../shared/AnnouncementBanner';
+import { NotificationBell } from './NotificationBell';
 
 const routeLabels: Record<string, string> = {
   '': 'Dashboard',
@@ -111,6 +112,7 @@ export const AppLayout: React.FC = () => {
             <span className="text-[13px] font-semibold text-slate-700 truncate">{label}</span>
           </div>
           <div className="flex items-center gap-2 ml-4">
+            <NotificationBell />
             <StockAlertsDropdown />
           </div>
         </header>

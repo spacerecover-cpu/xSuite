@@ -28,6 +28,7 @@ export function useCaseQueries(
           subject,
           priority,
           status,
+          status_id,
           client_reference,
           created_at,
           updated_at,

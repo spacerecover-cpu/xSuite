@@ -2422,6 +2422,45 @@ export type Database = {
           },
         ]
       }
+      case_status_transitions: {
+        Row: {
+          allowed_roles: string[]
+          created_at: string
+          description: string | null
+          from_phase: string
+          id: string
+          is_active: boolean
+          requires: string[]
+          sort_order: number
+          to_phase: string
+          updated_at: string
+        }
+        Insert: {
+          allowed_roles?: string[]
+          created_at?: string
+          description?: string | null
+          from_phase: string
+          id?: string
+          is_active?: boolean
+          requires?: string[]
+          sort_order?: number
+          to_phase: string
+          updated_at?: string
+        }
+        Update: {
+          allowed_roles?: string[]
+          created_at?: string
+          description?: string | null
+          from_phase?: string
+          id?: string
+          is_active?: boolean
+          requires?: string[]
+          sort_order?: number
+          to_phase?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cases: {
         Row: {
           actual_completion: string | null
@@ -2446,6 +2485,7 @@ export type Database = {
           is_urgent: boolean | null
           is_warranty: boolean | null
           net_amount: number | null
+          phase_entered_at: string | null
           priority: string | null
           priority_id: string | null
           referred_by: string | null
@@ -2486,6 +2526,7 @@ export type Database = {
           is_urgent?: boolean | null
           is_warranty?: boolean | null
           net_amount?: number | null
+          phase_entered_at?: string | null
           priority?: string | null
           priority_id?: string | null
           referred_by?: string | null
@@ -2526,6 +2567,7 @@ export type Database = {
           is_urgent?: boolean | null
           is_warranty?: boolean | null
           net_amount?: number | null
+          phase_entered_at?: string | null
           priority?: string | null
           priority_id?: string | null
           referred_by?: string | null
@@ -3571,51 +3613,133 @@ export type Database = {
       }
       clone_drives: {
         Row: {
+          archived_by: string | null
+          archived_date: string | null
           assigned_to: string | null
+          attributes: Json
           capacity: string | null
           case_id: string | null
+          clone_date: string | null
+          cloned_by: string | null
+          cloned_by_name: string | null
           created_at: string
           deleted_at: string | null
+          delivered_by: string | null
+          delivered_by_name: string | null
+          delivered_date: string | null
+          delivery_notes: string | null
           device_id: string | null
           drive_label: string | null
+          expected_size_gb: number | null
+          extracted_by: string | null
+          extracted_date: string | null
           id: string
+          image_format: string | null
+          image_size_gb: number | null
           notes: string | null
+          physical_location_id: string | null
+          preserve_reason: string | null
+          preserved_by: string | null
+          preserved_date: string | null
+          resource_clone_drive_id: string | null
+          retention_days: number | null
+          retention_deadline: string | null
           serial_number: string | null
           status: string | null
+          storage_path: string | null
+          storage_server: string | null
+          storage_type: string | null
           tenant_id: string
           updated_at: string
         }
         Insert: {
+          archived_by?: string | null
+          archived_date?: string | null
           assigned_to?: string | null
+          attributes?: Json
           capacity?: string | null
           case_id?: string | null
+          clone_date?: string | null
+          cloned_by?: string | null
+          cloned_by_name?: string | null
           created_at?: string
           deleted_at?: string | null
+          delivered_by?: string | null
+          delivered_by_name?: string | null
+          delivered_date?: string | null
+          delivery_notes?: string | null
           device_id?: string | null
           drive_label?: string | null
+          expected_size_gb?: number | null
+          extracted_by?: string | null
+          extracted_date?: string | null
           id?: string
+          image_format?: string | null
+          image_size_gb?: number | null
           notes?: string | null
+          physical_location_id?: string | null
+          preserve_reason?: string | null
+          preserved_by?: string | null
+          preserved_date?: string | null
+          resource_clone_drive_id?: string | null
+          retention_days?: number | null
+          retention_deadline?: string | null
           serial_number?: string | null
           status?: string | null
+          storage_path?: string | null
+          storage_server?: string | null
+          storage_type?: string | null
           tenant_id: string
           updated_at?: string
         }
         Update: {
+          archived_by?: string | null
+          archived_date?: string | null
           assigned_to?: string | null
+          attributes?: Json
           capacity?: string | null
           case_id?: string | null
+          clone_date?: string | null
+          cloned_by?: string | null
+          cloned_by_name?: string | null
           created_at?: string
           deleted_at?: string | null
+          delivered_by?: string | null
+          delivered_by_name?: string | null
+          delivered_date?: string | null
+          delivery_notes?: string | null
           device_id?: string | null
           drive_label?: string | null
+          expected_size_gb?: number | null
+          extracted_by?: string | null
+          extracted_date?: string | null
           id?: string
+          image_format?: string | null
+          image_size_gb?: number | null
           notes?: string | null
+          physical_location_id?: string | null
+          preserve_reason?: string | null
+          preserved_by?: string | null
+          preserved_date?: string | null
+          resource_clone_drive_id?: string | null
+          retention_days?: number | null
+          retention_deadline?: string | null
           serial_number?: string | null
           status?: string | null
+          storage_path?: string | null
+          storage_server?: string | null
+          storage_type?: string | null
           tenant_id?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "clone_drives_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "clone_drives_case_id_fkey"
             columns: ["case_id"]
@@ -3624,10 +3748,52 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "clone_drives_cloned_by_fkey"
+            columns: ["cloned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clone_drives_delivered_by_fkey"
+            columns: ["delivered_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "clone_drives_device_id_fkey"
             columns: ["device_id"]
             isOneToOne: false
             referencedRelation: "case_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clone_drives_extracted_by_fkey"
+            columns: ["extracted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clone_drives_physical_location_id_fkey"
+            columns: ["physical_location_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clone_drives_preserved_by_fkey"
+            columns: ["preserved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clone_drives_resource_clone_drive_id_fkey"
+            columns: ["resource_clone_drive_id"]
+            isOneToOne: false
+            referencedRelation: "resource_clone_drives"
             referencedColumns: ["id"]
           },
           {
@@ -7409,6 +7575,7 @@ export type Database = {
         Row: {
           color: string | null
           created_at: string
+          customer_visible: boolean
           id: string
           is_active: boolean
           is_default: boolean | null
@@ -7420,6 +7587,7 @@ export type Database = {
         Insert: {
           color?: string | null
           created_at?: string
+          customer_visible?: boolean
           id?: string
           is_active?: boolean
           is_default?: boolean | null
@@ -7431,6 +7599,7 @@ export type Database = {
         Update: {
           color?: string | null
           created_at?: string
+          customer_visible?: boolean
           id?: string
           is_active?: boolean
           is_default?: boolean | null
@@ -8166,6 +8335,351 @@ export type Database = {
           },
           {
             foreignKeyName: "ndas_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_events: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          dedup_key: string
+          deleted_at: string | null
+          entity_id: string
+          entity_type: string
+          event_type: string
+          id: string
+          last_error: string | null
+          occurred_at: string
+          payload: Json
+          processed_at: string | null
+          processing_attempts: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          dedup_key: string
+          deleted_at?: string | null
+          entity_id: string
+          entity_type: string
+          event_type: string
+          id?: string
+          last_error?: string | null
+          occurred_at?: string
+          payload?: Json
+          processed_at?: string | null
+          processing_attempts?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          dedup_key?: string
+          deleted_at?: string | null
+          entity_id?: string
+          entity_type?: string
+          event_type?: string
+          id?: string
+          last_error?: string | null
+          occurred_at?: string
+          payload?: Json
+          processed_at?: string | null
+          processing_attempts?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_log: {
+        Row: {
+          body: string | null
+          channel: string
+          clicked_at: string | null
+          created_at: string
+          deleted_at: string | null
+          delivered_at: string | null
+          dismissed_at: string | null
+          error: string | null
+          event_id: string | null
+          event_type: string
+          id: string
+          is_read: boolean
+          link_url: string | null
+          opened_at: string | null
+          payload: Json
+          provider: string | null
+          provider_message_id: string | null
+          read_at: string | null
+          recipient_address: string | null
+          recipient_customer_id: string | null
+          recipient_user_id: string | null
+          retry_count: number
+          sent_at: string | null
+          status: string
+          subscription_id: string | null
+          tenant_id: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          body?: string | null
+          channel: string
+          clicked_at?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          delivered_at?: string | null
+          dismissed_at?: string | null
+          error?: string | null
+          event_id?: string | null
+          event_type: string
+          id?: string
+          is_read?: boolean
+          link_url?: string | null
+          opened_at?: string | null
+          payload?: Json
+          provider?: string | null
+          provider_message_id?: string | null
+          read_at?: string | null
+          recipient_address?: string | null
+          recipient_customer_id?: string | null
+          recipient_user_id?: string | null
+          retry_count?: number
+          sent_at?: string | null
+          status?: string
+          subscription_id?: string | null
+          tenant_id: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          body?: string | null
+          channel?: string
+          clicked_at?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          delivered_at?: string | null
+          dismissed_at?: string | null
+          error?: string | null
+          event_id?: string | null
+          event_type?: string
+          id?: string
+          is_read?: boolean
+          link_url?: string | null
+          opened_at?: string | null
+          payload?: Json
+          provider?: string | null
+          provider_message_id?: string | null
+          read_at?: string | null
+          recipient_address?: string | null
+          recipient_customer_id?: string | null
+          recipient_user_id?: string | null
+          retry_count?: number
+          sent_at?: string | null
+          status?: string
+          subscription_id?: string | null
+          tenant_id?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_log_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "notification_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_log_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "notification_subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_subscriptions: {
+        Row: {
+          channel: string
+          created_at: string
+          customer_id: string | null
+          deleted_at: string | null
+          enabled: boolean
+          event_type: string
+          frequency: string
+          id: string
+          quiet_hours_end: string | null
+          quiet_hours_start: string | null
+          recipient_type: string
+          tenant_id: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          customer_id?: string | null
+          deleted_at?: string | null
+          enabled?: boolean
+          event_type: string
+          frequency?: string
+          id?: string
+          quiet_hours_end?: string | null
+          quiet_hours_start?: string | null
+          recipient_type: string
+          tenant_id: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          customer_id?: string | null
+          deleted_at?: string | null
+          enabled?: boolean
+          event_type?: string
+          frequency?: string
+          id?: string
+          quiet_hours_end?: string | null
+          quiet_hours_start?: string | null
+          recipient_type?: string
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_subscriptions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_templates: {
+        Row: {
+          body_template: string
+          channel: string
+          created_at: string
+          deleted_at: string | null
+          event_type: string
+          id: string
+          is_active: boolean
+          link_template: string | null
+          locale: string
+          subject_template: string | null
+          tenant_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          body_template: string
+          channel: string
+          created_at?: string
+          deleted_at?: string | null
+          event_type: string
+          id?: string
+          is_active?: boolean
+          link_template?: string | null
+          locale?: string
+          subject_template?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          body_template?: string
+          channel?: string
+          created_at?: string
+          deleted_at?: string | null
+          event_type?: string
+          id?: string
+          is_active?: boolean
+          link_template?: string | null
+          locale?: string
+          subject_template?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_templates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_webhooks: {
+        Row: {
+          consecutive_failures: number
+          created_at: string
+          deleted_at: string | null
+          event_types: string[]
+          id: string
+          is_active: boolean
+          last_failure_at: string | null
+          last_success_at: string | null
+          name: string
+          secret: string
+          tenant_id: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          consecutive_failures?: number
+          created_at?: string
+          deleted_at?: string | null
+          event_types?: string[]
+          id?: string
+          is_active?: boolean
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          name: string
+          secret: string
+          tenant_id: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          consecutive_failures?: number
+          created_at?: string
+          deleted_at?: string | null
+          event_types?: string[]
+          id?: string
+          is_active?: boolean
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          name?: string
+          secret?: string
+          tenant_id?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_webhooks_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -12779,6 +13293,33 @@ export type Database = {
         }
         Relationships: []
       }
+      system_settings_internal: {
+        Row: {
+          created_at: string
+          description: string | null
+          is_secret: boolean
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          is_secret?: boolean
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          is_secret?: boolean
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
       tax_rates: {
         Row: {
           created_at: string
@@ -13198,6 +13739,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "tenant_rate_limits_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_sla_policies: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          phase: string
+          priority: string
+          target_hours: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          phase: string
+          priority: string
+          target_hours: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          phase?: string
+          priority?: string
+          target_hours?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_sla_policies_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -14336,6 +14921,16 @@ export type Database = {
         Args: { p_customer_id: string }
         Returns: undefined
       }
+      emit_notification_event: {
+        Args: {
+          p_dedup_key?: string
+          p_entity_id: string
+          p_entity_type: string
+          p_event_type: string
+          p_payload?: Json
+        }
+        Returns: string
+      }
       export_customer_data: { Args: { p_customer_id: string }; Returns: Json }
       generate_next_number: { Args: { p_scope: string }; Returns: string }
       get_accessible_modules: {
@@ -14361,6 +14956,7 @@ export type Database = {
       get_next_supplier_number: { Args: never; Returns: string }
       get_next_ticket_number: { Args: never; Returns: string }
       get_next_transfer_number: { Args: never; Returns: string }
+      get_system_setting: { Args: { p_key: string }; Returns: string }
       get_tenant_storage_bytes: {
         Args: { p_tenant_id: string }
         Returns: number
@@ -14477,9 +15073,14 @@ export type Database = {
       lookup_interface: { Args: { p_name: string }; Returns: string }
       lookup_status_type: { Args: { p_name: string }; Returns: string }
       lookup_storage_location: { Args: { p_name: string }; Returns: string }
+      process_time_based_events: { Args: never; Returns: Json }
       reject_quote: {
         Args: { p_quote_id: string; p_reason?: string }
         Returns: undefined
+      }
+      render_notification_template: {
+        Args: { p_payload: Json; p_template: string }
+        Returns: string
       }
       search_donor_drives: {
         Args: { p_criteria: Json }
@@ -14541,6 +15142,15 @@ export type Database = {
           passed: boolean
           test_name: string
         }[]
+      }
+      transition_case_status: {
+        Args: {
+          p_case_id: string
+          p_notes?: string
+          p_reason?: string
+          p_to_status_id: string
+        }
+        Returns: Json
       }
       update_number_sequence: {
         Args: {
