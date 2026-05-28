@@ -9,13 +9,19 @@ import { getFinancialYearDates } from '../../lib/financialService';
 import {
   generateProfitLossReport,
   generateAgedReceivablesReport,
+  generateAgedPayablesReport,
   generateCashFlowReport,
   generateInvoiceSummaryReport,
+  generateExpenseByCategoryReport,
+  generateInvoiceVsExpenseReport,
   exportReportToCSV,
   ProfitLossData,
   AgedReceivablesData,
+  AgedPayablesData,
   CashFlowData,
   InvoiceSummaryData,
+  ExpenseByCategoryData,
+  InvoiceVsExpenseData,
 } from '../../lib/financialReportsService';
 import { logger } from '../../lib/logger';
 import {
@@ -49,8 +55,11 @@ export const ReportsDashboard: React.FC = () => {
   const [reportLoading, setReportLoading] = useState(false);
   const [profitLossData, setProfitLossData] = useState<ProfitLossData | null>(null);
   const [agedReceivablesData, setAgedReceivablesData] = useState<AgedReceivablesData | null>(null);
+  const [agedPayablesData, setAgedPayablesData] = useState<AgedPayablesData | null>(null);
   const [cashFlowData, setCashFlowData] = useState<CashFlowData | null>(null);
   const [invoiceSummaryData, setInvoiceSummaryData] = useState<InvoiceSummaryData | null>(null);
+  const [expenseByCategoryData, setExpenseByCategoryData] = useState<ExpenseByCategoryData | null>(null);
+  const [invoiceVsExpenseData, setInvoiceVsExpenseData] = useState<InvoiceVsExpenseData | null>(null);
 
   const dates = getFinancialYearDates();
   const selectedDateRange = dates[dateRange as keyof typeof dates] || dates.thisMonth;
@@ -77,6 +86,18 @@ export const ReportsDashboard: React.FC = () => {
         case 'invoice-report':
           const isData = await generateInvoiceSummaryReport(selectedDateRange.start, selectedDateRange.end);
           setInvoiceSummaryData(isData);
+          break;
+        case 'aged-payables':
+          const apData = await generateAgedPayablesReport();
+          setAgedPayablesData(apData);
+          break;
+        case 'expense-by-category':
+          const ebcData = await generateExpenseByCategoryReport(selectedDateRange.start, selectedDateRange.end);
+          setExpenseByCategoryData(ebcData);
+          break;
+        case 'invoice-vs-expense':
+          const iveData = await generateInvoiceVsExpenseReport(selectedDateRange.start, selectedDateRange.end);
+          setInvoiceVsExpenseData(iveData);
           break;
         default:
           break;
@@ -127,6 +148,59 @@ export const ReportsDashboard: React.FC = () => {
           exportReportToCSV(data, [{ key: 'item', label: 'Item' }, { key: 'amount', label: 'Amount' }], 'cash-flow-report');
         }
         break;
+      case 'aged-payables':
+        if (agedPayablesData) {
+          const data = [
+            { period: 'Current (≤30d)', amount: agedPayablesData.totals.current },
+            { period: '31-60 Days', amount: agedPayablesData.totals.thirtyDays },
+            { period: '61-90 Days', amount: agedPayablesData.totals.sixtyDays },
+            { period: '91-120 Days', amount: agedPayablesData.totals.ninetyDays },
+            { period: '120+ Days', amount: agedPayablesData.totals.overNinetyDays },
+            { period: 'Total', amount: agedPayablesData.totals.total },
+          ];
+          exportReportToCSV(data, [{ key: 'period', label: 'Period' }, { key: 'amount', label: 'Amount' }], 'aged-payables-report');
+        }
+        break;
+      case 'expense-by-category':
+        if (expenseByCategoryData) {
+          exportReportToCSV(
+            expenseByCategoryData.rows,
+            [
+              { key: 'category', label: 'Category' },
+              { key: 'count', label: 'Expense Count' },
+              { key: 'amount', label: 'Amount' },
+              { key: 'percentage', label: '% of Total' },
+            ],
+            'expense-by-category-report',
+          );
+        }
+        break;
+      case 'invoice-vs-expense':
+        if (invoiceVsExpenseData) {
+          const rows = invoiceVsExpenseData.months.map((m) => ({
+            month: m.month,
+            revenue: m.revenue,
+            expense: m.expense,
+            net: m.net,
+          }));
+          rows.push({
+            month: 'Total',
+            revenue: invoiceVsExpenseData.totals.revenue,
+            expense: invoiceVsExpenseData.totals.expense,
+            net: invoiceVsExpenseData.totals.net,
+          });
+          exportReportToCSV(
+            rows,
+            [
+              { key: 'month', label: 'Month' },
+              { key: 'revenue', label: 'Revenue' },
+              { key: 'expense', label: 'Expense' },
+              { key: 'net', label: 'Net' },
+            ],
+            'invoice-vs-expense-report',
+          );
+        }
+        break;
       default:
         break;
     }
@@ -137,8 +211,11 @@ export const ReportsDashboard: React.FC = () => {
     setSelectedReport(null);
     setProfitLossData(null);
     setAgedReceivablesData(null);
+    setAgedPayablesData(null);
     setCashFlowData(null);
     setInvoiceSummaryData(null);
+    setExpenseByCategoryData(null);
+    setInvoiceVsExpenseData(null);
   };
 
   const { data: reportData, isLoading } = useQuery({
@@ -746,7 +823,128 @@ export const ReportsDashboard: React.FC = () => {
                 </div>
               )}
 
-              {!['profit-loss', 'aged-receivables', 'cash-flow', 'invoice-report'].includes(selectedReport || '') && (
+              {selectedReport === 'aged-payables' && agedPayablesData && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-5 gap-3">
+                    <div className="bg-success-muted rounded-lg p-3 border border-success/30 text-center">
+                      <p className="text-xs font-medium text-success">Current</p>
+                      <p className="text-lg font-bold text-success">{formatCurrency(agedPayablesData.totals.current)}</p>
+                    </div>
+                    <div className="bg-warning-muted rounded-lg p-3 border border-warning/30 text-center">
+                      <p className="text-xs font-medium text-warning">31-60 Days</p>
+                      <p className="text-lg font-bold text-warning">{formatCurrency(agedPayablesData.totals.thirtyDays)}</p>
+                    </div>
+                    <div className="bg-orange-50 rounded-lg p-3 border border-orange-200 text-center">
+                      <p className="text-xs font-medium text-orange-600">61-90 Days</p>
+                      <p className="text-lg font-bold text-orange-900">{formatCurrency(agedPayablesData.totals.sixtyDays)}</p>
+                    </div>
+                    <div className="bg-danger-muted rounded-lg p-3 border border-danger/30 text-center">
+                      <p className="text-xs font-medium text-danger">91-120 Days</p>
+                      <p className="text-lg font-bold text-danger">{formatCurrency(agedPayablesData.totals.ninetyDays)}</p>
+                    </div>
+                    <div className="bg-danger-muted rounded-lg p-3 border border-danger/50 text-center">
+                      <p className="text-xs font-medium text-danger">120+ Days</p>
+                      <p className="text-lg font-bold text-danger">{formatCurrency(agedPayablesData.totals.overNinetyDays)}</p>
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 text-center">
+                    <p className="text-sm font-medium text-slate-600">Total Outstanding to Vendors</p>
+                    <p className="text-3xl font-bold text-slate-900">{formatCurrency(agedPayablesData.totals.total)}</p>
+                  </div>
+                </div>
+              )}
+
+              {selectedReport === 'expense-by-category' && expenseByCategoryData && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-info-muted rounded-lg p-3 border border-info/30 text-center">
+                      <p className="text-xs font-medium text-info">Total Expenses</p>
+                      <p className="text-lg font-bold text-info">{formatCurrency(expenseByCategoryData.total)}</p>
+                    </div>
+                    <div className="bg-slate-50 rounded-lg p-3 border border-slate-200 text-center">
+                      <p className="text-xs font-medium text-slate-600">Transactions</p>
+                      <p className="text-lg font-bold text-slate-900">{expenseByCategoryData.count}</p>
+                    </div>
+                  </div>
+                  {expenseByCategoryData.rows.length === 0 ? (
+                    <p className="text-sm text-slate-500 text-center py-4">No expenses in this date range.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {expenseByCategoryData.rows.map((row, i) => (
+                        <div key={i} className="flex items-center gap-3 py-2 border-b border-slate-100">
+                          <div className="flex-1">
+                            <div className="flex justify-between items-baseline">
+                              <span className="text-sm font-medium text-slate-700">{row.category}</span>
+                              <span className="text-sm font-semibold text-slate-900">{formatCurrency(row.amount)}</span>
+                            </div>
+                            {/* Inline percentage bar — visualizes share at a glance. */}
+                            <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">
+                              <div
+                                className="h-full bg-primary"
+                                style={{ width: `${Math.min(row.percentage, 100)}%` }}
+                              />
+                            </div>
+                            <div className="text-xs text-slate-500 mt-0.5">
+                              {row.count} expense{row.count === 1 ? '' : 's'} · {row.percentage.toFixed(1)}%
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {selectedReport === 'invoice-vs-expense' && invoiceVsExpenseData && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-info-muted rounded-lg p-3 border border-info/30 text-center">
+                      <p className="text-xs font-medium text-info">Revenue</p>
+                      <p className="text-lg font-bold text-info">{formatCurrency(invoiceVsExpenseData.totals.revenue)}</p>
+                    </div>
+                    <div className="bg-danger-muted rounded-lg p-3 border border-danger/30 text-center">
+                      <p className="text-xs font-medium text-danger">Expense</p>
+                      <p className="text-lg font-bold text-danger">{formatCurrency(invoiceVsExpenseData.totals.expense)}</p>
+                    </div>
+                    <div className={`${invoiceVsExpenseData.totals.net >= 0 ? 'bg-success-muted border-success/30' : 'bg-danger-muted border-danger/30'} rounded-lg p-3 border text-center`}>
+                      <p className={`text-xs font-medium ${invoiceVsExpenseData.totals.net >= 0 ? 'text-success' : 'text-danger'}`}>Net</p>
+                      <p className={`text-lg font-bold ${invoiceVsExpenseData.totals.net >= 0 ? 'text-success' : 'text-danger'}`}>
+                        {formatCurrency(invoiceVsExpenseData.totals.net)}
+                      </p>
+                    </div>
+                  </div>
+                  {invoiceVsExpenseData.months.length === 0 ? (
+                    <p className="text-sm text-slate-500 text-center py-4">No activity in this date range.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-200">
+                            <th className="text-left py-2 font-medium text-slate-600">Month</th>
+                            <th className="text-right py-2 font-medium text-slate-600">Revenue</th>
+                            <th className="text-right py-2 font-medium text-slate-600">Expense</th>
+                            <th className="text-right py-2 font-medium text-slate-600">Net</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {invoiceVsExpenseData.months.map((m) => (
+                            <tr key={m.month} className="border-b border-slate-50">
+                              <td className="py-2 font-mono text-slate-700">{m.month}</td>
+                              <td className="py-2 text-right text-slate-900">{formatCurrency(m.revenue)}</td>
+                              <td className="py-2 text-right text-slate-900">{formatCurrency(m.expense)}</td>
+                              <td className={`py-2 text-right font-semibold ${m.net >= 0 ? 'text-success' : 'text-danger'}`}>
+                                {formatCurrency(m.net)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!['profit-loss', 'aged-receivables', 'aged-payables', 'cash-flow', 'invoice-report', 'expense-by-category', 'invoice-vs-expense'].includes(selectedReport || '') && (
                 <div className="text-center py-12">
                   <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                   <p className="text-slate-500">This report is not yet available.</p>
@@ -758,7 +956,7 @@ export const ReportsDashboard: React.FC = () => {
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
             <Button variant="secondary" onClick={closeReportModal}>Close</Button>
-            {(profitLossData || agedReceivablesData || cashFlowData) && (
+            {(profitLossData || agedReceivablesData || agedPayablesData || cashFlowData || expenseByCategoryData || invoiceVsExpenseData) && (
               <Button onClick={handleExportCSV} className="flex items-center gap-2">
                 <Download className="w-4 h-4" />
                 Export CSV

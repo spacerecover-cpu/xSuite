@@ -424,6 +424,220 @@ export const generateRevenueByCaseReport = async (
     .sort((a, b) => b.revenue - a.revenue);
 };
 
+// ============================================================
+// Aged Payables — unpaid expenses bucketed by days since expense_date.
+// Mirrors aged-receivables: same buckets and totals shape so the UI
+// table can share rendering. Status filter excludes paid/cancelled/
+// rejected — anything else still owes money.
+// ============================================================
+export interface AgedPayablesData {
+  current: Array<{ vendor: string; amount: number; expenses: number }>;
+  thirtyDays: Array<{ vendor: string; amount: number; expenses: number }>;
+  sixtyDays: Array<{ vendor: string; amount: number; expenses: number }>;
+  ninetyDays: Array<{ vendor: string; amount: number; expenses: number }>;
+  overNinetyDays: Array<{ vendor: string; amount: number; expenses: number }>;
+  totals: {
+    current: number;
+    thirtyDays: number;
+    sixtyDays: number;
+    ninetyDays: number;
+    overNinetyDays: number;
+    total: number;
+  };
+}
+
+export const generateAgedPayablesReport = async (): Promise<AgedPayablesData> => {
+  const today = new Date();
+
+  const { data: expenses, error } = await supabase
+    .from('expenses')
+    .select('id, expense_date, amount, status, vendor')
+    .is('deleted_at', null)
+    .not('status', 'in', '("paid","cancelled","rejected")');
+
+  if (error) throw error;
+
+  const buckets: Record<string, Array<{ vendor: string; amount: number; expenses: number }>> = {
+    current: [],
+    thirtyDays: [],
+    sixtyDays: [],
+    ninetyDays: [],
+    overNinetyDays: [],
+  };
+
+  const vendorTotals: Record<string, Record<string, { amount: number; expenses: number }>> = {};
+
+  (expenses ?? []).forEach((exp) => {
+    if (!exp.expense_date) return;
+    const expDate = new Date(exp.expense_date);
+    const daysOld = Math.floor((today.getTime() - expDate.getTime()) / (1000 * 60 * 60 * 24));
+    const vendor = exp.vendor || 'Unknown vendor';
+
+    let bucket: string;
+    if (daysOld <= 30) bucket = 'current';
+    else if (daysOld <= 60) bucket = 'thirtyDays';
+    else if (daysOld <= 90) bucket = 'sixtyDays';
+    else if (daysOld <= 120) bucket = 'ninetyDays';
+    else bucket = 'overNinetyDays';
+
+    if (!vendorTotals[vendor]) vendorTotals[vendor] = {};
+    if (!vendorTotals[vendor][bucket]) vendorTotals[vendor][bucket] = { amount: 0, expenses: 0 };
+    vendorTotals[vendor][bucket].amount += exp.amount ?? 0;
+    vendorTotals[vendor][bucket].expenses += 1;
+  });
+
+  Object.entries(vendorTotals).forEach(([vendor, bucketData]) => {
+    Object.entries(bucketData).forEach(([bucket, data]) => {
+      buckets[bucket].push({ vendor, ...data });
+    });
+  });
+
+  Object.keys(buckets).forEach((bucket) => {
+    buckets[bucket].sort((a, b) => b.amount - a.amount);
+  });
+
+  const totals = {
+    current: buckets.current.reduce((sum, c) => sum + c.amount, 0),
+    thirtyDays: buckets.thirtyDays.reduce((sum, c) => sum + c.amount, 0),
+    sixtyDays: buckets.sixtyDays.reduce((sum, c) => sum + c.amount, 0),
+    ninetyDays: buckets.ninetyDays.reduce((sum, c) => sum + c.amount, 0),
+    overNinetyDays: buckets.overNinetyDays.reduce((sum, c) => sum + c.amount, 0),
+    total: 0,
+  };
+  totals.total =
+    totals.current + totals.thirtyDays + totals.sixtyDays + totals.ninetyDays + totals.overNinetyDays;
+
+  return { ...buckets, totals } as AgedPayablesData;
+};
+
+// ============================================================
+// Expense by Category — sum + count per expense category for a
+// date range, plus an "Uncategorized" bucket for expenses without
+// a category_id (these slip through if the UI defaults to optional).
+// ============================================================
+export interface ExpenseByCategoryData {
+  rows: Array<{ category: string; amount: number; count: number; percentage: number }>;
+  total: number;
+  count: number;
+}
+
+export const generateExpenseByCategoryReport = async (
+  dateFrom: string,
+  dateTo: string,
+): Promise<ExpenseByCategoryData> => {
+  const { data: expenses, error } = await supabase
+    .from('expenses')
+    .select(`
+      id,
+      amount,
+      category_id,
+      master_expense_categories ( id, name )
+    `)
+    .is('deleted_at', null)
+    .gte('expense_date', dateFrom)
+    .lte('expense_date', dateTo)
+    .not('status', 'in', '("cancelled","rejected")');
+
+  if (error) throw error;
+
+  const acc: Record<string, { amount: number; count: number }> = {};
+  let total = 0;
+  let count = 0;
+
+  for (const exp of expenses ?? []) {
+    const cat = (exp.master_expense_categories as { name?: string } | null)?.name
+      ?? 'Uncategorized';
+    if (!acc[cat]) acc[cat] = { amount: 0, count: 0 };
+    acc[cat].amount += exp.amount ?? 0;
+    acc[cat].count += 1;
+    total += exp.amount ?? 0;
+    count += 1;
+  }
+
+  const rows = Object.entries(acc)
+    .map(([category, v]) => ({
+      category,
+      amount: v.amount,
+      count: v.count,
+      percentage: total > 0 ? (v.amount / total) * 100 : 0,
+    }))
+    .sort((a, b) => b.amount - a.amount);
+
+  return { rows, total, count };
+};
+
+// ============================================================
+// Invoice vs Expense — month-by-month side-by-side. Invoiced
+// (revenue) uses paid invoices only so we measure realized cash
+// in, not just billed. Expenses excludes cancelled/rejected.
+// ============================================================
+export interface InvoiceVsExpenseData {
+  months: Array<{ month: string; revenue: number; expense: number; net: number }>;
+  totals: { revenue: number; expense: number; net: number };
+}
+
+export const generateInvoiceVsExpenseReport = async (
+  dateFrom: string,
+  dateTo: string,
+): Promise<InvoiceVsExpenseData> => {
+  const [invoicesRes, expensesRes] = await Promise.all([
+    supabase
+      .from('invoices')
+      .select('id, total_amount, amount_paid, invoice_date, paid_at, status')
+      .is('deleted_at', null)
+      .gte('invoice_date', dateFrom)
+      .lte('invoice_date', dateTo),
+    supabase
+      .from('expenses')
+      .select('id, amount, expense_date, status')
+      .is('deleted_at', null)
+      .gte('expense_date', dateFrom)
+      .lte('expense_date', dateTo)
+      .not('status', 'in', '("cancelled","rejected")'),
+  ]);
+
+  if (invoicesRes.error) throw invoicesRes.error;
+  if (expensesRes.error) throw expensesRes.error;
+
+  // Bucket by YYYY-MM. Use invoice_date / expense_date as the canonical
+  // monthly assignment — payment dates would skew across periods.
+  const byMonth: Record<string, { revenue: number; expense: number }> = {};
+
+  for (const inv of invoicesRes.data ?? []) {
+    if (!inv.invoice_date) continue;
+    const key = inv.invoice_date.slice(0, 7);
+    if (!byMonth[key]) byMonth[key] = { revenue: 0, expense: 0 };
+    byMonth[key].revenue += inv.total_amount ?? 0;
+  }
+  for (const exp of expensesRes.data ?? []) {
+    if (!exp.expense_date) continue;
+    const key = exp.expense_date.slice(0, 7);
+    if (!byMonth[key]) byMonth[key] = { revenue: 0, expense: 0 };
+    byMonth[key].expense += exp.amount ?? 0;
+  }
+
+  const months = Object.entries(byMonth)
+    .map(([month, v]) => ({
+      month,
+      revenue: v.revenue,
+      expense: v.expense,
+      net: v.revenue - v.expense,
+    }))
+    .sort((a, b) => a.month.localeCompare(b.month));
+
+  const totals = months.reduce(
+    (acc, m) => {
+      acc.revenue += m.revenue;
+      acc.expense += m.expense;
+      acc.net += m.net;
+      return acc;
+    },
+    { revenue: 0, expense: 0, net: 0 },
+  );
+
+  return { months, totals };
+};
+
 export const exportReportToCSV = (
   data: any[],
   columns: { key: string; label: string }[],
@@ -455,8 +669,11 @@ export const exportReportToCSV = (
 export const financialReportsService = {
   generateProfitLossReport,
   generateAgedReceivablesReport,
+  generateAgedPayablesReport,
   generateCashFlowReport,
   generateInvoiceSummaryReport,
+  generateExpenseByCategoryReport,
+  generateInvoiceVsExpenseReport,
   generateRevenueByCustomerReport,
   generateRevenueByCaseReport,
   exportReportToCSV,
