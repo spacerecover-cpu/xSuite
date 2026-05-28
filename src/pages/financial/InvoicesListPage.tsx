@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchInvoices, getInvoiceStats, createInvoice, updateInvoice } from '../../lib/invoiceService';
 import type { Invoice, InvoiceItem, InvoiceWithDetails } from '../../lib/invoiceService';
@@ -42,6 +42,7 @@ import { formatDate } from '../../lib/format';
 
 export const InvoicesListPage: React.FC<unknown> = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
   const [searchTerm, setSearchTerm] = useState('');
@@ -53,6 +54,16 @@ export const InvoicesListPage: React.FC<unknown> = () => {
   const [editingInvoice, setEditingInvoice] = useState<InvoiceWithDetails | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentInvoice, setPaymentInvoice] = useState<InvoiceWithDetails | null>(null);
+
+  // Command-palette deep-link: /invoices?new=1 opens the create modal.
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setShowInvoiceModal(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

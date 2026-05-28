@@ -1,10 +1,12 @@
 import React from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Search, Command } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { StockAlertsDropdown } from '../stock/StockAlertsDropdown';
 import { AnnouncementBanner } from '../shared/AnnouncementBanner';
 import { NotificationBell } from './NotificationBell';
+import { CommandPalette } from '../shared/CommandPalette';
+import { useCommandPalette } from '../../hooks/useCommandPalette';
 
 const routeLabels: Record<string, string> = {
   '': 'Dashboard',
@@ -86,6 +88,11 @@ function getBreadcrumbs(pathname: string): { label: string; section?: string } {
 export const AppLayout: React.FC = () => {
   const location = useLocation();
   const { label, section } = getBreadcrumbs(location.pathname);
+  const palette = useCommandPalette();
+  // Detect platform for the keyboard hint — Mac shows ⌘, others show Ctrl.
+  // navigator.platform is deprecated but still the most reliable signal here;
+  // userAgentData is gated behind feature detection.
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#f1f5f9' }}>
@@ -112,6 +119,23 @@ export const AppLayout: React.FC = () => {
             <span className="text-[13px] font-semibold text-slate-700 truncate">{label}</span>
           </div>
           <div className="flex items-center gap-2 ml-4">
+            {/* Click-target for users who don't know the keyboard shortcut.
+                Discoverability matters — power users hit Cmd+K, the rest
+                click the button. */}
+            <button
+              type="button"
+              onClick={palette.open}
+              className="hidden md:inline-flex items-center gap-2 px-2.5 h-8 rounded-md border border-slate-200 bg-white text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors"
+              aria-label="Open command palette"
+              title="Search and navigate"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span>Search…</span>
+              <kbd className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-slate-100 text-[10px] font-mono text-slate-500">
+                {isMac ? <Command className="w-2.5 h-2.5" /> : 'Ctrl'}
+                K
+              </kbd>
+            </button>
             <NotificationBell />
             <StockAlertsDropdown />
           </div>
@@ -122,6 +146,7 @@ export const AppLayout: React.FC = () => {
         </main>
         </div>
       </div>
+      <CommandPalette isOpen={palette.isOpen} onClose={palette.close} />
     </div>
   );
 };

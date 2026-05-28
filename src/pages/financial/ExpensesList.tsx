@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
@@ -62,6 +63,7 @@ export const ExpensesList: React.FC = () => {
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
   const { profile } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showExpenseModal, setShowExpenseModal] = useState(false);
@@ -72,6 +74,16 @@ export const ExpensesList: React.FC = () => {
   const [expenseToReject, setExpenseToReject] = useState<string | null>(null);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [expenseToApprove, setExpenseToApprove] = useState<string | null>(null);
+
+  // Command-palette deep-link: /expenses?new=1 opens the create modal.
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setShowExpenseModal(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const isAccountsRole = profile?.role === 'admin' || profile?.role === 'accounts';
 

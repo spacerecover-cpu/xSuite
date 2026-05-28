@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import type { Database } from '../../types/database.types';
@@ -70,6 +70,7 @@ interface City {
 
 export const CustomersListPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -85,6 +86,16 @@ export const CustomersListPage: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, filterGroup, filterPortal]);
+
+  // Command-palette deep-link: /customers?new=1 opens the create modal.
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setIsModalOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const [formData, setFormData] = useState({
     name: '',

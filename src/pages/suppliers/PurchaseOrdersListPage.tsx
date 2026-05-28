@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Plus, Search, Package, DollarSign, Clock, CheckCircle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { DataTable, type Column } from '../../components/shared/DataTable';
@@ -34,6 +34,7 @@ type PurchaseOrderWithJoins = PurchaseOrderRow & {
 
 export default function PurchaseOrdersListPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
   const [orders, setOrders] = useState<PurchaseOrderWithJoins[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,6 +49,16 @@ export default function PurchaseOrdersListPage() {
     approved: 0,
     totalValue: 0,
   });
+
+  // Command-palette deep-link: /purchase-orders?new=1 opens the create modal.
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setShowAddModal(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     void loadOrders();

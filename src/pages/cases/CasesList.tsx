@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
@@ -46,9 +46,22 @@ interface Case {
 
 export const CasesList: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { profile: _profile } = useAuth();
   const { usage: caseUsage } = useUsageLimit('max_cases_per_month');
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+
+  // Command-palette deep-link: /cases?new=1 opens the create wizard.
+  // Strip the param after we honor it so the wizard doesn't re-open on
+  // refresh and back-navigation reads the same URL.
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setIsWizardOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Search, Filter, Truck, UserCheck, Users, Mail, Phone, MapPin, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { Button } from '../../components/ui/Button';
@@ -34,6 +34,7 @@ interface Category {
 
 export default function SuppliersListPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
   const { formatCurrency } = useCurrency();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -63,6 +64,16 @@ export default function SuppliersListPage() {
     loadSuppliers();
     loadCategories();
   }, []);
+
+  // Command-palette deep-link: /suppliers?new=1 opens the create modal.
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setShowAddModal(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const loadSuppliers = async () => {
     try {

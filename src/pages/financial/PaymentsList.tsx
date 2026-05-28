@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
@@ -35,6 +36,7 @@ import {
 export const PaymentsList: React.FC = () => {
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
@@ -46,6 +48,16 @@ export const PaymentsList: React.FC = () => {
   const [fullPaymentData, setFullPaymentData] = useState<any>(null);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
+
+  // Command-palette deep-link: /payments?new=1 opens record payment.
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setShowRecordPaymentModal(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const { data: paymentMethods = [] } = useQuery({
     queryKey: ['payment_methods_active'],

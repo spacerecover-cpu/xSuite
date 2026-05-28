@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchQuotes, getQuoteStats } from '../../lib/quotesService';
 import type { QuoteWithDetails } from '../../lib/quotesService';
@@ -48,6 +48,7 @@ const toOptionalString = (value: unknown): string | null => {
 
 export const QuotesListPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
   const [searchTerm, setSearchTerm] = useState('');
@@ -57,6 +58,16 @@ export const QuotesListPage: React.FC = () => {
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [editingQuote, setEditingQuote] = useState<QuoteWithDetails | null>(null);
   const [sendingQuoteId, setSendingQuoteId] = useState<string | null>(null);
+
+  // Command-palette deep-link: /quotes?new=1 opens the create modal.
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setShowQuoteModal(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
