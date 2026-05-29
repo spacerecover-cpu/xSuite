@@ -126,6 +126,7 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['case', id] });
       queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries({ queryKey: ['cases_stats'] });
       queryClient.invalidateQueries({ queryKey: ['case_history', id] });
     },
     onError: (error) => {
@@ -152,6 +153,7 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['case', id] });
       queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries({ queryKey: ['cases_stats'] });
       queryClient.invalidateQueries({ queryKey: ['case_history', id] });
     },
     onError: (error) => {
@@ -473,6 +475,8 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
     },
     onSuccess: (newCase) => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries({ queryKey: ['cases_count'] });
+      queryClient.invalidateQueries({ queryKey: ['cases_stats'] });
       modals.setShowDuplicateModal(false);
       navigate(`/cases/${newCase.id}`);
     },
@@ -489,6 +493,8 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries({ queryKey: ['cases_count'] });
+      queryClient.invalidateQueries({ queryKey: ['cases_stats'] });
       toast.success(`Case ${result.case_number} deleted successfully. ${result.total_records_deleted} total records removed.`);
       navigate('/cases');
     },

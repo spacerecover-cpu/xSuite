@@ -157,7 +157,8 @@ export const PaymentsList: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payment_stats'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['unpaid_invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['cases_with_unpaid_invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['unpaid_invoices_by_case'] });
       setShowRecordPaymentModal(false);
     },
   });
@@ -168,6 +169,8 @@ export const PaymentsList: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payment_stats'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['cases_with_unpaid_invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['unpaid_invoices_by_case'] });
     },
   });
 

@@ -25,7 +25,7 @@ export default function ProcessPayrollPage() {
     onSuccess: (period) => {
       setCreatedPeriodId(period.id);
       setStep(2);
-      queryClient.invalidateQueries({ queryKey: payrollKeys.periods({}) });
+      queryClient.invalidateQueries({ queryKey: payrollKeys.all });
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to create payroll period');
@@ -38,7 +38,7 @@ export default function ProcessPayrollPage() {
       toast.success(
         `Payroll processed successfully! ${result.recordsCreated} employee records created.`
       );
-      queryClient.invalidateQueries({ queryKey: payrollKeys.periods({}) });
+      queryClient.invalidateQueries({ queryKey: payrollKeys.all });
       if (createdPeriodId) {
         navigate(`/payroll/periods/${createdPeriodId}`);
       }
