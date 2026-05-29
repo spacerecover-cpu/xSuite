@@ -4,9 +4,12 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { Plus, Search, Filter, Briefcase, AlertCircle, CheckCircle, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Filter, Briefcase, AlertCircle, CheckCircle, RefreshCw, ChevronLeft, ChevronRight, Archive, Download } from 'lucide-react';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { ExportButton } from '../../components/shared/ExportButton';
+import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
+import { useBulkSelection } from '../../hooks/useBulkSelection';
+import { downloadCSV } from '../../lib/csvExport';
 import { formatDate } from '../../lib/format';
 import { CreateCaseWizard } from '../../components/cases/CreateCaseWizard';
 import { useCasesRealtime } from '../../hooks/useCasesRealtime';
@@ -48,9 +51,12 @@ interface Case {
 export const CasesList: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { profile: _profile } = useAuth();
+  const { profile } = useAuth();
   const { usage: caseUsage } = useUsageLimit('max_cases_per_month');
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const selection = useBulkSelection();
+  const canBulkArchive = profile?.role === 'owner' || profile?.role === 'admin';
+  const [isArchiving, setIsArchiving] = useState(false);
 
   // Command-palette deep-link: /cases?new=1 opens the create wizard.
   // Strip the param after we honor it so the wizard doesn't re-open on
@@ -289,6 +295,74 @@ export const CasesList: React.FC = () => {
       toast(check.message, { icon: '⚠️' });
     }
     setIsWizardOpen(true);
+  };
+
+  // IDs visible on the current page — drives the header "select all"
+  // checkbox state. Selection state itself spans all pages.
+  const visibleIds = cases.map((c) => c.id);
+
+  const handleBulkExport = async () => {
+    if (selection.selectedCount === 0) return;
+    const ids = Array.from(selection.selectedIds);
+    const { data, error } = await supabase
+      .from('cases')
+      .select('case_no, title, priority, status, client_reference, created_at, customers_enhanced:customer_id(customer_name)')
+      .in('id', ids);
+    if (error) {
+      toast.error('Failed to export selected cases');
+      return;
+    }
+    downloadCSV(
+      data ?? [],
+      [
+        { key: 'case_no', label: 'Case #' },
+        { key: 'title', label: 'Title' },
+        { key: 'priority', label: 'Priority' },
+        { key: 'status', label: 'Status' },
+        {
+          key: (r) => (r.customers_enhanced as { customer_name?: string } | null)?.customer_name,
+          label: 'Customer',
+        },
+        { key: 'client_reference', label: 'Client Ref' },
+        {
+          key: 'created_at',
+          label: 'Created',
+          format: (v) => (v ? new Date(v as string).toISOString().slice(0, 10) : ''),
+        },
+      ],
+      'cases-selected',
+    );
+    toast.success(`Exported ${data?.length ?? 0} case${data?.length === 1 ? '' : 's'}`);
+  };
+
+  const handleBulkArchive = async () => {
+    if (selection.selectedCount === 0) return;
+    if (!canBulkArchive) {
+      toast.error('Only admins can bulk archive cases');
+      return;
+    }
+    const n = selection.selectedCount;
+    // Native confirm — destructive enough to warrant a hard stop. Don't
+    // build a custom modal until users actually request progress bars or
+    // bulk-archive undo; YAGNI.
+    if (!window.confirm(`Archive ${n} case${n === 1 ? '' : 's'}? They'll be hidden from lists but recoverable.`)) {
+      return;
+    }
+    setIsArchiving(true);
+    try {
+      const { error } = await supabase
+        .from('cases')
+        .update({ deleted_at: new Date().toISOString() })
+        .in('id', Array.from(selection.selectedIds));
+      if (error) throw error;
+      toast.success(`Archived ${n} case${n === 1 ? '' : 's'}`);
+      selection.clear();
+      refetch();
+    } catch (err) {
+      toast.error((err as Error).message || 'Failed to archive cases');
+    } finally {
+      setIsArchiving(false);
+    }
   };
 
   return (
@@ -571,6 +645,24 @@ export const CasesList: React.FC = () => {
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
+                    <th className="px-4 py-4 w-10">
+                      <input
+                        type="checkbox"
+                        checked={selection.allSelected(visibleIds)}
+                        // indeterminate state — set imperatively because React
+                        // doesn't support it via prop; ref callback fires on
+                        // every render so the state stays accurate.
+                        ref={(el) => {
+                          if (el) {
+                            el.indeterminate =
+                              !selection.allSelected(visibleIds) && selection.someSelected(visibleIds);
+                          }
+                        }}
+                        onChange={(e) => selection.setMany(visibleIds, e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                        aria-label="Select all on this page"
+                      />
+                    </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                       Case ID
                     </th>
@@ -605,8 +697,24 @@ export const CasesList: React.FC = () => {
                   <tr
                     key={caseItem.id}
                     onClick={() => navigate(`/cases/${caseItem.id}`)}
-                    className="hover:bg-slate-50 transition-colors cursor-pointer"
+                    className={`hover:bg-slate-50 transition-colors cursor-pointer ${
+                      selection.isSelected(caseItem.id) ? 'bg-info-muted/30' : ''
+                    }`}
                   >
+                    <td
+                      className="px-4 py-4 w-10"
+                      // Stop event propagation so clicking the checkbox
+                      // doesn't also navigate to the case detail page.
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selection.isSelected(caseItem.id)}
+                        onChange={() => selection.toggle(caseItem.id)}
+                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                        aria-label={`Select case ${caseItem.case_no}`}
+                      />
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="font-semibold text-primary">
                         {caseItem.case_no}
@@ -739,6 +847,28 @@ export const CasesList: React.FC = () => {
           onSuccess={handleWizardSuccess}
         />
       )}
+
+      <BulkActionsBar
+        count={selection.selectedCount}
+        onClear={selection.clear}
+        itemNoun="case"
+      >
+        <BulkActionButton
+          variant="ghost"
+          icon={<Download className="w-4 h-4" />}
+          label="Export"
+          onClick={handleBulkExport}
+        />
+        {canBulkArchive && (
+          <BulkActionButton
+            variant="danger"
+            icon={<Archive className="w-4 h-4" />}
+            label={isArchiving ? 'Archiving…' : 'Archive'}
+            onClick={handleBulkArchive}
+            disabled={isArchiving}
+          />
+        )}
+      </BulkActionsBar>
     </div>
   );
 };
