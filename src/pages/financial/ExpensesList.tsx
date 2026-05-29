@@ -21,6 +21,10 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { ExportButton } from '../../components/shared/ExportButton';
+import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
+import { useBulkSelection } from '../../hooks/useBulkSelection';
+import { downloadCSV } from '../../lib/csvExport';
+import toast from 'react-hot-toast';
 import { logger } from '../../lib/logger';
 import type { Database } from '../../types/database.types';
 import {
@@ -39,6 +43,8 @@ import {
   AlertCircle,
   Edit,
   RefreshCw,
+  Archive,
+  Download,
 } from 'lucide-react';
 
 type ExpenseRow = Pick<
@@ -65,6 +71,9 @@ export const ExpensesList: React.FC = () => {
   const { formatCurrency } = useCurrency();
   const { profile } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const selection = useBulkSelection();
+  const canBulkArchive = profile?.role === 'owner' || profile?.role === 'admin';
+  const [isArchiving, setIsArchiving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showExpenseModal, setShowExpenseModal] = useState(false);
@@ -242,6 +251,68 @@ export const ExpensesList: React.FC = () => {
     .reduce((sum, exp) => sum + (exp.amount ?? 0), 0);
   const pendingExpenses = expenses.filter((e) => e.status === 'pending');
   const approvedExpenses = expenses.filter((e) => e.status === 'approved' || e.status === 'paid');
+
+  const visibleIds = expenses.map((e) => e.id);
+
+  const handleBulkExport = async () => {
+    if (selection.selectedCount === 0) return;
+    const ids = Array.from(selection.selectedIds);
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('expense_number, expense_date, vendor, description, amount, tax_amount, currency, status, is_billable, master_expense_categories:category_id(name)')
+      .in('id', ids);
+    if (error) {
+      toast.error('Failed to export selected expenses');
+      return;
+    }
+    downloadCSV(
+      data ?? [],
+      [
+        { key: 'expense_number', label: 'Expense #' },
+        { key: 'expense_date', label: 'Date' },
+        { key: 'vendor', label: 'Vendor' },
+        { key: 'description', label: 'Description' },
+        {
+          key: (r) => (r.master_expense_categories as { name?: string } | null)?.name,
+          label: 'Category',
+        },
+        { key: 'amount', label: 'Amount' },
+        { key: 'tax_amount', label: 'Tax' },
+        { key: 'currency', label: 'Currency' },
+        { key: 'status', label: 'Status' },
+        { key: 'is_billable', label: 'Billable', format: (v) => (v ? 'yes' : 'no') },
+      ],
+      'expenses-selected',
+    );
+    toast.success(`Exported ${data?.length ?? 0} expense${data?.length === 1 ? '' : 's'}`);
+  };
+
+  const handleBulkArchive = async () => {
+    if (selection.selectedCount === 0) return;
+    if (!canBulkArchive) {
+      toast.error('Only admins can bulk archive expenses');
+      return;
+    }
+    const n = selection.selectedCount;
+    if (!window.confirm(`Archive ${n} expense${n === 1 ? '' : 's'}? They'll be hidden from lists but recoverable.`)) {
+      return;
+    }
+    setIsArchiving(true);
+    try {
+      const { error } = await supabase
+        .from('expenses')
+        .update({ deleted_at: new Date().toISOString() })
+        .in('id', Array.from(selection.selectedIds));
+      if (error) throw error;
+      toast.success(`Archived ${n} expense${n === 1 ? '' : 's'}`);
+      selection.clear();
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+    } catch (err) {
+      toast.error((err as Error).message || 'Failed to archive expenses');
+    } finally {
+      setIsArchiving(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -422,6 +493,21 @@ export const ExpensesList: React.FC = () => {
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
+                  <th className="px-4 py-4 w-10">
+                    <input
+                      type="checkbox"
+                      checked={selection.allSelected(visibleIds)}
+                      ref={(el) => {
+                        if (el) {
+                          el.indeterminate =
+                            !selection.allSelected(visibleIds) && selection.someSelected(visibleIds);
+                        }
+                      }}
+                      onChange={(e) => selection.setMany(visibleIds, e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                      aria-label="Select all on this page"
+                    />
+                  </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Expense #</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Date</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Description</th>
@@ -436,8 +522,19 @@ export const ExpensesList: React.FC = () => {
                 {expenses.map((expense) => (
                   <tr
                     key={expense.id}
-                    className="hover:bg-slate-50 transition-colors"
+                    className={`hover:bg-slate-50 transition-colors ${
+                      selection.isSelected(expense.id) ? 'bg-info-muted/30' : ''
+                    }`}
                   >
+                    <td className="px-4 py-4 w-10">
+                      <input
+                        type="checkbox"
+                        checked={selection.isSelected(expense.id)}
+                        onChange={() => selection.toggle(expense.id)}
+                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                        aria-label={`Select expense ${expense.expense_number ?? expense.id}`}
+                      />
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="font-semibold text-primary">{expense.expense_number ?? '-'}</span>
                     </td>
@@ -640,6 +737,28 @@ export const ExpensesList: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      <BulkActionsBar
+        count={selection.selectedCount}
+        onClear={selection.clear}
+        itemNoun="expense"
+      >
+        <BulkActionButton
+          variant="ghost"
+          icon={<Download className="w-4 h-4" />}
+          label="Export"
+          onClick={handleBulkExport}
+        />
+        {canBulkArchive && (
+          <BulkActionButton
+            variant="danger"
+            icon={<Archive className="w-4 h-4" />}
+            label={isArchiving ? 'Archiving…' : 'Archive'}
+            onClick={handleBulkArchive}
+            disabled={isArchiving}
+          />
+        )}
+      </BulkActionsBar>
     </div>
   );
 };
