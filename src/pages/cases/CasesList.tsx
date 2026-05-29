@@ -120,6 +120,9 @@ export const CasesList: React.FC = () => {
       const from = (currentPage - 1) * CASES_PER_PAGE;
       const to = from + CASES_PER_PAGE - 1;
 
+      // customer and devices are embedded via real FKs (cases.customer_id ->
+      // customers_enhanced, case_devices.case_id -> cases) in one query. cases.created_by
+      // has NO FK to profiles, so it cannot be a PostgREST embed; it is batched below.
       let query = supabase
         .from('cases')
         .select(`
@@ -133,7 +136,9 @@ export const CasesList: React.FC = () => {
           customer_id,
           contact_id,
           created_by,
-          assigned_engineer_id
+          assigned_engineer_id,
+          customer:customers_enhanced!customer_id (id, customer_number, customer_name, mobile_number),
+          devices:case_devices (id, serial_number, device_type_id, catalog_device_types (id, name))
         `);
 
       if (searchTerm) {
@@ -152,61 +157,35 @@ export const CasesList: React.FC = () => {
 
       const { data, error } = await query
         .order('created_at', { ascending: false })
+        .order('created_at', { referencedTable: 'case_devices', ascending: true })
         .range(from, to);
 
       if (error) throw error;
 
-      const casesWithRelations = await Promise.all(
-        (data || []).map(async (caseItem) => {
-          let customer = null;
-          let created_by_profile = null;
-          let devices: { id: string; serial_no: string | null; device_type: { id: string; name: string } | null }[] = [];
+      const rows = data || [];
 
-          if (caseItem.customer_id) {
-            const { data: customerData } = await supabase
-              .from('customers_enhanced')
-              .select('id, customer_number, customer_name, mobile_number')
-              .eq('id', caseItem.customer_id)
-              .maybeSingle();
-            customer = customerData;
-          }
+      // Batch the creator-profile lookup into a single query (no FK to embed; many
+      // rows share a creator, so dedupe the ids first).
+      const creatorIds = [...new Set(rows.map((r) => r.created_by).filter(Boolean))] as string[];
+      const profilesById = new Map<string, { id: string; full_name: string | null }>();
+      if (creatorIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', creatorIds);
+        for (const p of profilesData || []) profilesById.set(p.id, p);
+      }
 
-          if (caseItem.created_by) {
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('id, full_name')
-              .eq('id', caseItem.created_by)
-              .maybeSingle();
-            created_by_profile = profileData;
-          }
-
-          const { data: devicesData } = await supabase
-            .from('case_devices')
-            .select(`
-              id,
-              serial_number,
-              device_type_id,
-              catalog_device_types (id, name)
-            `)
-            .eq('case_id', caseItem.id)
-            .order('created_at');
-
-          if (devicesData) {
-            devices = devicesData.map(device => ({
-              id: device.id,
-              serial_no: device.serial_number,
-              device_type: device.catalog_device_types
-            }));
-          }
-
-          return {
-            ...caseItem,
-            customer,
-            created_by_profile,
-            devices,
-          };
-        })
-      );
+      const casesWithRelations = rows.map((caseItem) => ({
+        ...caseItem,
+        customer: caseItem.customer ?? null,
+        created_by_profile: caseItem.created_by ? profilesById.get(caseItem.created_by) ?? null : null,
+        devices: (caseItem.devices || []).map((device) => ({
+          id: device.id,
+          serial_no: device.serial_number,
+          device_type: device.catalog_device_types,
+        })),
+      }));
 
       return casesWithRelations as Case[];
     },
