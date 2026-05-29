@@ -5358,6 +5358,57 @@ export type Database = {
           },
         ]
       }
+      exchange_rates: {
+        Row: {
+          base_currency: string
+          created_at: string
+          fetched_at: string
+          id: string
+          provider: string | null
+          quote_currency: string
+          rate: number
+          rate_date: string
+          source: string
+        }
+        Insert: {
+          base_currency: string
+          created_at?: string
+          fetched_at?: string
+          id?: string
+          provider?: string | null
+          quote_currency: string
+          rate: number
+          rate_date: string
+          source?: string
+        }
+        Update: {
+          base_currency?: string
+          created_at?: string
+          fetched_at?: string
+          id?: string
+          provider?: string | null
+          quote_currency?: string
+          rate?: number
+          rate_date?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exchange_rates_base_currency_fkey"
+            columns: ["base_currency"]
+            isOneToOne: false
+            referencedRelation: "master_currency_codes"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "exchange_rates_quote_currency_fkey"
+            columns: ["quote_currency"]
+            isOneToOne: false
+            referencedRelation: "master_currency_codes"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
       expense_attachments: {
         Row: {
           created_at: string
@@ -7614,6 +7665,7 @@ export type Database = {
         Row: {
           code: string
           created_at: string
+          decimal_places: number
           id: string
           is_active: boolean
           name: string
@@ -7623,6 +7675,7 @@ export type Database = {
         Insert: {
           code: string
           created_at?: string
+          decimal_places?: number
           id?: string
           is_active?: boolean
           name: string
@@ -7632,6 +7685,7 @@ export type Database = {
         Update: {
           code?: string
           created_at?: string
+          decimal_places?: number
           id?: string
           is_active?: boolean
           name?: string
