@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { createPayment } from '@/lib/paymentsService';
-import { deleteCaseService } from '@/lib/caseService';
+import { deleteCaseService, duplicateCase, type DuplicateDeviceSource } from '@/lib/caseService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/useToast';
 import { logger } from '../../../lib/logger';
@@ -10,9 +10,7 @@ import type { Database } from '@/types/database.types';
 import type { CreateCloneDriveFormValues } from '../CreateCloneDriveModal';
 
 type CaseRow = Database['public']['Tables']['cases']['Row'];
-type CaseInsert = Database['public']['Tables']['cases']['Insert'];
 type CaseUpdate = Database['public']['Tables']['cases']['Update'];
-type CaseDeviceInsert = Database['public']['Tables']['case_devices']['Insert'];
 type CaseDeviceUpdate = Database['public']['Tables']['case_devices']['Update'];
 type CustomerUpdate = Database['public']['Tables']['customers_enhanced']['Update'];
 type CloneDriveInsert = Database['public']['Tables']['clone_drives']['Insert'];
@@ -29,27 +27,6 @@ export interface CreateCloneDriveInput {
   expectedSizeGb: number | null;
   resourceCloneDriveId: string | null;
 }
-
-// Shape duplicateCaseMutation reads from each source device row. Keys mirror
-// the case_devices.Row columns the query in useCaseQueries currently selects;
-// anything missing from the query is simply absent on the source object.
-type DuplicateDeviceSource = Partial<{
-  id: string;
-  device_type_id: string | null;
-  brand_id: string | null;
-  model: string | null;
-  serial_number: string | null;
-  capacity_id: string | null;
-  condition_id: string | null;
-  accessories: string[] | null;
-  symptoms: string | null;
-  notes: string | null;
-  password: string | null;
-  encryption_id: string | null;
-  device_role_id: number | null;
-  is_primary: boolean | null;
-  role_notes: string | null;
-}>;
 
 interface UseCaseMutationsParams {
   id: string | undefined;
@@ -479,98 +456,20 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
       if (!caseData) throw new Error('Case data is required to duplicate');
       const tenantId = requireTenantId(profile?.tenant_id);
 
-      const { data: nextCaseNumber, error: numberError } = await supabase
-        .rpc('get_next_case_number');
-
-      if (numberError) {
-        logger.error('Error getting next case number:', numberError);
-        throw new Error('Failed to get next case number');
-      }
-
-      const newCaseData: CaseInsert = {
-        tenant_id: tenantId,
-        case_number: nextCaseNumber,
-        customer_id: caseData.customer_id ?? null,
-        service_type_id: caseData.service_type_id ?? null,
-        priority: caseData.priority ?? null,
-        status: 'Received',
-        client_reference: caseData.case_no ?? null,
-        subject: caseData.title ?? null,
-        created_by: profile?.id ?? null,
-      };
-
-      if (caseData.contact_id) {
-        newCaseData.contact_id = caseData.contact_id;
-      }
-      if (caseData.assigned_engineer_id) {
-        newCaseData.assigned_to = caseData.assigned_engineer_id;
-      }
-      if (caseData.company_id) {
-        newCaseData.company_id = caseData.company_id;
-      }
-
-      const { data: newCase, error: caseError } = await supabase
-        .from('cases')
-        .insert(newCaseData)
-        .select()
-        .maybeSingle();
-
-      if (caseError) {
-        logger.error('Error creating duplicate case:', caseError);
-        throw new Error(`Failed to duplicate case: ${caseError.message}`);
-      }
-      if (!newCase) {
-        throw new Error('Failed to duplicate case: insert returned no row');
-      }
-
-      if (devices && devices.length > 0) {
-        // Map each source device row to the current case_devices Insert shape.
-        // Columns renamed/removed by past migrations are excluded; parent_device_id
-        // and inventory_item_id no longer exist on the table.
-        const devicesToInsert: CaseDeviceInsert[] = devices.map((device) => ({
-          tenant_id: tenantId,
-          case_id: newCase.id,
-          device_type_id: device.device_type_id ?? null,
-          brand_id: device.brand_id ?? null,
-          model: device.model ?? null,
-          serial_number: device.serial_number ?? null,
-          capacity_id: device.capacity_id ?? null,
-          condition_id: device.condition_id ?? null,
-          accessories: device.accessories ?? null,
-          symptoms: device.symptoms ?? null,
-          notes: device.notes ?? null,
-          password: device.password ?? null,
-          encryption_id: device.encryption_id ?? null,
-          device_role_id: device.device_role_id ?? null,
-          is_primary: device.is_primary ?? null,
-          role_notes: device.role_notes ?? null,
-          created_by: profile?.id ?? null,
-        }));
-
-        const { data: newDevices, error: devicesError } = await supabase
-          .from('case_devices')
-          .insert(devicesToInsert)
-          .select('id');
-
-        if (devicesError) {
-          logger.error('Error duplicating devices:', devicesError);
-          throw new Error(`Failed to duplicate devices: ${devicesError.message}`);
-        }
-
-        const deviceIdMapping: Record<string, string> = {};
-        devices.forEach((oldDevice, index) => {
-          if (oldDevice.id && newDevices && newDevices[index]) {
-            deviceIdMapping[oldDevice.id] = newDevices[index].id;
-          }
-        });
-
-        // parent_device_id column does not exist on the current case_devices
-        // schema; the old device-parent linkage was dropped. Block removed --
-        // duplicates no longer carry over parent relationships.
-        void deviceIdMapping;
-      }
-
-      return newCase;
+      return duplicateCase(
+        {
+          customer_id: caseData.customer_id ?? null,
+          service_type_id: caseData.service_type_id ?? null,
+          priority: caseData.priority ?? null,
+          case_no: caseData.case_no ?? null,
+          title: caseData.title ?? null,
+          contact_id: caseData.contact_id ?? null,
+          assigned_engineer_id: caseData.assigned_engineer_id ?? null,
+          company_id: caseData.company_id ?? null,
+        },
+        devices,
+        { id: profile?.id ?? null, tenantId },
+      );
     },
     onSuccess: (newCase) => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });

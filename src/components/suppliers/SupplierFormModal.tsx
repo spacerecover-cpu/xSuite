@@ -3,7 +3,7 @@ import { Building2, Mail, Phone, MapPin, FileText, User, Truck, CheckCircle } fr
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase, resolveTenantId } from '../../lib/supabaseClient';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
 
@@ -167,8 +167,7 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
         if (error) throw error;
         toast.success('Supplier updated successfully');
       } else {
-        const { data: tenantId, error: tenantErr } = await supabase.rpc('get_current_tenant_id');
-        if (tenantErr || !tenantId) throw new Error('Unable to resolve current tenant');
+        const tenantId = await resolveTenantId();
 
         const { error } = await supabase
           .from('suppliers')

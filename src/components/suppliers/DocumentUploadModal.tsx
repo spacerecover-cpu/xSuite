@@ -3,7 +3,7 @@ import { Upload, FileText, X } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase, resolveTenantId } from '../../lib/supabaseClient';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
 
@@ -69,8 +69,7 @@ export default function DocumentUploadModal({ isOpen, onClose, onSuccess, suppli
 
       if (uploadError) throw uploadError;
 
-      const { data: tenantId, error: tenantErr } = await supabase.rpc('get_current_tenant_id');
-      if (tenantErr || !tenantId) throw new Error('Unable to resolve current tenant');
+      const tenantId = await resolveTenantId();
 
       // Map UI fields to actual DB columns (name, file_url, file_type, file_size, uploaded_by)
       const { error: dbError } = await supabase

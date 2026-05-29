@@ -44,3 +44,19 @@ export const setTenantId = (tenantId: string | null): void => {
 export const clearTenantId = (): void => {
   localStorage.removeItem('tenant_id');
 };
+
+/**
+ * Canonical async resolver for the current tenant id. Prefers the value mirrored
+ * into localStorage by AuthContext on sign-in, falling back to the
+ * get_current_tenant_id() RPC. Throws if no tenant can be resolved. Tenant-scoped
+ * inserts are stamped server-side by the set_*_tenant_and_audit trigger regardless,
+ * so this value is for client convenience, not the source of isolation.
+ */
+export const resolveTenantId = async (): Promise<string> => {
+  const cached = getTenantId();
+  if (cached) return cached;
+  const { data, error } = await supabase.rpc('get_current_tenant_id');
+  if (error || !data) throw new Error('Unable to resolve current tenant');
+  setTenantId(data);
+  return data;
+};

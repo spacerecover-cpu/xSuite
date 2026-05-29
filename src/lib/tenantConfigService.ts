@@ -7,39 +7,44 @@ const configCache = new Map<string, { config: TenantConfig; timestamp: number }>
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 async function fetchTenantConfig(tenantId: string): Promise<TenantConfig> {
-  const { data, error } = await supabase
-    .from('tenants')
-    .select(`
-      id, name, theme,
-      currency_code, currency_symbol, decimal_places,
-      tax_system, tax_label, tax_number_label, tax_number, default_tax_rate,
-      locale_code, timezone, date_format, fiscal_year_start,
-      country:geo_countries!country_id (
-        code, name, currency_name,
-        decimal_separator, thousands_separator, currency_position,
-        tax_number_format, tax_number_placeholder,
-        time_format, week_starts_on, language_code,
-        postal_code_label, tax_invoice_required
-      )
-    `)
-    .eq('id', tenantId)
-    .maybeSingle();
+  // Both reads are keyed only on tenantId and are independent of each other, so
+  // run them concurrently to remove a serial round-trip from the auth->shell
+  // bootstrap path.
+  const [tenantResult, localeResult] = await Promise.all([
+    supabase
+      .from('tenants')
+      .select(`
+        id, name, theme,
+        currency_code, currency_symbol, decimal_places,
+        tax_system, tax_label, tax_number_label, tax_number, default_tax_rate,
+        locale_code, timezone, date_format, fiscal_year_start,
+        country:geo_countries!country_id (
+          code, name, currency_name,
+          decimal_separator, thousands_separator, currency_position,
+          tax_number_format, tax_number_placeholder,
+          time_format, week_starts_on, language_code,
+          postal_code_label, tax_invoice_required
+        )
+      `)
+      .eq('id', tenantId)
+      .maybeSingle(),
+    supabase
+      .from('accounting_locales')
+      .select('currency_code, currency_symbol, decimal_places, currency_position, decimal_separator, thousands_separator, date_format, locale_code')
+      .eq('tenant_id', tenantId)
+      .eq('is_default', true)
+      .is('deleted_at', null)
+      .maybeSingle(),
+  ]);
 
+  const { data, error } = tenantResult;
   if (error || !data) {
     logger.error('Failed to fetch tenant config:', error);
     return { ...DEFAULT_TENANT_CONFIG, tenantId };
   }
 
   const country = data.country as Record<string, unknown> | null;
-
-  // Fetch the default accounting locale for tenant-level overrides
-  const { data: defaultLocale } = await supabase
-    .from('accounting_locales')
-    .select('currency_code, currency_symbol, decimal_places, currency_position, decimal_separator, thousands_separator, date_format, locale_code')
-    .eq('tenant_id', tenantId)
-    .eq('is_default', true)
-    .is('deleted_at', null)
-    .maybeSingle();
+  const { data: defaultLocale } = localeResult;
 
   return {
     tenantId: data.id,

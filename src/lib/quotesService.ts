@@ -4,6 +4,7 @@ import { logAuditTrail } from './auditTrailService';
 import { sanitizeUuidFields as sanitizeUuids } from './dataValidation';
 import { sanitizeFilterValue } from './postgrestSanitizer';
 import { logger } from './logger';
+import { calculateQuoteTotals } from './financialMath';
 
 type QuoteInsert = Database['public']['Tables']['quotes']['Insert'];
 type QuoteUpdate = Database['public']['Tables']['quotes']['Update'];
@@ -359,19 +360,12 @@ export const createQuote = async (quote: Quote, items: QuoteItem[]) => {
       throw new Error('Failed to generate quote number. Please try again.');
     }
 
-    const subtotal = items.reduce((sum, item) => {
-      const lineTotal = Math.round(item.quantity * item.unit_price * 100) / 100;
-      return Math.round((sum + lineTotal) * 100) / 100;
-    }, 0);
-
-    const discountValue = quote.discount_type === 'percentage'
-      ? Math.round((subtotal * (quote.discount_amount || 0)) / 100 * 100) / 100
-      : (quote.discount_amount || 0);
-
-    const discountedSubtotal = Math.round((subtotal - discountValue) * 100) / 100;
-    const taxAmount = Math.round(discountedSubtotal * ((quote.tax_rate || 0) / 100) * 100) / 100;
-
-    const totalAmount = Math.round((discountedSubtotal + taxAmount) * 100) / 100;
+    const { subtotal, taxAmount, totalAmount } = calculateQuoteTotals(
+      items,
+      quote.discount_type,
+      quote.discount_amount || 0,
+      quote.tax_rate || 0,
+    );
 
     const persistFields = pickQuotePersistFields(quote);
     const quoteToInsertRaw: QuoteInsert = {
@@ -458,19 +452,12 @@ export const updateQuote = async (id: string, quote: Partial<Quote>, items?: Quo
   ) as QuoteUpdate;
 
   if (items) {
-    const subtotal = items.reduce((sum, item) => {
-      const lineTotal = Math.round(item.quantity * item.unit_price * 100) / 100;
-      return Math.round((sum + lineTotal) * 100) / 100;
-    }, 0);
-
-    const discountValue = quote.discount_type === 'percentage'
-      ? Math.round((subtotal * (quote.discount_amount || 0)) / 100 * 100) / 100
-      : (quote.discount_amount || 0);
-
-    const discountedSubtotal = Math.round((subtotal - discountValue) * 100) / 100;
-    const taxAmount = Math.round(discountedSubtotal * ((quote.tax_rate || 0) / 100) * 100) / 100;
-
-    const totalAmount = Math.round((discountedSubtotal + taxAmount) * 100) / 100;
+    const { subtotal, taxAmount, totalAmount } = calculateQuoteTotals(
+      items,
+      quote.discount_type,
+      quote.discount_amount || 0,
+      quote.tax_rate || 0,
+    );
 
     updateData = {
       ...updateData,

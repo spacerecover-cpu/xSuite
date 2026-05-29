@@ -1,18 +1,12 @@
 import { supabase } from './supabaseClient';
-import { initializePDFFonts, getFontFamily, createPdfWithFonts } from './pdf/fonts';
+import { initializePDFFonts, createPdfWithFonts } from './pdf/fonts';
 import { buildReportDocument, type ReportData } from './pdf/documents/ReportDocument';
 import { loadImageAsBase64 } from './pdf/utils';
 import { logPDFGeneration } from './pdf/loggingService';
-import type { TranslationContext } from './pdf/types';
+import { withTimeout, createTranslationContext } from './pdf/translationContext';
 import { logger } from './logger';
 import type { Database, Json } from '../types/database.types';
-import {
-  getTranslation,
-  isRTLLanguage,
-  formatBilingualText,
-  type LanguageCode,
-  type TranslationKey,
-} from './documentTranslations';
+import { type LanguageCode } from './documentTranslations';
 
 type CaseReportRow = Database['public']['Tables']['case_reports']['Row'];
 type CaseReportSectionRow = Database['public']['Tables']['case_report_sections']['Row'];
@@ -147,52 +141,6 @@ export interface PDFBlobResult {
   filename?: string;
   error?: string;
   errorCode?: string;
-}
-
-async function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  errorMessage: string
-): Promise<T> {
-  let timeoutId: NodeJS.Timeout;
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => {
-      reject(new Error(`${errorMessage} (timeout after ${timeoutMs}ms)`));
-    }, timeoutMs);
-  });
-
-  try {
-    const result = await Promise.race([promise, timeoutPromise]);
-    clearTimeout(timeoutId!);
-    return result;
-  } catch (error) {
-    clearTimeout(timeoutId!);
-    throw error;
-  }
-}
-
-function createTranslationContext(
-  mode: 'english_only' | 'bilingual',
-  languageCode: LanguageCode | null
-): TranslationContext {
-  const isRTL = languageCode ? isRTLLanguage(languageCode) : false;
-  const isBilingual = mode === 'bilingual' && languageCode !== null;
-  const fontFamily = getFontFamily(languageCode);
-
-  const t = (key: string, englishText: string): string => {
-    if (!isBilingual || !languageCode) return englishText;
-    const translated = getTranslation(key as TranslationKey, languageCode);
-    return formatBilingualText(englishText, translated, isRTL);
-  };
-
-  return {
-    t,
-    isRTL,
-    isBilingual,
-    languageCode,
-    fontFamily,
-  };
 }
 
 class ReportPDFService {

@@ -64,7 +64,7 @@ export function downloadCSV<T>(
   filename: string,
 ): void {
   const csv = rowsToCSV(rows, columns);
-  // ﻿ BOM. Without it, Excel mis-detects encoding for Arabic / €.
+  //  BOM. Without it, Excel mis-detects encoding for Arabic / €.
   const blob = new Blob(['﻿', csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const stamp = new Date().toISOString().slice(0, 10);

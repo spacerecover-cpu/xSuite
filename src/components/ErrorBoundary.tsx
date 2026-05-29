@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { logger } from '../lib/logger';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -23,7 +24,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('ErrorBoundary caught:', error, info);
+    logger.error('ErrorBoundary caught', error, info);
     this.props.onError?.(error, info);
   }
 

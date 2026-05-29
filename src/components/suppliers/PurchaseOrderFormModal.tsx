@@ -3,7 +3,7 @@ import { Plus, Trash2, Package, Calendar, DollarSign, FileText } from 'lucide-re
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase, resolveTenantId } from '../../lib/supabaseClient';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
 
@@ -184,8 +184,7 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
         if (error) throw error;
         toast.success('Purchase order updated successfully');
       } else {
-        const { data: tenantId, error: tenantErr } = await supabase.rpc('get_current_tenant_id');
-        if (tenantErr || !tenantId) throw new Error('Unable to resolve current tenant');
+        const tenantId = await resolveTenantId();
 
         const { error } = await supabase
           .from('purchase_orders')

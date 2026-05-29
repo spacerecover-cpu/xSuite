@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
-import type { Database } from '../../types/database.types';
+import { createCustomer } from '../../lib/customerService';
+import { createCompany } from '../../lib/companyService';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Modal } from '../ui/Modal';
@@ -209,12 +210,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   };
 
   const createMutation = useMutation({
-    mutationFn: async (customer: typeof formData) => {
-      const { data: customerNumber, error: numberError } = await supabase.rpc('get_next_customer_number');
-      if (numberError) throw numberError;
-
-      const customerPayload = {
-        customer_number: customerNumber,
+    mutationFn: async (customer: typeof formData) =>
+      createCustomer({
         customer_name: customer.customer_name,
         email: customer.email || null,
         mobile_number: customer.mobile_number || null,
@@ -226,31 +223,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         portal_enabled: customer.portal_enabled,
         notes: customer.notes || null,
         created_by: profile?.id,
-      } as Database['public']['Tables']['customers_enhanced']['Insert'];
-
-      const { data: newCustomer, error: createError } = await supabase
-        .from('customers_enhanced')
-        .insert(customerPayload)
-        .select()
-        .maybeSingle();
-
-      if (createError) throw createError;
-
-      if (customer.company_id && newCustomer) {
-        const relationshipPayload = {
-          customer_id: newCustomer.id,
-          company_id: customer.company_id,
-          is_primary: false,
-        } as Database['public']['Tables']['customer_company_relationships']['Insert'];
-
-        const { error: relError } = await supabase
-          .from('customer_company_relationships')
-          .insert(relationshipPayload);
-        if (relError) throw relError;
-      }
-
-      return newCustomer;
-    },
+        company_id: customer.company_id || null,
+      }),
     onSuccess: (newCustomer) => {
       queryClient.invalidateQueries({ queryKey: ['customers_enhanced'] });
       queryClient.invalidateQueries({ queryKey: ['customers_for_cases'] });
@@ -261,26 +235,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   });
 
   const createCompanyMutation = useMutation({
-    mutationFn: async (companyData: typeof newCompanyData) => {
-      const { data: companyNumber, error: numberError } = await supabase.rpc('get_next_company_number');
-      if (numberError) throw numberError;
-
-      const companyPayload = {
-        company_number: companyNumber,
-        name: companyData.company_name,
-        created_by: profile?.id,
-      } as Database['public']['Tables']['companies']['Insert'];
-
-      const { data: newCompany, error: createError } = await supabase
-        .from('companies')
-        .insert(companyPayload)
-        .select()
-        .maybeSingle();
-
-      if (createError) throw createError;
-      if (!newCompany) throw new Error('Failed to create company');
-      return newCompany;
-    },
+    mutationFn: async (companyData: typeof newCompanyData) =>
+      createCompany({ name: companyData.company_name, created_by: profile?.id }),
     onSuccess: async (newCompany) => {
       await queryClient.invalidateQueries({ queryKey: ['companies'] });
       await queryClient.refetchQueries({ queryKey: ['companies'] });

@@ -4,6 +4,7 @@ import { checkRateLimit, RATE_LIMITS } from './rateLimiter';
 import { logAuditTrail } from './auditTrailService';
 import { sanitizeUuidFields as sanitizeUuids } from './dataValidation';
 import { sanitizeFilterValue } from './postgrestSanitizer';
+import { calculateInvoiceTotals } from './financialMath';
 
 type InvoiceInsert = Database['public']['Tables']['invoices']['Insert'];
 type InvoiceUpdate = Database['public']['Tables']['invoices']['Update'];
@@ -352,17 +353,13 @@ export const createInvoice = async (invoice: Partial<Invoice>, items: InvoiceIte
   const invoiceType: 'proforma' | 'tax_invoice' = invoice.invoice_type ?? 'tax_invoice';
   const invoiceNumber = await getNextInvoiceNumber(invoiceType);
 
-  const subtotal = items.reduce((sum, item) => {
-    const itemSubtotal = Math.round(item.quantity * item.unit_price * 100) / 100;
-    const discount = Math.round(itemSubtotal * ((item.discount_percent || 0) / 100) * 100) / 100;
-    return Math.round((sum + (itemSubtotal - discount)) * 100) / 100;
-  }, 0);
-
-  const discountedSubtotal = Math.round((subtotal - (invoice.discount_amount || 0)) * 100) / 100;
   const invoiceTaxRate = invoice.tax_rate || 0;
-  const taxAmount = Math.round((discountedSubtotal * invoiceTaxRate) / 100 * 100) / 100;
-  const totalAmount = Math.round((discountedSubtotal + taxAmount) * 100) / 100;
-  const amountDue = Math.round((totalAmount - (invoice.amount_paid || 0)) * 100) / 100;
+  const { subtotal, taxAmount, totalAmount, amountDue } = calculateInvoiceTotals(
+    items,
+    invoice.discount_amount || 0,
+    invoiceTaxRate,
+    invoice.amount_paid || 0,
+  );
 
   const persistFields = pickInvoicePersistFields(invoice);
   const invoiceToInsert: InvoiceInsert = {
@@ -433,21 +430,16 @@ export const updateInvoice = async (id: string, invoice: Partial<Invoice>, items
   let updateData: InvoiceUpdate = sanitizeUuidFields(pickInvoicePersistFields(invoice));
 
   if (items) {
-    const subtotal = items.reduce((sum, item) => {
-      const itemSubtotal = item.quantity * item.unit_price;
-      const discount = itemSubtotal * ((item.discount_percent || 0) / 100);
-      return sum + (itemSubtotal - discount);
-    }, 0);
-
-    // Apply global invoice discount to subtotal first, then calculate VAT on discounted amount
-    const discountedSubtotal = subtotal - (invoice.discount_amount || 0);
-
-    // Use the invoice-level tax rate for all items
+    // Header totals now use the shared rounded helper (matching createInvoice).
+    // Previously this path skipped rounding, so editing an invoice could shift
+    // stored totals by sub-cent amounts versus what create stored.
     const invoiceTaxRate = invoice.tax_rate || 0;
-    const taxAmount = (discountedSubtotal * invoiceTaxRate) / 100;
-
-    const totalAmount = discountedSubtotal + taxAmount;
-    const amountDue = totalAmount - (invoice.amount_paid || 0);
+    const { subtotal, taxAmount, totalAmount, amountDue } = calculateInvoiceTotals(
+      items,
+      invoice.discount_amount || 0,
+      invoiceTaxRate,
+      invoice.amount_paid || 0,
+    );
 
     updateData = {
       ...updateData,
