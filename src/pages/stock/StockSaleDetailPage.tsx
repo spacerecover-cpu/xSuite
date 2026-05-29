@@ -10,14 +10,12 @@ import {
   FileText,
   ExternalLink,
   ShoppingBag,
-  RotateCcw,
 } from 'lucide-react';
 import { stockKeys } from '../../lib/queryKeys';
 import { getStockSale, cancelStockSale } from '../../lib/stockService';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { useToast } from '../../hooks/useToast';
-import { StockReturnModal } from '../../components/stock/StockReturnModal';
 
 type SaleStatusVariant = 'warning' | 'success' | 'info' | 'secondary' | 'danger';
 
@@ -49,7 +47,6 @@ export const StockSaleDetailPage: React.FC = () => {
   const queryClient = useQueryClient();
   const toast = useToast();
   const [confirmCancel, setConfirmCancel] = useState(false);
-  const [showReturnModal, setShowReturnModal] = useState(false);
 
   const { data: sale, isLoading, error } = useQuery({
     queryKey: stockKeys.sale(id!),
@@ -154,17 +151,6 @@ export const StockSaleDetailPage: React.FC = () => {
                 </Button>
               )}
             </>
-          )}
-          {sale.status === 'paid' && (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="gap-2"
-              onClick={() => setShowReturnModal(true)}
-            >
-              <RotateCcw className="w-4 h-4" />
-              Return Items
-            </Button>
           )}
           <Button
             variant="secondary"
@@ -373,12 +359,6 @@ export const StockSaleDetailPage: React.FC = () => {
         </div>
       )}
 
-      {showReturnModal && (
-        <StockReturnModal
-          sale={sale}
-          onClose={() => setShowReturnModal(false)}
-        />
-      )}
     </div>
   );
 };

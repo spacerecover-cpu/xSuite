@@ -58,7 +58,7 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
   const createLoanMutation = useMutation({
     mutationFn: (data: Parameters<typeof payrollService.createEmployeeLoan>[0]) => payrollService.createEmployeeLoan(data),
     onSuccess: (loan) => {
-      queryClient.invalidateQueries({ queryKey: payrollKeys.loans() });
+      queryClient.invalidateQueries({ queryKey: payrollKeys.all });
       toast.success(`Loan ${loan.loan_number ?? ''} created successfully`);
       onClose();
     },
