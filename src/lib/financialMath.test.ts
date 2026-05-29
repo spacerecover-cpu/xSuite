@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   roundMoney,
+  convertToBase,
   calculateInvoiceTotals,
   calculateQuoteTotals,
 } from './financialMath';
@@ -121,6 +122,52 @@ describe('canonical accounting policy', () => {
       taxAmount: 29.25,
       totalAmount: 614.25,
       amountDue: 614.25,
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Multi-currency: currency-aware rounding (per the currency's decimal places) and
+// base-currency conversion. Default decimalPlaces = 2 keeps every existing caller
+// (and the cases above) byte-identical.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('roundMoney (currency-aware)', () => {
+  it('defaults to 2 decimal places (backward compatible)', () => {
+    expect(roundMoney(2.999)).toBe(3);
+    expect(roundMoney(1.005)).toBe(1); // documented IEEE-754 quirk, unchanged
+  });
+
+  it('rounds to 0 decimals for zero-decimal currencies (JPY/KRW)', () => {
+    expect(roundMoney(1234.5, 0)).toBe(1235);
+    expect(roundMoney(99.4, 0)).toBe(99);
+  });
+
+  it('rounds to 3 decimals for three-decimal currencies (OMR/BHD/KWD)', () => {
+    expect(roundMoney(1.2349, 3)).toBe(1.235);
+    expect(roundMoney(0.385, 3)).toBe(0.385);
+  });
+});
+
+describe('convertToBase', () => {
+  it('multiplies by the rate and rounds to the base currency decimals', () => {
+    expect(convertToBase(100, 1.08, 2)).toBe(108);      // USD base, 2dp
+    expect(convertToBase(100, 0.385, 3)).toBe(38.5);    // OMR base, 3dp
+    expect(convertToBase(1000, 0.0067, 0)).toBe(7);     // JPY base, 0dp (6.7 -> 7)
+  });
+  it('is identity at rate 1', () => {
+    expect(convertToBase(614.25, 1, 2)).toBe(614.25);
+  });
+});
+
+describe('calculateInvoiceTotals (currency-aware rounding)', () => {
+  it('rounds totals to 0 decimals for a JPY invoice', () => {
+    // qty 1 @ 1000, 10% tax, nothing paid, 0-decimal currency
+    expect(calculateInvoiceTotals([{ quantity: 1, unit_price: 1000 }], 0, 10, 0, 0)).toEqual({
+      subtotal: 1000,
+      taxRate: 10,
+      taxAmount: 100,
+      totalAmount: 1100,
+      amountDue: 1100,
     });
   });
 });

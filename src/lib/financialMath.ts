@@ -5,8 +5,25 @@
 // (invoiceService.createInvoice and quotesService.createQuote/updateQuote);
 // they are shared so the create/update paths can no longer diverge.
 
-/** Round a monetary value to 2 decimal places (cents). */
-export const roundMoney = (value: number): number => Math.round(value * 100) / 100;
+/**
+ * Round a monetary value to a currency's minor units. decimalPlaces defaults to 2
+ * (cents) so every existing caller is unchanged; pass the currency's decimal_places
+ * (0 for JPY/KRW, 3 for BHD/JOD/KWD/OMR) for currency-correct rounding.
+ */
+export const roundMoney = (value: number, decimalPlaces = 2): number => {
+  const factor = 10 ** decimalPlaces;
+  return Math.round(value * factor) / factor;
+};
+
+/**
+ * Convert a transaction-currency amount to the base currency at a frozen rate,
+ * rounded to the base currency's minor units. base_amount = round(amount * rate).
+ */
+export const convertToBase = (
+  amount: number,
+  rate: number,
+  baseDecimalPlaces = 2,
+): number => roundMoney(amount * rate, baseDecimalPlaces);
 
 export interface MoneyLineItem {
   quantity: number;
@@ -32,17 +49,18 @@ export const calculateInvoiceTotals = (
   discountAmount: number,
   taxRate: number,
   amountPaid: number,
+  decimalPlaces = 2,
 ): InvoiceTotals => {
   const subtotal = items.reduce((sum, item) => {
-    const itemSubtotal = roundMoney(item.quantity * item.unit_price);
-    const discount = roundMoney(itemSubtotal * ((item.discount_percent || 0) / 100));
-    return roundMoney(sum + (itemSubtotal - discount));
+    const itemSubtotal = roundMoney(item.quantity * item.unit_price, decimalPlaces);
+    const discount = roundMoney(itemSubtotal * ((item.discount_percent || 0) / 100), decimalPlaces);
+    return roundMoney(sum + (itemSubtotal - discount), decimalPlaces);
   }, 0);
 
-  const discountedSubtotal = roundMoney(subtotal - discountAmount);
-  const taxAmount = roundMoney((discountedSubtotal * taxRate) / 100);
-  const totalAmount = roundMoney(discountedSubtotal + taxAmount);
-  const amountDue = roundMoney(totalAmount - amountPaid);
+  const discountedSubtotal = roundMoney(subtotal - discountAmount, decimalPlaces);
+  const taxAmount = roundMoney((discountedSubtotal * taxRate) / 100, decimalPlaces);
+  const totalAmount = roundMoney(discountedSubtotal + taxAmount, decimalPlaces);
+  const amountDue = roundMoney(totalAmount - amountPaid, decimalPlaces);
 
   return { subtotal, taxRate, taxAmount, totalAmount, amountDue };
 };
@@ -63,20 +81,21 @@ export const calculateQuoteTotals = (
   discountType: string | null | undefined,
   discountAmount: number,
   taxRate: number,
+  decimalPlaces = 2,
 ): QuoteTotals => {
   const subtotal = items.reduce((sum, item) => {
-    const lineTotal = roundMoney(item.quantity * item.unit_price);
-    return roundMoney(sum + lineTotal);
+    const lineTotal = roundMoney(item.quantity * item.unit_price, decimalPlaces);
+    return roundMoney(sum + lineTotal, decimalPlaces);
   }, 0);
 
   const discountValue =
     discountType === 'percentage'
-      ? roundMoney((subtotal * discountAmount) / 100)
+      ? roundMoney((subtotal * discountAmount) / 100, decimalPlaces)
       : discountAmount;
 
-  const discountedSubtotal = roundMoney(subtotal - discountValue);
-  const taxAmount = roundMoney(discountedSubtotal * (taxRate / 100));
-  const totalAmount = roundMoney(discountedSubtotal + taxAmount);
+  const discountedSubtotal = roundMoney(subtotal - discountValue, decimalPlaces);
+  const taxAmount = roundMoney(discountedSubtotal * (taxRate / 100), decimalPlaces);
+  const totalAmount = roundMoney(discountedSubtotal + taxAmount, decimalPlaces);
 
   return { subtotal, taxAmount, totalAmount };
 };
