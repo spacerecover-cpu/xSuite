@@ -13569,6 +13569,57 @@ export type Database = {
           },
         ]
       }
+      tenant_currencies: {
+        Row: {
+          created_at: string
+          currency_code: string
+          deleted_at: string | null
+          display_order: number
+          id: string
+          is_active: boolean
+          is_base: boolean
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          currency_code: string
+          deleted_at?: string | null
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          is_base?: boolean
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          currency_code?: string
+          deleted_at?: string | null
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          is_base?: boolean
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_currencies_currency_code_fkey"
+            columns: ["currency_code"]
+            isOneToOne: false
+            referencedRelation: "master_currency_codes"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "tenant_currencies_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_health_metrics: {
         Row: {
           active_users_count: number | null
@@ -13951,6 +14002,7 @@ export type Database = {
       }
       tenants: {
         Row: {
+          base_currency_code: string
           country_id: string | null
           created_at: string
           currency_code: string
@@ -13987,6 +14039,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          base_currency_code: string
           country_id?: string | null
           created_at?: string
           currency_code?: string
@@ -14023,6 +14076,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          base_currency_code?: string
           country_id?: string | null
           created_at?: string
           currency_code?: string
@@ -14059,6 +14113,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "tenants_base_currency_fk"
+            columns: ["base_currency_code"]
+            isOneToOne: false
+            referencedRelation: "master_currency_codes"
+            referencedColumns: ["code"]
+          },
           {
             foreignKeyName: "tenants_country_id_fkey"
             columns: ["country_id"]
