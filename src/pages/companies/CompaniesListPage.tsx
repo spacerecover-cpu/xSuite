@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
-import type { Database } from '../../types/database.types';
+import { createCompany } from '../../lib/companyService';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
@@ -204,50 +204,24 @@ export const CompaniesListPage: React.FC = () => {
   );
 
   const createMutation = useMutation({
-    mutationFn: async (company: typeof formData) => {
-      const { data: companyNumber, error: numberError } = await supabase.rpc('get_next_company_number');
-
-      if (numberError) throw numberError;
-
-      const companyPayload = {
-        company_number: companyNumber,
-        name: company.company_name,
-        company_name: company.company_name,
-        tax_number: company.tax_number || null,
-        industry_id: company.industry_id || null,
-        email: company.email || null,
-        phone: company.phone || null,
-        website: company.website || null,
-        country_id: company.country_id || null,
-        city_id: company.city_id || null,
-        address: company.address || null,
-        notes: company.notes || null,
-        created_by: profile?.id,
-      } as Database['public']['Tables']['companies']['Insert'];
-
-      const { data: newCompany, error: createError } = await supabase
-        .from('companies')
-        .insert(companyPayload)
-        .select()
-        .maybeSingle();
-
-      if (createError) throw createError;
-      if (!newCompany) throw new Error('Failed to create company');
-
-      if (company.primary_contact_id) {
-        const relationshipPayload = {
-          customer_id: company.primary_contact_id,
-          company_id: newCompany.id,
-          is_primary: true,
-        } as Database['public']['Tables']['customer_company_relationships']['Insert'];
-
-        await supabase
-          .from('customer_company_relationships')
-          .insert(relationshipPayload);
-      }
-
-      return newCompany;
-    },
+    mutationFn: async (company: typeof formData) =>
+      createCompany(
+        {
+          name: company.company_name,
+          company_name: company.company_name,
+          tax_number: company.tax_number || null,
+          industry_id: company.industry_id || null,
+          email: company.email || null,
+          phone: company.phone || null,
+          website: company.website || null,
+          country_id: company.country_id || null,
+          city_id: company.city_id || null,
+          address: company.address || null,
+          notes: company.notes || null,
+          created_by: profile?.id,
+        },
+        company.primary_contact_id || null,
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['companies'] });
       setIsModalOpen(false);
