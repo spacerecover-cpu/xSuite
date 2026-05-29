@@ -196,6 +196,8 @@ export const QuotesListPage: React.FC = () => {
       toast.success(`Archived ${n} quote${n === 1 ? '' : 's'}`);
       selection.clear();
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['deletedQuotes'] });
+      queryClient.invalidateQueries({ queryKey: ['quote_stats'] });
     } catch (err) {
       toast.error((err as Error).message || 'Failed to archive quotes');
     } finally {
@@ -231,6 +233,7 @@ export const QuotesListPage: React.FC = () => {
       }
       selection.clear();
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['quote_stats'] });
     } catch (err) {
       toast.error((err as Error).message || 'Bulk send failed');
     } finally {

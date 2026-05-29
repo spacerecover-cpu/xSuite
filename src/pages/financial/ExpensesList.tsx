@@ -307,6 +307,7 @@ export const ExpensesList: React.FC = () => {
       toast.success(`Archived ${n} expense${n === 1 ? '' : 's'}`);
       selection.clear();
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['expense_stats'] });
     } catch (err) {
       toast.error((err as Error).message || 'Failed to archive expenses');
     } finally {

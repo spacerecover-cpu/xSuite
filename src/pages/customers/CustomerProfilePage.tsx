@@ -254,6 +254,7 @@ export const CustomerProfilePage: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customer', id] });
+      queryClient.invalidateQueries({ queryKey: ['customers_enhanced'] });
       setIsEditModalOpen(false);
       setPhotoFile(null);
       setPhotoPreviewUrl(null);
