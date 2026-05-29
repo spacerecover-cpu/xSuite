@@ -788,6 +788,132 @@ export async function generateInvoicePDFBlob(invoiceId: string): Promise<PDFBlob
   return generateInvoiceAsBlob(invoiceId);
 }
 
+// Per-row outcome of bulkSendInvoiceEmails. Callers want all three
+// states so they can report a useful summary: "5 sent, 2 skipped
+// (no email), 1 failed".
+export interface BulkSendInvoiceResult {
+  invoiceId: string;
+  invoiceNumber: string | null;
+  status: 'sent' | 'skipped' | 'failed';
+  error?: string;
+}
+
+// Sequentially email each selected invoice to its customer's address.
+// Sequential because:
+//   1. The client-side rate limiter caps email send at 5/min — parallel
+//      hits would all race past the gate at once and then fail in a
+//      cluster, leaving partial state.
+//   2. PDF generation is heavy. Serializing keeps memory predictable
+//      and gives the progress callback meaningful "done of total" steps.
+// Returns one result per invoice; never throws for a single-row
+// failure (callers want the summary). Throws only if the initial
+// fetch fails.
+export async function bulkSendInvoiceEmails(
+  invoiceIds: string[],
+  onProgress?: (done: number, total: number, latest: BulkSendInvoiceResult) => void,
+): Promise<BulkSendInvoiceResult[]> {
+  // Lazy-load the email transport + template helpers so this code
+  // path doesn't drag them into the invoice-service main bundle.
+  // Templates are tiny but emailDocumentService also pulls rateLimiter.
+  const [{ sendDocumentEmail }, { getEmailTemplate }] = await Promise.all([
+    import('./emailDocumentService'),
+    import('./emailTemplates'),
+  ]);
+
+  const { data: rows, error } = await supabase
+    .from('invoices')
+    .select(
+      'id, invoice_number, case_id, customers_enhanced:customer_id(customer_name, email)',
+    )
+    .in('id', invoiceIds)
+    .is('deleted_at', null);
+  if (error) throw error;
+
+  const results: BulkSendInvoiceResult[] = [];
+  const total = rows?.length ?? 0;
+  let done = 0;
+
+  for (const inv of rows ?? []) {
+    const customer = inv.customers_enhanced as {
+      customer_name?: string;
+      email?: string | null;
+    } | null;
+    const email = customer?.email?.trim();
+    let result: BulkSendInvoiceResult;
+
+    if (!email) {
+      result = {
+        invoiceId: inv.id,
+        invoiceNumber: inv.invoice_number,
+        status: 'skipped',
+        error: 'Customer has no email',
+      };
+    } else {
+      try {
+        const pdfResult = await generateInvoicePDFBlob(inv.id);
+        if (!pdfResult.success || !pdfResult.blob || !pdfResult.filename) {
+          result = {
+            invoiceId: inv.id,
+            invoiceNumber: inv.invoice_number,
+            status: 'failed',
+            error: pdfResult.error || 'PDF generation failed',
+          };
+        } else {
+          const template = getEmailTemplate('invoice', {
+            customerName: customer?.customer_name || 'Valued Customer',
+            caseNumber: '',
+            companyName: '',
+            documentType: 'invoice',
+          });
+          const send = await sendDocumentEmail({
+            to: email,
+            subject: template.subject,
+            body: template.body,
+            blob: pdfResult.blob,
+            filename: pdfResult.filename,
+            caseId: inv.case_id || undefined,
+            documentType: 'invoice',
+          });
+          if (send.success) {
+            // Mark sent. Don't fail the whole row if the status update
+            // errors — the email already went out; surfacing a noisy
+            // failure would scare the user into resending.
+            await supabase
+              .from('invoices')
+              .update({ sent_at: new Date().toISOString(), status: 'sent' })
+              .eq('id', inv.id);
+            result = {
+              invoiceId: inv.id,
+              invoiceNumber: inv.invoice_number,
+              status: 'sent',
+            };
+          } else {
+            result = {
+              invoiceId: inv.id,
+              invoiceNumber: inv.invoice_number,
+              status: 'failed',
+              error: send.error || 'Send failed',
+            };
+          }
+        }
+      } catch (err) {
+        result = {
+          invoiceId: inv.id,
+          invoiceNumber: inv.invoice_number,
+          status: 'failed',
+          error: err instanceof Error ? err.message : 'Unknown error',
+        };
+      }
+    }
+
+    results.push(result);
+    done += 1;
+    onProgress?.(done, total, result);
+  }
+
+  return results;
+}
+
 export const invoiceService = {
   fetchInvoices,
   fetchInvoiceById,
@@ -805,4 +931,5 @@ export const invoiceService = {
   getConversionHistory,
   generateInvoicePDF,
   generateInvoicePDFBlob,
+  bulkSendInvoiceEmails,
 };
