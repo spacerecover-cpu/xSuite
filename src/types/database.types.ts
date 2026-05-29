@@ -5466,6 +5466,7 @@ export type Database = {
       expenses: {
         Row: {
           amount: number
+          amount_base: number | null
           approved_at: string | null
           approved_by: string | null
           bank_account_id: string | null
@@ -5476,21 +5477,25 @@ export type Database = {
           currency: string | null
           deleted_at: string | null
           description: string | null
+          exchange_rate: number
           expense_date: string | null
           expense_number: string | null
           id: string
           is_billable: boolean | null
           notes: string | null
+          rate_source: string
           receipt_url: string | null
           reference: string | null
           status: string | null
           tax_amount: number | null
+          tax_amount_base: number | null
           tenant_id: string
           updated_at: string
           vendor: string | null
         }
         Insert: {
           amount: number
+          amount_base?: number | null
           approved_at?: string | null
           approved_by?: string | null
           bank_account_id?: string | null
@@ -5501,21 +5506,25 @@ export type Database = {
           currency?: string | null
           deleted_at?: string | null
           description?: string | null
+          exchange_rate?: number
           expense_date?: string | null
           expense_number?: string | null
           id?: string
           is_billable?: boolean | null
           notes?: string | null
+          rate_source?: string
           receipt_url?: string | null
           reference?: string | null
           status?: string | null
           tax_amount?: number | null
+          tax_amount_base?: number | null
           tenant_id: string
           updated_at?: string
           vendor?: string | null
         }
         Update: {
           amount?: number
+          amount_base?: number | null
           approved_at?: string | null
           approved_by?: string | null
           bank_account_id?: string | null
@@ -5526,15 +5535,18 @@ export type Database = {
           currency?: string | null
           deleted_at?: string | null
           description?: string | null
+          exchange_rate?: number
           expense_date?: string | null
           expense_number?: string | null
           id?: string
           is_billable?: boolean | null
           notes?: string | null
+          rate_source?: string
           receipt_url?: string | null
           reference?: string | null
           status?: string | null
           tax_amount?: number | null
+          tax_amount_base?: number | null
           tenant_id?: string
           updated_at?: string
           vendor?: string | null
@@ -5626,6 +5638,7 @@ export type Database = {
       financial_transactions: {
         Row: {
           amount: number
+          amount_base: number | null
           bank_account_id: string | null
           category_id: string | null
           created_at: string
@@ -5633,8 +5646,10 @@ export type Database = {
           currency: string | null
           deleted_at: string | null
           description: string | null
+          exchange_rate: number
           id: string
           notes: string | null
+          rate_source: string
           reference_id: string | null
           reference_number: string | null
           reference_type: string | null
@@ -5646,6 +5661,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          amount_base?: number | null
           bank_account_id?: string | null
           category_id?: string | null
           created_at?: string
@@ -5653,8 +5669,10 @@ export type Database = {
           currency?: string | null
           deleted_at?: string | null
           description?: string | null
+          exchange_rate?: number
           id?: string
           notes?: string | null
+          rate_source?: string
           reference_id?: string | null
           reference_number?: string | null
           reference_type?: string | null
@@ -5666,6 +5684,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          amount_base?: number | null
           bank_account_id?: string | null
           category_id?: string | null
           created_at?: string
@@ -5673,8 +5692,10 @@ export type Database = {
           currency?: string | null
           deleted_at?: string | null
           description?: string | null
+          exchange_rate?: number
           id?: string
           notes?: string | null
+          rate_source?: string
           reference_id?: string | null
           reference_number?: string | null
           reference_type?: string | null
@@ -6869,7 +6890,9 @@ export type Database = {
       invoices: {
         Row: {
           amount_paid: number | null
+          amount_paid_base: number | null
           balance_due: number | null
+          balance_due_base: number | null
           bank_account_id: string | null
           case_id: string | null
           company_id: string | null
@@ -6883,6 +6906,7 @@ export type Database = {
           deleted_at: string | null
           discount_amount: number | null
           due_date: string | null
+          exchange_rate: number
           footer: string | null
           id: string
           invoice_date: string | null
@@ -6892,22 +6916,28 @@ export type Database = {
           notes: string | null
           paid_at: string | null
           proforma_invoice_id: string | null
+          rate_source: string
           sent_at: string | null
           status: string | null
           status_id: string | null
           subtotal: number | null
+          subtotal_base: number | null
           tax_amount: number | null
+          tax_amount_base: number | null
           tax_rate: number | null
           tenant_id: string
           terms: string | null
           total_amount: number | null
+          total_amount_base: number | null
           updated_at: string
           updated_by: string | null
           voided_at: string | null
         }
         Insert: {
           amount_paid?: number | null
+          amount_paid_base?: number | null
           balance_due?: number | null
+          balance_due_base?: number | null
           bank_account_id?: string | null
           case_id?: string | null
           company_id?: string | null
@@ -6921,6 +6951,7 @@ export type Database = {
           deleted_at?: string | null
           discount_amount?: number | null
           due_date?: string | null
+          exchange_rate?: number
           footer?: string | null
           id?: string
           invoice_date?: string | null
@@ -6930,22 +6961,28 @@ export type Database = {
           notes?: string | null
           paid_at?: string | null
           proforma_invoice_id?: string | null
+          rate_source?: string
           sent_at?: string | null
           status?: string | null
           status_id?: string | null
           subtotal?: number | null
+          subtotal_base?: number | null
           tax_amount?: number | null
+          tax_amount_base?: number | null
           tax_rate?: number | null
           tenant_id: string
           terms?: string | null
           total_amount?: number | null
+          total_amount_base?: number | null
           updated_at?: string
           updated_by?: string | null
           voided_at?: string | null
         }
         Update: {
           amount_paid?: number | null
+          amount_paid_base?: number | null
           balance_due?: number | null
+          balance_due_base?: number | null
           bank_account_id?: string | null
           case_id?: string | null
           company_id?: string | null
@@ -6959,6 +6996,7 @@ export type Database = {
           deleted_at?: string | null
           discount_amount?: number | null
           due_date?: string | null
+          exchange_rate?: number
           footer?: string | null
           id?: string
           invoice_date?: string | null
@@ -6968,15 +7006,19 @@ export type Database = {
           notes?: string | null
           paid_at?: string | null
           proforma_invoice_id?: string | null
+          rate_source?: string
           sent_at?: string | null
           status?: string | null
           status_id?: string | null
           subtotal?: number | null
+          subtotal_base?: number | null
           tax_amount?: number | null
+          tax_amount_base?: number | null
           tax_rate?: number | null
           tenant_id?: string
           terms?: string | null
           total_amount?: number | null
+          total_amount_base?: number | null
           updated_at?: string
           updated_by?: string | null
           voided_at?: string | null
@@ -9265,6 +9307,7 @@ export type Database = {
       payments: {
         Row: {
           amount: number
+          amount_base: number | null
           bank_account_id: string | null
           case_id: string | null
           created_at: string
@@ -9272,12 +9315,14 @@ export type Database = {
           currency: string | null
           customer_id: string | null
           deleted_at: string | null
+          exchange_rate: number
           id: string
           invoice_id: string | null
           notes: string | null
           payment_date: string | null
           payment_method_id: string | null
           payment_number: string | null
+          rate_source: string
           reference: string | null
           status: string | null
           tenant_id: string
@@ -9285,6 +9330,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          amount_base?: number | null
           bank_account_id?: string | null
           case_id?: string | null
           created_at?: string
@@ -9292,12 +9338,14 @@ export type Database = {
           currency?: string | null
           customer_id?: string | null
           deleted_at?: string | null
+          exchange_rate?: number
           id?: string
           invoice_id?: string | null
           notes?: string | null
           payment_date?: string | null
           payment_method_id?: string | null
           payment_number?: string | null
+          rate_source?: string
           reference?: string | null
           status?: string | null
           tenant_id: string
@@ -9305,6 +9353,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          amount_base?: number | null
           bank_account_id?: string | null
           case_id?: string | null
           created_at?: string
@@ -9312,12 +9361,14 @@ export type Database = {
           currency?: string | null
           customer_id?: string | null
           deleted_at?: string | null
+          exchange_rate?: number
           id?: string
           invoice_id?: string | null
           notes?: string | null
           payment_date?: string | null
           payment_method_id?: string | null
           payment_number?: string | null
+          rate_source?: string
           reference?: string | null
           status?: string | null
           tenant_id?: string
@@ -10725,21 +10776,26 @@ export type Database = {
           customer_id: string | null
           deleted_at: string | null
           discount_amount: number | null
+          exchange_rate: number
           id: string
           notes: string | null
           quote_date: string | null
           quote_number: string | null
           quote_type: string | null
+          rate_source: string
           rejected_at: string | null
           rejection_reason: string | null
           status: string | null
           status_id: string | null
           subtotal: number | null
+          subtotal_base: number | null
           tax_amount: number | null
+          tax_amount_base: number | null
           tax_rate: number | null
           tenant_id: string
           terms: string | null
           total_amount: number | null
+          total_amount_base: number | null
           updated_at: string
           updated_by: string | null
           valid_until: string | null
@@ -10756,21 +10812,26 @@ export type Database = {
           customer_id?: string | null
           deleted_at?: string | null
           discount_amount?: number | null
+          exchange_rate?: number
           id?: string
           notes?: string | null
           quote_date?: string | null
           quote_number?: string | null
           quote_type?: string | null
+          rate_source?: string
           rejected_at?: string | null
           rejection_reason?: string | null
           status?: string | null
           status_id?: string | null
           subtotal?: number | null
+          subtotal_base?: number | null
           tax_amount?: number | null
+          tax_amount_base?: number | null
           tax_rate?: number | null
           tenant_id: string
           terms?: string | null
           total_amount?: number | null
+          total_amount_base?: number | null
           updated_at?: string
           updated_by?: string | null
           valid_until?: string | null
@@ -10787,21 +10848,26 @@ export type Database = {
           customer_id?: string | null
           deleted_at?: string | null
           discount_amount?: number | null
+          exchange_rate?: number
           id?: string
           notes?: string | null
           quote_date?: string | null
           quote_number?: string | null
           quote_type?: string | null
+          rate_source?: string
           rejected_at?: string | null
           rejection_reason?: string | null
           status?: string | null
           status_id?: string | null
           subtotal?: number | null
+          subtotal_base?: number | null
           tax_amount?: number | null
+          tax_amount_base?: number | null
           tax_rate?: number | null
           tenant_id?: string
           terms?: string | null
           total_amount?: number | null
+          total_amount_base?: number | null
           updated_at?: string
           updated_by?: string | null
           valid_until?: string | null
