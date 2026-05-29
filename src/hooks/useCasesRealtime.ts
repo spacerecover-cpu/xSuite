@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, getTenantId } from '../lib/supabaseClient';
 import { logger } from '../lib/logger';
 
 export const useCasesRealtime = () => {
@@ -8,6 +8,11 @@ export const useCasesRealtime = () => {
   const debounceTimers = useRef<{ [key: string]: NodeJS.Timeout }>({});
 
   useEffect(() => {
+    // Scope the subscription to the current tenant so Postgres pre-filters before
+    // RLS, instead of evaluating this subscriber against every tenant's writes.
+    const tenantId = getTenantId();
+    if (!tenantId) return;
+
     const debouncedInvalidate = (queryKey: any[], delay: number = 500) => {
       const key = JSON.stringify(queryKey);
 
@@ -32,6 +37,7 @@ export const useCasesRealtime = () => {
           event: '*',
           schema: 'public',
           table: 'cases',
+          filter: `tenant_id=eq.${tenantId}`,
         },
         (payload) => {
           if (payload.new && 'id' in payload.new) {
@@ -51,6 +57,7 @@ export const useCasesRealtime = () => {
           event: 'UPDATE',
           schema: 'public',
           table: 'case_devices',
+          filter: `tenant_id=eq.${tenantId}`,
         },
         (payload) => {
           if (payload.new && 'case_id' in payload.new) {
