@@ -1,6 +1,48 @@
-import { supabase } from './supabaseClient';
+import { supabase, resolveTenantId } from './supabaseClient';
 import { AccountingLocale } from '../types/accountingLocale';
 import { logger } from './logger';
+import type { Database } from '../types/database.types';
+
+type FinancialTransactionInsert = Database['public']['Tables']['financial_transactions']['Insert'];
+
+export interface CreateFinancialTransactionInput {
+  transaction_date: string;
+  amount: number;
+  transaction_type: string;
+  description: string;
+  reference_type?: string;
+  reference_id?: string;
+}
+
+/**
+ * Single source of truth for writing a financial ledger entry. Throws on failure
+ * so callers can abort their unit of work rather than silently losing financial
+ * data. tenant_id is also stamped server-side by the set_*_tenant_and_audit trigger.
+ */
+export const createFinancialTransaction = async (
+  transaction: CreateFinancialTransactionInput,
+): Promise<void> => {
+  const tenantId = await resolveTenantId();
+
+  const payload: FinancialTransactionInsert = {
+    tenant_id: tenantId,
+    transaction_date: transaction.transaction_date,
+    amount: transaction.amount,
+    transaction_type: transaction.transaction_type,
+    description: transaction.description,
+    reference_type: transaction.reference_type,
+    reference_id: transaction.reference_id,
+  };
+
+  const { error } = await supabase
+    .from('financial_transactions')
+    .insert([payload]);
+
+  if (error) {
+    logger.error('Error creating financial transaction:', error);
+    throw new Error(`Failed to create financial audit record: ${error.message}`);
+  }
+};
 
 export interface FinancialSummary {
   totalRevenue: number;
