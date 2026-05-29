@@ -1,4 +1,4 @@
-import { initializePDFFonts, getFontFamily, createPdfWithFonts } from './fonts';
+import { initializePDFFonts, createPdfWithFonts } from './fonts';
 import { fetchReceiptData, fetchQuoteData, fetchInvoiceData, fetchPaymentReceiptData, fetchPayslipData, fetchChainOfCustodyData } from './dataFetcher';
 import { buildOfficeReceiptDocument } from './documents/OfficeReceiptDocument';
 import { buildCustomerCopyDocument } from './documents/CustomerCopyDocument';
@@ -11,14 +11,9 @@ import { buildPayslipDocument } from './documents/PayslipDocument';
 import { buildChainOfCustodyDocument } from './documents/ChainOfCustodyDocument';
 import { loadImageAsBase64 } from './utils';
 import { logPDFGeneration } from './loggingService';
-import type { TranslationContext, DocumentType } from './types';
-import {
-  getTranslation,
-  isRTLLanguage,
-  formatBilingualText,
-  type LanguageCode,
-  type TranslationKey,
-} from '../documentTranslations';
+import { withTimeout, createTranslationContext } from './translationContext';
+import type { DocumentType } from './types';
+import { type LanguageCode } from '../documentTranslations';
 
 const PDF_GENERATION_TIMEOUT = 45000; // 45 seconds
 
@@ -42,52 +37,6 @@ export interface PDFGenerationOptions {
   documentType: DocumentType;
   download?: boolean;
   filename?: string;
-}
-
-async function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  errorMessage: string
-): Promise<T> {
-  let timeoutId: NodeJS.Timeout;
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => {
-      reject(new Error(`${errorMessage} (timeout after ${timeoutMs}ms)`));
-    }, timeoutMs);
-  });
-
-  try {
-    const result = await Promise.race([promise, timeoutPromise]);
-    clearTimeout(timeoutId!);
-    return result;
-  } catch (error) {
-    clearTimeout(timeoutId!);
-    throw error;
-  }
-}
-
-function createTranslationContext(
-  mode: 'english_only' | 'bilingual',
-  languageCode: LanguageCode | null
-): TranslationContext {
-  const isRTL = languageCode ? isRTLLanguage(languageCode) : false;
-  const isBilingual = mode === 'bilingual' && languageCode !== null;
-  const fontFamily = getFontFamily(languageCode);
-
-  const t = (key: string, englishText: string): string => {
-    if (!isBilingual || !languageCode) return englishText;
-    const translated = getTranslation(key as TranslationKey, languageCode);
-    return formatBilingualText(englishText, translated, isRTL);
-  };
-
-  return {
-    t,
-    isRTL,
-    isBilingual,
-    languageCode,
-    fontFamily,
-  };
 }
 
 export async function generateOfficeReceipt(caseId: string, download: boolean = true): Promise<PDFGenerationResult> {

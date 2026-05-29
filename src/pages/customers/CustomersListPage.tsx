@@ -479,7 +479,7 @@ export const CustomersListPage: React.FC = () => {
       if (error) throw error;
       toast.success(`Archived ${n} customer${n === 1 ? '' : 's'}`);
       selection.clear();
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['customers_enhanced'] });
     } catch (err) {
       toast.error((err as Error).message || 'Failed to archive customers');
     } finally {

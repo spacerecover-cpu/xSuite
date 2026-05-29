@@ -21,3 +21,13 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# Build/typecheck scratch output (never commit)
+*.out
+tsc-*.txt
+cases-errors.txt
+.audit-result.json
+.audit-blueprints.txt
+
+# Local agent worktrees
+.claude/worktrees/
