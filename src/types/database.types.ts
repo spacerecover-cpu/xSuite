@@ -15179,6 +15179,7 @@ export type Database = {
         Args: { p_preset_id: string }
         Returns: undefined
       }
+      invoke_sync_exchange_rates: { Args: never; Returns: undefined }
       is_admin: { Args: never; Returns: boolean }
       is_admin_user: { Args: never; Returns: boolean }
       is_hr_or_admin: { Args: never; Returns: boolean }
