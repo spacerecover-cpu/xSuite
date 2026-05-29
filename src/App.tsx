@@ -110,10 +110,7 @@ const StockSalesPage = lazyWithRetry(() => import('./pages/stock/StockSalesPage'
 const StockSaleDetailPage = lazyWithRetry(() => import('./pages/stock/StockSaleDetailPage').then(m => ({ default: m.default as React.ComponentType<unknown> })));
 const StockAdjustmentsPage = lazyWithRetry(() => import('./pages/stock/StockAdjustmentsPage').then(m => ({ default: m.default as React.ComponentType<unknown> })));
 const StockReportsPage = lazyWithRetry(() => import('./pages/stock/StockReportsPage').then(m => ({ default: m.default as React.ComponentType<unknown> })));
-const StockReturnsPage = lazyWithRetry(() => import('./pages/stock/StockReturnsPage').then(m => ({ default: m.default as React.ComponentType<unknown> })));
 const StockLocationsPage = lazyWithRetry(() => import('./pages/stock/StockLocationsPage').then(m => ({ default: m.default as React.ComponentType<unknown> })));
-const StockTransfersPage = lazyWithRetry(() => import('./pages/stock/StockTransfersPage').then(m => ({ default: m.default as React.ComponentType<unknown> })));
-const StockTransferDetail = lazyWithRetry(() => import('./pages/stock/StockTransferDetail').then(m => ({ default: m.default as React.ComponentType<unknown> })));
 const InventoryListPage = lazyWithRetry(() => import('./pages/inventory/InventoryListPage').then(m => ({ default: m.default as React.ComponentType<unknown> })));
 const InventoryFormPage = lazyWithRetry(() => import('./pages/inventory/InventoryFormPage').then(m => ({ default: m.default as React.ComponentType<unknown> })));
 const DonorSearchPage = lazyWithRetry(() => import('./pages/inventory/DonorSearchPage').then(m => ({ default: m.default as React.ComponentType<unknown> })));
@@ -288,10 +285,7 @@ function App() {
             <Route path="stock/sales/:id" element={<StockSaleDetailPage />} />
             <Route path="stock/adjustments" element={<StockAdjustmentsPage />} />
             <Route path="stock/reports" element={<StockReportsPage />} />
-            <Route path="stock/returns" element={<StockReturnsPage />} />
             <Route path="stock/locations" element={<StockLocationsPage />} />
-            <Route path="stock/transfers" element={<StockTransfersPage />} />
-            <Route path="stock/transfers/:id" element={<StockTransferDetail />} />
             <Route path="stock/:id" element={<StockItemDetail />} />
             <Route path="inventory" element={<InventoryListPage />} />
             <Route path="inventory/new" element={<InventoryFormPage />} />
