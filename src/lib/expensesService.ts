@@ -2,6 +2,7 @@ import { supabase } from './supabaseClient';
 import { sanitizeFilterValue } from './postgrestSanitizer';
 import { logger } from './logger';
 import type { Database } from '../types/database.types';
+import { createFinancialTransaction } from './financialService';
 
 type ExpenseInsert = Database['public']['Tables']['expenses']['Insert'];
 type ExpenseAttachmentRow = Database['public']['Tables']['expense_attachments']['Row'];
@@ -469,31 +470,9 @@ export const getExpensesByCategory = async (filters?: {
     .sort((a, b) => b.amount - a.amount);
 };
 
-const createFinancialTransaction = async (transaction: {
-  transaction_date: string;
-  amount: number;
-  transaction_type: string;
-  description: string;
-  reference_type?: string;
-  reference_id?: string;
-}) => {
-  const payload = {
-    transaction_date: transaction.transaction_date,
-    amount: transaction.amount,
-    transaction_type: transaction.transaction_type,
-    description: transaction.description,
-    reference_type: transaction.reference_type,
-    reference_id: transaction.reference_id,
-  } as Database['public']['Tables']['financial_transactions']['Insert'];
-
-  const { error } = await supabase
-    .from('financial_transactions')
-    .insert([payload]);
-
-  if (error) {
-    logger.error('Error creating financial transaction:', error);
-  }
-};
+// createFinancialTransaction now lives in financialService (shared, fail-fast):
+// a failed ledger write throws so approveExpense aborts instead of silently
+// leaving the books out of balance.
 
 const createVATRecord = async (record: {
   record_type: string;

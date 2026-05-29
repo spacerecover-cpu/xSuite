@@ -2,11 +2,12 @@ import { supabase } from './supabaseClient';
 import { logAuditTrail } from './auditTrailService';
 import { sanitizeFilterValue } from './postgrestSanitizer';
 import { logger } from './logger';
+import { deriveInvoiceStatus } from './invoiceStatus';
+import { createFinancialTransaction } from './financialService';
 import type { Database } from '../types/database.types';
 
 type PaymentInsert = Database['public']['Tables']['payments']['Insert'];
 type PaymentAllocationInsert = Database['public']['Tables']['payment_allocations']['Insert'];
-type FinancialTransactionInsert = Database['public']['Tables']['financial_transactions']['Insert'];
 
 export interface Payment {
   id?: string;
@@ -271,12 +272,7 @@ export const allocatePaymentToInvoices = async (
       const newAmountPaid = Math.round(((invoice.amount_paid || 0) + alloc.amount) * 100) / 100;
       const newAmountDue = Math.round(((invoice.total_amount || 0) - newAmountPaid) * 100) / 100;
 
-      let newStatus = 'sent';
-      if (newAmountDue <= 0) {
-        newStatus = 'paid';
-      } else if (newAmountPaid > 0) {
-        newStatus = 'partial';
-      }
+      const newStatus = deriveInvoiceStatus(newAmountPaid, newAmountDue);
 
       const { error: updateError } = await supabase
         .from('invoices')
@@ -364,12 +360,7 @@ export const voidPayment = async (paymentId: string) => {
     const newAmountPaid = Math.max(0, (invoice.amount_paid || 0) - alloc.amount);
     const newAmountDue = (invoice.total_amount || 0) - newAmountPaid;
 
-    let newStatus = 'sent';
-    if (newAmountDue <= 0) {
-      newStatus = 'paid';
-    } else if (newAmountPaid > 0) {
-      newStatus = 'partial';
-    }
+    const newStatus = deriveInvoiceStatus(newAmountPaid, newAmountDue);
 
     await supabase
       .from('invoices')
@@ -562,35 +553,8 @@ export const getUnpaidInvoicesByCase = async (caseId: string) => {
   return data || [];
 };
 
-const createFinancialTransaction = async (transaction: {
-  transaction_date: string;
-  amount: number;
-  transaction_type: string;
-  description: string;
-  reference_type?: string;
-  reference_id?: string;
-}) => {
-  const tenantId = await getCurrentTenantId();
-
-  const payload: FinancialTransactionInsert = {
-    tenant_id: tenantId,
-    transaction_date: transaction.transaction_date,
-    amount: transaction.amount,
-    transaction_type: transaction.transaction_type,
-    description: transaction.description,
-    reference_type: transaction.reference_type,
-    reference_id: transaction.reference_id,
-  };
-
-  const { error } = await supabase
-    .from('financial_transactions')
-    .insert([payload]);
-
-  if (error) {
-    logger.error('Error creating financial transaction:', error);
-    throw new Error(`Failed to create financial audit record: ${error.message}`);
-  }
-};
+// createFinancialTransaction is now the shared fail-fast implementation in
+// financialService; this path already threw on error, so behavior is unchanged.
 
 export const paymentsService = {
   getNextPaymentNumber,

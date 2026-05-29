@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { deriveInvoiceStatus } from './invoiceStatus';
 import { sanitizeFilterValue, isValidUuid } from './postgrestSanitizer';
 import type { Database } from '../types/database.types';
 
@@ -663,7 +664,10 @@ export const bankingService = {
         .update({
           amount_paid: newAmountPaid,
           balance_due: newAmountDue,
-          status: newAmountDue <= 0 ? 'paid' : 'partially-paid',
+          status: deriveInvoiceStatus(newAmountPaid, newAmountDue, {
+            partialLabel: 'partially-paid',
+            unpaidLabel: 'partially-paid',
+          }),
         })
         .eq('id', invoiceId);
     }
@@ -977,12 +981,10 @@ export const bankingService = {
           const newAmountPaid = (invoice.amount_paid ?? 0) + allocation.allocated_amount;
           const newAmountDue = (invoice.balance_due ?? 0) - allocation.allocated_amount;
 
-          let newStatus = invoice.status;
-          if (newAmountDue <= 0) {
-            newStatus = 'paid';
-          } else if (newAmountPaid > 0) {
-            newStatus = 'partially-paid';
-          }
+          const newStatus = deriveInvoiceStatus(newAmountPaid, newAmountDue, {
+            partialLabel: 'partially-paid',
+            unpaidLabel: invoice.status ?? 'sent',
+          });
 
           await supabase
             .from('invoices')

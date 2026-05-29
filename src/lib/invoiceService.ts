@@ -5,6 +5,7 @@ import { logAuditTrail } from './auditTrailService';
 import { sanitizeUuidFields as sanitizeUuids } from './dataValidation';
 import { sanitizeFilterValue } from './postgrestSanitizer';
 import { calculateInvoiceTotals } from './financialMath';
+import { deriveInvoiceStatus } from './invoiceStatus';
 
 type InvoiceInsert = Database['public']['Tables']['invoices']['Insert'];
 type InvoiceUpdate = Database['public']['Tables']['invoices']['Update'];
@@ -678,12 +679,10 @@ export const recordPayment = async (
   const newAmountPaid = previousPaid + paymentData.amount;
   const newBalanceDue = totalAmount - newAmountPaid;
 
-  let newStatus = 'partial';
-  if (newBalanceDue <= 0) {
-    newStatus = 'paid';
-  } else if (newAmountPaid === 0) {
-    newStatus = 'sent';
-  }
+  const newStatus = deriveInvoiceStatus(newAmountPaid, newBalanceDue, {
+    partialLabel: 'partial',
+    unpaidLabel: 'sent',
+  });
 
   // payment_method here is the master_payment_methods UUID (caller already passes the FK).
   // The legacy `reference_number` arg maps to the `reference` column.
