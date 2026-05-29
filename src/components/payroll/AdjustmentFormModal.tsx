@@ -42,7 +42,7 @@ export function AdjustmentFormModal({ onClose }: Props) {
   const saveMutation = useMutation({
     mutationFn: (data: Parameters<typeof payrollService.createPayrollAdjustment>[0]) => payrollService.createPayrollAdjustment(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: payrollKeys.adjustments({}) });
+      queryClient.invalidateQueries({ queryKey: payrollKeys.all });
       toast.success('Adjustment created successfully');
       onClose();
     },

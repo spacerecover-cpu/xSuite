@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, DollarSign, Calendar, TrendingUp, CreditCard as Edit } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { payrollService } from '../../lib/payrollService';
+import { payrollKeys } from '../../lib/queryKeys';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
@@ -48,7 +49,7 @@ export const EmployeeProfilePage: React.FC = () => {
   });
 
   const { data: activeLoans = [] } = useQuery({
-    queryKey: ['employee-loans', id],
+    queryKey: payrollKeys.employeeLoans(id ?? ''),
     queryFn: () => payrollService.getEmployeeLoans({ employeeId: id }),
     enabled: !!id,
   });

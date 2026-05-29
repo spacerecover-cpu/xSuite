@@ -137,6 +137,7 @@ export const BankingPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['balance_summary'] });
       queryClient.invalidateQueries({ queryKey: ['invoices_by_case'] });
       queryClient.invalidateQueries({ queryKey: ['cases_with_invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['bank_transactions'] });
       setShowReceiptModal(false);
     },
   });
@@ -147,6 +148,7 @@ export const BankingPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['account_transfers'] });
       queryClient.invalidateQueries({ queryKey: ['bank_accounts'] });
       queryClient.invalidateQueries({ queryKey: ['balance_summary'] });
+      queryClient.invalidateQueries({ queryKey: ['bank_transactions'] });
       setShowTransferModal(false);
     },
   });
