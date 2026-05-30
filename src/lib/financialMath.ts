@@ -165,3 +165,22 @@ export const calculateQuoteTotals = (
 
   return { subtotal, taxAmount, totalAmount };
 };
+
+/**
+ * Read a row's base-currency value for a money field, for cross-document
+ * aggregation (reports / dashboards). Prefers the `<field>_base` column when it is
+ * a number — COALESCE semantics, so a stored 0 is honoured as a real value — and
+ * falls back to the raw `<field>` only for transition rows that predate the base
+ * snapshot, else 0. Summing the RAW transaction amount across documents is wrong
+ * the moment a tenant uses more than one currency (it adds OMR to EUR under one
+ * symbol); cross-document totals must always go through this helper.
+ */
+export const baseAmount = (
+  row: Record<string, unknown>,
+  field: string,
+): number => {
+  const base = row[`${field}_base`];
+  if (typeof base === 'number') return base;
+  const raw = row[field];
+  return typeof raw === 'number' ? raw : 0;
+};

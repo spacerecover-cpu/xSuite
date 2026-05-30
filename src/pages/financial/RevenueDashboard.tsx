@@ -11,6 +11,7 @@ import {
   generateRevenueByCustomerReport,
   generateRevenueByCaseReport,
 } from '../../lib/financialReportsService';
+import { baseAmount } from '../../lib/financialMath';
 import { TrendingUp, DollarSign, PieChart, BarChart3, Plus, Search, Users, Briefcase } from 'lucide-react';
 
 type RevenueInvoiceRow = {
@@ -84,7 +85,9 @@ export const RevenueDashboard: React.FC = () => {
           invoice_number,
           invoice_date,
           total_amount,
+          total_amount_base,
           amount_paid,
+          amount_paid_base,
           status,
           customer:customers_enhanced(customer_name)
         `)
@@ -116,16 +119,16 @@ export const RevenueDashboard: React.FC = () => {
       const prevEnd = new Date(dateRange.from);
       const { data } = await supabase
         .from('invoices')
-        .select('amount_paid')
+        .select('amount_paid, amount_paid_base')
         .gte('invoice_date', prevStart.toISOString().split('T')[0])
         .lt('invoice_date', prevEnd.toISOString().split('T')[0]);
-      return (data || []).reduce<number>((sum, inv) => sum + (inv.amount_paid ?? 0), 0);
+      return (data || []).reduce<number>((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
     },
   });
 
-  const totalRevenue = revenueData.reduce<number>((sum, inv) => sum + (inv.amount_paid ?? 0), 0);
+  const totalRevenue = revenueData.reduce<number>((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
   const thisMonth = revenueData.filter((inv) => inv.invoice_date !== null && new Date(inv.invoice_date).getMonth() === new Date().getMonth());
-  const thisMonthRevenue = thisMonth.reduce<number>((sum, inv) => sum + (inv.amount_paid ?? 0), 0);
+  const thisMonthRevenue = thisMonth.reduce<number>((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
   const paidInvoices = revenueData.filter((inv) => inv.status === 'paid');
   const growthRate = prevPeriodRevenue > 0 ? ((totalRevenue - prevPeriodRevenue) / prevPeriodRevenue) * 100 : 0;
 

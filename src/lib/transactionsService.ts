@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient';
 import { sanitizeFilterValue } from './postgrestSanitizer';
 import { logger } from './logger';
+import { baseAmount } from './financialMath';
 
 export interface Transaction {
   id?: string;
@@ -276,7 +277,7 @@ export const getTransactionStats = async (filters?: {
 }) => {
   let query = supabase
     .from('financial_transactions')
-    .select('amount, transaction_type, transaction_date')
+    .select('amount, amount_base, transaction_type, transaction_date')
     .is('deleted_at', null);
 
   if (filters?.dateFrom) {
@@ -292,13 +293,27 @@ export const getTransactionStats = async (filters?: {
 
   const allTransactions = transactions || [];
 
+  // Aggregate in base currency (transactions may be in mixed currencies once a
+  // tenant invoices in more than one). baseAmount falls back to raw for any
+  // pre-base transition row.
   const income = allTransactions
     .filter(t => t.transaction_type === 'income')
-    .reduce((sum, t) => sum + (t.amount || 0), 0);
+    .reduce((sum, t) => sum + baseAmount(t, 'amount'), 0);
 
   const expenseTotal = allTransactions
     .filter(t => t.transaction_type === 'expense')
-    .reduce((sum, t) => sum + (t.amount || 0), 0);
+    .reduce((sum, t) => sum + baseAmount(t, 'amount'), 0);
+
+  // Realized FX rows are posted as positive magnitudes typed fx_gain / fx_loss
+  // (see paymentsService.allocatePaymentToInvoices); fold them into the net so the
+  // bottom line reflects realized currency movement, not just operating flows.
+  const fxGain = allTransactions
+    .filter(t => t.transaction_type === 'fx_gain')
+    .reduce((sum, t) => sum + baseAmount(t, 'amount'), 0);
+
+  const fxLoss = allTransactions
+    .filter(t => t.transaction_type === 'fx_loss')
+    .reduce((sum, t) => sum + baseAmount(t, 'amount'), 0);
 
   return {
     total: allTransactions.length,
@@ -308,7 +323,7 @@ export const getTransactionStats = async (filters?: {
     reconciled: 0,
     totalIncome: income,
     totalExpenses: expenseTotal,
-    netCashFlow: income - expenseTotal,
+    netCashFlow: income - expenseTotal + fxGain - fxLoss,
   };
 };
 

@@ -7,6 +7,7 @@ import {
   calculateInvoiceTotalsBase,
   calculateQuoteTotalsBase,
   computeRealizedFx,
+  baseAmount,
 } from './financialMath';
 
 // Characterization tests. These pin the EXISTING behavior of the canonical
@@ -290,5 +291,32 @@ describe('computeRealizedFx', () => {
   it('rounds the delta to the base currency minor units (JPY base, 0dp)', () => {
     // 1000 * (0.0072 - 0.0070) = 0.2 -> 0 at 0 decimals
     expect(computeRealizedFx(1000, 0.0072, 0.007, 0)).toBe(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// baseAmount: read a row's base-currency value for cross-document aggregation.
+// Reports MUST sum the *_base columns (one currency), never the raw transaction
+// amounts (which mix currencies once >1 currency exists). COALESCE semantics:
+// prefer <field>_base, fall back to the raw field during the transition, else 0.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('baseAmount', () => {
+  it('returns the base-currency value when present', () => {
+    expect(baseAmount({ amount: 105, amount_base: 44.1 }, 'amount')).toBe(44.1);
+    expect(baseAmount({ total_amount: 105, total_amount_base: 44.1 }, 'total_amount')).toBe(44.1);
+  });
+
+  it('falls back to the raw amount when base is absent or null (transition rows)', () => {
+    expect(baseAmount({ amount: 105 }, 'amount')).toBe(105);
+    expect(baseAmount({ amount: 105, amount_base: null }, 'amount')).toBe(105);
+  });
+
+  it('treats a base of 0 as a real value, not a missing one', () => {
+    expect(baseAmount({ amount: 105, amount_base: 0 }, 'amount')).toBe(0);
+  });
+
+  it('returns 0 when neither base nor raw is a usable number', () => {
+    expect(baseAmount({}, 'amount')).toBe(0);
+    expect(baseAmount({ amount: null, amount_base: null }, 'amount')).toBe(0);
   });
 });
