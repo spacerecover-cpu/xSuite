@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, resolveTenantId } from './supabaseClient';
 import type { Database } from '../types/database.types';
 import { logAuditTrail } from './auditTrailService';
 import { sanitizeUuidFields as sanitizeUuids } from './dataValidation';
@@ -386,12 +386,15 @@ export const createQuote = async (quote: Quote, items: QuoteItem[]) => {
     );
     const baseTotals = calculateQuoteTotalsBase({ subtotal, taxAmount, totalAmount }, rc.rate, rc.baseDecimals);
 
+    // tenant_id must be a real uuid: the set_tenant_and_audit_fields trigger only
+    // stamps it when NULL, and an empty string fails the uuid cast (22P02) before
+    // the trigger fires. Resolve the authenticated tenant once for header + items.
+    const tenantId = await resolveTenantId();
     const persistFields = pickQuotePersistFields(quote);
     const quoteToInsertRaw: QuoteInsert = {
       ...persistFields,
-      // tenant_id is auto-populated by the set_tenant_and_audit_fields trigger;
-      // cast keeps the Insert type happy (tenant_id is declared NOT NULL in Insert).
-      tenant_id: persistFields.tenant_id ?? ('' as string),
+      // Honour any caller-provided tenant_id, else the resolved tenant.
+      tenant_id: persistFields.tenant_id ?? tenantId,
       case_id: quote.case_id,
       customer_id: quote.customer_id || null,
       company_id: quote.company_id || null,
@@ -441,8 +444,7 @@ export const createQuote = async (quote: Quote, items: QuoteItem[]) => {
     const itemsWithQuoteId: QuoteItemInsert[] = items.map((item, index) => {
       const total = roundMoney(item.quantity * item.unit_price, rc.documentDecimals);
       return {
-        // tenant_id auto-set by trigger; same workaround as quotes insert
-        tenant_id: '' as string,
+        tenant_id: tenantId,
         quote_id: quoteData.id,
         description: item.description.trim(),
         quantity: item.quantity,
@@ -532,10 +534,11 @@ export const updateQuote = async (id: string, quote: Partial<Quote>, items?: Quo
 
     await supabase.from('quote_items').update({ deleted_at: new Date().toISOString() }).eq('quote_id', id);
 
+    const tenantId = await resolveTenantId();
     const itemsWithQuoteId: QuoteItemInsert[] = items.map((item, index) => {
       const total = roundMoney(item.quantity * item.unit_price, docDecimals);
       return {
-        tenant_id: '' as string,
+        tenant_id: tenantId,
         quote_id: id,
         description: item.description,
         quantity: item.quantity,

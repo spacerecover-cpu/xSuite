@@ -14,7 +14,7 @@ import { useToast } from '../../hooks/useToast';
 import { FileText, ArrowLeft, CreditCard as Edit, DollarSign, AlertCircle, RefreshCw, CheckCircle, ArrowRight, Lock } from 'lucide-react';
 import { RecordReceiptModal } from '../../components/banking/RecordReceiptModal';
 import { logger } from '../../lib/logger';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase, resolveTenantId } from '../../lib/supabaseClient';
 import type { PaymentReceipt } from '../../lib/bankingService';
 
 const statusConfig = {
@@ -631,10 +631,12 @@ export const InvoiceDetailPage: React.FC = () => {
             if (typeof receiptRow.amount !== 'number') {
               throw new Error('Receipt amount is required');
             }
+            // Real tenant uuid: the trigger only stamps NULL; '' fails the uuid cast.
+            const tenantId = await resolveTenantId();
             const { data: receipt, error: receiptError } = await supabase
               .from('receipts')
               .insert({
-                tenant_id: '' as string,
+                tenant_id: tenantId,
                 amount: receiptRow.amount,
                 receipt_date: receiptRow.receipt_date,
                 customer_id: receiptRow.customer_id ?? null,
@@ -651,7 +653,7 @@ export const InvoiceDetailPage: React.FC = () => {
 
             if (allocations && allocations.length > 0) {
               const allocationRecords = allocations.map((alloc) => ({
-                tenant_id: '' as string,
+                tenant_id: tenantId,
                 receipt_id: receipt.id,
                 invoice_id: alloc.invoice_id,
                 amount: alloc.allocated_amount,

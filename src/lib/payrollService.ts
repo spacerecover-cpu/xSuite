@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, resolveTenantId } from './supabaseClient';
 import type { Database, Json } from '../types/database.types';
 
 type PayrollPeriod = Database['public']['Tables']['payroll_periods']['Row'];
@@ -107,7 +107,9 @@ export const payrollService = {
   async createSalaryComponent(component: Database['public']['Tables']['salary_components']['Insert']) {
     const { data, error } = await supabase
       .from('salary_components')
-      .insert(component)
+      // Stamp the real tenant: the trigger only fills NULL, and '' (some callers'
+      // placeholder) fails the uuid cast. resolveTenantId() owns this centrally.
+      .insert({ ...component, tenant_id: await resolveTenantId() })
       .select()
       .maybeSingle();
 
@@ -192,7 +194,7 @@ export const payrollService = {
   async createPayrollPeriod(data: PayrollPeriodInsert) {
     const { data: period, error } = await supabase
       .from('payroll_periods')
-      .insert(data)
+      .insert({ ...data, tenant_id: await resolveTenantId() })
       .select()
       .maybeSingle();
 
@@ -496,7 +498,7 @@ export const payrollService = {
   async createPayrollAdjustment(data: PayrollAdjustmentInsert) {
     const { data: adjustment, error } = await supabase
       .from('payroll_adjustments')
-      .insert(data)
+      .insert({ ...data, tenant_id: await resolveTenantId() })
       .select()
       .maybeSingle();
 
@@ -604,6 +606,7 @@ export const payrollService = {
     const loanData: EmployeeLoanInsert = {
       ...data,
       loan_number: nextNumber || `LOAN-${Date.now()}`,
+      tenant_id: await resolveTenantId(),
     };
 
     const { data: loan, error } = await supabase

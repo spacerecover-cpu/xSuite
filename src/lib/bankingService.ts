@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, resolveTenantId } from './supabaseClient';
 import { deriveInvoiceStatus } from './invoiceStatus';
 import { sanitizeFilterValue, isValidUuid } from './postgrestSanitizer';
 import type { Database } from '../types/database.types';
@@ -210,6 +210,7 @@ export const bankingService = {
       accountNumber = null;
     }
 
+    const tenantId = await resolveTenantId();
     const dataToInsert: BankAccountInsert = {
       name: accountName,
       account_number: accountNumber,
@@ -227,7 +228,7 @@ export const bankingService = {
       employee_id: accountData.employee_id ?? null,
       notes: accountData.notes ?? null,
       created_by: user?.id ?? null,
-      tenant_id: '', // populated by RLS trigger
+      tenant_id: tenantId,
     };
 
     const { data, error } = await supabase
@@ -363,6 +364,7 @@ export const bankingService = {
       throw new Error('Receipt amount is required');
     }
 
+    const tenantId = await resolveTenantId();
     const insertRow: PaymentReceiptInsert = {
       amount: receiptData.amount,
       receipt_number: (typeof receiptNumber === 'string' ? receiptNumber : null),
@@ -371,7 +373,7 @@ export const bankingService = {
       payment_id: receiptData.payment_id ?? null,
       notes: receiptData.notes ?? null,
       created_by: user?.id ?? null,
-      tenant_id: '', // populated by RLS trigger
+      tenant_id: tenantId,
     };
 
     const { data, error } = await supabase
@@ -445,6 +447,7 @@ export const bankingService = {
 
     const { data: disbursementNumber } = await supabase.rpc('get_next_disbursement_number');
 
+    const tenantId = await resolveTenantId();
     const insertRow: PaymentDisbursementInsert = {
       amount: disbursementData.amount,
       bank_account_id: disbursementData.bank_account_id ?? null,
@@ -456,7 +459,7 @@ export const bankingService = {
       notes: disbursementData.notes ?? null,
       status: disbursementData.status ?? 'pending',
       created_by: user?.id ?? null,
-      tenant_id: '', // populated by RLS trigger
+      tenant_id: tenantId,
     };
 
     const { data, error } = await supabase
@@ -554,6 +557,7 @@ export const bankingService = {
       throw new Error('Insufficient balance in the source account');
     }
 
+    const tenantId = await resolveTenantId();
     const insertRow: AccountTransferInsert = {
       amount: transferData.amount,
       from_account_id: transferData.from_account_id,
@@ -563,7 +567,7 @@ export const bankingService = {
       notes: transferData.notes ?? null,
       status: transferData.status ?? 'completed',
       created_by: user?.id ?? null,
-      tenant_id: '', // populated by RLS trigger
+      tenant_id: tenantId,
     };
 
     const { data, error } = await supabase
@@ -635,12 +639,13 @@ export const bankingService = {
   ): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
 
+    const tenantId = await resolveTenantId();
     const allocationRow: ReceiptAllocationInsert = {
       receipt_id: receiptId,
       invoice_id: invoiceId,
       amount,
       created_by: user?.id ?? null,
-      tenant_id: '', // populated by RLS trigger
+      tenant_id: tenantId,
     };
 
     const { error } = await supabase
@@ -935,6 +940,7 @@ export const bankingService = {
 
     const { data: receiptNumber } = await supabase.rpc('get_next_receipt_number');
 
+    const tenantId = await resolveTenantId();
     const receiptInsert: PaymentReceiptInsert = {
       amount: receiptData.amount,
       receipt_number: typeof receiptNumber === 'string' ? receiptNumber : null,
@@ -943,7 +949,7 @@ export const bankingService = {
       payment_id: receiptData.payment_id ?? null,
       notes: receiptData.notes ?? null,
       created_by: user?.id ?? null,
-      tenant_id: '', // populated by RLS trigger
+      tenant_id: tenantId,
     };
 
     const { data: receipt, error: receiptError } = await supabase
@@ -961,7 +967,7 @@ export const bankingService = {
         invoice_id: a.invoice_id,
         amount: a.allocated_amount,
         created_by: user?.id ?? null,
-        tenant_id: '', // populated by RLS trigger
+        tenant_id: tenantId,
       }));
 
       const { error: allocError } = await supabase

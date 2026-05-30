@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, resolveTenantId } from './supabaseClient';
 import type { Database } from '../types/database.types';
 import { checkRateLimit, RATE_LIMITS } from './rateLimiter';
 import { logAuditTrail } from './auditTrailService';
@@ -386,12 +386,15 @@ export const createInvoice = async (invoice: Partial<Invoice>, items: InvoiceIte
     rc.baseDecimals,
   );
 
+  // tenant_id must be a real uuid: the set_tenant_and_audit_fields trigger only
+  // stamps it when NULL, and an empty string fails the uuid cast (22P02) before
+  // the trigger fires. Resolve the authenticated tenant once for header + items.
+  const tenantId = await resolveTenantId();
   const persistFields = pickInvoicePersistFields(invoice);
   const invoiceToInsert: InvoiceInsert = {
     ...persistFields,
-    // tenant_id is auto-populated by the set_tenant_and_audit_fields trigger;
-    // cast keeps the Insert type happy (tenant_id is declared NOT NULL in Insert).
-    tenant_id: persistFields.tenant_id ?? ('' as string),
+    // Honour any caller-provided tenant_id, else the resolved tenant.
+    tenant_id: persistFields.tenant_id ?? tenantId,
     invoice_number: invoiceNumber,
     invoice_type: invoiceType,
     is_proforma: invoiceType === 'proforma',
@@ -434,8 +437,7 @@ export const createInvoice = async (invoice: Partial<Invoice>, items: InvoiceIte
     const lineTotal = roundMoney(taxableAmount + itemTax, rc.documentDecimals);
 
     return {
-      // tenant_id auto-set by trigger; same workaround as above
-      tenant_id: '' as string,
+      tenant_id: tenantId,
       invoice_id: invoiceData.id,
       description: item.description,
       quantity: item.quantity,
@@ -540,6 +542,7 @@ export const updateInvoice = async (id: string, invoice: Partial<Invoice>, items
 
     await supabase.from('invoice_line_items').update({ deleted_at: new Date().toISOString() }).eq('invoice_id', id);
 
+    const tenantId = await resolveTenantId();
     const itemsWithInvoiceId: InvoiceLineItemInsert[] = items.map((item, index) => {
       const itemSubtotal = item.quantity * item.unit_price;
       const discountPct = item.discount_percent || 0;
@@ -549,7 +552,7 @@ export const updateInvoice = async (id: string, invoice: Partial<Invoice>, items
       const lineTotal = roundMoney(taxableAmount + itemTax, docDecimals);
 
       return {
-        tenant_id: '' as string,
+        tenant_id: tenantId,
         invoice_id: id,
         description: item.description,
         quantity: item.quantity,
@@ -771,6 +774,7 @@ export const recordPayment = async (
   // paymentsService.allocatePaymentToInvoices path does.)
   const baseCurrency = await getBaseCurrency();
   const baseDecimals = await getCurrencyDecimals(baseCurrency);
+  const tenantId = await resolveTenantId();
   const invoiceRate = invoice.exchange_rate ?? 1;
   const newAmountPaidBase = convertToBase(newAmountPaid, invoiceRate, baseDecimals);
   const newBalanceDueBase = convertToBase(newBalanceDue, invoiceRate, baseDecimals);
@@ -788,7 +792,7 @@ export const recordPayment = async (
     .from('payments')
     .insert([
       {
-        tenant_id: '' as string, // auto-set by trigger
+        tenant_id: tenantId,
         invoice_id: invoiceId,
         customer_id: invoice.customer_id,
         amount: paymentData.amount,
