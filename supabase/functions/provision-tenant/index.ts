@@ -61,6 +61,7 @@ interface ProvisionTenantRequest {
   adminFullName: string;
   planId: string;
   countryId: string;
+  base_currency_code?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -131,7 +132,7 @@ Deno.serve(async (req: Request) => {
 
     const requestData: ProvisionTenantRequest = await req.json();
 
-    const { name, slug, adminEmail, adminPassword, adminFullName, planId, countryId } = requestData;
+    const { name, slug, adminEmail, adminPassword, adminFullName, planId, countryId, base_currency_code } = requestData;
 
     if (!name || !slug || !adminEmail || !adminPassword || !adminFullName || !planId || !countryId) {
       return new Response(
@@ -196,6 +197,7 @@ Deno.serve(async (req: Request) => {
         country_id: countryId,
         status: 'trial',
         trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        ...(base_currency_code ? { base_currency_code } : {}),
       })
       .select()
       .single();

@@ -104,6 +104,7 @@ export const TenantSignup = () => {
 
     setLoading(true);
     try {
+      const selectedCountry = countries.find((c) => c.id === selectedCountryId);
       await tenantService.createTenant({
         name: formData.companyName,
         slug: formData.slug,
@@ -112,6 +113,7 @@ export const TenantSignup = () => {
         adminFullName: formData.adminFullName,
         planId: selectedPlanId,
         countryId: selectedCountryId,
+        baseCurrencyCode: selectedCountry?.currency_code ?? 'USD',
       });
 
       toast.success('Account created successfully! Please log in.');

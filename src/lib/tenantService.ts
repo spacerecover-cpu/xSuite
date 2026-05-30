@@ -13,6 +13,7 @@ interface CreateTenantParams {
   adminFullName: string;
   planId: string;
   countryId: string;
+  baseCurrencyCode: string;
 }
 
 interface TenantWithPlan extends Tenant {
@@ -83,6 +84,7 @@ export const tenantService = {
         adminFullName: params.adminFullName,
         planId: params.planId,
         countryId: params.countryId,
+        base_currency_code: params.baseCurrencyCode,
       }),
     });
 
