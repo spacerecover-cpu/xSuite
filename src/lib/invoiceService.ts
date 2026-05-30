@@ -4,7 +4,8 @@ import { checkRateLimit, RATE_LIMITS } from './rateLimiter';
 import { logAuditTrail } from './auditTrailService';
 import { sanitizeUuidFields as sanitizeUuids } from './dataValidation';
 import { sanitizeFilterValue } from './postgrestSanitizer';
-import { calculateInvoiceTotals } from './financialMath';
+import { calculateInvoiceTotals, calculateInvoiceTotalsBase, convertToBase, roundMoney } from './financialMath';
+import { resolveRateContext, getBaseCurrency, getCurrencyDecimals } from './currencyService';
 import { deriveInvoiceStatus } from './invoiceStatus';
 
 type InvoiceInsert = Database['public']['Tables']['invoices']['Insert'];
@@ -60,6 +61,10 @@ export interface Invoice {
   /** @deprecated TODO(B8): not persisted — invoices table has no `currency_id` column (use `currency` text) */
   currency_id?: string | null;
   currency?: string | null;
+  /** Frozen documentCurrency->base rate. Optional manual override; otherwise snapshotted by the service. */
+  exchange_rate?: number;
+  /** 'provider' | 'manual' | 'derived'. Set by the service from the rate context. */
+  rate_source?: string;
   /** @deprecated TODO(B8): not persisted — invoices table column is `terms`, not `terms_and_conditions` */
   terms_and_conditions?: string;
   notes?: string;
@@ -355,11 +360,30 @@ export const createInvoice = async (invoice: Partial<Invoice>, items: InvoiceIte
   const invoiceNumber = await getNextInvoiceNumber(invoiceType);
 
   const invoiceTaxRate = invoice.tax_rate || 0;
+  const amountPaid = invoice.amount_paid ?? 0;
+
+  // Snapshot the documentCurrency->base rate at the invoice date and freeze the
+  // base-currency equivalents on the row, so cross-currency reports SUM(*_base)
+  // correctly without re-converting history. Single-currency tenants get rate 1
+  // (base == document) and never touch the rates table. Resolved BEFORE the totals
+  // so header amounts round to the document currency's decimals (3 for OMR, 0 for JPY).
+  const rc = await resolveRateContext(
+    invoice.currency,
+    invoice.invoice_date || new Date().toISOString().slice(0, 10),
+    invoice.exchange_rate ? { rate: invoice.exchange_rate, source: invoice.rate_source as 'manual' | 'provider' | undefined } : null,
+  );
+
   const { subtotal, taxAmount, totalAmount, amountDue } = calculateInvoiceTotals(
     items,
     invoice.discount_amount || 0,
     invoiceTaxRate,
-    invoice.amount_paid || 0,
+    amountPaid,
+    rc.documentDecimals,
+  );
+  const baseTotals = calculateInvoiceTotalsBase(
+    { subtotal, taxAmount, totalAmount, amountPaid, amountDue },
+    rc.rate,
+    rc.baseDecimals,
   );
 
   const persistFields = pickInvoicePersistFields(invoice);
@@ -378,8 +402,16 @@ export const createInvoice = async (invoice: Partial<Invoice>, items: InvoiceIte
     tax_amount: taxAmount,
     discount_amount: invoice.discount_amount ?? 0,
     total_amount: totalAmount,
-    amount_paid: invoice.amount_paid ?? 0,
+    amount_paid: amountPaid,
     balance_due: amountDue,
+    currency: rc.documentCurrency,
+    exchange_rate: rc.rate,
+    rate_source: rc.rateSource,
+    subtotal_base: baseTotals.subtotalBase,
+    tax_amount_base: baseTotals.taxAmountBase,
+    total_amount_base: baseTotals.totalAmountBase,
+    amount_paid_base: baseTotals.amountPaidBase,
+    balance_due_base: baseTotals.balanceDueBase,
   };
 
   const sanitizedInvoice = sanitizeUuidFields(invoiceToInsert);
@@ -398,8 +430,8 @@ export const createInvoice = async (invoice: Partial<Invoice>, items: InvoiceIte
     const discountPct = item.discount_percent || 0;
     const discount = itemSubtotal * (discountPct / 100);
     const taxableAmount = itemSubtotal - discount;
-    const itemTax = taxableAmount * (invoiceTaxRate / 100);
-    const lineTotal = taxableAmount + itemTax;
+    const itemTax = roundMoney(taxableAmount * (invoiceTaxRate / 100), rc.documentDecimals);
+    const lineTotal = roundMoney(taxableAmount + itemTax, rc.documentDecimals);
 
     return {
       // tenant_id auto-set by trigger; same workaround as above
@@ -435,11 +467,58 @@ export const updateInvoice = async (id: string, invoice: Partial<Invoice>, items
     // Previously this path skipped rounding, so editing an invoice could shift
     // stored totals by sub-cent amounts versus what create stored.
     const invoiceTaxRate = invoice.tax_rate || 0;
+
+    // Re-snapshot base amounts against the invoice's ALREADY-FROZEN rate — an edit
+    // must not re-derive the booked rate (that would restate history). Only a caller
+    // that explicitly changes the currency or supplies a manual override re-resolves.
+    // We also coalesce amount_paid from the persisted row: a line-item edit that omits
+    // amount_paid must NOT wipe recorded payments — otherwise raw amount_paid stays
+    // but amount_paid_base/balance_due_base desync and the base stats mis-report a
+    // partly-paid invoice.
+    const { data: existing } = await supabase
+      .from('invoices')
+      .select('currency, exchange_rate, rate_source, amount_paid')
+      .eq('id', id)
+      .maybeSingle();
+
+    const amountPaid = invoice.amount_paid ?? existing?.amount_paid ?? 0;
+
+    // Resolve the (frozen) rate + document currency BEFORE the totals so header
+    // amounts round to the document currency's decimals (3 for OMR, 0 for JPY) while
+    // *_base rounds to the base currency's decimals. base never changes on an edit.
+    const baseCurrency = await getBaseCurrency();
+    const baseDecimals = await getCurrencyDecimals(baseCurrency);
+    let rate = existing?.exchange_rate ?? 1;
+    let rateSource = existing?.rate_source ?? 'derived';
+    let docCurrency: string | null = existing?.currency ?? null;
+
+    const currencyChanged = invoice.currency !== undefined && invoice.currency !== existing?.currency;
+    if (invoice.exchange_rate || currencyChanged) {
+      const rc = await resolveRateContext(
+        invoice.currency ?? existing?.currency,
+        invoice.invoice_date || new Date().toISOString().slice(0, 10),
+        invoice.exchange_rate
+          ? { rate: invoice.exchange_rate, source: invoice.rate_source as 'manual' | 'provider' | undefined }
+          : null,
+      );
+      rate = rc.rate;
+      rateSource = rc.rateSource;
+      docCurrency = rc.documentCurrency;
+    }
+
+    const docDecimals = await getCurrencyDecimals(docCurrency ?? baseCurrency);
     const { subtotal, taxAmount, totalAmount, amountDue } = calculateInvoiceTotals(
       items,
       invoice.discount_amount || 0,
       invoiceTaxRate,
-      invoice.amount_paid || 0,
+      amountPaid,
+      docDecimals,
+    );
+
+    const baseTotals = calculateInvoiceTotalsBase(
+      { subtotal, taxAmount, totalAmount, amountPaid, amountDue },
+      rate,
+      baseDecimals,
     );
 
     updateData = {
@@ -447,7 +526,16 @@ export const updateInvoice = async (id: string, invoice: Partial<Invoice>, items
       subtotal,
       tax_amount: taxAmount,
       total_amount: totalAmount,
+      amount_paid: amountPaid,
       balance_due: amountDue,
+      exchange_rate: rate,
+      rate_source: rateSource,
+      ...(docCurrency != null ? { currency: docCurrency } : {}),
+      subtotal_base: baseTotals.subtotalBase,
+      tax_amount_base: baseTotals.taxAmountBase,
+      total_amount_base: baseTotals.totalAmountBase,
+      amount_paid_base: baseTotals.amountPaidBase,
+      balance_due_base: baseTotals.balanceDueBase,
     };
 
     await supabase.from('invoice_line_items').update({ deleted_at: new Date().toISOString() }).eq('invoice_id', id);
@@ -457,8 +545,8 @@ export const updateInvoice = async (id: string, invoice: Partial<Invoice>, items
       const discountPct = item.discount_percent || 0;
       const discount = itemSubtotal * (discountPct / 100);
       const taxableAmount = itemSubtotal - discount;
-      const itemTax = taxableAmount * (invoiceTaxRate / 100);
-      const lineTotal = taxableAmount + itemTax;
+      const itemTax = roundMoney(taxableAmount * (invoiceTaxRate / 100), docDecimals);
+      const lineTotal = roundMoney(taxableAmount + itemTax, docDecimals);
 
       return {
         tenant_id: '' as string,
@@ -526,33 +614,31 @@ export const updateInvoiceStatus = async (
 };
 
 export const getInvoiceStats = async (filters?: { caseId?: string }) => {
-  let query = supabase.from('invoices').select('status, total_amount, amount_paid, balance_due, invoice_type');
-
-  if (filters?.caseId) {
-    query = query.eq('case_id', filters.caseId);
-  }
-
-  const { data: invoices, error } = await query;
+  // Server-side aggregate in BASE currency (replaces the previous fetch-all-then-reduce
+  // over raw document amounts, which summed mixed currencies). The RPC reads
+  // coalesce(total_amount_base, total_amount * exchange_rate), so it is correct both
+  // before and after rows carry *_base, and it excludes soft-deleted rows.
+  const { data, error } = await supabase.rpc(
+    'get_invoice_stats_base',
+    filters?.caseId ? { p_case_id: filters.caseId } : {},
+  );
 
   if (error) throw error;
 
-  const rows = invoices ?? [];
-
-  const stats = {
-    total: rows.length,
-    draft: rows.filter((i) => i.status === 'draft').length,
-    sent: rows.filter((i) => i.status === 'sent').length,
-    paid: rows.filter((i) => i.status === 'paid').length,
-    partial: rows.filter((i) => i.status === 'partial').length,
-    overdue: rows.filter((i) => i.status === 'overdue').length,
-    proforma: rows.filter((i) => i.invoice_type === 'proforma').length,
-    taxInvoice: rows.filter((i) => i.invoice_type === 'tax_invoice').length,
-    totalValue: rows.reduce((sum, i) => sum + (i.total_amount || 0), 0),
-    totalPaid: rows.reduce((sum, i) => sum + (i.amount_paid || 0), 0),
-    totalOutstanding: rows.reduce((sum, i) => sum + (i.balance_due || 0), 0),
+  const s = (data ?? {}) as Record<string, number | null>;
+  return {
+    total: Number(s.total ?? 0),
+    draft: Number(s.draft ?? 0),
+    sent: Number(s.sent ?? 0),
+    paid: Number(s.paid ?? 0),
+    partial: Number(s.partial ?? 0),
+    overdue: Number(s.overdue ?? 0),
+    proforma: Number(s.proforma ?? 0),
+    taxInvoice: Number(s.taxInvoice ?? 0),
+    totalValue: Number(s.totalValueBase ?? 0),
+    totalPaid: Number(s.totalPaidBase ?? 0),
+    totalOutstanding: Number(s.totalOutstandingBase ?? 0),
   };
-
-  return stats;
 };
 
 export const convertQuoteToInvoice = async (
@@ -589,6 +675,7 @@ export const convertQuoteToInvoice = async (
     due_date: dueDate,
     status: 'draft',
     discount_amount: quote.discount_amount ?? 0,
+    currency: quote.currency,
     terms: quote.terms ?? '',
     notes: quote.notes ?? '',
     converted_from_quote_id: quote.id,
@@ -662,7 +749,7 @@ export const recordPayment = async (
 ) => {
   const { data: invoice, error: fetchError } = await supabase
     .from('invoices')
-    .select('total_amount, amount_paid, invoice_type, customer_id')
+    .select('total_amount, amount_paid, invoice_type, customer_id, currency, exchange_rate')
     .eq('id', invoiceId)
     .maybeSingle();
 
@@ -678,6 +765,15 @@ export const recordPayment = async (
   const previousPaid = invoice.amount_paid ?? 0;
   const newAmountPaid = previousPaid + paymentData.amount;
   const newBalanceDue = totalAmount - newAmountPaid;
+
+  // Keep the invoice/payment base amounts consistent at the invoice's frozen rate.
+  // (This legacy single-invoice path captures no realized FX; the canonical
+  // paymentsService.allocatePaymentToInvoices path does.)
+  const baseCurrency = await getBaseCurrency();
+  const baseDecimals = await getCurrencyDecimals(baseCurrency);
+  const invoiceRate = invoice.exchange_rate ?? 1;
+  const newAmountPaidBase = convertToBase(newAmountPaid, invoiceRate, baseDecimals);
+  const newBalanceDueBase = convertToBase(newBalanceDue, invoiceRate, baseDecimals);
 
   const newStatus = deriveInvoiceStatus(newAmountPaid, newBalanceDue, {
     partialLabel: 'partial',
@@ -701,6 +797,10 @@ export const recordPayment = async (
         reference: paymentData.reference_number,
         notes: paymentData.notes,
         status: 'completed',
+        currency: invoice.currency ?? baseCurrency,
+        exchange_rate: invoiceRate,
+        rate_source: 'derived',
+        amount_base: convertToBase(paymentData.amount, invoiceRate, baseDecimals),
       },
     ])
     .select()
@@ -713,6 +813,8 @@ export const recordPayment = async (
     .update({
       amount_paid: newAmountPaid,
       balance_due: newBalanceDue,
+      amount_paid_base: newAmountPaidBase,
+      balance_due_base: newBalanceDueBase,
       status: newStatus,
     })
     .eq('id', invoiceId);

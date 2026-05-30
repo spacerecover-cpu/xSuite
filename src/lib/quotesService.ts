@@ -4,7 +4,8 @@ import { logAuditTrail } from './auditTrailService';
 import { sanitizeUuidFields as sanitizeUuids } from './dataValidation';
 import { sanitizeFilterValue } from './postgrestSanitizer';
 import { logger } from './logger';
-import { calculateQuoteTotals } from './financialMath';
+import { calculateQuoteTotals, calculateQuoteTotalsBase, roundMoney } from './financialMath';
+import { resolveRateContext, getBaseCurrency, getCurrencyDecimals } from './currencyService';
 
 type QuoteInsert = Database['public']['Tables']['quotes']['Insert'];
 type QuoteUpdate = Database['public']['Tables']['quotes']['Update'];
@@ -69,6 +70,10 @@ export interface Quote {
   /** @deprecated TODO(B8): not persisted — quotes table has no `bank_account_id` column */
   bank_account_id?: string | null;
   currency?: string | null;
+  /** Frozen documentCurrency->base rate. Optional manual override; otherwise snapshotted by the service. */
+  exchange_rate?: number;
+  /** 'provider' | 'manual' | 'derived'. Set by the service from the rate context. */
+  rate_source?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -360,12 +365,26 @@ export const createQuote = async (quote: Quote, items: QuoteItem[]) => {
       throw new Error('Failed to generate quote number. Please try again.');
     }
 
+    // Snapshot the documentCurrency->base rate at the quote date and freeze the
+    // base equivalents (single-currency tenants get rate 1, base == document).
+    // Resolved BEFORE the totals so header amounts round to the document currency's
+    // decimals (3 for OMR, 0 for JPY) while base rounds to the base currency's.
+    const rc = await resolveRateContext(
+      quote.currency,
+      new Date().toISOString().slice(0, 10),
+      quote.exchange_rate
+        ? { rate: quote.exchange_rate, source: quote.rate_source as 'manual' | 'provider' | undefined }
+        : null,
+    );
+
     const { subtotal, taxAmount, totalAmount } = calculateQuoteTotals(
       items,
       quote.discount_type,
       quote.discount_amount || 0,
       quote.tax_rate || 0,
+      rc.documentDecimals,
     );
+    const baseTotals = calculateQuoteTotalsBase({ subtotal, taxAmount, totalAmount }, rc.rate, rc.baseDecimals);
 
     const persistFields = pickQuotePersistFields(quote);
     const quoteToInsertRaw: QuoteInsert = {
@@ -385,6 +404,12 @@ export const createQuote = async (quote: Quote, items: QuoteItem[]) => {
       subtotal,
       tax_amount: taxAmount,
       total_amount: totalAmount,
+      currency: rc.documentCurrency,
+      exchange_rate: rc.rate,
+      rate_source: rc.rateSource,
+      subtotal_base: baseTotals.subtotalBase,
+      tax_amount_base: baseTotals.taxAmountBase,
+      total_amount_base: baseTotals.totalAmountBase,
       created_by: user.id,
     };
     const quoteToInsert = sanitizeUuidFields(quoteToInsertRaw as Record<string, unknown>) as QuoteInsert;
@@ -414,7 +439,7 @@ export const createQuote = async (quote: Quote, items: QuoteItem[]) => {
     }
 
     const itemsWithQuoteId: QuoteItemInsert[] = items.map((item, index) => {
-      const total = Math.round(item.quantity * item.unit_price * 100) / 100;
+      const total = roundMoney(item.quantity * item.unit_price, rc.documentDecimals);
       return {
         // tenant_id auto-set by trigger; same workaround as quotes insert
         tenant_id: '' as string,
@@ -452,24 +477,63 @@ export const updateQuote = async (id: string, quote: Partial<Quote>, items?: Quo
   ) as QuoteUpdate;
 
   if (items) {
+    // Re-snapshot base against the quote's frozen rate (see updateInvoice rationale).
+    // Resolve currency/rate BEFORE the totals so header amounts round to the document
+    // currency's decimals; base never changes on an edit.
+    const { data: existing } = await supabase
+      .from('quotes')
+      .select('currency, exchange_rate, rate_source')
+      .eq('id', id)
+      .maybeSingle();
+
+    const baseCurrency = await getBaseCurrency();
+    const baseDecimals = await getCurrencyDecimals(baseCurrency);
+    let rate = existing?.exchange_rate ?? 1;
+    let rateSource = existing?.rate_source ?? 'derived';
+    let docCurrency: string | null = existing?.currency ?? null;
+
+    const currencyChanged = quote.currency !== undefined && quote.currency !== existing?.currency;
+    if (quote.exchange_rate || currencyChanged) {
+      const rc = await resolveRateContext(
+        quote.currency ?? existing?.currency,
+        new Date().toISOString().slice(0, 10),
+        quote.exchange_rate
+          ? { rate: quote.exchange_rate, source: quote.rate_source as 'manual' | 'provider' | undefined }
+          : null,
+      );
+      rate = rc.rate;
+      rateSource = rc.rateSource;
+      docCurrency = rc.documentCurrency;
+    }
+
+    const docDecimals = await getCurrencyDecimals(docCurrency ?? baseCurrency);
     const { subtotal, taxAmount, totalAmount } = calculateQuoteTotals(
       items,
       quote.discount_type,
       quote.discount_amount || 0,
       quote.tax_rate || 0,
+      docDecimals,
     );
+
+    const baseTotals = calculateQuoteTotalsBase({ subtotal, taxAmount, totalAmount }, rate, baseDecimals);
 
     updateData = {
       ...updateData,
       subtotal,
       tax_amount: taxAmount,
       total_amount: totalAmount,
+      exchange_rate: rate,
+      rate_source: rateSource,
+      ...(docCurrency != null ? { currency: docCurrency } : {}),
+      subtotal_base: baseTotals.subtotalBase,
+      tax_amount_base: baseTotals.taxAmountBase,
+      total_amount_base: baseTotals.totalAmountBase,
     };
 
     await supabase.from('quote_items').update({ deleted_at: new Date().toISOString() }).eq('quote_id', id);
 
     const itemsWithQuoteId: QuoteItemInsert[] = items.map((item, index) => {
-      const total = Math.round(item.quantity * item.unit_price * 100) / 100;
+      const total = roundMoney(item.quantity * item.unit_price, docDecimals);
       return {
         tenant_id: '' as string,
         quote_id: id,
@@ -589,9 +653,15 @@ export const updateQuoteStatus = async (
 
 export const getQuoteStats = async () => {
   try {
+    // Money totals aggregate the BASE-currency column (falling back to
+    // total_amount * exchange_rate until a row carries total_amount_base), so the
+    // figures are correct across currencies. We aggregate in JS rather than via
+    // get_quote_stats_base because that RPC does not expose sentValue. Soft-deleted
+    // quotes are now excluded (the previous query counted them).
     const { data: quotes, error } = await supabase
       .from('quotes')
-      .select('status, total_amount');
+      .select('status, total_amount, total_amount_base, exchange_rate')
+      .is('deleted_at', null);
 
     if (error) {
       logger.error('Error fetching quote stats:', error);
@@ -599,6 +669,8 @@ export const getQuoteStats = async () => {
     }
 
     const quotesList = quotes || [];
+    const baseValue = (q: { total_amount: number | null; total_amount_base: number | null; exchange_rate: number | null }) =>
+      Number(q.total_amount_base ?? (q.total_amount ?? 0) * (q.exchange_rate ?? 1));
 
     const stats = {
       total: quotesList.length,
@@ -608,13 +680,13 @@ export const getQuoteStats = async () => {
       rejected: quotesList.filter((q) => q.status === 'rejected').length,
       expired: quotesList.filter((q) => q.status === 'expired').length,
       converted: quotesList.filter((q) => q.status === 'converted').length,
-      totalValue: quotesList.reduce((sum, q) => sum + (q.total_amount || 0), 0),
+      totalValue: quotesList.reduce((sum, q) => sum + baseValue(q), 0),
       sentValue: quotesList
         .filter((q) => q.status === 'sent')
-        .reduce((sum, q) => sum + (q.total_amount || 0), 0),
+        .reduce((sum, q) => sum + baseValue(q), 0),
       acceptedValue: quotesList
         .filter((q) => q.status === 'accepted')
-        .reduce((sum, q) => sum + (q.total_amount || 0), 0),
+        .reduce((sum, q) => sum + baseValue(q), 0),
     };
 
     return stats;

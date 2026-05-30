@@ -194,6 +194,7 @@ export function useOnboardingFlow() {
         adminFullName: formData.fullName,
         planId: formData.planId,
         countryId: formData.countryId,
+        baseCurrencyCode: formData.baseCurrencyCode,
       });
 
       sessionStorage.removeItem(STORAGE_KEY);
@@ -228,7 +229,7 @@ export function useOnboardingFlow() {
 function getStepFields(step: number): string[] {
   switch (step) {
     case 0: return ['companyName', 'slug'];
-    case 1: return ['countryId'];
+    case 1: return ['countryId', 'baseCurrencyCode'];
     case 2: return ['fullName', 'email', 'password', 'confirmPassword'];
     case 3: return ['services', 'estimatedCases', 'planId'];
     default: return [];

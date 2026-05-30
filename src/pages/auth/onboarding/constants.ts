@@ -71,6 +71,7 @@ export const step1Schema = z.object({
 
 export const step2Schema = z.object({
   countryId: z.string().min(1, 'Please select a country'),
+  baseCurrencyCode: z.string().min(3, 'Please confirm your base currency'),
 });
 
 export const step3Schema = z.object({
@@ -99,6 +100,7 @@ export interface OnboardingFormData {
   companyName: string;
   slug: string;
   countryId: string;
+  baseCurrencyCode: string;
   fullName: string;
   email: string;
   password: string;
@@ -112,6 +114,7 @@ export const DEFAULT_FORM_DATA: OnboardingFormData = {
   companyName: '',
   slug: '',
   countryId: '',
+  baseCurrencyCode: '',
   fullName: '',
   email: '',
   password: '',

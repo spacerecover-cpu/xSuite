@@ -21,7 +21,7 @@ export const fetchCurrencyFormat = async (): Promise<CurrencyFormat> => {
   try {
     const { data, error } = await supabase
       .from('accounting_locales')
-      .select('currency_code, date_format, number_format, is_default')
+      .select('currency_code, date_format, number_format, is_default, decimal_places')
       .eq('is_default', true)
       .maybeSingle();
 
@@ -38,7 +38,8 @@ export const fetchCurrencyFormat = async (): Promise<CurrencyFormat> => {
     cachedCurrencyFormat = {
       currencySymbol: data.currency_code || DEFAULT_TENANT_CONFIG.currency.code,
       currencyPosition: 'before',
-      decimalPlaces: 2,
+      decimalPlaces: (data as { decimal_places?: number }).decimal_places
+        ?? DEFAULT_TENANT_CONFIG.currency.decimalPlaces,
       currencyCode: data.currency_code || DEFAULT_TENANT_CONFIG.currency.code,
     };
     return cachedCurrencyFormat;
@@ -92,15 +93,29 @@ export const formatCurrencyWithConfig = (
 
 export const formatCurrency = (amount: number, currency = 'USD'): string => {
   try {
+    // No fraction-digit overrides: Intl applies the currency's ISO-4217 decimals
+    // (USD 2, OMR 3, JPY 0).
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
     }).format(amount);
   } catch {
     return `${currency} ${amount.toFixed(2)}`;
   }
+};
+
+/**
+ * "≈ <base>" preview for a document total. Returns null when doc currency == base
+ * (caller hides the line). Rounds via Intl to the base currency's ISO-4217 decimals.
+ */
+export const formatBaseEquivalent = (
+  docTotal: number,
+  rate: number,
+  baseCurrency: string,
+  documentCurrency?: string,
+): string | null => {
+  if (documentCurrency && documentCurrency === baseCurrency) return null;
+  return `≈ ${formatCurrency(docTotal * rate, baseCurrency)}`;
 };
 
 export const formatDate = (date: string | Date, formatStr = 'MMM dd, yyyy'): string => {

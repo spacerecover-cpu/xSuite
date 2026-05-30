@@ -8,6 +8,8 @@ import { supabase } from '../../lib/supabaseClient';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
+import { getSupportedCurrencies, getBaseCurrency, getConversionRate, type SupportedCurrency } from '../../lib/currencyService';
+import { formatCurrency, formatBaseEquivalent } from '../../lib/format';
 
 interface LineItemTemplate {
   id: string;
@@ -40,6 +42,7 @@ interface InvoiceInitialData {
   bank_account_id?: string | null;
   invoice_number?: string;
   invoice_line_items?: InvoiceLineItem[];
+  currency?: string;
 }
 
 interface QuoteOption {
@@ -111,9 +114,31 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
     tax_rate: initialData?.tax_rate || 5,
     client_reference: initialData?.client_reference || clientReference || '',
     bank_account_id: initialData?.bank_account_id || null,
+    currency: initialData?.currency || '',
   });
 
   const [dueDateManuallySet, setDueDateManuallySet] = useState(false);
+
+  const [currencies, setCurrencies] = useState<SupportedCurrency[]>([]);
+  const [baseCurrency, setBaseCurrency] = useState<string>('');
+  const [baseRate, setBaseRate] = useState<number>(1);
+
+  useEffect(() => {
+    getSupportedCurrencies().then(setCurrencies).catch(() => setCurrencies([]));
+    getBaseCurrency().then(setBaseCurrency).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (baseCurrency && !invoiceData.currency) {
+      setInvoiceData((d) => ({ ...d, currency: baseCurrency }));
+    }
+  }, [baseCurrency]);
+
+  useEffect(() => {
+    const doc = invoiceData.currency || baseCurrency;
+    if (!doc || !baseCurrency || doc === baseCurrency) { setBaseRate(1); return; }
+    getConversionRate(doc, baseCurrency).then(setBaseRate).catch(() => setBaseRate(NaN));
+  }, [invoiceData.currency, baseCurrency]);
 
   useEffect(() => {
     if (initialData) {
@@ -130,6 +155,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
         tax_rate: initialData.tax_rate || 5,
         client_reference: initialData.client_reference || clientReference || '',
         bank_account_id: initialData.bank_account_id || null,
+        currency: initialData.currency || '',
       });
       setDueDateManuallySet(true);
     } else if (clientReference) {
@@ -388,6 +414,9 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
     setShowTermsTemplates(false);
   };
 
+  const docCurrency = invoiceData.currency || baseCurrency || 'USD';
+  const fmtDoc = (v: number) => formatCurrency(v, docCurrency);
+
   const subtotal = lineItems.reduce((sum, item) => {
     return sum + item.quantity * item.unit_price;
   }, 0);
@@ -603,6 +632,21 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                 />
               </div>
             </div>
+
+            {currencies.length > 1 && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Currency</label>
+                <select
+                  value={invoiceData.currency || baseCurrency}
+                  onChange={(e) => setInvoiceData((d) => ({ ...d, currency: e.target.value }))}
+                  className="rounded border border-border bg-surface px-3 py-2 text-sm"
+                >
+                  {currencies.map((c) => (
+                    <option key={c.code} value={c.code}>{c.code}{c.isBase ? ' (base)' : ''}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
 
@@ -744,7 +788,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Discount ({invoiceData.discount_type === 'percentage' ? '%' : currencyFormat.currencySymbol})
+                    Discount ({invoiceData.discount_type === 'percentage' ? '%' : docCurrency})
                   </label>
                   <input
                     type="number"
@@ -798,15 +842,13 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-700">Base Amount</span>
                   <span className="font-medium text-slate-900">
-                    {currencyFormat.currencySymbol}
-                    {subtotal.toFixed(2)}
+                    {fmtDoc(subtotal)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-700">VAT ({invoiceData.tax_rate}%)</span>
                   <span className="font-medium text-slate-900">
-                    {currencyFormat.currencySymbol}
-                    {taxAmount.toFixed(2)}
+                    {fmtDoc(taxAmount)}
                   </span>
                 </div>
                 {invoiceData.discount_amount > 0 && (
@@ -815,18 +857,22 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                       Discount {invoiceData.discount_type === 'percentage' ? `(${invoiceData.discount_amount}%)` : ''}
                     </span>
                     <span className="font-medium text-danger">
-                      -{currencyFormat.currencySymbol}
-                      {discountValue.toFixed(2)}
+                      -{fmtDoc(discountValue)}
                     </span>
                   </div>
                 )}
                 <div className="flex justify-between text-base font-bold border-t border-info/30 pt-2 mt-2">
                   <span className="text-info">Total Amount</span>
                   <span className="text-primary">
-                    {currencyFormat.currencySymbol}
-                    {total.toFixed(2)}
+                    {fmtDoc(total)}
                   </span>
                 </div>
+                {(() => {
+                  const preview = Number.isNaN(baseRate)
+                    ? 'rate unavailable'
+                    : formatBaseEquivalent(total, baseRate, baseCurrency, docCurrency);
+                  return preview ? <div className="text-xs text-surface-muted">{preview}</div> : null;
+                })()}
               </div>
             </div>
           </div>

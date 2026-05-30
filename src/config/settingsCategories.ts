@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Palette,
   Bell,
+  Coins,
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 
@@ -198,6 +199,16 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     tables: [],
     actionLabel: 'Go to Page',
     description: 'Language, timezone, currency, and regional settings',
+  },
+  {
+    id: 'currencies',
+    title: 'Currencies',
+    icon: Coins,
+    backgroundColor: '#10b981',
+    borderColor: '#10b981',
+    tables: [],
+    actionLabel: 'Manage Currencies',
+    description: 'Add and manage the transaction currencies you invoice in.',
   },
   {
     id: 'import-export',

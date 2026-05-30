@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
+import { supabase } from '../../../../lib/supabaseClient';
 import type { OnboardingFormData } from '../constants';
 
 interface GeoCountry {
@@ -32,6 +34,26 @@ export const LocationStep = ({
 }: LocationStepProps) => {
   const selectedCountry = countries.find(c => c.id === formData.countryId);
 
+  const [currencyCodes, setCurrencyCodes] = useState<{ code: string; name: string | null }[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from('master_currency_codes')
+      .select('code, name')
+      .eq('is_active', true)
+      .order('code')
+      .then(
+        ({ data }) => setCurrencyCodes(data ?? []),
+        () => setCurrencyCodes([]),
+      );
+  }, []);
+
+  const handleCountryChange = (id: string) => {
+    const c = countries.find((x) => x.id === id);
+    updateField('countryId', id);
+    updateField('baseCurrencyCode', c?.currency_code ?? 'USD');
+  };
+
   return (
     <div className="space-y-5">
       <motion.div
@@ -46,7 +68,7 @@ export const LocationStep = ({
           <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
           <select
             value={formData.countryId}
-            onChange={e => updateField('countryId', e.target.value)}
+            onChange={e => handleCountryChange(e.target.value)}
             className="w-full bg-slate-800/50 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-white font-body text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all appearance-none"
           >
             <option value="" className="bg-slate-900">Select your country...</option>
@@ -96,6 +118,36 @@ export const LocationStep = ({
           </motion.div>
         )}
       </AnimatePresence>
+
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+      >
+        <label className="block text-sm font-medium text-slate-300 font-body mb-2">
+          Base (reporting) currency <span className="text-primary">*</span>
+        </label>
+        <select
+          value={formData.baseCurrencyCode}
+          onChange={(e) => updateField('baseCurrencyCode', e.target.value)}
+          className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white font-body text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all appearance-none"
+        >
+          {formData.baseCurrencyCode === '' && (
+            <option value="" className="bg-slate-900">Select a country first...</option>
+          )}
+          {currencyCodes.map((cc) => (
+            <option key={cc.code} value={cc.code} className="bg-slate-900">
+              {cc.code}{cc.name ? ` — ${cc.name}` : ''}
+            </option>
+          ))}
+        </select>
+        {errors.baseCurrencyCode && (
+          <p className="text-danger text-xs mt-1 font-body">{errors.baseCurrencyCode}</p>
+        )}
+        <p className="text-xs text-slate-500 font-body mt-1">
+          Locked once you have financial documents.
+        </p>
+      </motion.div>
 
       <motion.div
         initial={{ opacity: 0, y: 10 }}

@@ -65,6 +65,7 @@ const TimesheetManagement = lazyWithRetry(() => import('./pages/employee-managem
 const TemplatesDashboard = lazyWithRetry(() => import('./pages/templates/TemplatesDashboard').then(m => ({ default: m.TemplatesDashboard as React.ComponentType<unknown> })));
 const TemplateTypeDetail = lazyWithRetry(() => import('./pages/templates/TemplateTypeDetail').then(m => ({ default: m.TemplateTypeDetail as React.ComponentType<unknown> })));
 const AccountingLocales = lazyWithRetry(() => import('./pages/settings/AccountingLocales').then(m => ({ default: m.AccountingLocales as React.ComponentType<unknown> })));
+const CurrencySettings = lazyWithRetry(() => import('./pages/settings/CurrencySettings').then(m => ({ default: m.CurrencySettings as React.ComponentType<unknown> })));
 const ClientPortalSettings = lazyWithRetry(() => import('./pages/settings/ClientPortalSettings').then(m => ({ default: m.ClientPortalSettings as React.ComponentType<unknown> })));
 const ImportExport = lazyWithRetry(() => import('./pages/settings/ImportExport').then(m => ({ default: m.ImportExport as React.ComponentType<unknown> })));
 const ReportSectionsPage = lazyWithRetry(() => import('./pages/settings/ReportSectionsPage').then(m => ({ default: m.ReportSectionsPage as React.ComponentType<unknown> })));
@@ -585,6 +586,14 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={['owner', 'admin']}>
                     <AccountingLocales />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="currencies"
+                element={
+                  <ProtectedRoute allowedRoles={['owner', 'admin']}>
+                    <CurrencySettings />
                   </ProtectedRoute>
                 }
               />

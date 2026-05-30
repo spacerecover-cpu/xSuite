@@ -12,12 +12,23 @@ export interface CreateFinancialTransactionInput {
   description: string;
   reference_type?: string;
   reference_id?: string;
+  /** Transaction currency. Omit to keep the column default. */
+  currency?: string;
+  /** documentCurrency->base rate frozen on this ledger row. */
+  exchange_rate?: number;
+  /** 'provider' | 'manual' | 'derived'. */
+  rate_source?: string;
+  /** The amount expressed in base currency. Omit to leave NULL (reports then coalesce amount * exchange_rate). */
+  amount_base?: number;
 }
 
 /**
  * Single source of truth for writing a financial ledger entry. Throws on failure
  * so callers can abort their unit of work rather than silently losing financial
  * data. tenant_id is also stamped server-side by the set_*_tenant_and_audit trigger.
+ *
+ * Currency/base fields are passed through when provided (multi-currency callers);
+ * omitting them keeps the existing single-currency column defaults untouched.
  */
 export const createFinancialTransaction = async (
   transaction: CreateFinancialTransactionInput,
@@ -32,6 +43,10 @@ export const createFinancialTransaction = async (
     description: transaction.description,
     reference_type: transaction.reference_type,
     reference_id: transaction.reference_id,
+    ...(transaction.currency !== undefined ? { currency: transaction.currency } : {}),
+    ...(transaction.exchange_rate !== undefined ? { exchange_rate: transaction.exchange_rate } : {}),
+    ...(transaction.rate_source !== undefined ? { rate_source: transaction.rate_source } : {}),
+    ...(transaction.amount_base !== undefined ? { amount_base: transaction.amount_base } : {}),
   };
 
   const { error } = await supabase
