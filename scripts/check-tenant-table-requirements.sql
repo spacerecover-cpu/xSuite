@@ -8,7 +8,11 @@ WITH tenant_tables AS (
     AND c.column_name = 'tenant_id'
     AND t.table_name NOT IN ('tenant_subscriptions', 'tenant_payment_methods',
                               'tenant_activity_log', 'tenant_health_metrics',
-                              'tenant_impersonation_sessions', 'tenant_rate_limits')
+                              'tenant_impersonation_sessions', 'tenant_rate_limits',
+                              -- core/platform + system-template tables that legitimately allow
+                              -- NULL tenant_id (platform admins; platform logs; system-default
+                              -- notification templates) and so cannot satisfy the NOT-NULL rule
+                              'profiles', 'platform_audit_logs', 'notification_templates')
 ),
 violations AS (
   SELECT
