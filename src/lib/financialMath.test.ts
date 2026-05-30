@@ -4,6 +4,9 @@ import {
   convertToBase,
   calculateInvoiceTotals,
   calculateQuoteTotals,
+  calculateInvoiceTotalsBase,
+  calculateQuoteTotalsBase,
+  computeRealizedFx,
 } from './financialMath';
 
 // Characterization tests. These pin the EXISTING behavior of the canonical
@@ -91,6 +94,13 @@ describe('calculateQuoteTotals (already-rounded create/update path)', () => {
       calculateQuoteTotals([{ quantity: 3, unit_price: 33.33 }], undefined, 0, 0),
     ).toEqual({ subtotal: 99.99, taxAmount: 0, totalAmount: 99.99 });
   });
+
+  it('keeps 3 decimals for an OMR quote', () => {
+    // qty 1 @ 33.333 OMR, 10% tax, 3-decimal currency.
+    expect(
+      calculateQuoteTotals([{ quantity: 1, unit_price: 33.333 }], undefined, 0, 10, 3),
+    ).toEqual({ subtotal: 33.333, taxAmount: 3.333, totalAmount: 36.666 });
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -169,5 +179,116 @@ describe('calculateInvoiceTotals (currency-aware rounding)', () => {
       totalAmount: 1100,
       amountDue: 1100,
     });
+  });
+
+  it('keeps 3 decimals for an OMR invoice (the real tenant currency)', () => {
+    // qty 3 @ 9.999 OMR, 5% tax, nothing paid, 3-decimal currency.
+    // At 2dp this would round the line to 30.00 and total to 31.50; at 3dp the
+    // third decimal survives (29.997 -> 31.497) — that is the whole point of the fix.
+    expect(calculateInvoiceTotals([{ quantity: 3, unit_price: 9.999 }], 0, 5, 0, 3)).toEqual({
+      subtotal: 29.997,
+      taxRate: 5,
+      taxAmount: 1.5,
+      totalAmount: 31.497,
+      amountDue: 31.497,
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Base-currency snapshotting (the "switch-on"). Each document money field is
+// converted to base independently at the frozen rate and rounded to the BASE
+// currency's minor units (the §3.3 invariant: *_base = round(* * rate, base.dp)).
+// Base fields are never derived from one another, so cross-field rounding never
+// accumulates. Hand-computed against doc * rate then round-to-base-dp.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('calculateInvoiceTotalsBase', () => {
+  it('converts each total to base at the frozen rate (EUR doc -> USD base, 2dp)', () => {
+    expect(
+      calculateInvoiceTotalsBase(
+        { subtotal: 585, taxAmount: 29.25, totalAmount: 614.25, amountPaid: 0, amountDue: 614.25 },
+        1.08,
+        2,
+      ),
+    ).toEqual({
+      subtotalBase: 631.8, // 585 * 1.08
+      taxAmountBase: 31.59, // 29.25 * 1.08
+      totalAmountBase: 663.39, // 614.25 * 1.08
+      amountPaidBase: 0,
+      balanceDueBase: 663.39,
+    });
+  });
+
+  it('is identity at rate 1 (single-currency tenant — base == document)', () => {
+    expect(
+      calculateInvoiceTotalsBase(
+        { subtotal: 585, taxAmount: 29.25, totalAmount: 614.25, amountPaid: 100, amountDue: 514.25 },
+        1,
+        2,
+      ),
+    ).toEqual({
+      subtotalBase: 585,
+      taxAmountBase: 29.25,
+      totalAmountBase: 614.25,
+      amountPaidBase: 100,
+      balanceDueBase: 514.25,
+    });
+  });
+
+  it('rounds base totals to 0 decimals when base is JPY', () => {
+    expect(
+      calculateInvoiceTotalsBase(
+        { subtotal: 100, taxAmount: 10, totalAmount: 110, amountPaid: 0, amountDue: 110 },
+        150,
+        0,
+      ),
+    ).toEqual({
+      subtotalBase: 15000,
+      taxAmountBase: 1500,
+      totalAmountBase: 16500,
+      amountPaidBase: 0,
+      balanceDueBase: 16500,
+    });
+  });
+});
+
+describe('calculateQuoteTotalsBase', () => {
+  it('converts each total to base at the frozen rate', () => {
+    expect(
+      calculateQuoteTotalsBase({ subtotal: 130, taxAmount: 5.85, totalAmount: 122.85 }, 1.08, 2),
+    ).toEqual({
+      subtotalBase: 140.4, // 130 * 1.08
+      taxAmountBase: 6.32, // 5.85 * 1.08 = 6.318 -> 6.32
+      totalAmountBase: 132.68, // 122.85 * 1.08 = 132.678 -> 132.68
+    });
+  });
+
+  it('is identity at rate 1', () => {
+    expect(
+      calculateQuoteTotalsBase({ subtotal: 100, taxAmount: 8.5, totalAmount: 93.5 }, 1, 2),
+    ).toEqual({ subtotalBase: 100, taxAmountBase: 8.5, totalAmountBase: 93.5 });
+  });
+});
+
+// Realized FX on settlement (SMB model: payment denominated in the invoice's
+// currency). Mirrors the canonical SQL compute_realized_fx():
+//   realized = round(docAmount * (paymentRate - invoiceRate), base.dp)
+describe('computeRealizedFx', () => {
+  it('is a gain when the base strengthened between booking and payment', () => {
+    // 1000 (doc) booked at 1.10, settled at 1.15 -> +50 base
+    expect(computeRealizedFx(1000, 1.15, 1.1, 2)).toBe(50);
+  });
+
+  it('is a (negative) loss when the rate moved the other way', () => {
+    expect(computeRealizedFx(1000, 1.05, 1.1, 2)).toBe(-50);
+  });
+
+  it('is exactly zero when the rate did not move (single-currency / same-day)', () => {
+    expect(computeRealizedFx(1000, 1.1, 1.1, 2)).toBe(0);
+  });
+
+  it('rounds the delta to the base currency minor units (JPY base, 0dp)', () => {
+    // 1000 * (0.0072 - 0.0070) = 0.2 -> 0 at 0 decimals
+    expect(computeRealizedFx(1000, 0.0072, 0.007, 0)).toBe(0);
   });
 });

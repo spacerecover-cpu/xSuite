@@ -3,6 +3,8 @@ import { sanitizeFilterValue } from './postgrestSanitizer';
 import { logger } from './logger';
 import type { Database } from '../types/database.types';
 import { createFinancialTransaction } from './financialService';
+import { resolveRateContext, getBaseCurrency, getCurrencyDecimals } from './currencyService';
+import { convertToBase } from './financialMath';
 
 type ExpenseInsert = Database['public']['Tables']['expenses']['Insert'];
 type ExpenseAttachmentRow = Database['public']['Tables']['expense_attachments']['Row'];
@@ -14,6 +16,14 @@ export interface Expense {
   expense_number?: string;
   expense_date: string;
   amount: number;
+  /** Expense transaction currency. Defaults to the tenant base currency. */
+  currency?: string | null;
+  /** Tax portion in the document currency (0 when none). */
+  tax_amount?: number;
+  /** Optional manual rate override; otherwise snapshotted by the service. */
+  exchange_rate?: number;
+  /** 'provider' | 'manual' | 'derived'. Set by the service from the rate context. */
+  rate_source?: string;
   description: string;
   vendor?: string;
   category_id?: string | null;
@@ -149,9 +159,23 @@ export const createExpense = async (
 ) => {
   const expenseNumber = await getNextExpenseNumber();
 
+  // Snapshot the documentCurrency->base rate at the expense date and freeze the
+  // base equivalents so cross-currency expense reporting SUM(*_base) is correct.
+  const rc = await resolveRateContext(
+    expense.currency,
+    expense.expense_date,
+    expense.exchange_rate ? { rate: expense.exchange_rate, source: expense.rate_source as 'manual' | 'provider' | undefined } : null,
+  );
+  const taxAmount = expense.tax_amount ?? 0;
+
   const payload = {
     ...expense,
     expense_number: expenseNumber,
+    currency: rc.documentCurrency,
+    exchange_rate: rc.rate,
+    rate_source: rc.rateSource,
+    amount_base: convertToBase(expense.amount, rc.rate, rc.baseDecimals),
+    tax_amount_base: convertToBase(taxAmount, rc.rate, rc.baseDecimals),
   } as unknown as ExpenseInsert;
 
   const { data, error } = await supabase
@@ -168,7 +192,51 @@ export const updateExpense = async (
   id: string,
   expense: Partial<Expense>
 ) => {
-  const updatePayload = expense as unknown as Database['public']['Tables']['expenses']['Update'];
+  const updatePayload = { ...expense } as unknown as Database['public']['Tables']['expenses']['Update'];
+
+  // Re-snapshot base amounts when the money or currency changes, reusing the
+  // expense's frozen rate unless the caller changes currency / overrides the rate.
+  if (
+    expense.amount !== undefined ||
+    expense.tax_amount !== undefined ||
+    expense.exchange_rate !== undefined ||
+    expense.currency !== undefined
+  ) {
+    const { data: existing } = await supabase
+      .from('expenses')
+      .select('amount, tax_amount, currency, exchange_rate, rate_source')
+      .eq('id', id)
+      .maybeSingle();
+
+    let rate = existing?.exchange_rate ?? 1;
+    let rateSource = existing?.rate_source ?? 'derived';
+    let docCurrency: string | null = existing?.currency ?? null;
+    const baseCurrency = await getBaseCurrency();
+    let baseDecimals = await getCurrencyDecimals(baseCurrency);
+
+    const currencyChanged = expense.currency !== undefined && expense.currency !== existing?.currency;
+    if (expense.exchange_rate || currencyChanged) {
+      const rc = await resolveRateContext(
+        expense.currency ?? existing?.currency,
+        expense.expense_date ?? new Date().toISOString().slice(0, 10),
+        expense.exchange_rate
+          ? { rate: expense.exchange_rate, source: expense.rate_source as 'manual' | 'provider' | undefined }
+          : null,
+      );
+      rate = rc.rate;
+      rateSource = rc.rateSource;
+      docCurrency = rc.documentCurrency;
+      baseDecimals = rc.baseDecimals;
+    }
+
+    const amount = expense.amount ?? existing?.amount ?? 0;
+    const taxAmount = expense.tax_amount ?? existing?.tax_amount ?? 0;
+    updatePayload.amount_base = convertToBase(amount, rate, baseDecimals);
+    updatePayload.tax_amount_base = convertToBase(taxAmount, rate, baseDecimals);
+    updatePayload.exchange_rate = rate;
+    updatePayload.rate_source = rateSource;
+    if (docCurrency != null) updatePayload.currency = docCurrency;
+  }
 
   const { data, error } = await supabase
     .from('expenses')
@@ -213,7 +281,7 @@ export const submitExpense = async (id: string, submittedBy: string) => {
 export const approveExpense = async (id: string, approvedBy: string) => {
   const { data: expense, error: fetchError } = await supabase
     .from('expenses')
-    .select('amount, description, case_id')
+    .select('amount, description, case_id, currency, exchange_rate, rate_source, amount_base')
     .eq('id', id)
     .maybeSingle();
 
@@ -242,6 +310,10 @@ export const approveExpense = async (id: string, approvedBy: string) => {
     description: `Expense approved: ${expense.description ?? ''}`,
     reference_type: 'expense',
     reference_id: id,
+    currency: expense.currency ?? undefined,
+    exchange_rate: expense.exchange_rate ?? undefined,
+    rate_source: expense.rate_source ?? undefined,
+    amount_base: expense.amount_base ?? undefined,
   });
 
   if (expense.case_id) {
@@ -388,9 +460,15 @@ export const getExpenseStats = async (filters?: {
   dateFrom?: string;
   dateTo?: string;
 }) => {
+  // Money totals aggregate the BASE-currency column (falling back to
+  // amount * exchange_rate until a row carries amount_base) so figures are correct
+  // across currencies. Aggregated in JS rather than via get_expense_stats_base
+  // because that RPC does not expose the status counts / pending / this-month
+  // breakdowns this view needs. Soft-deleted expenses are now excluded.
   let query = supabase
     .from('expenses')
-    .select('amount, status, expense_date, category_id');
+    .select('amount, amount_base, exchange_rate, status, expense_date, category_id')
+    .is('deleted_at', null);
 
   if (filters?.dateFrom) {
     query = query.gte('expense_date', filters.dateFrom);
@@ -404,6 +482,8 @@ export const getExpenseStats = async (filters?: {
   if (error) throw error;
 
   const rows = expenses ?? [];
+  const baseAmt = (e: { amount: number | null; amount_base: number | null; exchange_rate: number | null }) =>
+    Number(e.amount_base ?? (e.amount ?? 0) * (e.exchange_rate ?? 1));
 
   const thisMonth = new Date();
   thisMonth.setDate(1);
@@ -417,11 +497,11 @@ export const getExpenseStats = async (filters?: {
     approved: rows.filter(e => e.status === 'approved').length,
     rejected: rows.filter(e => e.status === 'rejected').length,
     paid: rows.filter(e => e.status === 'paid').length,
-    totalAmount: approvedExpenses.reduce((sum, e) => sum + (e.amount || 0), 0),
-    pendingAmount: rows.filter(e => e.status === 'pending').reduce((sum, e) => sum + (e.amount || 0), 0),
+    totalAmount: approvedExpenses.reduce((sum, e) => sum + baseAmt(e), 0),
+    pendingAmount: rows.filter(e => e.status === 'pending').reduce((sum, e) => sum + baseAmt(e), 0),
     thisMonthAmount: approvedExpenses
       .filter(e => e.expense_date !== null && e.expense_date >= thisMonthStart)
-      .reduce((sum, e) => sum + (e.amount || 0), 0),
+      .reduce((sum, e) => sum + baseAmt(e), 0),
   };
 };
 

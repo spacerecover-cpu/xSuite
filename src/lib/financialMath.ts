@@ -65,11 +65,77 @@ export const calculateInvoiceTotals = (
   return { subtotal, taxRate, taxAmount, totalAmount, amountDue };
 };
 
+export interface InvoiceBaseTotals {
+  subtotalBase: number;
+  taxAmountBase: number;
+  totalAmountBase: number;
+  amountPaidBase: number;
+  balanceDueBase: number;
+}
+
+/**
+ * Snapshot an invoice's document-currency totals into base currency at the frozen
+ * rate. Each field is converted independently and rounded to the base currency's
+ * minor units (the §3.3 invariant: *_base = round(* * rate, base.dp)); base fields
+ * are never derived from one another, so cross-field rounding never accumulates.
+ * At rate 1 this is the identity, so single-currency tenants store base == document.
+ */
+export const calculateInvoiceTotalsBase = (
+  totals: {
+    subtotal: number;
+    taxAmount: number;
+    totalAmount: number;
+    amountPaid: number;
+    amountDue: number;
+  },
+  rate: number,
+  baseDecimalPlaces = 2,
+): InvoiceBaseTotals => ({
+  subtotalBase: convertToBase(totals.subtotal, rate, baseDecimalPlaces),
+  taxAmountBase: convertToBase(totals.taxAmount, rate, baseDecimalPlaces),
+  totalAmountBase: convertToBase(totals.totalAmount, rate, baseDecimalPlaces),
+  amountPaidBase: convertToBase(totals.amountPaid, rate, baseDecimalPlaces),
+  balanceDueBase: convertToBase(totals.amountDue, rate, baseDecimalPlaces),
+});
+
 export interface QuoteTotals {
   subtotal: number;
   taxAmount: number;
   totalAmount: number;
 }
+
+export interface QuoteBaseTotals {
+  subtotalBase: number;
+  taxAmountBase: number;
+  totalAmountBase: number;
+}
+
+/** Snapshot a quote's document-currency totals into base. Same invariant as invoices. */
+export const calculateQuoteTotalsBase = (
+  totals: { subtotal: number; taxAmount: number; totalAmount: number },
+  rate: number,
+  baseDecimalPlaces = 2,
+): QuoteBaseTotals => ({
+  subtotalBase: convertToBase(totals.subtotal, rate, baseDecimalPlaces),
+  taxAmountBase: convertToBase(totals.taxAmount, rate, baseDecimalPlaces),
+  totalAmountBase: convertToBase(totals.totalAmount, rate, baseDecimalPlaces),
+});
+
+/**
+ * Realized FX gain/loss when a document amount booked at `invoiceRate` is settled
+ * at `paymentRate` (both documentCurrency -> base). TS mirror of the canonical SQL
+ * compute_realized_fx(): realized = round(docAmount * (paymentRate - invoiceRate),
+ * base.dp). Positive => gain, negative => loss, exactly 0 when the rate did not move
+ * (the single-currency / same-day case — so no FX row is ever posted there). Uses the
+ * house roundMoney (round-half-toward-+infinity); it can differ from Postgres round()
+ * only on an exact negative half-minor-unit, which is immaterial for rate * amount.
+ */
+export const computeRealizedFx = (
+  docAmount: number,
+  paymentRate: number,
+  invoiceRate: number,
+  baseDecimalPlaces = 2,
+): number => roundMoney(docAmount * (paymentRate - invoiceRate), baseDecimalPlaces);
 
 /**
  * Quote header totals. Per-item line totals, then a fixed-or-percentage
