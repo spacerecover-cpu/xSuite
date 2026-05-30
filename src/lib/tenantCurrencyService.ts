@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, resolveTenantId } from './supabaseClient';
 import type { Database } from '../types/database.types';
 
 export type TenantCurrencyRow = Pick<
@@ -36,10 +36,13 @@ export async function addTenantCurrency(code: string): Promise<void> {
   const rows = await listTenantCurrencies();
   assertCanAddCurrency(rows, code);
   const nextOrder = rows.reduce((m, r) => Math.max(m, r.display_order), 0) + 1;
+  // tenant_id must be a real uuid: the set_tenant_and_audit_fields trigger only
+  // stamps it when NULL, and an empty string fails the uuid cast (22P02) before
+  // the trigger fires. resolveTenantId() supplies the authenticated tenant.
+  const tenantId = await resolveTenantId();
   const { error } = await supabase
     .from('tenant_currencies')
-    // tenant_id is stamped by the set_tenant_and_audit_fields trigger.
-    .insert([{ tenant_id: '' as string, currency_code: code, is_base: false, is_active: true, display_order: nextOrder }]);
+    .insert([{ tenant_id: tenantId, currency_code: code, is_base: false, is_active: true, display_order: nextOrder }]);
   if (error) throw error;
 }
 

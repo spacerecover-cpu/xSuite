@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { baseAmount } from './financialMath';
 
 export interface ProfitLossData {
   revenue: {
@@ -65,13 +66,14 @@ export const generateProfitLossReport = async (
   const [invoicesResult, expensesResult] = await Promise.all([
     supabase
       .from('invoices')
-      .select('amount_paid, status')
+      .select('amount_paid, amount_paid_base, status')
       .gte('invoice_date', dateFrom)
       .lte('invoice_date', dateTo),
     supabase
       .from('expenses')
       .select(`
         amount,
+        amount_base,
         status,
         category:master_expense_categories(name)
       `)
@@ -83,15 +85,15 @@ export const generateProfitLossReport = async (
   const invoices = invoicesResult.data || [];
   const expenses = expensesResult.data || [];
 
-  const totalRevenue = invoices.reduce((sum, inv) => sum + (inv.amount_paid || 0), 0);
+  const totalRevenue = invoices.reduce((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
 
   const expensesByCategory: Record<string, number> = {};
   expenses.forEach((exp: any) => {
     const categoryName = exp.category?.name || 'Uncategorized';
-    expensesByCategory[categoryName] = (expensesByCategory[categoryName] || 0) + (exp.amount || 0);
+    expensesByCategory[categoryName] = (expensesByCategory[categoryName] || 0) + baseAmount(exp, 'amount');
   });
 
-  const totalExpenses = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+  const totalExpenses = expenses.reduce((sum, exp) => sum + baseAmount(exp, 'amount'), 0);
   const grossProfit = totalRevenue - totalExpenses;
   const netProfit = grossProfit;
   const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
@@ -130,6 +132,7 @@ export const generateAgedReceivablesReport = async (): Promise<AgedReceivablesDa
       invoice_date,
       due_date,
       balance_due,
+      balance_due_base,
       customer:customers_enhanced(id, customer_name)
     `)
     .gt('balance_due', 0)
@@ -171,7 +174,7 @@ export const generateAgedReceivablesReport = async (): Promise<AgedReceivablesDa
     if (!customerTotals[customerName][bucket]) {
       customerTotals[customerName][bucket] = { amount: 0, invoices: 0 };
     }
-    customerTotals[customerName][bucket].amount += inv.balance_due || 0;
+    customerTotals[customerName][bucket].amount += baseAmount(inv, 'balance_due');
     customerTotals[customerName][bucket].invoices += 1;
   });
 
@@ -208,13 +211,13 @@ export const generateCashFlowReport = async (
   const [paymentsResult, expensesResult, bankAccountsResult] = await Promise.all([
     supabase
       .from('payments')
-      .select('amount, status')
+      .select('amount, amount_base, status')
       .gte('payment_date', dateFrom)
       .lte('payment_date', dateTo)
       .eq('status', 'completed'),
     supabase
       .from('expenses')
-      .select('amount, status')
+      .select('amount, amount_base, status')
       .gte('expense_date', dateFrom)
       .lte('expense_date', dateTo)
       .in('status', ['approved', 'paid']),
@@ -224,8 +227,8 @@ export const generateCashFlowReport = async (
       .eq('is_active', true),
   ]);
 
-  const receipts = (paymentsResult.data || []).reduce((sum, p) => sum + (p.amount || 0), 0);
-  const payments = (expensesResult.data || []).reduce((sum, e) => sum + (e.amount || 0), 0);
+  const receipts = (paymentsResult.data || []).reduce((sum, p) => sum + baseAmount(p, 'amount'), 0);
+  const payments = (expensesResult.data || []).reduce((sum, e) => sum + baseAmount(e, 'amount'), 0);
 
   const totalCurrentBalance = (bankAccountsResult.data || []).reduce((sum, a) => sum + (a.current_balance || 0), 0);
   const totalOpeningBalance = (bankAccountsResult.data || []).reduce((sum, a) => sum + (a.opening_balance || 0), 0);
@@ -254,7 +257,7 @@ export const generateInvoiceSummaryReport = async (
   const [invoicesResult, quotesResult] = await Promise.all([
     supabase
       .from('invoices')
-      .select('status, invoice_type, total_amount, amount_paid, balance_due')
+      .select('status, invoice_type, total_amount, total_amount_base, amount_paid, amount_paid_base, balance_due, balance_due_base')
       .gte('invoice_date', dateFrom)
       .lte('invoice_date', dateTo),
     supabase
@@ -276,22 +279,22 @@ export const generateInvoiceSummaryReport = async (
       byStatus[status] = { count: 0, amount: 0 };
     }
     byStatus[status].count += 1;
-    byStatus[status].amount += inv.total_amount || 0;
+    byStatus[status].amount += baseAmount(inv, 'total_amount');
 
     const type = inv.invoice_type === 'proforma' ? 'Proforma' : 'Tax Invoice';
     if (!byType[type]) {
       byType[type] = { count: 0, amount: 0 };
     }
     byType[type].count += 1;
-    byType[type].amount += inv.total_amount || 0;
+    byType[type].amount += baseAmount(inv, 'total_amount');
   });
 
-  const totalInvoiced = invoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
-  const totalPaid = invoices.reduce((sum, inv) => sum + (inv.amount_paid || 0), 0);
-  const totalOutstanding = invoices.reduce((sum, inv) => sum + (inv.balance_due || 0), 0);
+  const totalInvoiced = invoices.reduce((sum, inv) => sum + baseAmount(inv, 'total_amount'), 0);
+  const totalPaid = invoices.reduce((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
+  const totalOutstanding = invoices.reduce((sum, inv) => sum + baseAmount(inv, 'balance_due'), 0);
   const totalOverdue = invoices
     .filter(inv => inv.status === 'overdue')
-    .reduce((sum, inv) => sum + (inv.balance_due || 0), 0);
+    .reduce((sum, inv) => sum + baseAmount(inv, 'balance_due'), 0);
 
   const convertedQuotes = quotes.filter(q => q.status === 'converted').length;
   const conversionRate = quotes.length > 0 ? (convertedQuotes / quotes.length) * 100 : 0;
@@ -323,6 +326,7 @@ export const generateRevenueByCustomerReport = async (
     .from('invoices')
     .select(`
       amount_paid,
+      amount_paid_base,
       customer:customers_enhanced(id, customer_name, email)
     `)
     .gte('invoice_date', dateFrom)
@@ -340,7 +344,7 @@ export const generateRevenueByCustomerReport = async (
     if (!customerRevenue[customerId]) {
       customerRevenue[customerId] = { name: customerName, email, amount: 0, count: 0 };
     }
-    customerRevenue[customerId].amount += inv.amount_paid || 0;
+    customerRevenue[customerId].amount += baseAmount(inv, 'amount_paid');
     customerRevenue[customerId].count += 1;
   });
 
@@ -357,6 +361,7 @@ export const generateRevenueByCaseReport = async (
     .from('invoices')
     .select(`
       amount_paid,
+      amount_paid_base,
       case_id,
       cases(id, case_no, title)
     `)
@@ -369,6 +374,7 @@ export const generateRevenueByCaseReport = async (
     .from('expenses')
     .select(`
       amount,
+      amount_base,
       case_id,
       cases(id, case_no, title)
     `)
@@ -398,7 +404,7 @@ export const generateRevenueByCaseReport = async (
         profit: 0,
       };
     }
-    caseFinancials[inv.case_id].revenue += inv.amount_paid || 0;
+    caseFinancials[inv.case_id].revenue += baseAmount(inv, 'amount_paid');
   });
 
   (expenses || []).forEach((exp: any) => {
@@ -412,7 +418,7 @@ export const generateRevenueByCaseReport = async (
         profit: 0,
       };
     }
-    caseFinancials[exp.case_id].expenses += exp.amount || 0;
+    caseFinancials[exp.case_id].expenses += baseAmount(exp, 'amount');
   });
 
   Object.values(caseFinancials).forEach(c => {
@@ -451,7 +457,7 @@ export const generateAgedPayablesReport = async (): Promise<AgedPayablesData> =>
 
   const { data: expenses, error } = await supabase
     .from('expenses')
-    .select('id, expense_date, amount, status, vendor')
+    .select('id, expense_date, amount, amount_base, status, vendor')
     .is('deleted_at', null)
     .not('status', 'in', '("paid","cancelled","rejected")');
 
@@ -482,7 +488,7 @@ export const generateAgedPayablesReport = async (): Promise<AgedPayablesData> =>
 
     if (!vendorTotals[vendor]) vendorTotals[vendor] = {};
     if (!vendorTotals[vendor][bucket]) vendorTotals[vendor][bucket] = { amount: 0, expenses: 0 };
-    vendorTotals[vendor][bucket].amount += exp.amount ?? 0;
+    vendorTotals[vendor][bucket].amount += baseAmount(exp, 'amount');
     vendorTotals[vendor][bucket].expenses += 1;
   });
 
@@ -530,6 +536,7 @@ export const generateExpenseByCategoryReport = async (
     .select(`
       id,
       amount,
+      amount_base,
       category_id,
       master_expense_categories ( id, name )
     `)
@@ -548,9 +555,9 @@ export const generateExpenseByCategoryReport = async (
     const cat = (exp.master_expense_categories as { name?: string } | null)?.name
       ?? 'Uncategorized';
     if (!acc[cat]) acc[cat] = { amount: 0, count: 0 };
-    acc[cat].amount += exp.amount ?? 0;
+    acc[cat].amount += baseAmount(exp, 'amount');
     acc[cat].count += 1;
-    total += exp.amount ?? 0;
+    total += baseAmount(exp, 'amount');
     count += 1;
   }
 
@@ -583,13 +590,13 @@ export const generateInvoiceVsExpenseReport = async (
   const [invoicesRes, expensesRes] = await Promise.all([
     supabase
       .from('invoices')
-      .select('id, total_amount, amount_paid, invoice_date, paid_at, status')
+      .select('id, total_amount, total_amount_base, amount_paid, invoice_date, paid_at, status')
       .is('deleted_at', null)
       .gte('invoice_date', dateFrom)
       .lte('invoice_date', dateTo),
     supabase
       .from('expenses')
-      .select('id, amount, expense_date, status')
+      .select('id, amount, amount_base, expense_date, status')
       .is('deleted_at', null)
       .gte('expense_date', dateFrom)
       .lte('expense_date', dateTo)
@@ -607,13 +614,13 @@ export const generateInvoiceVsExpenseReport = async (
     if (!inv.invoice_date) continue;
     const key = inv.invoice_date.slice(0, 7);
     if (!byMonth[key]) byMonth[key] = { revenue: 0, expense: 0 };
-    byMonth[key].revenue += inv.total_amount ?? 0;
+    byMonth[key].revenue += baseAmount(inv, 'total_amount');
   }
   for (const exp of expensesRes.data ?? []) {
     if (!exp.expense_date) continue;
     const key = exp.expense_date.slice(0, 7);
     if (!byMonth[key]) byMonth[key] = { revenue: 0, expense: 0 };
-    byMonth[key].expense += exp.amount ?? 0;
+    byMonth[key].expense += baseAmount(exp, 'amount');
   }
 
   const months = Object.entries(byMonth)

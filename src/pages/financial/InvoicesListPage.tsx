@@ -19,7 +19,7 @@ import { FinancialStatsCard } from '../../components/financial/FinancialStatsCar
 import { InvoiceFormModal } from '../../components/cases/InvoiceFormModal';
 import { RecordReceiptModal } from '../../components/banking/RecordReceiptModal';
 import { useCurrency } from '../../hooks/useCurrency';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase, resolveTenantId } from '../../lib/supabaseClient';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { ExportButton } from '../../components/shared/ExportButton';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
@@ -758,6 +758,8 @@ export const InvoicesListPage: React.FC<unknown> = () => {
             if (typeof receiptRow.amount !== 'number') {
               throw new Error('Receipt amount is required');
             }
+            // Real tenant uuid: the trigger only stamps NULL; '' fails the uuid cast.
+            const tenantId = await resolveTenantId();
             // `receipts` is the live tenant table. Caller-facing fields that do
             // not exist on the live schema (account_id, payment_method_id,
             // case_id, company_id, reference_number, description, source_type)
@@ -766,7 +768,7 @@ export const InvoicesListPage: React.FC<unknown> = () => {
             const { data: receipt, error: receiptError } = await supabase
               .from('receipts')
               .insert({
-                tenant_id: '' as string,
+                tenant_id: tenantId,
                 amount: receiptRow.amount,
                 receipt_date: receiptRow.receipt_date ?? null,
                 customer_id: receiptRow.customer_id ?? null,
@@ -783,7 +785,7 @@ export const InvoicesListPage: React.FC<unknown> = () => {
 
             if (allocations && allocations.length > 0) {
               const allocationRecords = allocations.map((alloc) => ({
-                tenant_id: '' as string,
+                tenant_id: tenantId,
                 receipt_id: receipt.id,
                 invoice_id: alloc.invoice_id,
                 amount: alloc.allocated_amount,

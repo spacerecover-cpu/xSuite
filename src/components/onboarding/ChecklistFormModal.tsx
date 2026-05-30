@@ -6,6 +6,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { employeeOnboardingKeys, recruitmentKeys } from '../../lib/queryKeys';
+import { resolveTenantId } from '../../lib/supabaseClient';
 import {
   createChecklist,
   updateChecklist,
@@ -84,8 +85,10 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
 
   const mutation = useMutation({
     mutationFn: async (data: ChecklistFormData) => {
+      // Real tenant uuid: the trigger only stamps NULL; '' fails the uuid cast.
+      const tenantId = await resolveTenantId();
       const payload = {
-        tenant_id: '' as string,
+        tenant_id: tenantId,
         name: data.name,
         description: data.description || null,
         for_position_id: data.for_position_id || null,
@@ -104,7 +107,7 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
 
       for (const item of items) {
         const itemPayload = {
-          tenant_id: '' as string,
+          tenant_id: tenantId,
           title: item.title,
           description: item.description || null,
           assigned_to_role: item.assigned_to_role || null,

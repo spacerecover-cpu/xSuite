@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { baseAmount } from './financialMath';
 
 export interface CaseFinancialSummary {
   caseId: string;
@@ -40,15 +41,15 @@ export async function getCaseFinancialSummary(caseId: string): Promise<CaseFinan
   const [quotesResult, invoicesResult, expensesResult] = await Promise.all([
     supabase
       .from('quotes')
-      .select('id, total_amount, status')
+      .select('id, total_amount, total_amount_base, status')
       .eq('case_id', caseId),
     supabase
       .from('invoices')
-      .select('id, total_amount, amount_paid, status')
+      .select('id, total_amount, total_amount_base, amount_paid, amount_paid_base, status')
       .eq('case_id', caseId),
     supabase
       .from('expenses')
-      .select('id, amount, status')
+      .select('id, amount, amount_base, status')
       .eq('case_id', caseId)
       .in('status', ['approved', 'paid']),
   ]);
@@ -57,13 +58,15 @@ export async function getCaseFinancialSummary(caseId: string): Promise<CaseFinan
   const invoices = invoicesResult.data || [];
   const expenses = expensesResult.data || [];
 
+  // Aggregate in base currency (a case can mix document currencies); baseAmount
+  // falls back to the raw column for any transition row lacking a base snapshot.
   const totalQuoted = quotes
     .filter(q => q.status !== 'rejected')
-    .reduce((sum, q) => sum + (q.total_amount || 0), 0);
+    .reduce((sum, q) => sum + baseAmount(q, 'total_amount'), 0);
 
-  const totalInvoiced = invoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
-  const totalPaid = invoices.reduce((sum, inv) => sum + (inv.amount_paid || 0), 0);
-  const totalExpenses = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+  const totalInvoiced = invoices.reduce((sum, inv) => sum + baseAmount(inv, 'total_amount'), 0);
+  const totalPaid = invoices.reduce((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
+  const totalExpenses = expenses.reduce((sum, exp) => sum + baseAmount(exp, 'amount'), 0);
   const outstandingBalance = totalInvoiced - totalPaid;
   const netRevenue = totalPaid - totalExpenses;
   const profitMargin = totalPaid > 0 ? (netRevenue / totalPaid) * 100 : 0;
