@@ -53,7 +53,7 @@ export const LoanDetailModal: React.FC<LoanDetailModalProps> = ({
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: payrollKeys.loans() });
+      queryClient.invalidateQueries({ queryKey: payrollKeys.all });
       queryClient.invalidateQueries({ queryKey: ['loan', loanId] });
       toast.success('Loan cancelled successfully');
       onClose();
@@ -66,7 +66,7 @@ export const LoanDetailModal: React.FC<LoanDetailModalProps> = ({
   const approveLoanMutation = useMutation({
     mutationFn: () => payrollService.approveLoan(loanId, user?.id || ''),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: payrollKeys.loans() });
+      queryClient.invalidateQueries({ queryKey: payrollKeys.all });
       queryClient.invalidateQueries({ queryKey: ['loan', loanId] });
       toast.success('Loan approved successfully');
     },

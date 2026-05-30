@@ -9,6 +9,7 @@ import { SaleableItemsGrid } from '../stock/SaleableItemsGrid';
 import { StockSaleModal } from '../stock/StockSaleModal';
 import { StockTransactionModal } from '../stock/StockTransactionModal';
 import { QuickSaleWidget } from '../stock/QuickSaleWidget';
+import { stockKeys } from '../../lib/queryKeys';
 import {
   getSalesByCase,
   getStockUsageByCase,
@@ -41,7 +42,7 @@ export const CaseBackupDevicesTab: React.FC<CaseBackupDevicesTabProps> = ({
   const [usageItem, setUsageItem] = useState<StockItemWithCategory | null>(null);
 
   const { data: sales = [], isLoading: loadingSales } = useQuery({
-    queryKey: ['stock-sales-case', caseId],
+    queryKey: stockKeys.salesByCase(caseId),
     queryFn: () => getSalesByCase(caseId),
     enabled: !!caseId,
   });
@@ -66,7 +67,7 @@ export const CaseBackupDevicesTab: React.FC<CaseBackupDevicesTabProps> = ({
 
   const handleSaleSuccess = (saleId: string) => {
     setShowSaleModal(false);
-    queryClient.invalidateQueries({ queryKey: ['stock-sales-case', caseId] });
+    queryClient.invalidateQueries({ queryKey: stockKeys.salesByCase(caseId) });
     navigate(`/resources/stock/sales/${saleId}`);
   };
 
@@ -103,7 +104,7 @@ export const CaseBackupDevicesTab: React.FC<CaseBackupDevicesTabProps> = ({
         caseId={caseId}
         customerId={customerId}
         onSaleCreated={() => {
-          queryClient.invalidateQueries({ queryKey: ['stock-sales-case', caseId] });
+          queryClient.invalidateQueries({ queryKey: stockKeys.salesByCase(caseId) });
         }}
       />
 

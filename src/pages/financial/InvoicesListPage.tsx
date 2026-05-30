@@ -204,6 +204,7 @@ export const InvoicesListPage: React.FC<unknown> = () => {
       toast.success(`Archived ${n} invoice${n === 1 ? '' : 's'}`);
       selection.clear();
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice'] });
       queryClient.invalidateQueries({ queryKey: ['invoice_stats'] });
     } catch (err) {
       toast.error((err as Error).message || 'Failed to archive invoices');
@@ -243,6 +244,7 @@ export const InvoicesListPage: React.FC<unknown> = () => {
       }
       selection.clear();
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice'] });
       queryClient.invalidateQueries({ queryKey: ['invoice_stats'] });
     } catch (err) {
       toast.error((err as Error).message || 'Bulk send failed');
@@ -840,6 +842,7 @@ export const InvoicesListPage: React.FC<unknown> = () => {
             }
 
             queryClient.invalidateQueries({ queryKey: ['invoices'] });
+            queryClient.invalidateQueries({ queryKey: ['invoice'] });
             queryClient.invalidateQueries({ queryKey: ['invoice_stats'] });
           }}
           prefilledData={{
@@ -901,6 +904,7 @@ export const InvoicesListPage: React.FC<unknown> = () => {
             }
 
             queryClient.invalidateQueries({ queryKey: ['invoices'] });
+            queryClient.invalidateQueries({ queryKey: ['invoice'] });
             queryClient.invalidateQueries({ queryKey: ['invoice_stats'] });
           }}
           caseId={editingInvoice?.case_id || ''}

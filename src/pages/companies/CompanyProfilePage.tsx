@@ -328,6 +328,7 @@ export const CompanyProfilePage: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['company', id] });
+      queryClient.invalidateQueries({ queryKey: ['companies'] });
       setIsEditModalOpen(false);
     },
   });

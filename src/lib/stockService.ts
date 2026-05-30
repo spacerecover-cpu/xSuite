@@ -1,6 +1,6 @@
 import { supabase, getTenantId } from './supabaseClient';
 import type { Database } from '../types/database.types';
-import { sanitizeFilterValue, isValidUuid } from './postgrestSanitizer';
+import { sanitizeFilterValue } from './postgrestSanitizer';
 
 function requireTenantId(): string {
   const tid = getTenantId();
@@ -1122,172 +1122,6 @@ export async function getPortalCustomerPurchases(customerId: string): Promise<{
   return { sales, warranties };
 }
 
-// ============================================================
-// Stock Returns
-// ============================================================
-
-export interface StockReturn {
-  id: string;
-  return_number: string;
-  return_date: string | null;
-  sale_id: string;
-  customer_id: string;
-  reason: string;
-  status: string;
-  refund_amount: number | null;
-  refund_method: string | null;
-  restock_items: boolean | null;
-  notes: string | null;
-  processed_by: string | null;
-  processed_at: string | null;
-  created_by: string | null;
-  created_at: string | null;
-  updated_at: string | null;
-  deleted_at: string | null;
-}
-
-export interface StockReturnItem {
-  id: string;
-  return_id: string;
-  sale_item_id: string;
-  stock_item_id: string;
-  quantity: number;
-  serial_number: string | null;
-  condition: string;
-  restock: boolean;
-  refund_amount: number | null;
-  notes: string | null;
-  created_at: string | null;
-}
-
-export interface StockReturnWithDetails extends StockReturn {
-  customers_enhanced?: { id: string; customer_name: string | null; email: string | null } | null;
-  stock_sales?: { id: string; sale_number: string | null } | null;
-  stock_return_items?: Array<StockReturnItem & {
-    stock_items?: Pick<StockItem, 'id' | 'name' | 'brand' | 'sku'> | null;
-  }>;
-}
-
-export interface CreateStockReturnInput {
-  sale_id: string;
-  customer_id: string;
-  reason: string;
-  refund_method?: string | null;
-  restock_items?: boolean;
-  notes?: string | null;
-  items: Array<{
-    sale_item_id: string;
-    stock_item_id: string;
-    quantity: number;
-    serial_number?: string | null;
-    condition?: string;
-    restock?: boolean;
-    refund_amount?: number | null;
-    notes?: string | null;
-  }>;
-}
-
-export interface StockReturnFilters {
-  status?: string;
-  customer_id?: string;
-  sale_id?: string;
-  startDate?: string;
-  endDate?: string;
-}
-
-// NOTE: stock_returns / stock_return_items tables do not exist in the v1.0.0 live schema.
-// The TS surface is kept so consumer screens compile; runtime calls throw a structured error.
-// TODO(B8): either add a migration creating these tables OR delete the entire returns flow
-// (4 components, 1 page) along with the routes in App.tsx.
-const RETURNS_DISABLED = 'Stock returns are not available in the current schema (tables removed in v1.0.0). See TODO(B8) in stockService.ts.';
-
-export async function getStockReturns(_filters?: StockReturnFilters): Promise<StockReturnWithDetails[]> {
-  return [];
-}
-
-export async function getStockReturn(_id: string): Promise<StockReturnWithDetails | null> {
-  return null;
-}
-
-export async function createStockReturn(_data: CreateStockReturnInput): Promise<StockReturn> {
-  throw new Error(RETURNS_DISABLED);
-}
-
-export async function processStockReturn(
-  _id: string,
-  _action: 'approve' | 'reject',
-  _processedBy: string,
-  _notes?: string
-): Promise<void> {
-  throw new Error(RETURNS_DISABLED);
-}
-
-export async function completeStockReturn(_id: string): Promise<void> {
-  throw new Error(RETURNS_DISABLED);
-}
-
-// ============================================================
-// Stock Reservations
-// ============================================================
-
-export interface StockReservation {
-  id: string;
-  stock_item_id: string;
-  quantity: number;
-  reservation_type: string;
-  reference_id: string | null;
-  reference_type: string | null;
-  status: string;
-  expires_at: string | null;
-  notes: string | null;
-  reserved_by: string | null;
-  created_at: string | null;
-  updated_at: string | null;
-  deleted_at: string | null;
-}
-
-export interface StockReservationWithItem extends StockReservation {
-  stock_items?: Pick<StockItem, 'id' | 'name' | 'brand' | 'sku'> | null;
-}
-
-export interface CreateReservationInput {
-  stock_item_id: string;
-  quantity: number;
-  reservation_type: 'quote' | 'case' | 'manual';
-  reference_id?: string | null;
-  reference_type?: 'quote' | 'case' | null;
-  expires_at?: string | null;
-  notes?: string | null;
-  reserved_by?: string | null;
-}
-
-// NOTE: stock_reservations table does not exist in v1.0.0 live schema. The simpler
-// quantity_reserved column on stock_items is used instead (see reserveStock above).
-// TS surface preserved for consumer compatibility; full reservation tracking with
-// expiry/fulfillment requires a migration to add stock_reservations.
-// TODO(B8): create stock_reservations table OR rewire consumers (BackupDeviceRecommendation,
-// quote reservation flow) to use simple quantity_reserved on stock_items.
-const RESERVATIONS_DISABLED = 'Detailed stock reservations are not available in the current schema. Use reserveStock/releaseReservedStock instead. See TODO(B8) in stockService.ts.';
-
-export async function createReservation(_data: CreateReservationInput): Promise<StockReservation> {
-  throw new Error(RESERVATIONS_DISABLED);
-}
-
-export async function releaseReservation(_id: string): Promise<void> {
-  throw new Error(RESERVATIONS_DISABLED);
-}
-
-export async function fulfillReservation(_id: string, _saleId: string): Promise<void> {
-  throw new Error(RESERVATIONS_DISABLED);
-}
-
-export async function getReservationsForItem(_stockItemId: string): Promise<StockReservation[]> {
-  return [];
-}
-
-export async function getReservationsForQuote(_quoteId: string): Promise<StockReservationWithItem[]> {
-  return [];
-}
 
 export async function getAvailableQuantity(stockItemId: string): Promise<number> {
   const item = await getStockItem(stockItemId);
@@ -1295,9 +1129,6 @@ export async function getAvailableQuantity(stockItemId: string): Promise<number>
   return Math.max(0, (item.current_quantity ?? 0) - (item.quantity_reserved ?? 0));
 }
 
-export async function expireOldReservations(): Promise<number> {
-  return 0;
-}
 
 // ============================================================
 // Barcode Lookup
@@ -1455,62 +1286,6 @@ export interface StockLocation {
 
 // NOTE: stock_item_locations table does not exist in v1.0.0 live schema. Type retained
 // for consumer compatibility; runtime functions return empty / throw.
-export interface StockItemLocation {
-  id: string;
-  stock_item_id: string;
-  location_id: string;
-  quantity: number;
-  bin_number: string | null;
-  created_at: string | null;
-  updated_at: string | null;
-  stock_locations?: StockLocation | null;
-}
-
-export interface StockTransfer {
-  id: string;
-  transfer_number: string;
-  from_location_id: string;
-  to_location_id: string;
-  status: string;
-  transfer_date: string | null;
-  notes: string | null;
-  created_by: string | null;
-  completed_by: string | null;
-  completed_at: string | null;
-  created_at: string | null;
-  updated_at: string | null;
-  deleted_at: string | null;
-}
-
-export interface StockTransferItem {
-  id: string;
-  transfer_id: string;
-  stock_item_id: string;
-  quantity: number;
-  serial_numbers: string[] | null;
-  notes: string | null;
-  created_at: string | null;
-  stock_items?: Pick<StockItem, 'id' | 'name' | 'brand' | 'sku'> | null;
-}
-
-export interface StockTransferWithDetails extends StockTransfer {
-  from_location?: StockLocation | null;
-  to_location?: StockLocation | null;
-  stock_transfer_items?: StockTransferItem[];
-}
-
-export interface CreateTransferInput {
-  from_location_id: string;
-  to_location_id: string;
-  notes?: string | null;
-  created_by?: string | null;
-  items: Array<{
-    stock_item_id: string;
-    quantity: number;
-    serial_numbers?: string[];
-    notes?: string | null;
-  }>;
-}
 
 export async function getStockLocations(): Promise<StockLocation[]> {
   const { data, error } = await supabase
@@ -1558,40 +1333,6 @@ export async function updateStockLocation(id: string, data: Partial<StockLocatio
   return result as unknown as StockLocation;
 }
 
-// NOTE: stock_item_locations, stock_transfers, stock_transfer_items tables do not exist in
-// v1.0.0 live schema. Multi-location inventory and inter-location transfers are not supported.
-// Type surface preserved so consumer screens compile. Runtime calls throw / return empty.
-// TODO(B8): either create these tables via migration or delete the entire transfer/location-bin
-// flow (StockTransfersPage, StockTransferDetail, StockTransferModal, StockLocationSelect, and
-// 3 routes in App.tsx).
-const TRANSFERS_DISABLED = 'Stock transfers/locations are not available in the current schema. See TODO(B8) in stockService.ts.';
-
-export async function getItemLocations(_stockItemId: string): Promise<StockItemLocation[]> {
-  // unused import guard: keep isValidUuid in surface so removal of transfer filter logic
-  // doesn't make the helper appear unused in other call sites.
-  void isValidUuid;
-  return [];
-}
-
-export async function getStockTransfers(_filters?: { status?: string; location_id?: string }): Promise<StockTransferWithDetails[]> {
-  return [];
-}
-
-export async function getStockTransfer(_id: string): Promise<StockTransferWithDetails | null> {
-  return null;
-}
-
-export async function createStockTransfer(_data: CreateTransferInput): Promise<StockTransfer> {
-  throw new Error(TRANSFERS_DISABLED);
-}
-
-export async function completeStockTransfer(_id: string, _completedBy: string): Promise<void> {
-  throw new Error(TRANSFERS_DISABLED);
-}
-
-export async function cancelStockTransfer(_id: string): Promise<void> {
-  throw new Error(TRANSFERS_DISABLED);
-}
 
 // ============================================================
 // Bulk Operations
