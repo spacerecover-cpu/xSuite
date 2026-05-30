@@ -75,6 +75,8 @@ export const QuoteDetailPage: React.FC = () => {
     mutationFn: () => deleteQuote(id!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['deletedQuotes'] });
+      queryClient.invalidateQueries({ queryKey: ['quote_stats'] });
       toast.success('Quote deleted successfully');
       navigate('/quotes');
     },
@@ -89,6 +91,7 @@ export const QuoteDetailPage: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quote', id] });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['quote_stats'] });
       toast.success('Quote status updated successfully');
       setShowStatusModal(false);
     },
@@ -101,6 +104,7 @@ export const QuoteDetailPage: React.FC = () => {
     mutationFn: () => duplicateQuote(id!),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['quote_stats'] });
       toast.success('Quote duplicated successfully');
       navigate(`/quotes/${data.id}`);
     },
@@ -171,6 +175,7 @@ export const QuoteDetailPage: React.FC = () => {
 
       queryClient.invalidateQueries({ queryKey: ['quote', id] });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['quote_stats'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
 
       toast.success(

@@ -7,6 +7,7 @@ import { Input } from '../ui/Input';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { SerialNumberInput } from '../stock/SerialNumberInput';
 import { getStockItems, receiveStockFromPO } from '../../lib/stockService';
+import { stockKeys } from '../../lib/queryKeys';
 import { useToast } from '../../hooks/useToast';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -96,7 +97,7 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stock-items'] });
+      queryClient.invalidateQueries({ queryKey: stockKeys.items() });
       queryClient.invalidateQueries({ queryKey: ['purchase-order', purchaseOrderId] });
       toast.success('Stock received successfully');
       onSuccess();

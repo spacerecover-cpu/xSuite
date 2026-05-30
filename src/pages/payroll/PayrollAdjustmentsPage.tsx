@@ -35,7 +35,7 @@ export default function PayrollAdjustmentsPage() {
   const approveMutation = useMutation({
     mutationFn: (id: string) => payrollService.approvePayrollAdjustment(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: payrollKeys.adjustments({}) });
+      queryClient.invalidateQueries({ queryKey: payrollKeys.all });
       toast.success('Adjustment approved successfully');
       setApprovingAdjustment(null);
     },
@@ -47,7 +47,7 @@ export default function PayrollAdjustmentsPage() {
   const cancelMutation = useMutation({
     mutationFn: (id: string) => payrollService.cancelPayrollAdjustment(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: payrollKeys.adjustments({}) });
+      queryClient.invalidateQueries({ queryKey: payrollKeys.all });
       toast.success('Adjustment cancelled');
       setCancellingAdjustment(null);
     },

@@ -13,13 +13,12 @@ import {
   recordStockReceipt,
   recordStockUsage,
   updateStockItem,
-  getReservationsForItem,
 } from '../../lib/stockService';
 import { stockKeys } from '../../lib/queryKeys';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useToast } from '../../hooks/useToast';
 
-type TabType = 'transactions' | 'serials' | 'sales' | 'reservations';
+type TabType = 'transactions' | 'serials' | 'sales';
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
@@ -163,11 +162,6 @@ export const StockItemDetail: React.FC = () => {
     enabled: !!id && activeTab === 'serials',
   });
 
-  const { data: reservations = [] } = useQuery({
-    queryKey: stockKeys.reservations(id),
-    queryFn: () => getReservationsForItem(id!),
-    enabled: !!id && activeTab === 'reservations',
-  });
 
   const receiveMutation = useMutation({
     mutationFn: ({ qty, cost, notes }: { qty: number; cost?: number; notes?: string }) =>
@@ -616,7 +610,6 @@ export const StockItemDetail: React.FC = () => {
               { key: 'transactions', label: 'Transaction History' },
               { key: 'serials', label: 'Serial Numbers' },
               ...(isSaleable ? [{ key: 'sales', label: 'Sales History' }] : []),
-              { key: 'reservations', label: `Reservations${reservedQty > 0 ? ` (${reservedQty})` : ''}` },
             ] as { key: TabType; label: string }[]
           ).map(({ key, label }) => (
             <button
@@ -775,44 +768,6 @@ export const StockItemDetail: React.FC = () => {
             </div>
           )}
 
-          {activeTab === 'reservations' && (
-            <div>
-              {reservations.length === 0 ? (
-                <div className="py-10 text-center text-slate-400 text-sm">
-                  No active reservations for this item
-                </div>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200">
-                      <th className="pb-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Reference</th>
-                      <th className="pb-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Type</th>
-                      <th className="pb-2.5 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Qty</th>
-                      <th className="pb-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Expires</th>
-                      <th className="pb-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Created</th>
-                      <th className="pb-2.5 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {reservations.map((r) => (
-                      <tr key={r.id} className="hover:bg-slate-50">
-                        <td className="py-2.5 pr-4 font-mono text-xs text-slate-700">{r.reference_id ?? '—'}</td>
-                        <td className="py-2.5 pr-4">
-                          <span className="capitalize text-slate-600">{r.reference_type ?? '—'}</span>
-                        </td>
-                        <td className="py-2.5 pr-4 text-center font-semibold text-warning">{r.quantity}</td>
-                        <td className="py-2.5 pr-4 text-slate-500">{r.expires_at ? formatDate(r.expires_at) : 'No expiry'}</td>
-                        <td className="py-2.5 pr-4 text-slate-500">{formatDate(r.created_at)}</td>
-                        <td className="py-2.5 text-center">
-                          <Badge variant="warning" size="sm">{r.status}</Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
         </div>
       </div>
 

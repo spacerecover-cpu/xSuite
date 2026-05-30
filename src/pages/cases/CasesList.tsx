@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -76,6 +76,7 @@ export const CasesList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const CASES_PER_PAGE = 7;
 
+  const queryClient = useQueryClient();
   useCasesRealtime();
 
   useEffect(() => {
@@ -337,6 +338,8 @@ export const CasesList: React.FC = () => {
       toast.success(`Archived ${n} case${n === 1 ? '' : 's'}`);
       selection.clear();
       refetch();
+      queryClient.invalidateQueries({ queryKey: ['cases_count'] });
+      queryClient.invalidateQueries({ queryKey: ['cases_stats'] });
     } catch (err) {
       toast.error((err as Error).message || 'Failed to archive cases');
     } finally {
