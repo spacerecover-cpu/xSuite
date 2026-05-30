@@ -120,6 +120,8 @@ export const SettingsDashboard: React.FC = () => {
       navigate('/settings/import-export');
     } else if (categoryId === 'notifications') {
       navigate('/settings/notifications');
+    } else if (categoryId === 'currencies') {
+      navigate('/settings/currencies');
     } else {
       navigate(`/settings/${categoryId}`);
     }
