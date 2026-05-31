@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useId } from 'react';
 import Cropper, { Point, Area } from 'react-easy-crop';
+import { useTranslation } from 'react-i18next';
 import { Modal } from './Modal';
 import { Button } from './Button';
 import { ZoomIn, ZoomOut, RotateCw } from 'lucide-react';
@@ -14,27 +15,25 @@ interface ImageCropModalProps {
   cropShape?: 'rect' | 'round';
 }
 
-export const ImageCropModal: React.FC<ImageCropModalProps> = ({
+export function ImageCropModal({
   isOpen,
   onClose,
   imageUrl,
   onCropComplete,
   aspectRatio = 1,
   cropShape = 'round',
-}) => {
+}: ImageCropModalProps) {
+  const { t } = useTranslation();
+  const zoomId = useId();
   const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [isCropping, setIsCropping] = useState(false);
+  const [cropError, setCropError] = useState<string | null>(null);
 
-  const onCropChange = (crop: Point) => {
-    setCrop(crop);
-  };
-
-  const onZoomChange = (zoom: number) => {
-    setZoom(zoom);
-  };
+  const onCropChange = (crop: Point) => setCrop(crop);
+  const onZoomChange = (zoom: number) => setZoom(zoom);
 
   const onCropCompleteInternal = useCallback((_croppedArea: Area, croppedAreaPixels: Area) => {
     setCroppedAreaPixels(croppedAreaPixels);
@@ -104,31 +103,25 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
     if (!croppedAreaPixels) return;
 
     try {
+      setCropError(null);
       setIsCropping(true);
       const { blob, url } = await getCroppedImg(imageUrl, croppedAreaPixels, rotation);
       onCropComplete(blob, url);
       onClose();
     } catch (error) {
       logger.error('Error cropping image:', error);
+      setCropError(t('ui.cropFailed'));
     } finally {
       setIsCropping(false);
     }
   };
 
-  const handleRotate = () => {
-    setRotation((prev) => (prev + 90) % 360);
-  };
-
-  const handleZoomIn = () => {
-    setZoom((prev) => Math.min(prev + 0.1, 3));
-  };
-
-  const handleZoomOut = () => {
-    setZoom((prev) => Math.max(prev - 0.1, 1));
-  };
+  const handleRotate = () => setRotation((prev) => (prev + 90) % 360);
+  const handleZoomIn = () => setZoom((prev) => Math.min(prev + 0.1, 3));
+  const handleZoomOut = () => setZoom((prev) => Math.max(prev - 0.1, 1));
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Crop Image" size="large">
+    <Modal isOpen={isOpen} onClose={onClose} title={t('ui.cropImage')} size="large">
       <div className="space-y-6">
         <div className="relative h-96 bg-slate-900 rounded-xl overflow-hidden">
           <Cropper
@@ -147,31 +140,35 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Zoom
+            <label htmlFor={zoomId} className="block text-sm font-medium text-slate-700 mb-2">
+              {t('ui.zoom')}
             </label>
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={handleZoomOut}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                aria-label={t('ui.zoomOut')}
+                className="p-2 hover:bg-surface-muted rounded-lg transition-colors"
                 disabled={zoom <= 1}
               >
                 <ZoomOut className="w-5 h-5 text-slate-600" />
               </button>
               <input
+                id={zoomId}
+                aria-label={t('ui.zoom')}
                 type="range"
                 min={1}
                 max={3}
                 step={0.1}
                 value={zoom}
                 onChange={(e) => setZoom(Number(e.target.value))}
-                className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                className="flex-1 h-2 bg-surface-muted rounded-lg appearance-none cursor-pointer accent-primary"
               />
               <button
                 type="button"
                 onClick={handleZoomIn}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                aria-label={t('ui.zoomIn')}
+                className="p-2 hover:bg-surface-muted rounded-lg transition-colors"
                 disabled={zoom >= 3}
               >
                 <ZoomIn className="w-5 h-5 text-slate-600" />
@@ -181,7 +178,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Rotation
+              {t('ui.rotation')}
             </label>
             <div className="flex items-center gap-3">
               <button
@@ -190,31 +187,26 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
                 className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
               >
                 <RotateCw className="w-4 h-4 text-slate-600" />
-                <span className="text-sm font-medium text-slate-700">Rotate 90°</span>
+                <span className="text-sm font-medium text-slate-700">{t('ui.rotate90')}</span>
               </button>
-              <span className="text-sm text-slate-600">Current: {rotation}°</span>
+              <span className="text-sm text-slate-600">{t('ui.current')}: {rotation}°</span>
             </div>
           </div>
         </div>
 
-        <div className="flex gap-3 justify-end pt-3 border-t">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={onClose}
-            disabled={isCropping}
-          >
-            Cancel
+        {cropError && (
+          <p className="text-sm text-danger" role="alert">{cropError}</p>
+        )}
+
+        <div className="flex gap-3 justify-end pt-3 border-t border-border">
+          <Button type="button" variant="secondary" onClick={onClose} disabled={isCropping}>
+            {t('common.cancel')}
           </Button>
-          <Button
-            type="button"
-            onClick={handleCrop}
-            disabled={isCropping}
-          >
-            {isCropping ? 'Cropping...' : 'Apply Crop'}
+          <Button type="button" onClick={handleCrop} disabled={isCropping}>
+            {isCropping ? t('ui.cropping') : t('ui.applyCrop')}
           </Button>
         </div>
       </div>
     </Modal>
   );
-};
+}

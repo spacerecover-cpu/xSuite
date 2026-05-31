@@ -19,3 +19,12 @@ describe('ui i18n keys', () => {
     expect(i18n.t('ui.selectedCount', { selected: 2, total: 5 })).toBe('2 of 5 selected');
   });
 });
+
+describe('phase 1 overlay ui keys', () => {
+  it('resolves new overlay keys in English', () => {
+    expect(i18n.t('ui.dialog')).toBe('Dialog');
+    expect(i18n.t('ui.cropImage')).toBe('Crop Image');
+    expect(i18n.t('ui.applyCrop')).toBe('Apply Crop');
+    expect(i18n.t('ui.photoViewerClose')).toBe('Close photo viewer');
+  });
+});

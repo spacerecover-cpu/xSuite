@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Trash2, Search, FileText, Download, DollarSign, FileBarChart, Briefcase, Calculator, Package, Info, X, Percent } from 'lucide-react';
 import { Modal } from '../ui/Modal';
+import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { supabase } from '../../lib/supabaseClient';
@@ -988,13 +989,12 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
         </div>
       </form>
 
-      {showCatalog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowCatalog(false)}>
-          <div className="fixed inset-0 bg-black bg-opacity-50" />
-          <div
-            className="relative bg-white rounded-lg shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
+      <Dialog
+        open={showCatalog}
+        onClose={() => setShowCatalog(false)}
+        label="Catalog"
+        className="max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
+      >
             <div className="flex items-center justify-between p-4 border-b border-slate-200">
               <div className="flex items-center gap-2">
                 <Search className="w-5 h-5 text-primary" />
@@ -1057,9 +1057,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                 )}
               </div>
             </div>
-          </div>
-        </div>
-      )}
+      </Dialog>
     </Modal>
   );
 };

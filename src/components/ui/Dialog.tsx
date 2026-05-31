@@ -12,6 +12,8 @@ interface DialogProps {
   closeOnBackdrop?: boolean;
   closeOnEscape?: boolean;
   className?: string;
+  overlayClassName?: string;
+  backdropClassName?: string;
   children: ReactNode;
 }
 
@@ -28,6 +30,8 @@ export function Dialog({
   closeOnBackdrop = true,
   closeOnEscape = true,
   className,
+  overlayClassName,
+  backdropClassName,
   children,
 }: DialogProps) {
   const panelRef = useFocusTrap<HTMLDivElement>({ active: open, initialFocusRef, restoreFocus: true });
@@ -80,10 +84,10 @@ export function Dialog({
   if (!open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div data-testid="dialog-overlay" className={cn('fixed inset-0 z-50 flex items-center justify-center', overlayClassName)}>
       <div
         data-testid="dialog-backdrop"
-        className="absolute inset-0 bg-black/50"
+        className={cn('absolute inset-0 bg-black/50', backdropClassName)}
         aria-hidden="true"
         onClick={closeOnBackdrop ? onClose : undefined}
       />

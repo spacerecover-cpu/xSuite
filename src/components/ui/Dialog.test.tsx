@@ -84,4 +84,18 @@ describe('Dialog', () => {
     );
     expect(document.body.style.overflow).toBe('');
   });
+
+  it('applies overlayClassName to the outer wrapper (z-index override wins)', () => {
+    render(<Dialog open onClose={() => {}} label="T" overlayClassName="z-[60]"><button>x</button></Dialog>);
+    const wrapper = screen.getByTestId('dialog-overlay');
+    expect(wrapper).toHaveClass('z-[60]');
+    expect(wrapper).not.toHaveClass('z-50');
+  });
+
+  it('applies backdropClassName, overriding the default scrim', () => {
+    render(<Dialog open onClose={() => {}} label="T" backdropClassName="bg-black/90 backdrop-blur-sm"><button>x</button></Dialog>);
+    const backdrop = screen.getByTestId('dialog-backdrop');
+    expect(backdrop).toHaveClass('bg-black/90', 'backdrop-blur-sm');
+    expect(backdrop).not.toHaveClass('bg-black/50');
+  });
 });
