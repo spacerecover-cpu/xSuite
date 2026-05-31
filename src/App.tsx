@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import { TenantConfigProvider } from './contexts/TenantConfigContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { LocaleProvider } from './contexts/LocaleContext';
 import { PortalAuthProvider } from './contexts/PortalAuthContext';
 import { PermissionsProvider } from './contexts/PermissionsContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -179,6 +180,7 @@ function App() {
       <AuthProvider>
         <TenantConfigProvider>
         <ThemeProvider>
+        <LocaleProvider>
         <PermissionsProvider>
           <PortalAuthProvider>
             <Suspense fallback={<LoadingFallback />}>
@@ -755,6 +757,7 @@ function App() {
           </Suspense>
           </PortalAuthProvider>
         </PermissionsProvider>
+        </LocaleProvider>
         </ThemeProvider>
         </TenantConfigProvider>
       </AuthProvider>
