@@ -1,6 +1,10 @@
-import React from 'react';
+import { useId } from 'react';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Dialog } from './Dialog';
 import { Button } from './Button';
+import { STATUS_TONE, STATUS_TONE_MUTED } from '../../lib/ui/variants';
+import { cn } from '../../lib/utils';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -14,96 +18,61 @@ interface ConfirmDialogProps {
   isLoading?: boolean;
 }
 
-export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
+export function ConfirmDialog({
   isOpen,
   onClose,
   onConfirm,
   title,
   message,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
+  confirmText,
+  cancelText,
   variant = 'danger',
   isLoading = false,
-}) => {
-  if (!isOpen) return null;
-
-  const variantStyles = {
-    danger: {
-      bg: 'bg-danger-muted',
-      iconBg: 'bg-danger-muted',
-      iconColor: 'text-danger',
-      buttonBg: 'bg-danger hover:bg-danger/90',
-    },
-    warning: {
-      bg: 'bg-warning-muted',
-      iconBg: 'bg-warning-muted',
-      iconColor: 'text-warning',
-      buttonBg: 'bg-warning hover:bg-warning/90',
-    },
-    info: {
-      bg: 'bg-info-muted',
-      iconBg: 'bg-info-muted',
-      iconColor: 'text-info',
-      buttonBg: 'bg-info hover:bg-info/90',
-    },
-  };
-
-  const styles = variantStyles[variant];
-
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget && !isLoading) {
-      onClose();
-    }
-  };
+}: ConfirmDialogProps) {
+  const { t } = useTranslation();
+  const titleId = useId();
+  const Icon = variant === 'danger' ? Trash2 : AlertTriangle;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      onMouseDown={handleBackdropClick}
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      labelledBy={titleId}
+      closeOnBackdrop={!isLoading}
+      closeOnEscape={!isLoading}
+      className="max-w-md p-6"
     >
-      <div className="fixed inset-0 bg-black bg-opacity-50" />
-      <div
-        className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6"
-        onMouseDown={(e) => e.stopPropagation()}
+      <button
+        onClick={onClose}
+        disabled={isLoading}
+        aria-label={t('ui.close')}
+        className="absolute top-4 right-4 p-1 hover:bg-surface-muted rounded transition-colors disabled:opacity-50"
       >
-        <button
-          onClick={onClose}
-          disabled={isLoading}
-          className="absolute top-4 right-4 p-1 hover:bg-slate-100 rounded transition-colors disabled:opacity-50"
-        >
-          <X className="w-5 h-5 text-slate-400" />
-        </button>
+        <X className="w-5 h-5 text-slate-400" />
+      </button>
 
-        <div className="flex items-start gap-4">
-          <div className={`p-3 rounded-full ${styles.iconBg}`}>
-            {variant === 'danger' && <Trash2 className={`w-6 h-6 ${styles.iconColor}`} />}
-            {variant === 'warning' && <AlertTriangle className={`w-6 h-6 ${styles.iconColor}`} />}
-            {variant === 'info' && <AlertTriangle className={`w-6 h-6 ${styles.iconColor}`} />}
-          </div>
-
-          <div className="flex-1 pt-1">
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">{title}</h3>
-            <p className="text-sm text-slate-600 mb-6">{message}</p>
-
-            <div className="flex gap-3 justify-end">
-              <Button
-                variant="ghost"
-                onClick={onClose}
-                disabled={isLoading}
-              >
-                {cancelText}
-              </Button>
-              <button
-                onClick={onConfirm}
-                disabled={isLoading}
-                className={`px-4 py-2 text-white rounded-lg font-medium transition-colors disabled:opacity-50 ${styles.buttonBg}`}
-              >
-                {isLoading ? 'Processing...' : confirmText}
-              </button>
-            </div>
+      <div className="flex items-start gap-4">
+        <div className={cn('p-3 rounded-full', STATUS_TONE_MUTED[variant])}>
+          <Icon className="w-6 h-6" />
+        </div>
+        <div className="flex-1 pt-1">
+          <h3 id={titleId} className="text-lg font-semibold text-slate-900 mb-2 pr-10">{title}</h3>
+          <p className="text-sm text-slate-600 mb-6">{message}</p>
+          <div className="flex gap-3 justify-end">
+            <Button variant="ghost" onClick={onClose} disabled={isLoading}>
+              {cancelText ?? t('common.cancel')}
+            </Button>
+            <button
+              onClick={onConfirm}
+              disabled={isLoading}
+              aria-busy={isLoading}
+              className={cn('px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 hover:opacity-90', STATUS_TONE[variant])}
+            >
+              {isLoading ? t('ui.processing') : confirmText ?? t('common.confirm')}
+            </button>
           </div>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
-};
+}
