@@ -140,4 +140,53 @@ describe('SearchableSelect', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(trigger).toHaveFocus();
   });
+
+  describe('RTL logical utilities (Phase 4a proof slice)', () => {
+    it('required asterisk uses logical ms-1, not physical ml-1', () => {
+      render(
+        <SearchableSelect label="Fruit" value="" onChange={() => {}} options={OPTIONS} required />,
+      );
+      const asterisk = screen.getByText('*');
+      expect(asterisk.className).toContain('ms-1');
+      expect(asterisk.className).not.toContain('ml-1');
+    });
+
+    it('search input uses logical ps-8 pe-3 leading padding, not pl-8 pr-3', async () => {
+      const user = userEvent.setup();
+      render(<Harness />);
+      await user.click(screen.getByRole('combobox'));
+      const search = screen.getByPlaceholderText('Search...');
+      expect(search.className).toContain('ps-8');
+      expect(search.className).toContain('pe-3');
+      expect(search.className).not.toContain('pl-8');
+      expect(search.className).not.toContain('pr-3');
+    });
+
+    it('search icon anchors to the logical start-2.5, not left-2.5', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<Harness />);
+      await user.click(screen.getByRole('combobox'));
+      const icon = container.querySelector('svg.lucide-search') as SVGElement;
+      expect(icon.getAttribute('class')).toContain('start-2.5');
+      expect(icon.getAttribute('class')).not.toContain('left-2.5');
+    });
+
+    it('the add-new button uses logical text-start, not physical text-left', async () => {
+      const user = userEvent.setup();
+      render(
+        <SearchableSelect
+          label="Fruit"
+          value=""
+          onChange={() => {}}
+          options={OPTIONS}
+          onAddNew={() => {}}
+          addNewLabel="Add fruit"
+        />,
+      );
+      await user.click(screen.getByRole('combobox'));
+      const addBtn = screen.getByRole('button', { name: /add fruit/i });
+      expect(addBtn.className).toContain('text-start');
+      expect(addBtn.className).not.toContain('text-left');
+    });
+  });
 });

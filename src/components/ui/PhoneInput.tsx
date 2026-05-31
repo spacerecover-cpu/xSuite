@@ -220,7 +220,7 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
           <label {...labelProps} className="block text-sm font-medium text-slate-700 mb-1">
             {label}
             {required && (
-              <span aria-hidden="true" className="text-danger ml-1">
+              <span aria-hidden="true" className="text-danger ms-1">
                 *
               </span>
             )}
@@ -244,7 +244,7 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
             aria-controls={listboxId}
             disabled={disabled}
             onClick={() => setIsDropdownOpen((prev) => !prev)}
-            className={`flex items-center gap-1 px-2.5 py-2 bg-slate-50 border-r border-slate-300 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors shrink-0 ${
+            className={`flex items-center gap-1 px-2.5 py-2 bg-slate-50 border-e border-slate-300 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors shrink-0 ${
               disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
             }`}
           >
@@ -296,7 +296,7 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
             >
               <div className="p-2 border-b border-slate-200">
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                  <Search className="absolute start-2.5 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                   <input
                     ref={searchInputRef}
                     type="text"
@@ -304,7 +304,7 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
                     aria-expanded
                     aria-controls={listboxId}
                     aria-activedescendant={activeOptionId}
-                    className="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full ps-8 pe-3 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                     placeholder={t('ui.phoneInput.searchPlaceholder')}
                     value={searchTerm}
                     onChange={(e) => {

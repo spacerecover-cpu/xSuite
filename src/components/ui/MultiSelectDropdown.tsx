@@ -153,7 +153,7 @@ export const MultiSelectDropdown = React.forwardRef<HTMLDivElement, MultiSelectD
       <>
         <div className="p-2 border-b border-slate-200">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <Search className="absolute start-2.5 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
             <input
               ref={searchInputRef}
               type="text"
@@ -162,7 +162,7 @@ export const MultiSelectDropdown = React.forwardRef<HTMLDivElement, MultiSelectD
               aria-controls={listboxId}
               aria-activedescendant={activeOptionId}
               aria-label={t('ui.select.searchPlaceholder')}
-              className="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full ps-8 pe-3 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               placeholder={t('ui.select.searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => {
@@ -251,7 +251,7 @@ export const MultiSelectDropdown = React.forwardRef<HTMLDivElement, MultiSelectD
           <label {...labelProps} className="block text-sm font-medium text-slate-700 mb-1">
             {label}
             {required && (
-              <span aria-hidden="true" className="text-danger ml-1">
+              <span aria-hidden="true" className="text-danger ms-1">
                 *
               </span>
             )}

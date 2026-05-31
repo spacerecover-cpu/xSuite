@@ -306,12 +306,12 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
                 className="bg-danger hover:bg-danger/90 text-danger-foreground"
                 size="sm"
               >
-                <X className="w-4 h-4 mr-2" aria-hidden="true" />
+                <X className="w-4 h-4 me-2" aria-hidden="true" />
                 {t('ui.remove')}
               </Button>
             </div>
             {uploadSuccess && (
-              <div className="absolute top-3 right-3 bg-success text-success-foreground rounded-full p-2 shadow-lg">
+              <div className="absolute top-3 end-3 bg-success text-success-foreground rounded-full p-2 shadow-lg">
                 <Check className="w-4 h-4" aria-hidden="true" />
               </div>
             )}
@@ -321,7 +321,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
             <div className="bg-slate-50 rounded-lg p-3 text-xs space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-slate-600 font-medium">{t('ui.imageUpload.fileLabel')}:</span>
-                <span className="text-slate-900 truncate ml-2 max-w-[200px]">
+                <span className="text-slate-900 truncate ms-2 max-w-[200px]">
                   {fileMetadata.name}
                 </span>
               </div>
@@ -392,7 +392,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
                 className="bg-primary hover:bg-primary/90 text-primary-foreground"
                 size="sm"
               >
-                <Upload className="w-4 h-4 mr-2" aria-hidden="true" />
+                <Upload className="w-4 h-4 me-2" aria-hidden="true" />
                 {t('ui.imageUpload.browse')}
               </Button>
             </div>

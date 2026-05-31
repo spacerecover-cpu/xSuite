@@ -160,4 +160,25 @@ describe('RichTextEditor copy + toolbar a11y (Phase 3)', () => {
     expect(important.className).toContain('bg-warning-muted');
     expect(important.className).toContain('text-warning');
   });
+
+  describe('RTL logical utilities (Phase 4a proof slice)', () => {
+    it('the color popover anchors to the logical start-0, not left-0', () => {
+      render(<RichTextEditor value="" onChange={() => {}} />);
+      const colorBtn = screen.getByRole('button', { name: 'Text color' });
+      fireEvent.click(colorBtn);
+      const popover = document.getElementById(
+        colorBtn.getAttribute('aria-controls') as string,
+      ) as HTMLElement;
+      expect(popover.className).toContain('start-0');
+      expect(popover.className).not.toMatch(/(^|\s)left-0(\s|$)/);
+    });
+
+    it('Quick-format button icons use the logical me-1 gap, not physical mr-1', () => {
+      render(<RichTextEditor value="" onChange={() => {}} />);
+      const warning = screen.getByRole('button', { name: 'Insert warning' });
+      const icon = warning.querySelector('svg') as SVGElement;
+      expect(icon.getAttribute('class')).toContain('me-1');
+      expect(icon.getAttribute('class')).not.toContain('mr-1');
+    });
+  });
 });

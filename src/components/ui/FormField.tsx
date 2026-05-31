@@ -43,7 +43,7 @@ export const FormField = React.forwardRef<HTMLDivElement, FormFieldProps>(
         <label {...labelProps} id={labelId} className="block text-sm font-medium text-slate-700">
           {label}
           {required && (
-            <span aria-hidden="true" className="text-danger ml-0.5">
+            <span aria-hidden="true" className="text-danger ms-0.5">
               *
             </span>
           )}

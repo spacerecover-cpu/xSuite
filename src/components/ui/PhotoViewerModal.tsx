@@ -27,7 +27,7 @@ export function PhotoViewerModal({ isOpen, onClose, imageUrl, altText }: PhotoVi
       <button
         onClick={onClose}
         aria-label={t('ui.photoViewerClose')}
-        className="absolute -top-3 -right-3 z-10 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-all backdrop-blur-sm group"
+        className="absolute -top-3 -end-3 z-10 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-all backdrop-blur-sm group"
       >
         <X className="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
       </button>

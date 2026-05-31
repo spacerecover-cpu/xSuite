@@ -46,7 +46,7 @@ export function ConfirmDialog({
         onClick={onClose}
         disabled={isLoading}
         aria-label={t('ui.close')}
-        className="absolute top-4 right-4 p-1 hover:bg-surface-muted rounded transition-colors disabled:opacity-50"
+        className="absolute top-4 end-4 p-1 hover:bg-surface-muted rounded transition-colors disabled:opacity-50"
       >
         <X className="w-5 h-5 text-slate-400" />
       </button>
@@ -56,7 +56,7 @@ export function ConfirmDialog({
           <Icon className="w-6 h-6" />
         </div>
         <div className="flex-1 pt-1">
-          <h3 id={titleId} className="text-lg font-semibold text-slate-900 mb-2 pr-10">{title}</h3>
+          <h3 id={titleId} className="text-lg font-semibold text-slate-900 mb-2 pe-10">{title}</h3>
           <p className="text-sm text-slate-600 mb-6">{message}</p>
           <div className="flex gap-3 justify-end">
             <Button variant="ghost" onClick={onClose} disabled={isLoading}>

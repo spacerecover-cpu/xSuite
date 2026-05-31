@@ -198,6 +198,29 @@ describe('Toast (Phase 3: aria-live + STATUS_TONE_MUTED tones)', () => {
     });
   });
 
+  describe('RTL logical utilities (Phase 4a proof slice)', () => {
+    it('root uses the logical leading-edge accent stripe border-s-4, not physical border-l-4', () => {
+      const { container } = render(<Toast message="m" type="success" />);
+      const el = root(container);
+      expect(el.className).toContain('border-s-4');
+      expect(el.className).not.toContain('border-l-4');
+    });
+
+    it('close button uses the logical -me-1, not physical -mr-1', () => {
+      const { container } = render(<Toast message="m" type="success" onClose={() => {}} />);
+      const btn = container.querySelector('button') as HTMLElement;
+      expect(btn.className).toContain('-me-1');
+      expect(btn.className).not.toContain('-mr-1');
+    });
+
+    it('PRECEDENCE: consumer className border-s-0 still wins over the base border-s-4 (cn override)', () => {
+      const { container } = render(<Toast message="m" type="success" className="border-s-0" />);
+      const el = root(container);
+      expect(el.className).toContain('border-s-0');
+      expect(el.className).not.toContain('border-s-4');
+    });
+  });
+
   it('PRECEDENCE: consumer className max-w-xs beats base max-w-md', () => {
     const { container } = render(
       <Toast message="m" type="success" className="max-w-xs" />,

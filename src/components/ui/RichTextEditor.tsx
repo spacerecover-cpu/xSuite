@@ -209,7 +209,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             {showColorPicker && (
               <div
                 id={colorPopoverId}
-                className="absolute top-full left-0 mt-1 bg-surface border border-slate-300 rounded-lg shadow-lg p-3 z-10 w-48"
+                className="absolute top-full start-0 mt-1 bg-surface border border-slate-300 rounded-lg shadow-lg p-3 z-10 w-48"
               >
                 <p className="text-xs font-medium text-slate-700 mb-2">{t('ui.richText.textColor')}</p>
                 <div className="space-y-2">
@@ -251,7 +251,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             {showHighlightPicker && (
               <div
                 id={highlightPopoverId}
-                className="absolute top-full left-0 mt-1 bg-surface border border-slate-300 rounded-lg shadow-lg p-3 z-10 w-48"
+                className="absolute top-full start-0 mt-1 bg-surface border border-slate-300 rounded-lg shadow-lg p-3 z-10 w-48"
               >
                 <p className="text-xs font-medium text-slate-700 mb-2">{t('ui.richText.highlight')}</p>
                 <div className="space-y-2">
@@ -324,7 +324,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
           <div className="w-px h-6 bg-slate-300 mx-1" />
 
           <div className="flex items-center gap-1">
-            <span className="text-xs text-slate-600 mr-1">{t('ui.richText.quickLabel')}:</span>
+            <span className="text-xs text-slate-600 me-1">{t('ui.richText.quickLabel')}:</span>
             <button
               type="button"
               onClick={() => applyQuickFormat('warning')}
@@ -336,7 +336,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                 'hover:bg-danger/20',
               )}
             >
-              <AlertTriangle className="w-3 h-3 inline mr-1" aria-hidden="true" />
+              <AlertTriangle className="w-3 h-3 inline me-1" aria-hidden="true" />
               {t('ui.richText.warning')}
             </button>
             <button
@@ -350,7 +350,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                 'hover:bg-warning/20',
               )}
             >
-              <Zap className="w-3 h-3 inline mr-1" aria-hidden="true" />
+              <Zap className="w-3 h-3 inline me-1" aria-hidden="true" />
               {t('ui.richText.important')}
             </button>
           </div>

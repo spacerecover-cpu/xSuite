@@ -36,4 +36,20 @@ describe('ConfirmDialog', () => {
     render(<ConfirmDialog {...base} confirmText="Delete" variant="danger" />);
     expect(screen.getByRole('button', { name: 'Delete' })).toHaveClass('bg-danger', 'text-danger-foreground');
   });
+
+  describe('RTL logical utilities (Phase 4a proof slice)', () => {
+    it('close button anchors to the logical end-4 corner, not right-4', () => {
+      render(<ConfirmDialog {...base} />);
+      const closeBtn = screen.getByRole('button', { name: /close/i });
+      expect(closeBtn.className).toContain('end-4');
+      expect(closeBtn.className).not.toContain('right-4');
+    });
+
+    it('title clears the corner close button via logical pe-10, not pr-10', () => {
+      render(<ConfirmDialog {...base} />);
+      const heading = screen.getByRole('heading', { name: 'Delete item?' });
+      expect(heading.className).toContain('pe-10');
+      expect(heading.className).not.toContain('pr-10');
+    });
+  });
 });

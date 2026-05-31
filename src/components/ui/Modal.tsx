@@ -68,7 +68,7 @@ export function Modal({
           <div className="flex items-center gap-3">
             {Icon && <Icon className="w-5 h-5 text-primary" />}
             <h2 id={titleId} className="text-lg font-semibold text-slate-900">{title}</h2>
-            {headerBadges && <div className="flex items-center gap-2 ml-2">{headerBadges}</div>}
+            {headerBadges && <div className="flex items-center gap-2 ms-2">{headerBadges}</div>}
           </div>
           <div className="flex items-center gap-2">
             {headerAction && <div>{headerAction}</div>}
@@ -88,7 +88,7 @@ export function Modal({
           <button
             onClick={onClose}
             aria-label={t('ui.close')}
-            className="no-print absolute top-3 right-3 z-10 p-1.5 hover:bg-surface-muted rounded-lg transition-colors"
+            className="no-print absolute top-3 end-3 z-10 p-1.5 hover:bg-surface-muted rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
           </button>

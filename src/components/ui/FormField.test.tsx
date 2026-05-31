@@ -101,4 +101,15 @@ describe('FormField (render-prop)', () => {
     );
     expect(captured).toBeInstanceOf(HTMLDivElement);
   });
+
+  it('RTL: required asterisk uses logical ms-0.5, not physical ml-0.5', () => {
+    render(
+      <FormField label="Email" required>
+        {(c) => <input {...c} />}
+      </FormField>
+    );
+    const asterisk = screen.getByText('*');
+    expect(asterisk.className).toContain('ms-0.5');
+    expect(asterisk.className).not.toContain('ml-0.5');
+  });
 });
