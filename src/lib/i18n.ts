@@ -53,6 +53,13 @@ const resources = {
         zoomOut: 'Zoom out',
         zoomIn: 'Zoom in',
         cropFailed: 'Could not crop the image. Please try again.',
+        chipInput: {
+          placeholder: 'Enter email and press Enter',
+          invalidEmail: 'Please enter a valid email address',
+          duplicateEmail: 'This email has already been added',
+          hint: 'Press Enter, comma, or semicolon to add multiple emails',
+          removeEmail: 'Remove {{email}}',
+        },
       },
       auth: {
         login: 'Login',
@@ -488,6 +495,13 @@ const resources = {
         zoomOut: 'تصغير',
         zoomIn: 'تكبير',
         cropFailed: 'تعذّر اقتصاص الصورة. حاول مرة أخرى.',
+        chipInput: {
+          placeholder: 'أدخل البريد الإلكتروني واضغط Enter',
+          invalidEmail: 'يرجى إدخال عنوان بريد إلكتروني صالح',
+          duplicateEmail: 'تمت إضافة هذا البريد الإلكتروني بالفعل',
+          hint: 'اضغط Enter أو فاصلة أو فاصلة منقوطة لإضافة عدة عناوين بريد إلكتروني',
+          removeEmail: 'إزالة {{email}}',
+        },
       },
       auth: {
         login: 'تسجيل الدخول',

@@ -17,6 +17,7 @@ import {
   X as XIcon,
 } from 'lucide-react';
 import { sendDocumentEmail } from '../../lib/emailDocumentService';
+import { isValidEmail } from '../../lib/utils';
 import { getEmailTemplate, getDocumentTypeLabel } from '../../lib/emailTemplates';
 import type { DocumentType } from '../../lib/pdf/types';
 
@@ -85,8 +86,7 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(to.trim())) {
+    if (!isValidEmail(to.trim())) {
       setError('Please enter a valid email address');
       return;
     }

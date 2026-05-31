@@ -1,40 +1,68 @@
 import React from 'react';
+import { AlertCircle } from 'lucide-react';
+import { useFieldA11y } from '../../hooks/useFieldA11y';
+import { cn } from '../../lib/utils';
+
+interface FieldControlProps {
+  id: string;
+  'aria-invalid'?: true;
+  'aria-required'?: true;
+  'aria-describedby'?: string;
+  /** Label element id — for group children that associate via aria-labelledby. */
+  'aria-labelledby': string;
+}
 
 interface FormFieldProps {
   label: string;
   error?: string;
   required?: boolean;
   hint?: string;
-  children: React.ReactNode;
+  id?: string;
   className?: string;
+  children: (control: FieldControlProps) => React.ReactNode;
 }
 
-export const FormField: React.FC<FormFieldProps> = ({
-  label,
-  error,
-  required,
-  hint,
-  children,
-  className = '',
-}) => {
-  return (
-    <div className={`space-y-1.5 ${className}`}>
-      <label className="block text-sm font-medium text-slate-700">
-        {label}
-        {required && <span className="text-danger ml-0.5">*</span>}
-      </label>
-      {children}
-      {hint && !error && (
-        <p className="text-xs text-slate-500">{hint}</p>
-      )}
-      {error && (
-        <p className="text-xs text-danger flex items-center gap-1">
-          <svg className="w-3 h-3 shrink-0" viewBox="0 0 12 12" fill="currentColor">
-            <path d="M6 0a6 6 0 100 12A6 6 0 006 0zm0 9a.75.75 0 110-1.5A.75.75 0 016 9zm.75-3.75a.75.75 0 11-1.5 0V3.75a.75.75 0 111.5 0v1.5z" />
-          </svg>
-          {error}
-        </p>
-      )}
-    </div>
-  );
-};
+export const FormField = React.forwardRef<HTMLDivElement, FormFieldProps>(
+  ({ label, error, required, hint, id, className, children }, ref) => {
+    const { fieldId, labelProps, controlProps, errorProps, hintProps } = useFieldA11y({
+      id,
+      hasError: !!error,
+      hasHint: !!hint,
+      required,
+    });
+
+    const labelId = `${fieldId}-label`;
+
+    const control: FieldControlProps = {
+      ...controlProps,
+      'aria-labelledby': labelId,
+    };
+
+    return (
+      <div ref={ref} className={cn('space-y-1.5', className)}>
+        <label {...labelProps} id={labelId} className="block text-sm font-medium text-slate-700">
+          {label}
+          {required && (
+            <span aria-hidden="true" className="text-danger ml-0.5">
+              *
+            </span>
+          )}
+        </label>
+        {children(control)}
+        {hint && !error && (
+          <p {...hintProps} className="text-xs text-slate-500">
+            {hint}
+          </p>
+        )}
+        {error && (
+          <p {...errorProps} className="text-xs text-danger flex items-center gap-1">
+            <AlertCircle aria-hidden="true" className="w-3 h-3 shrink-0" />
+            {error}
+          </p>
+        )}
+      </div>
+    );
+  }
+);
+
+FormField.displayName = 'FormField';

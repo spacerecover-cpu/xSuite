@@ -24,6 +24,11 @@ interface RichTextEditorProps {
   minHeight?: string;
   label?: string;
   helpText?: string;
+  /** Forwarded onto the editable region so a wrapping FormField can associate its label/hint/error. */
+  id?: string;
+  'aria-invalid'?: React.AriaAttributes['aria-invalid'];
+  'aria-describedby'?: string;
+  'aria-labelledby'?: string;
 }
 
 const PRESET_COLORS = [
@@ -49,6 +54,10 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   minHeight = '200px',
   label,
   helpText,
+  id,
+  'aria-invalid': ariaInvalid,
+  'aria-describedby': ariaDescribedBy,
+  'aria-labelledby': ariaLabelledBy,
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -309,6 +318,12 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         ) : (
           <div
             ref={editorRef}
+            id={id}
+            role="textbox"
+            aria-multiline="true"
+            aria-invalid={ariaInvalid}
+            aria-describedby={ariaDescribedBy}
+            aria-labelledby={ariaLabelledBy}
             contentEditable
             onInput={handleInput}
             className="w-full p-3 focus:outline-none prose max-w-none"

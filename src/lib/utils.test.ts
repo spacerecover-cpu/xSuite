@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cn } from './utils';
+import { cn, isValidEmail } from './utils';
 
 describe('cn', () => {
   it('resolves conflicting spacing utilities to the last one', () => {
@@ -22,5 +22,35 @@ describe('cn', () => {
 
   it('flattens conditional and array inputs', () => {
     expect(cn('text-sm', false, ['font-medium', null], undefined)).toBe('text-sm font-medium');
+  });
+});
+
+describe('isValidEmail', () => {
+  it('accepts a standard email address', () => {
+    expect(isValidEmail('user@example.com')).toBe(true);
+  });
+
+  it('accepts emails with subdomains and plus tags', () => {
+    expect(isValidEmail('first.last+tag@mail.example.co.uk')).toBe(true);
+  });
+
+  it('rejects a string without an @ sign', () => {
+    expect(isValidEmail('userexample.com')).toBe(false);
+  });
+
+  it('rejects a string without a domain dot', () => {
+    expect(isValidEmail('user@example')).toBe(false);
+  });
+
+  it('rejects a string with whitespace', () => {
+    expect(isValidEmail('user @example.com')).toBe(false);
+  });
+
+  it('rejects an empty string', () => {
+    expect(isValidEmail('')).toBe(false);
+  });
+
+  it('rejects a string missing the local part', () => {
+    expect(isValidEmail('@example.com')).toBe(false);
   });
 });
