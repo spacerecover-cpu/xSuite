@@ -1,5 +1,25 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, afterAll, vi } from 'vitest';
 import i18n from './i18n';
+
+// CLDR plural categories Arabic exercises. A plural-base key in `en` (detected by an
+// `_one`/`_other` suffixed sibling) must carry the full Arabic set in `ar`.
+const CLDR_PLURAL_SUFFIXES = ['zero', 'one', 'two', 'few', 'many', 'other'] as const;
+const PLURAL_SUFFIX_RE = /_(zero|one|two|few|many|other)$/;
+
+type LeafTree = Record<string, string>;
+
+// Flatten a nested translation resource into dot-path -> leaf-string entries.
+function flattenLeafKeys(obj: unknown, prefix = '', out: LeafTree = {}): LeafTree {
+  if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      flattenLeafKeys(value, path, out);
+    }
+  } else {
+    out[prefix] = String(obj);
+  }
+  return out;
+}
 
 describe('ui i18n keys', () => {
   it('resolves the new ui.* keys in English', () => {
@@ -72,5 +92,60 @@ describe('i18n init lng (anti-flash hint)', () => {
     // The module no longer owns DOM direction — LocaleProvider / main.tsx do.
     expect(document.documentElement.getAttribute('dir')).toBeNull();
     expect(document.documentElement.getAttribute('lang')).toBeNull();
+  });
+});
+
+// Phase 4a (spec §9 / §10.8): lock the en/ar dictionary in its complete state so any
+// future PR that adds an `en` key without its `ar` counterpart — or adds a plural-base
+// key without the full Arabic CLDR set — fails CI. The dictionary is complete on main,
+// so this guard PASSES today and only goes red on a desync.
+describe('i18n en/ar dictionary parity guard', () => {
+  // Read the live resource trees straight off the initialized singleton (no source
+  // change): getResourceBundle returns the full nested `translation` namespace object.
+  const enBundle = i18n.getResourceBundle('en', 'translation') as Record<string, unknown>;
+  const arBundle = i18n.getResourceBundle('ar', 'translation') as Record<string, unknown>;
+  const enKeys = flattenLeafKeys(enBundle);
+  const arKeys = flattenLeafKeys(arBundle);
+
+  // Reading bundles is read-only, but be a good citizen and leave the singleton on 'en'
+  // so plural-rule state never leaks into the rest of the suite.
+  afterAll(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('exposes non-empty en and ar resource bundles', () => {
+    expect(Object.keys(enKeys).length).toBeGreaterThan(0);
+    expect(Object.keys(arKeys).length).toBeGreaterThan(0);
+  });
+
+  it('has zero en leaf keys missing from ar', () => {
+    const missing = Object.keys(enKeys).filter((key) => !(key in arKeys));
+    expect(missing).toEqual([]);
+  });
+
+  it('has the full Arabic CLDR plural set for every en plural-base key', () => {
+    // A plural base is the dot-path with its CLDR suffix stripped. en ships English
+    // plurals (_one/_other); we require ar to carry _zero/_one/_two/_few/_many/_other.
+    const pluralBases = new Set<string>();
+    for (const key of Object.keys(enKeys)) {
+      if (PLURAL_SUFFIX_RE.test(key)) {
+        pluralBases.add(key.replace(PLURAL_SUFFIX_RE, ''));
+      }
+    }
+
+    // Guard the guard: the known plural-base keys must be discovered, or a refactor that
+    // silently drops plurals would let this assertion pass vacuously.
+    expect(pluralBases.size).toBeGreaterThanOrEqual(3);
+
+    const incomplete: Record<string, string[]> = {};
+    for (const base of pluralBases) {
+      const missingVariants = CLDR_PLURAL_SUFFIXES.filter(
+        (suffix) => !(`${base}_${suffix}` in arKeys),
+      );
+      if (missingVariants.length > 0) {
+        incomplete[base] = missingVariants;
+      }
+    }
+    expect(incomplete).toEqual({});
   });
 });
