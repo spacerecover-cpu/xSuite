@@ -1,5 +1,7 @@
-import { useState, useRef, useEffect, ReactNode } from 'react';
+import { useState, useRef, useEffect, useId, ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { cn } from '../../lib/utils';
 
 interface CollapsibleSectionProps {
   title: string;
@@ -10,6 +12,8 @@ interface CollapsibleSectionProps {
   isOpen?: boolean;
   onToggle?: () => void;
   fieldCount?: number;
+  className?: string;
+  ref?: React.Ref<HTMLDivElement>;
 }
 
 export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
@@ -21,10 +25,17 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   isOpen: controlledIsOpen,
   onToggle,
   fieldCount,
+  className,
+  ref,
 }) => {
+  const { t } = useTranslation();
   const [internalIsOpen, setInternalIsOpen] = useState(defaultOpen);
   const isControlled = controlledIsOpen !== undefined;
   const isOpen = isControlled ? controlledIsOpen : internalIsOpen;
+
+  const baseId = useId();
+  const titleId = `${baseId}-title`;
+  const contentId = `${baseId}-content`;
 
   const contentRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number | undefined>(isOpen ? undefined : 0);
@@ -59,29 +70,40 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
+    <div
+      ref={ref}
+      className={cn(
+        'bg-surface rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden',
+        className,
+      )}
+    >
       <button
+        type="button"
         onClick={handleToggle}
-        className="w-full px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white hover:from-slate-100 hover:to-slate-50 transition-all duration-200 flex items-center justify-between gap-4 group"
+        className="w-full px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-surface hover:from-slate-100 hover:to-slate-50 transition-all duration-200 flex items-center justify-between gap-4 group"
         aria-expanded={isOpen}
+        aria-controls={contentId}
       >
         <div className="flex items-center gap-3">
           <div
             className="w-10 h-10 rounded-lg flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow"
             style={{ backgroundColor: color }}
           >
-            <Icon className="w-5 h-5 text-white" />
+            <Icon className="w-5 h-5 text-white" aria-hidden="true" />
           </div>
           <div className="flex items-center gap-3">
-            <h3 className="text-lg font-bold text-slate-900">{title}</h3>
+            <h3 id={titleId} className="text-lg font-bold text-slate-900">
+              {title}
+            </h3>
             {fieldCount !== undefined && (
               <span className="px-2 py-0.5 text-xs font-semibold text-slate-600 bg-slate-100 rounded-full">
-                {fieldCount} fields
+                {t('ui.fieldCount', { count: fieldCount })}
               </span>
             )}
           </div>
         </div>
         <ChevronDown
+          aria-hidden="true"
           className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${
             isOpen ? 'rotate-180' : ''
           }`}
@@ -89,6 +111,9 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
       </button>
 
       <div
+        id={contentId}
+        role="region"
+        aria-labelledby={titleId}
         ref={contentRef}
         style={{
           height: height !== undefined ? `${height}px` : 'auto',

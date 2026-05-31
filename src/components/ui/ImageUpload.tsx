@@ -1,12 +1,54 @@
 import { useState, useRef, useCallback } from 'react';
-import { Upload, X, Image as ImageIcon, Loader2, Check, AlertCircle } from 'lucide-react';
+import { cva } from 'class-variance-authority';
+import { useTranslation } from 'react-i18next';
+import { Upload, X, Image as ImageIcon, Check, AlertCircle } from 'lucide-react';
 import { Button } from './Button';
+import { Spinner } from './Spinner';
 import { ImageCropModal } from './ImageCropModal';
+import { cn } from '../../lib/utils';
+import { useFieldA11y } from '../../hooks/useFieldA11y';
 import { logger } from '../../lib/logger';
+
+type Density = 'default' | 'compact';
+
+const previewImageVariants = cva('w-full object-contain p-4', {
+  variants: { density: { default: 'h-48', compact: 'h-32' } },
+  defaultVariants: { density: 'default' },
+});
+
+const dropzoneVariants = cva('relative border-2 border-dashed rounded-xl transition-all', {
+  variants: { density: { default: 'p-8', compact: 'p-4' } },
+  defaultVariants: { density: 'default' },
+});
+
+const dropzoneInnerVariants = cva('text-center', {
+  variants: { density: { default: 'space-y-3', compact: 'space-y-2' } },
+  defaultVariants: { density: 'default' },
+});
+
+const dropzoneIconWrapVariants = cva('rounded-full bg-slate-200 flex items-center justify-center', {
+  variants: { density: { default: 'w-14 h-14', compact: 'w-10 h-10' } },
+  defaultVariants: { density: 'default' },
+});
+
+const dropzoneIconVariants = cva('text-slate-600', {
+  variants: { density: { default: 'w-7 h-7', compact: 'w-5 h-5' } },
+  defaultVariants: { density: 'default' },
+});
+
+const dropzonePromptVariants = cva('font-medium text-slate-900 mb-1', {
+  variants: { density: { default: 'text-sm', compact: 'text-xs' } },
+  defaultVariants: { density: 'default' },
+});
 
 interface ImageUploadProps {
   value?: string;
   onChange: (file: File | null, previewUrl: string | null) => void;
+  /**
+   * Accepted but currently unused — upload is performed by the parent via
+   * fileStorageService. Kept in the signature so the 8 call sites that pass it
+   * keep compiling; wiring the internal upload is deferred (see spec §8/§4.10).
+   */
   onUploadComplete?: (url: string, filePath: string) => void;
   maxSizeMB?: number;
   acceptedTypes?: string[];
@@ -14,11 +56,22 @@ interface ImageUploadProps {
   description?: string;
   aspectRatio?: string;
   recommendedDimensions?: string;
+  /**
+   * Accepted but currently unused — the parent picks the storage bucket when it
+   * calls fileStorageService.uploadFile with the raw File from onChange. Kept in
+   * the signature so the 8 call sites that pass it keep compiling; internal
+   * upload routing is deferred (see spec §8/§4.10).
+   */
   bucketName?: 'company-assets' | 'company-qrcodes';
   className?: string;
+  /** Layout density. When undefined, falls back to a `compact-upload` className sniff. */
+  density?: Density;
+  /** When true, renders a Spinner in place of the idle dropzone icon. */
+  loading?: boolean;
   enableCrop?: boolean;
   cropAspectRatio?: number;
   cropShape?: 'rect' | 'round';
+  id?: string;
 }
 
 export const ImageUpload: React.FC<ImageUploadProps> = ({
@@ -33,14 +86,17 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   recommendedDimensions,
   bucketName: _bucketName = 'company-assets',
   className = '',
+  density,
+  loading = false,
   enableCrop = false,
   cropAspectRatio = 1,
   cropShape = 'round',
+  id,
 }) => {
+  const { t } = useTranslation();
   const [previewUrl, setPreviewUrl] = useState<string | null>(value || null);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [uploading, _setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [fileMetadata, setFileMetadata] = useState<{
     name: string;
@@ -52,26 +108,29 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   const [originalFileName, setOriginalFileName] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const { fieldId, labelProps, controlProps, errorProps } = useFieldA11y({
+    id,
+    hasError: !!error,
+  });
+
+  // Density: explicit prop wins; otherwise fall back to the legacy raw-className
+  // sniff so the only `compact-upload` consumer (CustomerProfilePage) is unchanged.
+  const resolvedDensity: Density = density ?? (className.includes('compact-upload') ? 'compact' : 'default');
+
   const validateFile = useCallback(
     (file: File): { valid: boolean; error?: string } => {
       if (!acceptedTypes.includes(file.type)) {
-        return {
-          valid: false,
-          error: `Invalid file type. Accepted: ${acceptedTypes.join(', ')}`,
-        };
+        return { valid: false, error: t('ui.imageUpload.errInvalidType') };
       }
 
       const maxSizeBytes = maxSizeMB * 1024 * 1024;
       if (file.size > maxSizeBytes) {
-        return {
-          valid: false,
-          error: `File too large. Maximum size: ${maxSizeMB}MB`,
-        };
+        return { valid: false, error: t('ui.imageUpload.errTooLarge') };
       }
 
       return { valid: true };
     },
-    [acceptedTypes, maxSizeMB]
+    [acceptedTypes, maxSizeMB, t]
   );
 
   const getImageDimensions = (file: File): Promise<{ width: number; height: number }> => {
@@ -100,7 +159,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
 
       const validation = validateFile(file);
       if (!validation.valid) {
-        setError(validation.error || 'Invalid file');
+        setError(validation.error || t('ui.imageUpload.errInvalid'));
         return;
       }
 
@@ -122,11 +181,11 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
           onChange(file, url);
         }
       } catch (err) {
-        setError('Failed to process image');
+        setError(t('ui.imageUpload.errProcessing'));
         logger.error('Image processing error:', err);
       }
     },
-    [validateFile, onChange, enableCrop]
+    [validateFile, onChange, enableCrop, t]
   );
 
   const handleCropComplete = useCallback(
@@ -151,11 +210,11 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
           setTempImageUrl(null);
         }
       } catch (err) {
-        setError('Failed to process cropped image');
+        setError(t('ui.imageUpload.errProcessingCropped'));
         logger.error('Crop processing error:', err);
       }
     },
-    [onChange, originalFileName, tempImageUrl]
+    [onChange, originalFileName, tempImageUrl, t]
   );
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -187,6 +246,13 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     }
   };
 
+  const handleDropzoneKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      fileInputRef.current?.click();
+    }
+  };
+
   const handleRemove = (e?: React.MouseEvent) => {
     if (e) {
       e.preventDefault();
@@ -211,10 +277,12 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
 
   return (
     <>
-      <div className={`space-y-3 ${className}`}>
+      <div className={cn('space-y-3', className)}>
         {label && (
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1">{label}</label>
+            <label {...labelProps} className="block text-sm font-semibold text-slate-700 mb-1">
+              {label}
+            </label>
             {description && <p className="text-xs text-slate-500">{description}</p>}
           </div>
         )}
@@ -224,11 +292,11 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
           <div className="relative group rounded-xl border-2 border-slate-200 overflow-hidden bg-slate-50">
             <img
               src={previewUrl}
-              alt="Preview"
-              className={`w-full object-contain p-4 ${className.includes('compact-upload') ? 'h-32' : 'h-48'}`}
+              alt={t('ui.imageUpload.previewAlt')}
+              className={previewImageVariants({ density: resolvedDensity })}
               style={aspectRatio ? { aspectRatio } : undefined}
             />
-            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+            <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
               <Button
                 onClick={(e) => {
                   e.preventDefault();
@@ -238,13 +306,13 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
                 className="bg-danger hover:bg-danger/90 text-danger-foreground"
                 size="sm"
               >
-                <X className="w-4 h-4 mr-2" />
-                Remove
+                <X className="w-4 h-4 mr-2" aria-hidden="true" />
+                {t('ui.remove')}
               </Button>
             </div>
             {uploadSuccess && (
               <div className="absolute top-3 right-3 bg-success text-success-foreground rounded-full p-2 shadow-lg">
-                <Check className="w-4 h-4" />
+                <Check className="w-4 h-4" aria-hidden="true" />
               </div>
             )}
           </div>
@@ -252,18 +320,18 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
           {fileMetadata && (
             <div className="bg-slate-50 rounded-lg p-3 text-xs space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-slate-600 font-medium">File:</span>
+                <span className="text-slate-600 font-medium">{t('ui.imageUpload.fileLabel')}:</span>
                 <span className="text-slate-900 truncate ml-2 max-w-[200px]">
                   {fileMetadata.name}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-600 font-medium">Size:</span>
+                <span className="text-slate-600 font-medium">{t('ui.imageUpload.sizeLabel')}:</span>
                 <span className="text-slate-900">{formatFileSize(fileMetadata.size)}</span>
               </div>
               {fileMetadata.dimensions && (
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-600 font-medium">Dimensions:</span>
+                  <span className="text-slate-600 font-medium">{t('ui.imageUpload.dimensionsLabel')}:</span>
                   <span className="text-slate-900">
                     {fileMetadata.dimensions.width} × {fileMetadata.dimensions.height}px
                   </span>
@@ -274,47 +342,46 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
         </div>
       ) : (
         <div
-          className={`relative border-2 border-dashed rounded-xl transition-all ${
-            className.includes('compact-upload') ? 'p-4' : 'p-8'
-          } ${
+          role="button"
+          tabIndex={0}
+          aria-label={t('ui.imageUpload.dropzoneLabel')}
+          className={cn(
+            dropzoneVariants({ density: resolvedDensity }),
+            'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             isDragging
               ? 'border-primary bg-primary/5'
               : 'border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-slate-100'
-          }`}
+          )}
+          onClick={() => fileInputRef.current?.click()}
+          onKeyDown={handleDropzoneKeyDown}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
           <input
+            {...controlProps}
             ref={fileInputRef}
+            id={fieldId}
             type="file"
             accept={acceptedTypes.join(',')}
             onChange={handleFileInput}
             className="hidden"
           />
 
-          <div className={`text-center ${className.includes('compact-upload') ? 'space-y-2' : 'space-y-3'}`}>
+          <div className={dropzoneInnerVariants({ density: resolvedDensity })}>
             <div className="flex justify-center">
-              <div className={`rounded-full bg-slate-200 flex items-center justify-center ${
-                className.includes('compact-upload') ? 'w-10 h-10' : 'w-14 h-14'
-              }`}>
-                {uploading ? (
-                  <Loader2 className={`text-slate-600 animate-spin ${
-                    className.includes('compact-upload') ? 'w-5 h-5' : 'w-7 h-7'
-                  }`} />
+              <div className={dropzoneIconWrapVariants({ density: resolvedDensity })}>
+                {loading ? (
+                  <Spinner size={resolvedDensity === 'compact' ? 'sm' : 'md'} className="text-slate-600" />
                 ) : (
-                  <ImageIcon className={`text-slate-600 ${
-                    className.includes('compact-upload') ? 'w-5 h-5' : 'w-7 h-7'
-                  }`} />
+                  <ImageIcon className={dropzoneIconVariants({ density: resolvedDensity })} aria-hidden="true" />
                 )}
               </div>
             </div>
 
             <div>
-              <p className={`font-medium text-slate-900 mb-1 ${
-                className.includes('compact-upload') ? 'text-xs' : 'text-sm'
-              }`}>
-                Drag and drop your image here, or
+              <p className={dropzonePromptVariants({ density: resolvedDensity })}>
+                {t('ui.imageUpload.dragDropPrompt')}
               </p>
               <Button
                 onClick={(e) => {
@@ -325,23 +392,27 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
                 className="bg-primary hover:bg-primary/90 text-primary-foreground"
                 size="sm"
               >
-                <Upload className="w-4 h-4 mr-2" />
-                Browse Files
+                <Upload className="w-4 h-4 mr-2" aria-hidden="true" />
+                {t('ui.imageUpload.browse')}
               </Button>
             </div>
 
             <div className="text-xs text-slate-500 space-y-1">
-              <p>Accepted: {acceptedTypes.map(t => t.split('/')[1].toUpperCase()).join(', ')}</p>
-              <p>Maximum size: {maxSizeMB}MB</p>
-              {recommendedDimensions && <p>Recommended: {recommendedDimensions}</p>}
+              <p>{t('ui.imageUpload.accepted', { types: acceptedTypes.map(ty => ty.split('/')[1].toUpperCase()).join(', ') })}</p>
+              <p>{t('ui.imageUpload.maxSize', { size: maxSizeMB })}</p>
+              {recommendedDimensions && <p>{recommendedDimensions}</p>}
             </div>
           </div>
         </div>
       )}
 
         {error && (
-          <div className="flex items-start gap-2 p-3 bg-danger-muted border border-danger/30 rounded-lg">
-            <AlertCircle className="w-4 h-4 text-danger mt-0.5 flex-shrink-0" />
+          <div
+            {...errorProps}
+            aria-live="polite"
+            className="flex items-start gap-2 p-3 bg-danger-muted border border-danger/30 rounded-lg"
+          >
+            <AlertCircle className="w-4 h-4 text-danger mt-0.5 flex-shrink-0" aria-hidden="true" />
             <p className="text-sm text-danger">{error}</p>
           </div>
         )}

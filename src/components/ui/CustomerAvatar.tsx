@@ -1,4 +1,7 @@
 import React from 'react';
+import { cva } from 'class-variance-authority';
+import { useTranslation } from 'react-i18next';
+import { cn } from '../../lib/utils';
 
 interface CustomerAvatarProps {
   firstName: string;
@@ -8,21 +11,31 @@ interface CustomerAvatarProps {
   className?: string;
   onClick?: () => void;
   clickable?: boolean;
+  ariaLabel?: string;
+  ref?: React.Ref<HTMLDivElement | HTMLButtonElement>;
 }
 
-const sizeClasses = {
-  sm: 'w-10 h-10 text-sm',
-  md: 'w-14 h-14 text-base',
-  lg: 'w-20 h-20 text-xl',
-  xl: 'w-24 h-24 text-2xl',
-};
-
-const sizeStyles = {
-  sm: { fontSize: '0.875rem' },
-  md: { fontSize: '1rem' },
-  lg: { fontSize: '1.25rem' },
-  xl: { fontSize: '1.5rem' },
-};
+export const avatarVariants = cva(
+  'rounded-2xl flex items-center justify-center overflow-hidden',
+  {
+    variants: {
+      size: {
+        sm: 'w-10 h-10 text-sm',
+        md: 'w-14 h-14 text-base',
+        lg: 'w-20 h-20 text-xl',
+        xl: 'w-24 h-24 text-2xl',
+      },
+      interactive: {
+        true: 'cursor-pointer transition-all hover:scale-105 hover:ring-4 hover:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        false: '',
+      },
+    },
+    defaultVariants: {
+      size: 'md',
+      interactive: false,
+    },
+  },
+);
 
 export const CustomerAvatar: React.FC<CustomerAvatarProps> = ({
   firstName,
@@ -32,37 +45,48 @@ export const CustomerAvatar: React.FC<CustomerAvatarProps> = ({
   className = '',
   onClick,
   clickable = false,
+  ariaLabel,
+  ref,
 }) => {
+  const { t } = useTranslation();
+  const [imageFailed, setImageFailed] = React.useState(false);
   const initials = `${firstName[0] || ''}${lastName[0] || ''}`.toUpperCase();
-  const baseClasses = `rounded-2xl flex items-center justify-center overflow-hidden ${sizeClasses[size]} ${className}`;
-  const interactiveClasses = (clickable || onClick) && photoUrl
-    ? 'cursor-pointer hover:ring-4 hover:ring-cyan-300 transition-all hover:scale-105'
-    : '';
+  const interactive = Boolean(clickable || onClick);
+  const showPhoto = Boolean(photoUrl) && !imageFailed;
 
   const handleClick = () => {
-    if ((clickable || onClick) && photoUrl) {
+    if (interactive) {
       onClick?.();
     }
   };
 
-  if (photoUrl) {
-    return (
-      <div
-        className={`${baseClasses} ${interactiveClasses}`}
-        onClick={handleClick}
-        role={clickable || onClick ? 'button' : undefined}
-        tabIndex={clickable || onClick ? 0 : undefined}
-        onKeyDown={(e) => {
-          if ((e.key === 'Enter' || e.key === ' ') && (clickable || onClick)) {
+  const interactiveProps = interactive
+    ? {
+        role: 'button',
+        tabIndex: 0,
+        'aria-label': ariaLabel ?? t('ui.avatar.viewPhoto', { name: `${firstName} ${lastName}`.trim() }),
+        onClick: handleClick,
+        onKeyDown: (e: React.KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             handleClick();
           }
-        }}
+        },
+      }
+    : {};
+
+  if (showPhoto) {
+    return (
+      <div
+        ref={ref as React.Ref<HTMLDivElement>}
+        className={cn(avatarVariants({ size, interactive }), className)}
+        {...interactiveProps}
       >
         <img
-          src={photoUrl}
+          src={photoUrl ?? undefined}
           alt={`${firstName} ${lastName}`}
           className="w-full h-full object-cover"
+          onError={() => setImageFailed(true)}
         />
       </div>
     );
@@ -70,8 +94,13 @@ export const CustomerAvatar: React.FC<CustomerAvatarProps> = ({
 
   return (
     <div
-      className={`${baseClasses} bg-gradient-to-br from-cyan-400 to-cyan-600 text-white font-semibold shadow-md`}
-      style={{ fontSize: sizeStyles[size].fontSize }}
+      ref={ref as React.Ref<HTMLDivElement>}
+      className={cn(
+        avatarVariants({ size, interactive }),
+        'bg-primary text-primary-foreground font-semibold shadow-md',
+        className,
+      )}
+      {...interactiveProps}
     >
       {initials}
     </div>

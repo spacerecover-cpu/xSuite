@@ -1,60 +1,58 @@
 import { CheckCircle, XCircle, AlertTriangle, Info, Loader2, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, type ComponentType } from 'react';
+import { useTranslation } from 'react-i18next';
+import { cn } from '../../lib/utils';
+import { STATUS_TONE_MUTED, type StatusTone } from '../../lib/ui/variants';
+
+type ToastType = 'success' | 'error' | 'warning' | 'info' | 'loading';
 
 interface ToastProps {
   message: string;
-  type: 'success' | 'error' | 'warning' | 'info' | 'loading';
+  type: ToastType;
   duration?: number;
   onClose?: () => void;
+  className?: string;
+  closeLabel?: string;
+  role?: string;
+  'aria-live'?: 'off' | 'polite' | 'assertive';
+  ref?: React.Ref<HTMLDivElement>;
 }
 
-const toastConfig = {
-  success: {
-    bgColor: 'bg-success-muted',
-    textColor: 'text-success',
-    borderColor: 'border-success',
-    progressColor: 'bg-success',
-    Icon: CheckCircle,
-    iconColor: 'text-success',
-  },
-  error: {
-    bgColor: 'bg-danger-muted',
-    textColor: 'text-danger',
-    borderColor: 'border-danger',
-    progressColor: 'bg-danger',
-    Icon: XCircle,
-    iconColor: 'text-danger',
-  },
-  warning: {
-    bgColor: 'bg-warning-muted',
-    textColor: 'text-warning',
-    borderColor: 'border-warning',
-    progressColor: 'bg-warning',
-    Icon: AlertTriangle,
-    iconColor: 'text-warning',
-  },
-  info: {
-    bgColor: 'bg-info-muted',
-    textColor: 'text-info',
-    borderColor: 'border-info',
-    progressColor: 'bg-info',
-    Icon: Info,
-    iconColor: 'text-info',
-  },
-  loading: {
-    bgColor: 'bg-info-muted',
-    textColor: 'text-info',
-    borderColor: 'border-info',
-    progressColor: 'bg-info',
-    Icon: Loader2,
-    iconColor: 'text-info',
-  },
+// type -> shared StatusTone (error->danger, loading->info; the rest pass through).
+const TYPE_TONE: Record<ToastType, StatusTone> = {
+  success: 'success',
+  error: 'danger',
+  warning: 'warning',
+  info: 'info',
+  loading: 'info',
 };
 
-export const Toast = ({ message, type, duration, onClose }: ToastProps) => {
+// The bits STATUS_TONE_MUTED doesn't cover: left border, progress fill, and icon.
+const TYPE_EXTRAS: Record<ToastType, { border: string; progress: string; Icon: ComponentType<{ className?: string; strokeWidth?: number; 'aria-hidden'?: boolean }> }> = {
+  success: { border: 'border-success', progress: 'bg-success', Icon: CheckCircle },
+  error: { border: 'border-danger', progress: 'bg-danger', Icon: XCircle },
+  warning: { border: 'border-warning', progress: 'bg-warning', Icon: AlertTriangle },
+  info: { border: 'border-info', progress: 'bg-info', Icon: Info },
+  loading: { border: 'border-info', progress: 'bg-info', Icon: Loader2 },
+};
+
+export const Toast = ({
+  message,
+  type,
+  duration,
+  onClose,
+  className,
+  closeLabel,
+  role,
+  'aria-live': ariaLive,
+  ref,
+}: ToastProps) => {
+  const { t } = useTranslation();
   const [progress, setProgress] = useState(100);
-  const config = toastConfig[type];
-  const { Icon, bgColor, textColor, borderColor, progressColor, iconColor } = config;
+
+  const tone = STATUS_TONE_MUTED[TYPE_TONE[type]];
+  const { border, progress: progressColor, Icon } = TYPE_EXTRAS[type];
+  const isUrgent = type === 'error' || type === 'warning';
   const showProgress = type !== 'loading' && duration;
 
   useEffect(() => {
@@ -76,42 +74,45 @@ export const Toast = ({ message, type, duration, onClose }: ToastProps) => {
 
   return (
     <div
-      className={`
-        ${bgColor} ${textColor}
-        border-l-4 ${borderColor}
-        rounded-lg shadow-lg
-        max-w-md w-full
-        overflow-hidden
-        relative
-      `}
+      ref={ref}
+      role={role ?? (isUrgent ? 'alert' : 'status')}
+      aria-live={ariaLive ?? (isUrgent ? 'assertive' : 'polite')}
+      aria-atomic="true"
+      className={cn(
+        tone,
+        'border-l-4',
+        border,
+        'rounded-lg shadow-lg max-w-md w-full overflow-hidden relative',
+        className,
+      )}
     >
       <div className="flex items-start gap-3 px-4 py-3">
-        <div className={`${iconColor} flex-shrink-0 mt-0.5`}>
+        <div className="flex-shrink-0 mt-0.5">
           <Icon
-            className={`w-5 h-5 ${type === 'loading' ? 'animate-spin' : ''}`}
+            className={cn('w-5 h-5', type === 'loading' && 'motion-safe:animate-spin')}
             strokeWidth={2}
+            aria-hidden
           />
         </div>
 
-        <div className="flex-1 text-sm leading-relaxed font-medium">
-          {message}
-        </div>
+        <div className="flex-1 text-sm leading-relaxed font-medium">{message}</div>
 
         {type !== 'loading' && onClose && (
           <button
+            type="button"
             onClick={onClose}
-            className={`${textColor} hover:opacity-70 transition-opacity flex-shrink-0 -mt-0.5 -mr-1`}
-            aria-label="Close notification"
+            className="hover:opacity-70 transition-opacity flex-shrink-0 -mt-0.5 -mr-1"
+            aria-label={closeLabel ?? t('ui.toast.close')}
           >
-            <X className="w-4 h-4" strokeWidth={2.5} />
+            <X className="w-4 h-4" strokeWidth={2.5} aria-hidden />
           </button>
         )}
       </div>
 
       {showProgress && (
-        <div className="h-0.5 w-full bg-black/5">
+        <div className="h-0.5 w-full bg-slate-200/60">
           <div
-            className={`h-full ${progressColor} transition-all duration-100 ease-linear`}
+            className={cn('h-full transition-all duration-100 ease-linear', progressColor)}
             style={{ width: `${progress}%` }}
           />
         </div>
