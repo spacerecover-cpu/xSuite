@@ -5,6 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 import { BANNED_TABLES } from './eslint-rules/banned-tables.js';
 import noBannedEmbeds from './eslint-rules/no-banned-embeds-in-select.js';
+import noUntranslatedJsxText from './eslint-rules/no-untranslated-jsx-text.js';
 
 export default tseslint.config(
   {
@@ -32,7 +33,12 @@ export default tseslint.config(
     plugins: {
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,
-      'xsuite': { rules: { 'no-banned-embeds-in-select': noBannedEmbeds } },
+      'xsuite': {
+        rules: {
+          'no-banned-embeds-in-select': noBannedEmbeds,
+          'no-untranslated-jsx-text': noUntranslatedJsxText,
+        },
+      },
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
@@ -52,6 +58,10 @@ export default tseslint.config(
         ],
       }],
       'xsuite/no-banned-embeds-in-select': 'error',
+      // Non-blocking (warn): the lint gate runs `eslint .` with no
+      // --max-warnings, so the ~1,684 pre-existing hardcoded strings warn
+      // without failing CI, while NEW untranslated JSX text surfaces in review.
+      'xsuite/no-untranslated-jsx-text': 'warn',
       '@typescript-eslint/no-unused-vars': ['error', {
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',

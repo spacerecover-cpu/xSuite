@@ -24,4 +24,11 @@ describe('PhotoViewerModal', () => {
     render(<PhotoViewerModal isOpen={false} onClose={() => {}} imageUrl="/x.jpg" />);
     expect(screen.queryByRole('dialog')).toBeNull();
   });
+
+  it('RTL: the close button anchors to the logical -end-3 corner, not -right-3', () => {
+    render(<PhotoViewerModal isOpen onClose={() => {}} imageUrl="/x.jpg" altText="Photo" />);
+    const closeBtn = screen.getByRole('button', { name: /close/i });
+    expect(closeBtn.className).toContain('-end-3');
+    expect(closeBtn.className).not.toContain('-right-3');
+  });
 });

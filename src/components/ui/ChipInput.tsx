@@ -87,7 +87,7 @@ export const ChipInput = forwardRef<HTMLInputElement, ChipInputProps>(
           <label {...labelProps} className="block text-sm font-medium text-slate-700 mb-1">
             {label}
             {required && (
-              <span aria-hidden="true" className="text-danger ml-1">
+              <span aria-hidden="true" className="text-danger ms-1">
                 *
               </span>
             )}

@@ -59,4 +59,24 @@ describe('Modal', () => {
     await user.click(screen.getByRole('button', { name: /close/i }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  describe('RTL logical utilities (Phase 4a proof slice)', () => {
+    it('headerBadges wrapper uses logical ms-2 gap, not physical ml-2', () => {
+      render(
+        <Modal isOpen onClose={() => {}} title="X" headerBadges={<span data-testid="badge">B</span>}>
+          <p>body</p>
+        </Modal>,
+      );
+      const wrapper = screen.getByTestId('badge').parentElement as HTMLElement;
+      expect(wrapper.className).toContain('ms-2');
+      expect(wrapper.className).not.toContain('ml-2');
+    });
+
+    it('floating (no-title) close button anchors to the logical end-3 corner, not right-3', () => {
+      render(<Modal isOpen onClose={() => {}} title=""><p>body</p></Modal>);
+      const btn = screen.getByRole('button', { name: /close/i });
+      expect(btn.className).toContain('end-3');
+      expect(btn.className).not.toContain('right-3');
+    });
+  });
 });

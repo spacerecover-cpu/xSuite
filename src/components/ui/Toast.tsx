@@ -80,7 +80,7 @@ export const Toast = ({
       aria-atomic="true"
       className={cn(
         tone,
-        'border-l-4',
+        'border-s-4',
         border,
         'rounded-lg shadow-lg max-w-md w-full overflow-hidden relative',
         className,
@@ -101,7 +101,7 @@ export const Toast = ({
           <button
             type="button"
             onClick={onClose}
-            className="hover:opacity-70 transition-opacity flex-shrink-0 -mt-0.5 -mr-1"
+            className="hover:opacity-70 transition-opacity flex-shrink-0 -mt-0.5 -me-1"
             aria-label={closeLabel ?? t('ui.toast.close')}
           >
             <X className="w-4 h-4" strokeWidth={2.5} aria-hidden />

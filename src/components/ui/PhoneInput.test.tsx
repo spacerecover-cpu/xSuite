@@ -105,4 +105,42 @@ describe('PhoneInput', () => {
     await user.type(telInput, '7');
     expect(onChangeSpy).toHaveBeenLastCalledWith('+44 7');
   });
+
+  describe('RTL logical utilities (Phase 4a proof slice)', () => {
+    it('required asterisk uses logical ms-1, not physical ml-1', () => {
+      render(
+        <PhoneInput label="Phone" value="" onChange={() => {}} countries={COUNTRIES} required />,
+      );
+      const asterisk = screen.getByText('*');
+      expect(asterisk.className).toContain('ms-1');
+      expect(asterisk.className).not.toContain('ml-1');
+    });
+
+    it('country-code button uses the logical inline-end divider border-e, not physical border-r', () => {
+      render(<Harness />);
+      const trigger = screen.getByRole('combobox');
+      expect(trigger.className).toContain('border-e');
+      expect(trigger.className).not.toMatch(/(^|\s)border-r(\s|$)/);
+    });
+
+    it('search input in the picker uses logical ps-8 pe-3, not pl-8 pr-3', async () => {
+      const user = userEvent.setup();
+      render(<Harness />);
+      await user.click(screen.getByRole('combobox'));
+      const search = screen.getByPlaceholderText('Search country or code...');
+      expect(search.className).toContain('ps-8');
+      expect(search.className).toContain('pe-3');
+      expect(search.className).not.toContain('pl-8');
+      expect(search.className).not.toContain('pr-3');
+    });
+
+    it('search icon in the picker anchors to logical start-2.5, not left-2.5', async () => {
+      const user = userEvent.setup();
+      render(<Harness />);
+      await user.click(screen.getByRole('combobox'));
+      const icon = document.querySelector('svg.lucide-search') as SVGElement;
+      expect(icon.getAttribute('class')).toContain('start-2.5');
+      expect(icon.getAttribute('class')).not.toContain('left-2.5');
+    });
+  });
 });

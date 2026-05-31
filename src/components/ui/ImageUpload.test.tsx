@@ -203,4 +203,21 @@ describe('ImageUpload (cn + density cva + a11y + loading + dead-API)', () => {
     fireEvent.keyDown(dropzone, { key: ' ' });
     expect(clickSpy).toHaveBeenCalledTimes(1);
   });
+
+  describe('RTL logical utilities (Phase 4a proof slice)', () => {
+    it('Browse button icon uses logical me-2 gap, not physical mr-2', () => {
+      const { container } = render(<ImageUpload onChange={() => {}} />);
+      const icon = container.querySelector('button svg') as SVGElement;
+      expect(icon.getAttribute('class')).toContain('me-2');
+      expect(icon.getAttribute('class')).not.toContain('mr-2');
+    });
+
+    it('Remove button icon (preview state) uses logical me-2 gap, not physical mr-2', () => {
+      render(<ImageUpload value="blob:existing" onChange={() => {}} />);
+      const removeBtn = screen.getByRole('button', { name: /remove/i });
+      const icon = removeBtn.querySelector('svg') as SVGElement;
+      expect(icon.getAttribute('class')).toContain('me-2');
+      expect(icon.getAttribute('class')).not.toContain('mr-2');
+    });
+  });
 });

@@ -176,7 +176,7 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
       <>
         <div className="p-2 border-b border-slate-200">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <Search className="absolute start-2.5 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
             <input
               ref={searchInputRef}
               type="text"
@@ -184,7 +184,7 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
               aria-expanded
               aria-controls={listboxId}
               aria-activedescendant={activeOptionId}
-              className="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full ps-8 pe-3 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               placeholder={t('ui.select.searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => {
@@ -248,7 +248,7 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
             <button
               type="button"
               onClick={handleAddNew}
-              className="w-full px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5 rounded-md transition-colors text-left"
+              className="w-full px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5 rounded-md transition-colors text-start"
             >
               + {resolvedAddNewLabel}
             </button>
@@ -273,7 +273,7 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
           <label {...labelProps} className="block text-sm font-medium text-slate-700 mb-1">
             {label}
             {required && (
-              <span aria-hidden="true" className="text-danger ml-1">
+              <span aria-hidden="true" className="text-danger ms-1">
                 *
               </span>
             )}

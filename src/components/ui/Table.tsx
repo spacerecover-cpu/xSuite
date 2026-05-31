@@ -64,7 +64,7 @@ export function Table<T extends Record<string, any>>({
                 key={column.key}
                 scope="col"
                 style={{ width: column.width }}
-                className="px-6 py-3.5 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider"
+                className="px-6 py-3.5 text-start text-xs font-semibold text-slate-700 uppercase tracking-wider"
               >
                 {column.header}
               </th>

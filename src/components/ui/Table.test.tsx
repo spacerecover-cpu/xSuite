@@ -131,6 +131,15 @@ describe('Table (cn + tokens + a11y + loading)', () => {
     expect(table).toHaveAttribute('aria-label', 'Customers');
   });
 
+  it('RTL: column headers use logical text-start, not physical text-left', () => {
+    render(<Table data={data} columns={columns} />);
+    const headers = screen.getAllByRole('columnheader');
+    headers.forEach((th) => {
+      expect(th.className).toContain('text-start');
+      expect(th.className).not.toContain('text-left');
+    });
+  });
+
   it('PRECEDENCE: consumer className rounded-none beats base rounded-lg on the container', () => {
     const { container } = render(
       <Table data={data} columns={columns} className="rounded-none" />,

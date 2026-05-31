@@ -50,4 +50,11 @@ describe('ChipInput', () => {
     const removeBtn = screen.getByRole('button', { name: 'Remove a@b.com' });
     expect(removeBtn).toBeInTheDocument();
   });
+
+  it('RTL: required asterisk uses logical ms-1, not physical ml-1', () => {
+    render(<ChipInput label="CC" value={[]} onChange={() => {}} required />);
+    const asterisk = screen.getByText('*');
+    expect(asterisk.className).toContain('ms-1');
+    expect(asterisk.className).not.toContain('ml-1');
+  });
 });

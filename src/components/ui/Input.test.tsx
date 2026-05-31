@@ -75,4 +75,29 @@ describe('Input', () => {
     const asterisk = screen.getByText('*');
     expect(asterisk).toHaveAttribute('aria-hidden', 'true');
   });
+
+  describe('RTL logical utilities (Phase 4a proof slice)', () => {
+    it('required asterisk uses logical ms-1, not physical ml-1', () => {
+      render(<Input label="Email" required />);
+      const asterisk = screen.getByText('*');
+      expect(asterisk.className).toContain('ms-1');
+      expect(asterisk.className).not.toContain('ml-1');
+    });
+
+    it('leftIcon slot is anchored start-0 ps-3 (logical), not left-0 pl-3', () => {
+      const { container } = render(<Input label="Email" leftIcon={<svg data-testid="ic" />} />);
+      const slot = container.querySelector('[data-testid="ic"]')?.parentElement as HTMLElement;
+      expect(slot.className).toContain('start-0');
+      expect(slot.className).toContain('ps-3');
+      expect(slot.className).not.toContain('left-0');
+      expect(slot.className).not.toMatch(/(^|\s)pl-3(\s|$)/);
+    });
+
+    it('input gets logical ps-9 (not pl-9) leading padding when a leftIcon is present', () => {
+      render(<Input label="Email" leftIcon={<svg />} />);
+      const input = screen.getByLabelText('Email');
+      expect(input.className).toContain('ps-9');
+      expect(input.className).not.toContain('pl-9');
+    });
+  });
 });

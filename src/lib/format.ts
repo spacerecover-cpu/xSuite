@@ -1,8 +1,17 @@
 import { format as dateFnsFormat, parseISO } from 'date-fns';
+import { ar as arDateLocale } from 'date-fns/locale/ar';
 import { supabase } from './supabaseClient';
 import { logger } from './logger';
+import { normalizeLang } from './locale';
 import type { CurrencyConfig } from '../types/tenantConfig';
 import { DEFAULT_TENANT_CONFIG } from '../types/tenantConfig';
+
+// Phase 4a: locale-aware formatting. All locale params are OPTIONAL (additive) and
+// every locale-dependent branch is gated on normalizeLang(localeCode) === 'ar', so
+// the 'en' path stays byte-identical to pre-Phase-4a output. Policy (LOCKED): Western
+// numerals + Gregorian for 'ar' (no Arabic-Indic digits / Hijri) — Intl's 'ar' locale
+// natively emits Arabic-Indic digits, so the 'ar' branch forces numberingSystem 'latn'.
+const DEFAULT_LOCALE = 'en-US';
 
 export interface CurrencyFormat {
   currencySymbol: string;
@@ -77,7 +86,12 @@ export const formatCurrencyWithSettings = (
 
 export const formatCurrencyWithConfig = (
   amount: number,
-  config: CurrencyConfig
+  config: CurrencyConfig,
+  // Accepted for API parity with the other formatters. v1 policy is Western numerals
+  // for 'ar' (Gulf-ERP norm), which this hand-rolled path already produces, so the
+  // 'ar' output is byte-identical to 'en' here. Reserved for a future Arabic-Indic
+  // opt-in without a breaking signature change.
+  _localeCode?: string,
 ): string => {
   const parts = amount.toFixed(config.decimalPlaces).split('.');
   const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, config.thousandsSeparator);
@@ -91,13 +105,16 @@ export const formatCurrencyWithConfig = (
     : `${formattedNumber} ${config.symbol}`;
 };
 
-export const formatCurrency = (amount: number, currency = 'USD'): string => {
+export const formatCurrency = (amount: number, currency = 'USD', localeCode?: string): string => {
+  const isArabic = normalizeLang(localeCode) === 'ar';
   try {
     // No fraction-digit overrides: Intl applies the currency's ISO-4217 decimals
     // (USD 2, OMR 3, JPY 0).
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat(isArabic ? localeCode : DEFAULT_LOCALE, {
       style: 'currency',
       currency: currency,
+      // 'ar' only: keep the locale's grouping/bidi but force Western digits.
+      ...(isArabic ? { numberingSystem: 'latn' } : {}),
     }).format(amount);
   } catch {
     return `${currency} ${amount.toFixed(2)}`;
@@ -118,23 +135,34 @@ export const formatBaseEquivalent = (
   return `≈ ${formatCurrency(docTotal * rate, baseCurrency)}`;
 };
 
-export const formatDate = (date: string | Date, formatStr = 'MMM dd, yyyy'): string => {
+export const formatDate = (
+  date: string | Date,
+  formatStr = 'MMM dd, yyyy',
+  localeCode?: string,
+): string => {
   try {
     const dateObj = typeof date === 'string' ? parseISO(date) : date;
-    return dateFnsFormat(dateObj, formatStr);
+    // 'ar' only: apply the date-fns ar locale (Gregorian, Western numerals). 'en'
+    // omits the option entirely so output is byte-identical to pre-Phase-4a.
+    return normalizeLang(localeCode) === 'ar'
+      ? dateFnsFormat(dateObj, formatStr, { locale: arDateLocale })
+      : dateFnsFormat(dateObj, formatStr);
   } catch (error) {
     return '';
   }
 };
 
-export const formatDateTime = (date: string | Date): string => {
-  return formatDate(date, 'MMM dd, yyyy HH:mm');
+export const formatDateTime = (date: string | Date, localeCode?: string): string => {
+  return formatDate(date, 'MMM dd, yyyy HH:mm', localeCode);
 };
 
-export const formatNumber = (num: number, decimals = 2): string => {
-  return new Intl.NumberFormat('en-US', {
+export const formatNumber = (num: number, decimals = 2, localeCode?: string): string => {
+  const isArabic = normalizeLang(localeCode) === 'ar';
+  return new Intl.NumberFormat(isArabic ? localeCode : DEFAULT_LOCALE, {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
+    // 'ar' only: force Western digits per the locked Western-numeral policy.
+    ...(isArabic ? { numberingSystem: 'latn' } : {}),
   }).format(num);
 };
 
