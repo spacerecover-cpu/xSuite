@@ -50,6 +50,9 @@ const resources = {
         current: 'Current',
         applyCrop: 'Apply Crop',
         cropping: 'Cropping...',
+        zoomOut: 'Zoom out',
+        zoomIn: 'Zoom in',
+        cropFailed: 'Could not crop the image. Please try again.',
       },
       auth: {
         login: 'Login',
@@ -482,6 +485,9 @@ const resources = {
         current: 'الحالي',
         applyCrop: 'تطبيق الاقتصاص',
         cropping: 'جاري الاقتصاص...',
+        zoomOut: 'تصغير',
+        zoomIn: 'تكبير',
+        cropFailed: 'تعذّر اقتصاص الصورة. حاول مرة أخرى.',
       },
       auth: {
         login: 'تسجيل الدخول',
