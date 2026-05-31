@@ -1050,18 +1050,24 @@ const resources = {
   },
 };
 
+// Phase 4a: the very first render must be correct for returning Arabic tenants, so
+// `lng` reads the synchronous anti-flash hint (`xsuite_locale_hint`, written by
+// LocaleProvider) rather than hard-pinning 'en'. `fallbackLng:'en'` keeps any
+// uninstrumented / missing key degrading to English. The static `dir`/`lang` writes
+// were removed — LocaleProvider (runtime) and the main.tsx pre-render block (anti-flash)
+// now own all DOM direction state.
+const localeHint =
+  typeof localStorage !== 'undefined' ? localStorage.getItem('xsuite_locale_hint') : null;
+
 i18n
   .use(initReactI18next)
   .init({
     resources,
-    lng: 'en',
+    lng: localeHint === 'ar' ? 'ar' : 'en',
     fallbackLng: 'en',
     interpolation: {
       escapeValue: false,
     },
   });
-
-document.documentElement.dir = 'ltr';
-document.documentElement.lang = 'en';
 
 export default i18n;
