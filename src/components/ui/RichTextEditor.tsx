@@ -1,5 +1,9 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useId } from 'react';
+import { useTranslation } from 'react-i18next';
+import { cva } from 'class-variance-authority';
 import { sanitizeHtml } from '../../lib/sanitizeHtml';
+import { cn } from '../../lib/utils';
+import { STATUS_TONE_MUTED } from '../../lib/ui/variants';
 import {
   Bold,
   Italic,
@@ -31,6 +35,21 @@ interface RichTextEditorProps {
   'aria-labelledby'?: string;
 }
 
+export const toolbarButtonVariants = cva(
+  'p-2 hover:bg-slate-200 rounded transition-colors',
+  {
+    variants: {
+      active: {
+        true: 'bg-slate-200',
+        false: '',
+      },
+    },
+    defaultVariants: {
+      active: false,
+    },
+  },
+);
+
 const PRESET_COLORS = [
   { name: 'Red (Warning)', value: '#ef4444' },
   { name: 'Orange (Caution)', value: '#f97316' },
@@ -50,7 +69,7 @@ const PRESET_HIGHLIGHTS = [
 export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   value,
   onChange,
-  placeholder = 'Enter text...',
+  placeholder,
   minHeight = '200px',
   label,
   helpText,
@@ -59,11 +78,18 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   'aria-describedby': ariaDescribedBy,
   'aria-labelledby': ariaLabelledBy,
 }) => {
+  const { t } = useTranslation();
   const editorRef = useRef<HTMLDivElement>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showHighlightPicker, setShowHighlightPicker] = useState(false);
   const [isSourceMode, setIsSourceMode] = useState(false);
   const [sourceValue, setSourceValue] = useState('');
+
+  const reactId = useId();
+  const colorPopoverId = `${reactId}-color`;
+  const highlightPopoverId = `${reactId}-highlight`;
+
+  const resolvedPlaceholder = placeholder ?? t('ui.richText.placeholder');
 
   useEffect(() => {
     if (editorRef.current && !isSourceMode) {
@@ -76,7 +102,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
   const handleInput = () => {
     if (editorRef.current) {
-      const newValue = editorRef.current.innerHTML;
+      const newValue = sanitizeHtml(editorRef.current.innerHTML);
       if (newValue !== value) {
         onChange(newValue);
       }
@@ -117,21 +143,21 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       setSourceValue(value || '');
       setIsSourceMode(true);
     } else {
-      onChange(sourceValue);
+      onChange(sanitizeHtml(sourceValue));
       setIsSourceMode(false);
     }
   };
 
   const formatButtons = [
-    { icon: Bold, command: 'bold', title: 'Bold (Ctrl+B)' },
-    { icon: Italic, command: 'italic', title: 'Italic (Ctrl+I)' },
-    { icon: Underline, command: 'underline', title: 'Underline (Ctrl+U)' },
-    { icon: Strikethrough, command: 'strikeThrough', title: 'Strikethrough' },
+    { icon: Bold, command: 'bold', title: 'Bold (Ctrl+B)', label: t('ui.richText.bold') },
+    { icon: Italic, command: 'italic', title: 'Italic (Ctrl+I)', label: t('ui.richText.italic') },
+    { icon: Underline, command: 'underline', title: 'Underline (Ctrl+U)', label: t('ui.richText.underline') },
+    { icon: Strikethrough, command: 'strikeThrough', title: 'Strikethrough', label: t('ui.richText.strikethrough') },
   ];
 
   const listButtons = [
-    { icon: List, command: 'insertUnorderedList', title: 'Bullet List' },
-    { icon: ListOrdered, command: 'insertOrderedList', title: 'Numbered List' },
+    { icon: List, command: 'insertUnorderedList', title: 'Bullet List', label: t('ui.richText.bulletList') },
+    { icon: ListOrdered, command: 'insertOrderedList', title: 'Numbered List', label: t('ui.richText.numberedList') },
   ];
 
   return (
@@ -143,16 +169,22 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       )}
 
       <div className="border border-slate-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-primary focus-within:border-primary">
-        <div className="bg-slate-50 border-b border-slate-300 p-2 flex flex-wrap gap-1 items-center">
-          {formatButtons.map(({ icon: Icon, command, title }) => (
+        <div
+          role="toolbar"
+          aria-label={t('ui.richText.toolbar')}
+          aria-controls={id}
+          className="bg-slate-50 border-b border-slate-300 p-2 flex flex-wrap gap-1 items-center"
+        >
+          {formatButtons.map(({ icon: Icon, command, title, label: buttonLabel }) => (
             <button
               key={command}
               type="button"
               onClick={() => execCommand(command)}
               title={title}
-              className="p-2 hover:bg-slate-200 rounded transition-colors"
+              aria-label={buttonLabel}
+              className={toolbarButtonVariants()}
             >
-              <Icon className="w-4 h-4 text-slate-700" />
+              <Icon className="w-4 h-4 text-slate-700" aria-hidden="true" />
             </button>
           ))}
 
@@ -165,14 +197,21 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                 setShowColorPicker(!showColorPicker);
                 setShowHighlightPicker(false);
               }}
-              title="Text Color"
-              className="p-2 hover:bg-slate-200 rounded transition-colors"
+              title={t('ui.richText.textColor')}
+              aria-label={t('ui.richText.textColor')}
+              aria-haspopup="true"
+              aria-expanded={showColorPicker}
+              aria-controls={colorPopoverId}
+              className={toolbarButtonVariants()}
             >
-              <Palette className="w-4 h-4 text-slate-700" />
+              <Palette className="w-4 h-4 text-slate-700" aria-hidden="true" />
             </button>
             {showColorPicker && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-slate-300 rounded-lg shadow-lg p-3 z-10 w-48">
-                <p className="text-xs font-medium text-slate-700 mb-2">Text Color</p>
+              <div
+                id={colorPopoverId}
+                className="absolute top-full left-0 mt-1 bg-surface border border-slate-300 rounded-lg shadow-lg p-3 z-10 w-48"
+              >
+                <p className="text-xs font-medium text-slate-700 mb-2">{t('ui.richText.textColor')}</p>
                 <div className="space-y-2">
                   {PRESET_COLORS.map((color) => (
                     <button
@@ -200,14 +239,21 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                 setShowHighlightPicker(!showHighlightPicker);
                 setShowColorPicker(false);
               }}
-              title="Highlight"
-              className="p-2 hover:bg-slate-200 rounded transition-colors"
+              title={t('ui.richText.highlight')}
+              aria-label={t('ui.richText.highlight')}
+              aria-haspopup="true"
+              aria-expanded={showHighlightPicker}
+              aria-controls={highlightPopoverId}
+              className={toolbarButtonVariants()}
             >
-              <Highlighter className="w-4 h-4 text-slate-700" />
+              <Highlighter className="w-4 h-4 text-slate-700" aria-hidden="true" />
             </button>
             {showHighlightPicker && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-slate-300 rounded-lg shadow-lg p-3 z-10 w-48">
-                <p className="text-xs font-medium text-slate-700 mb-2">Highlight</p>
+              <div
+                id={highlightPopoverId}
+                className="absolute top-full left-0 mt-1 bg-surface border border-slate-300 rounded-lg shadow-lg p-3 z-10 w-48"
+              >
+                <p className="text-xs font-medium text-slate-700 mb-2">{t('ui.richText.highlight')}</p>
                 <div className="space-y-2">
                   {PRESET_HIGHLIGHTS.map((color) => (
                     <button
@@ -230,15 +276,16 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
           <div className="w-px h-6 bg-slate-300 mx-1" />
 
-          {listButtons.map(({ icon: Icon, command, title }) => (
+          {listButtons.map(({ icon: Icon, command, title, label: buttonLabel }) => (
             <button
               key={command}
               type="button"
               onClick={() => execCommand(command)}
               title={title}
-              className="p-2 hover:bg-slate-200 rounded transition-colors"
+              aria-label={buttonLabel}
+              className={toolbarButtonVariants()}
             >
-              <Icon className="w-4 h-4 text-slate-700" />
+              <Icon className="w-4 h-4 text-slate-700" aria-hidden="true" />
             </button>
           ))}
 
@@ -248,50 +295,63 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             type="button"
             onClick={() => execCommand('undo')}
             title="Undo (Ctrl+Z)"
-            className="p-2 hover:bg-slate-200 rounded transition-colors"
+            aria-label={t('ui.richText.undo')}
+            className={toolbarButtonVariants()}
           >
-            <Undo className="w-4 h-4 text-slate-700" />
+            <Undo className="w-4 h-4 text-slate-700" aria-hidden="true" />
           </button>
 
           <button
             type="button"
             onClick={() => execCommand('redo')}
             title="Redo (Ctrl+Y)"
-            className="p-2 hover:bg-slate-200 rounded transition-colors"
+            aria-label={t('ui.richText.redo')}
+            className={toolbarButtonVariants()}
           >
-            <Redo className="w-4 h-4 text-slate-700" />
+            <Redo className="w-4 h-4 text-slate-700" aria-hidden="true" />
           </button>
 
           <button
             type="button"
             onClick={() => execCommand('removeFormat')}
             title="Clear Formatting"
-            className="p-2 hover:bg-slate-200 rounded transition-colors"
+            aria-label={t('ui.richText.clearFormatting')}
+            className={toolbarButtonVariants()}
           >
-            <Eraser className="w-4 h-4 text-slate-700" />
+            <Eraser className="w-4 h-4 text-slate-700" aria-hidden="true" />
           </button>
 
           <div className="w-px h-6 bg-slate-300 mx-1" />
 
           <div className="flex items-center gap-1">
-            <span className="text-xs text-slate-600 mr-1">Quick:</span>
+            <span className="text-xs text-slate-600 mr-1">{t('ui.richText.quickLabel')}:</span>
             <button
               type="button"
               onClick={() => applyQuickFormat('warning')}
-              title="Red Warning Text (Bold + Red)"
-              className="px-2 py-1 text-xs bg-danger-muted text-danger hover:bg-danger/20 rounded transition-colors font-semibold"
+              title={t('ui.richText.warningTitle')}
+              aria-label={t('ui.richText.warningTitle')}
+              className={cn(
+                'px-2 py-1 text-xs rounded transition-colors font-semibold',
+                STATUS_TONE_MUTED.danger,
+                'hover:bg-danger/20',
+              )}
             >
-              <AlertTriangle className="w-3 h-3 inline mr-1" />
-              Warning
+              <AlertTriangle className="w-3 h-3 inline mr-1" aria-hidden="true" />
+              {t('ui.richText.warning')}
             </button>
             <button
               type="button"
               onClick={() => applyQuickFormat('important')}
-              title="Important (Bold + Yellow Highlight)"
-              className="px-2 py-1 text-xs bg-warning-muted text-slate-700 hover:bg-warning/20 rounded transition-colors font-semibold"
+              title={t('ui.richText.importantTitle')}
+              aria-label={t('ui.richText.importantTitle')}
+              className={cn(
+                'px-2 py-1 text-xs rounded transition-colors font-semibold',
+                STATUS_TONE_MUTED.warning,
+                'hover:bg-warning/20',
+              )}
             >
-              <Zap className="w-3 h-3 inline mr-1" />
-              Important
+              <Zap className="w-3 h-3 inline mr-1" aria-hidden="true" />
+              {t('ui.richText.important')}
             </button>
           </div>
 
@@ -301,9 +361,11 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             type="button"
             onClick={toggleSourceMode}
             title="View HTML Source"
-            className={`p-2 hover:bg-slate-200 rounded transition-colors ${isSourceMode ? 'bg-slate-200' : ''}`}
+            aria-label={t('ui.richText.viewSource')}
+            aria-pressed={isSourceMode}
+            className={toolbarButtonVariants({ active: isSourceMode })}
           >
-            <Code className="w-4 h-4 text-slate-700" />
+            <Code className="w-4 h-4 text-slate-700" aria-hidden="true" />
           </button>
         </div>
 
@@ -313,7 +375,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onChange={(e) => setSourceValue(e.target.value)}
             className="w-full p-3 font-mono text-sm focus:outline-none resize-none"
             style={{ minHeight }}
-            placeholder="HTML source code..."
+            placeholder={t('ui.richText.sourcePlaceholder')}
           />
         ) : (
           <div
@@ -329,7 +391,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             className="w-full p-3 focus:outline-none prose max-w-none"
             style={{ minHeight }}
             suppressContentEditableWarning
-            data-placeholder={placeholder}
+            data-placeholder={resolvedPlaceholder}
           />
         )}
       </div>
