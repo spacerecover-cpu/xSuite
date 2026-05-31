@@ -177,58 +177,77 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOp
               <h4 className="text-sm font-semibold text-info">{editingId ? 'Edit Category' : 'New Category'}</h4>
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="Name" required>
-                  <Input
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="e.g. Diagnostic Protocols"
-                  />
+                  {(c) => (
+                    <Input
+                      {...c}
+                      value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      placeholder="e.g. Diagnostic Protocols"
+                    />
+                  )}
                 </FormField>
                 <FormField label="Display Order">
-                  <Input
-                    type="number"
-                    value={form.sort_order}
-                    onChange={(e) => setForm({ ...form, sort_order: e.target.value })}
-                    placeholder="0"
-                  />
+                  {(c) => (
+                    <Input
+                      {...c}
+                      type="number"
+                      value={form.sort_order}
+                      onChange={(e) => setForm({ ...form, sort_order: e.target.value })}
+                      placeholder="0"
+                    />
+                  )}
                 </FormField>
               </div>
               <FormField label="Description">
-                <Input
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Brief description (optional)"
-                />
+                {(c) => (
+                  <Input
+                    {...c}
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    placeholder="Brief description (optional)"
+                  />
+                )}
               </FormField>
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="Parent Category">
-                  <select
-                    value={form.parent_id}
-                    onChange={(e) => setForm({ ...form, parent_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
-                  >
-                    <option value="">None (top-level)</option>
-                    {parentOptions.map((cat) => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </select>
+                  {(c) => (
+                    <select
+                      {...c}
+                      value={form.parent_id}
+                      onChange={(e) => setForm({ ...form, parent_id: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                    >
+                      <option value="">None (top-level)</option>
+                      {parentOptions.map((cat) => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+                  )}
                 </FormField>
                 <FormField label="Color">
-                  <div className="flex gap-1.5 flex-wrap pt-1">
-                    {COLOR_OPTIONS.map((c) => (
-                      <button
-                        key={c.value}
-                        title={c.label}
-                        onClick={() => setForm({ ...form, color: c.value })}
-                        className="w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-110 border-2"
-                        style={{
-                          backgroundColor: c.value,
-                          borderColor: form.color === c.value ? '#1e293b' : 'transparent',
-                        }}
-                      >
-                        {form.color === c.value && <Check className="w-3 h-3 text-white" />}
-                      </button>
-                    ))}
-                  </div>
+                  {(c) => (
+                    <div
+                      role="group"
+                      aria-labelledby={c['aria-labelledby']}
+                      aria-describedby={c['aria-describedby']}
+                      className="flex gap-1.5 flex-wrap pt-1"
+                    >
+                      {COLOR_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          title={opt.label}
+                          onClick={() => setForm({ ...form, color: opt.value })}
+                          className="w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-110 border-2"
+                          style={{
+                            backgroundColor: opt.value,
+                            borderColor: form.color === opt.value ? '#1e293b' : 'transparent',
+                          }}
+                        >
+                          {form.color === opt.value && <Check className="w-3 h-3 text-white" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </FormField>
               </div>
               <div className="flex justify-end gap-2 pt-1">

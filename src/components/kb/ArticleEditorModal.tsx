@@ -160,39 +160,51 @@ export const ArticleEditorModal: React.FC<ArticleEditorModalProps> = ({ isOpen, 
       <div className="flex h-[80vh] overflow-hidden -mx-6 -mb-6">
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
           <FormField label="Title" required>
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. HDD Head Replacement SOP – Seagate Barracuda"
-            />
+            {(c) => (
+              <Input
+                {...c}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. HDD Head Replacement SOP – Seagate Barracuda"
+              />
+            )}
           </FormField>
 
           <FormField label="Excerpt" hint="Short description shown on article cards">
-            <textarea
-              value={excerpt}
-              onChange={(e) => setExcerpt(e.target.value)}
-              rows={2}
-              placeholder="Brief summary of this article..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-            />
+            {(c) => (
+              <textarea
+                {...c}
+                value={excerpt}
+                onChange={(e) => setExcerpt(e.target.value)}
+                rows={2}
+                placeholder="Brief summary of this article..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              />
+            )}
           </FormField>
 
           <FormField label="Content" required>
-            <RichTextEditor
-              value={content}
-              onChange={setContent}
-              placeholder="Write your article content here..."
-              minHeight="380px"
-            />
+            {(c) => (
+              <RichTextEditor
+                {...c}
+                value={content}
+                onChange={setContent}
+                placeholder="Write your article content here..."
+                minHeight="380px"
+              />
+            )}
           </FormField>
 
           {article && (
             <FormField label="Change Notes" hint="Describe what changed in this version">
-              <Input
-                value={changeNotes}
-                onChange={(e) => setChangeNotes(e.target.value)}
-                placeholder="e.g. Updated torque specs for WD drives"
-              />
+              {(c) => (
+                <Input
+                  {...c}
+                  value={changeNotes}
+                  onChange={(e) => setChangeNotes(e.target.value)}
+                  placeholder="e.g. Updated torque specs for WD drives"
+                />
+              )}
             </FormField>
           )}
         </div>
