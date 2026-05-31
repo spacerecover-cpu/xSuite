@@ -470,7 +470,14 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
           });
         } catch (error) {
           logger.error('Error saving diagnostics:', error);
-          // Don't fail the entire operation if diagnostics save fails
+          // The device record itself saved; surface the inspection-save failure
+          // loudly rather than swallowing it (a silent drop reads as success
+          // while the technician's findings are lost).
+          toast.error(
+            `Device saved, but the inspection/diagnostics did NOT save: ${
+              error instanceof Error ? error.message : 'unknown error'
+            }. Re-open the device and retry.`
+          );
         }
       }
 

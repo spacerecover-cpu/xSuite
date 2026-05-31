@@ -1,42 +1,13 @@
 import { supabase } from './supabaseClient';
 import { logger } from './logger';
+import {
+  toDeviceDiagnosticsInsert,
+  toDeviceDiagnosticsUpdate,
+  fromDeviceDiagnosticsRow,
+  type DeviceDiagnostics,
+} from './diagnosticsTransform';
 
-export interface DeviceDiagnostics {
-  id?: string;
-  case_device_id: string;
-  device_type_category: 'hdd' | 'ssd' | 'hybrid' | 'other';
-  diagnostic_date?: string;
-  diagnosed_by?: string;
-
-  heads_status?: string;
-  head_map?: any;
-  pcb_status?: string;
-  pcb_notes?: string;
-  motor_status?: string;
-  surface_status?: string;
-  sa_access?: boolean;
-  platter_condition?: string;
-
-  controller_status?: string;
-  controller_model?: string;
-  memory_chips_status?: string;
-  nand_type?: string;
-  firmware_corruption?: boolean;
-  trim_support?: boolean;
-  wear_leveling_count?: number;
-
-  firmware_version?: string;
-  rom_version?: string;
-  smart_data?: any;
-  imaging_stats?: any;
-
-  physical_damage_notes?: string;
-
-  technical_notes?: string;
-
-  created_at?: string;
-  updated_at?: string;
-}
+export type { DeviceDiagnostics } from './diagnosticsTransform';
 
 export interface ComponentStatus {
   id: string;
@@ -79,6 +50,9 @@ export const diagnosticsService = {
       .from('device_diagnostics')
       .select('*')
       .eq('device_id', caseDeviceId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (error) {
@@ -87,23 +61,16 @@ export const diagnosticsService = {
     }
 
     if (!data) return null;
-    return { ...data, case_device_id: data.device_id } as unknown as DeviceDiagnostics;
+    return fromDeviceDiagnosticsRow(data);
   },
 
   async createDeviceDiagnostics(diagnostics: DeviceDiagnostics): Promise<DeviceDiagnostics> {
     const { data: currentUser } = await supabase.auth.getUser();
-
-    const { case_device_id, ...rest } = diagnostics;
-    const diagnosticsData = {
-      ...rest,
-      device_id: case_device_id,
-      diagnosed_by: diagnostics.diagnosed_by || currentUser.user?.id,
-      diagnostic_date: diagnostics.diagnostic_date || new Date().toISOString(),
-    };
+    const payload = toDeviceDiagnosticsInsert(diagnostics, currentUser.user?.id);
 
     const { data, error } = await supabase
       .from('device_diagnostics')
-      .insert([diagnosticsData as never])
+      .insert([payload])
       .select()
       .maybeSingle();
 
@@ -113,18 +80,16 @@ export const diagnosticsService = {
     }
 
     if (!data) throw new Error('Failed to create device diagnostics');
-    return { ...data, case_device_id: data.device_id } as unknown as DeviceDiagnostics;
+    return fromDeviceDiagnosticsRow(data);
   },
 
   async updateDeviceDiagnostics(id: string, diagnostics: Partial<DeviceDiagnostics>): Promise<DeviceDiagnostics> {
-    const { case_device_id, ...rest } = diagnostics;
-    const updatePayload = case_device_id !== undefined
-      ? { ...rest, device_id: case_device_id }
-      : rest;
+    const { data: currentUser } = await supabase.auth.getUser();
+    const payload = toDeviceDiagnosticsUpdate(diagnostics, currentUser.user?.id);
 
     const { data, error } = await supabase
       .from('device_diagnostics')
-      .update(updatePayload as never)
+      .update(payload)
       .eq('id', id)
       .select()
       .maybeSingle();
@@ -135,7 +100,7 @@ export const diagnosticsService = {
     }
 
     if (!data) throw new Error('Failed to update device diagnostics');
-    return { ...data, case_device_id: data.device_id } as unknown as DeviceDiagnostics;
+    return fromDeviceDiagnosticsRow(data);
   },
 
   async upsertDeviceDiagnostics(diagnostics: DeviceDiagnostics): Promise<DeviceDiagnostics> {
@@ -163,11 +128,11 @@ export const diagnosticsService = {
   async getDiagnosticsWithDevice(caseDeviceId: string) {
     const { data, error } = await supabase
       .from('device_diagnostics')
-      .select(`
-        *,
-        diagnosed_by_user:profiles(full_name)
-      `)
+      .select('*')
       .eq('device_id', caseDeviceId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (error) {
