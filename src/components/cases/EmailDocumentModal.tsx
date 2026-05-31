@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
+import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { ChipInput } from '../ui/ChipInput';
@@ -319,47 +320,43 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
         </div>
       )}
 
-      {showPdfPreview && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center"
-          onClick={() => setShowPdfPreview(false)}
-        >
-          <div className="fixed inset-0 bg-black bg-opacity-70" />
-          <div
-            className="relative bg-white rounded-lg shadow-2xl max-w-7xl w-full mx-4 max-h-[90vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-4 border-b border-slate-200">
-              <div className="flex items-center gap-3">
-                <FileText className="w-5 h-5 text-primary" />
-                <h3 className="text-lg font-semibold text-slate-900">PDF Preview</h3>
-              </div>
-              <button
-                onClick={() => setShowPdfPreview(false)}
-                className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
-                aria-label="Close preview"
-              >
-                <XIcon className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="flex-1 p-4 overflow-hidden">
-              <iframe
-                src={URL.createObjectURL(blob)}
-                className="w-full h-full rounded-lg border border-slate-200"
-                title="PDF Preview"
-              />
-            </div>
-            <div className="p-4 border-t border-slate-200 flex justify-end">
-              <Button
-                variant="primary"
-                onClick={() => setShowPdfPreview(false)}
-              >
-                Close Preview
-              </Button>
-            </div>
+      <Dialog
+        open={showPdfPreview}
+        onClose={() => setShowPdfPreview(false)}
+        label="Document preview"
+        overlayClassName="z-[60]"
+        backdropClassName="bg-black/70"
+        className="max-w-7xl max-h-[90vh] flex flex-col overflow-hidden"
+      >
+        <div className="flex items-center justify-between p-4 border-b border-slate-200">
+          <div className="flex items-center gap-3">
+            <FileText className="w-5 h-5 text-primary" />
+            <h3 className="text-lg font-semibold text-slate-900">PDF Preview</h3>
           </div>
+          <button
+            onClick={() => setShowPdfPreview(false)}
+            className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+            aria-label="Close preview"
+          >
+            <XIcon className="w-5 h-5" />
+          </button>
         </div>
-      )}
+        <div className="flex-1 p-4 overflow-hidden">
+          <iframe
+            src={URL.createObjectURL(blob)}
+            className="w-full h-full rounded-lg border border-slate-200"
+            title="PDF Preview"
+          />
+        </div>
+        <div className="p-4 border-t border-slate-200 flex justify-end">
+          <Button
+            variant="primary"
+            onClick={() => setShowPdfPreview(false)}
+          >
+            Close Preview
+          </Button>
+        </div>
+      </Dialog>
     </Modal>
   );
 };
