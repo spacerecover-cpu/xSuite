@@ -1,6 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, Search, X } from 'lucide-react';
+import { useFieldA11y } from '../../hooks/useFieldA11y';
+import { useAnchoredPosition } from '../../hooks/useAnchoredPosition';
+import { useListboxKeyboard } from '../../hooks/useListboxKeyboard';
 
 interface Option {
   id: string;
@@ -21,354 +25,347 @@ interface SearchableSelectProps {
   addNewLabel?: string;
   clearable?: boolean;
   usePortal?: boolean;
+  id?: string;
+  error?: string;
+  hint?: string;
+  name?: string;
+  className?: string;
 }
 
-export const SearchableSelect: React.FC<SearchableSelectProps> = ({
-  label,
-  value,
-  onChange,
-  options,
-  placeholder = 'Select...',
-  required = false,
-  disabled = false,
-  emptyMessage = 'No options available',
-  onAddNew,
-  addNewLabel = 'Add New',
-  clearable = true,
-  usePortal = false,
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const [dropdownPosition, setDropdownPosition] = useState<'bottom' | 'top'>('bottom');
-  const [dropdownStyles, setDropdownStyles] = useState<React.CSSProperties>({});
-  const containerRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const portalDropdownRef = useRef<HTMLDivElement>(null);
+export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelectProps>(
+  (
+    {
+      label,
+      value,
+      onChange,
+      options,
+      placeholder,
+      required = false,
+      disabled = false,
+      emptyMessage,
+      onAddNew,
+      addNewLabel,
+      clearable = true,
+      usePortal = false,
+      id,
+      error,
+      hint,
+      name,
+      className,
+    },
+    ref
+  ) => {
+    const { t } = useTranslation();
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
 
-  const selectedOption = options.find((opt) => opt.id === value);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const triggerRef = useRef<HTMLDivElement>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+    const listRef = useRef<HTMLDivElement>(null);
+    const portalDropdownRef = useRef<HTMLDivElement>(null);
 
-  const filteredOptions = options.filter((option) =>
-    option.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+    const listboxId = useId();
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      const isInsideContainer = containerRef.current && containerRef.current.contains(target);
-      const isInsidePortalDropdown = portalDropdownRef.current && portalDropdownRef.current.contains(target);
+    const { labelProps, controlProps, errorProps, hintProps } = useFieldA11y({
+      id,
+      hasError: !!error,
+      hasHint: !error && !!hint,
+      required,
+    });
 
-      if (!isInsideContainer && !isInsidePortalDropdown) {
-        setIsOpen(false);
-        setSearchTerm('');
-      }
-    };
+    const resolvedPlaceholder = placeholder ?? t('ui.select.placeholder');
+    const resolvedEmptyMessage = emptyMessage ?? t('ui.noOptions');
+    const resolvedAddNewLabel = addNewLabel ?? t('ui.select.addNew');
 
-    const calculateDropdownPosition = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const dropdownHeight = 300;
-        const spaceBelow = window.innerHeight - rect.bottom;
-        const spaceAbove = rect.top;
+    const selectedOption = options.find((opt) => opt.id === value);
 
-        if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
-          setDropdownPosition('top');
-        } else {
-          setDropdownPosition('bottom');
-        }
+    const filteredOptions = options.filter((option) =>
+      option.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
-        if (usePortal) {
-          const styles: React.CSSProperties = {
-            position: 'fixed',
-            width: `${rect.width}px`,
-            left: `${rect.left}px`,
-            zIndex: 9999,
-          };
-
-          if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
-            styles.bottom = `${window.innerHeight - rect.top}px`;
-          } else {
-            styles.top = `${rect.bottom}px`;
-          }
-
-          setDropdownStyles(styles);
-        }
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      searchInputRef.current?.focus();
-      calculateDropdownPosition();
-      window.addEventListener('scroll', calculateDropdownPosition, true);
-      window.addEventListener('resize', calculateDropdownPosition);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      window.removeEventListener('scroll', calculateDropdownPosition, true);
-      window.removeEventListener('resize', calculateDropdownPosition);
-    };
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (isOpen && highlightedIndex >= 0 && dropdownRef.current) {
-      const highlightedElement = dropdownRef.current.children[highlightedIndex] as HTMLElement;
-      if (highlightedElement) {
-        highlightedElement.scrollIntoView({ block: 'nearest' });
-      }
-    }
-  }, [highlightedIndex, isOpen]);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!isOpen) {
-      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
-        e.preventDefault();
-        setIsOpen(true);
-      }
-      return;
-    }
-
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault();
-        setHighlightedIndex((prev) =>
-          prev < filteredOptions.length - 1 ? prev + 1 : prev
-        );
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : 0));
-        break;
-      case 'Enter':
-        e.preventDefault();
-        if (highlightedIndex >= 0 && filteredOptions[highlightedIndex]) {
-          handleSelect(filteredOptions[highlightedIndex].id);
-        }
-        break;
-      case 'Escape':
-        e.preventDefault();
-        setIsOpen(false);
-        setSearchTerm('');
-        break;
-    }
-  };
-
-  const handleSelect = (optionId: string) => {
-    onChange(optionId);
-    setIsOpen(false);
-    setSearchTerm('');
-    setHighlightedIndex(-1);
-  };
-
-  const handleClear = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onChange('');
-    setSearchTerm('');
-  };
-
-  const handleAddNew = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onAddNew) {
-      onAddNew();
+    const closeDropdown = useCallback(() => {
       setIsOpen(false);
       setSearchTerm('');
-    }
-  };
+    }, []);
 
-  return (
-    <div className="relative" ref={containerRef}>
-      <label className="block text-sm font-medium text-slate-700 mb-1">
-        {label}
-        {required && <span className="text-danger ml-1">*</span>}
-      </label>
+    const handleSelect = useCallback(
+      (optionId: string) => {
+        onChange(optionId);
+        closeDropdown();
+        triggerRef.current?.focus();
+      },
+      [onChange, closeDropdown]
+    );
 
-      <div
-        className={`relative w-full px-3 py-2 border rounded-lg cursor-pointer transition-all ${
-          disabled
-            ? 'bg-slate-100 border-slate-300 cursor-not-allowed'
-            : isOpen
-            ? 'border-primary ring-2 ring-primary ring-opacity-20'
-            : 'border-slate-300 hover:border-slate-400'
-        }`}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        onKeyDown={handleKeyDown}
-        tabIndex={disabled ? -1 : 0}
-      >
-        <div className="flex items-center justify-between">
-          <span className={selectedOption ? 'text-slate-900' : 'text-slate-400'}>
-            {selectedOption ? selectedOption.name : placeholder}
-          </span>
-          <div className="flex items-center gap-1">
-            {value && !disabled && clearable && (
-              <button
-                onClick={handleClear}
-                className="p-0.5 hover:bg-slate-200 rounded transition-colors"
-                type="button"
-              >
-                <X className="w-4 h-4 text-slate-400" />
-              </button>
-            )}
-            <ChevronDown
-              className={`w-4 h-4 text-slate-400 transition-transform ${
-                isOpen ? 'rotate-180' : ''
-              }`}
+    const getOptionId = useCallback(
+      (index: number) => {
+        const option = filteredOptions[index];
+        return option ? `${listboxId}-opt-${option.id}` : '';
+      },
+      [filteredOptions, listboxId]
+    );
+
+    const { activeIndex, setActiveIndex, activeOptionId, onKeyDown } = useListboxKeyboard({
+      open: isOpen,
+      itemCount: filteredOptions.length,
+      onOpen: () => setIsOpen(true),
+      onClose: () => {
+        closeDropdown();
+        triggerRef.current?.focus();
+      },
+      onSelect: (index) => {
+        const option = filteredOptions[index];
+        if (option && !option.disabled) handleSelect(option.id);
+      },
+      getOptionId,
+    });
+
+    const { floatingStyle, placement } = useAnchoredPosition({
+      open: isOpen,
+      anchorRef: triggerRef,
+      matchWidth: true,
+      gap: 0,
+    });
+
+    useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        const target = event.target as Node;
+        const isInsideContainer = containerRef.current?.contains(target);
+        const isInsidePortal = portalDropdownRef.current?.contains(target);
+        if (!isInsideContainer && !isInsidePortal) {
+          closeDropdown();
+          // Defer past the click's default focus handling (which would
+          // otherwise blur the active element back to <body>).
+          setTimeout(() => triggerRef.current?.focus(), 0);
+        }
+      };
+
+      if (isOpen) {
+        document.addEventListener('mousedown', handleClickOutside);
+        setTimeout(() => searchInputRef.current?.focus(), 0);
+      }
+
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }, [isOpen, closeDropdown]);
+
+    useEffect(() => {
+      if (isOpen && activeIndex >= 0 && listRef.current) {
+        const el = listRef.current.children[activeIndex] as HTMLElement;
+        el?.scrollIntoView?.({ block: 'nearest' });
+      }
+    }, [activeIndex, isOpen]);
+
+    const handleClear = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onChange('');
+      setSearchTerm('');
+    };
+
+    const handleAddNew = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (onAddNew) {
+        onAddNew();
+        closeDropdown();
+      }
+    };
+
+    const renderListbox = () => (
+      <>
+        <div className="p-2 border-b border-slate-200">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              role="combobox"
+              aria-expanded
+              aria-controls={listboxId}
+              aria-activedescendant={activeOptionId}
+              className="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              placeholder={t('ui.select.searchPlaceholder')}
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setActiveIndex(-1);
+              }}
+              onKeyDown={(e) => {
+                // Let a literal space type into the filter; the shared
+                // listbox handler preventDefaults Space (select), which would
+                // otherwise swallow spaces in multi-word option names.
+                if (e.key === ' ') return;
+                onKeyDown(e);
+              }}
             />
           </div>
         </div>
-      </div>
 
-      {isOpen && !usePortal && (
         <div
-          className={`absolute z-50 w-full bg-white border border-slate-300 rounded-lg shadow-lg overflow-hidden ${
-            dropdownPosition === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
-          }`}
+          ref={listRef}
+          role="listbox"
+          id={listboxId}
+          className="max-h-60 overflow-y-auto"
+          style={{ scrollbarWidth: 'thin' }}
         >
-          <div className="p-2 border-b border-slate-200">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                className="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                placeholder="Search..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setHighlightedIndex(-1);
-                }}
-                onKeyDown={handleKeyDown}
-              />
+          {filteredOptions.length === 0 ? (
+            <div
+              role="status"
+              aria-live="polite"
+              className="px-3 py-6 text-center text-slate-500 text-sm"
+            >
+              {resolvedEmptyMessage}
             </div>
-          </div>
-
-          <div
-            ref={dropdownRef}
-            className="max-h-60 overflow-y-auto"
-            style={{ scrollbarWidth: 'thin' }}
-          >
-            {filteredOptions.length === 0 ? (
-              <div className="px-3 py-6 text-center text-slate-500 text-sm">
-                {emptyMessage}
-              </div>
-            ) : (
-              filteredOptions.map((option, index) => (
-                <div
-                  key={option.id}
-                  className={`px-3 py-2 cursor-pointer transition-colors ${
-                    option.disabled
-                      ? 'text-slate-400 cursor-not-allowed'
-                      : highlightedIndex === index
-                      ? 'bg-primary/5 text-primary'
-                      : option.id === value
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-slate-900 hover:bg-slate-50'
-                  }`}
-                  onClick={() => !option.disabled && handleSelect(option.id)}
-                  onMouseEnter={() => setHighlightedIndex(index)}
-                >
-                  {option.name}
-                </div>
-              ))
-            )}
-          </div>
-
-          {onAddNew && (
-            <div className="p-2 border-t border-slate-200">
-              <button
-                type="button"
-                onClick={handleAddNew}
-                className="w-full px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5 rounded-md transition-colors text-left"
+          ) : (
+            filteredOptions.map((option, index) => (
+              <div
+                key={option.id}
+                role="option"
+                id={`${listboxId}-opt-${option.id}`}
+                aria-selected={option.id === value}
+                aria-disabled={option.disabled || undefined}
+                className={`px-3 py-2 cursor-pointer transition-colors ${
+                  option.disabled
+                    ? 'text-slate-400 cursor-not-allowed'
+                    : activeIndex === index
+                    ? 'bg-primary/5 text-primary'
+                    : option.id === value
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-slate-900 hover:bg-slate-50'
+                }`}
+                onClick={() => !option.disabled && handleSelect(option.id)}
+                onMouseEnter={() => setActiveIndex(index)}
               >
-                + {addNewLabel}
-              </button>
-            </div>
-          )}
-
-          {filteredOptions.length > 0 && !onAddNew && (
-            <div className="px-3 py-1.5 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 text-center">
-              {filteredOptions.length} {filteredOptions.length === 1 ? 'option' : 'options'}
-            </div>
+                {option.name}
+              </div>
+            ))
           )}
         </div>
-      )}
 
-      {isOpen && usePortal && createPortal(
+        {onAddNew && (
+          <div className="p-2 border-t border-slate-200">
+            <button
+              type="button"
+              onClick={handleAddNew}
+              className="w-full px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5 rounded-md transition-colors text-left"
+            >
+              + {resolvedAddNewLabel}
+            </button>
+          </div>
+        )}
+
+        {filteredOptions.length > 0 && !onAddNew && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="px-3 py-1.5 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 text-center"
+          >
+            {t('ui.select.optionCount', { count: filteredOptions.length })}
+          </div>
+        )}
+      </>
+    );
+
+    return (
+      <div className={`relative ${className ?? ''}`} ref={containerRef}>
+        {label && (
+          <label {...labelProps} className="block text-sm font-medium text-slate-700 mb-1">
+            {label}
+            {required && (
+              <span aria-hidden="true" className="text-danger ml-1">
+                *
+              </span>
+            )}
+          </label>
+        )}
+
         <div
-          ref={portalDropdownRef}
-          className="bg-white border border-slate-300 rounded-lg shadow-lg overflow-hidden"
-          style={dropdownStyles}
+          ref={(node) => {
+            triggerRef.current = node;
+            if (typeof ref === 'function') ref(node);
+            else if (ref) ref.current = node;
+          }}
+          role="combobox"
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          aria-controls={listboxId}
+          aria-activedescendant={activeOptionId}
+          {...controlProps}
+          {...(label ? {} : { 'aria-label': resolvedPlaceholder })}
+          data-name={name}
+          className={`relative w-full px-3 py-2 border rounded-lg cursor-pointer transition-all ${
+            disabled
+              ? 'bg-slate-100 border-slate-300 cursor-not-allowed'
+              : error
+              ? 'border-danger'
+              : isOpen
+              ? 'border-primary ring-2 ring-primary/20'
+              : 'border-slate-300 hover:border-slate-400'
+          }`}
+          onClick={() => !disabled && setIsOpen(!isOpen)}
+          onKeyDown={onKeyDown}
+          tabIndex={disabled ? -1 : 0}
         >
-          <div className="p-2 border-b border-slate-200">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                className="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                placeholder="Search..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setHighlightedIndex(-1);
-                }}
-                onKeyDown={handleKeyDown}
+          <div className="flex items-center justify-between">
+            <span className={selectedOption ? 'text-slate-900' : 'text-slate-400'}>
+              {selectedOption ? selectedOption.name : resolvedPlaceholder}
+            </span>
+            <div className="flex items-center gap-1">
+              {value && !disabled && clearable && (
+                <button
+                  onClick={handleClear}
+                  aria-label={t('ui.select.clear')}
+                  className="p-0.5 hover:bg-slate-200 rounded transition-colors"
+                  type="button"
+                >
+                  <X className="w-4 h-4 text-slate-400" />
+                </button>
+              )}
+              <ChevronDown
+                className={`w-4 h-4 text-slate-400 transition-transform ${
+                  isOpen ? 'rotate-180' : ''
+                }`}
               />
             </div>
           </div>
+        </div>
 
+        {error ? (
+          <p {...errorProps} className="mt-1 text-sm text-danger">
+            {error}
+          </p>
+        ) : hint ? (
+          <p {...hintProps} className="mt-1 text-sm text-slate-500">
+            {hint}
+          </p>
+        ) : null}
+
+        {isOpen && !usePortal && (
           <div
-            ref={dropdownRef}
-            className="max-h-60 overflow-y-auto"
-            style={{ scrollbarWidth: 'thin' }}
+            className={`absolute z-50 w-full bg-surface border border-slate-300 rounded-lg shadow-lg overflow-hidden ${
+              placement === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
+            }`}
           >
-            {filteredOptions.length === 0 ? (
-              <div className="px-3 py-6 text-center text-slate-500 text-sm">
-                {emptyMessage}
-              </div>
-            ) : (
-              filteredOptions.map((option, index) => (
-                <div
-                  key={option.id}
-                  className={`px-3 py-2 cursor-pointer transition-colors ${
-                    option.disabled
-                      ? 'text-slate-400 cursor-not-allowed'
-                      : highlightedIndex === index
-                      ? 'bg-primary/5 text-primary'
-                      : option.id === value
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-slate-900 hover:bg-slate-50'
-                  }`}
-                  onClick={() => !option.disabled && handleSelect(option.id)}
-                  onMouseEnter={() => setHighlightedIndex(index)}
-                >
-                  {option.name}
-                </div>
-              ))
-            )}
+            {renderListbox()}
           </div>
+        )}
 
-          {onAddNew && (
-            <div className="p-2 border-t border-slate-200">
-              <button
-                type="button"
-                onClick={handleAddNew}
-                className="w-full px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5 rounded-md transition-colors text-left"
-              >
-                + {addNewLabel}
-              </button>
-            </div>
+        {isOpen &&
+          usePortal &&
+          createPortal(
+            <div
+              ref={portalDropdownRef}
+              className="bg-surface border border-slate-300 rounded-lg shadow-lg overflow-hidden"
+              style={floatingStyle}
+            >
+              {renderListbox()}
+            </div>,
+            document.body
           )}
+      </div>
+    );
+  }
+);
 
-          {filteredOptions.length > 0 && !onAddNew && (
-            <div className="px-3 py-1.5 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 text-center">
-              {filteredOptions.length} {filteredOptions.length === 1 ? 'option' : 'options'}
-            </div>
-          )}
-        </div>,
-        document.body
-      )}
-    </div>
-  );
-};
+SearchableSelect.displayName = 'SearchableSelect';
