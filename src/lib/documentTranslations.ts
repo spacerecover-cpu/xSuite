@@ -1,3 +1,5 @@
+import { isRTLLanguage as isRTLLanguageShared } from './locale';
+
 export type LanguageCode = 'ar' | 'pl' | 'ru' | 'fr' | 'de' | 'it' | 'es' | 'tr' | 'ko' | 'pt' | 'uk' | 'cs' | 'th';
 
 export type DocumentLanguageMode = 'english_only' | 'bilingual';
@@ -1419,8 +1421,7 @@ export function getTranslation(
 
 export function isRTLLanguage(languageCode: LanguageCode | null): boolean {
   if (!languageCode) return false;
-  const language = SUPPORTED_LANGUAGES.find(lang => lang.code === languageCode);
-  return language?.isRTL || false;
+  return isRTLLanguageShared(languageCode);
 }
 
 export function formatBilingualText(
