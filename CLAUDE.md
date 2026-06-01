@@ -423,6 +423,13 @@ Sequences are tracked in `number_sequences` and audited in `number_sequences_aud
 
 ## Theming
 
+> **Read `DESIGN.md` (repo root) before any visual or UI change.** It is the single
+> source of truth for fonts, the 14 semantic tokens, the three themes, spacing,
+> motion, non-themed surfaces (charts/PDFs), and the live drift register. This
+> Theming section is the architecture; `DESIGN.md` is the enforceable contract.
+> In QA/design review, flag any code that deviates from `DESIGN.md`. Do not extend
+> the token vocabulary without updating `DESIGN.md` first.
+
 xSuite supports three tenant-selectable themes — Royal (default), Burgundy, Scarlet — selected per-tenant from Settings → Appearance (admin-gated). Active theme propagates through CSS variables; nothing rebuilds.
 
 ### Architecture
