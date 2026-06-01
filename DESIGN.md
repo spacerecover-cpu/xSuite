@@ -57,7 +57,7 @@ Every brand/status token is an **RGB triplet** CSS variable (e.g. `--color-prima
 | `surface` | `#FFFFFF` | 255 255 255 |
 | `surface-muted` | `#F8FAFC` | 248 250 252 |
 | `border` | `#E2E8F0` | 226 232 240 |
-| `ring` (focus) | `#6366F1` | 99 102 241 |
+| `ring` (focus) | follows `primary` | `var(--color-primary)` |
 
 ### Status (constant across themes — meaning is fixed, never theme it)
 | Role | Base | Foreground | Muted (bg) |
@@ -76,7 +76,7 @@ Every brand/status token is an **RGB triplet** CSS variable (e.g. `--color-prima
 These read from constants, never from CSS variables. This is by design so output stays comparable across tenants/themes.
 
 - **Charts:** `src/lib/chartTheme.ts` — `chartCategorical` (8 hues), `chartAxis` `#64748b`, `chartGrid`/`chartTooltipBorder` `#e2e8f0`. Data-vis neutral; never theme charts.
-- **PDFs:** `src/lib/pdf/styles.ts` — `PDF_COLORS` (primary `#0891B2`, text `#1E293B`, …), font `Roboto`. Device-role badge colors (patient/backup/donor/spare) are fixed.
+- **PDFs:** `src/lib/pdf/styles.ts` — `PDF_COLORS` (primary `#162660` = fixed Royal-brand navy, text `#1E293B`, …), font `Roboto`. One fixed color for all tenants by design (a themed invoice would look alarming). Device-role badge colors (patient/backup/donor/spare) are fixed.
 - **Device icons:** `src/lib/deviceIconMapper.ts` — fixed SVG hexes. Intentional.
 
 ## Spacing
@@ -96,16 +96,19 @@ These read from constants, never from CSS variables. This is by design so output
 - **Easing/duration default:** prefer Tailwind `transition` + `duration-150`/`duration-200`, `ease-out` for enter. Avoid long (>400ms) animations in the app shell.
 
 ## Known Deviations (drift register — fix toward the standard, do not propagate)
-Captured 2026-06-01 from a code audit. These contradict the rules above and should be corrected; until then they are documented so reviews don't treat them as precedent.
+Captured 2026-06-01 from a code audit. **All three drifts resolved 2026-06-02** (see Decisions Log). The table is kept as a record; nothing is currently open.
 
-| # | Where | Issue | Target fix |
+| # | Where | Issue | Resolution |
 |---|---|---|---|
-| 1 | `tailwind.config.js:42-43` | `glow-blue` / `glow-blue-lg` hardcode `rgba(59,130,246,…)` (blue-500) — a banned literal in config | Derive from a semantic token or remove if unused |
-| 2 | `src/index.css:37` | `--color-ring: 99 102 241` = `#6366F1` (indigo-500), the exact banned indigo; all focus rings render off-brand | Re-point `ring` to `primary` (or a sanctioned neutral) per theme |
-| 3 | `src/lib/pdf/styles.ts:4` | PDF `primary` `#0891B2` (cyan) matches none of the three brand primaries; printed docs look unrelated to the brand | Decide a fixed neutral brand color for PDFs and document it as intentional, or align to a brand value |
+| 1 | `tailwind.config.js` | `glow-blue` / `glow-blue-lg` hardcoded `rgba(59,130,246,…)` (blue-500) | ✅ Renamed → `glow-primary` / `glow-primary-lg`, derived from `rgb(var(--color-primary) / …)`; sole usage (`StepContainer.tsx`) updated. Now themes. |
+| 2 | `src/index.css` | `--color-ring` was `#6366F1` (indigo-500), off-brand focus rings | ✅ Re-pointed to `var(--color-primary)`; focus rings now follow the active theme. |
+| 3 | `src/lib/pdf/styles.ts` | PDF `primary` `#0891B2` (cyan) matched no brand primary | ✅ Set to fixed Royal-brand navy `#162660`. PDFs remain non-themed by design; documented under Non-Themed Surfaces. |
 
 ## Decisions Log
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2026-06-01 | Initial DESIGN.md created by codifying the live system (not proposing a new one) | xSuite has a locked theme/token system; goal is consistency, so the doc documents and enforces what exists. Source: `src/index.css`, `tailwind.config.js`, `src/lib/chartTheme.ts`, `src/lib/pdf/styles.ts`, `index.html`. |
 | 2026-06-01 | Logged 3 known deviations rather than silently "documenting them away" | A consistency contract must reflect reality; drift is tracked for fixing, not normalized. |
+| 2026-06-02 | Resolved drift #1: `glow-blue*` → `glow-primary*`, derived from `--color-primary` | The only consumer (`StepContainer` onboarding icon) is otherwise all-`primary`; a fixed blue-500 glow clashed and ignored the theme. Token-derived glow now themes across Royal/Burgundy/Scarlet. |
+| 2026-06-02 | Resolved drift #2: focus `ring` follows `primary` | Removed the banned indigo `#6366F1`; focus rings now read as on-brand per theme. (Shipped earlier in the a11y focus-ring work; doc reconciled here.) |
+| 2026-06-02 | Resolved drift #3: PDF `primary` set to fixed Royal navy `#162660` (was cyan `#0891B2`) | PDFs are intentionally non-themed (one color for all tenants — a themed invoice would look alarming). Cyan matched no brand and read as an unconfigured template; navy aligns to the default Royal identity and to the existing `primaryDark` navy. |
