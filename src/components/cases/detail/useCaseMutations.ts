@@ -5,6 +5,7 @@ import { createPayment } from '@/lib/paymentsService';
 import { deleteCaseService, duplicateCase, type DuplicateDeviceSource } from '@/lib/caseService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/useToast';
+import { describeGateError } from '@/lib/caseReleaseGate';
 import { logger } from '../../../lib/logger';
 import type { Database } from '@/types/database.types';
 import type { CreateCloneDriveFormValues } from '../CreateCloneDriveModal';
@@ -131,7 +132,7 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
     },
     onError: (error) => {
       logger.error('Status update failed:', error);
-      toast.error('Failed to update status. Please try again.');
+      toast.error(describeGateError(error) ?? 'Failed to update status. Please try again.');
     },
   });
 
@@ -312,6 +313,10 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
       queryClient.invalidateQueries({ queryKey: ['resource_clone_drives'] });
       modals.setShowMarkAsDeliveredModal(false);
       modals.setSelectedClone(null);
+    },
+    onError: (error) => {
+      logger.error('Mark as delivered failed:', error);
+      toast.error(describeGateError(error) ?? `Failed to mark as delivered: ${(error as Error).message}`);
     },
   });
 

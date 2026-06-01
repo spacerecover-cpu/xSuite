@@ -5,5 +5,6 @@ export { CaseReportsTab } from './CaseReportsTab';
 export { CaseFinancesTab } from './CaseFinancesTab';
 export { CaseFilesTab } from './CaseFilesTab';
 export { CaseEngineersTab } from './CaseEngineersTab';
+export { CaseRecoveryQaTab } from './CaseRecoveryQaTab';
 export { CaseNotesTab } from './CaseNotesTab';
 export { CasePortalTab } from './CasePortalTab';

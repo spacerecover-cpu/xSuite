@@ -44,6 +44,7 @@ import {
   CaseFinancesTab,
   CaseFilesTab,
   CaseEngineersTab,
+  CaseRecoveryQaTab,
   CaseNotesTab,
   CasePortalTab,
 } from '../../components/cases/detail';
@@ -52,7 +53,7 @@ import { useCaseQueries } from '../../components/cases/detail/useCaseQueries';
 import { useCaseMutations } from '../../components/cases/detail/useCaseMutations';
 import { logger } from '../../lib/logger';
 
-type TabType = 'overview' | 'client' | 'devices' | 'clones' | 'reports' | 'quotes' | 'files' | 'engineers' | 'notes' | 'portal' | 'history' | 'stock';
+type TabType = 'overview' | 'client' | 'devices' | 'clones' | 'reports' | 'quotes' | 'files' | 'engineers' | 'recovery_qa' | 'notes' | 'portal' | 'history' | 'stock';
 
 export const CaseDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -244,6 +245,7 @@ export const CaseDetail: React.FC = () => {
     { id: 'stock', label: 'Backup Devices', icon: Package },
     { id: 'files', label: 'Files', icon: FileStack },
     { id: 'engineers', label: 'Engineers', icon: Users },
+    { id: 'recovery_qa', label: 'Recovery & QA', icon: Activity },
     { id: 'notes', label: 'Internal Notes', icon: FileText },
     { id: 'portal', label: 'Client Portal', icon: Eye },
     { id: 'history', label: 'History', icon: History },
@@ -691,6 +693,11 @@ export const CaseDetail: React.FC = () => {
                 created_at: e.created_at,
               }))}
             />
+          )}
+
+          {/* Recovery & QA Tab */}
+          {activeTab === 'recovery_qa' && (
+            <CaseRecoveryQaTab caseId={id!} />
           )}
 
           {/* Notes Tab */}
