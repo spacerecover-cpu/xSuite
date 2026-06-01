@@ -149,7 +149,7 @@ export const TransactionsList: React.FC = () => {
 
   const handleVoid = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('Are you sure you want to void this transaction? This will reverse any bank account balance changes.')) {
+    if (window.confirm('Void this transaction? This posts a reversing entry that unwinds any bank balance change — the original is preserved in the ledger for audit.')) {
       await voidMutation.mutateAsync(id);
     }
   };

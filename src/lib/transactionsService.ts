@@ -1,6 +1,5 @@
 import { supabase } from './supabaseClient';
 import { sanitizeFilterValue } from './postgrestSanitizer';
-import { logger } from './logger';
 import { baseAmount } from './financialMath';
 
 export interface Transaction {
@@ -105,62 +104,29 @@ export const fetchTransactionById = async (id: string) => {
   return data as TransactionWithDetails;
 };
 
+// The financial_transactions ledger is append-only (REVOKE UPDATE/DELETE +
+// prevent_audit_mutation trigger). All manual writes go through SECURITY
+// DEFINER RPCs that set created_by server-side and maintain the bank-account
+// balance atomically in the same transaction.
 export const createTransaction = async (
   transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at'>
 ) => {
-  if (transaction.bank_account_id && transaction.transaction_type === 'expense') {
-    const { data: account } = await supabase
-      .from('bank_accounts')
-      .select('current_balance')
-      .eq('id', transaction.bank_account_id)
-      .maybeSingle();
-
-    if (account && (account.current_balance || 0) < transaction.amount) {
-      throw new Error(`Insufficient balance. Available: ${account.current_balance}, Required: ${transaction.amount}`);
-    }
-  }
-
-  const { data, error } = await supabase
-    .from('financial_transactions')
-    .insert([transaction as never])
-    .select()
-    .maybeSingle();
-
-  if (error) throw error;
-
-  if (transaction.bank_account_id) {
-    await updateBankAccountBalance(
-      transaction.bank_account_id,
-      transaction.amount,
-      transaction.transaction_type === 'income' ? 'credit' : 'debit'
-    );
-  }
-
-  return data;
-};
-
-export const updateTransaction = async (
-  id: string,
-  transaction: Partial<Transaction>
-) => {
-  const { data, error } = await supabase
-    .from('financial_transactions')
-    .update(transaction)
-    .eq('id', id)
-    .select()
-    .maybeSingle();
+  const { data, error } = await supabase.rpc('post_manual_transaction', {
+    p_txn: {
+      transaction_type: transaction.transaction_type,
+      amount: transaction.amount,
+      currency: transaction.currency ?? null,
+      transaction_date: transaction.transaction_date ?? null,
+      description: transaction.description ?? null,
+      category_id: transaction.category_id ?? null,
+      bank_account_id: transaction.bank_account_id ?? null,
+      reference_type: transaction.reference_type ?? null,
+      reference_id: transaction.reference_id ?? null,
+    },
+  });
 
   if (error) throw error;
   return data;
-};
-
-export const deleteTransaction = async (id: string) => {
-  const { error } = await supabase
-    .from('financial_transactions')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('id', id);
-
-  if (error) throw error;
 };
 
 export const reconcileTransaction = async (id: string) => {
@@ -172,93 +138,17 @@ export const bulkReconcileTransactions = async (ids: string[]) => {
   return results;
 };
 
-export const voidTransaction = async (id: string) => {
-  const { data: transaction, error: fetchError } = await supabase
-    .from('financial_transactions')
-    .select('bank_account_id, amount, transaction_type')
-    .eq('id', id)
-    .maybeSingle();
-
-  if (fetchError) throw fetchError;
-
-  if (transaction?.bank_account_id) {
-    await updateBankAccountBalance(
-      transaction.bank_account_id,
-      transaction.amount,
-      transaction.transaction_type === 'income' ? 'debit' : 'credit'
-    );
-  }
-
-  const { error } = await supabase
-    .from('financial_transactions')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('id', id);
+// Void = post a reversing (contra) entry. The original ledger row is
+// preserved (append-only); the RPC negates the amount, links the reversal to
+// the original, and unwinds the bank-account balance in the same transaction.
+export const voidTransaction = async (id: string, reason?: string) => {
+  const { data, error } = await supabase.rpc('reverse_financial_transaction', {
+    p_transaction_id: id,
+    p_reason: reason ?? undefined,
+  });
 
   if (error) throw error;
-  return transaction;
-};
-
-export const createTransactionFromPayment = async (
-  paymentId: string,
-  paymentData: {
-    amount: number;
-    payment_date: string;
-    payment_number: string;
-    bank_account_id?: string;
-    customer_name?: string;
-  }
-) => {
-  return createTransaction({
-    transaction_date: paymentData.payment_date,
-    amount: paymentData.amount,
-    transaction_type: 'income',
-    description: `Payment received: ${paymentData.payment_number}${paymentData.customer_name ? ` from ${paymentData.customer_name}` : ''}`,
-    reference_type: 'payment',
-    reference_id: paymentId,
-    bank_account_id: paymentData.bank_account_id || null,
-  });
-};
-
-export const createTransactionFromExpense = async (
-  expenseId: string,
-  expenseData: {
-    amount: number;
-    expense_date: string;
-    expense_number: string;
-    description: string;
-    bank_account_id?: string;
-    category_id?: string;
-  }
-) => {
-  return createTransaction({
-    transaction_date: expenseData.expense_date,
-    amount: expenseData.amount,
-    transaction_type: 'expense',
-    description: `Expense: ${expenseData.description}`,
-    reference_type: 'expense',
-    reference_id: expenseId,
-    bank_account_id: expenseData.bank_account_id || null,
-    category_id: expenseData.category_id || null,
-  });
-};
-
-export const createTransactionFromInvoice = async (
-  invoiceId: string,
-  invoiceData: {
-    total_amount: number;
-    invoice_date: string;
-    invoice_number: string;
-    customer_name?: string;
-  }
-) => {
-  return createTransaction({
-    transaction_date: invoiceData.invoice_date,
-    amount: invoiceData.total_amount,
-    transaction_type: 'income',
-    description: `Invoice: ${invoiceData.invoice_number}${invoiceData.customer_name ? ` to ${invoiceData.customer_name}` : ''}`,
-    reference_type: 'invoice',
-    reference_id: invoiceId,
-  });
+  return data;
 };
 
 export const getTransactionCategories = async () => {
@@ -385,54 +275,13 @@ export const getCashFlowSummary = async (filters?: {
     .sort((a, b) => a.month.localeCompare(b.month));
 };
 
-const updateBankAccountBalance = async (
-  accountId: string,
-  amount: number,
-  direction: 'credit' | 'debit'
-) => {
-  const { data: account, error: fetchError } = await supabase
-    .from('bank_accounts')
-    .select('current_balance')
-    .eq('id', accountId)
-    .maybeSingle();
-
-  if (fetchError) {
-    logger.error('Error fetching bank account:', fetchError);
-    return;
-  }
-
-  if (!account) {
-    logger.error('Bank account not found:', accountId);
-    return;
-  }
-
-  const currentBalance = account.current_balance || 0;
-  const newBalance = direction === 'credit'
-    ? currentBalance + amount
-    : currentBalance - amount;
-
-  const { error } = await supabase
-    .from('bank_accounts')
-    .update({ current_balance: newBalance })
-    .eq('id', accountId);
-
-  if (error) {
-    logger.error('Error updating bank account balance:', error);
-  }
-};
-
 export const transactionsService = {
   fetchTransactions,
   fetchTransactionById,
   createTransaction,
-  updateTransaction,
-  deleteTransaction,
   reconcileTransaction,
   bulkReconcileTransactions,
   voidTransaction,
-  createTransactionFromPayment,
-  createTransactionFromExpense,
-  createTransactionFromInvoice,
   getTransactionCategories,
   getTransactionStats,
   getTransactionsByDateRange,
