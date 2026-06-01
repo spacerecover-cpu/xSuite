@@ -1,7 +1,10 @@
 import type { StyleDictionary } from 'pdfmake/interfaces';
 
 export const PDF_COLORS = {
-  primary: '#0891B2',
+  // Fixed Royal-brand navy. PDFs are intentionally non-themed (one color for
+  // all tenants); aligned to the default Royal primary so documents read as
+  // branded. See DESIGN.md → Non-Themed Surfaces / Decisions Log.
+  primary: '#162660',
   primaryDark: '#1E3A5F',
   secondary: '#10b981',
   accent: '#f59e0b',

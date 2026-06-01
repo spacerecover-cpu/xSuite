@@ -39,8 +39,8 @@ export default {
       },
       boxShadow: {
         'inner-sm': 'inset 0 1px 2px 0 rgb(0 0 0 / 0.05)',
-        'glow-blue': '0 0 20px rgba(59, 130, 246, 0.3)',
-        'glow-blue-lg': '0 0 40px rgba(59, 130, 246, 0.2)',
+        'glow-primary': '0 0 20px rgb(var(--color-primary) / 0.3)',
+        'glow-primary-lg': '0 0 40px rgb(var(--color-primary) / 0.2)',
       },
       animation: {
         'slide-in': 'slideIn 0.2s ease-out',

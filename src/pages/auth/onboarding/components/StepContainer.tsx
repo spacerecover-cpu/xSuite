@@ -48,7 +48,7 @@ export const StepContainer = ({ step, stepIndex, direction, children }: StepCont
           >
             <div className="relative">
               <div className="absolute inset-0 rounded-full bg-primary/10 blur-2xl scale-150" />
-              <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20 flex items-center justify-center shadow-glow-blue">
+              <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20 flex items-center justify-center shadow-glow-primary">
                 <Icon className="w-12 h-12 text-primary" />
               </div>
             </div>
