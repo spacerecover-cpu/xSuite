@@ -144,7 +144,7 @@ export const bulkReconcileTransactions = async (ids: string[]) => {
 export const voidTransaction = async (id: string, reason?: string) => {
   const { data, error } = await supabase.rpc('reverse_financial_transaction', {
     p_transaction_id: id,
-    p_reason: reason ?? null,
+    p_reason: reason ?? undefined,
   });
 
   if (error) throw error;
