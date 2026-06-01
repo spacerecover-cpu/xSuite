@@ -687,7 +687,7 @@ export const ExpensesList: React.FC = () => {
               style={{ backgroundColor: '#10b981' }}
               size="sm"
             >
-              {approveExpenseMutation.isPending ? 'Approving...' : 'OK'}
+              {approveExpenseMutation.isPending ? 'Approving...' : 'Approve'}
             </Button>
           </div>
         </div>

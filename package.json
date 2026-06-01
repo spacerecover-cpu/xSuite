@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:tsc": "bash scripts/check-tsc.sh",
+    "check:tokens": "bash scripts/check-tokens.sh",
     "check:schema-drift": "bash scripts/check-schema-drift.sh",
     "db:types": "supabase gen types typescript --project-id ssmbegiyjivrcwgcqutu > src/types/database.types.ts"
   },

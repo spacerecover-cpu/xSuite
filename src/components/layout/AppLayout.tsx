@@ -98,6 +98,12 @@ export const AppLayout: React.FC = () => {
   return (
     <SidebarPreferencesProvider>
     <div className="min-h-screen flex flex-col" style={{ background: '#f1f5f9' }}>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-surface focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-primary focus:shadow-lg focus:ring-2 focus:ring-ring focus:outline-none"
+      >
+        Skip to main content
+      </a>
       <AnnouncementBanner />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
@@ -143,7 +149,7 @@ export const AppLayout: React.FC = () => {
           </div>
         </header>
 
-        <main className="flex-1 p-6 overflow-auto">
+        <main id="main-content" tabIndex={-1} className="flex-1 p-6 overflow-auto focus:outline-none">
           <Outlet />
         </main>
         </div>

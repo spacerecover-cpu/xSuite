@@ -34,7 +34,7 @@
   --color-surface: 255 255 255;
   --color-surface-muted: 248 250 252;
   --color-border: 226 232 240;
-  --color-ring: 99 102 241;
+  --color-ring: var(--color-primary);
 
   --color-success: 5 150 105;
   --color-success-foreground: 255 255 255;
@@ -120,5 +120,14 @@
 
   .animate-slideInLeft {
     animation: slideInLeft 0.3s ease-out;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

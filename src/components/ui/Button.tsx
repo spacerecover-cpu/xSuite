@@ -3,7 +3,7 @@ import { cva } from 'class-variance-authority';
 import { cn } from '../../lib/utils';
 import { Spinner } from './Spinner';
 
-type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline' | 'default' | 'destructive';
+type ButtonVariant = 'primary' | 'secondary' | 'success' | 'danger' | 'ghost' | 'outline' | 'default' | 'destructive';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
@@ -14,9 +14,10 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   ref?: React.Ref<HTMLButtonElement>;
 }
 
-const VARIANT_ALIAS: Record<ButtonVariant, 'primary' | 'secondary' | 'danger' | 'ghost'> = {
+const VARIANT_ALIAS: Record<ButtonVariant, 'primary' | 'secondary' | 'success' | 'danger' | 'ghost'> = {
   primary: 'primary',
   secondary: 'secondary',
+  success: 'success',
   danger: 'danger',
   ghost: 'ghost',
   outline: 'ghost',
@@ -31,6 +32,7 @@ export const buttonVariants = cva(
       variant: {
         primary: 'bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-primary',
         secondary: 'bg-slate-200 text-slate-900 hover:bg-slate-300 focus-visible:ring-slate-500',
+        success: 'bg-success text-success-foreground hover:bg-success/90 focus-visible:ring-success',
         danger: 'bg-danger text-danger-foreground hover:bg-danger/90 focus-visible:ring-danger',
         ghost: 'text-slate-700 hover:bg-slate-100 focus-visible:ring-slate-500',
       },

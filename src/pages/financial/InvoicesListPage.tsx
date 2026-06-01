@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchInvoices, getInvoiceStats, createInvoice, updateInvoice } from '../../lib/invoiceService';
 import type { Invoice, InvoiceItem, InvoiceWithDetails } from '../../lib/invoiceService';
 import type { PaymentReceipt } from '../../lib/bankingService';
+import { receiptsService } from '../../lib/receiptsService';
 
 // Legacy proforma -> tax-invoice linkage. Columns dropped from `invoices` in
 // v1.0.0; surfaced here only so the existing UI buttons compile until the
@@ -19,7 +20,8 @@ import { FinancialStatsCard } from '../../components/financial/FinancialStatsCar
 import { InvoiceFormModal } from '../../components/cases/InvoiceFormModal';
 import { RecordReceiptModal } from '../../components/banking/RecordReceiptModal';
 import { useCurrency } from '../../hooks/useCurrency';
-import { supabase, resolveTenantId } from '../../lib/supabaseClient';
+import { useConfirm } from '../../hooks/useConfirm';
+import { supabase } from '../../lib/supabaseClient';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { ExportButton } from '../../components/shared/ExportButton';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
@@ -54,6 +56,7 @@ export const InvoicesListPage: React.FC<unknown> = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
+  const confirm = useConfirm();
   const { profile } = useAuth();
   const selection = useBulkSelection();
   const canBulkArchive = profile?.role === 'owner' || profile?.role === 'admin';
@@ -191,7 +194,11 @@ export const InvoicesListPage: React.FC<unknown> = () => {
       return;
     }
     const n = selection.selectedCount;
-    if (!window.confirm(`Archive ${n} invoice${n === 1 ? '' : 's'}? They'll be hidden from lists but recoverable.`)) {
+    if (!(await confirm({
+      title: `Archive ${n} invoice${n === 1 ? '' : 's'}?`,
+      message: `Archive ${n} invoice${n === 1 ? '' : 's'}? They'll be hidden from lists but recoverable.`,
+      tone: 'danger',
+    }))) {
       return;
     }
     setIsArchiving(true);
@@ -222,7 +229,11 @@ export const InvoicesListPage: React.FC<unknown> = () => {
       n > 5
         ? `Email ${n} invoices to their customers? Sending is rate-limited to 5/minute — this will take roughly ${Math.ceil(n / 5)} minute(s).`
         : `Email ${n} invoice${n === 1 ? '' : 's'} to their customers?`;
-    if (!window.confirm(msg)) return;
+    if (!(await confirm({
+      title: n === 1 ? 'Email invoice?' : `Email ${n} invoices?`,
+      message: msg,
+      tone: 'default',
+    }))) return;
     setSendProgress({ done: 0, total: n });
     try {
       // Lazy-import: bulk-send drags pdfmake; only fetch on actual click.
@@ -754,94 +765,25 @@ export const InvoicesListPage: React.FC<unknown> = () => {
             setPaymentInvoice(null);
           }}
           onSave={async (receiptData: Record<string, unknown>, allocations?: Array<{ invoice_id: string; allocated_amount: number }>) => {
-            const receiptRow = receiptData as Partial<PaymentReceipt>;
-            if (typeof receiptRow.amount !== 'number') {
+            const r = receiptData as Partial<PaymentReceipt>;
+            if (typeof r.amount !== 'number') {
               throw new Error('Receipt amount is required');
             }
-            // Real tenant uuid: the trigger only stamps NULL; '' fails the uuid cast.
-            const tenantId = await resolveTenantId();
-            // `receipts` is the live tenant table. Caller-facing fields that do
-            // not exist on the live schema (account_id, payment_method_id,
-            // case_id, company_id, reference_number, description, source_type)
-            // exist only on the modal's draft. tenant_id is auto-populated by
-            // the set_tenant_and_audit_fields trigger.
-            const { data: receipt, error: receiptError } = await supabase
-              .from('receipts')
-              .insert({
-                tenant_id: tenantId,
-                amount: receiptRow.amount,
-                receipt_date: receiptRow.receipt_date ?? null,
-                customer_id: receiptRow.customer_id ?? null,
-                payment_method: receiptRow.payment_method_id ?? null,
-                reference: receiptRow.reference_number ?? null,
-                notes: receiptRow.notes ?? null,
-                status: receiptRow.status ?? 'completed',
-              })
-              .select()
-              .maybeSingle();
-
-            if (receiptError) throw receiptError;
-            if (!receipt) throw new Error('Receipt insert returned no row');
-
-            if (allocations && allocations.length > 0) {
-              const allocationRecords = allocations.map((alloc) => ({
-                tenant_id: tenantId,
-                receipt_id: receipt.id,
-                invoice_id: alloc.invoice_id,
-                amount: alloc.allocated_amount,
-              }));
-
-              const { error: allocError } = await supabase
-                .from('receipt_allocations')
-                .insert(allocationRecords);
-
-              if (allocError) throw allocError;
-
-              for (const alloc of allocations) {
-                const { data: invoice } = await supabase
-                  .from('invoices')
-                  .select('total_amount, amount_paid, status')
-                  .eq('id', alloc.invoice_id)
-                  .maybeSingle();
-
-                if (invoice) {
-                  const totalAmount = invoice.total_amount ?? 0;
-                  const newAmountPaid = (invoice.amount_paid ?? 0) + alloc.allocated_amount;
-                  const newAmountDue = totalAmount - newAmountPaid;
-                  const newStatus =
-                    newAmountDue <= 0 ? 'paid' : newAmountPaid > 0 ? 'partial' : invoice.status;
-
-                  await supabase
-                    .from('invoices')
-                    .update({
-                      amount_paid: newAmountPaid,
-                      balance_due: newAmountDue,
-                      status: newStatus,
-                    })
-                    .eq('id', alloc.invoice_id);
-                }
-              }
-            }
-
-            // `account_id` lives on the modal draft only (no FK column on
-            // `receipts`); still useful for updating the bank balance.
-            const accountId = receiptRow.account_id;
-            if (accountId) {
-              const { data: account } = await supabase
-                .from('bank_accounts')
-                .select('current_balance')
-                .eq('id', accountId)
-                .maybeSingle();
-
-              if (account) {
-                await supabase
-                  .from('bank_accounts')
-                  .update({
-                    current_balance: (account.current_balance ?? 0) + receiptRow.amount,
-                  })
-                  .eq('id', accountId);
-              }
-            }
+            // Atomic, money-conserving, append-only-ledger-posting receipt recording.
+            // The RPC owns invoice balance recompute and bank-balance maintenance.
+            await receiptsService.createReceiptWithAllocations(
+              {
+                amount: r.amount,
+                receipt_date: r.receipt_date ?? null,
+                customer_id: r.customer_id ?? null,
+                payment_method: r.payment_method_id ?? null,
+                reference: r.reference_number ?? null,
+                notes: r.notes ?? null,
+                status: r.status ?? 'completed',
+                bank_account_id: r.account_id ?? null,
+              },
+              (allocations ?? []).map((a) => ({ invoice_id: a.invoice_id, amount: a.allocated_amount })),
+            );
 
             queryClient.invalidateQueries({ queryKey: ['invoices'] });
             queryClient.invalidateQueries({ queryKey: ['invoice'] });

@@ -40,7 +40,7 @@ export const CaseSuccessModal: React.FC<CaseSuccessModalProps> = ({
         </button>
 
         <div className="p-8 text-center">
-          <div className="w-20 h-20 bg-success-muted rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
+          <div className="w-20 h-20 bg-success-muted rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-12 h-12 text-success" />
           </div>
 

@@ -7,6 +7,17 @@ import { Search, Eye, Edit, Trash2, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { logger } from '../../lib/logger';
 
+type BadgeTone = 'success' | 'info' | 'danger' | 'secondary';
+
+// Static tone map so Tailwind JIT can see every chip class literally. Dynamic
+// `bg-${color}-100` strings were stripped at build time, leaving invisible chips.
+const ACTION_TONE: Record<string, { chip: string; badge: BadgeTone }> = {
+  create: { chip: 'bg-success-muted', badge: 'success' },
+  update: { chip: 'bg-info-muted', badge: 'info' },
+  delete: { chip: 'bg-danger-muted', badge: 'danger' },
+  view: { chip: 'bg-surface-muted', badge: 'secondary' },
+};
+
 interface AuditTrail {
   id: string;
   performed_by: string | null;
@@ -92,21 +103,6 @@ export const AuditTrails: React.FC = () => {
     }
   };
 
-  const getActionColor = (action: string) => {
-    switch (action) {
-      case 'create':
-        return 'green';
-      case 'update':
-        return 'blue';
-      case 'delete':
-        return 'red';
-      case 'view':
-        return 'gray';
-      default:
-        return 'gray';
-    }
-  };
-
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
@@ -164,16 +160,18 @@ export const AuditTrails: React.FC = () => {
 
       <div className="bg-white rounded-lg shadow-sm border border-slate-200">
         <div className="divide-y divide-slate-200">
-          {filteredTrails.map((trail) => (
+          {filteredTrails.map((trail) => {
+            const tone = ACTION_TONE[trail.action] ?? ACTION_TONE.view;
+            return (
             <div key={trail.id} className="p-4 hover:bg-slate-50 transition-colors">
               <div className="flex items-start gap-3">
-                <div className={`mt-1 p-2 rounded-lg bg-${getActionColor(trail.action)}-100`}>
+                <div className={`mt-1 p-2 rounded-lg ${tone.chip}`}>
                   {getActionIcon(trail.action)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-sm font-medium text-slate-900">{trail.user_name}</span>
-                    <Badge color={getActionColor(trail.action)}>{trail.action}</Badge>
+                    <Badge variant={tone.badge}>{trail.action}</Badge>
                     <span className="text-sm text-slate-600">{trail.record_type}</span>
                     <span className="text-xs text-slate-400 ml-auto">
                       {format(new Date(trail.performed_at), 'MMM dd, yyyy HH:mm:ss')}
@@ -188,7 +186,8 @@ export const AuditTrails: React.FC = () => {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {loading && (

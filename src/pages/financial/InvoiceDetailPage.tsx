@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchInvoiceById, convertProformaToTaxInvoice, getConversionHistory } from '../../lib/invoiceService';
+import { fetchInvoiceById, convertProformaToTaxInvoice, getConversionHistory, updateInvoice } from '../../lib/invoiceService';
+import type { Invoice, InvoiceItem, InvoiceWithDetails } from '../../lib/invoiceService';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -13,9 +14,11 @@ import { usePDFDownload } from '../../hooks/usePDFDownload';
 import { useToast } from '../../hooks/useToast';
 import { FileText, ArrowLeft, CreditCard as Edit, DollarSign, AlertCircle, RefreshCw, CheckCircle, ArrowRight, Lock } from 'lucide-react';
 import { RecordReceiptModal } from '../../components/banking/RecordReceiptModal';
+import { InvoiceFormModal } from '../../components/cases/InvoiceFormModal';
 import { logger } from '../../lib/logger';
-import { supabase, resolveTenantId } from '../../lib/supabaseClient';
+import { supabase } from '../../lib/supabaseClient';
 import type { PaymentReceipt } from '../../lib/bankingService';
+import { receiptsService } from '../../lib/receiptsService';
 
 const statusConfig = {
   draft: { label: 'Draft', color: 'secondary', icon: FileText },
@@ -58,6 +61,8 @@ export const InvoiceDetailPage: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<InvoiceWithDetails | null>(null);
   const [showConversionHistoryModal, setShowConversionHistoryModal] = useState(false);
   const [conversionHistory, setConversionHistory] = useState<Array<Record<string, unknown>>>([]);
 
@@ -126,6 +131,28 @@ export const InvoiceDetailPage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['invoice', id] });
     queryClient.invalidateQueries({ queryKey: ['invoices'] });
     setShowPaymentModal(false);
+  };
+
+  const handleOpenEdit = async () => {
+    if (!id) return;
+    // Re-fetch with line items so the form can pre-fill items (the detail
+    // query returns the document-shaped invoice without an editable item array).
+    const { data, error } = await supabase
+      .from('invoices')
+      .select(`
+        *,
+        invoice_line_items (*)
+      `)
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error || !data) {
+      logger.error('Error loading invoice for edit:', error);
+      toast.error('Failed to load invoice for editing.');
+      return;
+    }
+    setEditingInvoice(data as unknown as InvoiceWithDetails);
+    setShowEditModal(true);
   };
 
   if (isLoading) {
@@ -518,7 +545,7 @@ export const InvoiceDetailPage: React.FC = () => {
 
                 {canEdit && (
                   <Button
-                    onClick={() => navigate(`/invoices/${id}/edit`)}
+                    onClick={handleOpenEdit}
                     variant="secondary"
                     className="w-full"
                   >
@@ -620,54 +647,75 @@ export const InvoiceDetailPage: React.FC = () => {
             receiptData: Record<string, unknown>,
             allocations?: Array<{ invoice_id: string; allocated_amount: number }>
           ) => {
-            const receiptRow = receiptData as Partial<PaymentReceipt> & {
-              status?: string;
-            };
-            // `receipts` is the live tenant table. Several caller-facing fields
-            // (account_id, payment_method_id, case_id, company_id, reference_number,
-            // description, source_type) are not persisted here — they exist only on
-            // the modal's draft. tenant_id is auto-populated by the
-            // set_tenant_and_audit_fields trigger.
-            if (typeof receiptRow.amount !== 'number') {
+            const r = receiptData as Partial<PaymentReceipt> & { status?: string };
+            if (typeof r.amount !== 'number') {
               throw new Error('Receipt amount is required');
             }
-            // Real tenant uuid: the trigger only stamps NULL; '' fails the uuid cast.
-            const tenantId = await resolveTenantId();
-            const { data: receipt, error: receiptError } = await supabase
-              .from('receipts')
-              .insert({
-                tenant_id: tenantId,
-                amount: receiptRow.amount,
-                receipt_date: receiptRow.receipt_date,
-                customer_id: receiptRow.customer_id ?? null,
-                payment_method: receiptRow.payment_method_id ?? null,
-                reference: receiptRow.reference_number ?? null,
-                notes: receiptRow.notes ?? null,
-                status: receiptRow.status ?? 'completed',
-              })
-              .select()
-              .maybeSingle();
-
-            if (receiptError) throw receiptError;
-            if (!receipt) throw new Error('Receipt insert returned no row');
-
-            if (allocations && allocations.length > 0) {
-              const allocationRecords = allocations.map((alloc) => ({
-                tenant_id: tenantId,
-                receipt_id: receipt.id,
-                invoice_id: alloc.invoice_id,
-                amount: alloc.allocated_amount,
-              }));
-
-              const { error: allocError } = await supabase
-                .from('receipt_allocations')
-                .insert(allocationRecords);
-
-              if (allocError) throw allocError;
-            }
-
+            // Atomic, money-conserving, append-only-ledger-posting receipt recording.
+            // singleInvoiceMode emits no allocations, so allocate the full amount to this invoice.
+            const allocs =
+              allocations && allocations.length > 0
+                ? allocations.map((a) => ({ invoice_id: a.invoice_id, amount: a.allocated_amount }))
+                : [{ invoice_id: id as string, amount: r.amount }];
+            await receiptsService.createReceiptWithAllocations(
+              {
+                amount: r.amount,
+                receipt_date: r.receipt_date ?? null,
+                customer_id: r.customer_id ?? null,
+                payment_method: r.payment_method_id ?? null,
+                reference: r.reference_number ?? null,
+                notes: r.notes ?? null,
+                status: r.status ?? 'completed',
+                bank_account_id: r.account_id ?? null,
+              },
+              allocs,
+            );
             handlePaymentRecorded();
           }}
+        />
+      )}
+
+      {/* Edit Invoice Modal */}
+      {showEditModal && editingInvoice && (
+        <InvoiceFormModal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingInvoice(null);
+          }}
+          onSave={async (invoiceData: Record<string, unknown>, items: InvoiceItem[]) => {
+            const invoicePayload = invoiceData as Partial<Invoice>;
+            if (!editingInvoice.id) return;
+            await updateInvoice(
+              editingInvoice.id,
+              {
+                title: invoicePayload.title,
+                invoice_type: invoicePayload.invoice_type,
+                invoice_date: invoicePayload.invoice_date,
+                due_date: invoicePayload.due_date,
+                status: invoicePayload.status,
+                payment_terms: invoicePayload.payment_terms,
+                notes: invoicePayload.notes,
+                internal_notes: invoicePayload.internal_notes,
+                discount_amount: invoicePayload.discount_amount,
+                discount_type: invoicePayload.discount_type,
+                tax_rate: invoicePayload.tax_rate,
+                client_reference: invoicePayload.client_reference,
+                bank_account_id: invoicePayload.bank_account_id,
+                terms_and_conditions: invoicePayload.terms_and_conditions,
+                quote_id: invoicePayload.quote_id,
+              },
+              items,
+            );
+            queryClient.invalidateQueries({ queryKey: ['invoice', id] });
+            queryClient.invalidateQueries({ queryKey: ['invoices'] });
+            queryClient.invalidateQueries({ queryKey: ['invoice_stats'] });
+          }}
+          caseId={editingInvoice.case_id || ''}
+          customerId={editingInvoice.customer_id}
+          companyId={editingInvoice.company_id}
+          initialData={editingInvoice as unknown as Record<string, unknown> | undefined}
+          clientReference={editingInvoice.client_reference}
         />
       )}
 
