@@ -20,6 +20,7 @@ import { FinancialStatsCard } from '../../components/financial/FinancialStatsCar
 import { InvoiceFormModal } from '../../components/cases/InvoiceFormModal';
 import { RecordReceiptModal } from '../../components/banking/RecordReceiptModal';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useConfirm } from '../../hooks/useConfirm';
 import { supabase } from '../../lib/supabaseClient';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { ExportButton } from '../../components/shared/ExportButton';
@@ -55,6 +56,7 @@ export const InvoicesListPage: React.FC<unknown> = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
+  const confirm = useConfirm();
   const { profile } = useAuth();
   const selection = useBulkSelection();
   const canBulkArchive = profile?.role === 'owner' || profile?.role === 'admin';
@@ -192,7 +194,11 @@ export const InvoicesListPage: React.FC<unknown> = () => {
       return;
     }
     const n = selection.selectedCount;
-    if (!window.confirm(`Archive ${n} invoice${n === 1 ? '' : 's'}? They'll be hidden from lists but recoverable.`)) {
+    if (!(await confirm({
+      title: `Archive ${n} invoice${n === 1 ? '' : 's'}?`,
+      message: `Archive ${n} invoice${n === 1 ? '' : 's'}? They'll be hidden from lists but recoverable.`,
+      tone: 'danger',
+    }))) {
       return;
     }
     setIsArchiving(true);
@@ -223,7 +229,11 @@ export const InvoicesListPage: React.FC<unknown> = () => {
       n > 5
         ? `Email ${n} invoices to their customers? Sending is rate-limited to 5/minute — this will take roughly ${Math.ceil(n / 5)} minute(s).`
         : `Email ${n} invoice${n === 1 ? '' : 's'} to their customers?`;
-    if (!window.confirm(msg)) return;
+    if (!(await confirm({
+      title: n === 1 ? 'Email invoice?' : `Email ${n} invoices?`,
+      message: msg,
+      tone: 'default',
+    }))) return;
     setSendProgress({ done: 0, total: n });
     try {
       // Lazy-import: bulk-send drags pdfmake; only fetch on actual click.

@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { formatDate } from '../../lib/format';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useConfirm } from '../../hooks/useConfirm';
 import { useTaxConfig } from '../../contexts/TenantConfigContext';
 import { fetchDefaultLocale } from '../../lib/financialService';
 import { Input } from '../../components/ui/Input';
@@ -66,6 +67,7 @@ interface AuditLog {
 export const VATAuditPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
+  const confirm = useConfirm();
   const taxConfig = useTaxConfig();
   const [activeTab, setActiveTab] = useState<'vat' | 'audit'>('vat');
   const [searchTerm, setSearchTerm] = useState('');
@@ -149,14 +151,22 @@ export const VATAuditPage: React.FC = () => {
 
   const handleSubmitReturn = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('Submit this VAT return? This action cannot be undone.')) {
+    if (await confirm({
+      title: 'Submit VAT return?',
+      message: 'Submit this VAT return? This action cannot be undone.',
+      tone: 'default',
+    })) {
       await submitVATReturnMutation.mutateAsync(id);
     }
   };
 
   const handleMarkPaid = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('Mark this VAT return as paid?')) {
+    if (await confirm({
+      title: 'Mark VAT return as paid?',
+      message: 'Mark this VAT return as paid?',
+      tone: 'default',
+    })) {
       await markVATPaidMutation.mutateAsync(id);
     }
   };

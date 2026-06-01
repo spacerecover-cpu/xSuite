@@ -8,6 +8,7 @@ import { Modal } from '../../ui/Modal';
 import { EngineerSelector } from '../EngineerSelector';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/useToast';
+import { useConfirm } from '../../../hooks/useConfirm';
 import { formatDate } from '@/lib/format';
 
 interface CaseEngineerAssignment {
@@ -28,6 +29,7 @@ interface CaseEngineersTabProps {
 
 export const CaseEngineersTab: React.FC<CaseEngineersTabProps> = ({ caseId, caseEngineers }) => {
   const toast = useToast();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedEngineerId, setSelectedEngineerId] = useState<string | null>(null);
@@ -108,7 +110,7 @@ export const CaseEngineersTab: React.FC<CaseEngineersTabProps> = ({ caseId, case
   };
 
   const handleRemove = async (assignmentId: string, name: string) => {
-    if (!window.confirm(`Remove ${name} from this case?`)) return;
+    if (!(await confirm({ title: 'Remove Engineer', message: `Remove ${name} from this case?`, tone: 'danger' }))) return;
     setRemovingId(assignmentId);
     try {
       await removeEngineerMutation.mutateAsync(assignmentId);

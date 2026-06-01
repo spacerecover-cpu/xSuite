@@ -17,6 +17,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { logger } from '../../lib/logger';
+import toast from 'react-hot-toast';
 
 interface ExpenseFormModalProps {
   isOpen: boolean;
@@ -42,6 +43,8 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
   const [caseId, setCaseId] = useState<string>(preselectedCaseId || '');
   const [paymentMethodId, setPaymentMethodId] = useState<string>('');
   const [notes, setNotes] = useState('');
+  const [amountError, setAmountError] = useState<string | null>(null);
+  const [descriptionError, setDescriptionError] = useState<string | null>(null);
 
   const { data: categories = [] } = useQuery({
     queryKey: ['expense_categories'],
@@ -102,7 +105,14 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent, submitForApproval: boolean = false) => {
     e.preventDefault();
-    if (amount <= 0 || !description.trim()) return;
+    const nextAmountError = amount <= 0 ? 'Amount must be greater than zero.' : null;
+    const nextDescriptionError = !description.trim() ? 'Description is required.' : null;
+    setAmountError(nextAmountError);
+    setDescriptionError(nextDescriptionError);
+    if (nextAmountError || nextDescriptionError) {
+      toast.error(nextAmountError || nextDescriptionError || 'Please fix the highlighted fields.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -165,11 +175,17 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
                 step="0.01"
                 min="0"
                 value={amount}
-                onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
+                onChange={(e) => {
+                  setAmount(parseFloat(e.target.value) || 0);
+                  setAmountError(null);
+                }}
                 className="pl-10"
                 required
               />
             </div>
+            {amountError && (
+              <p className="mt-1 text-sm text-danger">{amountError}</p>
+            )}
           </div>
         </div>
 
@@ -181,13 +197,19 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
             <FileText className="absolute left-3 top-3 text-slate-400 w-4 h-4" />
             <textarea
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => {
+                setDescription(e.target.value);
+                setDescriptionError(null);
+              }}
               rows={2}
               className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               placeholder="What was this expense for?"
               required
             />
           </div>
+          {descriptionError && (
+            <p className="mt-1 text-sm text-danger">{descriptionError}</p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">

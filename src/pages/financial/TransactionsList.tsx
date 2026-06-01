@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { formatDate } from '../../lib/format';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useConfirm } from '../../hooks/useConfirm';
 import { getStatusColor } from '../../lib/financialService';
 import { FinancialModuleHeader } from '../../components/financial/FinancialModuleHeader';
 import { FinancialStatsCard } from '../../components/financial/FinancialStatsCard';
@@ -52,6 +53,7 @@ interface TransactionDisplay {
 export const TransactionsList: React.FC = () => {
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
+  const confirm = useConfirm();
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<string>('all');
@@ -142,14 +144,22 @@ export const TransactionsList: React.FC = () => {
 
   const handleReconcile = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('Mark this transaction as reconciled?')) {
+    if (await confirm({
+      title: 'Reconcile transaction?',
+      message: 'Mark this transaction as reconciled?',
+      tone: 'default',
+    })) {
       await reconcileMutation.mutateAsync(id);
     }
   };
 
   const handleVoid = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('Void this transaction? This posts a reversing entry that unwinds any bank balance change — the original is preserved in the ledger for audit.')) {
+    if (await confirm({
+      title: 'Void transaction?',
+      message: 'Void this transaction? This posts a reversing entry that unwinds any bank balance change — the original is preserved in the ledger for audit.',
+      tone: 'danger',
+    })) {
       await voidMutation.mutateAsync(id);
     }
   };

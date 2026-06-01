@@ -7,6 +7,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { LocaleProvider } from './contexts/LocaleContext';
 import { PortalAuthProvider } from './contexts/PortalAuthContext';
 import { PermissionsProvider } from './contexts/PermissionsContext';
+import { ConfirmProvider } from './hooks/useConfirm';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ProtectedPortalRoute } from './components/ProtectedPortalRoute';
 import { ProtectedPlatformAdminRoute } from './components/ProtectedPlatformAdminRoute';
@@ -183,6 +184,7 @@ function App() {
         <LocaleProvider>
         <PermissionsProvider>
           <PortalAuthProvider>
+            <ConfirmProvider>
             <Suspense fallback={<LoadingFallback />}>
             <Routes>
               <Route path="/login" element={<Login />} />
@@ -755,6 +757,7 @@ function App() {
               } />
             </Routes>
           </Suspense>
+            </ConfirmProvider>
           </PortalAuthProvider>
         </PermissionsProvider>
         </LocaleProvider>

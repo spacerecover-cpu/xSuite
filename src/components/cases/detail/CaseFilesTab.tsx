@@ -4,6 +4,7 @@ import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/useToast';
+import { useConfirm } from '../../../hooks/useConfirm';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatDate } from '@/lib/format';
 
@@ -42,6 +43,7 @@ function formatFileSize(bytes: number | null): string {
 
 export const CaseFilesTab: React.FC<CaseFilesTabProps> = ({ caseId, attachments, uploadedBy }) => {
   const toast = useToast();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -127,7 +129,7 @@ export const CaseFilesTab: React.FC<CaseFilesTabProps> = ({ caseId, attachments,
   };
 
   const handleDelete = async (attachment: { id: string; file_url: string; file_name: string }) => {
-    if (!window.confirm(`Delete "${attachment.file_name}"? This cannot be undone.`)) return;
+    if (!(await confirm({ title: 'Delete File', message: `Delete "${attachment.file_name}"? This cannot be undone.`, tone: 'danger' }))) return;
 
     setDeletingId(attachment.id);
     try {

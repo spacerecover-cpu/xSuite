@@ -11,6 +11,7 @@ import { RecordPaymentModal } from '../../components/financial/RecordPaymentModa
 import { PaymentViewModal } from '../../components/financial/PaymentViewModal';
 import { PaymentReceiptModal } from '../../components/financial/PaymentReceiptModal';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useConfirm } from '../../hooks/useConfirm';
 import { createPayment, getPaymentStats, voidPayment, fetchPaymentById } from '../../lib/paymentsService';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { logger } from '../../lib/logger';
@@ -36,6 +37,7 @@ import {
 export const PaymentsList: React.FC = () => {
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
+  const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -176,7 +178,11 @@ export const PaymentsList: React.FC = () => {
 
   const handleVoidPayment = async (paymentId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('Are you sure you want to void this payment? This will reverse all invoice allocations.')) {
+    if (await confirm({
+      title: 'Void payment?',
+      message: 'Are you sure you want to void this payment? This will reverse all invoice allocations.',
+      tone: 'danger',
+    })) {
       await voidPaymentMutation.mutateAsync(paymentId);
     }
   };
