@@ -15310,6 +15310,31 @@ export type Database = {
         Args: { p_quote_id: string }
         Returns: string
       }
+      create_receipt_with_allocations: {
+        Args: { p_allocations: Json; p_receipt: Json }
+        Returns: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          deleted_at: string | null
+          id: string
+          notes: string | null
+          payment_method: string | null
+          receipt_date: string | null
+          receipt_number: string | null
+          reference: string | null
+          status: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "receipts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       delete_case_permanently: {
         Args: { p_case_id: string }
         Returns: undefined

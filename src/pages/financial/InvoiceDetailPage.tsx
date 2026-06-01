@@ -14,8 +14,9 @@ import { useToast } from '../../hooks/useToast';
 import { FileText, ArrowLeft, CreditCard as Edit, DollarSign, AlertCircle, RefreshCw, CheckCircle, ArrowRight, Lock } from 'lucide-react';
 import { RecordReceiptModal } from '../../components/banking/RecordReceiptModal';
 import { logger } from '../../lib/logger';
-import { supabase, resolveTenantId } from '../../lib/supabaseClient';
+import { supabase } from '../../lib/supabaseClient';
 import type { PaymentReceipt } from '../../lib/bankingService';
+import { receiptsService } from '../../lib/receiptsService';
 
 const statusConfig = {
   draft: { label: 'Draft', color: 'secondary', icon: FileText },
@@ -620,52 +621,29 @@ export const InvoiceDetailPage: React.FC = () => {
             receiptData: Record<string, unknown>,
             allocations?: Array<{ invoice_id: string; allocated_amount: number }>
           ) => {
-            const receiptRow = receiptData as Partial<PaymentReceipt> & {
-              status?: string;
-            };
-            // `receipts` is the live tenant table. Several caller-facing fields
-            // (account_id, payment_method_id, case_id, company_id, reference_number,
-            // description, source_type) are not persisted here — they exist only on
-            // the modal's draft. tenant_id is auto-populated by the
-            // set_tenant_and_audit_fields trigger.
-            if (typeof receiptRow.amount !== 'number') {
+            const r = receiptData as Partial<PaymentReceipt> & { status?: string };
+            if (typeof r.amount !== 'number') {
               throw new Error('Receipt amount is required');
             }
-            // Real tenant uuid: the trigger only stamps NULL; '' fails the uuid cast.
-            const tenantId = await resolveTenantId();
-            const { data: receipt, error: receiptError } = await supabase
-              .from('receipts')
-              .insert({
-                tenant_id: tenantId,
-                amount: receiptRow.amount,
-                receipt_date: receiptRow.receipt_date,
-                customer_id: receiptRow.customer_id ?? null,
-                payment_method: receiptRow.payment_method_id ?? null,
-                reference: receiptRow.reference_number ?? null,
-                notes: receiptRow.notes ?? null,
-                status: receiptRow.status ?? 'completed',
-              })
-              .select()
-              .maybeSingle();
-
-            if (receiptError) throw receiptError;
-            if (!receipt) throw new Error('Receipt insert returned no row');
-
-            if (allocations && allocations.length > 0) {
-              const allocationRecords = allocations.map((alloc) => ({
-                tenant_id: tenantId,
-                receipt_id: receipt.id,
-                invoice_id: alloc.invoice_id,
-                amount: alloc.allocated_amount,
-              }));
-
-              const { error: allocError } = await supabase
-                .from('receipt_allocations')
-                .insert(allocationRecords);
-
-              if (allocError) throw allocError;
-            }
-
+            // Atomic, money-conserving, append-only-ledger-posting receipt recording.
+            // singleInvoiceMode emits no allocations, so allocate the full amount to this invoice.
+            const allocs =
+              allocations && allocations.length > 0
+                ? allocations.map((a) => ({ invoice_id: a.invoice_id, amount: a.allocated_amount }))
+                : [{ invoice_id: id as string, amount: r.amount }];
+            await receiptsService.createReceiptWithAllocations(
+              {
+                amount: r.amount,
+                receipt_date: r.receipt_date ?? null,
+                customer_id: r.customer_id ?? null,
+                payment_method: r.payment_method_id ?? null,
+                reference: r.reference_number ?? null,
+                notes: r.notes ?? null,
+                status: r.status ?? 'completed',
+                bank_account_id: r.account_id ?? null,
+              },
+              allocs,
+            );
             handlePaymentRecorded();
           }}
         />
