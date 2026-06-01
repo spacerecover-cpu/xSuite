@@ -7,6 +7,7 @@ import { AnnouncementBanner } from '../shared/AnnouncementBanner';
 import { NotificationBell } from './NotificationBell';
 import { CommandPalette } from '../shared/CommandPalette';
 import { useCommandPalette } from '../../hooks/useCommandPalette';
+import { SidebarPreferencesProvider } from '../../contexts/SidebarPreferencesContext';
 
 const routeLabels: Record<string, string> = {
   '': 'Dashboard',
@@ -95,6 +96,7 @@ export const AppLayout: React.FC = () => {
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
   return (
+    <SidebarPreferencesProvider>
     <div className="min-h-screen flex flex-col" style={{ background: '#f1f5f9' }}>
       <AnnouncementBanner />
       <div className="flex flex-1 overflow-hidden">
@@ -148,5 +150,6 @@ export const AppLayout: React.FC = () => {
       </div>
       <CommandPalette isOpen={palette.isOpen} onClose={palette.close} />
     </div>
+    </SidebarPreferencesProvider>
   );
 };
