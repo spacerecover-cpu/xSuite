@@ -14822,6 +14822,7 @@ export type Database = {
           id: string
           is_collapsed: boolean | null
           pinned_items: string[] | null
+          sidebar_position: string
           sidebar_width: number | null
           tenant_id: string
           updated_at: string
@@ -14834,6 +14835,7 @@ export type Database = {
           id?: string
           is_collapsed?: boolean | null
           pinned_items?: string[] | null
+          sidebar_position?: string
           sidebar_width?: number | null
           tenant_id: string
           updated_at?: string
@@ -14846,6 +14848,7 @@ export type Database = {
           id?: string
           is_collapsed?: boolean | null
           pinned_items?: string[] | null
+          sidebar_position?: string
           sidebar_width?: number | null
           tenant_id?: string
           updated_at?: string
@@ -15468,6 +15471,38 @@ export type Database = {
       lookup_interface: { Args: { p_name: string }; Returns: string }
       lookup_status_type: { Args: { p_name: string }; Returns: string }
       lookup_storage_location: { Args: { p_name: string }; Returns: string }
+      post_manual_transaction: {
+        Args: { p_txn: Json }
+        Returns: {
+          amount: number
+          amount_base: number | null
+          bank_account_id: string | null
+          category_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          deleted_at: string | null
+          description: string | null
+          exchange_rate: number
+          id: string
+          notes: string | null
+          rate_source: string
+          reference_id: string | null
+          reference_number: string | null
+          reference_type: string | null
+          status: string
+          tenant_id: string
+          transaction_date: string | null
+          transaction_type: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "financial_transactions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       process_time_based_events: { Args: never; Returns: Json }
       record_payment: {
         Args: { p_allocations: Json; p_payment: Json }
@@ -15508,6 +15543,38 @@ export type Database = {
       render_notification_template: {
         Args: { p_payload: Json; p_template: string }
         Returns: string
+      }
+      reverse_financial_transaction: {
+        Args: { p_reason?: string; p_transaction_id: string }
+        Returns: {
+          amount: number
+          amount_base: number | null
+          bank_account_id: string | null
+          category_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          deleted_at: string | null
+          description: string | null
+          exchange_rate: number
+          id: string
+          notes: string | null
+          rate_source: string
+          reference_id: string | null
+          reference_number: string | null
+          reference_type: string | null
+          status: string
+          tenant_id: string
+          transaction_date: string | null
+          transaction_type: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "financial_transactions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       search_donor_drives: {
         Args: { p_criteria: Json }

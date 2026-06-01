@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '../../contexts/PermissionsContext';
-import { supabase } from '../../lib/supabaseClient';
+import { useSidebarPreferences } from '../../contexts/SidebarPreferencesContext';
 import {
   LayoutDashboard,
   FolderOpen,
@@ -50,55 +50,13 @@ export const Sidebar: React.FC = () => {
   const { profile, signOut } = useAuth();
   const { hasModuleAccess } = usePermissions();
   const { casesTodayCount, invoicesAttentionCount, pendingQuotesCount, lowStockCount } = useSidebarBadges();
+  const { position, isCollapsed, toggleCollapsed, expandedSection, setExpandedSection } = useSidebarPreferences();
   const navigate = useNavigate();
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [userCardHovered, setUserCardHovered] = useState(false);
   const [helpHovered, setHelpHovered] = useState(false);
 
-  useEffect(() => {
-    loadSidebarPreferences();
-  }, []);
-
-  const loadSidebarPreferences = async () => {
-    if (!profile?.id) return;
-
-    const { data, error } = await supabase
-      .from('user_sidebar_preferences')
-      .select('*')
-      .eq('user_id', profile.id)
-      .maybeSingle();
-
-    if (!error && data) {
-      const collapsedSections = data.collapsed_sections || [];
-      if (collapsedSections.length > 0) {
-        const allSections = ['financial', 'business', 'resources', 'system'];
-        const expanded = allSections.find(s => !collapsedSections.includes(s));
-        setExpandedSection(expanded || null);
-      }
-    }
-  };
-
-  const saveSidebarPreferences = async (expanded: string | null) => {
-    if (!profile?.id) return;
-
-    const allSections = ['financial', 'business', 'resources', 'system'];
-    const collapsed = allSections.filter(s => s !== expanded);
-
-    await supabase
-      .from('user_sidebar_preferences')
-      .upsert({
-        user_id: profile.id,
-        collapsed_sections: collapsed,
-      } as never, {
-        onConflict: 'user_id'
-      });
-  };
-
   const handleSectionToggle = (sectionName: string, collapsed: boolean) => {
-    const newExpandedSection = collapsed ? null : sectionName;
-    setExpandedSection(newExpandedSection);
-    saveSidebarPreferences(newExpandedSection);
+    setExpandedSection(collapsed ? null : sectionName);
   };
 
   const handleSignOut = async () => {
@@ -106,9 +64,12 @@ export const Sidebar: React.FC = () => {
     navigate('/login');
   };
 
-  const handleToggleCollapse = () => {
-    setIsCollapsed(!isCollapsed);
-  };
+  // Sidebar side is a per-user preference. On the right, the divider + collapse
+  // affordance flip to the inner (content-facing) edge, and the chevron mirrors.
+  const isRight = position === 'right';
+  const CollapseChevron = isRight
+    ? (isCollapsed ? ChevronLeft : ChevronRight)
+    : (isCollapsed ? ChevronRight : ChevronLeft);
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'owner';
   const canViewFinance = hasModuleAccess('invoices') || hasModuleAccess('payments');
@@ -142,12 +103,15 @@ export const Sidebar: React.FC = () => {
     <aside
       className={`
         ${isCollapsed ? 'w-[72px]' : 'w-72'}
+        ${isRight ? 'order-last' : ''}
         flex flex-col transition-all duration-300 ease-in-out flex-shrink-0
         relative
       `}
       style={{
         background: 'rgb(var(--color-primary) / 0.05)',
-        borderRight: '1px solid rgb(var(--color-primary) / 0.15)',
+        ...(isRight
+          ? { borderLeft: '1px solid rgb(var(--color-primary) / 0.15)' }
+          : { borderRight: '1px solid rgb(var(--color-primary) / 0.15)' }),
         fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif",
       }}
     >
@@ -180,8 +144,8 @@ export const Sidebar: React.FC = () => {
           </div>
 
           <button
-            onClick={handleToggleCollapse}
-            className="absolute top-1/2 -translate-y-1/2 right-3 w-6 h-6 flex items-center justify-center rounded-lg transition-all duration-200"
+            onClick={toggleCollapsed}
+            className={`absolute top-1/2 -translate-y-1/2 ${isRight ? 'left-3' : 'right-3'} w-6 h-6 flex items-center justify-center rounded-lg transition-all duration-200`}
             style={{ background: '#E0E6ED', color: '#64748b' }}
             onMouseEnter={e => {
               (e.currentTarget as HTMLButtonElement).style.background = '#D4DCE8';
@@ -193,11 +157,7 @@ export const Sidebar: React.FC = () => {
             }}
             title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            {isCollapsed ? (
-              <ChevronRight className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronLeft className="w-3.5 h-3.5" />
-            )}
+            <CollapseChevron className="w-3.5 h-3.5" />
           </button>
         </div>
 
