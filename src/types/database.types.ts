@@ -15257,6 +15257,8 @@ export type Database = {
       }
     }
     Functions: {
+      _fin_base_currency: { Args: { p_tenant: string }; Returns: string }
+      _fin_currency_decimals: { Args: { p_code: string }; Returns: number }
       admin_validate_user_creation: { Args: { p_email: string }; Returns: Json }
       anonymize_customer_data: {
         Args: { p_customer_id: string }
@@ -15467,6 +15469,38 @@ export type Database = {
       lookup_status_type: { Args: { p_name: string }; Returns: string }
       lookup_storage_location: { Args: { p_name: string }; Returns: string }
       process_time_based_events: { Args: never; Returns: Json }
+      record_payment: {
+        Args: { p_allocations: Json; p_payment: Json }
+        Returns: {
+          amount: number
+          amount_base: number | null
+          bank_account_id: string | null
+          case_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          customer_id: string | null
+          deleted_at: string | null
+          exchange_rate: number
+          id: string
+          invoice_id: string | null
+          notes: string | null
+          payment_date: string | null
+          payment_method_id: string | null
+          payment_number: string | null
+          rate_source: string
+          reference: string | null
+          status: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       reject_quote: {
         Args: { p_quote_id: string; p_reason?: string }
         Returns: undefined
@@ -15553,6 +15587,38 @@ export type Database = {
           p_scope: string
         }
         Returns: undefined
+      }
+      void_payment: {
+        Args: { p_payment_id: string }
+        Returns: {
+          amount: number
+          amount_base: number | null
+          bank_account_id: string | null
+          case_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          customer_id: string | null
+          deleted_at: string | null
+          exchange_rate: number
+          id: string
+          invoice_id: string | null
+          notes: string | null
+          payment_date: string | null
+          payment_method_id: string | null
+          payment_number: string | null
+          rate_source: string
+          reference: string | null
+          status: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
     }
     Enums: {
