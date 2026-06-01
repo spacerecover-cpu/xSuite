@@ -1,0 +1,14 @@
+Superpowers — vendored Claude Code skills library
+
+Upstream: https://github.com/obra/superpowers
+Version:  5.1.0
+Commit:   6fd4507659784c351abbd2bc264c7162cfd386dc
+Vendored: 2026-06-01
+
+Vendored paths: skills/, hooks/, .claude-plugin/plugin.json, LICENSE, README.md
+(tests/, docs/, multi-tool plugin dirs, and CI config intentionally omitted.)
+
+Exposed to Claude Code via symlinks in .claude/skills/<skill-name>.
+Activation hook: .claude/hooks/superpowers-session-start.sh (registered in .claude/settings.json).
+
+To update: re-clone upstream, re-copy vendored paths, bump this file, refresh symlinks.
