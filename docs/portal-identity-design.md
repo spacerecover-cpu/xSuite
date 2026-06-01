@@ -113,3 +113,14 @@ Steps 1–3 are additive/reversible (drop the `TO portal` policies, restore the 
 3. **Scope of cut-over** — do all portal pages at once, or page-by-page behind the flag.
 
 Until this lands, C4's customer manifest-acceptance stays **staff-attested** (the correct interim), and the C3 customer-facing gates remain staff-driven.
+
+## 11. Go-live runbook — `portal-login` edge function
+
+**Status (2026-06-01):** `supabase/functions/portal-login` is **deployed** (ACTIVE, `verify_jwt=false`) and **fails closed** — probed live, it returns `500 {"error":"jwt_secret_not_configured"}` because Supabase does not expose the JWT secret to edge functions by default. Go-live is gated on two owner-only inputs, then a live verification, then the frontend cutover.
+
+1. **Set the JWT signing secret** (owner only — I cannot access it):
+   `supabase secrets set PORTAL_JWT_SECRET=<project JWT secret>` (Dashboard → Project Settings → API → JWT Settings → *JWT Secret*). Optional: `PORTAL_JWT_TTL_SECONDS` (default `28800` = 8h).
+2. **Set a portal password** for a test customer — today **0 of 7** portal-enabled customers have a `portal_password_hash`, so nobody can log in. Use the existing `change_portal_password` RPC (or seed a bcrypt hash) for one test account.
+3. **Verify minting:** `curl -X POST https://<ref>.supabase.co/functions/v1/portal-login -H "apikey: <anon>" -H "Content-Type: application/json" -d '{"email":"<t>","password":"<p>"}'` → expect `200` + `access_token`. Decode it: claims must be `role:portal`, `customer_id`, `tenant_id`, `aud:authenticated`, `exp`.
+4. **Verify the hosted gateway accepts `role='portal'`** (the one thing not provable without the secret): `curl "https://<ref>.supabase.co/rest/v1/cases?select=id,customer_id" -H "apikey: <anon>" -H "Authorization: Bearer <access_token>"` → must return **only that customer's** cases and **zero** of any other (the live counterpart of the role-sim anti-leak test that already passed at the DB layer). If PostgREST rejects the role, confirm Supabase gateway role config (the DB side — `grant portal to authenticator` — is already in place).
+5. **Frontend cutover (next PR, only after 3–4 pass):** a portal-scoped Supabase client that sends the minted JWT; `PortalAuthContext.login` calls `portal-login` and stores the token (sessionStorage to match current posture; in-memory+short-TTL is the hardening option); cut the portal pages from the anon client + client-JS `customer_id` filter over to the portal client (RLS now enforces scoping — keep the `.eq` as defense-in-depth). Deliberately deferred here because it is unverifiable until steps 3–4 succeed, and a blind cutover would break the live portal.
