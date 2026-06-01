@@ -6,6 +6,7 @@ import { payrollService } from '../../lib/payrollService';
 import { payrollKeys } from '../../lib/queryKeys';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { StatsCard } from '../../components/ui/StatsCard';
 import { useToast } from '../../hooks/useToast';
 import { useCurrency } from '../../hooks/useCurrency';
@@ -158,23 +159,6 @@ export default function PayrollPeriodDetailPage() {
     );
   }
 
-  const getStatusColor = (status: string | null): 'secondary' | 'warning' | 'success' | 'danger' => {
-    switch (status) {
-      case 'draft':
-        return 'secondary';
-      case 'processing':
-        return 'warning';
-      case 'approved':
-        return 'success';
-      case 'paid':
-        return 'success';
-      case 'cancelled':
-        return 'danger';
-      default:
-        return 'secondary';
-    }
-  };
-
   const canApprove = period.status === 'processing';
   const canMarkAsPaid = period.status === 'approved';
 
@@ -195,7 +179,7 @@ export default function PayrollPeriodDetailPage() {
               {format(new Date(period.end_date), 'MMM dd, yyyy')}
             </p>
           </div>
-          <Badge variant={getStatusColor(period.status)}>{(period.status ?? '').toUpperCase()}</Badge>
+          <Badge variant={statusToBadgeVariant(period.status ?? '')}>{(period.status ?? '').toUpperCase()}</Badge>
         </div>
         <div className="flex items-center gap-3">
           {canApprove && (

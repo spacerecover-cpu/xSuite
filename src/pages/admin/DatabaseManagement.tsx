@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
+import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { Database, Download, Calendar, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { logger } from '../../lib/logger';
@@ -93,21 +94,6 @@ export const DatabaseManagement: React.FC = () => {
       logger.error('Error creating backup:', error);
     } finally {
       setCreating(false);
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'green';
-      case 'in_progress':
-        return 'blue';
-      case 'pending':
-        return 'orange';
-      case 'failed':
-        return 'red';
-      default:
-        return 'gray';
     }
   };
 
@@ -220,7 +206,7 @@ export const DatabaseManagement: React.FC = () => {
                     <td className="py-3">
                       <div className="flex items-center gap-2">
                         {getStatusIcon(backup.status ?? '')}
-                        <Badge color={getStatusColor(backup.status ?? '')}>{backup.status ?? ''}</Badge>
+                        <Badge variant={statusToBadgeVariant(backup.status ?? '')}>{backup.status ?? ''}</Badge>
                       </div>
                     </td>
                     <td className="py-3 text-sm text-slate-600">

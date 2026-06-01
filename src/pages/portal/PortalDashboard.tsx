@@ -5,6 +5,7 @@ import { usePortalAuth } from '../../contexts/PortalAuthContext';
 import { supabase } from '../../lib/supabaseClient';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
+import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { FileText, DollarSign, MessageSquare, Clock } from 'lucide-react';
 import { formatDate } from '../../lib/format';
 import { fetchPortalVisibility, getVisibleCaseIds, getCaseIdsWithFlag } from '../../lib/portalVisibility';
@@ -122,27 +123,6 @@ export const PortalDashboard: React.FC = () => {
     enabled: !!customer?.id,
   });
 
-  const getStatusColor = (status: string | null) => {
-    switch (status) {
-      case 'received':
-      case 'diagnosis':
-        return '#3b82f6';
-      case 'in-progress':
-        return '#f59e0b';
-      case 'waiting-approval':
-        return 'rgb(var(--color-accent))';
-      case 'ready':
-        return '#06b6d4';
-      case 'completed':
-      case 'delivered':
-        return '#10b981';
-      case 'cancelled':
-        return '#ef4444';
-      default:
-        return '#64748b';
-    }
-  };
-
   const getPriorityColor = (priority: string | null) => {
     if (!priority) return '#64748b';
     const priorityItem = casePriorities.find(
@@ -223,7 +203,7 @@ export const PortalDashboard: React.FC = () => {
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-slate-900">Quotes Awaiting Your Response</h2>
-            <Badge variant="custom" color="#f59e0b">
+            <Badge variant="warning">
               {pendingQuotes.length} Pending
             </Badge>
           </div>
@@ -305,7 +285,7 @@ export const PortalDashboard: React.FC = () => {
                     </div>
                     <p className="text-sm text-slate-600">{caseItem.case_no}</p>
                   </div>
-                  <Badge variant="custom" color={getStatusColor(caseItem.status)}>
+                  <Badge variant={statusToBadgeVariant(caseItem.status ?? '')}>
                     {caseItem.status}
                   </Badge>
                 </div>

@@ -14,6 +14,8 @@ import {
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
+import { Badge } from '../../components/ui/Badge';
+import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { ENTITY_CONFIGS, EntityType, getJobs, getEntityCount } from '../../lib/importExportService';
 import { ExportWizard } from '../../components/importExport/ExportWizard';
 import { ImportWizard } from '../../components/importExport/ImportWizard';
@@ -80,21 +82,6 @@ export const ImportExport: React.FC = () => {
         return <Clock className="w-4 h-4 text-info animate-pulse" />;
       default:
         return <AlertCircle className="w-4 h-4 text-warning" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-success-muted text-success';
-      case 'failed':
-        return 'bg-danger-muted text-danger';
-      case 'processing':
-        return 'bg-info-muted text-info';
-      case 'pending':
-        return 'bg-warning-muted text-warning';
-      default:
-        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -252,9 +239,9 @@ export const ImportExport: React.FC = () => {
                             {job.job_type === 'import' ? 'Import' : 'Export'}{' '}
                             {ENTITY_CONFIGS[job.entity_type as EntityType]?.label}
                           </p>
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(job.status)}`}>
+                          <Badge variant={statusToBadgeVariant(job.status)} size="sm">
                             {job.status}
-                          </span>
+                          </Badge>
                         </div>
                         <div className="flex items-center gap-4 text-sm text-slate-600">
                           <span>{job.file_name}</span>

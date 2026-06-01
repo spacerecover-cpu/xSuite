@@ -5,6 +5,7 @@ import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { ResourceCloneDriveModal } from '../../components/resources/ResourceCloneDriveModal';
 import { HardDrive, Search, Filter, Plus, Database, AlertCircle, CheckCircle, CreditCard as Edit2, MapPin, Calendar, ArrowUpDown, FileText, X } from 'lucide-react';
 
@@ -218,24 +219,6 @@ export const CloneDrivesList: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'available':
-        return '#10b981';
-      case 'in_use':
-        return '#3b82f6';
-      case 'maintenance':
-        return '#f59e0b';
-      case 'retired':
-        return '#6b7280';
-      case 'lost':
-      case 'damaged':
-        return '#ef4444';
-      default:
-        return '#64748b';
-    }
-  };
-
   const getStatusLabel = (status: string) => {
     return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
@@ -438,16 +421,6 @@ export const CloneDrivesList: React.FC = () => {
               </h3>
               <div className="space-y-2">
                 {caseAssignments.map((assignment: any) => {
-                  const assignStatusColor = (s: string) => {
-                    switch (s) {
-                      case 'active': return '#10b981';
-                      case 'extracted': return '#3b82f6';
-                      case 'archived': return '#6b7280';
-                      case 'deleted': return '#ef4444';
-                      default: return '#64748b';
-                    }
-                  };
-
                   return (
                     <div key={assignment.id} className="bg-white p-3 rounded border border-info/20">
                       <div className="flex items-center justify-between">
@@ -461,8 +434,7 @@ export const CloneDrivesList: React.FC = () => {
                               {assignment.drive_label || 'N/A'}
                             </span>
                             <Badge
-                              variant="custom"
-                              color={assignStatusColor(assignment.status || '')}
+                              variant={statusToBadgeVariant(assignment.status || '')}
                               size="sm"
                             >
                               {(assignment.status || '').charAt(0).toUpperCase() + (assignment.status || '').slice(1)}
@@ -668,8 +640,7 @@ export const CloneDrivesList: React.FC = () => {
                       </td>
                       <td className="p-4">
                         <Badge
-                          variant="custom"
-                          color={getStatusColor(drive.status)}
+                          variant={statusToBadgeVariant(drive.status)}
                           size="sm"
                         >
                           {getStatusLabel(drive.status)}
@@ -829,8 +800,7 @@ export const CloneDrivesList: React.FC = () => {
                                             </span>
                                           )}
                                           <Badge
-                                            variant="custom"
-                                            color={assignment.status === 'active' ? '#10b981' : '#3b82f6'}
+                                            variant={statusToBadgeVariant(assignment.status || '')}
                                             size="sm"
                                           >
                                             {assignment.status}

@@ -48,7 +48,9 @@ export type BadgeVariant =
  */
 export function statusToBadgeVariant(status: string): BadgeVariant {
   switch (status.trim().toLowerCase()) {
-    // Positive / terminal-good outcomes.
+    // Positive / terminal-good outcomes. Domain additions: 'ready' (recovery
+    // data ready for delivery — matches the internal "Ready" success stat card),
+    // 'available' (clone drive free for use).
     case 'paid':
     case 'completed':
     case 'complete':
@@ -60,29 +62,47 @@ export function statusToBadgeVariant(status: string): BadgeVariant {
     case 'resolved':
     case 'closed':
     case 'verified':
+    case 'ready':
+    case 'available':
       return 'success';
 
-    // In-progress / needs-attention but not failed.
+    // In-progress / needs-attention but not failed. Domain additions:
+    // 'in-progress' (hyphenated portal variant), 'waiting-approval' (recovery
+    // blocked on customer approval — was an accent color, but no accent Badge
+    // variant exists and "needs approval" reads as attention), 'maintenance'
+    // (clone drive), 'on_leave' (employee).
     case 'pending':
     case 'partial':
     case 'partially_paid':
     case 'in_progress':
+    case 'in-progress':
     case 'on_hold':
     case 'awaiting':
     case 'processing':
     case 'warning':
+    case 'waiting-approval':
+    case 'maintenance':
+    case 'on_leave':
       return 'warning';
 
-    // Informational / early-lifecycle states.
+    // Informational / early-lifecycle states. Domain additions: 'received'/
+    // 'diagnosis' (recovery intake), 'in_use' (clone drive in use), 'extracted'
+    // (clone image extracted off the drive).
     case 'draft':
     case 'sent':
     case 'open':
     case 'new':
     case 'submitted':
     case 'info':
+    case 'received':
+    case 'diagnosis':
+    case 'in_use':
+    case 'extracted':
       return 'info';
 
-    // Negative / failed / terminated outcomes.
+    // Negative / failed / terminated outcomes. Domain additions: 'lost'/
+    // 'damaged' (clone drive), 'deleted' (clone assignment), 'suspended'
+    // (employee).
     case 'overdue':
     case 'failed':
     case 'rejected':
@@ -93,6 +113,10 @@ export function statusToBadgeVariant(status: string): BadgeVariant {
     case 'declined':
     case 'expired':
     case 'error':
+    case 'lost':
+    case 'damaged':
+    case 'deleted':
+    case 'suspended':
       return 'danger';
 
     default:

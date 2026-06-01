@@ -4,6 +4,7 @@ import { usePortalAuth } from '../../contexts/PortalAuthContext';
 import { supabase } from '../../lib/supabaseClient';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
+import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { Modal } from '../../components/ui/Modal';
 import { FileText, Package, Clock, CheckCircle, XCircle, Info } from 'lucide-react';
 import { formatDate } from '../../lib/format';
@@ -131,27 +132,6 @@ export const PortalCases: React.FC = () => {
     enabled: !!selectedCase?.id,
   });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'received':
-      case 'diagnosis':
-        return '#3b82f6';
-      case 'in-progress':
-        return '#f59e0b';
-      case 'waiting-approval':
-        return 'rgb(var(--color-accent))';
-      case 'ready':
-        return '#06b6d4';
-      case 'completed':
-      case 'delivered':
-        return '#10b981';
-      case 'cancelled':
-        return '#ef4444';
-      default:
-        return '#64748b';
-    }
-  };
-
   const getPriorityColor = (priority: string) => {
     const priorityItem = casePriorities.find(
       p => p.name.toLowerCase() === priority.toLowerCase()
@@ -264,7 +244,7 @@ export const PortalCases: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   {getStatusIcon(caseItem.status)}
-                  <Badge variant="custom" color={getStatusColor(caseItem.status)}>
+                  <Badge variant={statusToBadgeVariant(caseItem.status)}>
                     {caseItem.status}
                   </Badge>
                 </div>
@@ -302,7 +282,7 @@ export const PortalCases: React.FC = () => {
             <div>
               <div className="flex items-center gap-3 mb-4">
                 <h2 className="text-xl font-bold text-slate-900">{selectedCase.title}</h2>
-                <Badge variant="custom" color={getStatusColor(selectedCase.status)}>
+                <Badge variant={statusToBadgeVariant(selectedCase.status)}>
                   {selectedCase.status}
                 </Badge>
                 <Badge variant="custom" color={getPriorityColor(selectedCase.priority)} size="sm">

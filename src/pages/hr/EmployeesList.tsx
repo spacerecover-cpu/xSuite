@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
+import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { Database } from '../../types/database.types';
 import { logger } from '../../lib/logger';
 
@@ -43,21 +44,6 @@ export const EmployeesList: React.FC = () => {
       logger.error('Error loading employees:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const getStatusColor = (status: string | null) => {
-    switch (status) {
-      case 'active':
-        return 'green';
-      case 'on_leave':
-        return 'orange';
-      case 'suspended':
-        return 'red';
-      case 'terminated':
-        return 'gray';
-      default:
-        return 'blue';
     }
   };
 
@@ -186,10 +172,10 @@ export const EmployeesList: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Badge color={getStatusColor(employee.employment_status)}>
+                    <Badge variant={statusToBadgeVariant(employee.employment_status ?? '')}>
                       {(employee.employment_status ?? 'unknown').replace('_', ' ')}
                     </Badge>
-                    <Badge color="blue">
+                    <Badge variant="info">
                       {(employee.employment_type ?? 'unknown').replace('_', ' ')}
                     </Badge>
                   </div>

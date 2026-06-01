@@ -57,3 +57,37 @@ describe('statusToBadgeVariant', () => {
     expect(statusToBadgeVariant('')).toBe('secondary');
   });
 });
+
+describe('statusToBadgeVariant — domain lifecycle/resource/employment vocab', () => {
+  it('maps data-recovery lifecycle statuses to their preserved tones', () => {
+    expect(statusToBadgeVariant('received')).toBe('info');
+    expect(statusToBadgeVariant('diagnosis')).toBe('info');
+    expect(statusToBadgeVariant('in-progress')).toBe('warning');
+    // accent has no Badge variant; waiting-on-customer reads as needs-attention
+    expect(statusToBadgeVariant('waiting-approval')).toBe('warning');
+    // ready-for-delivery aligns with the internal "Ready" success stat card
+    expect(statusToBadgeVariant('ready')).toBe('success');
+  });
+
+  it('maps clone-drive resource statuses to their preserved tones', () => {
+    expect(statusToBadgeVariant('available')).toBe('success');
+    expect(statusToBadgeVariant('in_use')).toBe('info');
+    expect(statusToBadgeVariant('maintenance')).toBe('warning');
+    expect(statusToBadgeVariant('lost')).toBe('danger');
+    expect(statusToBadgeVariant('damaged')).toBe('danger');
+    expect(statusToBadgeVariant('retired')).toBe('secondary');
+  });
+
+  it('maps clone-assignment statuses to their preserved tones', () => {
+    expect(statusToBadgeVariant('active')).toBe('success');
+    expect(statusToBadgeVariant('extracted')).toBe('info');
+    expect(statusToBadgeVariant('archived')).toBe('secondary');
+    expect(statusToBadgeVariant('deleted')).toBe('danger');
+  });
+
+  it('maps employment statuses to their preserved tones', () => {
+    expect(statusToBadgeVariant('on_leave')).toBe('warning');
+    expect(statusToBadgeVariant('suspended')).toBe('danger');
+    expect(statusToBadgeVariant('terminated')).toBe('secondary');
+  });
+});
