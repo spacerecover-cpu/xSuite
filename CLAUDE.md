@@ -1,8 +1,48 @@
 # xSuite — Architecture Reference for Claude
 
+## ⚠️ THIS IS A DATA RECOVERY LAB PLATFORM — NOT A GENERIC CRM
+
+> **xSuite is built EXCLUSIVELY for data recovery companies and forensic data-recovery labs.**
+> It is **not** a generic CRM, helpdesk, or service-ticketing tool, and it must never be designed as one.
+> Every workflow, permission, automation, form, status, dashboard, report, and business rule **MUST** map to how a real data recovery lab actually operates: physical devices arriving for recovery, chain of custody, cleanroom/imaging work, recoverability assessment, verified data delivery, and forensic auditability.
+
+**Generic-CRM assumptions are bugs, not features.** A "case" is not a support ticket — it is a custody-tracked physical job that may hold many individually-tracked devices (e.g. a 12-drive RAID). "Delivery" is not a status flip — it is the release of recovered data that the customer reviews and the lab must be able to prove. Treating cases like one-thing tickets, collapsing N devices into one record, or wiring approval to the money (quotes) but not the product (recovered data) are all known anti-patterns this codebase has leaked before. **Do not reintroduce them.** See `docs/data-recovery-workflow.md` for the verified leak catalog.
+
+### The 16-Stage Data Recovery Lifecycle (index → primary tables/modules)
+
+| # | Stage | Primary table(s) / module — _today_ |
+|---|-------|-------------------------------------|
+| 1 | Lead / Customer Enquiry | _no lead entity_ → starts at `customers_enhanced` (+ `customer_communications`) |
+| 2 | Case Creation | `cases` (+ `number_sequences`); created in `CreateCaseWizard`, not `caseService` |
+| 3 | Device Intake | `case_devices` (multi-device array; primary = `patient` role) |
+| 4 | Device Labeling & Tracking | case-level `CaseLabelDocument`; `chain_of_custody` (built, not init'd at intake) |
+| 5 | Initial Inspection / Condition | `case_devices.condition_id`; `device_diagnostics` (insert fails — see workflow doc) |
+| 6 | Diagnosis / Fault / Recoverability | `case_devices.symptoms` + `catalog_service_problems` (flat label, no severity) |
+| 7 | Quotation & Approval | `quotes` (internal) vs `case_quotes` (portal read — 0 rows; loop broken) |
+| 8 | Recovery Process | `transition_case_status` + `resource_clone_drives`; `case_recovery_attempts` unwired |
+| 9 | Engineer Assignment | `case_engineers` (hardcoded `profiles.role='technician'`; hard-delete on remove) |
+| 10 | Internal Notes & Findings | `case_internal_notes`; `device_diagnostics` (no visibility/private column) |
+| 11 | Recovery Verification / QA | `chain_of_custody_integrity_checks` (hash/seal); `case_qa_checklists` orphan |
+| 12 | File Listing & Delivery Approval | _no recovered-file manifest, no customer accept gate_; `case_reports` (read-only portal) |
+| 13 | Device Checkout / Return | `log_case_checkout` (raw `status='Delivered'`); `chain_of_custody_transfers` |
+| 14 | Billing & Payment | `invoices`, `payments`, `payment_allocations` (no payment-before-release gate) |
+| 15 | Case Closure | `transition_case_status` (`requires[]` advisory-only) vs `log_case_checkout` bypass |
+| 16 | Audit Trail & Reporting | `case_job_history`, `audit_trails`, `case_reports`, `chain_of_custody` |
+
+### Before you change anything
+
+- **Evaluate workflow impact first.** Locate the change within the 16-stage lifecycle above and confirm it matches real lab process before writing code.
+- **Preserve case history & auditability.** Never break `case_job_history`, `audit_trails`, or `chain_of_custody`. Audit/custody tables are append-only by design (REVOKE + `prevent_audit_mutation` trigger) — do not weaken that.
+- **Maintain device-level tracking & chain of custody.** Devices are tracked individually; a multi-device job must never collapse to a single outcome. Custody events belong at physical device receipt, not only on financial events.
+- **Respect multi-tenant isolation & role-based permissions.** Keep RESTRICTIVE tenant isolation intact and gate lab control points (recovery authorization, QA sign-off, data release, custody transfer) — do not treat the tenant as a shared CRM workspace.
+- **Hold to production-grade lab standards.** Forensic, legal, and customer-trust stakes are real (NDAs, destructive-attempt consent, certificates of destruction). Do not ship CRM-grade shortcuts on these surfaces.
+- **Do not implement until you understand the change in the context of the data recovery business process.** When in doubt, read `docs/data-recovery-workflow.md` (the canonical end-to-end reference) first.
+
+---
+
 ## Project Overview
 
-xSuite is an AI-powered, multi-tenant SaaS platform for the **data recovery industry**. It is a full ERP + CRM system that manages cases, devices, clients, finances, inventory, HR, and supplier relationships for data recovery labs.
+xSuite is an AI-powered, multi-tenant SaaS platform for the **data recovery industry**. It is a purpose-built ERP/CRM-grade platform for data recovery labs — managing cases, devices, chain of custody, clients, finances, inventory, HR, and supplier relationships. It applies ERP/CRM-grade rigor to lab operations; it is **not** a generic CRM (see the banner above and `docs/data-recovery-workflow.md`).
 
 **Stack:**
 - Frontend: React 18 + TypeScript + Vite + Tailwind CSS
