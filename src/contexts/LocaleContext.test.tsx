@@ -18,7 +18,15 @@ vi.mock('./TenantConfigContext', () => ({
   }),
 }));
 
-// Import after the mock is registered.
+// setLocale now persists the choice to the tenant. Mock the service write so the
+// test stays hermetic and importing it does not pull in the real Supabase client.
+// vi.hoisted initialises the spy before the hoisted vi.mock factory runs.
+const { updateTenantUiLanguage } = vi.hoisted(() => ({
+  updateTenantUiLanguage: vi.fn(async () => {}),
+}));
+vi.mock('../lib/tenantConfigService', () => ({ updateTenantUiLanguage }));
+
+// Import after the mocks are registered.
 import { LocaleProvider, useLocale } from './LocaleContext';
 
 function configWithLang(languageCode: string): TenantConfig {
@@ -38,6 +46,7 @@ function SetLocaleButton() {
 
 beforeEach(() => {
   refreshConfig.mockClear();
+  updateTenantUiLanguage.mockClear();
   mockConfig = DEFAULT_TENANT_CONFIG;
   localStorage.clear();
   document.documentElement.dir = '';
@@ -113,7 +122,7 @@ describe('LocaleContext', () => {
     expect(document.documentElement.lang).toBe('en');
   });
 
-  it('setLocale optimistically flips dir/lang/hint with no service write', async () => {
+  it('setLocale optimistically flips dir/lang/hint and persists to the tenant', async () => {
     mockConfig = configWithLang('en');
     await act(async () => {
       render(
@@ -133,8 +142,9 @@ describe('LocaleContext', () => {
     expect(document.documentElement.lang).toBe('ar');
     expect(i18n.language).toBe('ar');
     expect(localStorage.getItem('xsuite_locale_hint')).toBe('ar');
-    // 4a is plumbing-only: no tenant write / refreshConfig from setLocale.
-    expect(refreshConfig).not.toHaveBeenCalled();
+    // Now persistent: setLocale writes the tenant's ui_language then refreshes config.
+    expect(updateTenantUiLanguage).toHaveBeenCalledWith('tenant-1', 'ar');
+    expect(refreshConfig).toHaveBeenCalled();
   });
 
   it('useLocale exposes the effective locale', async () => {

@@ -14,7 +14,7 @@ async function fetchTenantConfig(tenantId: string): Promise<TenantConfig> {
     supabase
       .from('tenants')
       .select(`
-        id, name, theme,
+        id, name, theme, ui_language,
         currency_code, currency_symbol, decimal_places,
         tax_system, tax_label, tax_number_label, tax_number, default_tax_rate,
         locale_code, timezone, date_format, fiscal_year_start,
@@ -78,7 +78,10 @@ async function fetchTenantConfig(tenantId: string): Promise<TenantConfig> {
     },
     locale: {
       localeCode: defaultLocale?.locale_code || data.locale_code || 'en-US',
-      languageCode: (country?.language_code as string) || 'en',
+      // UI language / text-direction is a deliberate tenant choice, NOT a function
+      // of country. country.language_code is intentionally no longer read here, so
+      // an English-operating lab in an Arabic-language country defaults to LTR.
+      languageCode: (data.ui_language as string) || 'en',
       postalCodeLabel: (country?.postal_code_label as string) || 'Postal Code',
     },
     theme: THEMES.includes(data.theme as Theme) ? (data.theme as Theme) : DEFAULT_THEME,
@@ -94,6 +97,21 @@ export async function getTenantConfig(tenantId: string): Promise<TenantConfig> {
   const config = await fetchTenantConfig(tenantId);
   configCache.set(tenantId, { config, timestamp: Date.now() });
   return config;
+}
+
+export async function updateTenantUiLanguage(tenantId: string, language: 'en' | 'ar'): Promise<void> {
+  if (language !== 'en' && language !== 'ar') {
+    throw new Error(`Invalid UI language: ${language}`);
+  }
+  const { error } = await supabase
+    .from('tenants')
+    .update({ ui_language: language })
+    .eq('id', tenantId);
+  if (error) {
+    logger.error('Failed to update tenant UI language:', error);
+    throw error;
+  }
+  invalidateTenantConfigCache(tenantId);
 }
 
 export function invalidateTenantConfigCache(tenantId: string): void {

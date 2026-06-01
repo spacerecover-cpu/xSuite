@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '../../contexts/PermissionsContext';
 import { useSidebarPreferences } from '../../contexts/SidebarPreferencesContext';
+import { useLocale } from '../../contexts/LocaleContext';
 import {
   LayoutDashboard,
   FolderOpen,
@@ -51,6 +52,7 @@ export const Sidebar: React.FC = () => {
   const { hasModuleAccess } = usePermissions();
   const { casesTodayCount, invoicesAttentionCount, pendingQuotesCount, lowStockCount } = useSidebarBadges();
   const { position, isCollapsed, toggleCollapsed, expandedSection, setExpandedSection } = useSidebarPreferences();
+  const { locale } = useLocale();
   const navigate = useNavigate();
   const [userCardHovered, setUserCardHovered] = useState(false);
   const [helpHovered, setHelpHovered] = useState(false);
@@ -64,9 +66,13 @@ export const Sidebar: React.FC = () => {
     navigate('/login');
   };
 
-  // Sidebar side is a per-user preference. On the right, the divider + collapse
-  // affordance flip to the inner (content-facing) edge, and the chevron mirrors.
+  // Sidebar side is a per-user, physical preference. The first flex child sits on
+  // the inline-start edge — left in LTR, right in RTL — so push the sidebar to
+  // order-last only when the wanted physical side differs from that edge. The
+  // divider, collapse affordance, and chevron all key off the physical side.
+  const isRTL = locale === 'ar';
   const isRight = position === 'right';
+  const orderLast = isRTL ? !isRight : isRight;
   const CollapseChevron = isRight
     ? (isCollapsed ? ChevronLeft : ChevronRight)
     : (isCollapsed ? ChevronRight : ChevronLeft);
@@ -103,7 +109,7 @@ export const Sidebar: React.FC = () => {
     <aside
       className={`
         ${isCollapsed ? 'w-[72px]' : 'w-72'}
-        ${isRight ? 'order-last' : ''}
+        ${orderLast ? 'order-last' : ''}
         flex flex-col transition-all duration-300 ease-in-out flex-shrink-0
         relative
       `}

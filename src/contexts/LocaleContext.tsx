@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import i18n from '../lib/i18n';
 import { isRTLLanguage, normalizeLang } from '../lib/locale';
 import { useTenantConfig } from './TenantConfigContext';
+import { updateTenantUiLanguage } from '../lib/tenantConfigService';
+import { logger } from '../lib/logger';
 
 const LOCALE_HINT_KEY = 'xsuite_locale_hint';
 
@@ -9,12 +11,12 @@ type Locale = 'en' | 'ar';
 
 interface LocaleContextType {
   locale: Locale;
-  setLocale: (locale: Locale) => void;
+  setLocale: (locale: Locale) => Promise<void>;
 }
 
 const LocaleContext = createContext<LocaleContextType>({
   locale: 'en',
-  setLocale: () => {},
+  setLocale: async () => {},
 });
 
 function applyLocaleToDOM(lang: Locale): void {
@@ -32,8 +34,9 @@ function persistLocaleHint(lang: Locale): void {
 }
 
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
-  const { config } = useTenantConfig();
+  const { config, refreshConfig } = useTenantConfig();
   const tenantLang = normalizeLang(config.locale.languageCode);
+  const tenantId = config.tenantId;
 
   const [optimisticLang, setOptimisticLang] = useState<Locale | null>(null);
 
@@ -44,11 +47,19 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     persistLocaleHint(effectiveLang);
   }, [effectiveLang]);
 
-  // 4a is plumbing-only: setLocale is optimistic + persists the anti-flash hint.
-  // The per-tenant override (service write + refreshConfig) is a future additive change.
-  const setLocale = useCallback((next: Locale) => {
+  // Optimistically flip the UI now (DOM + i18n via the effect above), then persist
+  // the choice on the tenant and refresh config so it survives reloads and applies
+  // on every device. Country continues to drive currency/date/number formats.
+  const setLocale = useCallback(async (next: Locale) => {
     setOptimisticLang(next);
-  }, []);
+    if (!tenantId) return;
+    try {
+      await updateTenantUiLanguage(tenantId, next);
+      await refreshConfig();
+    } catch (err) {
+      logger.error('Failed to persist UI language:', err);
+    }
+  }, [tenantId, refreshConfig]);
 
   const value = useMemo(() => ({
     locale: effectiveLang,

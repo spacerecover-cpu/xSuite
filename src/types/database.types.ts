@@ -14301,6 +14301,7 @@ export type Database = {
           theme: string
           timezone: string
           trial_ends_at: string | null
+          ui_language: string
           updated_at: string
         }
         Insert: {
@@ -14338,6 +14339,7 @@ export type Database = {
           theme?: string
           timezone?: string
           trial_ends_at?: string | null
+          ui_language?: string
           updated_at?: string
         }
         Update: {
@@ -14375,6 +14377,7 @@ export type Database = {
           theme?: string
           timezone?: string
           trial_ends_at?: string | null
+          ui_language?: string
           updated_at?: string
         }
         Relationships: [
