@@ -2,14 +2,7 @@ import { supabase } from './supabaseClient';
 import { logAuditTrail } from './auditTrailService';
 import { sanitizeFilterValue } from './postgrestSanitizer';
 import { logger } from './logger';
-import { deriveInvoiceStatus } from './invoiceStatus';
-import { createFinancialTransaction } from './financialService';
-import { convertToBase, computeRealizedFx, roundMoney } from './financialMath';
-import { resolveRateContext, getBaseCurrency, getCurrencyDecimals } from './currencyService';
-import type { Database } from '../types/database.types';
-
-type PaymentInsert = Database['public']['Tables']['payments']['Insert'];
-type PaymentAllocationInsert = Database['public']['Tables']['payment_allocations']['Insert'];
+import { resolveRateContext } from './currencyService';
 
 export interface Payment {
   id?: string;
@@ -78,18 +71,6 @@ export interface PaymentWithDetails extends Payment {
     full_name: string;
   };
 }
-
-const getCurrentTenantId = async (): Promise<string> => {
-  const { data, error } = await supabase.rpc('get_current_tenant_id');
-  if (error) {
-    logger.error('Error fetching current tenant id:', error);
-    throw new Error('Unable to resolve current tenant');
-  }
-  if (!data) {
-    throw new Error('No active tenant for current session');
-  }
-  return data;
-};
 
 export const getNextPaymentNumber = async (): Promise<string> => {
   const { data, error } = await supabase.rpc('get_next_number', {
@@ -193,237 +174,46 @@ export const createPayment = async (
   payment: Omit<Payment, 'id' | 'payment_number' | 'created_at' | 'updated_at'>,
   allocations?: Array<{ invoice_id: string; amount: number }>
 ) => {
-  const paymentNumber = await getNextPaymentNumber();
-  const tenantId = await getCurrentTenantId();
+  if (!allocations || allocations.length === 0) {
+    // Money conservation: every unit of cash received must be allocated to an invoice.
+    // Unapplied/advance cash needs a credit model (Phase 4) before it can be accepted.
+    throw new Error('A payment must be allocated to at least one invoice.');
+  }
 
-  // Snapshot the payment's own currency + rate at the payment date. amount_base is
-  // the cash received expressed in base; realized FX vs each invoice's booked rate
-  // is posted during allocation, not here.
+  // Resolve the payment-date rate client-side (honouring any manual override). The RPC
+  // owns atomicity, FOR UPDATE locking, money-conservation validation, balance recompute,
+  // and the (append-only) ledger posting — see record_payment in the DB.
   const rc = await resolveRateContext(
     payment.currency,
     payment.payment_date,
     payment.exchange_rate ? { rate: payment.exchange_rate } : null,
   );
 
-  const insertPayload: PaymentInsert = {
-    tenant_id: tenantId,
-    payment_number: paymentNumber,
-    payment_date: payment.payment_date,
-    amount: payment.amount,
-    currency: rc.documentCurrency,
-    exchange_rate: rc.rate,
-    rate_source: rc.rateSource,
-    amount_base: convertToBase(payment.amount, rc.rate, rc.baseDecimals),
-    customer_id: payment.customer_id ?? null,
-    payment_method_id: payment.payment_method_id ?? null,
-    bank_account_id: payment.bank_account_id ?? null,
-    reference: payment.reference,
-    status: payment.status,
-    notes: payment.notes,
-    created_by: payment.created_by ?? null,
-  };
+  const { data, error } = await supabase.rpc('record_payment', {
+    p_payment: {
+      amount: payment.amount,
+      currency: rc.documentCurrency,
+      exchange_rate: rc.rate,
+      rate_source: rc.rateSource,
+      payment_date: payment.payment_date,
+      customer_id: payment.customer_id ?? null,
+      payment_method_id: payment.payment_method_id ?? null,
+      bank_account_id: payment.bank_account_id ?? null,
+      reference: payment.reference ?? null,
+      status: payment.status ?? 'completed',
+      notes: payment.notes ?? null,
+    },
+    p_allocations: allocations.map((a) => ({ invoice_id: a.invoice_id, amount: a.amount })),
+  });
 
-  const { data: paymentData, error: paymentError } = await supabase
-    .from('payments')
-    .insert([insertPayload])
-    .select()
-    .maybeSingle();
-
-  if (paymentError) throw paymentError;
-  if (!paymentData) {
+  if (error) throw error;
+  if (!data) {
     throw new Error('Failed to create payment record');
   }
 
-  if (allocations && allocations.length > 0) {
-    await allocatePaymentToInvoices(paymentData.id, allocations);
-  }
+  await logAuditTrail('create', 'payments', data.id, {}, { payment_number: data.payment_number, amount: payment.amount });
 
-  await logAuditTrail('create', 'payments', paymentData.id, {}, { payment_number: paymentNumber, amount: payment.amount });
-
-  return paymentData;
-};
-
-export const allocatePaymentToInvoices = async (
-  paymentId: string,
-  allocations: Array<{ invoice_id: string; amount: number }>
-) => {
-  const tenantId = await getCurrentTenantId();
-
-  const allocationRecords: PaymentAllocationInsert[] = allocations.map(alloc => ({
-    tenant_id: tenantId,
-    payment_id: paymentId,
-    invoice_id: alloc.invoice_id,
-    amount: alloc.amount,
-  }));
-
-  const { error: allocError } = await supabase
-    .from('payment_allocations')
-    .insert(allocationRecords);
-
-  if (allocError) throw allocError;
-
-  // The payment date drives the settlement rate for realized FX; the base currency
-  // and its decimals frame every *_base figure below.
-  const { data: paymentRow } = await supabase
-    .from('payments')
-    .select('payment_date, currency, exchange_rate')
-    .eq('id', paymentId)
-    .maybeSingle();
-  const paymentDate = paymentRow?.payment_date ?? new Date().toISOString().split('T')[0];
-  // The payment's settlement rate was frozen at createPayment (honouring any manual
-  // override). Realized FX measures it against each invoice's booked rate — we never
-  // re-derive it from the rates table, which would discard the override and (while the
-  // rate cron is dormant and exchange_rates is empty) throw on a cross-currency lookup.
-  // Sound under the Phase-1 SMB invariant (payment is in the invoice's currency, so the
-  // payment's frozen documentCurrency->base rate IS the settlement rate for that invoice).
-  const paymentRate = paymentRow?.exchange_rate ?? 1;
-  const baseCurrency = await getBaseCurrency();
-  const baseDecimals = await getCurrencyDecimals(baseCurrency);
-
-  // Track successfully updated invoices for rollback on failure (base fields included).
-  const updatedInvoices: Array<{
-    invoice_id: string;
-    original: {
-      amount_paid: number;
-      balance_due: number;
-      status: string;
-      amount_paid_base: number | null;
-      balance_due_base: number | null;
-    };
-  }> = [];
-
-  // Accumulated postings to write once all invoice updates have succeeded.
-  let baseAllocated = 0;
-  const currenciesTouched = new Set<string>();
-  const fxPostings: number[] = [];
-
-  try {
-    for (const alloc of allocations) {
-      const { data: invoice, error: fetchError } = await supabase
-        .from('invoices')
-        .select('total_amount, amount_paid, balance_due, status, currency, exchange_rate, amount_paid_base, balance_due_base')
-        .eq('id', alloc.invoice_id)
-        .maybeSingle();
-
-      if (fetchError) throw fetchError;
-      if (!invoice) {
-        throw new Error(`Invoice ${alloc.invoice_id} not found`);
-      }
-
-      // Save original state for rollback
-      updatedInvoices.push({
-        invoice_id: alloc.invoice_id,
-        original: {
-          amount_paid: invoice.amount_paid || 0,
-          balance_due: invoice.balance_due || 0,
-          status: invoice.status || 'sent',
-          amount_paid_base: invoice.amount_paid_base,
-          balance_due_base: invoice.balance_due_base,
-        },
-      });
-
-      const invCurrency = invoice.currency ?? baseCurrency;
-      const invoiceRate = invoice.exchange_rate ?? 1;
-      const docDecimals = await getCurrencyDecimals(invCurrency);
-
-      const newAmountPaid = roundMoney((invoice.amount_paid || 0) + alloc.amount, docDecimals);
-      const newAmountDue = roundMoney((invoice.total_amount || 0) - newAmountPaid, docDecimals);
-
-      // The receivable is carried at the invoice's BOOKED rate; the rate movement
-      // between booking and settlement is captured separately as realized FX below.
-      const newAmountPaidBase = convertToBase(newAmountPaid, invoiceRate, baseDecimals);
-      const newBalanceDueBase = convertToBase(Math.max(0, newAmountDue), invoiceRate, baseDecimals);
-
-      const newStatus = deriveInvoiceStatus(newAmountPaid, newAmountDue);
-
-      const { error: updateError } = await supabase
-        .from('invoices')
-        .update({
-          amount_paid: newAmountPaid,
-          balance_due: Math.max(0, newAmountDue),
-          amount_paid_base: newAmountPaidBase,
-          balance_due_base: newBalanceDueBase,
-          status: newStatus,
-        })
-        .eq('id', alloc.invoice_id);
-
-      if (updateError) throw updateError;
-
-      baseAllocated = roundMoney(baseAllocated + convertToBase(alloc.amount, invoiceRate, baseDecimals), baseDecimals);
-      currenciesTouched.add(invCurrency);
-
-      // Realized FX only exists when the document currency differs from base AND the
-      // payment's frozen rate moved from the invoice's booked rate. Same-currency
-      // settlements are structurally zero, so we skip them.
-      if (invCurrency !== baseCurrency) {
-        const realizedFx = computeRealizedFx(alloc.amount, paymentRate, invoiceRate, baseDecimals);
-        if (realizedFx !== 0) fxPostings.push(realizedFx);
-      }
-    }
-
-    // Income posting in the document currency, with the exact base equivalent. For a
-    // uniform-currency payment we tag the effective booked rate; mixed-currency
-    // allocations (Phase 2) fall back to a base-denominated row.
-    const totalAllocated = allocations.reduce((sum, a) => sum + a.amount, 0);
-    const uniformCurrency = currenciesTouched.size === 1 ? [...currenciesTouched][0] : null;
-    await createFinancialTransaction({
-      transaction_date: paymentDate,
-      amount: uniformCurrency ? totalAllocated : baseAllocated,
-      transaction_type: 'income',
-      description: `Payment received`,
-      reference_type: 'payment',
-      reference_id: paymentId,
-      currency: uniformCurrency ?? baseCurrency,
-      exchange_rate: uniformCurrency && totalAllocated !== 0 ? baseAllocated / totalAllocated : 1,
-      amount_base: baseAllocated,
-    });
-
-    // One fx_gain / fx_loss ledger row per allocation that realized a non-zero delta.
-    for (const fx of fxPostings) {
-      await createFinancialTransaction({
-        transaction_date: paymentDate,
-        amount: Math.abs(fx),
-        transaction_type: fx > 0 ? 'fx_gain' : 'fx_loss',
-        description: `Realized FX ${fx > 0 ? 'gain' : 'loss'} on payment allocation`,
-        reference_type: 'payment',
-        reference_id: paymentId,
-        currency: baseCurrency,
-        exchange_rate: 1,
-        amount_base: Math.abs(fx),
-      });
-    }
-  } catch (error) {
-    // Rollback: reverse allocation insert
-    await supabase
-      .from('payment_allocations')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('payment_id', paymentId);
-
-    // Rollback: restore original invoice states (including base fields)
-    for (const updated of updatedInvoices) {
-      await supabase
-        .from('invoices')
-        .update({
-          amount_paid: updated.original.amount_paid,
-          balance_due: updated.original.balance_due,
-          amount_paid_base: updated.original.amount_paid_base,
-          balance_due_base: updated.original.balance_due_base,
-          status: updated.original.status,
-        })
-        .eq('id', updated.invoice_id);
-    }
-
-    // Rollback: compensate any income / fx ledger rows already posted for this payment
-    // before the failure, so a reversed allocation never leaves orphan revenue behind.
-    // (A single-transaction RPC would make this atomic — tracked as Wave-3 follow-up.)
-    await supabase
-      .from('financial_transactions')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('reference_type', 'payment')
-      .eq('reference_id', paymentId);
-
-    throw error;
-  }
+  return data;
 };
 
 export const updatePaymentStatus = async (
@@ -446,60 +236,10 @@ export const updatePaymentStatus = async (
 };
 
 export const voidPayment = async (paymentId: string) => {
-  const { data: allocations, error: allocError } = await supabase
-    .from('payment_allocations')
-    .select('invoice_id, amount')
-    .eq('payment_id', paymentId);
-
-  if (allocError) throw allocError;
-
-  const baseCurrency = await getBaseCurrency();
-  const baseDecimals = await getCurrencyDecimals(baseCurrency);
-
-  for (const alloc of allocations || []) {
-    const { data: invoice, error: fetchError } = await supabase
-      .from('invoices')
-      .select('total_amount, amount_paid, currency, exchange_rate')
-      .eq('id', alloc.invoice_id)
-      .maybeSingle();
-
-    if (fetchError) throw fetchError;
-    if (!invoice) {
-      throw new Error(`Invoice ${alloc.invoice_id} not found`);
-    }
-
-    const invoiceRate = invoice.exchange_rate ?? 1;
-    const docDecimals = await getCurrencyDecimals(invoice.currency ?? baseCurrency);
-    const newAmountPaid = Math.max(0, roundMoney((invoice.amount_paid || 0) - alloc.amount, docDecimals));
-    const newAmountDue = roundMoney((invoice.total_amount || 0) - newAmountPaid, docDecimals);
-
-    const newStatus = deriveInvoiceStatus(newAmountPaid, newAmountDue);
-
-    await supabase
-      .from('invoices')
-      .update({
-        amount_paid: newAmountPaid,
-        balance_due: newAmountDue,
-        amount_paid_base: convertToBase(newAmountPaid, invoiceRate, baseDecimals),
-        balance_due_base: convertToBase(newAmountDue, invoiceRate, baseDecimals),
-        status: newStatus,
-      })
-      .eq('id', alloc.invoice_id);
-  }
-
-  const { error: deleteAllocError } = await supabase
-    .from('payment_allocations')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('payment_id', paymentId);
-
-  if (deleteAllocError) throw deleteAllocError;
-
-  const { data, error } = await supabase
-    .from('payments')
-    .update({ status: 'refunded' })
-    .eq('id', paymentId)
-    .select()
-    .maybeSingle();
+  // Atomic reversal: the RPC reverses each invoice balance, soft-deletes the allocations,
+  // and posts a REVERSING (negative) income ledger entry rather than deleting the original
+  // posting — keeping the ledger append-only. See void_payment in the DB.
+  const { data, error } = await supabase.rpc('void_payment', { p_payment_id: paymentId });
 
   if (error) throw error;
 
@@ -676,7 +416,6 @@ export const paymentsService = {
   fetchPayments,
   fetchPaymentById,
   createPayment,
-  allocatePaymentToInvoices,
   updatePaymentStatus,
   voidPayment,
   getPaymentsByCase,

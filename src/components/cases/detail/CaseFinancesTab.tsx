@@ -434,7 +434,7 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
                       </p>
                     </div>
                   </div>
-                  <p className="text-sm font-bold text-success">{formatDate(payment.payment_date)}</p>
+                  <p className="text-sm font-bold text-success">{formatCurrency(payment.amount)}</p>
                 </div>
               ))}
             </div>

@@ -107,25 +107,53 @@ export async function getCaseExpenses(caseId: string): Promise<CaseExpense[]> {
 }
 
 export async function getCasePayments(caseId: string): Promise<CasePayment[]> {
+  // Case→payment linkage lives in payment_allocations — the record-payment write path
+  // does not populate payments.invoice_id/case_id, so resolving through payments directly
+  // returns nothing. Resolve via allocations → invoices for this case instead. The amount
+  // shown is the amount allocated to this case (correct when a payment spans cases/invoices).
   const { data, error } = await supabase
-    .from('payments')
+    .from('payment_allocations')
     .select(`
       id,
-      payment_number,
-      payment_date,
       amount,
-      payment_method:master_payment_methods(name),
+      created_at,
       invoice:invoices!inner(invoice_number, case_id),
-      customer:customers_enhanced(customer_name)
+      payment:payments!inner(
+        payment_number,
+        payment_date,
+        payment_method:master_payment_methods(name),
+        customer:customers_enhanced(customer_name)
+      )
     `)
     .eq('invoices.case_id', caseId)
-    .order('payment_date', { ascending: false });
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false });
 
   if (error) {
     return [];
   }
 
-  return (data || []) as CasePayment[];
+  type AllocationRow = {
+    id: string;
+    amount: number | string | null;
+    invoice: { invoice_number: string } | null;
+    payment: {
+      payment_number: string | null;
+      payment_date: string | null;
+      payment_method: { name: string } | null;
+      customer: { customer_name: string } | null;
+    } | null;
+  };
+
+  return ((data || []) as unknown as AllocationRow[]).map((row) => ({
+    id: row.id,
+    payment_number: row.payment?.payment_number ?? '',
+    payment_date: row.payment?.payment_date ?? '',
+    amount: Number(row.amount) || 0,
+    payment_method: row.payment?.payment_method ?? null,
+    invoice: row.invoice ? { invoice_number: row.invoice.invoice_number } : null,
+    customer: row.payment?.customer ?? null,
+  }));
 }
 
 export async function linkExpenseToCase(expenseId: string, caseId: string): Promise<void> {
