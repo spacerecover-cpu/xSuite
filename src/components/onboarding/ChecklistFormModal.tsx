@@ -173,6 +173,7 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
       onClose={onClose}
       title={isEditing ? 'Edit Checklist' : 'New Onboarding Checklist'}
       size="lg"
+      closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-5">
         <div>

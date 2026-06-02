@@ -92,6 +92,7 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
       onClose={onClose}
       title={isEditing ? 'Edit Feature' : 'Add Feature'}
       size="md"
+      closeOnBackdrop={false}
       initialFocusRef={firstFieldRef}
     >
       <form

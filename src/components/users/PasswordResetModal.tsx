@@ -63,7 +63,7 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Reset User Password" size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title="Reset User Password" size="md" closeOnBackdrop={false}>
       <div className="space-y-4">
         <div className="flex items-start gap-3 p-4 bg-warning-muted border border-warning/30 rounded-lg">
           <AlertCircle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />

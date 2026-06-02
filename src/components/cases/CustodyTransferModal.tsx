@@ -171,6 +171,7 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
       title={getTitle()}
       icon={ArrowRightLeft}
       size="2xl"
+      closeOnBackdrop={false}
     >
       <div className="space-y-4">
         {error && (

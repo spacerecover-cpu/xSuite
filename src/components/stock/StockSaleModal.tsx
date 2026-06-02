@@ -315,6 +315,7 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
       title="New Stock Sale"
       icon={ShoppingCart}
       maxWidth="7xl"
+      closeOnBackdrop={false}
     >
       <div className="flex flex-col lg:flex-row gap-4 min-h-0" style={{ height: 'calc(80vh - 80px)' }}>
         <div className="flex-1 flex flex-col gap-3 overflow-hidden">

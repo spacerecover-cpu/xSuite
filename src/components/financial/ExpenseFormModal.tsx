@@ -145,6 +145,7 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
       onClose={handleClose}
       title={initialData?.id ? 'Edit Expense' : 'New Expense'}
       size="lg"
+      closeOnBackdrop={false}
     >
       <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-6">
         <div className="grid grid-cols-2 gap-4">

@@ -86,6 +86,7 @@ export const PreserveLongTermModal: React.FC<PreserveLongTermModalProps> = ({
       title="Preserve Clone Long-term"
       icon={Archive}
       maxWidth="3xl"
+      closeOnBackdrop={false}
     >
       <div>
           <div className="mb-3 p-2.5 bg-info-muted border-l-4 border-info rounded">

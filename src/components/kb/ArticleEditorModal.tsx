@@ -156,6 +156,7 @@ export const ArticleEditorModal: React.FC<ArticleEditorModalProps> = ({ isOpen, 
       icon={BookOpen}
       maxWidth="7xl"
       size="large"
+      closeOnBackdrop={false}
     >
       <div className="flex h-[80vh] overflow-hidden -mx-6 -mb-6">
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">

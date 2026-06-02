@@ -226,6 +226,7 @@ export const CreateCloneDriveModal: React.FC<CreateCloneDriveModalProps> = ({
       title={caseNo ? `Create Clone Drive — Case #${caseNo}` : 'Create Clone Drive'}
       icon={HardDriveDownload}
       maxWidth="3xl"
+      closeOnBackdrop={false}
     >
       <form
         onSubmit={(e) => {

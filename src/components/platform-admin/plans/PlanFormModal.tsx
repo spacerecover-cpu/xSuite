@@ -70,6 +70,7 @@ export const PlanFormModal: React.FC<PlanFormModalProps> = ({ isOpen, onClose })
       onClose={onClose}
       title="Create Subscription Plan"
       size="lg"
+      closeOnBackdrop={false}
       initialFocusRef={nameInputRef}
     >
       <form

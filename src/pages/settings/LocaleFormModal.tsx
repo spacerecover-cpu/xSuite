@@ -82,6 +82,7 @@ export const LocaleFormModal: React.FC<LocaleFormModalProps> = ({
       onClose={onClose}
       title={editingLocale ? 'Edit Accounting Locale' : 'Add Accounting Locale'}
       size="lg"
+      closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="grid grid-cols-2 gap-4">

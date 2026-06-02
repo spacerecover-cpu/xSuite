@@ -131,6 +131,7 @@ export const CandidateFormModal: React.FC<Props> = ({ isOpen, onClose, candidate
       onClose={onClose}
       title={isEditing ? 'Edit Candidate' : `Add Candidate — ${job.title}`}
       size="lg"
+      closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">

@@ -111,7 +111,7 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
   const validCount = rows.filter((r) => r.stockItemId && Number(r.quantity) > 0).length;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Receive Stock from Purchase Order" size="xl">
+    <Modal isOpen={isOpen} onClose={onClose} title="Receive Stock from Purchase Order" size="xl" closeOnBackdrop={false}>
       <div className="space-y-4">
         <p className="text-sm text-slate-600">
           Match each line item to a stock item and confirm quantities received. Items without a linked stock item will be skipped.

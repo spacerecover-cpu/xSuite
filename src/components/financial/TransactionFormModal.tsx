@@ -109,7 +109,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="New Transaction" size="md">
+    <Modal isOpen={isOpen} onClose={handleClose} title="New Transaction" size="md" closeOnBackdrop={false}>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
           <button

@@ -169,7 +169,7 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Perform Integrity Check" icon={Shield} maxWidth="3xl">
+    <Modal isOpen={isOpen} onClose={onClose} title="Perform Integrity Check" icon={Shield} maxWidth="3xl" closeOnBackdrop={false}>
       <div className="space-y-4">
         {performCheckMutation.error && (
           <div className="bg-danger-muted border border-danger/30 rounded-lg p-3 flex items-start gap-2">

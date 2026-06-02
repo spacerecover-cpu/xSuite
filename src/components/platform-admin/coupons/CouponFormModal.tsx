@@ -65,6 +65,7 @@ export const CouponFormModal: React.FC<CouponFormModalProps> = ({ isOpen, onClos
       onClose={onClose}
       title={isEditing ? 'Edit Coupon' : 'Create Coupon'}
       size="md"
+      closeOnBackdrop={false}
       initialFocusRef={codeInputRef}
     >
         <form

@@ -157,7 +157,7 @@ export const AnnouncementFormModal: React.FC<AnnouncementFormModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} maxWidth="7xl">
+    <Modal isOpen={isOpen} onClose={onClose} maxWidth="7xl" closeOnBackdrop={false}>
       <form onSubmit={handleSubmit} className="flex flex-col h-[90vh]">
         <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-200">
           <h2 className="text-2xl font-bold text-slate-900">

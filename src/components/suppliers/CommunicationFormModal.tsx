@@ -117,7 +117,7 @@ export default function CommunicationFormModal({ isOpen, onClose, onSuccess, sup
   ];
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={communication ? 'Edit Communication' : 'Log Communication'}>
+    <Modal isOpen={isOpen} onClose={onClose} title={communication ? 'Edit Communication' : 'Log Communication'} closeOnBackdrop={false}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">

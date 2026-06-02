@@ -194,6 +194,7 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
       onClose={onClose}
       title={isEditing ? 'Edit Performance Review' : 'New Performance Review'}
       size="lg"
+      closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-4">
         <div>

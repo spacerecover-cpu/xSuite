@@ -84,6 +84,7 @@ export const MarkAsDeliveredModal: React.FC<MarkAsDeliveredModalProps> = ({
       icon={Truck}
       maxWidth="3xl"
       initialFocusRef={retentionInputRef}
+      closeOnBackdrop={false}
     >
       <div>
         <div>

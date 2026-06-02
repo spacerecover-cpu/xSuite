@@ -157,7 +157,7 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={isEditing ? 'Edit Job' : 'Post New Job'} size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title={isEditing ? 'Edit Job' : 'Post New Job'} size="lg" closeOnBackdrop={false}>
       <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">

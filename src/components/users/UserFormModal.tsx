@@ -111,6 +111,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
       onClose={onClose}
       title={mode === 'create' ? 'Add New User' : 'Edit User'}
       size="lg"
+      closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (

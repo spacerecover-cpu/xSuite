@@ -498,6 +498,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
       title={initialData ? 'Edit Invoice' : 'Create New Invoice'}
       size="xl"
       headerBadges={headerBadges}
+      closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit} className="space-y-3">
 

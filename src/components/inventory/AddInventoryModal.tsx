@@ -353,6 +353,7 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({ isOpen, onClose, 
       title={itemId ? "Edit Inventory Item" : "Add Inventory Item"}
       icon={Package}
       maxWidth="7xl"
+      closeOnBackdrop={false}
       headerAction={
         nextInventoryNumber && (
           <div className="flex items-center gap-2 px-3 py-1.5 bg-info-muted border border-info/30 rounded-lg">

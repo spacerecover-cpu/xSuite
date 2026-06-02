@@ -269,6 +269,7 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
       onClose={onClose}
       title={singleInvoiceMode ? "Record Payment for Invoice" : "Record Payment Receipt"}
       size="large"
+      closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && (

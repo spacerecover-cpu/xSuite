@@ -119,7 +119,7 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Device Checkout">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Device Checkout" closeOnBackdrop={false}>
       <div className="space-y-6">
         <div className="bg-info-muted border border-info/30 rounded-lg p-4">
           <div className="flex items-center gap-2 text-info font-semibold mb-2">

@@ -134,6 +134,7 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
       title="Send Document via Email"
       icon={Mail}
       size="lg"
+      closeOnBackdrop={false}
     >
       {success ? (
         <div className="flex flex-col items-center justify-center py-12">

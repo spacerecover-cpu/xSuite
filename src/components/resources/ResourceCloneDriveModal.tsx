@@ -225,6 +225,7 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
       title={editingId ? `Edit Clone Drive ${cloneIdLabel}` : 'Add Clone Drive to Resources'}
       icon={HardDrive}
       maxWidth="4xl"
+      closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (

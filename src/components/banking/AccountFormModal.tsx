@@ -196,7 +196,7 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={initialData ? 'Edit Account' : 'Add New Account'} size="large">
+    <Modal isOpen={isOpen} onClose={onClose} title={initialData ? 'Edit Account' : 'Add New Account'} size="large" closeOnBackdrop={false}>
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
           <div className="bg-danger-muted border border-danger/30 rounded-lg p-3 flex items-start gap-2">

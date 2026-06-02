@@ -120,7 +120,7 @@ export default function ContactFormModal({ isOpen, onClose, onSuccess, supplierI
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={contact ? 'Edit Contact' : 'Add New Contact'}>
+    <Modal isOpen={isOpen} onClose={onClose} title={contact ? 'Edit Contact' : 'Add New Contact'} closeOnBackdrop={false}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">

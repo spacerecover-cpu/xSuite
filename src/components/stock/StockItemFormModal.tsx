@@ -189,6 +189,7 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
       title={item ? 'Edit Stock Item' : 'New Stock Item'}
       size="xl"
       icon={Package}
+      closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-0">
         <div className="flex border-b border-slate-200 mb-5 -mx-4 px-4">

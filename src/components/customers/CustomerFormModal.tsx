@@ -303,6 +303,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         onClose={handleClose}
         title="Add New Customer"
         icon={User}
+        closeOnBackdrop={false}
       >
         <form onSubmit={handleSubmit} className="space-y-1">
 

@@ -434,6 +434,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
       title={initialData ? 'Edit Quote' : 'Create New Quote'}
       size="xl"
       headerBadges={headerBadges}
+      closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit} className="space-y-3">
 

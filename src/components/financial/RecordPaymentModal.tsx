@@ -242,7 +242,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   const totalAllocated = allocations.reduce((sum, a) => sum + a.allocation_amount, 0);
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Record Payment" size="lg">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Record Payment" size="lg" closeOnBackdrop={false}>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
