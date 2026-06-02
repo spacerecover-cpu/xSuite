@@ -460,8 +460,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
         const { data: insertedDevices, error: devicesError } = await supabase
           .from('case_devices')
           .insert(devicesToInsert.map(({ _wizard_id: _w, ...rest }) => rest))
-          .select('id')
-          .order('created_at', { ascending: true });
+          .select('id');
 
         if (devicesError) {
           logger.error('Error inserting devices:', devicesError);
