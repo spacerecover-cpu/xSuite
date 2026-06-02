@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
@@ -56,6 +56,12 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
   const isEditMode = !!deviceData;
   const { profile } = useAuth();
   const toast = useToast();
+  const passwordId = useId();
+  const symptomsId = useId();
+  const recoveryNotesId = useId();
+  const roleNotesId = useId();
+  const physicalDamageId = useId();
+  const technicalNotesId = useId();
 
   const [formData, setFormData] = useState({
     device_role_id: '',
@@ -545,7 +551,7 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
 
   return (
     <>
-      <Modal isOpen={isOpen} onClose={onClose} title={isEditMode ? 'Edit Device' : 'Add Device'} maxWidth="4xl">
+      <Modal isOpen={isOpen} onClose={onClose} title={isEditMode ? 'Edit Device' : 'Add Device'} maxWidth="4xl" closeOnBackdrop={false}>
         <div className="space-y-4">
           <div className="flex items-center gap-3 mb-4 p-4 bg-slate-50 rounded-lg">
             <HardDrive className="w-5 h-5 text-warning" />
@@ -700,11 +706,12 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
             {showAdvancedOptions && (
               <>
                 <div className="col-span-3">
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label htmlFor={passwordId} className="block text-sm font-medium text-slate-700 mb-2">
                     Device Password
                   </label>
                   <div className="flex items-center gap-2">
                     <input
+                      id={passwordId}
                       type={showPassword ? 'text' : 'password'}
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -737,10 +744,11 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
                 {isPatientRole && (
                   <>
                     <div className="col-span-3">
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                      <label htmlFor={symptomsId} className="block text-sm font-medium text-slate-700 mb-2">
                         Problem Description
                       </label>
                       <textarea
+                        id={symptomsId}
                         value={formData.symptoms}
                         onChange={(e) => setFormData({ ...formData, symptoms: e.target.value })}
                         placeholder="Describe the device problem or symptoms..."
@@ -750,10 +758,11 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
                     </div>
 
                     <div className="col-span-3">
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                      <label htmlFor={recoveryNotesId} className="block text-sm font-medium text-slate-700 mb-2">
                         Recovery Requirements
                       </label>
                       <textarea
+                        id={recoveryNotesId}
                         value={formData.recovery_notes}
                         onChange={(e) => setFormData({ ...formData, recovery_notes: e.target.value })}
                         placeholder="Specify what data needs to be recovered..."
@@ -765,10 +774,11 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
                 )}
 
                 <div className="col-span-3">
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label htmlFor={roleNotesId} className="block text-sm font-medium text-slate-700 mb-2">
                     Role-Specific Notes
                   </label>
                   <textarea
+                    id={roleNotesId}
                     value={formData.role_notes}
                     onChange={(e) => setFormData({ ...formData, role_notes: e.target.value })}
                     placeholder="Additional notes specific to this device role..."
@@ -964,10 +974,11 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
                       <h4 className="font-semibold text-sm text-slate-800">Additional Notes</h4>
                       <div className="space-y-3">
                         <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-2">
+                          <label htmlFor={physicalDamageId} className="block text-sm font-medium text-slate-700 mb-2">
                             Physical Damage Notes
                           </label>
                           <textarea
+                            id={physicalDamageId}
                             value={diagnosticsFormData.physical_damage_notes}
                             onChange={(e) => setDiagnosticsFormData({ ...diagnosticsFormData, physical_damage_notes: e.target.value })}
                             placeholder="Describe any physical damage observed..."
@@ -976,10 +987,11 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-2">
+                          <label htmlFor={technicalNotesId} className="block text-sm font-medium text-slate-700 mb-2">
                             Technical Notes
                           </label>
                           <textarea
+                            id={technicalNotesId}
                             value={diagnosticsFormData.technical_notes}
                             onChange={(e) => setDiagnosticsFormData({ ...diagnosticsFormData, technical_notes: e.target.value })}
                             placeholder="Additional technical observations..."

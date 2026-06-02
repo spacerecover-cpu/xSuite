@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -45,6 +45,7 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
   const [notes, setNotes] = useState('');
   const [amountError, setAmountError] = useState<string | null>(null);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
+  const firstFieldRef = useRef<HTMLInputElement>(null);
 
   const { data: categories = [] } = useQuery({
     queryKey: ['expense_categories'],
@@ -145,6 +146,8 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
       onClose={handleClose}
       title={initialData?.id ? 'Edit Expense' : 'New Expense'}
       size="lg"
+      closeOnBackdrop={false}
+      initialFocusRef={firstFieldRef}
     >
       <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-6">
         <div className="grid grid-cols-2 gap-4">
@@ -155,6 +158,7 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
             <div className="relative">
               <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
               <Input
+                ref={firstFieldRef}
                 type="date"
                 value={expenseDate}
                 onChange={(e) => setExpenseDate(e.target.value)}
@@ -190,12 +194,13 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label htmlFor="expense-description" className="block text-sm font-medium text-slate-700 mb-1">
             Description
           </label>
           <div className="relative">
             <FileText className="absolute left-3 top-3 text-slate-400 w-4 h-4" />
             <textarea
+              id="expense-description"
               value={description}
               onChange={(e) => {
                 setDescription(e.target.value);
@@ -226,12 +231,13 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor="expense-category" className="block text-sm font-medium text-slate-700 mb-1">
               Category
             </label>
             <div className="relative">
               <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
               <select
+                id="expense-category"
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
                 className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
@@ -249,12 +255,13 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor="expense-case" className="block text-sm font-medium text-slate-700 mb-1">
               Link to Case (Optional)
             </label>
             <div className="relative">
               <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
               <select
+                id="expense-case"
                 value={caseId}
                 onChange={(e) => setCaseId(e.target.value)}
                 className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
@@ -270,10 +277,11 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor="expense-payment-method" className="block text-sm font-medium text-slate-700 mb-1">
               Payment Method
             </label>
             <select
+              id="expense-payment-method"
               value={paymentMethodId}
               onChange={(e) => setPaymentMethodId(e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
@@ -289,10 +297,11 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label htmlFor="expense-notes" className="block text-sm font-medium text-slate-700 mb-1">
             Notes (Optional)
           </label>
           <textarea
+            id="expense-notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={2}

@@ -171,6 +171,7 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
       title={getTitle()}
       icon={ArrowRightLeft}
       size="2xl"
+      closeOnBackdrop={false}
     >
       <div className="space-y-4">
         {error && (
@@ -219,10 +220,11 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label htmlFor="custody-transfer-reason" className="block text-sm font-medium text-slate-700 mb-2">
                 Transfer Reason <span className="text-danger">*</span>
               </label>
               <textarea
+                id="custody-transfer-reason"
                 value={transferReason}
                 onChange={(e) => setTransferReason(e.target.value)}
                 rows={3}
@@ -258,10 +260,11 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label htmlFor="custody-condition-before" className="block text-sm font-medium text-slate-700 mb-2">
                   Condition Before Transfer
                 </label>
                 <textarea
+                  id="custody-condition-before"
                   value={conditionBefore}
                   onChange={(e) => setConditionBefore(e.target.value)}
                   rows={2}
@@ -346,10 +349,11 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label htmlFor="custody-condition-after" className="block text-sm font-medium text-slate-700 mb-2">
                 Condition After Transfer
               </label>
               <textarea
+                id="custody-condition-after"
                 value={conditionAfter}
                 onChange={(e) => setConditionAfter(e.target.value)}
                 rows={3}
@@ -388,10 +392,11 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label htmlFor="custody-rejection-reason" className="block text-sm font-medium text-slate-700 mb-2">
                 Rejection Reason <span className="text-danger">*</span>
               </label>
               <textarea
+                id="custody-rejection-reason"
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 rows={4}

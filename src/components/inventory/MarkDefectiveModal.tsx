@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -26,6 +26,9 @@ export function MarkDefectiveModal({
   const [usageNotes, setUsageNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const defectReasonRef = useRef<HTMLInputElement>(null);
+  const defectReasonId = useId();
+  const usageNotesId = useId();
 
   const handleReset = () => {
     setDefectReason('');
@@ -78,6 +81,7 @@ export function MarkDefectiveModal({
       onClose={handleClose}
       title="Mark as Defective"
       size="md"
+      initialFocusRef={defectReasonRef}
     >
       <div className="space-y-2">
         <div className="bg-danger-muted border border-danger/30 rounded-lg p-2">
@@ -126,10 +130,12 @@ export function MarkDefectiveModal({
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">
+          <label htmlFor={defectReasonId} className="block text-xs font-medium text-slate-700 mb-1">
             Defect Reason <span className="text-danger">*</span>
           </label>
           <Input
+            id={defectReasonId}
+            ref={defectReasonRef}
             type="text"
             value={defectReason}
             onChange={(e) => setDefectReason(e.target.value)}
@@ -162,10 +168,11 @@ export function MarkDefectiveModal({
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">
+          <label htmlFor={usageNotesId} className="block text-xs font-medium text-slate-700 mb-1">
             Additional Notes (Optional)
           </label>
           <textarea
+            id={usageNotesId}
             value={usageNotes}
             onChange={(e) => setUsageNotes(e.target.value)}
             rows={2}

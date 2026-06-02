@@ -312,7 +312,7 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
               {selectedOption ? selectedOption.name : resolvedPlaceholder}
             </span>
             <div className="flex items-center gap-1">
-              {value && !disabled && clearable && (
+              {value && !disabled && clearable && !required && (
                 <button
                   onClick={handleClear}
                   aria-label={t('ui.select.clear')}

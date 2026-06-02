@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useId, useRef, useState } from 'react';
 import { Printer, Download, X, Plus, Minus } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -31,6 +31,9 @@ const DEFAULT_CONFIG: LabelConfig = {
 
 export const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({ items, onClose }) => {
   const toast = useToast();
+  const companyFieldRef = useRef<HTMLInputElement>(null);
+  const companyFieldId = useId();
+  const locationFieldId = useId();
   const [config, setConfig] = useState<LabelConfig>(DEFAULT_CONFIG);
   const [isPrinting, setIsPrinting] = useState(false);
 
@@ -71,7 +74,7 @@ export const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({ items, onClo
   };
 
   return (
-    <Modal isOpen onClose={onClose} title="Print Stock Labels" size="md">
+    <Modal isOpen onClose={onClose} title="Print Stock Labels" size="md" initialFocusRef={companyFieldRef}>
       <div className="space-y-5">
         <div className="bg-slate-50 rounded-lg border border-slate-200 p-4">
           <p className="text-sm text-slate-600">
@@ -93,8 +96,10 @@ export const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({ items, onClo
           <h4 className="text-sm font-semibold text-slate-700">Label Options</h4>
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Company Name</label>
+            <label htmlFor={companyFieldId} className="block text-xs font-medium text-slate-600 mb-1">Company Name</label>
             <input
+              ref={companyFieldRef}
+              id={companyFieldId}
               type="text"
               value={config.companyName}
               onChange={(e) => set('companyName', e.target.value)}
@@ -104,8 +109,9 @@ export const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({ items, onClo
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Location</label>
+            <label htmlFor={locationFieldId} className="block text-xs font-medium text-slate-600 mb-1">Location</label>
             <input
+              id={locationFieldId}
               type="text"
               value={config.locationName}
               onChange={(e) => set('locationName', e.target.value)}

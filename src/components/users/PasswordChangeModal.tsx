@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useId } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -14,6 +14,10 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
   isOpen,
   userName,
 }) => {
+  const firstFieldRef = useRef<HTMLInputElement>(null);
+  const currentPasswordId = useId();
+  const newPasswordId = useId();
+  const confirmPasswordId = useId();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -111,6 +115,7 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
       title="Change Your Password"
       size="md"
       showCloseButton={false}
+      initialFocusRef={firstFieldRef}
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="flex items-start gap-3 p-4 bg-warning-muted border border-warning/30 rounded-lg">
@@ -134,7 +139,7 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
         )}
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label htmlFor={currentPasswordId} className="block text-sm font-medium text-slate-700 mb-2">
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4" />
               Current Password
@@ -142,6 +147,8 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
           </label>
           <div className="relative">
             <Input
+              ref={firstFieldRef}
+              id={currentPasswordId}
               type={showCurrentPassword ? 'text' : 'password'}
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
@@ -160,7 +167,7 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label htmlFor={newPasswordId} className="block text-sm font-medium text-slate-700 mb-2">
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4" />
               New Password
@@ -168,6 +175,7 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
           </label>
           <div className="relative">
             <Input
+              id={newPasswordId}
               type={showNewPassword ? 'text' : 'password'}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
@@ -224,7 +232,7 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label htmlFor={confirmPasswordId} className="block text-sm font-medium text-slate-700 mb-2">
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4" />
               Confirm New Password
@@ -232,6 +240,7 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
           </label>
           <div className="relative">
             <Input
+              id={confirmPasswordId}
               type={showConfirmPassword ? 'text' : 'password'}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}

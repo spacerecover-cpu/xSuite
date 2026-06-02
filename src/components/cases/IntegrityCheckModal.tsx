@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Fingerprint, Shield, CheckCircle2, XCircle, AlertTriangle, Package } from 'lucide-react';
 import { Modal } from '../ui/Modal';
@@ -28,6 +28,13 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
 }) => {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
+
+  const checkReasonId = useId();
+  const expectedHashId = useId();
+  const actualHashId = useId();
+  const sealNumberId = useId();
+  const physicalConditionId = useId();
+  const findingsId = useId();
 
   const [selectedDevice, setSelectedDevice] = useState<string>('');
   const [checkType, setCheckType] = useState('');
@@ -169,7 +176,7 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Perform Integrity Check" icon={Shield} maxWidth="3xl">
+    <Modal isOpen={isOpen} onClose={onClose} title="Perform Integrity Check" icon={Shield} maxWidth="3xl" closeOnBackdrop={false}>
       <div className="space-y-4">
         {performCheckMutation.error && (
           <div className="bg-danger-muted border border-danger/30 rounded-lg p-3 flex items-start gap-2">
@@ -223,8 +230,9 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Check Reason</label>
+          <label htmlFor={checkReasonId} className="block text-sm font-medium text-slate-700 mb-2">Check Reason</label>
           <textarea
+            id={checkReasonId}
             value={checkReason}
             onChange={(e) => setCheckReason(e.target.value)}
             rows={2}
@@ -256,8 +264,9 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Expected Hash</label>
+              <label htmlFor={expectedHashId} className="block text-sm font-medium text-slate-700 mb-2">Expected Hash</label>
               <Input
+                id={expectedHashId}
                 type="text"
                 value={expectedHash}
                 onChange={(e) => setExpectedHash(e.target.value)}
@@ -266,8 +275,9 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Actual Hash</label>
+              <label htmlFor={actualHashId} className="block text-sm font-medium text-slate-700 mb-2">Actual Hash</label>
               <Input
+                id={actualHashId}
                 type="text"
                 value={actualHash}
                 onChange={(e) => setActualHash(e.target.value)}
@@ -299,8 +309,9 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
 
           <div className="grid grid-cols-2 gap-4 mb-3">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Seal Number</label>
+              <label htmlFor={sealNumberId} className="block text-sm font-medium text-slate-700 mb-2">Seal Number</label>
               <Input
+                id={sealNumberId}
                 type="text"
                 value={sealNumber}
                 onChange={(e) => setSealNumber(e.target.value)}
@@ -335,8 +346,9 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Physical Condition</label>
+            <label htmlFor={physicalConditionId} className="block text-sm font-medium text-slate-700 mb-2">Physical Condition</label>
             <textarea
+              id={physicalConditionId}
               value={physicalCondition}
               onChange={(e) => setPhysicalCondition(e.target.value)}
               rows={2}
@@ -384,8 +396,9 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Findings</label>
+          <label htmlFor={findingsId} className="block text-sm font-medium text-slate-700 mb-2">Findings</label>
           <textarea
+            id={findingsId}
             value={findings}
             onChange={(e) => setFindings(e.target.value)}
             rows={3}

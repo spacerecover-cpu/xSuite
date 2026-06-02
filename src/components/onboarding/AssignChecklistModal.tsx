@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useId } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Modal } from '../ui/Modal';
@@ -30,6 +30,9 @@ export const AssignChecklistModal: React.FC<Props> = ({
   preselectedEmployeeId,
 }) => {
   const queryClient = useQueryClient();
+  const employeeFieldId = useId();
+  const checklistFieldId = useId();
+  const startDateFieldId = useId();
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
     defaultValues: {
@@ -81,10 +84,11 @@ export const AssignChecklistModal: React.FC<Props> = ({
     <Modal isOpen={isOpen} onClose={onClose} title="Assign Onboarding Checklist">
       <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label htmlFor={employeeFieldId} className="block text-sm font-medium text-slate-700 mb-1">
             Employee <span className="text-danger">*</span>
           </label>
           <select
+            id={employeeFieldId}
             {...register('employee_id', { required: 'Select an employee' })}
             disabled={!!preselectedEmployeeId}
             className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-slate-50"
@@ -103,10 +107,11 @@ export const AssignChecklistModal: React.FC<Props> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label htmlFor={checklistFieldId} className="block text-sm font-medium text-slate-700 mb-1">
             Checklist <span className="text-danger">*</span>
           </label>
           <select
+            id={checklistFieldId}
             {...register('checklist_id', { required: 'Select a checklist' })}
             className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           >
@@ -123,10 +128,11 @@ export const AssignChecklistModal: React.FC<Props> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label htmlFor={startDateFieldId} className="block text-sm font-medium text-slate-700 mb-1">
             Start Date <span className="text-danger">*</span>
           </label>
           <Input
+            id={startDateFieldId}
             {...register('start_date', { required: 'Start date is required' })}
             type="date"
           />

@@ -1,4 +1,4 @@
-import { useId, type ReactNode, type ElementType } from 'react';
+import { useId, type ReactNode, type ElementType, type RefObject } from 'react';
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Dialog } from './Dialog';
@@ -16,6 +16,9 @@ interface ModalProps {
   headerBadges?: ReactNode;
   showCloseButton?: boolean;
   ariaLabel?: string;
+  initialFocusRef?: RefObject<HTMLElement | null>;
+  closeOnBackdrop?: boolean;
+  closeOnEscape?: boolean;
 }
 
 const sizeClasses: Record<NonNullable<ModalProps['size']>, string> = {
@@ -48,6 +51,9 @@ export function Modal({
   headerBadges,
   showCloseButton = true,
   ariaLabel,
+  initialFocusRef,
+  closeOnBackdrop = true,
+  closeOnEscape = true,
 }: ModalProps) {
   const { t } = useTranslation();
   const titleId = useId();
@@ -59,8 +65,9 @@ export function Modal({
       onClose={onClose}
       labelledBy={title ? titleId : undefined}
       label={title ? undefined : ariaLabel ?? t('ui.dialog')}
-      closeOnBackdrop
-      closeOnEscape
+      initialFocusRef={initialFocusRef}
+      closeOnBackdrop={closeOnBackdrop}
+      closeOnEscape={closeOnEscape}
       className={cn(widthClass, 'flex flex-col overflow-hidden')}
     >
       {title ? (

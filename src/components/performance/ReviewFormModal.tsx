@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useId } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Star } from 'lucide-react';
@@ -119,6 +119,15 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isEditing = !!review;
+  const employeeFieldId = useId();
+  const periodStartFieldId = useId();
+  const periodEndFieldId = useId();
+  const strengthsFieldId = useId();
+  const improvementsFieldId = useId();
+  const goalsAchievedFieldId = useId();
+  const goalsNextFieldId = useId();
+  const commentsFieldId = useId();
+  const statusFieldId = useId();
 
   const [rating, setRating] = React.useState(0);
 
@@ -194,13 +203,15 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
       onClose={onClose}
       title={isEditing ? 'Edit Performance Review' : 'New Performance Review'}
       size="lg"
+      closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label htmlFor={employeeFieldId} className="block text-sm font-medium text-slate-700 mb-1">
             Employee <span className="text-danger">*</span>
           </label>
           <select
+            id={employeeFieldId}
             {...register('employee_id', { required: 'Select an employee' })}
             disabled={isEditing}
             className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-slate-50"
@@ -220,10 +231,11 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor={periodStartFieldId} className="block text-sm font-medium text-slate-700 mb-1">
               Period Start <span className="text-danger">*</span>
             </label>
             <Input
+              id={periodStartFieldId}
               {...register('review_period_start', { required: 'Required' })}
               type="date"
             />
@@ -232,10 +244,11 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor={periodEndFieldId} className="block text-sm font-medium text-slate-700 mb-1">
               Period End <span className="text-danger">*</span>
             </label>
             <Input
+              id={periodEndFieldId}
               {...register('review_period_end', { required: 'Required' })}
               type="date"
             />
@@ -251,8 +264,9 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Strengths</label>
+          <label htmlFor={strengthsFieldId} className="block text-sm font-medium text-slate-700 mb-1">Strengths</label>
           <textarea
+            id={strengthsFieldId}
             {...register('strengths')}
             rows={3}
             placeholder="Key strengths demonstrated during the review period..."
@@ -261,8 +275,9 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Areas for Improvement</label>
+          <label htmlFor={improvementsFieldId} className="block text-sm font-medium text-slate-700 mb-1">Areas for Improvement</label>
           <textarea
+            id={improvementsFieldId}
             {...register('areas_for_improvement')}
             rows={3}
             placeholder="Areas that need development or improvement..."
@@ -272,8 +287,9 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Goals Achieved</label>
+            <label htmlFor={goalsAchievedFieldId} className="block text-sm font-medium text-slate-700 mb-1">Goals Achieved</label>
             <textarea
+              id={goalsAchievedFieldId}
               {...register('goals_achieved')}
               rows={3}
               placeholder="Goals accomplished this period..."
@@ -281,8 +297,9 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Goals Next Period</label>
+            <label htmlFor={goalsNextFieldId} className="block text-sm font-medium text-slate-700 mb-1">Goals Next Period</label>
             <textarea
+              id={goalsNextFieldId}
               {...register('goals_next_period')}
               rows={3}
               placeholder="Objectives for the next review period..."
@@ -292,8 +309,9 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Additional Comments</label>
+          <label htmlFor={commentsFieldId} className="block text-sm font-medium text-slate-700 mb-1">Additional Comments</label>
           <textarea
+            id={commentsFieldId}
             {...register('comments')}
             rows={2}
             placeholder="Any additional comments or notes..."
@@ -302,8 +320,9 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+          <label htmlFor={statusFieldId} className="block text-sm font-medium text-slate-700 mb-1">Status</label>
           <select
+            id={statusFieldId}
             {...register('status')}
             className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           >

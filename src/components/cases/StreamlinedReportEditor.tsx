@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   X,
   Save,
@@ -16,6 +16,7 @@ import { reportSectionService, type ReportSection, type SectionPreset, type Temp
 import { REPORT_TYPES, type ReportType } from '../../lib/reportTypes';
 import { getIconComponent } from '../../lib/iconMapper';
 import { logger } from '../../lib/logger';
+import { Dialog } from '../ui/Dialog';
 
 interface StreamlinedReportEditorProps {
   isOpen: boolean;
@@ -356,25 +357,22 @@ export function StreamlinedReportEditor({
 
   if (initialLoading) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div className="bg-white rounded-lg shadow-xl p-8 flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-slate-600">Loading report sections...</p>
-        </div>
-      </div>
+      <Dialog
+        open={isOpen}
+        onClose={onClose}
+        label="Loading report"
+        closeOnBackdrop={false}
+        closeOnEscape={false}
+        className="w-auto max-w-none bg-white p-8 flex flex-col items-center gap-4"
+      >
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <p className="text-slate-600">Loading report sections...</p>
+      </Dialog>
     );
   }
 
   const { completed, total } = getCompletionStatus();
   const isComplete = completed === total;
-
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) {
-      if (confirm('You have unsaved changes. Are you sure you want to close?')) {
-        onClose();
-      }
-    }
-  };
 
   const activeSectionConfig = sectionConfigs.find((c) => c.key === activeSection);
   if (!activeSectionConfig) {
@@ -385,15 +383,14 @@ export function StreamlinedReportEditor({
   const presets = getPresetsForSection(activeSection);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
-      onMouseDown={handleBackdropClick}
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      label="Report editor"
+      closeOnBackdrop={false}
+      closeOnEscape={false}
+      className="mx-8 h-[90vh] max-h-[90vh] w-full max-w-[1400px] overflow-hidden bg-white p-0 flex flex-col"
     >
-      <div
-        className="bg-white rounded-lg shadow-xl w-full h-[90vh] mx-8 flex flex-col"
-        style={{ maxWidth: '1400px' }}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 flex-shrink-0">
           <div className="flex items-center gap-4 flex-1">
             <div className="flex items-center gap-2">
@@ -564,7 +561,6 @@ export function StreamlinedReportEditor({
             </Button>
           </div>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }

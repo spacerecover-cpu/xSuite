@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { payrollService } from '../../lib/payrollService';
 import { payrollKeys } from '../../lib/queryKeys';
@@ -16,6 +16,9 @@ interface Props {
 export function AdjustmentFormModal({ onClose }: Props) {
   const toast = useToast();
   const queryClient = useQueryClient();
+  const typeFieldId = useId();
+  const amountFieldId = useId();
+  const descriptionFieldId = useId();
 
   const [formData, setFormData] = useState({
     employee_id: '',
@@ -93,10 +96,11 @@ export function AdjustmentFormModal({ onClose }: Props) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={typeFieldId} className="block text-sm font-medium text-slate-700 mb-2">
               Type <span className="text-danger">*</span>
             </label>
             <select
+              id={typeFieldId}
               value={formData.type}
               onChange={(e) => handleChange('type', e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
@@ -112,10 +116,11 @@ export function AdjustmentFormModal({ onClose }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={amountFieldId} className="block text-sm font-medium text-slate-700 mb-2">
               Amount (OMR) <span className="text-danger">*</span>
             </label>
             <Input
+              id={amountFieldId}
               type="number"
               step="0.001"
               value={formData.amount}
@@ -126,10 +131,11 @@ export function AdjustmentFormModal({ onClose }: Props) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label htmlFor={descriptionFieldId} className="block text-sm font-medium text-slate-700 mb-2">
             Description <span className="text-danger">*</span>
           </label>
           <textarea
+            id={descriptionFieldId}
             value={formData.description}
             onChange={(e) => handleChange('description', e.target.value)}
             placeholder="Enter reason for adjustment..."

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, GripVertical } from 'lucide-react';
@@ -44,6 +44,9 @@ interface Props {
 export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist }) => {
   const queryClient = useQueryClient();
   const isEditing = !!checklist;
+  const nameFieldId = useId();
+  const descriptionFieldId = useId();
+  const positionFieldId = useId();
 
   const [items, setItems] = useState<ChecklistItemDraft[]>([]);
 
@@ -173,13 +176,15 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
       onClose={onClose}
       title={isEditing ? 'Edit Checklist' : 'New Onboarding Checklist'}
       size="lg"
+      closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-5">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label htmlFor={nameFieldId} className="block text-sm font-medium text-slate-700 mb-1">
             Checklist Name <span className="text-danger">*</span>
           </label>
           <Input
+            id={nameFieldId}
             {...register('name', { required: 'Name is required' })}
             placeholder="e.g. Engineering Onboarding"
           />
@@ -187,8 +192,9 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+          <label htmlFor={descriptionFieldId} className="block text-sm font-medium text-slate-700 mb-1">Description</label>
           <textarea
+            id={descriptionFieldId}
             {...register('description')}
             rows={2}
             placeholder="What this checklist covers..."
@@ -198,8 +204,9 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">For Position</label>
+            <label htmlFor={positionFieldId} className="block text-sm font-medium text-slate-700 mb-1">For Position</label>
             <select
+              id={positionFieldId}
               {...register('for_position_id')}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >

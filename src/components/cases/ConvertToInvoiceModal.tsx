@@ -59,6 +59,7 @@ export const ConvertToInvoiceModal: React.FC<ConvertToInvoiceModalProps> = ({
       onClose={onClose}
       title="Convert Quote to Invoice"
       size="lg"
+      closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="bg-info-muted border border-info/30 rounded-lg p-4">
@@ -145,10 +146,11 @@ export const ConvertToInvoiceModal: React.FC<ConvertToInvoiceModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor="convert-invoice-notes" className="block text-sm font-medium text-slate-700 mb-2">
               Additional Notes (Optional)
             </label>
             <textarea
+              id="convert-invoice-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}

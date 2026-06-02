@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Truck, X, Info, HardDrive, FolderOpen, CheckCircle2, Clock } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Truck, Info, HardDrive, FolderOpen, CheckCircle2, Clock } from 'lucide-react';
+import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { formatDate } from '../../lib/format';
@@ -53,6 +54,7 @@ export const MarkAsDeliveredModal: React.FC<MarkAsDeliveredModalProps> = ({
   const [updateCaseStatus, setUpdateCaseStatus] = useState(caseStatus !== 'Delivered');
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [retentionDays, setRetentionDays] = useState(clone?.retention_days || 180);
+  const retentionInputRef = useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (clone) {
@@ -75,29 +77,17 @@ export const MarkAsDeliveredModal: React.FC<MarkAsDeliveredModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose} />
-      <div
-        className="relative bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-5 border-b border-slate-200">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-success-muted rounded-lg flex items-center justify-center">
-              <Truck className="w-4 h-4 text-success" />
-            </div>
-            <h2 className="text-lg font-semibold text-slate-900">Mark Clone as Delivered</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-slate-100 rounded-lg transition-colors"
-            disabled={isLoading}
-          >
-            <X className="w-5 h-5 text-slate-400" />
-          </button>
-        </div>
-
-        <div className="p-5">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Mark Clone as Delivered"
+      icon={Truck}
+      maxWidth="3xl"
+      initialFocusRef={retentionInputRef}
+      closeOnBackdrop={false}
+    >
+      <div>
+        <div>
           <div className="mb-3 p-2.5 bg-success-muted border-l-4 border-success rounded">
             <div className="flex gap-2">
               <Info className="w-4 h-4 text-success flex-shrink-0 mt-0.5" />
@@ -200,6 +190,7 @@ export const MarkAsDeliveredModal: React.FC<MarkAsDeliveredModalProps> = ({
                       Retention Period (days)
                     </div>
                     <Input
+                      ref={retentionInputRef}
                       type="number"
                       min="1"
                       value={retentionDays}
@@ -219,10 +210,11 @@ export const MarkAsDeliveredModal: React.FC<MarkAsDeliveredModalProps> = ({
 
           <div className="space-y-2.5 mb-4">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+              <label htmlFor="mark-delivered-notes" className="block text-xs font-medium text-slate-700 mb-1.5">
                 Delivery Notes (Optional)
               </label>
               <Input
+                id="mark-delivered-notes"
                 value={deliveryNotes}
                 onChange={(e) => setDeliveryNotes(e.target.value)}
                 placeholder="e.g., USB drive, Cloud link, Physical pickup..."
@@ -273,6 +265,6 @@ export const MarkAsDeliveredModal: React.FC<MarkAsDeliveredModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };

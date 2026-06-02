@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { TrendingUp } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
@@ -23,6 +23,12 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
   const { formatCurrency } = useCurrency();
   const toast = useToast();
   const queryClient = useQueryClient();
+  const loanTypeFieldId = useId();
+  const principalFieldId = useId();
+  const interestFieldId = useId();
+  const installmentsFieldId = useId();
+  const startDateFieldId = useId();
+  const notesFieldId = useId();
 
   const [formData, setFormData] = useState({
     employee_id: '',
@@ -139,7 +145,7 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Create New Loan">
+    <Modal isOpen={isOpen} onClose={onClose} title="Create New Loan" closeOnBackdrop={false}>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="md:col-span-2">
@@ -157,10 +163,11 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor={loanTypeFieldId} className="block text-sm font-medium text-gray-700 mb-2">
               Loan Type <span className="text-danger">*</span>
             </label>
             <select
+              id={loanTypeFieldId}
               value={formData.loan_type}
               onChange={(e) => handleChange('loan_type', e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -173,10 +180,11 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor={principalFieldId} className="block text-sm font-medium text-gray-700 mb-2">
               Principal Amount <span className="text-danger">*</span>
             </label>
             <Input
+              id={principalFieldId}
               type="number"
               step="0.001"
               min="0"
@@ -188,10 +196,11 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor={interestFieldId} className="block text-sm font-medium text-gray-700 mb-2">
               Interest Rate (%)
             </label>
             <Input
+              id={interestFieldId}
               type="number"
               step="0.01"
               min="0"
@@ -203,10 +212,11 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor={installmentsFieldId} className="block text-sm font-medium text-gray-700 mb-2">
               Number of Installments <span className="text-danger">*</span>
             </label>
             <Input
+              id={installmentsFieldId}
               type="number"
               min="1"
               value={formData.installments_count}
@@ -217,10 +227,11 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor={startDateFieldId} className="block text-sm font-medium text-gray-700 mb-2">
               Start Date <span className="text-danger">*</span>
             </label>
             <Input
+              id={startDateFieldId}
               type="date"
               value={formData.start_date}
               onChange={(e) => handleChange('start_date', e.target.value)}
@@ -229,8 +240,9 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+            <label htmlFor={notesFieldId} className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
             <textarea
+              id={notesFieldId}
               value={formData.notes}
               onChange={(e) => handleChange('notes', e.target.value)}
               rows={3}

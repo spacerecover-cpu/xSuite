@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { createRef } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Modal } from './Modal';
@@ -58,6 +59,32 @@ describe('Modal', () => {
     render(<Modal isOpen onClose={onClose} title=""><p>body</p></Modal>);
     await user.click(screen.getByRole('button', { name: /close/i }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes on backdrop click by default (behavior preserved)', async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    render(<Modal isOpen onClose={onClose} title="X"><p>body</p></Modal>);
+    await user.click(screen.getByTestId('dialog-backdrop'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not close on backdrop click when closeOnBackdrop is false', async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    render(<Modal isOpen onClose={onClose} title="X" closeOnBackdrop={false}><p>body</p></Modal>);
+    await user.click(screen.getByTestId('dialog-backdrop'));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('redirects initial focus to initialFocusRef instead of the close button', () => {
+    const inputRef = createRef<HTMLInputElement>();
+    render(
+      <Modal isOpen onClose={() => {}} title="X" initialFocusRef={inputRef}>
+        <input ref={inputRef} aria-label="first field" />
+      </Modal>,
+    );
+    expect(inputRef.current).toHaveFocus();
   });
 
   describe('RTL logical utilities (Phase 4a proof slice)', () => {

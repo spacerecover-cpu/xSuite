@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId, useRef } from 'react';
 import { Modal } from '../ui/Modal';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
@@ -57,6 +57,10 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const firstFieldRef = useRef<HTMLInputElement>(null);
+  const toId = useId();
+  const subjectId = useId();
+  const bodyId = useId();
 
   useEffect(() => {
     if (isOpen) {
@@ -134,6 +138,8 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
       title="Send Document via Email"
       icon={Mail}
       size="lg"
+      closeOnBackdrop={false}
+      initialFocusRef={firstFieldRef}
     >
       {success ? (
         <div className="flex flex-col items-center justify-center py-12">
@@ -172,10 +178,12 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor={toId} className="block text-sm font-medium text-slate-700 mb-1">
               Recipient Email <span className="text-danger">*</span>
             </label>
             <Input
+              id={toId}
+              ref={firstFieldRef}
               type="email"
               value={to}
               onChange={(e) => setTo(e.target.value)}
@@ -258,10 +266,11 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
           )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor={subjectId} className="block text-sm font-medium text-slate-700 mb-1">
               Subject
             </label>
             <Input
+              id={subjectId}
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
@@ -271,10 +280,11 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor={bodyId} className="block text-sm font-medium text-slate-700 mb-1">
               Message
             </label>
             <textarea
+              id={bodyId}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={8}

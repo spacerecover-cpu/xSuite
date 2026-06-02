@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useId, useRef, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -47,6 +47,11 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
   const [recoveryOutcome, setRecoveryOutcome] = useState<string>('full');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const firstFieldRef = useRef<HTMLInputElement>(null);
+  const collectorNameId = useId();
+  const collectorMobileId = useId();
+  const collectorIdId = useId();
+  const recoveryOutcomeId = useId();
 
   const handleDeviceToggle = (deviceId: string) => {
     setSelectedDevices((prev) =>
@@ -119,8 +124,14 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Device Checkout">
-      <div className="space-y-6">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Device Checkout" closeOnBackdrop={false} initialFocusRef={firstFieldRef}>
+      <form
+        className="space-y-6"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void handleSubmit();
+        }}
+      >
         <div className="bg-info-muted border border-info/30 rounded-lg p-4">
           <div className="flex items-center gap-2 text-info font-semibold mb-2">
             <Package className="w-5 h-5" />
@@ -166,11 +177,13 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
           </div>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label htmlFor={collectorNameId} className="block text-sm font-medium text-slate-700 mb-1">
                 <User className="w-4 h-4 inline mr-1" />
                 Collector Name *
               </label>
               <Input
+                id={collectorNameId}
+                ref={firstFieldRef}
                 value={collectorName}
                 onChange={(e) => setCollectorName(e.target.value)}
                 placeholder="Enter collector name"
@@ -178,11 +191,12 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label htmlFor={collectorMobileId} className="block text-sm font-medium text-slate-700 mb-1">
                 <Phone className="w-4 h-4 inline mr-1" />
                 Mobile Number *
               </label>
               <Input
+                id={collectorMobileId}
                 value={collectorMobile}
                 onChange={(e) => setCollectorMobile(e.target.value)}
                 placeholder="Enter mobile number"
@@ -190,11 +204,12 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label htmlFor={collectorIdId} className="block text-sm font-medium text-slate-700 mb-1">
                 <CreditCard className="w-4 h-4 inline mr-1" />
                 National ID, Passport, etc. (Optional)
               </label>
               <Input
+                id={collectorIdId}
                 value={collectorId}
                 onChange={(e) => setCollectorId(e.target.value)}
                 placeholder="Enter ID number (optional)"
@@ -205,10 +220,11 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
         </div>
 
         <div className="bg-accent/10 border border-accent/30 rounded-lg p-4">
-          <label className="block text-sm font-medium text-accent-foreground mb-2">
+          <label htmlFor={recoveryOutcomeId} className="block text-sm font-medium text-accent-foreground mb-2">
             Recovery Outcome
           </label>
           <select
+            id={recoveryOutcomeId}
             value={recoveryOutcome}
             onChange={(e) => setRecoveryOutcome(e.target.value)}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
@@ -228,6 +244,7 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
 
         <div className="flex justify-end gap-3 pt-4 border-t">
           <Button
+            type="button"
             variant="secondary"
             onClick={handleClose}
             disabled={isSubmitting}
@@ -235,7 +252,7 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
             Cancel
           </Button>
           <Button
-            onClick={handleSubmit}
+            type="submit"
             disabled={isSubmitting}
             style={{ backgroundColor: 'rgb(var(--color-accent))' }}
           >
@@ -252,7 +269,7 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
             )}
           </Button>
         </div>
-      </div>
+      </form>
     </Modal>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useId, useRef, useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BookOpen, Star, X, Tag, Plus } from 'lucide-react';
 import { Modal } from '../ui/Modal';
@@ -39,6 +39,8 @@ export const ArticleEditorModal: React.FC<ArticleEditorModalProps> = ({ isOpen, 
   const [changeNotes, setChangeNotes] = useState('');
   const [newTagInput, setNewTagInput] = useState('');
   const [isCreatingTag, setIsCreatingTag] = useState(false);
+  const titleRef = useRef<HTMLInputElement>(null);
+  const categoryId_a11y = useId();
 
   const { data: categories = [] } = useQuery({ queryKey: kbKeys.categories(), queryFn: getKBCategories, enabled: isOpen });
   const { data: allTags = [] } = useQuery({ queryKey: kbKeys.tags(), queryFn: getKBTags, enabled: isOpen });
@@ -156,6 +158,8 @@ export const ArticleEditorModal: React.FC<ArticleEditorModalProps> = ({ isOpen, 
       icon={BookOpen}
       maxWidth="7xl"
       size="large"
+      closeOnBackdrop={false}
+      initialFocusRef={titleRef}
     >
       <div className="flex h-[80vh] overflow-hidden -mx-6 -mb-6">
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
@@ -163,6 +167,7 @@ export const ArticleEditorModal: React.FC<ArticleEditorModalProps> = ({ isOpen, 
             {(c) => (
               <Input
                 {...c}
+                ref={titleRef}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. HDD Head Replacement SOP – Seagate Barracuda"
@@ -232,8 +237,9 @@ export const ArticleEditorModal: React.FC<ArticleEditorModalProps> = ({ isOpen, 
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Category</label>
+            <label htmlFor={categoryId_a11y} className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Category</label>
             <select
+              id={categoryId_a11y}
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"

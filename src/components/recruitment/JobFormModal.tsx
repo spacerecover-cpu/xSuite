@@ -157,7 +157,7 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={isEditing ? 'Edit Job' : 'Post New Job'} size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title={isEditing ? 'Edit Job' : 'Post New Job'} size="lg" closeOnBackdrop={false}>
       <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -172,8 +172,9 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Department</label>
+            <label htmlFor="job-department" className="block text-sm font-medium text-slate-700 mb-1">Department</label>
             <select
+              id="job-department"
               {...register('department_id')}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
@@ -185,8 +186,9 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Position</label>
+            <label htmlFor="job-position" className="block text-sm font-medium text-slate-700 mb-1">Position</label>
             <select
+              id="job-position"
               {...register('position_id')}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
@@ -200,8 +202,9 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Employment Type</label>
+            <label htmlFor="job-employment-type" className="block text-sm font-medium text-slate-700 mb-1">Employment Type</label>
             <select
+              id="job-employment-type"
               {...register('employment_type')}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
@@ -212,8 +215,9 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+            <label htmlFor="job-status" className="block text-sm font-medium text-slate-700 mb-1">Status</label>
             <select
+              id="job-status"
               {...register('status')}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
@@ -252,8 +256,9 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Job Description</label>
+          <label htmlFor="job-description" className="block text-sm font-medium text-slate-700 mb-1">Job Description</label>
           <textarea
+            id="job-description"
             {...register('description')}
             rows={4}
             placeholder="Describe responsibilities, requirements, and qualifications..."

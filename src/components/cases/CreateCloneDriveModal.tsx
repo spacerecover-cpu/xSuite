@@ -226,6 +226,7 @@ export const CreateCloneDriveModal: React.FC<CreateCloneDriveModalProps> = ({
       title={caseNo ? `Create Clone Drive — Case #${caseNo}` : 'Create Clone Drive'}
       icon={HardDriveDownload}
       maxWidth="3xl"
+      closeOnBackdrop={false}
     >
       <form
         onSubmit={(e) => {
@@ -243,10 +244,11 @@ export const CreateCloneDriveModal: React.FC<CreateCloneDriveModalProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor="clone-source-device" className="block text-sm font-medium text-slate-700 mb-1">
               Source Device <span className="text-danger">*</span>
             </label>
             <select
+              id="clone-source-device"
               value={values.deviceId}
               onChange={(e) => update('deviceId', e.target.value)}
               disabled={isLoading || devices.length === 0}
@@ -337,10 +339,11 @@ export const CreateCloneDriveModal: React.FC<CreateCloneDriveModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor="clone-storage-type" className="block text-sm font-medium text-slate-700 mb-1">
               Storage Type
             </label>
             <select
+              id="clone-storage-type"
               value={values.storageType}
               onChange={(e) =>
                 update('storageType', e.target.value as CreateCloneDriveFormValues['storageType'])
@@ -357,10 +360,11 @@ export const CreateCloneDriveModal: React.FC<CreateCloneDriveModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor="clone-image-format" className="block text-sm font-medium text-slate-700 mb-1">
               Image Format
             </label>
             <select
+              id="clone-image-format"
               value={values.imageFormat}
               onChange={(e) =>
                 update('imageFormat', e.target.value as CreateCloneDriveFormValues['imageFormat'])
@@ -377,10 +381,11 @@ export const CreateCloneDriveModal: React.FC<CreateCloneDriveModalProps> = ({
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor="clone-resource-drive" className="block text-sm font-medium text-slate-700 mb-1">
               Resource Clone Drive (optional)
             </label>
             <select
+              id="clone-resource-drive"
               value={values.resourceCloneDriveId ?? ''}
               onChange={(e) =>
                 update('resourceCloneDriveId', e.target.value === '' ? null : e.target.value)

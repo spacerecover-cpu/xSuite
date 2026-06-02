@@ -157,7 +157,7 @@ export const AnnouncementFormModal: React.FC<AnnouncementFormModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} maxWidth="7xl">
+    <Modal isOpen={isOpen} onClose={onClose} maxWidth="7xl" closeOnBackdrop={false}>
       <form onSubmit={handleSubmit} className="flex flex-col h-[90vh]">
         <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-200">
           <h2 className="text-2xl font-bold text-slate-900">
@@ -196,10 +196,11 @@ export const AnnouncementFormModal: React.FC<AnnouncementFormModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label htmlFor="announcement-content-en" className="block text-sm font-medium text-slate-700 mb-1">
                   Content (English) <span className="text-danger">*</span>
                 </label>
                 <textarea
+                  id="announcement-content-en"
                   value={contentEn}
                   onChange={(e) => setContentEn(e.target.value)}
                   placeholder="Enter announcement content"
@@ -210,8 +211,9 @@ export const AnnouncementFormModal: React.FC<AnnouncementFormModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Content (Arabic)</label>
+                <label htmlFor="announcement-content-ar" className="block text-sm font-medium text-slate-700 mb-1">Content (Arabic)</label>
                 <textarea
+                  id="announcement-content-ar"
                   value={contentAr}
                   onChange={(e) => setContentAr(e.target.value)}
                   placeholder="أدخل محتوى الإعلان"
@@ -296,10 +298,11 @@ export const AnnouncementFormModal: React.FC<AnnouncementFormModalProps> = ({
               <div className="space-y-3">
                 <h4 className="text-sm font-medium text-slate-700">Schedule</h4>
                 <div>
-                  <label className="block text-sm text-slate-600 mb-1">
+                  <label htmlFor="announcement-starts-at" className="block text-sm text-slate-600 mb-1">
                     Starts At <span className="text-danger">*</span>
                   </label>
                   <input
+                    id="announcement-starts-at"
                     type="datetime-local"
                     value={startsAt}
                     onChange={(e) => setStartsAt(e.target.value)}
@@ -308,8 +311,9 @@ export const AnnouncementFormModal: React.FC<AnnouncementFormModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-600 mb-1">Ends At (optional)</label>
+                  <label htmlFor="announcement-ends-at" className="block text-sm text-slate-600 mb-1">Ends At (optional)</label>
                   <input
+                    id="announcement-ends-at"
                     type="datetime-local"
                     value={endsAt}
                     onChange={(e) => setEndsAt(e.target.value)}

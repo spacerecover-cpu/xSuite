@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { CheckCircle2, RefreshCw } from 'lucide-react';
@@ -24,6 +24,8 @@ export function CompleteAssignmentModal({
   const [usageNotes, setUsageNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const usageNotesRef = useRef<HTMLTextAreaElement>(null);
+  const usageNotesId = useId();
 
   const handleReset = () => {
     setUsageNotes('');
@@ -59,6 +61,7 @@ export function CompleteAssignmentModal({
       onClose={handleClose}
       title="Mark as Working & Free for Reuse"
       size="md"
+      initialFocusRef={usageNotesRef}
     >
       <div className="space-y-2">
         <div className="bg-success-muted border border-success/30 rounded-lg p-2">
@@ -107,10 +110,12 @@ export function CompleteAssignmentModal({
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">
+          <label htmlFor={usageNotesId} className="block text-xs font-medium text-slate-700 mb-1">
             Performance Notes (Optional)
           </label>
           <textarea
+            id={usageNotesId}
+            ref={usageNotesRef}
             value={usageNotes}
             onChange={(e) => setUsageNotes(e.target.value)}
             rows={2}

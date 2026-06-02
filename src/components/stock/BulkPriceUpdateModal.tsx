@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { TrendingUp } from 'lucide-react';
 import { Modal } from '../ui/Modal';
@@ -17,6 +17,10 @@ export const BulkPriceUpdateModal: React.FC<Props> = ({ selectedItems, onClose }
   const queryClient = useQueryClient();
   const toast = useToast();
   const { formatCurrency } = useCurrency();
+
+  const priceFieldId = useId();
+  const directionFieldId = useId();
+  const amountFieldId = useId();
 
   const [updateType, setUpdateType] = useState<'percentage' | 'fixed'>('percentage');
   const [priceField, setPriceField] = useState<'selling' | 'cost' | 'both'>('selling');
@@ -66,10 +70,11 @@ export const BulkPriceUpdateModal: React.FC<Props> = ({ selectedItems, onClose }
       <div className="space-y-5">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+            <label htmlFor={priceFieldId} className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
               Price Field
             </label>
             <select
+              id={priceFieldId}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
               value={priceField}
               onChange={(e) => setPriceField(e.target.value as typeof priceField)}
@@ -80,10 +85,11 @@ export const BulkPriceUpdateModal: React.FC<Props> = ({ selectedItems, onClose }
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+            <label htmlFor={directionFieldId} className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
               Direction
             </label>
             <select
+              id={directionFieldId}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
               value={direction}
               onChange={(e) => setDirection(e.target.value as typeof direction)}
@@ -117,10 +123,11 @@ export const BulkPriceUpdateModal: React.FC<Props> = ({ selectedItems, onClose }
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+            <label htmlFor={amountFieldId} className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
               {updateType === 'percentage' ? 'Percentage (%)' : 'Amount'}
             </label>
             <input
+              id={amountFieldId}
               type="number"
               min={0}
               step={updateType === 'percentage' ? 0.1 : 0.001}

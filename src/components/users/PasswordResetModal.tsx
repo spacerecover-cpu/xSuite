@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { AlertCircle, Mail, Copy, Check, Eye, EyeOff } from 'lucide-react';
@@ -19,6 +19,7 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
   userName,
   userEmail,
 }) => {
+  const temporaryPasswordId = useId();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [temporaryPassword, setTemporaryPassword] = useState('');
@@ -63,7 +64,7 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Reset User Password" size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title="Reset User Password" size="md" closeOnBackdrop={false}>
       <div className="space-y-4">
         <div className="flex items-start gap-3 p-4 bg-warning-muted border border-warning/30 rounded-lg">
           <AlertCircle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
@@ -96,11 +97,12 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label htmlFor={temporaryPasswordId} className="block text-sm font-medium text-slate-700 mb-2">
             Temporary Password
           </label>
           <div className="relative">
             <input
+              id={temporaryPasswordId}
               type={showPassword ? 'text' : 'password'}
               value={temporaryPassword}
               readOnly

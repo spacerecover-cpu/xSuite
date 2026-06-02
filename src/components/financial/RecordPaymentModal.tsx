@@ -242,15 +242,16 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   const totalAllocated = allocations.reduce((sum, a) => sum + a.allocation_amount, 0);
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Record Payment" size="lg">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Record Payment" size="lg" closeOnBackdrop={false}>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label htmlFor="payment-case" className="block text-sm font-medium text-slate-700 mb-1">
             Case <span className="text-danger">*</span>
           </label>
           <div className="relative">
             <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
             <select
+              id="payment-case"
               value={selectedCaseId}
               onChange={(e) => handleCaseChange(e.target.value)}
               className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
@@ -326,12 +327,13 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor="payment-method" className="block text-sm font-medium text-slate-700 mb-1">
               Payment Method
             </label>
             <div className="relative">
               <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
               <select
+                id="payment-method"
                 value={paymentMethodId}
                 onChange={(e) => setPaymentMethodId(e.target.value)}
                 className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
@@ -352,10 +354,11 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor="payment-bank-account" className="block text-sm font-medium text-slate-700 mb-1">
               Bank Account
             </label>
             <select
+              id="payment-bank-account"
               value={bankAccountId}
               onChange={(e) => setBankAccountId(e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
@@ -493,10 +496,11 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label htmlFor="payment-notes" className="block text-sm font-medium text-slate-700 mb-1">
             Notes
           </label>
           <textarea
+            id="payment-notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={2}

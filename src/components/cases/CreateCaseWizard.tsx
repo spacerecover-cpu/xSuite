@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../ui/Button';
+import { Dialog } from '../ui/Dialog';
 import { Input } from '../ui/Input';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown';
@@ -549,8 +550,14 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
   const isFormValid = isStep1Valid && isStep2Valid && isPrimaryDeviceValid;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-[1600px] max-h-[90vh] overflow-hidden flex flex-col">
+    <Dialog
+      open={true}
+      onClose={onClose}
+      label="Create case"
+      closeOnBackdrop={false}
+      closeOnEscape={false}
+      className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-[1600px] max-h-[90vh] overflow-hidden flex flex-col"
+    >
         <div className="flex items-center justify-between p-6 border-b border-slate-200">
           <div>
             <h2 className="text-2xl font-bold text-slate-900">Create New Case</h2>
@@ -1023,7 +1030,6 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
             </Button>
           </UsageLimitGuard>
         </div>
-      </div>
 
       <CustomerFormModal
         isOpen={isCustomerModalOpen}
@@ -1063,6 +1069,6 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
           }}
         />
       )}
-    </div>
+    </Dialog>
   );
 };

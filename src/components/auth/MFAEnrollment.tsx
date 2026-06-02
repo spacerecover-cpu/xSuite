@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ShieldCheck, Copy, Check, Loader2, AlertCircle, X } from 'lucide-react';
 import { mfaService, MFAEnrollResponse } from '../../lib/mfaService';
 import { useAuth } from '../../contexts/AuthContext';
+import { Dialog } from '../ui/Dialog';
 
 interface MFAEnrollmentProps {
   isOpen: boolean;
@@ -72,11 +73,16 @@ export const MFAEnrollment: React.FC<MFAEnrollmentProps> = ({ isOpen, onClose, o
     setTimeout(() => setSecretCopied(false), 2000);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden">
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      label="Two-factor authentication setup"
+      className="max-w-md overflow-hidden bg-white"
+      closeOnEscape
+      closeOnBackdrop={false}
+      initialFocusRef={inputRef}
+    >
         <div className="flex items-center justify-between p-4 border-b border-slate-200">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-primary" />
@@ -210,7 +216,6 @@ export const MFAEnrollment: React.FC<MFAEnrollmentProps> = ({ isOpen, onClose, o
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 };

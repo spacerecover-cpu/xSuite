@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Trash2, Search, DollarSign, FileText, FileBarChart, Briefcase, Calculator, Package, Info, X, Percent } from 'lucide-react';
 import { Modal } from '../ui/Modal';
@@ -81,6 +81,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
   const [quoteNumber, setQuoteNumber] = useState<string>('');
   const [caseNumber, setCaseNumber] = useState<string>('');
   const [selectedCaseId, setSelectedCaseId] = useState<string>(caseId || '');
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Calculate default valid_until date (30 days from now)
   const getDefaultValidUntil = () => {
@@ -433,7 +434,9 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
       onClose={onClose}
       title={initialData ? 'Edit Quote' : 'Create New Quote'}
       size="xl"
+      initialFocusRef={titleInputRef}
       headerBadges={headerBadges}
+      closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit} className="space-y-3">
 
@@ -474,6 +477,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5">
             <div className="md:col-span-1">
               <Input
+                ref={titleInputRef}
                 label="Quote Title"
                 value={quoteData.title}
                 onChange={(e) => setQuoteData({ ...quoteData, title: e.target.value })}

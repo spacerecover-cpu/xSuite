@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useId } from 'react';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -34,6 +34,12 @@ export const LocaleFormModal: React.FC<LocaleFormModalProps> = ({
   isSubmitting,
 }) => {
   const [formData, setFormData] = useState<AccountingLocaleFormData>(DEFAULT_FORM);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const decimalPlacesId = useId();
+  const currencyPositionId = useId();
+  const decimalSeparatorId = useId();
+  const thousandsSeparatorId = useId();
+  const dateFormatId = useId();
 
   useEffect(() => {
     if (editingLocale) {
@@ -82,10 +88,13 @@ export const LocaleFormModal: React.FC<LocaleFormModalProps> = ({
       onClose={onClose}
       title={editingLocale ? 'Edit Accounting Locale' : 'Add Accounting Locale'}
       size="lg"
+      closeOnBackdrop={false}
+      initialFocusRef={nameRef}
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="grid grid-cols-2 gap-4">
           <Input
+            ref={nameRef}
             label="Name"
             value={formData.name}
             onChange={(e) => handleChange('name', e.target.value)}
@@ -121,8 +130,9 @@ export const LocaleFormModal: React.FC<LocaleFormModalProps> = ({
 
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Decimal Places</label>
+            <label htmlFor={decimalPlacesId} className="block text-sm font-medium text-slate-700 mb-1">Decimal Places</label>
             <select
+              id={decimalPlacesId}
               value={formData.decimal_places}
               onChange={(e) => handleChange('decimal_places', parseInt(e.target.value))}
               className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
@@ -134,8 +144,9 @@ export const LocaleFormModal: React.FC<LocaleFormModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Currency Position</label>
+            <label htmlFor={currencyPositionId} className="block text-sm font-medium text-slate-700 mb-1">Currency Position</label>
             <select
+              id={currencyPositionId}
               value={formData.currency_position}
               onChange={(e) => handleChange('currency_position', e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
@@ -155,8 +166,9 @@ export const LocaleFormModal: React.FC<LocaleFormModalProps> = ({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Decimal Separator</label>
+            <label htmlFor={decimalSeparatorId} className="block text-sm font-medium text-slate-700 mb-1">Decimal Separator</label>
             <select
+              id={decimalSeparatorId}
               value={formData.decimal_separator}
               onChange={(e) => handleChange('decimal_separator', e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
@@ -167,8 +179,9 @@ export const LocaleFormModal: React.FC<LocaleFormModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Thousands Separator</label>
+            <label htmlFor={thousandsSeparatorId} className="block text-sm font-medium text-slate-700 mb-1">Thousands Separator</label>
             <select
+              id={thousandsSeparatorId}
               value={formData.thousands_separator}
               onChange={(e) => handleChange('thousands_separator', e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
@@ -182,8 +195,9 @@ export const LocaleFormModal: React.FC<LocaleFormModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Date Format</label>
+          <label htmlFor={dateFormatId} className="block text-sm font-medium text-slate-700 mb-1">Date Format</label>
           <select
+            id={dateFormatId}
             value={formData.date_format}
             onChange={(e) => handleChange('date_format', e.target.value)}
             className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"

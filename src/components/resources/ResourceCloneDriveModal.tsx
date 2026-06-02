@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useId, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Modal } from '../ui/Modal';
@@ -59,6 +59,9 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
 }) => {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
+  const labelFieldRef = useRef<HTMLInputElement>(null);
+  const statusFieldId = useId();
+  const notesFieldId = useId();
 
   const editingId: string | null = typeof editingDrive?.id === 'string' ? editingDrive.id : null;
   const cloneIdLabel: string = toFormString(editingDrive?.clone_id ?? editingDrive?.label);
@@ -225,6 +228,8 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
       title={editingId ? `Edit Clone Drive ${cloneIdLabel}` : 'Add Clone Drive to Resources'}
       icon={HardDrive}
       maxWidth="4xl"
+      closeOnBackdrop={false}
+      initialFocusRef={labelFieldRef}
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
@@ -255,6 +260,7 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
             </h3>
 
             <Input
+              ref={labelFieldRef}
               label="Clone ID / Label"
               value={formData.label}
               onChange={(e) => setFormData({ ...formData, label: e.target.value })}
@@ -309,10 +315,11 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
             </h3>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label htmlFor={statusFieldId} className="block text-sm font-medium text-slate-700 mb-2">
                 Status
               </label>
               <select
+                id={statusFieldId}
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
@@ -351,8 +358,9 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Notes</label>
+          <label htmlFor={notesFieldId} className="block text-sm font-medium text-slate-700 mb-2">Notes</label>
           <textarea
+            id={notesFieldId}
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             rows={3}

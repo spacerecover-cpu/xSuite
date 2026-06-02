@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -39,6 +39,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
   const [notes, setNotes] = useState('');
   const [amountError, setAmountError] = useState<string | null>(null);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
+  const firstFieldRef = useRef<HTMLInputElement>(null);
 
   const { data: categories = [] } = useQuery({
     queryKey: ['transaction_categories'],
@@ -109,7 +110,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="New Transaction" size="md">
+    <Modal isOpen={isOpen} onClose={handleClose} title="New Transaction" size="md" closeOnBackdrop={false} initialFocusRef={firstFieldRef}>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
           <button
@@ -146,6 +147,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
             <div className="relative">
               <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
               <Input
+                ref={firstFieldRef}
                 type="date"
                 value={transactionDate}
                 onChange={(e) => setTransactionDate(e.target.value)}
@@ -181,12 +183,13 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label htmlFor="transaction-description" className="block text-sm font-medium text-slate-700 mb-1">
             Description
           </label>
           <div className="relative">
             <FileText className="absolute left-3 top-3 text-slate-400 w-4 h-4" />
             <textarea
+              id="transaction-description"
               value={description}
               onChange={(e) => {
                 setDescription(e.target.value);
@@ -205,12 +208,13 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor="transaction-category" className="block text-sm font-medium text-slate-700 mb-1">
               Category
             </label>
             <div className="relative">
               <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
               <select
+                id="transaction-category"
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
                 className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
@@ -226,10 +230,11 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor="transaction-bank-account" className="block text-sm font-medium text-slate-700 mb-1">
               Bank Account
             </label>
             <select
+              id="transaction-bank-account"
               value={bankAccountId}
               onChange={(e) => setBankAccountId(e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
@@ -257,10 +262,11 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label htmlFor="transaction-notes" className="block text-sm font-medium text-slate-700 mb-1">
             Notes (Optional)
           </label>
           <textarea
+            id="transaction-notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={2}

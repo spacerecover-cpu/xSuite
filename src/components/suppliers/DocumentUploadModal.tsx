@@ -111,10 +111,11 @@ export default function DocumentUploadModal({ isOpen, onClose, onSuccess, suppli
     <Modal isOpen={isOpen} onClose={onClose} title="Upload Document">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="supplier-doc-type" className="block text-sm font-medium text-gray-700 mb-1">
             Document Type *
           </label>
           <select
+            id="supplier-doc-type"
             value={formData.document_type}
             onChange={(e) => setFormData({ ...formData, document_type: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"

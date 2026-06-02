@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { SlidersHorizontal } from 'lucide-react';
 import { Modal } from '../ui/Modal';
@@ -22,6 +22,7 @@ interface Props {
 export const BulkAdjustmentModal: React.FC<Props> = ({ selectedItems, onClose }) => {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const reasonFieldId = useId();
   const [reason, setReason] = useState('');
   const [lines, setLines] = useState<AdjustmentLine[]>(
     selectedItems.map((item) => ({
@@ -58,10 +59,11 @@ export const BulkAdjustmentModal: React.FC<Props> = ({ selectedItems, onClose })
     <Modal isOpen onClose={onClose} title={`Bulk Quantity Adjustment — ${selectedItems.length} items`} size="md">
       <div className="space-y-5">
         <div>
-          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+          <label htmlFor={reasonFieldId} className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
             Adjustment Reason <span className="text-danger">*</span>
           </label>
           <select
+            id={reasonFieldId}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
             value={reason}
             onChange={(e) => setReason(e.target.value)}

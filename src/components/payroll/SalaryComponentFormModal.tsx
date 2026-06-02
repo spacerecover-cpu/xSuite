@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { payrollService } from '../../lib/payrollService';
 import { payrollKeys } from '../../lib/queryKeys';
@@ -20,6 +20,11 @@ export function SalaryComponentFormModal({ component, onClose }: Props) {
   const toast = useToast();
   const queryClient = useQueryClient();
   const isEditing = !!component;
+  const nameFieldRef = useRef<HTMLInputElement>(null);
+  const nameFieldId = useId();
+  const typeFieldId = useId();
+  const calculationFieldId = useId();
+  const percentageFieldId = useId();
 
   const [formData, setFormData] = useState({
     name: component?.name || '',
@@ -76,14 +81,16 @@ export function SalaryComponentFormModal({ component, onClose }: Props) {
   };
 
   return (
-    <Modal isOpen onClose={onClose} title={isEditing ? 'Edit Salary Component' : 'Add Salary Component'}>
+    <Modal isOpen onClose={onClose} title={isEditing ? 'Edit Salary Component' : 'Add Salary Component'} closeOnBackdrop={false} initialFocusRef={nameFieldRef}>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={nameFieldId} className="block text-sm font-medium text-slate-700 mb-2">
               Name <span className="text-danger">*</span>
             </label>
             <Input
+              ref={nameFieldRef}
+              id={nameFieldId}
               value={formData.name}
               onChange={(e) => handleChange('name', e.target.value)}
               placeholder="e.g., Basic Salary"
@@ -91,10 +98,11 @@ export function SalaryComponentFormModal({ component, onClose }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={typeFieldId} className="block text-sm font-medium text-slate-700 mb-2">
               Component Type <span className="text-danger">*</span>
             </label>
             <select
+              id={typeFieldId}
               value={formData.type}
               onChange={(e) => handleChange('type', e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
@@ -107,10 +115,11 @@ export function SalaryComponentFormModal({ component, onClose }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={calculationFieldId} className="block text-sm font-medium text-slate-700 mb-2">
               Calculation Type <span className="text-danger">*</span>
             </label>
             <select
+              id={calculationFieldId}
               value={formData.calculation_type}
               onChange={(e) => handleChange('calculation_type', e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
@@ -122,10 +131,11 @@ export function SalaryComponentFormModal({ component, onClose }: Props) {
 
           {formData.calculation_type === 'percentage' && (
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label htmlFor={percentageFieldId} className="block text-sm font-medium text-slate-700 mb-2">
                 Percentage (%)
               </label>
               <Input
+                id={percentageFieldId}
                 type="number"
                 step="0.01"
                 value={formData.percentage}

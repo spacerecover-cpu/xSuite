@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useId } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -50,6 +50,10 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
   isLineItemType,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const firstFieldRef = useRef<HTMLInputElement>(null);
+  const descriptionId = useId();
+  const defaultPriceId = useId();
+  const templateContentId = useId();
   const { locale, getCurrencySymbol } = useAccountingLocale();
   const decimalPlaces = locale?.decimal_places ?? DEFAULT_DECIMAL_PLACES;
   const [formData, setFormData] = useState<LineItemTemplateFormState>({
@@ -122,11 +126,14 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
       onClose={onClose}
       title={initialData ? 'Edit Line Item Template' : 'Create Line Item Template'}
       size="large"
+      closeOnBackdrop={false}
+      initialFocusRef={firstFieldRef}
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
             <Input
+              ref={firstFieldRef}
               label="Service Name *"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -136,10 +143,11 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor={descriptionId} className="block text-sm font-medium text-slate-700 mb-1">
               Description
             </label>
             <textarea
+              id={descriptionId}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               rows={2}
@@ -151,7 +159,7 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
           {isLineItemType && (
             <>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label htmlFor={defaultPriceId} className="block text-sm font-medium text-slate-700 mb-1">
                   Default Price <span className="text-danger ml-1">*</span>
                 </label>
                 <div className="relative">
@@ -161,6 +169,7 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
                     </div>
                   )}
                   <input
+                    id={defaultPriceId}
                     type="number"
                     step={locale ? Math.pow(10, -decimalPlaces).toFixed(decimalPlaces) : "0.01"}
                     min="0"
@@ -210,10 +219,11 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
               />
             ) : (
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label htmlFor={templateContentId} className="block text-sm font-medium text-slate-700 mb-1">
                   Template Content
                 </label>
                 <textarea
+                  id={templateContentId}
                   value={formData.content}
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                   rows={12}

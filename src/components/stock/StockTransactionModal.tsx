@@ -180,11 +180,12 @@ export function StockTransactionModal({
             />
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label htmlFor="stock-txn-serial-numbers" className="block text-sm font-medium text-slate-700 mb-1">
                 Serial Numbers
                 <span className="text-slate-400 font-normal ml-1">(comma-separated, optional)</span>
               </label>
               <textarea
+                id="stock-txn-serial-numbers"
                 rows={3}
                 value={form.serialNumbers}
                 onChange={(e) =>
@@ -198,11 +199,12 @@ export function StockTransactionModal({
         )}
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label htmlFor="stock-txn-notes" className="block text-sm font-medium text-slate-700 mb-1">
             Notes
             <span className="text-slate-400 font-normal ml-1">(optional)</span>
           </label>
           <textarea
+            id="stock-txn-notes"
             rows={3}
             value={form.notes}
             onChange={(e) =>

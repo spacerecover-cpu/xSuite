@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useId } from 'react';
 import { Building2, Mail, Phone, MapPin, FileText, User, Truck, CheckCircle } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -41,6 +41,9 @@ interface SupplierFormModalProps {
 
 export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier }: SupplierFormModalProps) {
   const toast = useToast();
+  const firstFieldRef = useRef<HTMLInputElement>(null);
+  const categorySelectId = useId();
+  const paymentTermsSelectId = useId();
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Array<{ id: string; name: string; is_active?: boolean }>>([]);
   const [paymentTerms, setPaymentTerms] = useState<Array<{ id: string; name: string; days: number | null; is_active?: boolean }>>([]);
@@ -192,7 +195,7 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={supplier ? 'Edit Supplier' : 'Add New Supplier'} size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title={supplier ? 'Edit Supplier' : 'Add New Supplier'} size="lg" closeOnBackdrop={false} initialFocusRef={firstFieldRef}>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
@@ -201,6 +204,7 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
               Company Name *
             </label>
             <Input
+              ref={firstFieldRef}
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
@@ -222,10 +226,11 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor={categorySelectId} className="block text-sm font-medium text-gray-700 mb-1">
               Category
             </label>
             <select
+              id={categorySelectId}
               value={formData.category_id}
               onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -345,10 +350,11 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor={paymentTermsSelectId} className="block text-sm font-medium text-gray-700 mb-1">
               Payment Terms
             </label>
             <select
+              id={paymentTermsSelectId}
               value={formData.payment_terms_id}
               onChange={(e) => setFormData({ ...formData, payment_terms_id: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"

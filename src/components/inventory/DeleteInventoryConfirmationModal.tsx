@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useId, useState, useEffect } from 'react';
 import { AlertTriangle, Trash2, RefreshCw, X } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -24,6 +24,7 @@ export default function DeleteInventoryConfirmationModal({
   const [selectedStatusId, setSelectedStatusId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [loadingStatusTypes, setLoadingStatusTypes] = useState(false);
+  const statusSelectId = useId();
 
   useEffect(() => {
     if (isOpen) {
@@ -106,10 +107,11 @@ export default function DeleteInventoryConfirmationModal({
           </div>
         ) : (
           <div className="mb-6">
-            <label className="block text-left text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor={statusSelectId} className="block text-left text-sm font-medium text-gray-700 mb-2">
               Change Status To:
             </label>
             <select
+              id={statusSelectId}
               value={selectedStatusId}
               onChange={(e) => setSelectedStatusId(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-base"

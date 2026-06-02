@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useId } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -50,6 +50,14 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const firstFieldRef = useRef<HTMLInputElement>(null);
+  const fullNameId = useId();
+  const emailId = useId();
+  const passwordId = useId();
+  const phoneId = useId();
+  const roleId = useId();
+  const caseAccessLevelId = useId();
+  const statusId = useId();
 
   useEffect(() => {
     if (user && mode === 'edit') {
@@ -111,6 +119,8 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
       onClose={onClose}
       title={mode === 'create' ? 'Add New User' : 'Edit User'}
       size="lg"
+      closeOnBackdrop={false}
+      initialFocusRef={firstFieldRef}
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
@@ -121,13 +131,15 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={fullNameId} className="block text-sm font-medium text-slate-700 mb-2">
               <div className="flex items-center gap-2">
                 <User className="w-4 h-4" />
                 Full Name
               </div>
             </label>
             <Input
+              ref={firstFieldRef}
+              id={fullNameId}
               type="text"
               value={formData.full_name}
               onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
@@ -137,7 +149,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={emailId} className="block text-sm font-medium text-slate-700 mb-2">
               <div className="flex items-center gap-2">
                 <Mail className="w-4 h-4" />
                 Email
@@ -145,6 +157,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
             </label>
             {mode === 'edit' ? (
               <Input
+                id={emailId}
                 type="email"
                 value={formData.email}
                 readOnly
@@ -153,6 +166,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
               />
             ) : (
               <Input
+                id={emailId}
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -169,13 +183,14 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
 
           {mode === 'create' && (
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label htmlFor={passwordId} className="block text-sm font-medium text-slate-700 mb-2">
                 <div className="flex items-center gap-2">
                   <Lock className="w-4 h-4" />
                   Password
                 </div>
               </label>
               <Input
+                id={passwordId}
                 type="password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -187,13 +202,14 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
           )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={phoneId} className="block text-sm font-medium text-slate-700 mb-2">
               <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4" />
                 Phone Number
               </div>
             </label>
             <Input
+              id={phoneId}
               type="tel"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
@@ -202,13 +218,14 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={roleId} className="block text-sm font-medium text-slate-700 mb-2">
               <div className="flex items-center gap-2">
                 <Shield className="w-4 h-4" />
                 Role
               </div>
             </label>
             <select
+              id={roleId}
               value={formData.role}
               onChange={(e) =>
                 setFormData({
@@ -229,10 +246,11 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
 
           {formData.role === 'technician' && (
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label htmlFor={caseAccessLevelId} className="block text-sm font-medium text-slate-700 mb-2">
                 Case Access Level
               </label>
               <select
+                id={caseAccessLevelId}
                 value={formData.case_access_level || 'full'}
                 onChange={(e) =>
                   setFormData({
@@ -254,8 +272,9 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
           )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Status</label>
+            <label htmlFor={statusId} className="block text-sm font-medium text-slate-700 mb-2">Status</label>
             <select
+              id={statusId}
               value={formData.is_active ? 'active' : 'inactive'}
               onChange={(e) =>
                 setFormData({ ...formData, is_active: e.target.value === 'active' })

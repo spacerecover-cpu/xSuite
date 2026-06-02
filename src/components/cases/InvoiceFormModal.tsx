@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Trash2, Search, FileText, Download, DollarSign, FileBarChart, Briefcase, Calculator, Package, Info, X, Percent } from 'lucide-react';
 import { Modal } from '../ui/Modal';
@@ -93,6 +93,12 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
 }) => {
   const { currencyFormat } = useCurrency();
   const toast = useToast();
+  const caseSelectId = useId();
+  const statusId = useId();
+  const currencyId = useId();
+  const discountAmountId = useId();
+  const bankAccountId = useId();
+  const paymentTermsId = useId();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -498,6 +504,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
       title={initialData ? 'Edit Invoice' : 'Create New Invoice'}
       size="xl"
       headerBadges={headerBadges}
+      closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit} className="space-y-3">
 
@@ -510,8 +517,9 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
               <h3 className="text-sm font-semibold text-slate-900">Select Case</h3>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Case *</label>
+              <label htmlFor={caseSelectId} className="block text-sm font-medium text-slate-700 mb-1">Case *</label>
               <select
+                id={caseSelectId}
                 value={selectedCaseId}
                 onChange={(e) => handleCaseSelection(e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
@@ -566,8 +574,9 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
               </div>
 
               <div className="md:col-span-1">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+                <label htmlFor={statusId} className="block text-sm font-medium text-slate-700 mb-1">Status</label>
                 <select
+                  id={statusId}
                   value={invoiceData.status}
                   onChange={(e) => setInvoiceData({ ...invoiceData, status: e.target.value })}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
@@ -636,8 +645,9 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
 
             {currencies.length > 1 && (
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Currency</label>
+                <label htmlFor={currencyId} className="block text-sm font-medium text-slate-700 mb-1">Currency</label>
                 <select
+                  id={currencyId}
                   value={invoiceData.currency || baseCurrency}
                   onChange={(e) => setInvoiceData((d) => ({ ...d, currency: e.target.value }))}
                   className="rounded border border-border bg-surface px-3 py-2 text-sm"
@@ -788,10 +798,11 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                  <label htmlFor={discountAmountId} className="block text-sm font-medium text-slate-700 mb-1">
                     Discount ({invoiceData.discount_type === 'percentage' ? '%' : docCurrency})
                   </label>
                   <input
+                    id={discountAmountId}
                     type="number"
                     value={invoiceData.discount_amount}
                     onChange={(e) =>
@@ -895,10 +906,11 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                <label htmlFor={bankAccountId} className="block text-xs font-medium text-slate-700 mb-1.5">
                   Bank Account
                 </label>
                 <select
+                  id={bankAccountId}
                   value={invoiceData.bank_account_id || ''}
                   onChange={(e) => setInvoiceData({ ...invoiceData, bank_account_id: e.target.value || null })}
                   className="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
@@ -918,7 +930,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-medium text-slate-700">
+                  <label htmlFor={paymentTermsId} className="block text-xs font-medium text-slate-700">
                     Payment Terms
                   </label>
                   <button
@@ -960,6 +972,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                   </div>
                 )}
                 <textarea
+                  id={paymentTermsId}
                   value={invoiceData.terms_and_conditions}
                   onChange={(e) =>
                     setInvoiceData({ ...invoiceData, terms_and_conditions: e.target.value })

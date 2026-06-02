@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { X } from 'lucide-react';
+import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
 import { createPlanFeature, updatePlanFeature } from '../../../lib/billingService';
 import { platformAdminKeys } from '../../../lib/queryKeys';
@@ -56,6 +56,7 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
   });
 
   const [customKey, setCustomKey] = useState(!FEATURE_KEY_OPTIONS.includes(formData.feature_key));
+  const firstFieldRef = useRef<HTMLSelectElement>(null);
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -85,28 +86,22 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
     onError: (err: Error) => toast.error(err.message || 'Failed to save feature'),
   });
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg mx-4">
-        <div className="flex items-center justify-between p-6 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-900">
-            {isEditing ? 'Edit Feature' : 'Add Feature'}
-          </h2>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600 rounded">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            mutation.mutate();
-          }}
-          className="p-6 space-y-4"
-        >
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isEditing ? 'Edit Feature' : 'Add Feature'}
+      size="md"
+      closeOnBackdrop={false}
+      initialFocusRef={firstFieldRef}
+    >
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          mutation.mutate();
+        }}
+        className="space-y-4"
+      >
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Feature Key *</label>
             {customKey ? (
@@ -126,6 +121,7 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
             ) : (
               <div className="flex gap-2">
                 <select
+                  ref={firstFieldRef}
                   value={formData.feature_key}
                   onChange={(e) => setFormData((p) => ({ ...p, feature_key: e.target.value }))}
                   className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
@@ -145,8 +141,9 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Display Name *</label>
+              <label htmlFor="feature-display-name" className="block text-sm font-medium text-slate-700 mb-1">Display Name *</label>
               <input
+                id="feature-display-name"
                 type="text"
                 value={formData.feature_name}
                 onChange={(e) => setFormData((p) => ({ ...p, feature_name: e.target.value }))}
@@ -155,8 +152,9 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Arabic Name</label>
+              <label htmlFor="feature-arabic-name" className="block text-sm font-medium text-slate-700 mb-1">Arabic Name</label>
               <input
+                id="feature-arabic-name"
                 type="text"
                 dir="rtl"
                 value={formData.feature_name_ar}
@@ -168,8 +166,9 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Limit Type</label>
+              <label htmlFor="feature-limit-type" className="block text-sm font-medium text-slate-700 mb-1">Limit Type</label>
               <input
+                id="feature-limit-type"
                 type="text"
                 value={formData.limit_type}
                 onChange={(e) => setFormData((p) => ({ ...p, limit_type: e.target.value }))}
@@ -178,8 +177,9 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Limit Value</label>
+              <label htmlFor="feature-limit-value" className="block text-sm font-medium text-slate-700 mb-1">Limit Value</label>
               <input
+                id="feature-limit-value"
                 type="number"
                 value={formData.limit_value ?? ''}
                 onChange={(e) =>
@@ -195,8 +195,9 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Display Order</label>
+            <label htmlFor="feature-display-order" className="block text-sm font-medium text-slate-700 mb-1">Display Order</label>
             <input
+              id="feature-display-order"
               type="number"
               value={formData.display_order ?? 0}
               onChange={(e) =>
@@ -236,7 +237,6 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
             </Button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 };

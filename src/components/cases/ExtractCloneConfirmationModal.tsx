@@ -1,5 +1,6 @@
 import React from 'react';
-import { CheckCircle2, X, Info, HardDrive, FolderOpen, Calendar } from 'lucide-react';
+import { CheckCircle2, Info, HardDrive, FolderOpen, Calendar } from 'lucide-react';
+import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { formatDate } from '../../lib/format';
 
@@ -54,29 +55,15 @@ export const ExtractCloneConfirmationModal: React.FC<ExtractCloneConfirmationMod
   const displaySerial = clone.resource_clone_drive?.serial_number || clone.physical_drive_serial || '';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose} />
-      <div
-        className="relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-5 border-b border-slate-200">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-success-muted rounded-lg flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4 text-success" />
-            </div>
-            <h2 className="text-lg font-semibold text-slate-900">Extract Clone Drive</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-slate-100 rounded-lg transition-colors"
-            disabled={isLoading}
-          >
-            <X className="w-5 h-5 text-slate-400" />
-          </button>
-        </div>
-
-        <div className="p-5">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Extract Clone Drive"
+      size="md"
+      icon={CheckCircle2}
+    >
+      <div>
+        <div>
           <div className="mb-4 p-3 bg-success-muted border-l-4 border-success rounded">
             <div className="flex gap-2">
               <Info className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
@@ -196,6 +183,6 @@ export const ExtractCloneConfirmationModal: React.FC<ExtractCloneConfirmationMod
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };

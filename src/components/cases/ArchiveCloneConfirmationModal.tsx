@@ -1,6 +1,7 @@
 import React from 'react';
-import { Archive, X, AlertTriangle, Info, HardDrive, FolderOpen, Calendar } from 'lucide-react';
+import { Archive, AlertTriangle, Info, HardDrive, FolderOpen, Calendar } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { Modal } from '../ui/Modal';
 import { formatDate } from '../../lib/format';
 
 interface CloneDrive {
@@ -54,30 +55,15 @@ export const ArchiveCloneConfirmationModal: React.FC<ArchiveCloneConfirmationMod
   const displaySerial = clone.resource_clone_drive?.serial_number || clone.physical_drive_serial || '';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose} />
-      <div
-        className="relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-5 border-b border-slate-200">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
-              <Archive className="w-4 h-4 text-slate-600" />
-            </div>
-            <h2 className="text-lg font-semibold text-slate-900">Archive Clone Drive</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-slate-100 rounded-lg transition-colors"
-            disabled={isLoading}
-          >
-            <X className="w-5 h-5 text-slate-400" />
-          </button>
-        </div>
-
-        <div className="p-5">
-          <div className="mb-4 p-3 bg-slate-50 border-l-4 border-slate-500 rounded">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Archive Clone Drive"
+      size="md"
+      icon={Archive}
+    >
+      <div>
+        <div className="mb-4 p-3 bg-slate-50 border-l-4 border-slate-500 rounded">
             <div className="flex gap-2">
               <Info className="w-5 h-5 text-slate-600 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-slate-900">
@@ -195,7 +181,6 @@ export const ArchiveCloneConfirmationModal: React.FC<ArchiveCloneConfirmationMod
             </Button>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };

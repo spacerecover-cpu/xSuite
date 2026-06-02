@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useId } from 'react';
 import { Search, Filter, Save, X, Star, AlertCircle } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';
+import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/ui/Badge';
 import { SearchableSelect } from '../../components/ui/SearchableSelect';
 import { supabase, getTenantId } from '../../lib/supabaseClient';
@@ -42,6 +43,9 @@ export default function DonorSearchPage() {
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [templateName, setTemplateName] = useState('');
   const [templateDescription, setTemplateDescription] = useState('');
+  const templateNameRef = useRef<HTMLInputElement>(null);
+  const templateNameId = useId();
+  const templateDescriptionId = useId();
 
   useEffect(() => {
     loadMasterData();
@@ -403,46 +407,57 @@ export default function DonorSearchPage() {
         </Card>
       )}
 
-      {showSaveTemplate && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md p-6 m-4">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">Save Search Template</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Template Name
-                </label>
-                <Input
-                  type="text"
-                  value={templateName}
-                  onChange={(e) => setTemplateName(e.target.value)}
-                  placeholder="e.g., WD 2TB SATA Drives"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Description (Optional)
-                </label>
-                <textarea
-                  value={templateDescription}
-                  onChange={(e) => setTemplateDescription(e.target.value)}
-                  placeholder="Describe this search template..."
-                  rows={3}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              <div className="flex justify-end space-x-3 pt-4 border-t border-slate-200">
-                <Button variant="secondary" onClick={() => setShowSaveTemplate(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSaveTemplate} disabled={!templateName.trim()}>
-                  Save Template
-                </Button>
-              </div>
-            </div>
-          </Card>
-        </div>
-      )}
+      <Modal
+        isOpen={showSaveTemplate}
+        onClose={() => setShowSaveTemplate(false)}
+        title="Save Search Template"
+        icon={Save}
+        size="sm"
+        initialFocusRef={templateNameRef}
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSaveTemplate();
+          }}
+          className="space-y-4"
+        >
+          <div>
+            <label htmlFor={templateNameId} className="block text-sm font-medium text-slate-700 mb-2">
+              Template Name
+            </label>
+            <Input
+              ref={templateNameRef}
+              id={templateNameId}
+              type="text"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder="e.g., WD 2TB SATA Drives"
+            />
+          </div>
+          <div>
+            <label htmlFor={templateDescriptionId} className="block text-sm font-medium text-slate-700 mb-2">
+              Description (Optional)
+            </label>
+            <textarea
+              id={templateDescriptionId}
+              value={templateDescription}
+              onChange={(e) => setTemplateDescription(e.target.value)}
+              placeholder="Describe this search template..."
+              rows={3}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          <div className="flex justify-end space-x-3 pt-4 border-t border-slate-200">
+            <Button type="button" variant="secondary" onClick={() => setShowSaveTemplate(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!templateName.trim()}>
+              Save Template
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

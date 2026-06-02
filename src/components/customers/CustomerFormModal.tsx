@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { createCustomer } from '../../lib/customerService';
@@ -99,6 +99,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   const [settingsCollapsed, setSettingsCollapsed] = useState(true);
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const customerNameRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     customer_name: '',
@@ -303,6 +304,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         onClose={handleClose}
         title="Add New Customer"
         icon={User}
+        initialFocusRef={customerNameRef}
+        closeOnBackdrop={false}
       >
         <form onSubmit={handleSubmit} className="space-y-1">
 
@@ -312,6 +315,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
 
             <div className="mt-2.5 space-y-3">
               <Input
+                ref={customerNameRef}
                 label="Customer Name"
                 value={formData.customer_name}
                 onChange={(e) => handleFieldChange('customer_name', e.target.value)}
@@ -468,11 +472,12 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1">
+                  <label htmlFor="customer-internal-notes" className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1">
                     <StickyNote className="w-3.5 h-3.5 text-slate-400" />
                     Internal Notes
                   </label>
                   <textarea
+                    id="customer-internal-notes"
                     value={formData.notes}
                     onChange={(e) => handleFieldChange('notes', e.target.value)}
                     rows={2}

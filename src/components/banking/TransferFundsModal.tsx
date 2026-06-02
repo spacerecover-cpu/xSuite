@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useId } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -22,6 +22,9 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string>('');
   const [warning, setWarning] = useState<string>('');
+  const fromAccountId = useId();
+  const toAccountId = useId();
+  const descriptionId = useId();
 
   const [formData, setFormData] = useState({
     transfer_date: new Date().toISOString().split('T')[0],
@@ -111,8 +114,9 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
 
         <div className="grid grid-cols-[1fr,auto,1fr] gap-4 items-end">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">From Account</label>
+            <label htmlFor={fromAccountId} className="block text-sm font-medium text-slate-700 mb-1.5">From Account</label>
             <select
+              id={fromAccountId}
               value={formData.from_account_id}
               onChange={(e) => setFormData({ ...formData, from_account_id: e.target.value })}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
@@ -137,8 +141,9 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">To Account</label>
+            <label htmlFor={toAccountId} className="block text-sm font-medium text-slate-700 mb-1.5">To Account</label>
             <select
+              id={toAccountId}
               value={formData.to_account_id}
               onChange={(e) => setFormData({ ...formData, to_account_id: e.target.value })}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
@@ -178,8 +183,9 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
         />
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Description</label>
+          <label htmlFor={descriptionId} className="block text-sm font-medium text-slate-700 mb-1.5">Description</label>
           <textarea
+            id={descriptionId}
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             rows={3}

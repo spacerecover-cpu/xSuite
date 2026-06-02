@@ -211,7 +211,7 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
   const totals = calculateTotals();
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={purchaseOrder ? 'Edit Purchase Order' : 'Create Purchase Order'} size="xl">
+    <Modal isOpen={isOpen} onClose={onClose} title={purchaseOrder ? 'Edit Purchase Order' : 'Create Purchase Order'} size="xl" closeOnBackdrop={false}>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -228,11 +228,12 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="po-supplier" className="block text-sm font-medium text-gray-700 mb-1">
               <Package className="inline w-4 h-4 mr-1" />
               Supplier *
             </label>
             <select
+              id="po-supplier"
               value={formData.supplier_id}
               onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -274,10 +275,11 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="po-status" className="block text-sm font-medium text-gray-700 mb-1">
               Status *
             </label>
             <select
+              id="po-status"
               value={formData.status_id}
               onChange={(e) => setFormData({ ...formData, status_id: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -304,10 +306,11 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="po-shipping-address" className="block text-sm font-medium text-gray-700 mb-1">
               Shipping Address
             </label>
             <textarea
+              id="po-shipping-address"
               value={formData.shipping_address}
               onChange={(e) => setFormData({ ...formData, shipping_address: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -404,11 +407,12 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="po-notes" className="block text-sm font-medium text-gray-700 mb-1">
               <FileText className="inline w-4 h-4 mr-1" />
               Notes (Visible to Supplier)
             </label>
             <textarea
+              id="po-notes"
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -418,10 +422,11 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="po-internal-notes" className="block text-sm font-medium text-gray-700 mb-1">
               Internal Notes (Private)
             </label>
             <textarea
+              id="po-internal-notes"
               value={formData.internal_notes}
               onChange={(e) => setFormData({ ...formData, internal_notes: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"

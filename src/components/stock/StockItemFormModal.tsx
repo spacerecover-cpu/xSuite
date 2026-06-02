@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useId, useState, useEffect } from 'react';
 import { Package, Plus, Trash2, Save } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -47,6 +47,8 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
   onSuccess,
 }) => {
   const toast = useToast();
+  const fieldIdPrefix = useId();
+  const fid = (key: string) => `${fieldIdPrefix}-${key}`;
   const [activeTab, setActiveTab] = useState<TabId>('basic');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -189,6 +191,7 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
       title={item ? 'Edit Stock Item' : 'New Stock Item'}
       size="xl"
       icon={Package}
+      closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-0">
         <div className="flex border-b border-slate-200 mb-5 -mx-4 px-4">
@@ -211,10 +214,11 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
         {activeTab === 'basic' && (
           <div className="space-y-4">
             <div>
-              <label className={labelClass}>
+              <label htmlFor={fid('name')} className={labelClass}>
                 Name <span className="text-danger">*</span>
               </label>
               <Input
+                id={fid('name')}
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -224,8 +228,9 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
             </div>
 
             <div>
-              <label className={labelClass}>Description</label>
+              <label htmlFor={fid('description')} className={labelClass}>Description</label>
               <textarea
+                id={fid('description')}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
@@ -244,8 +249,9 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
                 />
               </div>
               <div>
-                <label className={labelClass}>Item Type</label>
+                <label htmlFor={fid('itemType')} className={labelClass}>Item Type</label>
                 <select
+                  id={fid('itemType')}
                   value={itemType}
                   onChange={(e) => setItemType(e.target.value as 'internal' | 'saleable' | 'both')}
                   className={inputClass}
@@ -259,8 +265,9 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
 
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className={labelClass}>Brand</label>
+                <label htmlFor={fid('brand')} className={labelClass}>Brand</label>
                 <Input
+                  id={fid('brand')}
                   type="text"
                   value={brand}
                   onChange={(e) => setBrand(e.target.value)}
@@ -268,8 +275,9 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
                 />
               </div>
               <div>
-                <label className={labelClass}>Model</label>
+                <label htmlFor={fid('model')} className={labelClass}>Model</label>
                 <Input
+                  id={fid('model')}
                   type="text"
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
@@ -277,8 +285,9 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
                 />
               </div>
               <div>
-                <label className={labelClass}>Capacity</label>
+                <label htmlFor={fid('capacity')} className={labelClass}>Capacity</label>
                 <Input
+                  id={fid('capacity')}
                   type="text"
                   value={capacity}
                   onChange={(e) => setCapacity(e.target.value)}
@@ -289,8 +298,9 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={labelClass}>Unit of Measure</label>
+                <label htmlFor={fid('unit')} className={labelClass}>Unit of Measure</label>
                 <Input
+                  id={fid('unit')}
                   type="text"
                   value={unitOfMeasure}
                   onChange={(e) => setUnitOfMeasure(e.target.value)}
@@ -298,8 +308,9 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
                 />
               </div>
               <div>
-                <label className={labelClass}>Barcode</label>
+                <label htmlFor={fid('barcode')} className={labelClass}>Barcode</label>
                 <Input
+                  id={fid('barcode')}
                   type="text"
                   value={barcode}
                   onChange={(e) => setBarcode(e.target.value)}
@@ -309,8 +320,9 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
             </div>
 
             <div>
-              <label className={labelClass}>Image URL</label>
+              <label htmlFor={fid('imageUrl')} className={labelClass}>Image URL</label>
               <Input
+                id={fid('imageUrl')}
                 type="text"
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
@@ -347,8 +359,9 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={labelClass}>Cost Price</label>
+                <label htmlFor={fid('costPrice')} className={labelClass}>Cost Price</label>
                 <Input
+                  id={fid('costPrice')}
                   type="number"
                   min="0"
                   step="0.01"
@@ -359,8 +372,9 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
               </div>
               {isSaleable && (
                 <div>
-                  <label className={labelClass}>Selling Price</label>
+                  <label htmlFor={fid('sellingPrice')} className={labelClass}>Selling Price</label>
                   <Input
+                    id={fid('sellingPrice')}
                     type="number"
                     min="0"
                     step="0.01"
@@ -383,8 +397,9 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
             </label>
 
             <div>
-              <label className={labelClass}>Warranty (months)</label>
+              <label htmlFor={fid('warranty')} className={labelClass}>Warranty (months)</label>
               <Input
+                id={fid('warranty')}
                 type="number"
                 min="0"
                 step="1"
@@ -400,8 +415,9 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={labelClass}>Reorder Point (min qty)</label>
+                <label htmlFor={fid('minQty')} className={labelClass}>Reorder Point (min qty)</label>
                 <Input
+                  id={fid('minQty')}
                   type="number"
                   min="0"
                   step="1"
@@ -411,8 +427,9 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
                 />
               </div>
               <div>
-                <label className={labelClass}>Suggested Order Qty</label>
+                <label htmlFor={fid('reorderQty')} className={labelClass}>Suggested Order Qty</label>
                 <Input
+                  id={fid('reorderQty')}
                   type="number"
                   min="0"
                   step="1"
@@ -424,8 +441,9 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
             </div>
 
             <div>
-              <label className={labelClass}>Storage Location</label>
+              <label htmlFor={fid('location')} className={labelClass}>Storage Location</label>
               <Input
+                id={fid('location')}
                 type="text"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
@@ -434,8 +452,9 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
             </div>
 
             <div>
-              <label className={labelClass}>Notes</label>
+              <label htmlFor={fid('notes')} className={labelClass}>Notes</label>
               <textarea
+                id={fid('notes')}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={4}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -41,6 +41,7 @@ export const VATReturnModal: React.FC<VATReturnModalProps> = ({
   const [periodEnd, setPeriodEnd] = useState('');
   const [summary, setSummary] = useState<VATSummary | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
+  const firstFieldRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const now = new Date();
@@ -115,7 +116,7 @@ export const VATReturnModal: React.FC<VATReturnModalProps> = ({
   ];
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Create VAT Return" size="lg">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Create VAT Return" size="lg" initialFocusRef={firstFieldRef}>
       <div className="space-y-6">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -147,12 +148,14 @@ export const VATReturnModal: React.FC<VATReturnModalProps> = ({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor="vat-period-start" className="block text-sm font-medium text-slate-700 mb-1">
               Period Start
             </label>
             <div className="relative">
               <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
               <Input
+                ref={firstFieldRef}
+                id="vat-period-start"
                 type="date"
                 value={periodStart}
                 onChange={(e) => setPeriodStart(e.target.value)}
@@ -163,12 +166,13 @@ export const VATReturnModal: React.FC<VATReturnModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor="vat-period-end" className="block text-sm font-medium text-slate-700 mb-1">
               Period End
             </label>
             <div className="relative">
               <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
               <Input
+                id="vat-period-end"
                 type="date"
                 value={periodEnd}
                 onChange={(e) => setPeriodEnd(e.target.value)}

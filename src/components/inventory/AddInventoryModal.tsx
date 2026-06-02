@@ -353,6 +353,7 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({ isOpen, onClose, 
       title={itemId ? "Edit Inventory Item" : "Add Inventory Item"}
       icon={Package}
       maxWidth="7xl"
+      closeOnBackdrop={false}
       headerAction={
         nextInventoryNumber && (
           <div className="flex items-center gap-2 px-3 py-1.5 bg-info-muted border border-info/30 rounded-lg">
@@ -403,10 +404,11 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({ isOpen, onClose, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="inventory-model" className="block text-sm font-medium text-gray-700 mb-1">
                       Model Number <span className="text-danger">*</span>
                     </label>
                     <Input
+                      id="inventory-model"
                       type="text"
                       value={formData.model}
                       onChange={(e) => setFormData((prev) => ({ ...prev, model: e.target.value }))}
@@ -417,8 +419,9 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({ isOpen, onClose, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Serial Number</label>
+                    <label htmlFor="inventory-serial" className="block text-sm font-medium text-gray-700 mb-1">Serial Number</label>
                     <Input
+                      id="inventory-serial"
                       type="text"
                       value={formData.serial_number}
                       onChange={(e) => setFormData((prev) => ({ ...prev, serial_number: e.target.value }))}
@@ -511,8 +514,9 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({ isOpen, onClose, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">PCB Number</label>
+                    <label htmlFor="inventory-pcb" className="block text-sm font-medium text-gray-700 mb-1">PCB Number</label>
                     <Input
+                      id="inventory-pcb"
                       type="text"
                       value={formData.pcb_number}
                       onChange={(e) => setFormData((prev) => ({ ...prev, pcb_number: e.target.value }))}
@@ -522,8 +526,9 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({ isOpen, onClose, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Head Map</label>
+                    <label htmlFor="inventory-head-map" className="block text-sm font-medium text-gray-700 mb-1">Head Map</label>
                     <Input
+                      id="inventory-head-map"
                       type="text"
                       value={formData.head_map}
                       onChange={(e) => setFormData((prev) => ({ ...prev, head_map: e.target.value }))}
@@ -533,8 +538,9 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({ isOpen, onClose, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Firmware</label>
+                    <label htmlFor="inventory-firmware" className="block text-sm font-medium text-gray-700 mb-1">Firmware</label>
                     <Input
+                      id="inventory-firmware"
                       type="text"
                       value={formData.firmware_version}
                       onChange={(e) => setFormData((prev) => ({ ...prev, firmware_version: e.target.value }))}
@@ -550,7 +556,7 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({ isOpen, onClose, 
               <h3 className="text-lg font-semibold text-gray-900 mb-3">Inventory Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="inventory-purchase-price" className="block text-sm font-medium text-gray-700 mb-1">
                     Purchase Cost ({currencyFormat.currencyCode})
                   </label>
                   <div className="relative">
@@ -560,6 +566,7 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({ isOpen, onClose, 
                       </span>
                     )}
                     <Input
+                      id="inventory-purchase-price"
                       type="number"
                       step={`0.${'0'.repeat(Math.max(0, currencyFormat.decimalPlaces - 1))}1`}
                       min="0"
@@ -578,8 +585,9 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({ isOpen, onClose, 
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Date</label>
+                  <label htmlFor="inventory-purchase-date" className="block text-sm font-medium text-gray-700 mb-1">Purchase Date</label>
                   <Input
+                    id="inventory-purchase-date"
                     type="date"
                     value={formData.purchase_date}
                     onChange={(e) => setFormData((prev) => ({ ...prev, purchase_date: e.target.value }))}
@@ -615,10 +623,11 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({ isOpen, onClose, 
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="inventory-quantity" className="block text-sm font-medium text-gray-700 mb-1">
                     Quantity <span className="text-danger">*</span>
                   </label>
                   <Input
+                    id="inventory-quantity"
                     type="number"
                     min="0"
                     value={formData.quantity}

@@ -29,6 +29,9 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import { Dialog } from '../ui/Dialog';
+
+const LISTBOX_ID = 'command-palette-listbox';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -303,94 +306,103 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-start justify-center bg-slate-900/40 backdrop-blur-sm px-4 pt-[10vh]"
-      onMouseDown={(e) => {
-        // Click outside content to close. Use mousedown so a click that
-        // starts inside and drags out doesn't dismiss.
-        if (e.target === e.currentTarget) onClose();
-      }}
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      label="Command palette"
+      initialFocusRef={inputRef}
+      closeOnEscape={false}
+      overlayClassName="items-start justify-center pt-[10vh] bg-slate-900/40 backdrop-blur-sm px-4"
+      className="w-full max-w-2xl rounded-xl shadow-2xl border border-border overflow-hidden flex flex-col max-h-[70vh]"
     >
-      <div className="w-full max-w-2xl bg-surface rounded-xl shadow-2xl border border-border overflow-hidden flex flex-col max-h-[70vh]">
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-          <Search className="w-5 h-5 text-slate-400 flex-shrink-0" />
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Search pages, recent items, or actions…"
-            className="flex-1 bg-transparent outline-none text-base text-slate-900 placeholder:text-slate-400"
-          />
-          <kbd className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-[11px] font-mono text-slate-500">
-            ESC
-          </kbd>
-        </div>
-
-        <div ref={listRef} className="flex-1 overflow-y-auto">
-          {visibleItems.length === 0 ? (
-            <div className="px-4 py-12 text-center text-sm text-slate-400">
-              No matches for &ldquo;{query}&rdquo;
-            </div>
-          ) : (
-            groupedItems.map((group, gi) => {
-              // Each rendered item needs its global index so the active-index
-              // highlight works across groups.
-              let cursor = 0;
-              for (let i = 0; i < gi; i++) cursor += groupedItems[i].items.length;
-              return (
-                <div key={group.name} className="py-1">
-                  <div className="px-4 pt-2 pb-1 text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
-                    {group.name}
-                  </div>
-                  {group.items.map((item, i) => {
-                    const globalIdx = cursor + i;
-                    const isActive = globalIdx === activeIndex;
-                    const Icon = item.icon;
-                    return (
-                      <button
-                        key={item.id}
-                        data-cmd-index={globalIdx}
-                        type="button"
-                        onMouseEnter={() => setActiveIndex(globalIdx)}
-                        onClick={() => runItem(item)}
-                        className={`w-full flex items-center gap-3 px-4 py-2 text-left transition-colors ${
-                          isActive ? 'bg-primary/8 text-slate-900' : 'text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-400'}`} />
-                        <span className="flex-1 text-sm truncate">{item.label}</span>
-                        {item.hint && (
-                          <span className="text-xs text-slate-400 truncate">{item.hint}</span>
-                        )}
-                        {isActive && (
-                          <CornerDownLeft className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        <div className="flex items-center gap-4 px-4 py-2 border-t border-border bg-slate-50 text-[11px] text-slate-500">
-          <span className="inline-flex items-center gap-1">
-            <ArrowUp className="w-3 h-3" />
-            <ArrowDown className="w-3 h-3" />
-            navigate
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <CornerDownLeft className="w-3 h-3" />
-            go
-          </span>
-          <span className="inline-flex items-center gap-1 ml-auto">
-            <Command className="w-3 h-3" />
-            <span className="font-mono">K</span> to open anywhere
-          </span>
-        </div>
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+        <Search className="w-5 h-5 text-slate-400 flex-shrink-0" />
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Search pages, recent items, or actions…"
+          className="flex-1 bg-transparent outline-none text-base text-slate-900 placeholder:text-slate-400"
+          role="combobox"
+          aria-expanded
+          aria-controls={LISTBOX_ID}
+          aria-activedescendant={
+            visibleItems[activeIndex] ? `command-palette-option-${activeIndex}` : undefined
+          }
+          aria-autocomplete="list"
+        />
+        <kbd className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-[11px] font-mono text-slate-500">
+          ESC
+        </kbd>
       </div>
-    </div>
+
+      <div ref={listRef} id={LISTBOX_ID} role="listbox" className="flex-1 overflow-y-auto">
+        {visibleItems.length === 0 ? (
+          <div className="px-4 py-12 text-center text-sm text-slate-400">
+            No matches for &ldquo;{query}&rdquo;
+          </div>
+        ) : (
+          groupedItems.map((group, gi) => {
+            // Each rendered item needs its global index so the active-index
+            // highlight works across groups.
+            let cursor = 0;
+            for (let i = 0; i < gi; i++) cursor += groupedItems[i].items.length;
+            return (
+              <div key={group.name} className="py-1">
+                <div className="px-4 pt-2 pb-1 text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
+                  {group.name}
+                </div>
+                {group.items.map((item, i) => {
+                  const globalIdx = cursor + i;
+                  const isActive = globalIdx === activeIndex;
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      id={`command-palette-option-${globalIdx}`}
+                      role="option"
+                      aria-selected={isActive}
+                      data-cmd-index={globalIdx}
+                      type="button"
+                      onMouseEnter={() => setActiveIndex(globalIdx)}
+                      onClick={() => runItem(item)}
+                      className={`w-full flex items-center gap-3 px-4 py-2 text-left transition-colors ${
+                        isActive ? 'bg-primary/8 text-slate-900' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-400'}`} />
+                      <span className="flex-1 text-sm truncate">{item.label}</span>
+                      {item.hint && (
+                        <span className="text-xs text-slate-400 truncate">{item.hint}</span>
+                      )}
+                      {isActive && (
+                        <CornerDownLeft className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <div className="flex items-center gap-4 px-4 py-2 border-t border-border bg-slate-50 text-[11px] text-slate-500">
+        <span className="inline-flex items-center gap-1">
+          <ArrowUp className="w-3 h-3" />
+          <ArrowDown className="w-3 h-3" />
+          navigate
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <CornerDownLeft className="w-3 h-3" />
+          go
+        </span>
+        <span className="inline-flex items-center gap-1 ml-auto">
+          <Command className="w-3 h-3" />
+          <span className="font-mono">K</span> to open anywhere
+        </span>
+      </div>
+    </Dialog>
   );
 }
