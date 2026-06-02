@@ -106,6 +106,19 @@ describe('SearchableSelect', () => {
     await user.click(screen.getByRole('combobox'));
   });
 
+  it('hides the clear X for a required field even when a value is selected', () => {
+    render(
+      <SearchableSelect
+        label="Fruit"
+        value="a"
+        onChange={() => {}}
+        options={OPTIONS}
+        required
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();
+  });
+
   it('uses the t() default placeholder but lets a placeholder prop override it', () => {
     const { rerender } = render(<Harness />);
     expect(screen.getByText('Select...')).toBeInTheDocument();
