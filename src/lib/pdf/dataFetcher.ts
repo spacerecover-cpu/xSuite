@@ -7,8 +7,10 @@ import type {
   ReceiptData,
   QuoteData,
   QuoteDocumentData,
+  QuoteItemData,
   InvoiceData,
   InvoiceDocumentData,
+  InvoiceItemData,
   PaymentReceiptData,
   PaymentReceiptDocumentData,
   PayslipData,
@@ -16,6 +18,134 @@ import type {
   ChainOfCustodyDocumentData,
   ChainOfCustodyEntryData,
 } from './types';
+import type { Database } from '../../types/database.types';
+
+type QuotesRow = Database['public']['Tables']['quotes']['Row'];
+type InvoicesRow = Database['public']['Tables']['invoices']['Row'];
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Typed nested-relation mappers — the permanent guard against the "customer info
+ * shows N/A" bug class.
+ *
+ * Root cause history: document fetchers used to embed customer/company via
+ * PostgREST under the aliases `customers`/`companies` (plural) and then cast the
+ * whole result `as unknown as QuoteData`. The document builders read singular
+ * `customer`/`company`, so the data silently vanished — and the cast meant tsc
+ * never caught the mismatch. It was "fixed" twice in runtime data-shaping and
+ * regressed each time a query was refactored.
+ *
+ * Two structural defenses now make it impossible to recur silently:
+ *   1. Customer/company are fetched with SEPARATE queries (no alias to mismatch),
+ *      exactly like the working office-receipt path.
+ *   2. Every nested object is built by an explicitly-typed mapper below and the
+ *      document objects are assembled with `satisfies`, so any shape/key drift is
+ *      a compile error. The pure `toQuoteData`/`toInvoiceData` builders are unit
+ *      tested (see dataFetcher.test.ts).
+ * Do NOT reintroduce `... as unknown as QuoteData/InvoiceData` over nested data.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+function pickRecord(value: unknown): Record<string, unknown> | null {
+  const v = Array.isArray(value) ? value[0] : value;
+  return v != null && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+}
+
+function optStr(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function reqStr(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+// Superset customer block — assignable to every *Data['customer'] field.
+function toCustomerBlock(src: unknown): NonNullable<QuoteData['customer']> | undefined {
+  const r = pickRecord(src);
+  if (!r) return undefined;
+  return {
+    id: reqStr(r.id),
+    customer_name: reqStr(r.customer_name),
+    email: optStr(r.email),
+    mobile_number: optStr(r.mobile_number),
+    // DB column is `phone`; the type historically called it `phone_number`.
+    phone_number: optStr(r.phone_number) ?? optStr(r.phone),
+    address_line1: optStr(r.address_line1) ?? optStr(r.address),
+    address_line2: optStr(r.address_line2),
+    city: optStr(r.city),
+    postal_code: optStr(r.postal_code),
+    country: optStr(r.country),
+  };
+}
+
+// Superset company block — assignable to every *Data['company'] field.
+function toCompanyBlock(src: unknown): NonNullable<InvoiceData['company']> | undefined {
+  const r = pickRecord(src);
+  if (!r) return undefined;
+  return {
+    id: reqStr(r.id),
+    company_name: reqStr(r.company_name) || reqStr(r.name),
+    email: optStr(r.email),
+    phone_number: optStr(r.phone_number) ?? optStr(r.phone),
+    address_line1: optStr(r.address_line1) ?? optStr(r.address),
+    address_line2: optStr(r.address_line2),
+    city: optStr(r.city),
+    postal_code: optStr(r.postal_code),
+    country: optStr(r.country),
+  };
+}
+
+function toAssociatedCompany(src: unknown): NonNullable<QuoteData['customer_associated_company']> | undefined {
+  const block = toCompanyBlock(src);
+  return block ? { id: block.id, company_name: block.company_name } : undefined;
+}
+
+function toCaseRef(src: unknown): NonNullable<QuoteData['cases']> | undefined {
+  const r = pickRecord(src);
+  if (!r) return undefined;
+  return {
+    id: reqStr(r.id),
+    case_no: reqStr(r.case_no),
+    title: optStr(r.title),
+    contact_name: optStr(r.contact_name),
+    contact_email: optStr(r.contact_email),
+    contact_phone: optStr(r.contact_phone),
+  };
+}
+
+function toCreatedByProfile(src: unknown): { id: string; full_name: string; email?: string } | undefined {
+  const r = pickRecord(src);
+  if (!r) return undefined;
+  return {
+    id: reqStr(r.id),
+    full_name: reqStr(r.full_name),
+    email: optStr(r.email),
+  };
+}
+
+function toBankAccount(src: unknown): NonNullable<InvoiceData['bank_accounts']> | undefined {
+  const r = pickRecord(src);
+  if (!r) return undefined;
+  return {
+    id: reqStr(r.id),
+    account_name: reqStr(r.account_name) || reqStr(r.name),
+    bank_name: reqStr(r.bank_name),
+    account_number: reqStr(r.account_number),
+    iban: optStr(r.iban),
+    swift_code: optStr(r.swift_code),
+    branch_code: optStr(r.branch_code),
+  };
+}
+
+function toLocale(src: unknown): NonNullable<QuoteData['accounting_locales']> {
+  const r = pickRecord(src);
+  const position = r && r.currency_position === 'after' ? 'after' : 'before';
+  return {
+    currency_symbol: (r && optStr(r.currency_symbol)) || 'USD',
+    currency_position: position,
+    decimal_places: r && typeof r.decimal_places === 'number' ? r.decimal_places : 2,
+  };
+}
 
 export async function fetchReceiptData(caseId: string): Promise<ReceiptData> {
   const [caseResult, devicesResult, settingsResult] = await Promise.all([
@@ -85,14 +215,24 @@ async function fetchCaseData(caseId: string): Promise<CaseData> {
       : Promise.resolve({ data: null, error: null }),
   ]);
 
+  const serviceTypeRow = pickRecord(serviceTypeData.data);
+  const technicianRow = pickRecord(technicianData.data);
+
+  const service_type: CaseData['service_type'] = serviceTypeRow
+    ? { id: reqStr(serviceTypeRow.id), name: reqStr(serviceTypeRow.name) }
+    : undefined;
+  const assigned_technician: CaseData['assigned_technician'] = technicianRow
+    ? { id: reqStr(technicianRow.id), full_name: reqStr(technicianRow.full_name) }
+    : undefined;
+
   return {
-    ...caseData,
-    customer: customerData.data,
-    company: companyData.data,
-    service_type: serviceTypeData.data,
-    assigned_technician: technicianData.data,
-    created_by_profile: createdByData.data,
-  } as CaseData;
+    ...(caseData as unknown as CaseData),
+    customer: toCustomerBlock(customerData.data),
+    company: toCompanyBlock(companyData.data),
+    service_type,
+    assigned_technician,
+    created_by_profile: toCreatedByProfile(createdByData.data),
+  } satisfies CaseData;
 }
 
 async function fetchCaseDevices(caseId: string): Promise<DeviceData[]> {
@@ -183,6 +323,53 @@ async function fetchCompanySettings(): Promise<CompanySettingsData> {
   }
 }
 
+/**
+ * Pure transform from a raw `quotes` row (+ separately-fetched relations) into the
+ * QuoteData shape the document builder consumes. Kept pure and exported so the
+ * customer/company contract is unit tested without a live database.
+ */
+export function toQuoteData(
+  quoteRow: Partial<QuotesRow> & { cases?: unknown },
+  extras: {
+    customer?: unknown;
+    company?: unknown;
+    createdByProfile?: unknown;
+    customerAssociatedCompany?: unknown;
+    items?: QuoteItemData[] | null;
+    locale?: unknown;
+  },
+): QuoteData {
+  // Built field-by-field from the typed row (no `as unknown as`): a renamed or
+  // removed column is now a compile error, and `satisfies` proves completeness.
+  return {
+    id: quoteRow.id ?? '',
+    quote_number: quoteRow.quote_number ?? '',
+    case_id: quoteRow.case_id ?? undefined,
+    customer_id: quoteRow.customer_id ?? undefined,
+    company_id: quoteRow.company_id ?? undefined,
+    status: quoteRow.status ?? '',
+    title: '',
+    valid_until: quoteRow.valid_until ?? undefined,
+    subtotal: quoteRow.subtotal ?? 0,
+    tax_rate: quoteRow.tax_rate ?? 0,
+    tax_amount: quoteRow.tax_amount ?? 0,
+    discount_amount: quoteRow.discount_amount ?? 0,
+    discount_type: 'amount',
+    total_amount: quoteRow.total_amount ?? 0,
+    notes: quoteRow.notes ?? undefined,
+    created_at: quoteRow.created_at ?? '',
+    created_by: quoteRow.created_by ?? undefined,
+    terms_and_conditions: optStr(quoteRow.terms),
+    customer: toCustomerBlock(extras.customer),
+    company: toCompanyBlock(extras.company),
+    cases: toCaseRef(quoteRow.cases),
+    created_by_profile: toCreatedByProfile(extras.createdByProfile),
+    customer_associated_company: toAssociatedCompany(extras.customerAssociatedCompany),
+    quote_items: extras.items ?? [],
+    accounting_locales: toLocale(extras.locale),
+  } satisfies QuoteData;
+}
+
 export async function fetchQuoteData(quoteId: string): Promise<QuoteDocumentData> {
   const [quoteResult, settingsResult] = await Promise.all([
     fetchQuoteDetails(quoteId),
@@ -196,36 +383,9 @@ export async function fetchQuoteData(quoteId: string): Promise<QuoteDocumentData
 }
 
 async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
-  const { data: quoteData, error: quoteError } = await supabase
+  const { data: quoteRow, error: quoteError } = await supabase
     .from('quotes')
-    .select(`
-      *,
-      cases:case_id (
-        id,
-        case_no,
-        title
-      ),
-      customers:customers_enhanced (
-        id,
-        customer_name,
-        email,
-        mobile_number,
-        phone,
-        address,
-        country_id,
-        city_id,
-        geo_countries(name),
-        geo_cities(name)
-      ),
-      companies (
-        id,
-        name,
-        company_name,
-        email,
-        phone,
-        address
-      )
-    `)
+    .select('*, cases:case_id ( id, case_no, title )')
     .eq('id', quoteId)
     .maybeSingle();
 
@@ -234,28 +394,44 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
     throw new Error('Failed to load quote data');
   }
 
-  if (!quoteData) {
+  if (!quoteRow) {
     throw new Error('Quote not found');
   }
 
-  // quotes.created_by FKs to auth.users (not profiles), so PostgREST cannot embed
-  // it — fetch the creator profile separately.
-  const { data: createdByProfile } = quoteData.created_by
-    ? await supabase.from('profiles').select('id, full_name').eq('id', quoteData.created_by).maybeSingle()
-    : { data: null };
+  // Customer/company are fetched separately (NOT embedded) so there is no plural
+  // alias that can drift away from the builder's `customer`/`company` reads.
+  // quotes.created_by FKs to auth.users (not profiles), so the creator profile is
+  // also a separate lookup.
+  const [customerRes, companyRes, createdByRes] = await Promise.all([
+    quoteRow.customer_id
+      ? supabase
+          .from('customers_enhanced')
+          .select('id, customer_name, email, mobile_number, phone, address')
+          .eq('id', quoteRow.customer_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    quoteRow.company_id
+      ? supabase
+          .from('companies')
+          .select('id, name, company_name, email, phone, address')
+          .eq('id', quoteRow.company_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    quoteRow.created_by
+      ? supabase.from('profiles').select('id, full_name').eq('id', quoteRow.created_by).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
 
-  let customerAssociatedCompany = null;
-  if (quoteData.customer_id) {
+  let customerAssociatedCompany: unknown = null;
+  if (quoteRow.customer_id) {
     const { data: relationshipData } = await supabase
       .from('customer_company_relationships')
-      .select(`companies (id, name, company_name)`)
-      .eq('customer_id', quoteData.customer_id)
+      .select('companies (id, name, company_name)')
+      .eq('customer_id', quoteRow.customer_id)
       .eq('is_primary', true)
       .maybeSingle();
 
-    if (relationshipData && relationshipData.companies) {
-      customerAssociatedCompany = relationshipData.companies;
-    }
+    customerAssociatedCompany = relationshipData?.companies ?? null;
   }
 
   const { data: items, error: itemsError } = await supabase
@@ -275,19 +451,60 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
     .eq('is_active', true)
     .maybeSingle();
 
+  return toQuoteData(quoteRow, {
+    customer: customerRes.data,
+    company: companyRes.data,
+    createdByProfile: createdByRes.data,
+    customerAssociatedCompany,
+    items: (items ?? []) as unknown as QuoteItemData[],
+    locale: defaultLocale,
+  });
+}
+
+/**
+ * Pure transform from a raw `invoices` row (+ separately-fetched relations) into
+ * InvoiceData. Pure and exported for unit testing the customer/company contract.
+ */
+export function toInvoiceData(
+  invoiceRow: Partial<InvoicesRow> & { cases?: unknown; bank_accounts?: unknown },
+  extras: {
+    customer?: unknown;
+    company?: unknown;
+    customerAssociatedCompany?: unknown;
+    items?: InvoiceItemData[] | null;
+    locale?: unknown;
+  },
+): InvoiceData {
+  // Built field-by-field from the typed row (no `as unknown as`): column drift is
+  // a compile error, and `satisfies` proves completeness.
   return {
-    ...quoteData,
-    created_by_profile: createdByProfile,
-    terms_and_conditions: quoteData.terms ?? undefined,
-    title: undefined,
-    quote_items: items || [],
-    customer_associated_company: customerAssociatedCompany,
-    accounting_locales: defaultLocale || {
-      currency_symbol: 'USD',
-      currency_position: 'before',
-      decimal_places: 2,
-    },
-  } as unknown as QuoteData;
+    id: invoiceRow.id ?? '',
+    invoice_number: invoiceRow.invoice_number ?? '',
+    case_id: invoiceRow.case_id ?? undefined,
+    customer_id: invoiceRow.customer_id ?? undefined,
+    company_id: invoiceRow.company_id ?? undefined,
+    invoice_type: invoiceRow.invoice_type === 'proforma' ? 'proforma' : 'tax_invoice',
+    invoice_date: invoiceRow.invoice_date ?? '',
+    due_date: invoiceRow.due_date ?? '',
+    status: invoiceRow.status ?? '',
+    subtotal: invoiceRow.subtotal ?? 0,
+    tax_rate: invoiceRow.tax_rate ?? undefined,
+    tax_amount: invoiceRow.tax_amount ?? 0,
+    discount_amount: invoiceRow.discount_amount ?? 0,
+    total_amount: invoiceRow.total_amount ?? 0,
+    amount_paid: invoiceRow.amount_paid ?? 0,
+    balance_due: invoiceRow.balance_due ?? 0,
+    notes: invoiceRow.notes ?? undefined,
+    created_at: invoiceRow.created_at ?? '',
+    created_by: invoiceRow.created_by ?? undefined,
+    customer: toCustomerBlock(extras.customer),
+    company: toCompanyBlock(extras.company),
+    cases: toCaseRef(invoiceRow.cases),
+    bank_accounts: toBankAccount(invoiceRow.bank_accounts),
+    customer_associated_company: toAssociatedCompany(extras.customerAssociatedCompany),
+    invoice_line_items: extras.items ?? [],
+    accounting_locales: toLocale(extras.locale),
+  } satisfies InvoiceData;
 }
 
 export async function fetchInvoiceData(invoiceId: string): Promise<InvoiceDocumentData> {
@@ -303,39 +520,11 @@ export async function fetchInvoiceData(invoiceId: string): Promise<InvoiceDocume
 }
 
 async function fetchInvoiceDetails(invoiceId: string): Promise<InvoiceData> {
-  const { data: invoiceData, error: invoiceError } = await supabase
+  const { data: invoiceRow, error: invoiceError } = await supabase
     .from('invoices')
     .select(`
       *,
-      cases (
-        id,
-        case_no,
-        title
-      ),
-      customers:customers_enhanced (
-        id,
-        customer_name,
-        email,
-        mobile_number,
-        phone,
-        address,
-        country_id,
-        city_id,
-        geo_countries(name),
-        geo_cities(name)
-      ),
-      companies (
-        id,
-        name,
-        company_name,
-        email,
-        phone,
-        address,
-        country_id,
-        city_id,
-        geo_countries(name),
-        geo_cities(name)
-      ),
+      cases ( id, case_no, title ),
       bank_accounts (
         id,
         account_name:name,
@@ -354,22 +543,38 @@ async function fetchInvoiceDetails(invoiceId: string): Promise<InvoiceData> {
     throw new Error('Failed to load invoice data');
   }
 
-  if (!invoiceData) {
+  if (!invoiceRow) {
     throw new Error('Invoice not found');
   }
 
-  let customerAssociatedCompany = null;
-  if (invoiceData.customer_id) {
+  // Customer/company fetched separately (no plural-alias drift) — see toInvoiceData.
+  const [customerRes, companyRes] = await Promise.all([
+    invoiceRow.customer_id
+      ? supabase
+          .from('customers_enhanced')
+          .select('id, customer_name, email, mobile_number, phone, address')
+          .eq('id', invoiceRow.customer_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    invoiceRow.company_id
+      ? supabase
+          .from('companies')
+          .select('id, name, company_name, email, phone, address')
+          .eq('id', invoiceRow.company_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  let customerAssociatedCompany: unknown = null;
+  if (invoiceRow.customer_id) {
     const { data: relationshipData } = await supabase
       .from('customer_company_relationships')
-      .select(`companies (id, name, company_name)`)
-      .eq('customer_id', invoiceData.customer_id)
+      .select('companies (id, name, company_name)')
+      .eq('customer_id', invoiceRow.customer_id)
       .eq('is_primary', true)
       .maybeSingle();
 
-    if (relationshipData && relationshipData.companies) {
-      customerAssociatedCompany = relationshipData.companies;
-    }
+    customerAssociatedCompany = relationshipData?.companies ?? null;
   }
 
   const { data: items, error: itemsError } = await supabase
@@ -389,16 +594,13 @@ async function fetchInvoiceDetails(invoiceId: string): Promise<InvoiceData> {
     .eq('is_active', true)
     .maybeSingle();
 
-  return {
-    ...invoiceData,
-    invoice_line_items: items || [],
-    customer_associated_company: customerAssociatedCompany,
-    accounting_locales: defaultLocale || {
-      currency_symbol: 'USD',
-      currency_position: 'before',
-      decimal_places: 2,
-    },
-  } as unknown as InvoiceData;
+  return toInvoiceData(invoiceRow, {
+    customer: customerRes.data,
+    company: companyRes.data,
+    customerAssociatedCompany,
+    items: (items ?? []) as unknown as InvoiceItemData[],
+    locale: defaultLocale,
+  });
 }
 
 export async function fetchPaymentReceiptData(paymentId: string): Promise<PaymentReceiptDocumentData> {
@@ -424,13 +626,6 @@ async function fetchPaymentDetails(paymentId: string): Promise<PaymentReceiptDat
         total_amount,
         invoice_type
       ),
-      customers:customers_enhanced (
-        id,
-        customer_name,
-        email,
-        mobile_number,
-        phone
-      ),
       bank_accounts (
         id,
         account_name:name,
@@ -452,16 +647,23 @@ async function fetchPaymentDetails(paymentId: string): Promise<PaymentReceiptDat
     throw new Error('Payment not found');
   }
 
-  let caseInfo = null;
+  // Customer fetched separately (no plural-alias drift).
+  const { data: customerRow } = paymentData.customer_id
+    ? await supabase
+        .from('customers_enhanced')
+        .select('id, customer_name, email, mobile_number, phone')
+        .eq('id', paymentData.customer_id)
+        .maybeSingle()
+    : { data: null };
+
+  let caseInfo: unknown = null;
   if (paymentData.invoices?.id) {
     const { data: invoiceData } = await supabase
       .from('invoices')
       .select('case_id, cases(id, case_no)')
       .eq('id', paymentData.invoices.id)
       .maybeSingle();
-    if (invoiceData?.cases) {
-      caseInfo = invoiceData.cases;
-    }
+    caseInfo = invoiceData?.cases ?? null;
   }
 
   const { data: defaultLocale } = await supabase
@@ -471,17 +673,23 @@ async function fetchPaymentDetails(paymentId: string): Promise<PaymentReceiptDat
     .eq('is_active', true)
     .maybeSingle();
 
+  const invoiceRef = pickRecord(paymentData.invoices);
+
   return {
-    ...paymentData,
-    invoice: paymentData.invoices,
-    customer: paymentData.customers,
-    cases: caseInfo,
-    accounting_locales: defaultLocale || {
-      currency_symbol: 'USD',
-      currency_position: 'before',
-      decimal_places: 2,
-    },
-  } as unknown as PaymentReceiptData;
+    ...(paymentData as unknown as PaymentReceiptData),
+    invoice: invoiceRef
+      ? {
+          id: reqStr(invoiceRef.id),
+          invoice_number: reqStr(invoiceRef.invoice_number),
+          total_amount: typeof invoiceRef.total_amount === 'number' ? invoiceRef.total_amount : 0,
+          invoice_type: reqStr(invoiceRef.invoice_type),
+        }
+      : undefined,
+    customer: toCustomerBlock(customerRow),
+    bank_accounts: toBankAccount(paymentData.bank_accounts),
+    cases: toCaseRef(caseInfo),
+    accounting_locales: toLocale(defaultLocale),
+  } satisfies PaymentReceiptData;
 }
 
 export async function fetchPayslipData(recordId: string): Promise<PayslipDocumentData> {
@@ -544,15 +752,24 @@ async function fetchPayslipDetails(recordId: string): Promise<PayslipData> {
     amount: item.amount,
   }));
 
+  const employeeRow = pickRecord(recordData.employee);
+  const periodRow = pickRecord(recordData.payroll_period);
+
   return {
-    ...recordData,
-    items: mappedItems,
-    accounting_locales: defaultLocale || {
-      currency_symbol: 'USD',
-      currency_position: 'before',
-      decimal_places: 2,
+    ...(recordData as unknown as PayslipData),
+    employee: {
+      first_name: reqStr(employeeRow?.first_name),
+      last_name: reqStr(employeeRow?.last_name),
+      employee_number: reqStr(employeeRow?.employee_number),
     },
-  } as unknown as PayslipData;
+    payroll_period: {
+      period_name: reqStr(periodRow?.period_name),
+      start_date: reqStr(periodRow?.start_date),
+      end_date: reqStr(periodRow?.end_date),
+    },
+    items: mappedItems,
+    accounting_locales: toLocale(defaultLocale),
+  } satisfies PayslipData;
 }
 
 export async function fetchChainOfCustodyData(
