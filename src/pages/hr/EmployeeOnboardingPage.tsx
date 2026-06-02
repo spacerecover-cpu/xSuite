@@ -130,7 +130,7 @@ function EmployeeOnboardingCard({
       <div className="p-4">
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cat-7 to-cat-7 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cat-7 to-cat-7/80 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
               {(employee.first_name?.[0] || '?').toUpperCase()}
             </div>
             <div>
