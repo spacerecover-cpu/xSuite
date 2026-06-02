@@ -90,7 +90,7 @@ export const Sidebar: React.FC = () => {
   const getRoleAvatarBg = (role?: string) => {
     switch (role) {
       case 'admin': return 'from-cat-6 to-cat-6';
-      case 'technician': return 'from-cat-2 to-cat-2';
+      case 'technician': return 'from-cat-2 to-cat-2/80';
       case 'sales': return 'from-cat-3 to-cat-3';
       case 'accounts': return 'from-cat-4 to-cat-4';
       case 'hr': return 'from-cat-1 to-cat-1';
