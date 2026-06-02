@@ -15,11 +15,9 @@ const QUOTE_ROW = {
   tax_rate: 5,
   tax_amount: 5,
   discount_amount: 0,
-  discount_type: 'amount',
   total_amount: 105,
   created_at: '2026-01-01',
   terms: 'Net 30',
-  client_reference: 'REF-1',
   cases: { id: 'c1', case_no: 'CASE-1', title: 'Recovery' },
 };
 

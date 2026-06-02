@@ -18,6 +18,10 @@ import type {
   ChainOfCustodyDocumentData,
   ChainOfCustodyEntryData,
 } from './types';
+import type { Database } from '../../types/database.types';
+
+type QuotesRow = Database['public']['Tables']['quotes']['Row'];
+type InvoicesRow = Database['public']['Tables']['invoices']['Row'];
 
 /*
  * ─────────────────────────────────────────────────────────────────────────────
@@ -325,7 +329,7 @@ async function fetchCompanySettings(): Promise<CompanySettingsData> {
  * customer/company contract is unit tested without a live database.
  */
 export function toQuoteData(
-  quoteRow: Record<string, unknown>,
+  quoteRow: Partial<QuotesRow> & { cases?: unknown },
   extras: {
     customer?: unknown;
     company?: unknown;
@@ -335,15 +339,32 @@ export function toQuoteData(
     locale?: unknown;
   },
 ): QuoteData {
+  // Built field-by-field from the typed row (no `as unknown as`): a renamed or
+  // removed column is now a compile error, and `satisfies` proves completeness.
   return {
-    ...(quoteRow as unknown as QuoteData),
+    id: quoteRow.id ?? '',
+    quote_number: quoteRow.quote_number ?? '',
+    case_id: quoteRow.case_id ?? undefined,
+    customer_id: quoteRow.customer_id ?? undefined,
+    company_id: quoteRow.company_id ?? undefined,
+    status: quoteRow.status ?? '',
+    title: '',
+    valid_until: quoteRow.valid_until ?? undefined,
+    subtotal: quoteRow.subtotal ?? 0,
+    tax_rate: quoteRow.tax_rate ?? 0,
+    tax_amount: quoteRow.tax_amount ?? 0,
+    discount_amount: quoteRow.discount_amount ?? 0,
+    discount_type: 'amount',
+    total_amount: quoteRow.total_amount ?? 0,
+    notes: quoteRow.notes ?? undefined,
+    created_at: quoteRow.created_at ?? '',
+    created_by: quoteRow.created_by ?? undefined,
+    terms_and_conditions: optStr(quoteRow.terms),
     customer: toCustomerBlock(extras.customer),
     company: toCompanyBlock(extras.company),
     cases: toCaseRef(quoteRow.cases),
     created_by_profile: toCreatedByProfile(extras.createdByProfile),
     customer_associated_company: toAssociatedCompany(extras.customerAssociatedCompany),
-    terms_and_conditions: optStr(quoteRow.terms),
-    title: '',
     quote_items: extras.items ?? [],
     accounting_locales: toLocale(extras.locale),
   } satisfies QuoteData;
@@ -445,7 +466,7 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
  * InvoiceData. Pure and exported for unit testing the customer/company contract.
  */
 export function toInvoiceData(
-  invoiceRow: Record<string, unknown>,
+  invoiceRow: Partial<InvoicesRow> & { cases?: unknown; bank_accounts?: unknown },
   extras: {
     customer?: unknown;
     company?: unknown;
@@ -454,8 +475,28 @@ export function toInvoiceData(
     locale?: unknown;
   },
 ): InvoiceData {
+  // Built field-by-field from the typed row (no `as unknown as`): column drift is
+  // a compile error, and `satisfies` proves completeness.
   return {
-    ...(invoiceRow as unknown as InvoiceData),
+    id: invoiceRow.id ?? '',
+    invoice_number: invoiceRow.invoice_number ?? '',
+    case_id: invoiceRow.case_id ?? undefined,
+    customer_id: invoiceRow.customer_id ?? undefined,
+    company_id: invoiceRow.company_id ?? undefined,
+    invoice_type: invoiceRow.invoice_type === 'proforma' ? 'proforma' : 'tax_invoice',
+    invoice_date: invoiceRow.invoice_date ?? '',
+    due_date: invoiceRow.due_date ?? '',
+    status: invoiceRow.status ?? '',
+    subtotal: invoiceRow.subtotal ?? 0,
+    tax_rate: invoiceRow.tax_rate ?? undefined,
+    tax_amount: invoiceRow.tax_amount ?? 0,
+    discount_amount: invoiceRow.discount_amount ?? 0,
+    total_amount: invoiceRow.total_amount ?? 0,
+    amount_paid: invoiceRow.amount_paid ?? 0,
+    balance_due: invoiceRow.balance_due ?? 0,
+    notes: invoiceRow.notes ?? undefined,
+    created_at: invoiceRow.created_at ?? '',
+    created_by: invoiceRow.created_by ?? undefined,
     customer: toCustomerBlock(extras.customer),
     company: toCompanyBlock(extras.company),
     cases: toCaseRef(invoiceRow.cases),
