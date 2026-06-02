@@ -87,36 +87,36 @@ export const InventoryInsightsHeader: React.FC<InventoryInsightsHeaderProps> = (
               icon={HardDrive}
               label="Hard Drives"
               value={formatNumber(hddCount)}
-              iconColor="text-info"
-              iconBgColor="bg-info-muted"
+              iconColor="text-cat-1"
+              iconBgColor="bg-cat-1/10"
             />
             <InsightCard
               icon={Cpu}
               label="Solid State"
               value={formatNumber(ssdCount)}
-              iconColor="text-teal-600"
-              iconBgColor="bg-teal-100"
+              iconColor="text-cat-2"
+              iconBgColor="bg-cat-2/10"
             />
             <InsightCard
               icon={CircuitBoard}
               label="PCB Boards"
               value={formatNumber(pcbCount)}
-              iconColor="text-orange-600"
-              iconBgColor="bg-orange-100"
+              iconColor="text-cat-5"
+              iconBgColor="bg-cat-5/10"
             />
             <InsightCard
               icon={TrendingUp}
               label="In Use"
               value={formatNumber(inUseCount)}
-              iconColor="text-rose-600"
-              iconBgColor="bg-rose-100"
+              iconColor="text-cat-6"
+              iconBgColor="bg-cat-6/10"
             />
             <InsightCard
               icon={DollarSign}
               label="Total Value"
               value={formatCurrency(totalValue)}
-              iconColor="text-emerald-700"
-              iconBgColor="bg-emerald-100"
+              iconColor="text-cat-3"
+              iconBgColor="bg-cat-3/10"
             />
           </>
         )}

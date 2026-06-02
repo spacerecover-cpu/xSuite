@@ -26,6 +26,17 @@ export default {
         info: 'rgb(var(--color-info) / <alpha-value>)',
         'info-foreground': 'rgb(var(--color-info-foreground) / <alpha-value>)',
         'info-muted': 'rgb(var(--color-info-muted) / <alpha-value>)',
+        // Categorical palette — fixed, NOT themed (mirrors chartCategorical).
+        // Distinct IDENTITY color only (per-module, device-type, category
+        // tiles). Never use for status. Muted bg via alpha, e.g. bg-cat-1/10.
+        'cat-1': 'rgb(var(--color-cat-1) / <alpha-value>)',
+        'cat-2': 'rgb(var(--color-cat-2) / <alpha-value>)',
+        'cat-3': 'rgb(var(--color-cat-3) / <alpha-value>)',
+        'cat-4': 'rgb(var(--color-cat-4) / <alpha-value>)',
+        'cat-5': 'rgb(var(--color-cat-5) / <alpha-value>)',
+        'cat-6': 'rgb(var(--color-cat-6) / <alpha-value>)',
+        'cat-7': 'rgb(var(--color-cat-7) / <alpha-value>)',
+        'cat-8': 'rgb(var(--color-cat-8) / <alpha-value>)',
       },
       fontFamily: {
         display: ['"DM Serif Display"', 'serif'],

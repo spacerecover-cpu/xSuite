@@ -67,15 +67,33 @@ Every brand/status token is an **RGB triplet** CSS variable (e.g. `--color-prima
 | `danger` | `#DC2626` | `#FFFFFF` | `#FEE2E2` |
 | `info` | `#0284C7` | `#FFFFFF` | `#E0F2FE` |
 
+### Categorical (identity) palette — `cat-1` … `cat-8`
+For **distinct identity** color where status/brand tokens don't apply: per-module
+accents, device-type tiles, category swatches — places that need *N visually
+separable hues whose only meaning is "different from each other"*. The 14 semantic
+tokens have no "N categories" slot; routing identity color through `danger`/`info`
+etc. is a bug (it falsely signals status). Use these instead.
+
+- **Fixed, NOT themed** — same 8 hues for every tenant/theme, so dashboards stay
+  comparable. They **mirror `chartCategorical`** in `src/lib/chartTheme.ts` (cyan,
+  teal, lime, yellow, orange, pink, blue-800, slate). Values: `src/index.css`
+  (`--color-cat-1` … `--color-cat-8`); wired in `tailwind.config.js`.
+- **Never use for status.** Status meaning lives only in `success/warning/danger/info`.
+- **Muted background:** use alpha, e.g. `bg-cat-1/10` with `text-cat-1` (mirrors the
+  `*-muted` pattern). Proof-of-concept consumer: `InventoryInsightsHeader.tsx`.
+
 ### Banned in `src/` (enforced by `eslint-rules`)
 - `purple-*`, `indigo-*`, `violet-*` (any shade) → use `accent` or `secondary`.
 - Brand hex literals: `#1E5BB8`, `#8b5cf6`, `#6366f1`, `#a855f7`, `#4A5568`, `#6A7A8A`.
-- Raw Tailwind brand colors (`bg-blue-600`, `text-purple-*`, etc.). Neutrals (`gray/slate/zinc/white/black`) remain allowed for utility use.
+- Raw Tailwind brand colors (`bg-blue-600`, `text-purple-*`, etc.) → use a semantic
+  token, or `cat-1`…`cat-8` for identity color. Neutrals (`gray/slate/zinc/white/black`)
+  remain allowed for utility use.
 
 ## Non-Themed Surfaces (intentionally fixed — do NOT wire to the theme)
 These read from constants, never from CSS variables. This is by design so output stays comparable across tenants/themes.
 
 - **Charts:** `src/lib/chartTheme.ts` — `chartCategorical` (8 hues), `chartAxis` `#64748b`, `chartGrid`/`chartTooltipBorder` `#e2e8f0`. Data-vis neutral; never theme charts.
+- **Categorical UI palette:** `cat-1`…`cat-8` (`src/index.css`, `tailwind.config.js`) — the screen-side mirror of `chartCategorical`, for identity color in UI (see **Color → Categorical (identity) palette**). Fixed across themes by design.
 - **PDFs:** `src/lib/pdf/styles.ts` — `PDF_COLORS` (primary `#162660` = fixed Royal-brand navy, text `#1E293B`, …), font `Roboto`. One fixed color for all tenants by design (a themed invoice would look alarming). Device-role badge colors (patient/backup/donor/spare) are fixed.
 - **Device icons:** `src/lib/deviceIconMapper.ts` — fixed SVG hexes. Intentional.
 
@@ -112,3 +130,4 @@ Captured 2026-06-01 from a code audit. **All three drifts resolved 2026-06-02** 
 | 2026-06-02 | Resolved drift #1: `glow-blue*` → `glow-primary*`, derived from `--color-primary` | The only consumer (`StepContainer` onboarding icon) is otherwise all-`primary`; a fixed blue-500 glow clashed and ignored the theme. Token-derived glow now themes across Royal/Burgundy/Scarlet. |
 | 2026-06-02 | Resolved drift #2: focus `ring` follows `primary` | Removed the banned indigo `#6366F1`; focus rings now read as on-brand per theme. (Shipped earlier in the a11y focus-ring work; doc reconciled here.) |
 | 2026-06-02 | Resolved drift #3: PDF `primary` set to fixed Royal navy `#162660` (was cyan `#0891B2`) | PDFs are intentionally non-themed (one color for all tenants — a themed invoice would look alarming). Cyan matched no brand and read as an unconfigured template; navy aligns to the default Royal identity and to the existing `primaryDark` navy. |
+| 2026-06-02 | Added a sanctioned **categorical palette** (`cat-1`…`cat-8`), mirroring `chartCategorical`; migrated `InventoryInsightsHeader` onto it as proof | The raw-color burndown found that most surviving raw Tailwind brand colors are *identity* color (device-type tiles, per-module accents), not status. The 14-token vocab had no "N distinct categories" slot, so mechanical migration to `danger`/`info` falsely signalled status. A fixed, non-themed categorical tier reuses the already-blessed chart hues and unblocks a safe sweep. |
