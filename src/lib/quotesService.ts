@@ -254,15 +254,6 @@ export const fetchQuoteById = async (id: string): Promise<QuoteWithDetails | nul
         email,
         phone,
         address
-      ),
-      bank_accounts (
-        id,
-        account_name:name,
-        bank_name,
-        account_number,
-        iban,
-        swift_code,
-        branch_code
       )
     `)
     .eq('id', id)
