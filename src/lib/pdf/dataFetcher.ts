@@ -22,6 +22,11 @@ import type { Database } from '../../types/database.types';
 
 type QuotesRow = Database['public']['Tables']['quotes']['Row'];
 type InvoicesRow = Database['public']['Tables']['invoices']['Row'];
+type CasesRow = Database['public']['Tables']['cases']['Row'];
+type PaymentsRow = Database['public']['Tables']['payments']['Row'];
+type PayrollRecordsRow = Database['public']['Tables']['payroll_records']['Row'];
+type QuoteItemsRow = Database['public']['Tables']['quote_items']['Row'];
+type InvoiceLineItemsRow = Database['public']['Tables']['invoice_line_items']['Row'];
 
 /*
  * ─────────────────────────────────────────────────────────────────────────────
@@ -147,6 +152,96 @@ function toLocale(src: unknown): NonNullable<QuoteData['accounting_locales']> {
   };
 }
 
+function toIdName(src: unknown): { id: string; name: string } | undefined {
+  const r = pickRecord(src);
+  return r ? { id: reqStr(r.id), name: reqStr(r.name) } : undefined;
+}
+
+function toIdFullName(src: unknown): { id: string; full_name: string } | undefined {
+  const r = pickRecord(src);
+  return r ? { id: reqStr(r.id), full_name: reqStr(r.full_name) } : undefined;
+}
+
+// Line-item mappers — typed field extraction replaces the old
+// `as unknown as XItemData[]` casts so a column rename is a compile error.
+// Neither table has a `line_total` column: the quote builder computes the row
+// total itself, and the invoice builder falls back to quantity*unit_price, so
+// we compute it here to satisfy the required field without changing output.
+export function toQuoteItems(rows: Partial<QuoteItemsRow>[] | null | undefined): QuoteItemData[] {
+  return (rows ?? []).map(row => ({
+    id: row.id ?? undefined,
+    description: row.description ?? '',
+    quantity: row.quantity ?? 0,
+    unit_price: row.unit_price ?? 0,
+  }));
+}
+
+export function toInvoiceItems(rows: Partial<InvoiceLineItemsRow>[] | null | undefined): InvoiceItemData[] {
+  return (rows ?? []).map(row => {
+    const quantity = row.quantity ?? 0;
+    const unit_price = row.unit_price ?? 0;
+    return {
+      id: row.id ?? undefined,
+      description: row.description ?? '',
+      quantity,
+      unit_price,
+      tax_rate: row.tax_rate ?? 0,
+      line_total: quantity * unit_price,
+    };
+  });
+}
+
+/**
+ * Pure transform from a raw `cases` row (+ separately-fetched relations) into
+ * CaseData. Built field-by-field from the typed row (no `as unknown as`) so a
+ * renamed/removed column is a compile error and `satisfies` proves completeness.
+ *
+ * Note: the DB column is `description`; the document builders read
+ * `problem_description` (used as the fallback when no device problem is set), so
+ * it is mapped here. `contact_name/phone/email` and `assigned_technician_id` have
+ * no `cases` column and stay undefined, matching prior behavior.
+ */
+export function toCaseData(
+  caseRow: Partial<CasesRow>,
+  extras: {
+    customer?: unknown;
+    company?: unknown;
+    serviceType?: unknown;
+    assignedTechnician?: unknown;
+    createdByProfile?: unknown;
+  },
+): CaseData {
+  return {
+    id: caseRow.id ?? '',
+    case_no: caseRow.case_no ?? '',
+    case_number: caseRow.case_number ?? undefined,
+    created_at: caseRow.created_at ?? '',
+    status: caseRow.status ?? '',
+    priority: caseRow.priority ?? '',
+    problem_description: caseRow.description ?? undefined,
+    contact_name: undefined,
+    contact_phone: undefined,
+    contact_email: undefined,
+    customer_id: caseRow.customer_id ?? undefined,
+    company_id: caseRow.company_id ?? undefined,
+    service_type_id: caseRow.service_type_id ?? undefined,
+    assigned_technician_id: undefined,
+    checkout_date: caseRow.checkout_date ?? undefined,
+    checkout_collector_name: caseRow.checkout_collector_name ?? undefined,
+    checkout_collector_mobile: caseRow.checkout_collector_mobile ?? undefined,
+    checkout_collector_id: caseRow.checkout_collector_id ?? undefined,
+    checkout_notes: undefined, // no `cases.checkout_notes` column — undefined as before
+    recovery_outcome: caseRow.recovery_outcome ?? undefined,
+    client_reference: caseRow.client_reference ?? undefined,
+    customer: toCustomerBlock(extras.customer),
+    company: toCompanyBlock(extras.company),
+    service_type: toIdName(extras.serviceType),
+    assigned_technician: toIdFullName(extras.assignedTechnician),
+    created_by: caseRow.created_by ?? undefined,
+    created_by_profile: toCreatedByProfile(extras.createdByProfile),
+  } satisfies CaseData;
+}
+
 export async function fetchReceiptData(caseId: string): Promise<ReceiptData> {
   const [caseResult, devicesResult, settingsResult] = await Promise.all([
     fetchCaseData(caseId),
@@ -215,24 +310,13 @@ async function fetchCaseData(caseId: string): Promise<CaseData> {
       : Promise.resolve({ data: null, error: null }),
   ]);
 
-  const serviceTypeRow = pickRecord(serviceTypeData.data);
-  const technicianRow = pickRecord(technicianData.data);
-
-  const service_type: CaseData['service_type'] = serviceTypeRow
-    ? { id: reqStr(serviceTypeRow.id), name: reqStr(serviceTypeRow.name) }
-    : undefined;
-  const assigned_technician: CaseData['assigned_technician'] = technicianRow
-    ? { id: reqStr(technicianRow.id), full_name: reqStr(technicianRow.full_name) }
-    : undefined;
-
-  return {
-    ...(caseData as unknown as CaseData),
-    customer: toCustomerBlock(customerData.data),
-    company: toCompanyBlock(companyData.data),
-    service_type,
-    assigned_technician,
-    created_by_profile: toCreatedByProfile(createdByData.data),
-  } satisfies CaseData;
+  return toCaseData(caseData, {
+    customer: customerData.data,
+    company: companyData.data,
+    serviceType: serviceTypeData.data,
+    assignedTechnician: technicianData.data,
+    createdByProfile: createdByData.data,
+  });
 }
 
 async function fetchCaseDevices(caseId: string): Promise<DeviceData[]> {
@@ -456,7 +540,7 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
     company: companyRes.data,
     createdByProfile: createdByRes.data,
     customerAssociatedCompany,
-    items: (items ?? []) as unknown as QuoteItemData[],
+    items: toQuoteItems(items),
     locale: defaultLocale,
   });
 }
@@ -598,9 +682,53 @@ async function fetchInvoiceDetails(invoiceId: string): Promise<InvoiceData> {
     customer: customerRes.data,
     company: companyRes.data,
     customerAssociatedCompany,
-    items: (items ?? []) as unknown as InvoiceItemData[],
+    items: toInvoiceItems(items),
     locale: defaultLocale,
   });
+}
+
+/**
+ * Pure transform from a raw `payments` row (+ separately-fetched relations) into
+ * PaymentReceiptData. Built field-by-field (no `as unknown as`).
+ *
+ * Column renames the old cast silently dropped: `payment_number→receipt_number`
+ * (the receipt header previously always read "Draft") and `reference→reference_number`
+ * (the reference line never rendered). `payment_method`, `company`, and
+ * `created_by_profile` have no source in this query and stay undefined.
+ */
+export function toPaymentReceiptData(
+  paymentRow: Partial<PaymentsRow>,
+  extras: {
+    invoice?: unknown;
+    customer?: unknown;
+    bankAccounts?: unknown;
+    cases?: unknown;
+    locale?: unknown;
+  },
+): PaymentReceiptData {
+  const invoiceRef = pickRecord(extras.invoice);
+  return {
+    id: paymentRow.id ?? '',
+    receipt_number: paymentRow.payment_number ?? undefined,
+    payment_date: paymentRow.payment_date ?? '',
+    amount: paymentRow.amount ?? 0,
+    payment_method: undefined,
+    reference_number: paymentRow.reference ?? undefined,
+    notes: paymentRow.notes ?? undefined,
+    created_at: paymentRow.created_at ?? '',
+    invoice: invoiceRef
+      ? {
+          id: reqStr(invoiceRef.id),
+          invoice_number: reqStr(invoiceRef.invoice_number),
+          total_amount: typeof invoiceRef.total_amount === 'number' ? invoiceRef.total_amount : 0,
+          invoice_type: reqStr(invoiceRef.invoice_type),
+        }
+      : undefined,
+    customer: toCustomerBlock(extras.customer),
+    bank_accounts: toBankAccount(extras.bankAccounts),
+    cases: toCaseRef(extras.cases),
+    accounting_locales: toLocale(extras.locale),
+  } satisfies PaymentReceiptData;
 }
 
 export async function fetchPaymentReceiptData(paymentId: string): Promise<PaymentReceiptDocumentData> {
@@ -673,23 +801,57 @@ async function fetchPaymentDetails(paymentId: string): Promise<PaymentReceiptDat
     .eq('is_active', true)
     .maybeSingle();
 
-  const invoiceRef = pickRecord(paymentData.invoices);
+  return toPaymentReceiptData(paymentData, {
+    invoice: paymentData.invoices,
+    customer: customerRow,
+    bankAccounts: paymentData.bank_accounts,
+    cases: caseInfo,
+    locale: defaultLocale,
+  });
+}
 
+/**
+ * Pure transform from a raw `payroll_records` row (+ separately-fetched relations)
+ * into PayslipData. Built field-by-field (no `as unknown as`).
+ *
+ * `total_earnings→gross_salary`. `payment_date`, `days_worked`, `days_absent`, and
+ * `regular_hours` have no `payroll_records` column and stay undefined, matching
+ * prior behavior (the builder renders 0 / "Not paid" for them).
+ */
+export function toPayslipData(
+  recordRow: Partial<PayrollRecordsRow>,
+  extras: {
+    employee?: unknown;
+    period?: unknown;
+    items?: PayslipData['items'];
+    locale?: unknown;
+  },
+): PayslipData {
+  const employeeRow = pickRecord(extras.employee);
+  const periodRow = pickRecord(extras.period);
   return {
-    ...(paymentData as unknown as PaymentReceiptData),
-    invoice: invoiceRef
-      ? {
-          id: reqStr(invoiceRef.id),
-          invoice_number: reqStr(invoiceRef.invoice_number),
-          total_amount: typeof invoiceRef.total_amount === 'number' ? invoiceRef.total_amount : 0,
-          invoice_type: reqStr(invoiceRef.invoice_type),
-        }
-      : undefined,
-    customer: toCustomerBlock(customerRow),
-    bank_accounts: toBankAccount(paymentData.bank_accounts),
-    cases: toCaseRef(caseInfo),
-    accounting_locales: toLocale(defaultLocale),
-  } satisfies PaymentReceiptData;
+    id: recordRow.id ?? '',
+    employee: {
+      first_name: reqStr(employeeRow?.first_name),
+      last_name: reqStr(employeeRow?.last_name),
+      employee_number: reqStr(employeeRow?.employee_number),
+    },
+    payroll_period: {
+      period_name: reqStr(periodRow?.period_name),
+      start_date: reqStr(periodRow?.start_date),
+      end_date: reqStr(periodRow?.end_date),
+    },
+    payment_date: undefined,
+    working_days: recordRow.working_days ?? undefined,
+    days_worked: undefined,
+    days_absent: undefined,
+    regular_hours: undefined,
+    overtime_hours: recordRow.overtime_hours ?? undefined,
+    gross_salary: recordRow.total_earnings ?? undefined,
+    net_salary: recordRow.net_salary ?? 0,
+    items: extras.items ?? [],
+    accounting_locales: toLocale(extras.locale),
+  } satisfies PayslipData;
 }
 
 export async function fetchPayslipData(recordId: string): Promise<PayslipDocumentData> {
@@ -752,24 +914,12 @@ async function fetchPayslipDetails(recordId: string): Promise<PayslipData> {
     amount: item.amount,
   }));
 
-  const employeeRow = pickRecord(recordData.employee);
-  const periodRow = pickRecord(recordData.payroll_period);
-
-  return {
-    ...(recordData as unknown as PayslipData),
-    employee: {
-      first_name: reqStr(employeeRow?.first_name),
-      last_name: reqStr(employeeRow?.last_name),
-      employee_number: reqStr(employeeRow?.employee_number),
-    },
-    payroll_period: {
-      period_name: reqStr(periodRow?.period_name),
-      start_date: reqStr(periodRow?.start_date),
-      end_date: reqStr(periodRow?.end_date),
-    },
+  return toPayslipData(recordData, {
+    employee: recordData.employee,
+    period: recordData.payroll_period,
     items: mappedItems,
-    accounting_locales: toLocale(defaultLocale),
-  } satisfies PayslipData;
+    locale: defaultLocale,
+  });
 }
 
 export async function fetchChainOfCustodyData(
