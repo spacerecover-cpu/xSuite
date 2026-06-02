@@ -10,6 +10,7 @@ import { SearchableSelect } from '../ui/SearchableSelect';
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown';
 import { HardDrive, Eye, EyeOff, Trash2, ChevronDown, ChevronUp, Cpu } from 'lucide-react';
 import { diagnosticsService } from '../../lib/diagnosticsService';
+import { setPrimaryDevice } from '../../lib/deviceService';
 import { logger } from '../../lib/logger';
 import type { Database } from '../../types/database.types';
 
@@ -362,7 +363,6 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
         tenant_id: profile?.tenant_id ?? '',
         device_role_id: formData.device_role_id ? Number(formData.device_role_id) : null,
         password: formData.password || null,
-        is_primary: formData.is_primary,
         role_notes: formData.role_notes || null,
       };
 
@@ -420,6 +420,10 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
 
         if (error) throw error;
         deviceId = insertedDevice?.id;
+      }
+
+      if (formData.is_primary && deviceId) {
+        await setPrimaryDevice(deviceId, caseId);
       }
 
       if (isDonorRole && selectedDonorInventoryId && deviceId) {

@@ -83,6 +83,7 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
         p_collector_mobile: collectorMobile.trim(),
         p_collector_id: collectorId.trim() || null,
         p_recovery_outcome: recoveryOutcome,
+        p_device_ids: selectedDevices,
       });
 
       if (dbError) throw dbError;

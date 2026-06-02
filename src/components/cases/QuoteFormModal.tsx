@@ -703,22 +703,30 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                     {fmtDoc(subtotal)}
                   </span>
                 </div>
+                {quoteData.discount_amount > 0 && (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-700">
+                        Discount {quoteData.discount_type === 'percentage' ? `(${quoteData.discount_amount}%)` : ''}
+                      </span>
+                      <span className="font-medium text-danger">
+                        -{fmtDoc(discountValue)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-700">Net Amount</span>
+                      <span className="font-medium text-slate-900">
+                        {fmtDoc(discountedSubtotal)}
+                      </span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-700">VAT ({quoteData.tax_rate}%)</span>
                   <span className="font-medium text-slate-900">
                     {fmtDoc(taxAmount)}
                   </span>
                 </div>
-                {quoteData.discount_amount > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-700">
-                      Discount {quoteData.discount_type === 'percentage' ? `(${quoteData.discount_amount}%)` : ''}
-                    </span>
-                    <span className="font-medium text-danger">
-                      -{fmtDoc(discountValue)}
-                    </span>
-                  </div>
-                )}
                 <div className="flex justify-between text-base font-bold border-t border-info/30 pt-2 mt-2">
                   <span className="text-info">Total Amount</span>
                   <span className="text-success">

@@ -846,22 +846,30 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                     {fmtDoc(subtotal)}
                   </span>
                 </div>
+                {invoiceData.discount_amount > 0 && (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-700">
+                        Discount {invoiceData.discount_type === 'percentage' ? `(${invoiceData.discount_amount}%)` : ''}
+                      </span>
+                      <span className="font-medium text-danger">
+                        -{fmtDoc(discountValue)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-700">Net Amount</span>
+                      <span className="font-medium text-slate-900">
+                        {fmtDoc(discountedSubtotal)}
+                      </span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-700">VAT ({invoiceData.tax_rate}%)</span>
                   <span className="font-medium text-slate-900">
                     {fmtDoc(taxAmount)}
                   </span>
                 </div>
-                {invoiceData.discount_amount > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-700">
-                      Discount {invoiceData.discount_type === 'percentage' ? `(${invoiceData.discount_amount}%)` : ''}
-                    </span>
-                    <span className="font-medium text-danger">
-                      -{fmtDoc(discountValue)}
-                    </span>
-                  </div>
-                )}
                 <div className="flex justify-between text-base font-bold border-t border-info/30 pt-2 mt-2">
                   <span className="text-info">Total Amount</span>
                   <span className="text-primary">

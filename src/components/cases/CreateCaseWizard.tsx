@@ -23,6 +23,7 @@ import {
   Layers
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { setPrimaryDevice } from '../../lib/deviceService';
 import { logger } from '../../lib/logger';
 import type { Database } from '../../types/database.types';
 
@@ -423,6 +424,8 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
 
       const allDevices = [...devices, ...bulkServerDrives];
 
+      const primaryWizardDevice = allDevices.find(d => d.is_primary);
+
       const devicesToInsert = allDevices
         .filter(d => d.device_type_id || d.serial_no)
         .map(device => {
@@ -445,20 +448,36 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
             password: device.device_password || null,
             encryption_id: device.encryption_type_id || null,
             device_role_id: device.device_role_id || null,
-            is_primary: device.is_primary || false,
             created_by: profile?.id || null,
+            _wizard_id: device.id,
           };
         });
 
+      let primaryDeviceDbId: string | null = null;
+
       if (devicesToInsert.length > 0) {
-        const { error: devicesError } = await supabase
+        const { data: insertedDevices, error: devicesError } = await supabase
           .from('case_devices')
-          .insert(devicesToInsert);
+          .insert(devicesToInsert.map(({ _wizard_id: _w, ...rest }) => rest))
+          .select('id')
+          .order('created_at', { ascending: true });
 
         if (devicesError) {
           logger.error('Error inserting devices:', devicesError);
           throw new Error(`Failed to insert devices: ${devicesError.message}`);
         }
+
+        if (primaryWizardDevice && insertedDevices && insertedDevices.length > 0) {
+          const primaryIndex = devicesToInsert.findIndex(d => d._wizard_id === primaryWizardDevice.id);
+          const matched = primaryIndex >= 0 ? insertedDevices[primaryIndex] : insertedDevices[0];
+          if (matched) primaryDeviceDbId = matched.id;
+        } else if (insertedDevices && insertedDevices.length > 0) {
+          primaryDeviceDbId = insertedDevices[0].id;
+        }
+      }
+
+      if (primaryDeviceDbId) {
+        await setPrimaryDevice(primaryDeviceDbId, newCase.id);
       }
 
       return newCase;

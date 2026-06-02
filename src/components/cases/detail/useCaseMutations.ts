@@ -92,6 +92,20 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
     },
   });
 
+  const updateNoteMutation = useMutation({
+    mutationFn: async ({ noteId, content }: { noteId: string; content: string }) => {
+      const { data, error } = await supabase.rpc('update_case_note', {
+        p_note_id: noteId,
+        p_content: content,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['case_notes', id] });
+    },
+  });
+
   const updateCaseStatusMutation = useMutation({
     // The state-machine guard trigger blocks direct UPDATE cases.status,
     // so this mutation now routes through transition_case_status RPC which
@@ -511,6 +525,7 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
 
   return {
     addNoteMutation,
+    updateNoteMutation,
     updateCaseStatusMutation,
     updateCasePriorityMutation,
     updateAssignedEngineerMutation,

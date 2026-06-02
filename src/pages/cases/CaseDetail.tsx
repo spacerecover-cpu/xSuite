@@ -89,7 +89,7 @@ export const CaseDetail: React.FC = () => {
 
 
   const {
-    addNoteMutation, updateCaseStatusMutation, updateCasePriorityMutation,
+    addNoteMutation, updateNoteMutation, updateCaseStatusMutation, updateCasePriorityMutation,
     updateAssignedEngineerMutation, updateCaseInfoMutation,
     updateDeviceInfoMutation, updateCustomerInfoMutation, markAsDeliveredMutation,
     preserveLongTermMutation, duplicateCaseMutation, deleteCaseMutation,
@@ -708,12 +708,16 @@ export const CaseDetail: React.FC = () => {
                 id: n.id,
                 note_text: n.content,
                 created_at: n.created_at,
+                updated_at: n.updated_at,
                 created_by: n.created_by,
               }))}
               newNote={modals.newNote}
               onNoteChange={modals.setNewNote}
               onAddNote={handleAddNote}
               isAdding={addNoteMutation.isPending}
+              onUpdateNote={async (noteId, content) => {
+                await updateNoteMutation.mutateAsync({ noteId, content });
+              }}
             />
           )}
 

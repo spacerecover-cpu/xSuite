@@ -392,7 +392,8 @@ export function useCaseQueries(
           id,
           content,
           created_by,
-          created_at
+          created_at,
+          updated_at
         `)
         .eq('case_id', id)
         .order('created_at', { ascending: false });

@@ -96,7 +96,12 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
   if (!invoice) return null;
 
   const customerAssociatedCompany = invoice.customer_associated_company;
-  const customerName = invoice.customer_name || 'N/A';
+  const customerName =
+    invoice.customers_enhanced?.customer_name ||
+    invoice.customers?.customer_name ||
+    customerAssociatedCompany?.company_name ||
+    invoice.companies?.company_name ||
+    'N/A';
   const companyName = customerAssociatedCompany?.company_name || invoice.companies?.company_name || null;
   const customerEmail = invoice.customers_enhanced?.email || invoice.customers?.email || invoice.companies?.email || 'N/A';
   const customerPhone = invoice.customers_enhanced?.mobile_number || invoice.customers?.mobile_number || invoice.companies?.phone_number || 'N/A';

@@ -90,7 +90,7 @@ export const QuoteDocument: React.FC<QuoteDocumentProps> = ({
   if (!quote) return null;
 
   const customerAssociatedCompany = quote.customer_associated_company;
-  const customerName = quote.customer_name || 'N/A';
+  const customerName = quote.customers?.customer_name || quote.customers_enhanced?.customer_name || customerAssociatedCompany?.company_name || quote.companies?.company_name || 'N/A';
   const companyName = customerAssociatedCompany?.company_name || quote.companies?.company_name || null;
   const customerEmail = quote.customers?.email || quote.companies?.email || 'N/A';
   const customerPhone = quote.customers?.mobile_number || quote.companies?.phone_number || 'N/A';
@@ -316,6 +316,14 @@ export const QuoteDocument: React.FC<QuoteDocumentProps> = ({
                 </span>
                 <span className="font-semibold text-red-600 text-right">
                   - {currencyFormat.currencySymbol} {discountValue.toFixed(currencyFormat.decimalPlaces)}
+                </span>
+              </div>
+            )}
+            {quote.discount_amount > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-700 font-medium">{t('netAmount', 'Net Amount')}:</span>
+                <span className="font-semibold text-slate-900 text-right">
+                  {currencyFormat.currencySymbol} {discountedSubtotal.toFixed(currencyFormat.decimalPlaces)}
                 </span>
               </div>
             )}

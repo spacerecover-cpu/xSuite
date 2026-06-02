@@ -70,9 +70,9 @@ export const PaymentReceiptDocument: React.FC<PaymentReceiptDocumentProps> = ({
     return `${currencyFormat.currencySymbol}${amount.toFixed(currencyFormat.decimalPlaces)}`;
   };
 
-  const customerName = payment.customer_name || 'N/A';
-  const customerEmail = payment.customer?.email || '';
-  const customerPhone = payment.customer?.mobile_number || '';
+  const customerName = payment.customer?.customer_name || payment.customers?.customer_name || payment.customer_associated_company?.company_name || payment.companies?.company_name || 'N/A';
+  const customerEmail = payment.customer?.email || payment.customers?.email || '';
+  const customerPhone = payment.customer?.mobile_number || payment.customers?.mobile_number || '';
   const customerAddress = payment.customer?.address_line1 || '';
   const customerCity = payment.customer?.city || '';
 

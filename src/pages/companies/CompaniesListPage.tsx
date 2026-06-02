@@ -807,6 +807,14 @@ export const CompaniesListPage: React.FC = () => {
             />
           </div>
 
+          {createMutation.isError && (
+            <div className="bg-danger-muted border border-danger/30 rounded-lg p-3 text-sm text-danger">
+              {createMutation.error instanceof Error
+                ? createMutation.error.message
+                : 'Failed to create company. Please try again.'}
+            </div>
+          )}
+
           <div className="flex gap-3 justify-end pt-3 border-t">
             <Button
               type="button"
@@ -818,8 +826,8 @@ export const CompaniesListPage: React.FC = () => {
             >
               Cancel
             </Button>
-            <Button type="submit">
-              Create Company
+            <Button type="submit" disabled={createMutation.isPending}>
+              {createMutation.isPending ? 'Creating...' : 'Create Company'}
             </Button>
           </div>
         </form>

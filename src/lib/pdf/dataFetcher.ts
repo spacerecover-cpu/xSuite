@@ -228,15 +228,6 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
       created_by_profile:profiles!quotes_created_by_fkey (
         id,
         full_name
-      ),
-      bank_accounts (
-        id,
-        account_name:name,
-        bank_name,
-        account_number,
-        iban,
-        swift_code,
-        branch_code
       )
     `)
     .eq('id', quoteId)

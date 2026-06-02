@@ -2469,6 +2469,10 @@ export type Database = {
           branch_id: string | null
           case_no: string | null
           case_number: string | null
+          checkout_collector_id: string | null
+          checkout_collector_mobile: string | null
+          checkout_collector_name: string | null
+          checkout_date: string | null
           client_reference: string | null
           company_id: string | null
           contact_id: string | null
@@ -2488,6 +2492,7 @@ export type Database = {
           phase_entered_at: string | null
           priority: string | null
           priority_id: string | null
+          recovery_outcome: string | null
           referred_by: string | null
           resolution: string | null
           service_location_id: string | null
@@ -2510,6 +2515,10 @@ export type Database = {
           branch_id?: string | null
           case_no?: string | null
           case_number?: string | null
+          checkout_collector_id?: string | null
+          checkout_collector_mobile?: string | null
+          checkout_collector_name?: string | null
+          checkout_date?: string | null
           client_reference?: string | null
           company_id?: string | null
           contact_id?: string | null
@@ -2529,6 +2538,7 @@ export type Database = {
           phase_entered_at?: string | null
           priority?: string | null
           priority_id?: string | null
+          recovery_outcome?: string | null
           referred_by?: string | null
           resolution?: string | null
           service_location_id?: string | null
@@ -2551,6 +2561,10 @@ export type Database = {
           branch_id?: string | null
           case_no?: string | null
           case_number?: string | null
+          checkout_collector_id?: string | null
+          checkout_collector_mobile?: string | null
+          checkout_collector_name?: string | null
+          checkout_date?: string | null
           client_reference?: string | null
           company_id?: string | null
           contact_id?: string | null
@@ -2570,6 +2584,7 @@ export type Database = {
           phase_entered_at?: string | null
           priority?: string | null
           priority_id?: string | null
+          recovery_outcome?: string | null
           referred_by?: string | null
           resolution?: string | null
           service_location_id?: string | null
@@ -11009,13 +11024,16 @@ export type Database = {
       receipts: {
         Row: {
           amount: number
+          amount_base: number | null
           created_at: string
           created_by: string | null
           customer_id: string | null
           deleted_at: string | null
+          exchange_rate: number
           id: string
           notes: string | null
           payment_method: string | null
+          rate_source: string
           receipt_date: string | null
           receipt_number: string | null
           reference: string | null
@@ -11025,13 +11043,16 @@ export type Database = {
         }
         Insert: {
           amount: number
+          amount_base?: number | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
           deleted_at?: string | null
+          exchange_rate?: number
           id?: string
           notes?: string | null
           payment_method?: string | null
+          rate_source?: string
           receipt_date?: string | null
           receipt_number?: string | null
           reference?: string | null
@@ -11041,13 +11062,16 @@ export type Database = {
         }
         Update: {
           amount?: number
+          amount_base?: number | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
           deleted_at?: string | null
+          exchange_rate?: number
           id?: string
           notes?: string | null
           payment_method?: string | null
+          rate_source?: string
           receipt_date?: string | null
           receipt_number?: string | null
           reference?: string | null
@@ -15314,13 +15338,16 @@ export type Database = {
         Args: { p_allocations: Json; p_receipt: Json }
         Returns: {
           amount: number
+          amount_base: number | null
           created_at: string
           created_by: string | null
           customer_id: string | null
           deleted_at: string | null
+          exchange_rate: number
           id: string
           notes: string | null
           payment_method: string | null
+          rate_source: string
           receipt_date: string | null
           receipt_number: string | null
           reference: string | null
@@ -15380,6 +15407,51 @@ export type Database = {
       get_next_supplier_number: { Args: never; Returns: string }
       get_next_ticket_number: { Args: never; Returns: string }
       get_next_transfer_number: { Args: never; Returns: string }
+      get_primary_device_for_case: {
+        Args: { p_case_id: string }
+        Returns: {
+          accessories: string[] | null
+          brand_id: string | null
+          capacity_id: string | null
+          case_id: string
+          condition_id: string | null
+          created_at: string
+          created_by: string | null
+          data_recovered_size: string | null
+          deleted_at: string | null
+          device_role_id: number | null
+          device_type_id: string | null
+          diagnosis: string | null
+          encryption_id: string | null
+          firmware_version: string | null
+          form_factor_id: string | null
+          head_count_id: string | null
+          id: string
+          interface_id: string | null
+          is_primary: boolean | null
+          made_in_id: string | null
+          model: string | null
+          notes: string | null
+          password: string | null
+          pcb_number: string | null
+          photos: string[] | null
+          physical_damage: string | null
+          platter_count_id: string | null
+          recovery_result: string | null
+          role_notes: string | null
+          serial_number: string | null
+          storage_location: string | null
+          symptoms: string | null
+          tenant_id: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "case_devices"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_quote_stats_base: { Args: never; Returns: Json }
       get_system_setting: { Args: { p_key: string }; Returns: string }
       get_tenant_storage_bytes: {
@@ -15454,6 +15526,7 @@ export type Database = {
           p_collector_id?: string
           p_collector_mobile: string
           p_collector_name: string
+          p_device_ids?: string[]
           p_recovery_outcome?: string
         }
         Returns: undefined
@@ -15532,6 +15605,10 @@ export type Database = {
         }
       }
       process_time_based_events: { Args: never; Returns: Json }
+      promote_device_to_primary: {
+        Args: { p_case_id: string; p_device_id: string }
+        Returns: undefined
+      }
       record_payment: {
         Args: { p_allocations: Json; p_payment: Json }
         Returns: {
@@ -15673,6 +15750,25 @@ export type Database = {
           p_to_status_id: string
         }
         Returns: Json
+      }
+      update_case_note: {
+        Args: { p_content: string; p_note_id: string }
+        Returns: {
+          case_id: string
+          content: string
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          id: string
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "case_internal_notes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       update_number_sequence: {
         Args: {

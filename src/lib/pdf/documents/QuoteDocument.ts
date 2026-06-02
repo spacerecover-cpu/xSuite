@@ -253,6 +253,14 @@ export function buildQuoteDocument(
       ],
       margin: [0, 2, 0, 2],
     });
+    const netAmountLabel = isBilingual ? 'Net Amount | صافي المبلغ:' : 'Net Amount:';
+    financialSummaryRows.push({
+      columns: [
+        { text: netAmountLabel, fontSize: 9, color: PDF_COLORS.textLight, width: '*', alignment: 'right' },
+        { text: formatCurrency(discountedSubtotal), fontSize: 9, bold: true, color: PDF_COLORS.text, width: 100, alignment: 'right' },
+      ],
+      margin: [0, 2, 0, 2],
+    });
   }
 
   financialSummaryRows.push({
