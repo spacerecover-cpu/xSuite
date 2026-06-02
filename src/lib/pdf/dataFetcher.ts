@@ -224,10 +224,6 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
         email,
         phone,
         address
-      ),
-      created_by_profile:profiles!quotes_created_by_fkey (
-        id,
-        full_name
       )
     `)
     .eq('id', quoteId)
@@ -241,6 +237,12 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
   if (!quoteData) {
     throw new Error('Quote not found');
   }
+
+  // quotes.created_by FKs to auth.users (not profiles), so PostgREST cannot embed
+  // it — fetch the creator profile separately.
+  const { data: createdByProfile } = quoteData.created_by
+    ? await supabase.from('profiles').select('id, full_name').eq('id', quoteData.created_by).maybeSingle()
+    : { data: null };
 
   let customerAssociatedCompany = null;
   if (quoteData.customer_id) {
@@ -275,6 +277,7 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
 
   return {
     ...quoteData,
+    created_by_profile: createdByProfile,
     terms_and_conditions: quoteData.terms ?? undefined,
     title: undefined,
     quote_items: items || [],
