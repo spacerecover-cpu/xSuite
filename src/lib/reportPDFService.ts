@@ -374,15 +374,23 @@ class ReportPDFService {
 
     const { data: reportRaw, error: reportError } = await supabase
       .from('case_reports')
-      .select(`
-        *,
-        created_by_profile:profiles!case_reports_created_by_fkey(full_name, email)
-      `)
+      .select('*')
       .eq('id', reportId)
       .maybeSingle<CaseReportRowWithProfile>();
 
     if (reportError || !reportRaw) {
       throw new Error('Failed to fetch report');
+    }
+
+    // case_reports.created_by FKs to auth.users (not profiles), so PostgREST cannot
+    // embed it — fetch the creator profile separately.
+    if (reportRaw.created_by) {
+      const { data: createdByProfile } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', reportRaw.created_by)
+        .maybeSingle();
+      reportRaw.created_by_profile = createdByProfile ?? null;
     }
 
     const reportContent: JsonObject | null = isJsonObject(reportRaw.content) ? reportRaw.content : null;
@@ -543,17 +551,35 @@ class ReportPDFService {
         actor?: ProfileNameEmbed;
       };
 
-      const { data: cocEvents } = await supabase
+      const { data: cocEventsRaw } = await supabase
         .from('chain_of_custody')
-        .select(`
-          *,
-          actor:profiles!actor_id(full_name)
-        `)
+        .select('*')
         .eq('case_id', reportRaw.case_id)
         .order('created_at', { ascending: true })
-        .overrideTypes<ChainOfCustodyRowWithActor[]>();
+        .overrideTypes<ChainOfCustodyRow[]>();
 
-      chainOfCustodyEvents = (cocEvents ?? []).map((row): NonNullable<ReportData['chainOfCustodyEvents']>[number] => {
+      // chain_of_custody.actor_id FKs to auth.users (not profiles), so PostgREST
+      // cannot embed it — resolve actor profiles via a separate lookup.
+      const actorIds = [
+        ...new Set((cocEventsRaw ?? []).map((row) => row.actor_id).filter((id): id is string => !!id)),
+      ];
+      const actorMap = new Map<string, ProfileNameEmbed>();
+      if (actorIds.length > 0) {
+        const { data: actorProfiles } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', actorIds);
+        for (const profile of actorProfiles ?? []) {
+          actorMap.set(profile.id, { full_name: profile.full_name });
+        }
+      }
+
+      const cocEvents: ChainOfCustodyRowWithActor[] = (cocEventsRaw ?? []).map((row) => ({
+        ...row,
+        actor: row.actor_id ? actorMap.get(row.actor_id) ?? null : null,
+      }));
+
+      chainOfCustodyEvents = cocEvents.map((row): NonNullable<ReportData['chainOfCustodyEvents']>[number] => {
         const metadata: JsonObject | null = isJsonObject(row.metadata) ? row.metadata : null;
         return {
           event_type: row.action,

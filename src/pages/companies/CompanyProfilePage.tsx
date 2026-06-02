@@ -146,10 +146,7 @@ export const CompanyProfilePage: React.FC = () => {
 
       const { data, error } = await supabase
         .from('customer_communications')
-        .select(`
-          *,
-          profiles (full_name)
-        `)
+        .select('*')
         .in('customer_id', customerIds)
         .order('created_at', { ascending: false });
 
@@ -157,7 +154,31 @@ export const CompanyProfilePage: React.FC = () => {
         logger.error('Error fetching communications:', error);
         return [];
       }
-      return ((data as unknown) as Communication[]) || [];
+
+      const rows = ((data as unknown) as Communication[]) || [];
+
+      // customer_communications.sent_by FKs to auth.users (not profiles), so
+      // PostgREST cannot embed the profile — look up the loggers separately.
+      const senderIds = Array.from(
+        new Set(rows.map(r => r.sent_by).filter((v): v is string => Boolean(v)))
+      );
+
+      if (senderIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', senderIds);
+
+        const profileMap = new Map(
+          (profilesData || []).map(p => [p.id, { full_name: p.full_name }])
+        );
+
+        for (const row of rows) {
+          row.profiles = row.sent_by ? profileMap.get(row.sent_by) ?? null : null;
+        }
+      }
+
+      return rows;
     },
     enabled: !!id && contacts.length > 0,
   });

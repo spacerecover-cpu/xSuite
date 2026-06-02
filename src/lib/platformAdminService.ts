@@ -345,6 +345,27 @@ export async function reactivateTenant(tenantId: string): Promise<void> {
   await supabase.from('tenants').update({ status: 'active' }).eq('id', tenantId);
 }
 
+// support_tickets.customer_id FKs to auth.users (not profiles), so PostgREST
+// cannot embed the customer profile. Fetch the profiles directly by id instead.
+async function fetchCustomerProfiles(
+  customerIds: Array<string | null | undefined>,
+): Promise<Map<string, { id: string; email: string; full_name: string }>> {
+  const ids = [...new Set(customerIds.filter((id): id is string => !!id))];
+  const map = new Map<string, { id: string; email: string; full_name: string }>();
+  if (ids.length === 0) return map;
+
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, email, full_name')
+    .in('id', ids);
+
+  (data || []).forEach(p => {
+    map.set(p.id, { id: p.id, email: p.email ?? '', full_name: p.full_name ?? '' });
+  });
+
+  return map;
+}
+
 export async function getSupportTickets(filters?: {
   status?: string;
   priority?: string;
@@ -357,7 +378,6 @@ export async function getSupportTickets(filters?: {
     .select(`
       *,
       tenants(id, company_name),
-      profiles!support_tickets_customer_id_fkey(id, email, full_name),
       platform_admins(id, full_name)
     `)
     .is('deleted_at', null)
@@ -382,9 +402,14 @@ export async function getSupportTickets(filters?: {
 
   const { data } = await query;
 
-  return (data || []).map((ticket: any) => ({
+  const rows = data || [];
+  const customerProfiles = await fetchCustomerProfiles(
+    rows.map((ticket: any) => ticket.customer_id),
+  );
+
+  return rows.map((ticket: any) => ({
     ...ticket,
-    customer: ticket.profiles,
+    customer: customerProfiles.get(ticket.customer_id),
     tenant: ticket.tenants,
     assigned_admin: ticket.platform_admins,
   }));
@@ -396,7 +421,6 @@ export async function getTicketDetails(ticketId: string): Promise<TicketWithDeta
     .select(`
       *,
       tenants(id, company_name),
-      profiles!support_tickets_customer_id_fkey(id, email, full_name),
       platform_admins(id, full_name)
     `)
     .eq('id', ticketId)
@@ -405,9 +429,11 @@ export async function getTicketDetails(ticketId: string): Promise<TicketWithDeta
 
   if (!ticket) return null;
 
+  const customerProfiles = await fetchCustomerProfiles([(ticket as any).customer_id]);
+
   return {
     ...(ticket as any),
-    customer: (ticket as any).profiles,
+    customer: customerProfiles.get((ticket as any).customer_id),
     tenant: (ticket as any).tenants,
     assigned_admin: (ticket as any).platform_admins,
   };

@@ -212,13 +212,15 @@ export async function deleteInventoryItem(id: string) {
   if (error) throw error;
 }
 
+type StatusTypeRef = { id: string; name: string | null; color_code: string | null };
+
 export async function getInventoryStatusHistory(itemId: string) {
   const { data, error } = await supabase
     .from('inventory_status_history')
     .select(`
       *,
-      old_status:master_inventory_status_types!inventory_status_history_old_status_id_fkey(id, name, color_code),
-      new_status:master_inventory_status_types!inventory_status_history_new_status_id_fkey(id, name, color_code)
+      old_status_id,
+      new_status_id
     `)
     .eq('item_id', itemId)
     .order('created_at', { ascending: false });
@@ -227,7 +229,36 @@ export async function getInventoryStatusHistory(itemId: string) {
     logger.error('Error fetching inventory status history:', error);
     return [];
   }
-  return data ?? [];
+
+  const rows = data ?? [];
+
+  // old_status_id / new_status_id have no FK constraint, so PostgREST cannot embed
+  // master_inventory_status_types — fetch the lookup rows separately and attach them.
+  const statusIds = Array.from(
+    new Set(
+      rows
+        .flatMap((row) => [row.old_status_id, row.new_status_id])
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+
+  const statusMap = new Map<string, StatusTypeRef>();
+  if (statusIds.length > 0) {
+    const { data: statusTypes } = await supabase
+      .from('master_inventory_status_types')
+      .select('id, name, color_code')
+      .in('id', statusIds);
+
+    (statusTypes ?? []).forEach((status) => {
+      statusMap.set(status.id, status);
+    });
+  }
+
+  return rows.map((row) => ({
+    ...row,
+    old_status: row.old_status_id ? statusMap.get(row.old_status_id) ?? null : null,
+    new_status: row.new_status_id ? statusMap.get(row.new_status_id) ?? null : null,
+  }));
 }
 
 export async function getInventoryTransactions(itemId: string) {

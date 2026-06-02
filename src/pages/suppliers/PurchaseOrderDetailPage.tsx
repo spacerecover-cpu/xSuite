@@ -41,11 +41,7 @@ export default function PurchaseOrderDetailPage() {
           .select(`
             *,
             supplier:suppliers(*),
-            status:master_purchase_order_statuses(name, color),
-            created_by_user:auth.users!purchase_orders_created_by_fkey(email),
-            updated_by_user:auth.users!purchase_orders_updated_by_fkey(email),
-            approved_by_user:auth.users!purchase_orders_approved_by_fkey(email),
-            received_by_user:auth.users!purchase_orders_received_by_fkey(email)
+            status:master_purchase_order_statuses(name, color)
           `)
           .eq('id', orderId)
           .maybeSingle(),
@@ -57,7 +53,43 @@ export default function PurchaseOrderDetailPage() {
       ]);
 
       if (error) throw error;
-      setOrder(data);
+
+      // created_by/updated_by/approved_by/received_by FK to auth.users (not
+      // profiles), which PostgREST cannot embed. profiles.id == auth.users.id,
+      // so resolve the actor emails via a single direct profiles lookup.
+      if (data) {
+        const userIds = [
+          data.created_by,
+          data.updated_by,
+          data.approved_by,
+          data.received_by,
+        ].filter((uid): uid is string => !!uid);
+        const uniqueUserIds = Array.from(new Set(userIds));
+
+        const profileMap = new Map<string, { email: string | null; full_name: string | null }>();
+        if (uniqueUserIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, email, full_name')
+            .in('id', uniqueUserIds);
+          for (const profile of profiles ?? []) {
+            profileMap.set(profile.id, { email: profile.email, full_name: profile.full_name });
+          }
+        }
+
+        const resolveUser = (uid: string | null) =>
+          uid ? profileMap.get(uid) ?? null : null;
+
+        setOrder({
+          ...data,
+          created_by_user: resolveUser(data.created_by),
+          updated_by_user: resolveUser(data.updated_by),
+          approved_by_user: resolveUser(data.approved_by),
+          received_by_user: resolveUser(data.received_by),
+        });
+      } else {
+        setOrder(data);
+      }
       setPoLineItems(itemsData ?? []);
     } catch (error: unknown) {
       logger.error('Error loading purchase order:', error);

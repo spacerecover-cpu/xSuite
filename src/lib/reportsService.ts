@@ -135,6 +135,40 @@ function mergeContent(existing: Json | null | undefined, updates: JsonObject): J
   return base as Json;
 }
 
+// case_reports.created_by FKs to auth.users (not profiles), so PostgREST cannot
+// embed it — look up creator profiles separately and attach them under the same
+// `created_by_profile` alias the broken embed used.
+async function attachCreatedByProfiles(
+  rows: CaseReportRow[]
+): Promise<CaseReportRowWithProfiles[]> {
+  const ids = Array.from(
+    new Set(rows.map((r) => r.created_by).filter((id): id is string => !!id))
+  );
+
+  if (ids.length === 0) {
+    return rows.map((r) => ({ ...r, created_by_profile: null }));
+  }
+
+  const { data: profiles, error } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .in('id', ids);
+
+  if (error) {
+    logger.error('Error fetching report creator profiles:', error);
+    throw error;
+  }
+
+  const byId = new Map<string, { full_name: string | null }>(
+    (profiles ?? []).map((p) => [p.id, { full_name: p.full_name }])
+  );
+
+  return rows.map((r) => ({
+    ...r,
+    created_by_profile: r.created_by ? byId.get(r.created_by) ?? null : null,
+  }));
+}
+
 export const reportsService = {
   /**
    * Get all report templates, optionally filtered by report type
@@ -401,10 +435,7 @@ export const reportsService = {
   async getReportById(reportId: string): Promise<Report | null> {
     const { data, error } = await supabase
       .from('case_reports')
-      .select(`
-        *,
-        created_by_profile:profiles!created_by(full_name)
-      `)
+      .select('*')
       .eq('id', reportId)
       .maybeSingle();
 
@@ -413,7 +444,12 @@ export const reportsService = {
       throw error;
     }
 
-    return data ? mapReportRow(data as unknown as CaseReportRowWithProfiles) : null;
+    if (!data) {
+      return null;
+    }
+
+    const [withProfile] = await attachCreatedByProfiles([data]);
+    return mapReportRow(withProfile);
   },
 
   /**
@@ -447,10 +483,7 @@ export const reportsService = {
   ): Promise<Report[]> {
     let query = supabase
       .from('case_reports')
-      .select(`
-        *,
-        created_by_profile:profiles!created_by(full_name)
-      `)
+      .select('*')
       .eq('case_id', caseId)
       .order('created_at', { ascending: false });
 
@@ -473,7 +506,8 @@ export const reportsService = {
       throw error;
     }
 
-    return ((data ?? []) as unknown as CaseReportRowWithProfiles[]).map(mapReportRow);
+    const withProfiles = await attachCreatedByProfiles(data ?? []);
+    return withProfiles.map(mapReportRow);
   },
 
   /**
@@ -489,10 +523,7 @@ export const reportsService = {
 
     const { data, error } = await supabase
       .from('case_reports')
-      .select(`
-        *,
-        created_by_profile:profiles!created_by(full_name)
-      `)
+      .select('*')
       .or(
         isValidUuid(parentId)
           ? `id.eq.${parentId},content->>parent_report_id.eq.${parentId}`
@@ -505,7 +536,8 @@ export const reportsService = {
       throw error;
     }
 
-    return ((data ?? []) as unknown as CaseReportRowWithProfiles[]).map(mapReportRow);
+    const withProfiles = await attachCreatedByProfiles(data ?? []);
+    return withProfiles.map(mapReportRow);
   },
 
   /**
@@ -716,10 +748,7 @@ export const reportsService = {
   }>> {
     const { data, error } = await supabase
       .from('chain_of_custody')
-      .select(`
-        *,
-        actor:profiles!actor_id(full_name)
-      `)
+      .select('*')
       .eq('case_id', caseId)
       .order('created_at', { ascending: true });
 
@@ -728,8 +757,35 @@ export const reportsService = {
       throw error;
     }
 
-    return (data ?? []) as unknown as Array<Database['public']['Tables']['chain_of_custody']['Row'] & {
-      actor: { full_name: string | null } | null;
-    }>;
+    const rows = data ?? [];
+
+    // chain_of_custody.actor_id FKs to auth.users (not profiles), so PostgREST
+    // cannot embed it — look up actor profiles separately and attach under the
+    // same `actor` alias the broken embed used.
+    const actorIds = Array.from(
+      new Set(rows.map((r) => r.actor_id).filter((id): id is string => !!id))
+    );
+
+    let actorById = new Map<string, { full_name: string | null }>();
+    if (actorIds.length > 0) {
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', actorIds);
+
+      if (profilesError) {
+        logger.error('Error fetching custody actor profiles:', profilesError);
+        throw profilesError;
+      }
+
+      actorById = new Map(
+        (profiles ?? []).map((p) => [p.id, { full_name: p.full_name }])
+      );
+    }
+
+    return rows.map((r) => ({
+      ...r,
+      actor: r.actor_id ? actorById.get(r.actor_id) ?? null : null,
+    }));
   },
 };
