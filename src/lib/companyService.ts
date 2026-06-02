@@ -44,16 +44,19 @@ export async function createCompany(
   // to null here so every caller (forms that send '' for an unset select) is safe.
   const uuidOrNull = (v?: string | null) => (v && v.trim() !== '' ? v : null);
 
+  // company_name is a GENERATED column (ALWAYS AS name); Postgres rejects any
+  // value for it ("cannot insert a non-DEFAULT value into a generated column").
+  // Persist only `name` and strip company_name from the spread payload.
   const payload = {
     ...input,
     company_number: companyNumber,
-    company_name: resolvedName,
     name: resolvedName,
     industry_id: uuidOrNull(input.industry_id),
     country_id: uuidOrNull(input.country_id),
     city_id: uuidOrNull(input.city_id),
     created_by: uuidOrNull(input.created_by),
   } as CompanyInsert;
+  delete (payload as Record<string, unknown>).company_name;
 
   const { data: newCompany, error: createError } = await supabase
     .from('companies')
