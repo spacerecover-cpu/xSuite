@@ -23,11 +23,11 @@ const colorClasses = {
     iconBg: 'bg-success',
   },
   orange: {
-    gradient: 'from-orange-50 to-orange-100',
-    border: 'border-orange-200',
-    text: 'text-orange-600',
-    textValue: 'text-orange-900',
-    iconBg: 'bg-orange-500',
+    gradient: 'from-warning-muted to-warning-muted',
+    border: 'border-warning/30',
+    text: 'text-warning',
+    textValue: 'text-warning',
+    iconBg: 'bg-warning',
   },
   amber: {
     gradient: 'from-warning-muted to-warning-muted',
@@ -58,11 +58,11 @@ const colorClasses = {
     iconBg: 'bg-accent',
   },
   teal: {
-    gradient: 'from-teal-50 to-teal-100',
-    border: 'border-teal-200',
-    text: 'text-teal-600',
-    textValue: 'text-teal-900',
-    iconBg: 'bg-teal-500',
+    gradient: 'from-info-muted to-info-muted',
+    border: 'border-info/30',
+    text: 'text-info',
+    textValue: 'text-info',
+    iconBg: 'bg-info',
   },
 };
 
