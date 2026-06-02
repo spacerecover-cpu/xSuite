@@ -683,8 +683,7 @@ export const BankingPage: React.FC = () => {
                                 {formatCurrencyValue(receipt.amount)}
                               </p>
                               <Badge
-                                variant="custom"
-                                color={receipt.status === 'completed' ? '#10b981' : '#f59e0b'}
+                                variant={receipt.status === 'completed' ? 'success' : 'warning'}
                                 size="sm"
                               >
                                 {receipt.status}
@@ -721,8 +720,7 @@ export const BankingPage: React.FC = () => {
                                 {formatCurrencyValue(transfer.amount)}
                               </p>
                               <Badge
-                                variant="custom"
-                                color={transfer.status === 'completed' ? '#10b981' : '#f59e0b'}
+                                variant={transfer.status === 'completed' ? 'success' : 'warning'}
                                 size="sm"
                               >
                                 {transfer.status}
