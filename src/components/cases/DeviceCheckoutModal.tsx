@@ -105,7 +105,12 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
       }, 500);
     } catch (err) {
       logger.error('Error during checkout:', err);
-      setError('Failed to complete checkout. Please try again.');
+      const dbMessage =
+        err && typeof err === 'object' && 'message' in err &&
+        typeof (err as { message: unknown }).message === 'string'
+          ? (err as { message: string }).message
+          : null;
+      setError(dbMessage ? `Checkout failed: ${dbMessage}` : 'Failed to complete checkout. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
