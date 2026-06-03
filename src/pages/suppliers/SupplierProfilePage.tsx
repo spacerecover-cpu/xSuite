@@ -320,6 +320,13 @@ export default function SupplierProfilePage() {
             category_id: supplier.category_id ?? undefined,
             payment_terms_id: supplier.payment_terms_id ?? undefined,
             is_active: supplier.is_active ?? undefined,
+            // Map DB columns -> the modal's form-field prop names so the edit form
+            // loads these instead of blanking them (the modal's save maps back).
+            tax_id: supplier.tax_number ?? undefined,
+            description: supplier.notes ?? undefined,
+            primary_contact_name: supplier.contact_person ?? undefined,
+            primary_contact_email: supplier.contact_email ?? undefined,
+            primary_contact_phone: supplier.contact_phone ?? undefined,
           }}
         />
       )}
