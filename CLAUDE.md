@@ -40,6 +40,50 @@
 
 ---
 
+## 🧠 Mandatory Skill Loading — Startup Gate (READ FIRST)
+
+> **Skills are mandatory prerequisites, not optional aids.** Before ANY task — analysis, planning, design, code, debugging, optimization, or even a "quick" answer — classify the task and load the required skill(s) below. This gate runs **first** and **automatically** at the start of every task. Work produced without the required skill loaded is non-conforming and must be redone.
+
+### Startup Checklist (complete BEFORE task execution begins)
+
+Run this at the start of every task, before writing any plan, design, or code:
+
+1. [ ] **Classify the task** — UI/UX-facing, backend/logic, or **mixed**? (use the routing table)
+2. [ ] **Load the required skill(s)** for that class via the `Skill` tool, and announce: `Loading <skill> per CLAUDE.md skill gate.`
+3. [ ] **Verify each skill is active** (its guidance is in context) before producing anything.
+4. [ ] **Apply the skill's standards** to every design, solution, and line of code.
+5. [ ] **Verify before completion** — confirm output conforms to the loaded skill(s) (`verification-before-completion`).
+6. [ ] If a required skill is missing or fails to load, **STOP and report** — do not proceed without it.
+
+### Skill Routing — which skill(s) for which task
+
+| Task involves… | Load BEFORE starting (mandatory) |
+|---|---|
+| UI/UX, front-end, design system, dashboard, form, **workflow & user-experience screens**, components, styling, theming, layout, charts, portal/print surfaces | **`ui-ux-pro-max`** **and** **`frontend-design`** (Anthropic Front-End Design Skill) — load and apply **both** |
+| Everything else — architecture, analysis, debugging, implementation, optimization, refactoring, planning, schema/migrations, services, data, tests, tooling | **Superpowers** ("the Superpower Skill") — load **`using-superpowers`**, which routes to the right process skill: `brainstorming`, `writing-plans`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `requesting-code-review`, etc. |
+| **Both** UI/UX **and** backend/business logic in the same task | Load **both tracks** — `ui-ux-pro-max` + `frontend-design` **and** Superpowers — and use them together |
+
+### Rules
+
+1. **Mandatory & automatic.** Loading the skill is step 0 of every relevant task; it happens without being asked.
+2. **No bypass.** No task is too small to skip the gate — a one-line fix or a "simple question" is still a task. Classify, load, then act.
+3. **Standards compliance.** All generated solutions, designs, and code MUST follow the standards, patterns, and best practices defined by the loaded skill(s).
+4. **Both when mixed.** Mixed tasks require both tracks — never either/or.
+5. **Order of operations.** Process skills first (Superpowers: `brainstorming` / `systematic-debugging` decide *how* to approach), then design/implementation skills (`frontend-design`, `ui-ux-pro-max`) guide execution.
+6. **This gate does NOT override the data-recovery domain rules below.** Domain correctness (the 16-stage lifecycle, custody, tenancy) **and** skill standards both apply — satisfy both.
+
+### Installed skills (present & version-controlled in this repo)
+
+| Skill | Role | Location |
+|---|---|---|
+| `ui-ux-pro-max` | UI/UX design intelligence — styles, palettes, typography, UX guidelines, charts, 16 stacks | `.claude/skills/ui-ux-pro-max/` |
+| `frontend-design` | **Anthropic Front-End Design Skill** — distinctive, production-grade front-end | `.agents/skills/frontend-design/` → `.claude/skills/frontend-design` |
+| `using-superpowers` (+ `brainstorming`, `writing-plans`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `requesting-code-review`, `receiving-code-review`, `executing-plans`, …) | **The Superpowers system** ("the Superpower Skill") | `.agents/skills/superpowers/` → `.claude/skills/*` |
+
+A `SessionStart` hook (`.claude/hooks/superpowers-session-start.sh`) auto-loads the Superpowers entry point at session start; this gate extends that to per-task UI/UX and design skills. **No workflow may begin task work without completing the Startup Checklist above.**
+
+---
+
 ## Project Overview
 
 xSuite is an AI-powered, multi-tenant SaaS platform for the **data recovery industry**. It is a purpose-built ERP/CRM-grade platform for data recovery labs — managing cases, devices, chain of custody, clients, finances, inventory, HR, and supplier relationships. It applies ERP/CRM-grade rigor to lab operations; it is **not** a generic CRM (see the banner above and `docs/data-recovery-workflow.md`).
