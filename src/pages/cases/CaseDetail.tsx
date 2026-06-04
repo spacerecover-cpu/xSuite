@@ -354,7 +354,7 @@ export const CaseDetail: React.FC = () => {
             </Button>
             <Button
               onClick={handlePrintOfficeReceipt}
-              style={{ backgroundColor: '#ea580c' }}
+              className="bg-cat-5 text-white hover:bg-cat-5/90"
               size="sm"
               title="Print Office Receipt"
             >
@@ -363,7 +363,7 @@ export const CaseDetail: React.FC = () => {
             </Button>
             <Button
               onClick={handlePrintCustomerCopy}
-              style={{ backgroundColor: '#16a34a' }}
+              className="bg-cat-2 text-white hover:bg-cat-2/90"
               size="sm"
               title="Print Customer Copy"
             >
@@ -372,7 +372,7 @@ export const CaseDetail: React.FC = () => {
             </Button>
             <Button
               onClick={handlePrintLabel}
-              style={{ backgroundColor: '#7c3aed' }}
+              className="bg-cat-7 text-white hover:bg-cat-7/90"
               size="sm"
               title="Print Label"
             >
@@ -381,7 +381,7 @@ export const CaseDetail: React.FC = () => {
             </Button>
             <Button
               onClick={() => modals.setShowCheckoutModal(true)}
-              style={{ backgroundColor: 'rgb(var(--color-accent))' }}
+              variant="accent"
               size="sm"
               title="Device Checkout"
             >
@@ -400,7 +400,7 @@ export const CaseDetail: React.FC = () => {
             {profile?.role === 'admin' && (
               <Button
                 onClick={handleDeleteCase}
-                style={{ backgroundColor: 'rgb(var(--color-danger))' }}
+                variant="danger"
                 size="sm"
                 title="Delete Case Permanently"
               >

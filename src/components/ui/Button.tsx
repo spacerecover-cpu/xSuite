@@ -3,7 +3,7 @@ import { cva } from 'class-variance-authority';
 import { cn } from '../../lib/utils';
 import { Spinner } from './Spinner';
 
-type ButtonVariant = 'primary' | 'secondary' | 'success' | 'danger' | 'ghost' | 'outline' | 'default' | 'destructive';
+type ButtonVariant = 'primary' | 'secondary' | 'success' | 'danger' | 'ghost' | 'outline' | 'default' | 'destructive' | 'accent';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
@@ -14,7 +14,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   ref?: React.Ref<HTMLButtonElement>;
 }
 
-const VARIANT_ALIAS: Record<ButtonVariant, 'primary' | 'secondary' | 'success' | 'danger' | 'ghost'> = {
+const VARIANT_ALIAS: Record<ButtonVariant, 'primary' | 'secondary' | 'success' | 'danger' | 'ghost' | 'accent'> = {
   primary: 'primary',
   secondary: 'secondary',
   success: 'success',
@@ -23,6 +23,7 @@ const VARIANT_ALIAS: Record<ButtonVariant, 'primary' | 'secondary' | 'success' |
   outline: 'ghost',
   default: 'primary',
   destructive: 'danger',
+  accent: 'accent',
 };
 
 export const buttonVariants = cva(
@@ -35,6 +36,7 @@ export const buttonVariants = cva(
         success: 'bg-success text-success-foreground hover:bg-success/90 focus-visible:ring-success',
         danger: 'bg-danger text-danger-foreground hover:bg-danger/90 focus-visible:ring-danger',
         ghost: 'text-slate-700 hover:bg-slate-100 focus-visible:ring-slate-500',
+        accent: 'bg-accent text-accent-foreground hover:bg-accent/90 focus-visible:ring-accent-foreground',
       },
       size: {
         sm: 'px-3 py-1.5 text-sm',

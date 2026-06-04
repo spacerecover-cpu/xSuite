@@ -17,11 +17,11 @@ interface AnnouncementCardProps {
 }
 
 const typeConfig = {
-  info: { icon: Info, color: 'bg-info' },
-  warning: { icon: AlertTriangle, color: 'bg-warning' },
-  maintenance: { icon: Construction, color: 'bg-danger' },
-  feature: { icon: Sparkles, color: 'bg-success' },
-  promotion: { icon: Tag, color: 'bg-accent' },
+  info: { icon: Info, color: 'bg-info', iconClass: 'text-info-foreground' },
+  warning: { icon: AlertTriangle, color: 'bg-warning', iconClass: 'text-warning-foreground' },
+  maintenance: { icon: Construction, color: 'bg-danger', iconClass: 'text-danger-foreground' },
+  feature: { icon: Sparkles, color: 'bg-success', iconClass: 'text-success-foreground' },
+  promotion: { icon: Tag, color: 'bg-accent', iconClass: 'text-accent-foreground' },
 };
 
 export const AnnouncementCard: React.FC<AnnouncementCardProps> = ({ announcement, onEdit }) => {
@@ -99,7 +99,7 @@ export const AnnouncementCard: React.FC<AnnouncementCardProps> = ({ announcement
       <Card className="p-6 relative hover:shadow-lg transition-shadow">
         <div className="flex items-start gap-4">
           <div className={`w-12 h-12 ${config.color} rounded-lg flex items-center justify-center flex-shrink-0`}>
-            <Icon className="w-6 h-6 text-white" />
+            <Icon className={`w-6 h-6 ${config.iconClass}`} />
           </div>
 
           <div className="flex-1 min-w-0">

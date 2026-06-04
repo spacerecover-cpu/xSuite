@@ -258,12 +258,12 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
           </Button>
           <Button
             type="submit"
+            variant="accent"
             disabled={isSubmitting}
-            style={{ backgroundColor: 'rgb(var(--color-accent))' }}
           >
             {isSubmitting ? (
               <span className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-4 h-4 border-2 border-accent-foreground border-t-transparent rounded-full animate-spin"></div>
                 Processing...
               </span>
             ) : (

@@ -22,7 +22,7 @@
 }
 
 :root[data-theme="scarlet"] {
-  --color-primary: 40 11 8;
+  --color-primary: 220 38 38;
   --color-primary-foreground: 255 255 255;
   --color-secondary: 201 41 37;
   --color-secondary-foreground: 255 255 255;
