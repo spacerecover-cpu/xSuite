@@ -29,14 +29,19 @@ jobs:
 
   schema-drift:
     runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
         with:
           version: latest
-      - run: bash scripts/check-schema-drift.sh
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      - name: Check schema drift
+        if: ${{ env.SUPABASE_ACCESS_TOKEN != '' }}
+        run: bash scripts/check-schema-drift.sh
+      - name: Skip schema drift (no Supabase credentials)
+        if: ${{ env.SUPABASE_ACCESS_TOKEN == '' }}
+        run: 'echo "SKIP schema-drift: SUPABASE_ACCESS_TOKEN unavailable (Dependabot/fork PRs have no access to Actions secrets). Enforced on internal PRs and on push to main."'
 
   lint:
     runs-on: ubuntu-latest
@@ -51,19 +56,29 @@ jobs:
 
   tenant-table-requirements:
     runs-on: ubuntu-latest
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
     steps:
       - uses: actions/checkout@v4
-      - run: bash scripts/check-tenant-table-requirements.sh
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      - name: Check tenant table requirements
+        if: ${{ env.SUPABASE_DB_URL != '' }}
+        run: bash scripts/check-tenant-table-requirements.sh
+      - name: Skip tenant table requirements (no Supabase credentials)
+        if: ${{ env.SUPABASE_DB_URL == '' }}
+        run: 'echo "SKIP tenant-table-requirements: SUPABASE_DB_URL unavailable (Dependabot/fork PRs have no access to Actions secrets). Enforced on internal PRs and on push to main."'
 
   migration-manifest:
     runs-on: ubuntu-latest
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
     steps:
       - uses: actions/checkout@v4
-      - run: bash scripts/check-migration-manifest.sh
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      - name: Check migration manifest
+        if: ${{ env.SUPABASE_DB_URL != '' }}
+        run: bash scripts/check-migration-manifest.sh
+      - name: Skip migration manifest (no Supabase credentials)
+        if: ${{ env.SUPABASE_DB_URL == '' }}
+        run: 'echo "SKIP migration-manifest: SUPABASE_DB_URL unavailable (Dependabot/fork PRs have no access to Actions secrets). Enforced on internal PRs and on push to main."'
 
   from-table-names:
     runs-on: ubuntu-latest
