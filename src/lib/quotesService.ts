@@ -1,7 +1,7 @@
 import { supabase, resolveTenantId } from './supabaseClient';
 import type { Database } from '../types/database.types';
 import { logAuditTrail } from './auditTrailService';
-import { sanitizeUuidFields as sanitizeUuids } from './dataValidation';
+import { sanitizeUuidFields as sanitizeUuids, dropEmptyKeys } from './dataValidation';
 import { sanitizeFilterValue } from './postgrestSanitizer';
 import { logger } from './logger';
 import { calculateQuoteTotals, calculateQuoteTotalsBase, roundMoney } from './financialMath';
@@ -289,6 +289,7 @@ export const fetchQuoteById = async (id: string): Promise<QuoteWithDetails | nul
     .from('quote_items')
     .select('*')
     .eq('quote_id', id)
+    .is('deleted_at', null)
     .order('sort_order', { ascending: true });
 
   if (itemsError) throw itemsError;
@@ -565,6 +566,12 @@ export const updateQuote = async (id: string, quote: Partial<Quote>, items?: Quo
 
     if (itemsError) throw itemsError;
   }
+
+  // Defense-in-depth (Issue 2): an edit must never clear the quote's ownership links.
+  updateData = dropEmptyKeys(
+    updateData as Record<string, unknown>,
+    ['case_id', 'customer_id', 'company_id', 'created_by'],
+  ) as QuoteUpdate;
 
   const { data, error } = await supabase
     .from('quotes')

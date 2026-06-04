@@ -522,6 +522,7 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
     .from('quote_items')
     .select('*')
     .eq('quote_id', quoteId)
+    .is('deleted_at', null)
     .order('sort_order', { ascending: true });
 
   if (itemsError) {
@@ -665,6 +666,7 @@ async function fetchInvoiceDetails(invoiceId: string): Promise<InvoiceData> {
     .from('invoice_line_items')
     .select('*')
     .eq('invoice_id', invoiceId)
+    .is('deleted_at', null)
     .order('sort_order', { ascending: true });
 
   if (itemsError) {

@@ -2,7 +2,7 @@ import { supabase, resolveTenantId } from './supabaseClient';
 import type { Database } from '../types/database.types';
 import { checkRateLimit, RATE_LIMITS } from './rateLimiter';
 import { logAuditTrail } from './auditTrailService';
-import { sanitizeUuidFields as sanitizeUuids } from './dataValidation';
+import { sanitizeUuidFields as sanitizeUuids, dropEmptyKeys } from './dataValidation';
 import { sanitizeFilterValue } from './postgrestSanitizer';
 import { calculateInvoiceTotals, calculateInvoiceTotalsBase, convertToBase, roundMoney } from './financialMath';
 import { resolveRateContext, getBaseCurrency, getCurrencyDecimals } from './currencyService';
@@ -320,6 +320,7 @@ export const fetchInvoiceById = async (id: string): Promise<InvoiceWithDetails |
     .from('invoice_line_items')
     .select('*')
     .eq('invoice_id', id)
+    .is('deleted_at', null)
     .order('sort_order', { ascending: true });
 
   if (itemsError) throw itemsError;
@@ -591,6 +592,12 @@ export const updateInvoice = async (id: string, invoice: Partial<Invoice>, items
 
     if (itemsError) throw itemsError;
   }
+
+  // Defense-in-depth (Issue 2): an edit must never clear the invoice's ownership links.
+  updateData = dropEmptyKeys(
+    updateData as Record<string, unknown>,
+    ['case_id', 'customer_id', 'company_id', 'created_by'],
+  ) as InvoiceUpdate;
 
   const { data, error } = await supabase
     .from('invoices')
