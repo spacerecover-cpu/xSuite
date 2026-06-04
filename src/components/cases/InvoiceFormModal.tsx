@@ -465,9 +465,12 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
     setIsSubmitting(true);
     try {
       const selectedCase = cases.find(c => c.id === activeCaseId);
+      const editingId = (initialData as { id?: string } | undefined)?.id;
+      console.warn('[DOC-SAVE-DIAG] InvoiceFormModal.submit', { hasInitialData: !!initialData, editingId });
 
       const invoicePayload = {
         ...invoiceData,
+        id: editingId,
         case_id: activeCaseId,
         customer_id: customerId || selectedCase?.customer_id || null,
         company_id: companyId || selectedCase?.company_id || null,

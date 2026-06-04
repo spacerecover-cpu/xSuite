@@ -395,9 +395,12 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
     setIsSubmitting(true);
     try {
       const selectedCase = cases.find(c => c.id === activeCaseId);
+      const editingId = asString(initialData?.id);
+      console.warn('[DOC-SAVE-DIAG] QuoteFormModal.submit', { hasInitialData: !!initialData, editingId });
       await onSave(
         {
           ...quoteData,
+          id: editingId,
           case_id: activeCaseId,
           customer_id: customerId || selectedCase?.customer_id || null,
           company_id: companyId || selectedCase?.company_id || null,

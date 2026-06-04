@@ -166,7 +166,7 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
                   <FileText className="w-5 h-5 text-success" />
                   Quotes
                 </h3>
-                <Button onClick={() => onSetShowQuoteModal(true)} style={{ backgroundColor: 'rgb(var(--color-success))' }} size="sm">
+                <Button onClick={() => { onSetEditingQuote(null); onSetShowQuoteModal(true); }} style={{ backgroundColor: 'rgb(var(--color-success))' }} size="sm">
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>
@@ -229,7 +229,9 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
                             size="sm"
                             onClick={async () => {
                               const fullQuote = await quotesService.fetchQuoteById(quote.id);
-                              onSetEditingQuote(fullQuote ? toQuoteEditInitialData(fullQuote as Record<string, unknown>) : null);
+                              const editData = fullQuote ? toQuoteEditInitialData(fullQuote as Record<string, unknown>) : null;
+                              console.warn('[DOC-SAVE-DIAG] editQuote.open', { clickedId: quote.id, fetchedId: (fullQuote as { id?: string } | null)?.id, editDataId: (editData as { id?: string } | null)?.id });
+                              onSetEditingQuote(editData);
                               onSetShowQuoteModal(true);
                             }}
                             title="Edit Quote"
@@ -251,7 +253,7 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
                   <FileText className="w-5 h-5 text-primary" />
                   Invoices
                 </h3>
-                <Button onClick={() => onSetShowInvoiceModal(true)} size="sm">
+                <Button onClick={() => { onSetEditingInvoice(null); onSetShowInvoiceModal(true); }} size="sm">
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>
@@ -370,7 +372,9 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
                               size="sm"
                               onClick={async () => {
                                 const fullInvoice = await invoiceService.fetchInvoiceById(invoice.id);
-                                onSetEditingInvoice(fullInvoice ? toInvoiceEditInitialData(fullInvoice as Record<string, unknown>) : null);
+                                const editData = fullInvoice ? toInvoiceEditInitialData(fullInvoice as Record<string, unknown>) : null;
+                                console.warn('[DOC-SAVE-DIAG] editInvoice.open', { clickedId: invoice.id, fetchedId: (fullInvoice as { id?: string } | null)?.id, editDataId: (editData as { id?: string } | null)?.id });
+                                onSetEditingInvoice(editData);
                                 onSetShowInvoiceModal(true);
                               }}
                               title="Edit Invoice"

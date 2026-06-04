@@ -1106,9 +1106,11 @@ export const CaseDetail: React.FC = () => {
           clientReference={caseData?.client_reference ?? undefined}
           onSave={async (quoteData, items) => {
             try {
-              const editing = modals.editingQuote as { id?: string } | null;
-              if (editing?.id) {
-                const editingQuoteId: string = editing.id;
+              const stateEditingId = (modals.editingQuote as { id?: string } | null)?.id;
+              const payloadEditingId = typeof quoteData.id === 'string' && quoteData.id ? quoteData.id : undefined;
+              const editingQuoteId = payloadEditingId ?? stateEditingId;
+              console.warn('[DOC-SAVE-DIAG] CaseDetail.quote.onSave', { stateEditingId, payloadEditingId, decision: editingQuoteId ? 'UPDATE' : 'CREATE' });
+              if (editingQuoteId) {
                 // Edit path — patch quote + replace line items inline
                 const updatePayload: Database['public']['Tables']['quotes']['Update'] = {
                   status: typeof quoteData.status === 'string' ? quoteData.status : 'draft',
@@ -1206,11 +1208,14 @@ export const CaseDetail: React.FC = () => {
           clientReference={caseData?.client_reference ?? undefined}
           onSave={async (invoiceData, items) => {
             try {
-              const editing = modals.editingInvoice as { id?: string } | null;
-              const payload = invoiceData as Partial<InvoiceShape>;
+              const stateEditingId = (modals.editingInvoice as { id?: string } | null)?.id;
+              const payload = invoiceData as Partial<InvoiceShape> & { id?: string };
+              const payloadEditingId = typeof payload.id === 'string' && payload.id ? payload.id : undefined;
+              const editingInvoiceId = payloadEditingId ?? stateEditingId;
               const lineItems = items as InvoiceItemShape[];
-              if (editing?.id) {
-                await updateInvoiceService(editing.id, {
+              console.warn('[DOC-SAVE-DIAG] CaseDetail.invoice.onSave', { stateEditingId, payloadEditingId, decision: editingInvoiceId ? 'UPDATE' : 'CREATE' });
+              if (editingInvoiceId) {
+                await updateInvoiceService(editingInvoiceId, {
                   title: payload.title,
                   invoice_type: payload.invoice_type,
                   invoice_date: payload.invoice_date,
