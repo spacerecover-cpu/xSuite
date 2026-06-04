@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Discourage browser page-translation (Google Translate et al.) from rewriting
+         React-managed DOM nodes, which crashes the app with a removeChild error. The
+         app has its own EN/AR i18n; domTranslationGuard.ts is the runtime safety net. -->
+    <meta name="google" content="notranslate" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://api-m.paypal.com https://api-m.sandbox.paypal.com; frame-src 'self' blob:; object-src 'self' blob:; base-uri 'self'; form-action 'self';" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

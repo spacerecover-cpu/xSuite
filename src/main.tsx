@@ -3,8 +3,14 @@ import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
+import { installDomTranslationGuard } from './lib/domTranslationGuard';
 import './index.css';
 import './lib/i18n';
+
+// Make React's DOM commits tolerant of browser page-translation (Google Translate
+// et al.) re-parenting nodes, which otherwise crashes the app with a removeChild
+// NotFoundError. Installed before any DOM work. See domTranslationGuard.ts.
+installDomTranslationGuard();
 
 // Anti-flash: apply the user's last-seen theme synchronously before React mounts,
 // so returning visitors don't see a Royal-default paint before their saved theme loads.
