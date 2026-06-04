@@ -134,7 +134,7 @@ export const SettingsDashboard: React.FC = () => {
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
             style={{
-              background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)',
+              background: 'linear-gradient(135deg, rgb(var(--color-cat-1)) 0%, rgb(var(--color-primary)) 100%)',
               boxShadow: '0 6px 20px -4px rgba(6, 182, 212, 0.4)',
             }}
           >

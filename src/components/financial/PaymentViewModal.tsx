@@ -296,7 +296,7 @@ export const PaymentViewModal: React.FC<PaymentViewModalProps> = ({
           {onPrintReceipt && payment.status === 'completed' && (
             <Button
               onClick={onPrintReceipt}
-              style={{ backgroundColor: '#10b981' }}
+              variant="primary"
               className="flex items-center gap-2"
             >
               <Printer className="w-4 h-4" />

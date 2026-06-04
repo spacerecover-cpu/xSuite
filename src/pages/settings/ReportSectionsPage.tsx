@@ -262,7 +262,7 @@ export const ReportSectionsPage: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     {section.is_system && (
-                      <Badge className="text-xs" style={{ backgroundColor: '#f1f5f9', color: '#64748b' }}>
+                      <Badge variant="default" className="text-xs">
                         System
                       </Badge>
                     )}

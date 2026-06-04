@@ -516,11 +516,8 @@ export const CategoryDetail: React.FC = () => {
               <Button
                 onClick={handleSeedData}
                 disabled={isSeeding}
+                variant="primary"
                 className="shadow-md self-start md:self-auto"
-                style={{
-                  backgroundColor: '#10b981',
-                  opacity: isSeeding ? 0.6 : 1
-                }}
               >
                 {isSeeding ? (
                   <>

@@ -615,7 +615,7 @@ export const GeneralSettings: React.FC = () => {
           <div
             className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg"
             style={{
-              background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)',
+              background: 'linear-gradient(135deg, rgb(var(--color-cat-1)) 0%, rgb(var(--color-primary)) 100%)',
             }}
           >
             <Building2 className="w-8 h-8 text-white" />
@@ -698,7 +698,7 @@ export const GeneralSettings: React.FC = () => {
         <CollapsibleSection
           title="Basic Information"
           icon={Building2}
-          color="#0ea5e9"
+          color="rgb(var(--color-cat-1))"
           fieldCount={8}
           isOpen={openSections.has('basic_info')}
           onToggle={() => toggleSection('basic_info')}
@@ -762,7 +762,7 @@ export const GeneralSettings: React.FC = () => {
         <CollapsibleSection
           title="Location & Address"
           icon={MapPin}
-          color="#10b981"
+          color="rgb(var(--color-cat-2))"
           fieldCount={9}
           isOpen={openSections.has('location')}
           onToggle={() => toggleSection('location')}
@@ -839,7 +839,7 @@ export const GeneralSettings: React.FC = () => {
         <CollapsibleSection
           title="Contact Information"
           icon={Phone}
-          color="#f59e0b"
+          color="rgb(var(--color-cat-4))"
           fieldCount={10}
           isOpen={openSections.has('contact_info')}
           onToggle={() => toggleSection('contact_info')}
@@ -918,7 +918,7 @@ export const GeneralSettings: React.FC = () => {
         <CollapsibleSection
           title="Online Presence"
           icon={Globe}
-          color="#14b8a6"
+          color="rgb(var(--color-cat-3))"
           fieldCount={6}
           isOpen={openSections.has('online_presence')}
           onToggle={() => toggleSection('online_presence')}
@@ -967,7 +967,7 @@ export const GeneralSettings: React.FC = () => {
         <CollapsibleSection
           title="Legal & Compliance"
           icon={Shield}
-          color="rgb(var(--color-accent))"
+          color="rgb(var(--color-cat-7))"
           fieldCount={5}
           isOpen={openSections.has('legal_compliance')}
           onToggle={() => toggleSection('legal_compliance')}
@@ -1019,7 +1019,7 @@ export const GeneralSettings: React.FC = () => {
         <CollapsibleSection
           title="Branding & Visual Identity"
           icon={Palette}
-          color="#ec4899"
+          color="rgb(var(--color-cat-6))"
           isOpen={openSections.has('branding')}
           onToggle={() => toggleSection('branding')}
         >
@@ -1263,7 +1263,7 @@ export const GeneralSettings: React.FC = () => {
         <CollapsibleSection
           title="Document Language Settings"
           icon={Languages}
-          color="#06b6d4"
+          color="rgb(var(--color-cat-1))"
           fieldCount={1}
           isOpen={openSections.has('document_language')}
           onToggle={() => toggleSection('document_language')}
@@ -1408,7 +1408,7 @@ export const GeneralSettings: React.FC = () => {
         <CollapsibleSection
           title="Clone Drive Defaults"
           icon={HardDrive}
-          color="rgb(var(--color-accent))"
+          color="rgb(var(--color-cat-2))"
           fieldCount={3}
           isOpen={openSections.has('clone_defaults')}
           onToggle={() => toggleSection('clone_defaults')}
@@ -1530,10 +1530,8 @@ export const GeneralSettings: React.FC = () => {
             <Button
               onClick={handleSave}
               disabled={isSaving}
+              variant="primary"
               className="flex items-center gap-2 px-6 py-2 whitespace-nowrap shadow-md hover:shadow-lg transition-shadow"
-              style={{
-                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-              }}
             >
               <Save className="w-4 h-4" />
               {isSaving ? 'Saving...' : 'Save Now'}

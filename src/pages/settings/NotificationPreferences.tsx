@@ -364,7 +364,7 @@ export const NotificationPreferences: React.FC = () => {
         <div
           className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0"
           style={{
-            background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)',
+            background: 'linear-gradient(135deg, rgb(var(--color-primary)) 0%, rgb(var(--color-cat-1)) 100%)',
           }}
         >
           <Bell className="w-7 h-7 text-white" />

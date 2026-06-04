@@ -139,7 +139,7 @@ export const CloneDriveCard: React.FC<CloneDriveCardProps> = ({
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className="w-10 h-10 rounded-lg bg-accent/15 flex items-center justify-center">
-            <Copy className="w-5 h-5 text-accent" />
+            <Copy className="w-5 h-5 text-accent-foreground" />
           </div>
           <div>
             <h3 className="font-semibold text-slate-900">

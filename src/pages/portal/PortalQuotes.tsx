@@ -257,7 +257,7 @@ export const PortalQuotes: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex items-center justify-between pt-4 border-t border-warning/30">
-                  <Badge variant="custom" color="#f59e0b">
+                  <Badge variant="warning">
                     Response Required
                   </Badge>
                   <span className="text-sm text-primary font-medium">View & Respond →</span>

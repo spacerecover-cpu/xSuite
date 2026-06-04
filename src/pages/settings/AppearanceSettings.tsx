@@ -36,8 +36,8 @@ const THEME_OPTIONS: readonly ThemeOption[] = [
   {
     id: 'scarlet',
     name: 'Scarlet',
-    description: 'Bold, high-contrast near-black with vivid red accent.',
-    primaryHex: '#280B08',
+    description: 'Bold, vivid scarlet red — high energy, high contrast.',
+    primaryHex: '#DC2626',
     secondaryHex: '#C92925',
     accentHex: '#F9E7C9',
   },

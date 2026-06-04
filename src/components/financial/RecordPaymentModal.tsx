@@ -517,7 +517,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             type="submit"
             disabled={isSubmitting || totalAmount <= 0 || !selectedCaseId}
             className="flex items-center gap-2"
-            style={{ backgroundColor: '#10b981' }}
+            variant="primary"
           >
             <CheckCircle className="w-4 h-4" />
             {isSubmitting ? 'Recording...' : 'Record Payment'}

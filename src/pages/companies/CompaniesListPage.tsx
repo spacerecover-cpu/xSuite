@@ -623,7 +623,7 @@ export const CompaniesListPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {company.master_industries ? (
-                          <Badge variant="custom" color="rgb(var(--color-accent))" size="sm">
+                          <Badge variant="accent" size="sm">
                             {company.master_industries.name}
                           </Badge>
                         ) : (

@@ -212,14 +212,8 @@ export const BankingPage: React.FC = () => {
     <div className="p-8 max-w-[1800px] mx-auto">
       <div className="mb-8 flex items-start justify-between">
         <div className="flex items-start gap-6">
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg"
-            style={{
-              backgroundColor: '#10b981',
-              boxShadow: '0 10px 40px -10px #10b98180',
-            }}
-          >
-            <Landmark className="w-7 h-7 text-white" />
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg bg-primary">
+            <Landmark className="w-7 h-7 text-primary-foreground" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900 mb-2">Banking & Cash Management</h1>
@@ -289,7 +283,7 @@ export const BankingPage: React.FC = () => {
               setEditingAccount(null);
               setShowAccountModal(true);
             }}
-            style={{ backgroundColor: '#10b981' }}
+            variant="primary"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Account

@@ -42,7 +42,7 @@ Every brand/status token is an **RGB triplet** CSS variable (e.g. `--color-prima
 
 | Token | Royal (default) | Burgundy | Scarlet |
 |---|---|---|---|
-| `primary` | `#162660` (22 38 96) | `#6C131F` (108 19 31) | `#280B08` (40 11 8) |
+| `primary` | `#162660` (22 38 96) | `#6C131F` (108 19 31) | `#DC2626` (220 38 38) |
 | `primary-foreground` | `#FFFFFF` | `#FFFFFF` | `#FFFFFF` |
 | `secondary` | `#D0E6FD` (208 230 253) | `#A14B58` (161 75 88) | `#C92925` (201 41 37) |
 | `secondary-foreground` | `#162660` | `#FFFFFF` | `#FFFFFF` |
@@ -84,6 +84,8 @@ etc. is a bug (it falsely signals status). Use these instead.
 
 ### Banned in `src/` (enforced by `eslint-rules`)
 - `purple-*`, `indigo-*`, `violet-*` (any shade) → use `accent` or `secondary`.
+- **Raw color literals in inline `style`/`color` props** (hex like `#7c3aed`, or `rgb()`/`hsl()` with literal numbers) — they bypass per-tenant theming **and** the class-based `no-raw-tailwind-colors` rule (which only sees Tailwind classes). Use a semantic token (`rgb(var(--color-x))`), the `cat-*` palette, or a Button/Badge variant. Guarded by `eslint-rules/no-raw-style-colors.js` (`error`; test fixtures + app-shell neutral chrome baselined per-file). Sanctioned exception: WhatsApp brand green `#25D366`.
+- **`accent` is a LIGHT surface token, never a foreground.** Pair `bg-accent` with `text-accent-foreground`, or use the `accent` Button/Badge variant (`src/components/ui/Button.tsx`, `Badge.tsx`). Never `text-accent`/`border-accent` on a light/white surface, and never `bg-accent` with white text — both render ~1.2:1 (invisible).
 - Brand hex literals: `#1E5BB8`, `#8b5cf6`, `#6366f1`, `#a855f7`, `#4A5568`, `#6A7A8A`.
 - Raw Tailwind brand colors (`bg-blue-600`, `text-purple-*`, etc.) → use a semantic
   token, or `cat-1`…`cat-8` for identity color. Neutrals (`gray/slate/zinc/white/black`)
@@ -118,13 +120,17 @@ These read from constants, never from CSS variables. This is by design so output
 - **Easing/duration default:** prefer Tailwind `transition` + `duration-150`/`duration-200`, `ease-out` for enter. Avoid long (>400ms) animations in the app shell.
 
 ## Known Deviations (drift register — fix toward the standard, do not propagate)
-Captured 2026-06-01 from a code audit. **All three drifts resolved 2026-06-02** (see Decisions Log). The table is kept as a record; nothing is currently open.
+Captured 2026-06-01 from a code audit; drifts #1–#3 resolved 2026-06-02. **A 2026-06-04 UI audit reopened the register** with #4–#7 (contrast + theming), all resolved in the same change set (see Decisions Log).
 
 | # | Where | Issue | Resolution |
 |---|---|---|---|
 | 1 | `tailwind.config.js` | `glow-blue` / `glow-blue-lg` hardcoded `rgba(59,130,246,…)` (blue-500) | ✅ Renamed → `glow-primary` / `glow-primary-lg`, derived from `rgb(var(--color-primary) / …)`; sole usage (`StepContainer.tsx`) updated. Now themes. |
 | 2 | `src/index.css` | `--color-ring` was `#6366F1` (indigo-500), off-brand focus rings | ✅ Re-pointed to `var(--color-primary)`; focus rings now follow the active theme. |
 | 3 | `src/lib/pdf/styles.ts` | PDF `primary` `#0891B2` (cyan) matched no brand primary | ✅ Set to fixed Royal-brand navy `#162660`. PDFs remain non-themed by design; documented under Non-Themed Surfaces. |
+| 4 | `src/index.css`, `DESIGN.md`, `AppearanceSettings.tsx` | Scarlet `primary` was near-black `#280B08`; chrome reads `primary`, so the theme rendered brown — the true red `#C92925` sat unused in `secondary`. | ✅ `primary` → `#DC2626` (220 38 38) across all three sources; white text stays AA (4.85:1); theme now renders scarlet. |
+| 5 | `Button.tsx`, `Badge.tsx` + ~26 call-sites | No `accent` variant, so call-sites hand-rolled `bg-accent`/`color="rgb(var(--color-accent))"` with light foregrounds → invisible (~1.2:1). | ✅ Added `accent` variant (`bg-accent` + `text-accent-foreground`); migrated call-sites; `text-accent`/`border-accent` foregrounds → `text-accent-foreground`. |
+| 6 | `CaseDetail.tsx` action bar + inline-hex controls | Action colors hand-rolled via inline `style` hex (incl. **banned violet `#7c3aed`**), bypassing tokens, theming, and lint. | ✅ Mapped to Button variants / `cat-*` identity; violet removed; WhatsApp green kept as a documented exception. |
+| 7 | `eslint-rules/` | `no-raw-tailwind-colors` only inspects class names, so inline-`style` hex escaped enforcement. | ✅ Added `no-raw-style-colors` (`error`; tests + app-shell neutral chrome baselined per-file) covering inline `style`/color props. |
 
 ## Decisions Log
 | Date | Decision | Rationale |
@@ -136,3 +142,5 @@ Captured 2026-06-01 from a code audit. **All three drifts resolved 2026-06-02** 
 | 2026-06-02 | Resolved drift #3: PDF `primary` set to fixed Royal navy `#162660` (was cyan `#0891B2`) | PDFs are intentionally non-themed (one color for all tenants — a themed invoice would look alarming). Cyan matched no brand and read as an unconfigured template; navy aligns to the default Royal identity and to the existing `primaryDark` navy. |
 | 2026-06-02 | Added a sanctioned **categorical palette** (`cat-1`…`cat-8`), mirroring `chartCategorical`; migrated `InventoryInsightsHeader` onto it as proof | The raw-color burndown found that most surviving raw Tailwind brand colors are *identity* color (device-type tiles, per-module accents), not status. The 14-token vocab had no "N distinct categories" slot, so mechanical migration to `danger`/`info` falsely signalled status. A fixed, non-themed categorical tier reuses the already-blessed chart hues and unblocks a safe sweep. |
 | 2026-06-02 | Completed the burndown: 31 files migrated to **zero** raw brand-color classes (identity→`cat-*`, status→semantic, brand→`primary`/`ring`, neutrals kept); exempted the fixed surfaces (PDF doc builders, auth decorative) | Finishes the work the categorical palette unblocked. Each file was classified by *intent* (status vs identity vs neutral) rather than find-replaced, so no element falsely signals status. Leaves `src/` clean enough that `no-raw-tailwind-colors` can enforce as `error` with only file-level exemptions. |
+| 2026-06-04 | Scarlet `primary` `#280B08` → `#DC2626`; kept `#C92925` secondary | The theme was authored as "near-black + red accent", but chrome reads `primary` so it rendered brown app-wide; users expect a red "Scarlet". A brighter red keeps white-text AA (4.85:1) and leaves the 5 `secondary` usages untouched (zero blast radius). |
+| 2026-06-04 | Added `accent` Button/Badge variant; banned raw inline-`style` colors | Closes the systemic gap that rendered ~26 accent controls invisible and let a banned violet button through. `no-raw-style-colors` guards the inline-`style` vector the class-based rule can't see (`error`; pre-existing test fixtures + app-shell neutral chrome baselined per-file, mirroring the no-raw-tailwind-colors burndown). |

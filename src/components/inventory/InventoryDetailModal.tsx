@@ -199,7 +199,7 @@ export default function InventoryDetailModal({
                   <h3 className="text-sm font-semibold text-slate-900">Case Assignment</h3>
                 </div>
                 {activeAssignment && (
-                  <Badge variant="default" style={{ backgroundColor: '#3B82F6', color: '#fff' }}>
+                  <Badge variant="info">
                     Assigned
                   </Badge>
                 )}
@@ -272,8 +272,8 @@ export default function InventoryDetailModal({
                     <Button
                       onClick={() => setShowAssignToCaseModal(true)}
                       size="sm"
-                      variant="secondary"
-                      className="w-full text-xs border-accent/30 text-accent hover:bg-accent/10"
+                      variant="accent"
+                      className="w-full text-xs"
                     >
                       <Zap className="w-3 h-3 mr-1" />
                       Assign Donor to Case
@@ -397,18 +397,15 @@ export default function InventoryDetailModal({
                       </span>
                       {assignment.usage_result && (
                         <Badge
-                          variant="default"
-                          style={{
-                            backgroundColor:
-                              assignment.usage_result === 'working'
-                                ? '#10B981'
-                                : assignment.usage_result === 'defective'
-                                ? '#EF4444'
-                                : '#6B7280',
-                            color: '#fff',
-                            fontSize: '10px',
-                            padding: '2px 6px'
-                          }}
+                          variant={
+                            assignment.usage_result === 'working'
+                              ? 'success'
+                              : assignment.usage_result === 'defective'
+                              ? 'danger'
+                              : 'default'
+                          }
+                          size="sm"
+                          className="text-xxs px-1.5 py-0.5"
                         >
                           {assignment.usage_result}
                         </Badge>

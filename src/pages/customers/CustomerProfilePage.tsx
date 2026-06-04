@@ -443,7 +443,7 @@ export const CustomerProfilePage: React.FC = () => {
 
                 {customer.customer_groups && (
                   <div className="flex items-center gap-2 mb-4">
-                    <Badge variant="custom" color="rgb(var(--color-accent))">
+                    <Badge variant="accent">
                       {customer.customer_groups.name}
                     </Badge>
                   </div>

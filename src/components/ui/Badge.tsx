@@ -3,9 +3,9 @@ import { cva } from 'class-variance-authority';
 import { cn } from '../../lib/utils';
 import { STATUS_TONE_MUTED } from '../../lib/ui/variants';
 
-type BadgeVariant = 'default' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'custom' | 'error' | 'outline';
+type BadgeVariant = 'default' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'custom' | 'error' | 'outline' | 'accent';
 
-type ResolvedBadgeVariant = 'default' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'custom';
+type ResolvedBadgeVariant = 'default' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'custom' | 'accent';
 
 interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   children: React.ReactNode;
@@ -25,6 +25,7 @@ const VARIANT_ALIAS: Record<BadgeVariant, ResolvedBadgeVariant> = {
   custom: 'custom',
   error: 'danger',
   outline: 'secondary',
+  accent: 'accent',
 };
 
 export const badgeVariants = cva('inline-flex items-center font-semibold rounded-md transition-all', {
@@ -36,6 +37,7 @@ export const badgeVariants = cva('inline-flex items-center font-semibold rounded
       warning: `${STATUS_TONE_MUTED.warning} ring-1 ring-warning/30`,
       danger: `${STATUS_TONE_MUTED.danger} ring-1 ring-danger/30`,
       info: `${STATUS_TONE_MUTED.info} ring-1 ring-info/30`,
+      accent: `${STATUS_TONE_MUTED.accent} ring-1 ring-accent-foreground/20`,
       custom: '',
     },
     size: {

@@ -803,7 +803,7 @@ export const CustomersListPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {customer.customer_groups ? (
-                          <Badge variant="custom" color="rgb(var(--color-accent))" size="sm">
+                          <Badge variant="accent" size="sm">
                             {customer.customer_groups.name}
                           </Badge>
                         ) : (

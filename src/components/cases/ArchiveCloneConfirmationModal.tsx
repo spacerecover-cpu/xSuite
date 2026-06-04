@@ -173,7 +173,7 @@ export const ArchiveCloneConfirmationModal: React.FC<ArchiveCloneConfirmationMod
             <Button
               onClick={onConfirm}
               disabled={isLoading}
-              style={{ backgroundColor: '#64748b' }}
+              variant="secondary"
               className="flex items-center gap-2"
             >
               <Archive className="w-4 h-4" />

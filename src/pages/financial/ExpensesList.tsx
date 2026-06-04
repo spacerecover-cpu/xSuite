@@ -673,7 +673,7 @@ export const ExpensesList: React.FC = () => {
             <Button
               onClick={handleApproveConfirm}
               disabled={approveExpenseMutation.isPending}
-              style={{ backgroundColor: '#10b981' }}
+              variant="primary"
               size="sm"
             >
               {approveExpenseMutation.isPending ? 'Approving...' : 'Approve'}
@@ -719,7 +719,7 @@ export const ExpensesList: React.FC = () => {
             <Button
               onClick={handleRejectConfirm}
               disabled={!rejectionReason.trim() || rejectExpenseMutation.isPending}
-              style={{ backgroundColor: '#ef4444' }}
+              variant="danger"
               size="sm"
             >
               {rejectExpenseMutation.isPending ? 'Rejecting...' : 'Reject'}

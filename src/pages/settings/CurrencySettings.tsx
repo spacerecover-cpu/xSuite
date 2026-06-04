@@ -75,7 +75,7 @@ export function CurrencySettings() {
             <div className="flex items-center gap-2">
               <span className="font-medium">{row.currency_code}</span>
               {row.is_base && (
-                <span className="inline-flex items-center gap-1 text-xs text-accent">
+                <span className="inline-flex items-center gap-1 text-xs text-accent-foreground">
                   <Star className="h-3 w-3" /> Base
                 </span>
               )}

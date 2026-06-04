@@ -36,7 +36,8 @@ export type BadgeVariant =
   | 'info'
   | 'custom'
   | 'error'
-  | 'outline';
+  | 'outline'
+  | 'accent';
 
 /**
  * Canonical mapping from a domain status string to a Badge variant. Replaces

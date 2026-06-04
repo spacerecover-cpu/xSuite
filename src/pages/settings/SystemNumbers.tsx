@@ -189,7 +189,7 @@ export const SystemNumbers: React.FC = () => {
               boxShadow: '0 10px 40px -10px rgb(var(--color-accent) / 0.5)'
             }}
           >
-            <Hash className="w-8 h-8 text-white" />
+            <Hash className="w-8 h-8 text-accent-foreground" />
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">System & Numbers</h1>

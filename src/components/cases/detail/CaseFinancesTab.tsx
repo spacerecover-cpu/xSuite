@@ -269,23 +269,30 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <span className="font-semibold text-slate-900">{invoice.invoice_number || 'Draft'}</span>
-                            <Badge variant="custom" color={invoice.invoice_type === 'proforma' ? 'rgb(var(--color-accent))' : 'rgb(var(--color-primary))'} size="sm">
-                              {invoice.invoice_type === 'proforma' ? 'Proforma' : 'Tax Invoice'}
-                            </Badge>
-                            <Badge
-                              variant="custom"
-                              color={
-                                invoice.status === 'draft' ? '#64748b'
-                                  : invoice.status === 'sent' ? '#3b82f6'
-                                  : invoice.status === 'paid' ? '#10b981'
-                                  : invoice.status === 'overdue' ? '#ef4444'
-                                  : invoice.status === 'converted' ? 'rgb(var(--color-accent))'
-                                  : '#f59e0b'
-                              }
-                              size="sm"
-                            >
-                              {invoice.status}
-                            </Badge>
+                            {invoice.invoice_type === 'proforma' ? (
+                              <Badge variant="accent" size="sm">Proforma</Badge>
+                            ) : (
+                              <Badge variant="custom" color="rgb(var(--color-primary))" size="sm">Tax Invoice</Badge>
+                            )}
+                            {invoice.status === 'converted' ? (
+                              <Badge variant="accent" size="sm">
+                                {invoice.status}
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="custom"
+                                color={
+                                  invoice.status === 'draft' ? '#64748b'
+                                    : invoice.status === 'sent' ? '#3b82f6'
+                                    : invoice.status === 'paid' ? '#10b981'
+                                    : invoice.status === 'overdue' ? '#ef4444'
+                                    : '#f59e0b'
+                                }
+                                size="sm"
+                              >
+                                {invoice.status}
+                              </Badge>
+                            )}
                             {invoice.status === 'converted' && invoice.converted_to_invoice_id && (
                               <button
                                 onClick={(e) => {

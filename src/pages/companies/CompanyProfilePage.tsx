@@ -458,7 +458,7 @@ export const CompanyProfilePage: React.FC = () => {
 
             <div className="flex items-center gap-3 mb-4">
               {company.master_industries && (
-                <Badge variant="custom" color="rgb(var(--color-accent))">
+                <Badge variant="accent">
                   {company.master_industries.name}
                 </Badge>
               )}

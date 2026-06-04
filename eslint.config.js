@@ -7,6 +7,7 @@
   import noBannedEmbeds from './eslint-rules/no-banned-embeds-in-select.js';
   import noUntranslatedJsxText from './eslint-rules/no-untranslated-jsx-text.js';
   import noRawTailwindColors from './eslint-rules/no-raw-tailwind-colors.js';
+  import noRawStyleColors from './eslint-rules/no-raw-style-colors.js';
 
   // Hoisted so the main config and the fixed-surface override below share one
   // identical xsuite plugin object (flat config resolves plugin rules per block).
@@ -15,6 +16,7 @@
       'no-banned-embeds-in-select': noBannedEmbeds,
       'no-untranslated-jsx-text': noUntranslatedJsxText,
       'no-raw-tailwind-colors': noRawTailwindColors,
+      'no-raw-style-colors': noRawStyleColors,
     },
   };
 
@@ -70,6 +72,12 @@
         // --max-warnings, so the ~1,684 pre-existing hardcoded strings warn
         // without failing CI, while NEW untranslated JSX text surfaces in review.
         'xsuite/no-untranslated-jsx-text': 'warn',
+        // Enforced as error: raw inline-style hex colors bypass per-tenant
+        // theming AND the class-based no-raw-tailwind-colors rule (how a banned
+        // violet button bg slipped through). Test fixtures and the app-shell
+        // neutral-chrome are baselined OFF per-file below (same pattern as
+        // no-raw-tailwind-colors).
+        'xsuite/no-raw-style-colors': 'error',
         '@typescript-eslint/no-unused-vars': ['error', {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
@@ -110,6 +118,25 @@
         'src/components/auth/shared/constants.ts',
       ],
       plugins: { 'xsuite': xsuitePlugin },
-      rules: { 'xsuite/no-raw-tailwind-colors': 'off' },
+      rules: {
+        'xsuite/no-raw-tailwind-colors': 'off',
+        'xsuite/no-raw-style-colors': 'off',
+      },
+    },
+    {
+      // no-raw-style-colors baseline (per-file OFF), mirroring the
+      // no-raw-tailwind-colors burndown pattern:
+      //  - *.test.* — fixtures legitimately pass literal hex to components.
+      //  - app-shell chrome (Sidebar/AppLayout) still uses raw *neutral* hex
+      //    (slate/gray) inside inline styles with hover handlers; neutrals are
+      //    allowed by DESIGN.md, pending a separate slate-class migration.
+      files: [
+        'src/**/*.test.{ts,tsx}',
+        'src/components/layout/Sidebar.tsx',
+        'src/components/layout/SidebarSection.tsx',
+        'src/components/layout/AppLayout.tsx',
+      ],
+      plugins: { 'xsuite': xsuitePlugin },
+      rules: { 'xsuite/no-raw-style-colors': 'off' },
     }
   );

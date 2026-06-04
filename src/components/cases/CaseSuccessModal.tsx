@@ -66,7 +66,7 @@ export const CaseSuccessModal: React.FC<CaseSuccessModalProps> = ({
 
           <button
             onClick={onPrintLabel}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 border-2 border-accent text-accent rounded-lg hover:bg-accent/10 transition-all font-medium"
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-accent text-accent-foreground rounded-lg hover:bg-accent/80 transition-all font-medium"
           >
             <Tag className="w-5 h-5" />
             Print Case Label

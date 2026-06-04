@@ -205,14 +205,8 @@ export default function SuppliersListPage() {
     <div className="p-6 max-w-[1800px] mx-auto">
       <div className="mb-6 flex items-start justify-between">
         <div className="flex items-start gap-4">
-          <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg"
-            style={{
-              backgroundColor: '#0ea5e9',
-              boxShadow: '0 10px 40px -10px #0ea5e980',
-            }}
-          >
-            <Truck className="w-6 h-6 text-white" />
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg bg-primary">
+            <Truck className="w-6 h-6 text-primary-foreground" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900 mb-1">Suppliers</h1>
@@ -221,7 +215,7 @@ export default function SuppliersListPage() {
             </p>
           </div>
         </div>
-        <Button onClick={handleOpenModal} style={{ backgroundColor: '#0ea5e9' }}>
+        <Button onClick={handleOpenModal} variant="primary">
           <Plus className="w-4 h-4 mr-2" />
           Add Supplier
         </Button>
@@ -526,7 +520,7 @@ export default function SuppliersListPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {supplier.category ? (
-                          <Badge variant="custom" color="rgb(var(--color-accent))" size="sm">
+                          <Badge variant="accent" size="sm">
                             {supplier.category.name}
                           </Badge>
                         ) : (

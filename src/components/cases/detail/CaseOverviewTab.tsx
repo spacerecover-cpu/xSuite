@@ -607,8 +607,8 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
       <Card variant="bordered" className="overflow-hidden">
         <div className="bg-accent/10 border-b border-accent/20 px-4 py-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-accent flex items-center gap-2">
-              <User className="w-4 h-4 text-accent" />
+            <h2 className="text-base font-bold text-accent-foreground flex items-center gap-2">
+              <User className="w-4 h-4 text-accent-foreground" />
               Client Info
             </h2>
             <Button variant="secondary" size="sm" onClick={() => setEditingSection(editingSection === 'client' ? null : 'client')}>
