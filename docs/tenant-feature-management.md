@@ -24,14 +24,16 @@ This is a **workflow/visibility** layer, NOT a security boundary. Tenant isolati
 - **Mutation** — `src/lib/tenantFeaturesService.ts` `updateTenantFeatureFlags(tenantId, flags)`
   then `refreshConfig()` (mirrors the theme system).
 
-## ⚠️ Pending migration (apply when ready — "build code now, migrate later")
+## Migration — APPLIED (`20260607193758_add_tenants_feature_flags`)
 
-The code is written against `tenants.feature_flags`, but the migration is **not yet applied**
-(to avoid re-breaking the `schema-drift` check on the other open PRs against the shared DB).
-Until it is applied, reads degrade gracefully to `{}` (all features on) and saves from the
-Settings page will error.
+The migration below is **applied to the live DB**, so the feature runs end-to-end (Settings
+saves persist; reads resolve overrides). The only owed step is regenerating
+`database.types.ts` — the Supabase CLI is unavailable in-container and the ~16k-line MCP regen
+was deferred to avoid a context blowout. Until the regen, the code reads `feature_flags` and
+calls `tenant_feature_enabled` through small temporary casts in `tenantConfigService.ts`,
+`tenantFeaturesService.ts`, and `PortalAuthContext.tsx`.
 
-Apply via `mcp__supabase__apply_migration` (name e.g. `add_tenants_feature_flags`):
+The applied SQL was:
 
 ```sql
 -- 1) Per-tenant feature overrides (override-only; default '{}' = all registry defaults)
