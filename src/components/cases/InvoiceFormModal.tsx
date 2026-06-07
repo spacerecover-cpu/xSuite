@@ -465,11 +465,6 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
       return;
     }
 
-    if (!invoiceData.client_reference || !invoiceData.client_reference.trim()) {
-      toast.error('Client reference is required for invoices');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       const selectedCase = cases.find(c => c.id === activeCaseId);
@@ -606,7 +601,6 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                   value={invoiceData.client_reference}
                   onChange={(e) => setInvoiceData({ ...invoiceData, client_reference: e.target.value })}
                   placeholder="Client's PO or reference number"
-                  required
                 />
               </div>
             </div>
