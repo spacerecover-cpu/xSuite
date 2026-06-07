@@ -8,6 +8,7 @@ import { Badge } from '../ui/Badge';
 import { ChangeClientModal } from './ChangeClientModal';
 import { ChangeCompanyModal } from './ChangeCompanyModal';
 import { formatDate } from '../../lib/format';
+import { updateCompany } from '../../lib/companyService';
 import { User, Mail, Phone, MapPin, Hash, CreditCard as Edit, Save, X, ArrowLeftRight, Building2, FileText, Clock, Briefcase, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 
 type CustomerUpdate = Database['public']['Tables']['customers_enhanced']['Update'];
@@ -184,12 +185,7 @@ export const ClientTab: React.FC<ClientTabProps> = ({ caseId, caseData }) => {
   const updateCompanyMutation = useMutation({
     mutationFn: async (updates: CompanyUpdate) => {
       if (!caseData?.company_id) return;
-      const { error } = await supabase
-        .from('companies')
-        .update(updates)
-        .eq('id', caseData.company_id);
-
-      if (error) throw error;
+      await updateCompany(caseData.company_id, updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['case_company', caseData?.company_id] });
@@ -266,7 +262,6 @@ export const ClientTab: React.FC<ClientTabProps> = ({ caseId, caseData }) => {
       const updates: CompanyUpdate = { ...rest };
       if (name) {
         updates.name = name;
-        updates.company_name = name;
       }
       updateCompanyMutation.mutate(updates);
     } else {
