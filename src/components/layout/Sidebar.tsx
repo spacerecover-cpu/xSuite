@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '../../contexts/PermissionsContext';
+import { useTenantFeatures } from '../../contexts/TenantConfigContext';
 import { useSidebarPreferences } from '../../contexts/SidebarPreferencesContext';
 import { useLocale } from '../../contexts/LocaleContext';
 import {
@@ -50,6 +51,7 @@ import { useSidebarBadges } from '../../hooks/useSidebarBadges';
 export const Sidebar: React.FC = () => {
   const { profile, signOut } = useAuth();
   const { hasModuleAccess } = usePermissions();
+  const { isEnabled } = useTenantFeatures();
   const { casesTodayCount, invoicesAttentionCount, pendingQuotesCount, lowStockCount } = useSidebarBadges();
   const { position, isCollapsed, toggleCollapsed, expandedSection, setExpandedSection } = useSidebarPreferences();
   const { locale } = useLocale();
@@ -78,10 +80,10 @@ export const Sidebar: React.FC = () => {
     : (isCollapsed ? ChevronRight : ChevronLeft);
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'owner';
-  const canViewFinance = hasModuleAccess('invoices') || hasModuleAccess('payments');
-  const canViewClients = hasModuleAccess('customers') || hasModuleAccess('companies');
-  const canViewLab = hasModuleAccess('inventory') || hasModuleAccess('stock') || hasModuleAccess('clone-drives');
-  const canViewHR = hasModuleAccess('hr-dashboard') || hasModuleAccess('employees');
+  const canViewFinance = (hasModuleAccess('invoices') || hasModuleAccess('payments')) && isEnabled('nav.financial');
+  const canViewClients = (hasModuleAccess('customers') || hasModuleAccess('companies')) && isEnabled('nav.business');
+  const canViewLab = (hasModuleAccess('inventory') || hasModuleAccess('stock') || hasModuleAccess('clone-drives')) && isEnabled('nav.resources');
+  const canViewHR = (hasModuleAccess('hr-dashboard') || hasModuleAccess('employees')) && isEnabled('nav.hr');
 
   const getRoleColor = (_role?: string) => {
     return { bg: 'rgb(var(--color-primary) / 0.12)', text: 'rgb(var(--color-primary))' };

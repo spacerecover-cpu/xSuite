@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { usePortalAuth } from '../../contexts/PortalAuthContext';
+import { useTenantFeature } from '../../contexts/TenantConfigContext';
 import { CustomerAvatar } from '../ui/CustomerAvatar';
 import { FileText, DollarSign, MessageSquare, LogOut, LayoutDashboard, Settings, FileBarChart, ShoppingBag, ChevronDown, Receipt } from 'lucide-react';
 import { AnnouncementBanner } from '../shared/AnnouncementBanner';
@@ -15,6 +16,7 @@ interface PortalBranding {
 
 export const PortalLayout: React.FC = () => {
   const { customer, logout } = usePortalAuth();
+  const portalEnabled = useTenantFeature('portal.customer');
   const navigate = useNavigate();
   const [branding, setBranding] = useState<PortalBranding>({
     logoUrl: null,
@@ -93,6 +95,20 @@ export const PortalLayout: React.FC = () => {
     { path: '/portal/communications', label: 'Messages', icon: MessageSquare },
     { path: '/portal/settings', label: 'Settings', icon: Settings },
   ];
+
+  if (!portalEnabled) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center bg-slate-50 p-6">
+        <div className="max-w-md rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <h1 className="text-lg font-semibold text-slate-900">Portal unavailable</h1>
+          <p className="mt-2 text-sm text-slate-600">
+            The customer portal is not currently enabled for this account. Please contact us
+            directly for updates on your case.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
