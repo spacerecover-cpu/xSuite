@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { getNextCaseNumber } from '../../lib/caseService';
@@ -14,6 +14,8 @@ import { useCurrency } from '../../hooks/useCurrency';
 import { CaseBackupDevicesTab } from '../../components/cases/CaseBackupDevicesTab';
 import { CaseStageBanner } from '../../components/cases/detail/CaseStageBanner';
 import type { CasePhase } from '../../lib/caseStateMachineService';
+import { useTenantFeatures } from '../../contexts/TenantConfigContext';
+import { CASE_TAB_FEATURE } from '../../lib/features/registry';
 import { openWhatsAppChat, isValidWhatsAppNumber, logWhatsAppCommunication } from '../../lib/whatsappUtils';
 import { DeviceCheckoutModal } from '../../components/cases/DeviceCheckoutModal';
 import { DuplicateCaseConfirmationModal } from '../../components/cases/DuplicateCaseConfirmationModal';
@@ -60,6 +62,7 @@ type TabType = 'overview' | 'client' | 'devices' | 'clones' | 'reports' | 'quote
 export const CaseDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const { isEnabled } = useTenantFeatures();
   const modals = useCaseModals();
 
   const { formatCurrency } = useCurrency();
@@ -266,7 +269,15 @@ export const CaseDetail: React.FC = () => {
     { id: 'notes', label: 'Internal Notes', icon: FileText },
     { id: 'portal', label: 'Client Portal', icon: Eye },
     { id: 'history', label: 'History', icon: History },
-  ];
+  ].filter((tab) => isEnabled(CASE_TAB_FEATURE[tab.id] ?? ''));
+
+  // If the active tab is disabled by a tenant feature flag, fall back to Overview
+  // (always-on core) so the content pane never goes blank.
+  useEffect(() => {
+    if (!tabs.some((tab) => tab.id === activeTab)) {
+      setActiveTab('overview');
+    }
+  }, [tabs, activeTab]);
 
   if (isLoading) {
     return (
@@ -412,18 +423,20 @@ export const CaseDetail: React.FC = () => {
         </div>
 
         {/* Stage banner: shows current phase + Next Action CTA + allowed transitions */}
-        <div className="mb-6">
-          <CaseStageBanner
-            caseId={id!}
-            currentStatusId={caseData.status_id ?? null}
-            currentStatusName={caseData.status ?? null}
-            currentPhase={(() => {
-              if (!caseData.status_id) return null;
-              const match = caseStatuses.find((s) => s.id === caseData.status_id);
-              return (match?.type as CasePhase | undefined) ?? null;
-            })()}
-          />
-        </div>
+        {isEnabled('workflow.stage_banner') && (
+          <div className="mb-6">
+            <CaseStageBanner
+              caseId={id!}
+              currentStatusId={caseData.status_id ?? null}
+              currentStatusName={caseData.status ?? null}
+              currentPhase={(() => {
+                if (!caseData.status_id) return null;
+                const match = caseStatuses.find((s) => s.id === caseData.status_id);
+                return (match?.type as CasePhase | undefined) ?? null;
+              })()}
+            />
+          </div>
+        )}
 
         {/* Quick Info Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -98,6 +98,11 @@ export const CASE_TAB_FEATURE: Record<string, string> = Object.fromEntries(
   FEATURE_REGISTRY.filter((f) => f.caseTabId).map((f) => [f.caseTabId as string, f.key]),
 );
 
+/** Maps a case-status phase → the feature key that toggles its pipeline chip. */
+export const STAGE_FEATURE_BY_PHASE: Record<string, string> = Object.fromEntries(
+  FEATURE_REGISTRY.filter((f) => f.stagePhase).map((f) => [f.stagePhase as string, f.key]),
+);
+
 export function featuresByCategory(): Record<FeatureCategory, FeatureDef[]> {
   const out = {} as Record<FeatureCategory, FeatureDef[]>;
   for (const f of FEATURE_REGISTRY) {

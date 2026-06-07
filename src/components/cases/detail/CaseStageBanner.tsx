@@ -14,6 +14,8 @@ import { Button } from '../../ui/Button';
 import { Modal } from '../../ui/Modal';
 import { useToast } from '../../../hooks/useToast';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useTenantFeatures } from '../../../contexts/TenantConfigContext';
+import { STAGE_FEATURE_BY_PHASE } from '../../../lib/features/registry';
 
 interface CaseStageBannerProps {
   caseId: string;
@@ -32,6 +34,17 @@ export function CaseStageBanner({
   const queryClient = useQueryClient();
   const toast = useToast();
   const callerRole = profile?.role ?? null;
+
+  // Per-tenant pipeline display: hide stage chips the tenant disabled. Display-only —
+  // transitions are unaffected (the global state machine stays intact).
+  const { isEnabled } = useTenantFeatures();
+  const visiblePhases = useMemo(
+    () => PHASE_ORDER.filter((p) => {
+      const key = STAGE_FEATURE_BY_PHASE[p];
+      return !key || isEnabled(key);
+    }),
+    [isEnabled],
+  );
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [reason, setReason] = useState('');
@@ -116,7 +129,7 @@ export function CaseStageBanner({
             {currentStatusName ?? 'Unknown'}
           </span>
           <div className="mt-2 flex flex-wrap items-center gap-1 text-xs text-slate-500">
-            {PHASE_ORDER.map((phase, idx) => {
+            {visiblePhases.map((phase, idx) => {
               const reached = phaseReached(currentPhase, phase);
               const isCurrent = phase === currentPhase;
               return (
@@ -132,7 +145,7 @@ export function CaseStageBanner({
                   >
                     {PHASE_LABEL[phase]}
                   </span>
-                  {idx < PHASE_ORDER.length - 1 ? (
+                  {idx < visiblePhases.length - 1 ? (
                     <ChevronRight className="h-3 w-3 text-slate-300" />
                   ) : null}
                 </span>

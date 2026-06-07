@@ -13,6 +13,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { UpgradeBanner } from '../../components/shared/UpgradeBanner';
 import { useFeature } from '../../hooks/useFeatureGate';
 import { getCurrentPlanCode } from '../../lib/featureGateService';
+import { useTenantFeatures } from '../../contexts/TenantConfigContext';
 
 interface QuickStatProps {
   label: string;
@@ -41,6 +42,7 @@ const QuickStat: React.FC<QuickStatProps> = ({ label, value, icon: Icon, color, 
 export const Dashboard: React.FC = () => {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const { isEnabled } = useTenantFeatures();
   const { hasAccess: _hasAdvancedReports } = useFeature('advanced_reports');
   const [showUpgradeBanner, setShowUpgradeBanner] = useState(true);
   const [planCode, setPlanCode] = useState<string>('');
@@ -112,6 +114,7 @@ export const Dashboard: React.FC = () => {
         />
       )}
 
+      {isEnabled('dashboard.cases_overview') && (
       <div>
         <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Cases Overview</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -149,7 +152,9 @@ export const Dashboard: React.FC = () => {
           />
         </div>
       </div>
+      )}
 
+      {isEnabled('dashboard.stock_widgets') && (
       <div>
         <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Stock & Inventory</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -158,7 +163,9 @@ export const Dashboard: React.FC = () => {
           <StockValueWidget />
         </div>
       </div>
+      )}
 
+      {isEnabled('dashboard.quick_nav') && (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <button
           onClick={() => navigate('/cases')}
@@ -199,6 +206,7 @@ export const Dashboard: React.FC = () => {
           <p className="text-xs text-slate-500">View stock valuation, sales history and movements</p>
         </button>
       </div>
+      )}
     </div>
   );
 };
