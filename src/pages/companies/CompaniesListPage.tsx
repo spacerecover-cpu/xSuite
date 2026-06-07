@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
-import { createCompany } from '../../lib/companyService';
+import { createCompany, updateCompany } from '../../lib/companyService';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
@@ -230,31 +230,19 @@ export const CompaniesListPage: React.FC = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
-      const { data: updatedCompany, error } = await supabase
-        .from('companies')
-        .update({
-          name: data.company_name,
-          tax_number: data.tax_number || null,
-          industry_id: data.industry_id || null,
-          email: data.email || null,
-          phone: data.phone || null,
-          website: data.website || null,
-          country_id: data.country_id || null,
-          city_id: data.city_id || null,
-          address: data.address || null,
-          notes: data.notes || null,
-        })
-        .eq('id', id)
-        .select()
-        .maybeSingle();
-
-      if (error) throw error;
-      if (!updatedCompany) {
-        throw new Error('Update succeeded but no row was returned');
-      }
-      return updatedCompany;
-    },
+    mutationFn: async ({ id, data }: { id: string; data: typeof formData }) =>
+      updateCompany(id, {
+        name: data.company_name,
+        tax_number: data.tax_number || null,
+        industry_id: data.industry_id || null,
+        email: data.email || null,
+        phone: data.phone || null,
+        website: data.website || null,
+        country_id: data.country_id || null,
+        city_id: data.city_id || null,
+        address: data.address || null,
+        notes: data.notes || null,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['companies'] });
       setIsEditModalOpen(false);

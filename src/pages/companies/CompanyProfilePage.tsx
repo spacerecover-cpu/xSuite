@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { formatDate } from '../../lib/format';
 import { logger } from '../../lib/logger';
+import { updateCompany } from '../../lib/companyService';
 import { CustomerCasesTab } from '../../components/customers/CustomerCasesTab';
 import { CustomerFinancialTab } from '../../components/customers/CustomerFinancialTab';
 
@@ -325,27 +326,18 @@ export const CompanyProfilePage: React.FC = () => {
   const updateMutation = useMutation({
     mutationFn: async (updatedData: typeof editFormData) => {
       if (!id) throw new Error('Company id is required');
-      const { data, error } = await supabase
-        .from('companies')
-        .update({
-          name: updatedData.company_name,
-          company_name: updatedData.company_name,
-          tax_number: updatedData.tax_number || null,
-          industry_id: updatedData.industry_id || null,
-          email: updatedData.email || null,
-          phone: updatedData.phone || null,
-          website: updatedData.website || null,
-          country_id: updatedData.country_id || null,
-          city_id: updatedData.city_id || null,
-          address: updatedData.address || null,
-          notes: updatedData.notes || null,
-        })
-        .eq('id', id)
-        .select()
-        .maybeSingle();
-
-      if (error) throw error;
-      return data;
+      return updateCompany(id, {
+        name: updatedData.company_name,
+        tax_number: updatedData.tax_number || null,
+        industry_id: updatedData.industry_id || null,
+        email: updatedData.email || null,
+        phone: updatedData.phone || null,
+        website: updatedData.website || null,
+        country_id: updatedData.country_id || null,
+        city_id: updatedData.city_id || null,
+        address: updatedData.address || null,
+        notes: updatedData.notes || null,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['company', id] });
