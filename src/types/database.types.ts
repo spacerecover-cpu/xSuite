@@ -15367,6 +15367,10 @@ export type Database = {
         }
         Returns: number
       }
+      convert_proforma_invoice_to_tax_invoice: {
+        Args: { p_due_date?: string; p_invoice_id: string; p_notes?: string }
+        Returns: string
+      }
       convert_proforma_to_tax_invoice: {
         Args: { p_quote_id: string }
         Returns: string

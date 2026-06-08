@@ -34,7 +34,7 @@ import { PDFPreviewModal } from '../../components/cases/PDFPreviewModal';
 import { EmailDocumentModal } from '../../components/cases/EmailDocumentModal';
 import { QuoteFormModal } from '../../components/cases/QuoteFormModal';
 import { InvoiceFormModal } from '../../components/cases/InvoiceFormModal';
-import { ConvertToInvoiceModal } from '../../components/cases/ConvertToInvoiceModal';
+import { ConvertProformaToTaxModal } from '../../components/cases/ConvertProformaToTaxModal';
 import { RecordPaymentModal } from '../../components/financial/RecordPaymentModal';
 import { createQuote as createQuoteService, type Quote as QuoteShape, type QuoteItem as QuoteItemShape } from '../../lib/quotesService';
 import { createInvoice as createInvoiceService, updateInvoice as updateInvoiceService, convertProformaToTaxInvoice, type Invoice as InvoiceShape, type InvoiceItem as InvoiceItemShape } from '../../lib/invoiceService';
@@ -1279,13 +1279,17 @@ export const CaseDetail: React.FC = () => {
 
       {/* Convert Proforma to Tax Invoice Modal */}
       {modals.showConvertProformaModal && modals.convertingInvoice && (
-        <ConvertToInvoiceModal
+        <ConvertProformaToTaxModal
           isOpen={modals.showConvertProformaModal}
           onClose={() => {
             modals.setShowConvertProformaModal(false);
             modals.setConvertingInvoice(null);
           }}
-          quote={modals.convertingInvoice as React.ComponentProps<typeof ConvertToInvoiceModal>['quote']}
+          source={{
+            number: (modals.convertingInvoice as { invoice_number?: string | null }).invoice_number ?? null,
+            customerName: caseData.customer?.customer_name ?? null,
+            totalAmount: (modals.convertingInvoice as { total_amount?: number | null }).total_amount ?? null,
+          }}
           isConverting={isConvertingProforma}
           onConvert={async (data) => {
             const convertingId = (modals.convertingInvoice as { id?: string } | null)?.id;
@@ -1298,7 +1302,7 @@ export const CaseDetail: React.FC = () => {
                 data.notes
               );
               invalidateCaseFinanceQueries();
-              toast.success(`Converted to ${data.invoiceType === 'proforma' ? 'Proforma' : 'Tax'} Invoice`);
+              toast.success('Converted to Tax Invoice');
               modals.setShowConvertProformaModal(false);
               modals.setConvertingInvoice(null);
             } catch (error: unknown) {

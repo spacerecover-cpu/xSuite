@@ -963,19 +963,23 @@ export const getPaymentHistory = async (invoiceId: string): Promise<PaymentHisto
 };
 
 export const convertProformaToTaxInvoice = async (
-  proformaId: string,
-  _dueDate?: string,
-  _notes?: string
+  proformaInvoiceId: string,
+  dueDate?: string,
+  notes?: string
 ) => {
   const rl = checkRateLimit(RATE_LIMITS.INVOICE_CONVERSION);
   if (!rl.allowed) {
     throw new Error(rl.message);
   }
 
-  // Live RPC signature: convert_proforma_to_tax_invoice(p_quote_id uuid) returns uuid.
-  // _dueDate / _notes kept for API back-compat but ignored — TODO(B8) update callers.
-  const { data, error } = await supabase.rpc('convert_proforma_to_tax_invoice', {
-    p_quote_id: proformaId,
+  // Proforma INVOICE -> Tax INVOICE via the dedicated invoice RPC. The previous call sent
+  // the invoice id to convert_proforma_to_tax_invoice(p_quote_id), which reads the quotes
+  // table -> "Quote not found" (400). This RPC reads invoices: it creates a linked tax
+  // invoice, copies line items, and marks the proforma converted — atomically.
+  const { data, error } = await supabase.rpc('convert_proforma_invoice_to_tax_invoice', {
+    p_invoice_id: proformaInvoiceId,
+    p_due_date: dueDate || undefined,
+    p_notes: notes || undefined,
   });
 
   if (error) throw error;
