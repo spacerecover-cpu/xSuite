@@ -12,6 +12,12 @@
 // timeout UX). Deployed with verify_jwt=false because this IS the login
 // endpoint (the caller has no JWT yet); it does its own authentication.
 //
+// Abuse controls (audit SEC-8): CORS is restricted to the origin allowlist
+// (same pattern as send-otp-email — defaults + ALLOWED_ORIGINS env), and login
+// attempts are rate-limited DB-side via check_rate_limit per email (5/15min)
+// and per source IP (20/15min). The limiter fails OPEN so a rate-limit outage
+// can never lock customers out of the portal.
+//
 // REQUIRES the project JWT secret to be available as SUPABASE_JWT_SECRET (or
 // PORTAL_JWT_SECRET). Supabase does NOT provide the JWT secret to edge functions
 // by default — set it once:  supabase secrets set PORTAL_JWT_SECRET=<jwt secret>
@@ -20,20 +26,45 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { SignJWT } from "npm:jose@5";
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const ALLOWED_ORIGINS = [
+  "https://xsuite.space",
+  "https://space-recovery.pages.dev",
+  ...(Deno.env.get("ALLOWED_ORIGINS") || Deno.env.get("ALLOWED_ORIGIN") || "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean),
+];
 
-function json(status: number, payload: unknown): Response {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...cors, "Content-Type": "application/json" },
-  });
+function getAllowedOrigin(req: Request): string {
+  const origin = req.headers.get("Origin") || "";
+  return ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+}
+
+function makeCorsHeaders(req: Request): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": getAllowedOrigin(req),
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
+}
+
+function clientIp(req: Request): string {
+  return (
+    req.headers.get("CF-Connecting-IP") ??
+    (req.headers.get("X-Forwarded-For") || "").split(",")[0].trim() ??
+    "unknown"
+  );
 }
 
 Deno.serve(async (req: Request) => {
+  const cors = makeCorsHeaders(req);
+  const json = (status: number, payload: unknown): Response =>
+    new Response(JSON.stringify(payload), {
+      status,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json(405, { error: "method_not_allowed" });
 
@@ -55,6 +86,29 @@ Deno.serve(async (req: Request) => {
   if (!supabaseUrl || !serviceKey) return json(500, { error: "server_misconfigured" });
 
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+
+  // DB-side rate limit before touching credentials: per-email and per-IP
+  // windows. RPC errors fail OPEN (availability over throttling).
+  try {
+    const ip = clientIp(req);
+    const [emailLimit, ipLimit] = await Promise.all([
+      admin.rpc("check_rate_limit", {
+        p_key: `portal-login:email:${email.toLowerCase()}`,
+        p_max_requests: 5,
+        p_window_seconds: 900,
+      }),
+      admin.rpc("check_rate_limit", {
+        p_key: `portal-login:ip:${ip}`,
+        p_max_requests: 20,
+        p_window_seconds: 900,
+      }),
+    ]);
+    if (emailLimit.data === false || ipLimit.data === false) {
+      return json(429, { error: "too_many_attempts", retry_after_seconds: 900 });
+    }
+  } catch (_e) {
+    // fail open
+  }
 
   const { data, error } = await admin.rpc("authenticate_portal_customer", {
     p_email: email,
