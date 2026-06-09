@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { sanitizeFilterValue } from './postgrestSanitizer';
 import { logger } from './logger';
 import type { Database } from '../types/database.types';
 
@@ -92,11 +93,12 @@ export async function getInventoryItems(filters?: {
   }
 
   if (filters?.search) {
+    const s = sanitizeFilterValue(filters.search);
     query = query.or(
-      `name.ilike.%${filters.search}%,` +
-      `item_number.ilike.%${filters.search}%,` +
-      `serial_number.ilike.%${filters.search}%,` +
-      `model.ilike.%${filters.search}%`
+      `name.ilike.%${s}%,` +
+      `item_number.ilike.%${s}%,` +
+      `serial_number.ilike.%${s}%,` +
+      `model.ilike.%${s}%`
     );
   }
 

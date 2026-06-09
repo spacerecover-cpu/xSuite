@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Plus, Search, Filter, Briefcase, AlertCircle, CheckCircle, RefreshCw, ChevronLeft, ChevronRight, Archive, Download } from 'lucide-react';
@@ -94,8 +95,9 @@ export const CasesList: React.FC = () => {
       .is('deleted_at', null);
 
     if (searchTerm) {
+      const s = sanitizeFilterValue(searchTerm);
       query = query.or(
-        `case_no.ilike.%${searchTerm}%,client_reference.ilike.%${searchTerm}%`
+        `case_no.ilike.%${s}%,client_reference.ilike.%${s}%`
       );
     }
 
@@ -149,8 +151,9 @@ export const CasesList: React.FC = () => {
         .is('deleted_at', null);
 
       if (searchTerm) {
+        const s = sanitizeFilterValue(searchTerm);
         query = query.or(
-          `case_no.ilike.%${searchTerm}%,client_reference.ilike.%${searchTerm}%`
+          `case_no.ilike.%${s}%,client_reference.ilike.%${s}%`
         );
       }
 
@@ -198,20 +201,6 @@ export const CasesList: React.FC = () => {
     },
   });
 
-  const { data: allCasesForStats = [] } = useQuery({
-    queryKey: ['cases_stats'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('cases')
-        .select('id, status, priority')
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
-    },
-  });
-
   const { data: caseStatuses = [] } = useQuery({
     queryKey: ['case_statuses'],
     queryFn: async () => {
@@ -222,6 +211,48 @@ export const CasesList: React.FC = () => {
         .order('sort_order');
       if (error) throw error;
       return data;
+    },
+  });
+
+  // Dashboard counters as head-only COUNT queries instead of pulling every
+  // case row to the client (the previous select grew linearly with tenant
+  // case volume). Status-name lists come from master_case_statuses, so this
+  // waits for them and re-keys when they change. "Active" is derived as
+  // (cases with a status) - (cases in a terminal status) because terminal
+  // names can contain PostgREST control characters that .in() quotes safely
+  // but a NOT-IN DSL string would not.
+  const { data: caseStats } = useQuery({
+    queryKey: ['cases_stats', caseStatuses.map((s) => s.id).join(',')],
+    enabled: caseStatuses.length > 0,
+    queryFn: async () => {
+      const namesOfTypes = (types: string[]) =>
+        caseStatuses
+          .filter((s) => s.type !== null && types.includes(s.type))
+          .map((s) => s.name);
+      const terminal = namesOfTypes(['completed', 'delivered', 'cancelled']);
+      const diagnosis = namesOfTypes(['diagnosis']);
+      const ready = namesOfTypes(['ready']);
+
+      const base = () =>
+        supabase.from('cases').select('id', { count: 'exact', head: true }).is('deleted_at', null);
+      const none = { count: 0 as number | null, error: null };
+
+      const [withStatus, inTerminal, urgent, inDiagnosis, inReady] = await Promise.all([
+        base().not('status', 'is', null),
+        terminal.length ? base().in('status', terminal) : Promise.resolve(none),
+        base().eq('priority', 'urgent'),
+        diagnosis.length ? base().in('status', diagnosis) : Promise.resolve(none),
+        ready.length ? base().in('status', ready) : Promise.resolve(none),
+      ]);
+      for (const r of [withStatus, inTerminal, urgent, inDiagnosis, inReady]) {
+        if (r.error) throw r.error;
+      }
+      return {
+        active: Math.max(0, (withStatus.count ?? 0) - (inTerminal.count ?? 0)),
+        urgent: urgent.count ?? 0,
+        diagnosis: inDiagnosis.count ?? 0,
+        ready: inReady.count ?? 0,
+      };
     },
   });
 
@@ -266,10 +297,6 @@ export const CasesList: React.FC = () => {
       s => s.name === status
     );
     return statusItem?.name || status;
-  };
-
-  const getStatusesByType = (type: string) => {
-    return caseStatuses.filter(s => s.type === type).map(s => s.name);
   };
 
   const handleCreateCase = async () => {
@@ -408,7 +435,7 @@ export const CasesList: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-info uppercase tracking-wide">Active Cases</p>
-              <p className="text-2xl font-bold text-info mt-1">{allCasesForStats.filter(c => c.status !== null && !getStatusesByType('completed').includes(c.status) && !getStatusesByType('delivered').includes(c.status) && !getStatusesByType('cancelled').includes(c.status)).length}</p>
+              <p className="text-2xl font-bold text-info mt-1">{caseStats?.active ?? 0}</p>
             </div>
             <div className="w-10 h-10 bg-info rounded-lg flex items-center justify-center">
               <Briefcase className="w-5 h-5 text-info-foreground" />
@@ -420,7 +447,7 @@ export const CasesList: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-danger uppercase tracking-wide">Urgent</p>
-              <p className="text-2xl font-bold text-danger mt-1">{allCasesForStats.filter(c => c.priority === 'urgent').length}</p>
+              <p className="text-2xl font-bold text-danger mt-1">{caseStats?.urgent ?? 0}</p>
             </div>
             <div className="w-10 h-10 bg-danger rounded-lg flex items-center justify-center">
               <AlertCircle className="w-5 h-5 text-danger-foreground" />
@@ -432,7 +459,7 @@ export const CasesList: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-warning uppercase tracking-wide">In Diagnosis</p>
-              <p className="text-2xl font-bold text-warning mt-1">{allCasesForStats.filter(c => c.status !== null && getStatusesByType('diagnosis').includes(c.status)).length}</p>
+              <p className="text-2xl font-bold text-warning mt-1">{caseStats?.diagnosis ?? 0}</p>
             </div>
             <div className="w-10 h-10 bg-warning rounded-lg flex items-center justify-center">
               <Search className="w-5 h-5 text-warning-foreground" />
@@ -444,7 +471,7 @@ export const CasesList: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-success uppercase tracking-wide">Ready</p>
-              <p className="text-2xl font-bold text-success mt-1">{allCasesForStats.filter(c => c.status !== null && getStatusesByType('ready').includes(c.status)).length}</p>
+              <p className="text-2xl font-bold text-success mt-1">{caseStats?.ready ?? 0}</p>
             </div>
             <div className="w-10 h-10 bg-success rounded-lg flex items-center justify-center">
               <CheckCircle className="w-5 h-5 text-success-foreground" />
@@ -560,7 +587,8 @@ export const CasesList: React.FC = () => {
                   .select('case_no, title, priority, status, client_reference, created_at, customers_enhanced:customer_id(customer_name)')
                   .is('deleted_at', null);
                 if (searchTerm) {
-                  q = q.or(`case_no.ilike.%${searchTerm}%,client_reference.ilike.%${searchTerm}%`);
+                  const s = sanitizeFilterValue(searchTerm);
+                  q = q.or(`case_no.ilike.%${s}%,client_reference.ilike.%${s}%`);
                 }
                 if (filterStatus !== 'all') q = q.eq('status', filterStatus);
                 if (filterPriority !== 'all') q = q.eq('priority', filterPriority);

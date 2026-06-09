@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
@@ -127,7 +128,8 @@ export const ExpensesList: React.FC = () => {
           .order('expense_date', { ascending: false });
 
         if (searchTerm) {
-          query = query.or(`expense_number.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,vendor.ilike.%${searchTerm}%`);
+          const s = sanitizeFilterValue(searchTerm);
+          query = query.or(`expense_number.ilike.%${s}%,description.ilike.%${s}%,vendor.ilike.%${s}%`);
         }
 
         if (statusFilter !== 'all') {
@@ -471,7 +473,8 @@ export const ExpensesList: React.FC = () => {
                   .select('expense_number, expense_date, vendor, description, amount, tax_amount, currency, status, is_billable, master_expense_categories:category_id(name)')
                   .is('deleted_at', null);
                 if (searchTerm) {
-                  q = q.or(`expense_number.ilike.%${searchTerm}%,vendor.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+                  const s = sanitizeFilterValue(searchTerm);
+                  q = q.or(`expense_number.ilike.%${s}%,vendor.ilike.%${s}%,description.ilike.%${s}%`);
                 }
                 if (statusFilter !== 'all') q = q.eq('status', statusFilter);
                 const { data, error } = await q.order('expense_date', { ascending: false, nullsFirst: false });

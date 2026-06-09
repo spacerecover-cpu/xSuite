@@ -14,6 +14,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -78,7 +79,7 @@ export function NotificationsHistory() {
       if (search.trim()) {
         // ilike across title + body — server-side so pagination stays
         // honest. Empty search short-circuits this branch.
-        const term = `%${search.trim()}%`;
+        const term = `%${sanitizeFilterValue(search.trim())}%`;
         q = q.or(`title.ilike.${term},body.ilike.${term}`);
       }
 

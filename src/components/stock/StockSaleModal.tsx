@@ -19,6 +19,7 @@ import {
 } from '../../lib/stockService';
 import { stockKeys } from '../../lib/queryKeys';
 import { supabase } from '../../lib/supabaseClient';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { useToast } from '../../hooks/useToast';
 
 interface SerialLinePickerProps {
@@ -151,7 +152,7 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
       .from('customers_enhanced')
       .select('id, customer_name, email')
       .is('deleted_at', null)
-      .or(`customer_name.ilike.%${term}%,email.ilike.%${term}%`)
+      .or(`customer_name.ilike.%${sanitizeFilterValue(term)}%,email.ilike.%${sanitizeFilterValue(term)}%`)
       .limit(20);
     setCustomers(
       (data ?? []).map((c) => ({

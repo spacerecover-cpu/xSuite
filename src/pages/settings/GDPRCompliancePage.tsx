@@ -8,6 +8,7 @@ import { gdprService } from '../../lib/gdprService';
 import { gdprKeys } from '../../lib/queryKeys';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabaseClient';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
 
@@ -103,7 +104,7 @@ export const GDPRCompliancePage: React.FC = () => {
     const { data } = await supabase
       .from('customers_enhanced')
       .select('id, customer_name, email')
-      .or(`email.ilike.%${customerSearch}%,customer_name.ilike.%${customerSearch}%`)
+      .or(`email.ilike.%${sanitizeFilterValue(customerSearch)}%,customer_name.ilike.%${sanitizeFilterValue(customerSearch)}%`)
       .is('deleted_at', null)
       .limit(1)
       .maybeSingle();

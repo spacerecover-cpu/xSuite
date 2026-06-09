@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -100,10 +101,15 @@ export const PaymentsList: React.FC = () => {
             invoice:invoices(invoice_number, case_id)
           )
         `)
-        .order('payment_date', { ascending: false });
+        .order('payment_date', { ascending: false })
+        // Bounded fetch: render the 500 most recent matches instead of the
+        // whole payments table. Server-side pagination is the structural
+        // follow-up (see InvoicesListPage for the pattern).
+        .limit(500);
 
       if (searchTerm) {
-        query = query.or(`payment_number.ilike.%${searchTerm}%,reference.ilike.%${searchTerm}%`);
+        const s = sanitizeFilterValue(searchTerm);
+        query = query.or(`payment_number.ilike.%${s}%,reference.ilike.%${s}%`);
       }
 
       if (statusFilter !== 'all') {

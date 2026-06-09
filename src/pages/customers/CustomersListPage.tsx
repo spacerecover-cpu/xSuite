@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import type { Database } from '../../types/database.types';
 import { createCustomer } from '../../lib/customerService';
 import { createCompany } from '../../lib/companyService';
@@ -157,7 +158,11 @@ export const CustomersListPage: React.FC = () => {
           )
         `)
         .is('deleted_at', null)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        // Bounded fetch: the page filters/paginates client-side, so cap the
+        // payload at the 1000 most recent customers. Server-side pagination
+        // is the structural follow-up (see InvoicesListPage for the pattern).
+        .limit(1000);
 
       if (error) throw error;
       return (data ?? []) as unknown as Customer[];
@@ -621,7 +626,8 @@ export const CustomersListPage: React.FC = () => {
                   .select('customer_number, customer_name, email, mobile_number, phone, address, portal_enabled, created_at, customer_groups:customer_group_id(name)')
                   .is('deleted_at', null);
                 if (searchTerm) {
-                  q = q.or(`customer_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,customer_number.ilike.%${searchTerm}%`);
+                  const s = sanitizeFilterValue(searchTerm);
+                  q = q.or(`customer_name.ilike.%${s}%,email.ilike.%${s}%,customer_number.ilike.%${s}%`);
                 }
                 if (filterGroup !== 'all') q = q.eq('customer_group_id', filterGroup);
                 if (filterPortal === 'enabled') q = q.eq('portal_enabled', true);

@@ -8,6 +8,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import SupplierFormModal from '../../components/suppliers/SupplierFormModal';
 import { supabase } from '../../lib/supabaseClient';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { useToast } from '../../hooks/useToast';
 import { useCurrency } from '../../hooks/useCurrency';
 import { formatDate } from '../../lib/format';
@@ -363,7 +364,8 @@ export default function SuppliersListPage() {
                   .select('supplier_number, name, contact_person, email, phone, tax_number, is_active, master_supplier_categories:category_id(name)')
                   .is('deleted_at', null);
                 if (searchTerm) {
-                  q = q.or(`name.ilike.%${searchTerm}%,supplier_number.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+                  const s = sanitizeFilterValue(searchTerm);
+                  q = q.or(`name.ilike.%${s}%,supplier_number.ilike.%${s}%,email.ilike.%${s}%`);
                 }
                 if (statusFilter === 'active') q = q.eq('is_active', true);
                 if (statusFilter === 'inactive') q = q.eq('is_active', false);
