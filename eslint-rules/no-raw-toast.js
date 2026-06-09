@@ -51,9 +51,21 @@ export default {
     }
 
     return {
-      // import ... from 'react-hot-toast'  (default / named / namespace / side-effect)
+      // import ... from 'react-hot-toast'. Allow infrastructure imports that do
+      // NOT pull in the `toast` function (e.g. `import { Toaster }` at the single
+      // mount point in App.tsx); ban the default/namespace/side-effect import and
+      // a named `toast` import anywhere.
       ImportDeclaration(node) {
-        reportSource(node.source);
+        if (!isPackageString(node.source)) return;
+        const importsToast =
+          node.specifiers.length === 0 ||
+          node.specifiers.some(
+            (s) =>
+              s.type === 'ImportDefaultSpecifier' ||
+              s.type === 'ImportNamespaceSpecifier' ||
+              (s.type === 'ImportSpecifier' && s.imported && s.imported.name === 'toast'),
+          );
+        if (importsToast) context.report({ node: node.source, messageId: 'raw' });
       },
       // export ... from 'react-hot-toast'
       ExportNamedDeclaration(node) {
