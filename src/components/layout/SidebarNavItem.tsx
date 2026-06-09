@@ -83,6 +83,7 @@ export const SidebarNavItem: React.FC<SidebarNavItemProps> = ({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       title={isCollapsed ? label : undefined}
+      aria-current={isActive ? 'page' : undefined}
     >
       {isCollapsed && isActive && (
         <div

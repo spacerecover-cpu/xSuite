@@ -13,6 +13,26 @@ interface PageHeaderProps {
   }>;
 }
 
+// Maps caller-supplied color keys to literal, JIT-safe token classes.
+// Brand/status keys route through semantic tokens; "teal" has no status
+// meaning so it uses the cat-* identity palette. Raw Tailwind brand colors
+// (text-blue-600 etc.) are banned by DESIGN.md / no-raw-tailwind-colors.
+const STAT_COLOR_CLASSES: Record<string, string> = {
+  primary: 'text-primary',
+  secondary: 'text-secondary',
+  accent: 'text-accent-foreground',
+  blue: 'text-info',
+  green: 'text-success',
+  emerald: 'text-success',
+  teal: 'text-cat-2',
+  red: 'text-danger',
+  orange: 'text-warning',
+  amber: 'text-warning',
+  slate: 'text-slate-900',
+};
+
+const DEFAULT_STAT_COLOR_CLASS = 'text-slate-900';
+
 export const PageHeader: React.FC<PageHeaderProps> = ({
   title,
   description,
@@ -49,7 +69,9 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
               <p className="text-sm text-slate-600 mb-1">{stat.label}</p>
               <p
                 className={`text-2xl font-bold ${
-                  stat.color ? `text-${stat.color}-600` : 'text-slate-900'
+                  stat.color
+                    ? STAT_COLOR_CLASSES[stat.color] ?? DEFAULT_STAT_COLOR_CLASS
+                    : DEFAULT_STAT_COLOR_CLASS
                 }`}
               >
                 {stat.value}

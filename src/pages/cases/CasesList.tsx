@@ -16,7 +16,7 @@ import { useCasesRealtime } from '../../hooks/useCasesRealtime';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUsageLimit } from '../../hooks/useFeatureGate';
 import { canPerformAction } from '../../lib/featureGateService';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
 
 interface Case {
   id: string;
@@ -50,6 +50,7 @@ interface Case {
 
 export const CasesList: React.FC = () => {
   const navigate = useNavigate();
+  const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile } = useAuth();
   const { usage: caseUsage } = useUsageLimit('max_cases_per_month');
@@ -86,7 +87,8 @@ export const CasesList: React.FC = () => {
   const buildFiltersQuery = () => {
     let query = supabase
       .from('cases')
-      .select('id, case_no, priority, status, customer_id', { count: 'exact', head: false });
+      .select('id, case_no, priority, status, customer_id', { count: 'exact', head: false })
+      .is('deleted_at', null);
 
     if (searchTerm) {
       query = query.or(
@@ -140,7 +142,8 @@ export const CasesList: React.FC = () => {
           assigned_engineer_id,
           customer:customers_enhanced!customer_id (id, customer_number, customer_name, mobile_number),
           devices:case_devices (id, serial_number, device_type_id, catalog_device_types (id, name))
-        `);
+        `)
+        .is('deleted_at', null);
 
       if (searchTerm) {
         query = query.or(
@@ -198,6 +201,7 @@ export const CasesList: React.FC = () => {
       const { data, error } = await supabase
         .from('cases')
         .select('id, status, priority')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -272,7 +276,7 @@ export const CasesList: React.FC = () => {
       return;
     }
     if (check.message) {
-      toast(check.message, { icon: '⚠️' });
+      toast.warning(check.message);
     }
     setIsWizardOpen(true);
   };
@@ -574,7 +578,7 @@ export const CasesList: React.FC = () => {
                 >
                   <option value="all">All Statuses</option>
                   {caseStatuses.map((status) => (
-                    <option key={status.id} value={status.name.toLowerCase()}>
+                    <option key={status.id} value={status.name}>
                       {status.name}
                     </option>
                   ))}

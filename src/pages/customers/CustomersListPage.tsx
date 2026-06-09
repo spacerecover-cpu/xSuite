@@ -19,7 +19,7 @@ import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { downloadCSV } from '../../lib/csvExport';
 import { formatDate } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
 
 interface Customer {
   id: string;
@@ -77,6 +77,7 @@ interface City {
 
 export const CustomersListPage: React.FC = () => {
   const navigate = useNavigate();
+  const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
@@ -152,6 +153,7 @@ export const CustomersListPage: React.FC = () => {
             companies (id, company_name, company_number)
           )
         `)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

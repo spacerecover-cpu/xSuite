@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import type { BadgeVariant } from '../../lib/ui/variants';
 import { Search, Download, AlertCircle, AlertTriangle, Info, Bug } from 'lucide-react';
 import { format } from 'date-fns';
 import { logger } from '../../lib/logger';
@@ -90,20 +91,27 @@ export const SystemLogs: React.FC = () => {
     }
   };
 
-  const getLevelColor = (level: string) => {
-    switch (level) {
-      case 'error':
-        return 'red';
-      case 'warning':
-        return 'orange';
-      case 'info':
-        return 'blue';
-      case 'debug':
-        return 'gray';
-      default:
-        return 'gray';
-    }
+  // Static, JIT-safe class strings keyed by level. Tailwind purges interpolated
+  // classes (e.g. `bg-${color}-100`), so literal token classes are required.
+  const LEVEL_CHIP_CLASS: Record<string, string> = {
+    error: 'bg-danger-muted text-danger',
+    warning: 'bg-warning-muted text-warning',
+    info: 'bg-info-muted text-info',
+    debug: 'bg-slate-100 text-slate-600',
   };
+
+  const LEVEL_BADGE_VARIANT: Record<string, BadgeVariant> = {
+    error: 'danger',
+    warning: 'warning',
+    info: 'info',
+    debug: 'secondary',
+  };
+
+  const getLevelChipClass = (level: string) =>
+    LEVEL_CHIP_CLASS[level] ?? 'bg-slate-100 text-slate-600';
+
+  const getLevelBadgeVariant = (level: string): BadgeVariant =>
+    LEVEL_BADGE_VARIANT[level] ?? 'secondary';
 
   const exportLogs = () => {
     const csv = [
@@ -191,12 +199,12 @@ export const SystemLogs: React.FC = () => {
           {filteredLogs.map((log) => (
             <div key={log.id} className="p-4 hover:bg-slate-50 transition-colors">
               <div className="flex items-start gap-3">
-                <div className={`mt-1 p-2 rounded-lg bg-${getLevelColor(log.level)}-100`}>
+                <div className={`mt-1 p-2 rounded-lg ${getLevelChipClass(log.level)}`}>
                   {getLevelIcon(log.level)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <Badge color={getLevelColor(log.level)}>{log.level}</Badge>
+                    <Badge variant={getLevelBadgeVariant(log.level)}>{log.level}</Badge>
                     {log.category && (
                       <span className="text-sm font-medium text-slate-900">{log.category}</span>
                     )}

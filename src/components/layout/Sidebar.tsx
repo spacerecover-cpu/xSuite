@@ -24,7 +24,6 @@ import {
   UserCog,
   Shield,
   HardDrive,
-  Plug,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -164,6 +163,8 @@ export const Sidebar: React.FC = () => {
               (e.currentTarget as HTMLButtonElement).style.color = '#64748b';
             }}
             title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={!isCollapsed}
           >
             <CollapseChevron className="w-3.5 h-3.5" />
           </button>
@@ -482,12 +483,6 @@ export const Sidebar: React.FC = () => {
                 isCollapsed={isCollapsed}
               />
               <ProtectedSidebarNavItem
-                to="/integrations"
-                icon={Plug}
-                label="Integrations"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
                 to="/admin"
                 icon={Shield}
                 label="Admin Panel"
@@ -503,6 +498,7 @@ export const Sidebar: React.FC = () => {
           <div className={`${isCollapsed ? 'px-2 py-2' : 'px-3 py-2'}`}>
             {isCollapsed ? (
               <button
+                onClick={() => navigate('/procedures')}
                 className="w-10 h-10 flex items-center justify-center rounded-lg transition-all duration-[180ms] mx-auto"
                 title="Help & Support"
                 style={{ background: 'transparent', color: '#64748b' }}
@@ -519,6 +515,7 @@ export const Sidebar: React.FC = () => {
               </button>
             ) : (
               <button
+                onClick={() => navigate('/procedures')}
                 className="w-full flex items-center gap-3 rounded-lg transition-all duration-[180ms]"
                 style={{
                   padding: '9px 10px',

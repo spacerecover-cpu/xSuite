@@ -30,7 +30,7 @@ import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkAc
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { downloadCSV } from '../../lib/csvExport';
 import { useAuth } from '../../contexts/AuthContext';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
 import {
   FileText,
   Plus,
@@ -55,6 +55,7 @@ import { formatDate } from '../../lib/format';
 
 export const InvoicesListPage: React.FC<unknown> = () => {
   const navigate = useNavigate();
+  const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
@@ -236,11 +237,10 @@ export const InvoicesListPage: React.FC<unknown> = () => {
       const failed = results.filter((r) => r.status === 'failed').length;
       if (failed === 0 && skipped === 0) {
         toast.success(`Sent ${sent} invoice${sent === 1 ? '' : 's'}`);
+      } else if (failed > 0) {
+        toast.warning(`Bulk send: ${sent} sent, ${skipped} skipped, ${failed} failed`);
       } else {
-        toast(
-          `Bulk send: ${sent} sent, ${skipped} skipped, ${failed} failed`,
-          { icon: failed > 0 ? '⚠️' : 'ℹ️', duration: 6000 },
-        );
+        toast.info(`Bulk send: ${sent} sent, ${skipped} skipped, ${failed} failed`);
       }
       selection.clear();
       queryClient.invalidateQueries({ queryKey: ['invoices'] });

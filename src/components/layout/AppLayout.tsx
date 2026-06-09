@@ -36,10 +36,8 @@ const routeLabels: Record<string, string> = {
   'timesheets': 'Timesheets',
   'settings': 'Settings',
   'users': 'User Management',
-  'integrations': 'Integrations',
   'admin': 'Admin Panel',
   'profile': 'Profile',
-  'search': 'Search',
 };
 
 const sectionLabels: Record<string, string> = {
@@ -68,7 +66,6 @@ const sectionLabels: Record<string, string> = {
   'timesheets': 'Employee Management',
   'settings': 'System',
   'users': 'System',
-  'integrations': 'System',
   'admin': 'System',
 };
 

@@ -95,7 +95,7 @@ const STATIC_COMMANDS: CommandItem[] = [
   { id: 'nav-security', kind: 'page', group: 'System', label: 'Security', icon: Shield, to: '/settings/security' },
   { id: 'nav-appearance', kind: 'page', group: 'System', label: 'Appearance', icon: Settings, to: '/settings/appearance', keywords: 'theme color' },
   { id: 'nav-admin', kind: 'page', group: 'System', label: 'Admin Panel', icon: Shield, to: '/admin' },
-  { id: 'nav-audit', kind: 'page', group: 'System', label: 'Audit Trails', icon: Shield, to: '/admin/audit-trails' },
+  { id: 'nav-audit', kind: 'page', group: 'System', label: 'Audit Trails', icon: Shield, to: '/admin/audit' },
 
   // Quick actions — navigation with an intent. The destination page reads
   // ?new=1 (where supported) to auto-open the create modal.

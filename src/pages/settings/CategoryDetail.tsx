@@ -18,6 +18,7 @@ import {
 } from '../../lib/seedService';
 import { SeedingResultsDisplay } from '../../components/settings/SeedingResultsDisplay';
 import { logger } from '../../lib/logger';
+import { useToast } from '../../hooks/useToast';
 
 interface MasterDataItem {
   id: number;
@@ -42,6 +43,7 @@ export const CategoryDetail: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
+  const toast = useToast();
 
   const category = SETTINGS_CATEGORIES.find((c) => c.id === categoryId);
   const [activeTable, setActiveTable] = useState<MasterDataTable>(
@@ -212,6 +214,14 @@ export const CategoryDetail: React.FC = () => {
       setIsModalOpen(false);
       setFormValue('');
     },
+    onError: (error: Error) => {
+      logger.error('Create master data error:', error);
+      toast.error(
+        isTenantScopedTable(activeTable)
+          ? `Could not save: ${error.message}`
+          : `Could not save: ${error.message}. This category type is managed by the platform, not your tenant.`
+      );
+    },
   });
 
   const updateMutation = useMutation({
@@ -227,6 +237,14 @@ export const CategoryDetail: React.FC = () => {
       setIsModalOpen(false);
       setEditingItem(null);
       setFormValue('');
+    },
+    onError: (error: Error) => {
+      logger.error('Update master data error:', error);
+      toast.error(
+        isTenantScopedTable(activeTable)
+          ? `Could not save: ${error.message}`
+          : `Could not save: ${error.message}. This category type is managed by the platform, not your tenant.`
+      );
     },
   });
 
@@ -249,6 +267,14 @@ export const CategoryDetail: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: settingsKeys.masterData(activeTable) });
       queryClient.invalidateQueries({ queryKey: ['settings', 'category-count'] });
+    },
+    onError: (error: Error) => {
+      logger.error('Delete master data error:', error);
+      toast.error(
+        isTenantScopedTable(activeTable)
+          ? `Could not delete: ${error.message}`
+          : `Could not delete: ${error.message}. This category type is managed by the platform, not your tenant.`
+      );
     },
   });
 
