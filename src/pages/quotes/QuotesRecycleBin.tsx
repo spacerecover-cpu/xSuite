@@ -12,6 +12,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Table } from '../../components/ui/Table';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { useToast } from '../../hooks/useToast';
 import { formatDate } from '../../lib/format';
 import {
@@ -196,9 +197,10 @@ export const QuotesRecycleBin: React.FC = () => {
 
         <Card className="mt-6">
           {isLoading ? (
-            <div className="p-8 text-center">
-              <div className="inline-block w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
-              <p className="text-slate-600 mt-4">Loading deleted quotes...</p>
+            <div className="p-6 space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full rounded-lg" />
+              ))}
             </div>
           ) : deletedQuotes.length === 0 ? (
             <div className="p-12 text-center">

@@ -1,7 +1,8 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Gauge, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Gauge, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 interface TenantRateLimit {
   id: string;
@@ -57,8 +58,11 @@ export const RateLimitDashboardPage: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
         </div>
       ) : limits.length === 0 ? (
         <div className="bg-white rounded-lg border border-slate-200 p-12 text-center">

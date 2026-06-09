@@ -5,6 +5,7 @@ import { Calendar, DollarSign, Users, Eye } from 'lucide-react';
 import { payrollService } from '../../lib/payrollService';
 import { payrollKeys } from '../../lib/queryKeys';
 import { Button } from '../../components/ui/Button';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { formatCurrency } from '../../lib/format';
 import { format } from 'date-fns';
@@ -74,9 +75,10 @@ export default function PayrollHistoryPage() {
 
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
         {isLoading ? (
-          <div className="p-12 text-center">
-            <div className="inline-block w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-            <p className="text-slate-600 mt-4">Loading payroll periods...</p>
+          <div className="p-6 space-y-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full rounded-lg" />
+            ))}
           </div>
         ) : filteredPeriods && filteredPeriods.length > 0 ? (
           <div className="overflow-x-auto">

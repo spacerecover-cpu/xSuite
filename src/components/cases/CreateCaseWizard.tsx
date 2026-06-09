@@ -26,6 +26,8 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { setPrimaryDevice } from '../../lib/deviceService';
 import { logger } from '../../lib/logger';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
 import type { Database } from '../../types/database.types';
 
 type CasesInsert = Database['public']['Tables']['cases']['Insert'];
@@ -55,6 +57,8 @@ interface CreateCaseWizardProps {
 export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onSuccess }) => {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [showPassword, setShowPassword] = useState(false);
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -491,7 +495,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
     },
     onError: (error) => {
       logger.error('Case creation error:', error);
-      alert(`Failed to create case: ${error.message}`);
+      toast.error(`Failed to create case: ${error.message}`);
     },
   });
 
@@ -739,8 +743,13 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                           View/Edit
                         </button>
                         <button
-                          onClick={() => {
-                            const confirmed = window.confirm(`Remove all ${bulkServerDrives.length} bulk drives?`);
+                          onClick={async () => {
+                            const confirmed = await confirm({
+                              title: 'Remove All Bulk Drives',
+                              message: `Remove all ${bulkServerDrives.length} bulk drives?`,
+                              confirmLabel: 'Remove All',
+                              tone: 'danger',
+                            });
                             if (confirmed) setBulkServerDrives([]);
                           }}
                           className="text-xs text-danger hover:text-danger/80 font-medium"

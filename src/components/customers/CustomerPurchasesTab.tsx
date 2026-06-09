@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ShoppingBag, Shield, Hash, ExternalLink, Package } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
+import { Skeleton } from '../ui/Skeleton';
 import {
   getSalesByCustomer,
   getCustomerWarranties,
@@ -65,8 +66,10 @@ export const CustomerPurchasesTab: React.FC<CustomerPurchasesTabProps> = ({ cust
           </div>
 
           {loadingSales ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
+            <div className="space-y-3 py-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
             </div>
           ) : sales.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-slate-400">
@@ -141,8 +144,10 @@ export const CustomerPurchasesTab: React.FC<CustomerPurchasesTabProps> = ({ cust
           </div>
 
           {loadingWarranties ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
+            <div className="space-y-3 py-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
             </div>
           ) : warranties.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-slate-400">
@@ -203,8 +208,10 @@ export const CustomerPurchasesTab: React.FC<CustomerPurchasesTabProps> = ({ cust
           </div>
 
           {loadingSerials ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
+            <div className="space-y-3 py-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
             </div>
           ) : serialNumbers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-slate-400">

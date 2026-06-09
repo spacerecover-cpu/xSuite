@@ -25,7 +25,9 @@ import { ExportButton } from '../../components/shared/ExportButton';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { downloadCSV } from '../../lib/csvExport';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { logger } from '../../lib/logger';
 import type { Database } from '../../types/database.types';
 import {
@@ -69,6 +71,8 @@ type ExpenseRow = Pick<
 
 export const ExpensesList: React.FC = () => {
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const confirm = useConfirm();
   const { formatCurrency } = useCurrency();
   const { profile } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -284,7 +288,13 @@ export const ExpensesList: React.FC = () => {
       return;
     }
     const n = selection.selectedCount;
-    if (!window.confirm(`Archive ${n} expense${n === 1 ? '' : 's'}? They'll be hidden from lists but recoverable.`)) {
+    const ok = await confirm({
+      title: `Archive ${n} expense${n === 1 ? '' : 's'}?`,
+      message: `They'll be hidden from lists but recoverable.`,
+      confirmLabel: 'Archive',
+      tone: 'danger',
+    });
+    if (!ok) {
       return;
     }
     setIsArchiving(true);
@@ -307,10 +317,18 @@ export const ExpensesList: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-8 max-w-[1800px] mx-auto">
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading expenses...</p>
+      <div className="p-8 max-w-[1800px] mx-auto space-y-6">
+        <Skeleton className="h-28 w-full rounded-2xl" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+          ))}
+        </div>
+        <Skeleton className="h-20 w-full rounded-2xl" />
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full rounded-lg" />
+          ))}
         </div>
       </div>
     );

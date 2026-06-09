@@ -4,6 +4,7 @@ import { DollarSign, Receipt, FileText, ExternalLink } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
+import { Skeleton } from '../ui/Skeleton';
 import { formatDate } from '../../lib/format';
 import { useCurrency } from '../../hooks/useCurrency';
 
@@ -97,8 +98,25 @@ export function CustomerFinancialTab({ customerId, companyId }: CustomerFinancia
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}>
+              <div className="p-4 space-y-2">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-7 w-24" />
+              </div>
+            </Card>
+          ))}
+        </div>
+        <Card>
+          <div className="p-6 space-y-3">
+            <Skeleton className="h-5 w-40" />
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-8 w-full" />
+            ))}
+          </div>
+        </Card>
       </div>
     );
   }

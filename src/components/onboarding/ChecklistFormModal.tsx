@@ -16,7 +16,7 @@ import {
   type ChecklistWithItems,
 } from '../../lib/employeeOnboardingService';
 import { getPositions } from '../../lib/recruitmentService';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
 
 interface ChecklistFormData {
   name: string;
@@ -43,6 +43,7 @@ interface Props {
 
 export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist }) => {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const isEditing = !!checklist;
   const nameFieldId = useId();
   const descriptionFieldId = useId();

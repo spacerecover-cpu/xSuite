@@ -6,6 +6,7 @@ import { RichTextEditor } from '../ui/RichTextEditor';
 import { DollarSign } from 'lucide-react';
 import { useAccountingLocale } from '../../hooks/useAccountingLocale';
 import { logger } from '../../lib/logger';
+import { useToast } from '../../hooks/useToast';
 
 interface LineItemTemplateFormState {
   name: string;
@@ -49,6 +50,7 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
   templateTypeId,
   isLineItemType,
 }) => {
+  const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const firstFieldRef = useRef<HTMLInputElement>(null);
   const descriptionId = useId();
@@ -86,12 +88,12 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      alert('Please enter a template name');
+      toast.error('Please enter a template name');
       return;
     }
 
     if (isLineItemType && formData.default_price < 0) {
-      alert('Price cannot be negative');
+      toast.error('Price cannot be negative');
       return;
     }
 
@@ -100,7 +102,7 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
       const roundedPrice = Math.round(formData.default_price * factor) / factor;
 
       if (formData.default_price !== roundedPrice) {
-        alert(`Price must have at most ${decimalPlaces} decimal places`);
+        toast.error(`Price must have at most ${decimalPlaces} decimal places`);
         return;
       }
     }
@@ -114,7 +116,7 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
       onClose();
     } catch (error: unknown) {
       logger.error('Error saving template:', error);
-      alert(error instanceof Error ? error.message : 'Failed to save template. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to save template. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

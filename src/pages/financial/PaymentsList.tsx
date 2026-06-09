@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { formatDate } from '../../lib/format';
 import { FinancialModuleHeader } from '../../components/financial/FinancialModuleHeader';
@@ -13,6 +14,7 @@ import { PaymentViewModal } from '../../components/financial/PaymentViewModal';
 import { PaymentReceiptModal } from '../../components/financial/PaymentReceiptModal';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useConfirm } from '../../hooks/useConfirm';
+import { useToast } from '../../hooks/useToast';
 import { createPayment, getPaymentStats, voidPayment, fetchPaymentById } from '../../lib/paymentsService';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { logger } from '../../lib/logger';
@@ -39,6 +41,7 @@ export const PaymentsList: React.FC = () => {
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
   const confirm = useConfirm();
+  const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -195,7 +198,7 @@ export const PaymentsList: React.FC = () => {
       setShowViewModal(true);
     } catch (error) {
       logger.error('Error fetching payment details:', error);
-      alert('Failed to load payment details');
+      toast.error('Failed to load payment details');
     }
   };
 
@@ -206,7 +209,7 @@ export const PaymentsList: React.FC = () => {
       setShowReceiptModal(true);
     } catch (error) {
       logger.error('Error fetching payment details:', error);
-      alert('Failed to load payment receipt');
+      toast.error('Failed to load payment receipt');
     }
   };
 
@@ -278,10 +281,18 @@ export const PaymentsList: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-8 max-w-[1800px] mx-auto">
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading payments...</p>
+      <div className="p-8 max-w-[1800px] mx-auto space-y-6">
+        <Skeleton className="h-28 w-full rounded-2xl" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+          ))}
+        </div>
+        <Skeleton className="h-20 w-full rounded-2xl" />
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full rounded-lg" />
+          ))}
         </div>
       </div>
     );

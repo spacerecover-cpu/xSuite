@@ -5,6 +5,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { SearchableSelect } from '../ui/SearchableSelect';
+import { Skeleton } from '../ui/Skeleton';
 import { SaleableItemsGrid } from './SaleableItemsGrid';
 import { BarcodeLookupInput } from './BarcodeLookupInput';
 import { SerialNumberSelect } from './SerialNumberSelect';
@@ -339,8 +340,10 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
 
           <div className="flex-1 overflow-y-auto pr-1">
             {loadingItems ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <div className="grid grid-cols-2 gap-3 py-2 sm:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-24 w-full rounded-lg" />
+                ))}
               </div>
             ) : (
               <SaleableItemsGrid

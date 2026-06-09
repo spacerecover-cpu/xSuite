@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Activity, FileText, Users, CreditCard, Settings, AlertCircle } from 'lucide-react';
 import { Card } from '../../ui/Card';
+import { Skeleton } from '../../ui/Skeleton';
 import { getTenantActivityLog } from '@/lib/platformAdminService';
 import { platformAdminKeys } from '@/lib/queryKeys';
 import { formatDistanceToNow } from 'date-fns';
@@ -45,8 +46,11 @@ export const TenantActivityTab: React.FC<TenantActivityTabProps> = ({ tenantId }
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      <div className="space-y-3">
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
       </div>
     );
   }

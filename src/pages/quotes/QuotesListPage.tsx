@@ -18,6 +18,8 @@ import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { downloadCSV } from '../../lib/csvExport';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
+import { Skeleton } from '../../components/ui/Skeleton';
 import type { Database } from '../../types/database.types';
 import {
   FileText,
@@ -58,6 +60,7 @@ const toOptionalString = (value: unknown): string | null => {
 export const QuotesListPage: React.FC = () => {
   const navigate = useNavigate();
   const toast = useToast();
+  const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
@@ -173,9 +176,13 @@ export const QuotesListPage: React.FC = () => {
       return;
     }
     const n = selection.selectedCount;
-    if (!window.confirm(`Archive ${n} quote${n === 1 ? '' : 's'}? They'll be hidden from lists but recoverable.`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Archive quotes',
+      message: `Archive ${n} quote${n === 1 ? '' : 's'}? They'll be hidden from lists but recoverable.`,
+      confirmLabel: 'Archive',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setIsArchiving(true);
     try {
       const { error } = await supabase
@@ -202,7 +209,13 @@ export const QuotesListPage: React.FC = () => {
       n > 5
         ? `Email ${n} quotes to their customers? Sending is rate-limited to 5/minute — this will take roughly ${Math.ceil(n / 5)} minute(s).`
         : `Email ${n} quote${n === 1 ? '' : 's'} to their customers?`;
-    if (!window.confirm(msg)) return;
+    const ok = await confirm({
+      title: 'Send quotes',
+      message: msg,
+      confirmLabel: 'Send',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setSendProgress({ done: 0, total: n });
     try {
       const { bulkSendQuoteEmails } = await import('../../lib/quotesService');
@@ -233,9 +246,16 @@ export const QuotesListPage: React.FC = () => {
   if (isLoading || statsLoading) {
     return (
       <div className="p-8 max-w-[1800px] mx-auto">
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading quotes...</p>
+        <Skeleton className="h-24 w-full rounded-2xl mb-6" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 w-full rounded-2xl" />
+          ))}
+        </div>
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full rounded-lg" />
+          ))}
         </div>
       </div>
     );
@@ -643,28 +663,33 @@ export const QuotesListPage: React.FC = () => {
                             onClick={async () => {
                               if (!quote.id) return;
                               const quoteId = quote.id;
-                              if (window.confirm(`Send quote ${quote.quote_number} to ${getClientName(quote)}?`)) {
-                                try {
-                                  setSendingQuoteId(quoteId);
-                                  const { error } = await supabase
-                                    .from('quotes')
-                                    .update({
-                                      status: 'sent',
-                                    })
-                                    .eq('id', quoteId);
+                              const ok = await confirm({
+                                title: 'Send quote',
+                                message: `Send quote ${quote.quote_number} to ${getClientName(quote)}?`,
+                                confirmLabel: 'Send',
+                                tone: 'danger',
+                              });
+                              if (!ok) return;
+                              try {
+                                setSendingQuoteId(quoteId);
+                                const { error } = await supabase
+                                  .from('quotes')
+                                  .update({
+                                    status: 'sent',
+                                  })
+                                  .eq('id', quoteId);
 
-                                  if (error) throw error;
+                                if (error) throw error;
 
-                                  queryClient.invalidateQueries({ queryKey: ['quotes'] });
-                                  queryClient.invalidateQueries({ queryKey: ['quote_stats'] });
+                                queryClient.invalidateQueries({ queryKey: ['quotes'] });
+                                queryClient.invalidateQueries({ queryKey: ['quote_stats'] });
 
-                                  alert(`Quote ${quote.quote_number} has been sent successfully!`);
-                                } catch (error) {
-                                  logger.error('Error sending quote:', error);
-                                  alert('Failed to send quote. Please try again.');
-                                } finally {
-                                  setSendingQuoteId(null);
-                                }
+                                toast.success(`Quote ${quote.quote_number} has been sent successfully!`);
+                              } catch (error) {
+                                logger.error('Error sending quote:', error);
+                                toast.error('Failed to send quote. Please try again.');
+                              } finally {
+                                setSendingQuoteId(null);
                               }
                             }}
                             disabled={sendingQuoteId === quote.id}

@@ -3,6 +3,7 @@ import { Eye } from 'lucide-react';
 import type { StockSaleWithDetails } from '../../lib/stockService';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { Skeleton } from '../ui/Skeleton';
 
 interface StockSalesTableProps {
   sales: StockSaleWithDetails[];
@@ -41,8 +42,10 @@ export const StockSalesTable: React.FC<StockSalesTableProps> = ({
 }) => {
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="space-y-2 py-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-12 w-full rounded-lg" />
+        ))}
       </div>
     );
   }

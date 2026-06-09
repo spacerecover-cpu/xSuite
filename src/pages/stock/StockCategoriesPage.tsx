@@ -5,6 +5,7 @@ import { PageHeader } from '../../components/shared/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
+import { Skeleton } from '../../components/ui/Skeleton';
 import {
   getStockCategories,
   createStockCategory,
@@ -282,8 +283,10 @@ export const StockCategoriesPage: React.FC = () => {
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
         {isLoading ? (
-          <div className="py-16 flex items-center justify-center">
-            <div className="w-7 h-7 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="p-4 space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full rounded-lg" />
+            ))}
           </div>
         ) : treeRoots.length === 0 ? (
           <div className="py-16 text-center">

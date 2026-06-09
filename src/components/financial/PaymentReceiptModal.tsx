@@ -4,6 +4,7 @@ import { PDFDownloadButton } from '../shared/PDFDownloadButton';
 import { PaymentReceiptDocument } from '../documents/PaymentReceiptDocument';
 import { useCurrency } from '../../hooks/useCurrency';
 import { usePDFDownload } from '../../hooks/usePDFDownload';
+import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
 
 interface PaymentData {
@@ -25,6 +26,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   payment,
 }) => {
   const { currencyFormat } = useCurrency();
+  const toast = useToast();
   const {
     companySettings,
     isLoadingSettings,
@@ -49,11 +51,11 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
       const { generatePaymentReceipt } = await import('../../lib/pdf/pdfService');
       const result = await generatePaymentReceipt(payment.id);
       if (!result.success) {
-        alert(result.error || 'Failed to generate PDF');
+        toast.error(result.error || 'Failed to generate PDF');
       }
     } catch (error) {
       logger.error('Error generating payment receipt PDF:', error);
-      alert('Failed to generate PDF. Please try again.');
+      toast.error('Failed to generate PDF. Please try again.');
     } finally {
       setIsGenerating(false);
     }

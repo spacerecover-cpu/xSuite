@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Ticket, Search } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { StatsCard } from '../../components/ui/StatsCard';
 import { Table } from '../../components/ui/Table';
 import { Input } from '../../components/ui/Input';
@@ -241,8 +242,11 @@ export const SupportTicketsPage: React.FC = () => {
 
       <Card>
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          <div className="p-4 space-y-3">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
           </div>
         ) : tickets.length === 0 ? (
           <div className="p-12 text-center">

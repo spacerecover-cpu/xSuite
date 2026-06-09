@@ -13,7 +13,7 @@ import {
   type JobWithDetails,
 } from '../../lib/recruitmentService';
 import type { Database } from '../../types/database.types';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
 
 interface CandidateFormData {
   first_name: string;
@@ -55,6 +55,7 @@ const stageLabels: Record<string, string> = {
 
 export const CandidateFormModal: React.FC<Props> = ({ isOpen, onClose, candidate, job }) => {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const isEditing = !!candidate;
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<CandidateFormData>({

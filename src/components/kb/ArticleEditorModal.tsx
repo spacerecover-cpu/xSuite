@@ -17,7 +17,7 @@ import {
 } from '../../lib/kbService';
 import { kbKeys } from '../../lib/queryKeys';
 import { useAuth } from '../../contexts/AuthContext';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
 
 interface ArticleEditorModalProps {
   isOpen: boolean;
@@ -26,6 +26,7 @@ interface ArticleEditorModalProps {
 }
 
 export const ArticleEditorModal: React.FC<ArticleEditorModalProps> = ({ isOpen, onClose, article }) => {
+  const toast = useToast();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
 

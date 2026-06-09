@@ -14,7 +14,7 @@ import {
 } from '../../lib/performanceService';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Database } from '../../types/database.types';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
 
 interface ReviewFormData {
   employee_id: string;
@@ -117,6 +117,7 @@ function StarPicker({
 
 export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) => {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { user } = useAuth();
   const isEditing = !!review;
   const employeeFieldId = useId();

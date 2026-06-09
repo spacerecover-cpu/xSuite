@@ -10,7 +10,9 @@ import { Input } from '../../components/ui/Input';
 import { ImageUpload } from '../../components/ui/ImageUpload';
 import { CollapsibleSection } from '../../components/ui/CollapsibleSection';
 import { SearchableSelect } from '../../components/ui/SearchableSelect';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
 import { logger } from '../../lib/logger';
 import {
   Building2,
@@ -117,6 +119,7 @@ export const GeneralSettings: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const confirm = useConfirm();
   const [formData, setFormData] = useState<Partial<CompanySettings> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [, setUploadingFiles] = useState<Set<string>>(new Set());
@@ -421,12 +424,12 @@ export const GeneralSettings: React.FC = () => {
       const { default_retention_days = 180, min_retention_days = 1, max_retention_days = 3650 } = formData.clone_defaults;
 
       if (min_retention_days > max_retention_days) {
-        alert('Minimum retention period cannot be greater than maximum retention period.');
+        toast.error('Minimum retention period cannot be greater than maximum retention period.');
         return;
       }
 
       if (default_retention_days < min_retention_days || default_retention_days > max_retention_days) {
-        alert(`Default retention period must be between ${min_retention_days} and ${max_retention_days} days.`);
+        toast.error(`Default retention period must be between ${min_retention_days} and ${max_retention_days} days.`);
         return;
       }
     }
@@ -580,21 +583,31 @@ export const GeneralSettings: React.FC = () => {
   if (isLoading || !formData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-            <p className="text-slate-500 mt-4">Loading settings...</p>
+        <Skeleton className="h-5 w-32 mb-6" />
+        <div className="flex items-start gap-6 mb-8">
+          <Skeleton className="w-16 h-16 rounded-2xl" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-80" />
           </div>
+        </div>
+        <div className="space-y-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+          ))}
         </div>
       </div>
     );
   }
 
-  const handleBackClick = () => {
+  const handleBackClick = async () => {
     if (hasUnsavedChanges) {
-      const confirmLeave = window.confirm(
-        'You have unsaved changes. Are you sure you want to leave? All unsaved changes will be lost.'
-      );
+      const confirmLeave = await confirm({
+        title: 'Unsaved Changes',
+        message: 'You have unsaved changes. Are you sure you want to leave? All unsaved changes will be lost.',
+        confirmLabel: 'Leave',
+        tone: 'danger',
+      });
       if (!confirmLeave) return;
     }
     navigate('/settings');

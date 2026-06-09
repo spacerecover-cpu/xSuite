@@ -4,9 +4,10 @@ import { ShieldCheck, ShieldOff, Loader2, AlertTriangle, KeyRound } from 'lucide
 import { mfaService } from '../../lib/mfaService';
 import { MFAEnrollment } from '../../components/auth/MFAEnrollment';
 import { useAuth } from '../../contexts/AuthContext';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
 
 export const SecuritySettingsPage: React.FC = () => {
+  const toast = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showEnrollment, setShowEnrollment] = useState(false);

@@ -17,6 +17,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { seedTemplates } from '../../lib/seedService';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { SeedingResultsDisplay } from '../../components/settings/SeedingResultsDisplay';
@@ -150,10 +151,12 @@ export const TemplatesDashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-slate-600">Loading templates...</p>
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-56" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-40 w-full rounded-lg" />
+          ))}
         </div>
       </div>
     );

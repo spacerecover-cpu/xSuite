@@ -15,6 +15,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
 import {
   getStockAdjustments,
   createStockAdjustment,
@@ -258,8 +259,10 @@ export const StockAdjustmentsPage: React.FC = () => {
         </div>
 
         {isLoading ? (
-          <div className="py-16 flex items-center justify-center">
-            <div className="w-7 h-7 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="p-4 space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full rounded-lg" />
+            ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="py-16 text-center">

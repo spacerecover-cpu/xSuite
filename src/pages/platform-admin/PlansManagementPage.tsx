@@ -6,7 +6,8 @@ import { Button } from '../../components/ui/Button';
 import { getAllSubscriptionPlans, updateSubscriptionPlan, softDeleteSubscriptionPlan, formatPlanPrice } from '../../lib/billingService';
 import { platformAdminKeys } from '../../lib/queryKeys';
 import { PlanFormModal } from '../../components/platform-admin/plans/PlanFormModal';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
 import type { PlanWithFeatures } from '../../lib/billingService';
 
 type TabType = 'all' | 'active' | 'inactive';
@@ -20,6 +21,8 @@ const tabs: Array<{ id: TabType; label: string }> = [
 export const PlansManagementPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
 
@@ -125,10 +128,15 @@ export const PlansManagementPage: React.FC = () => {
                   onToggleActive={() =>
                     toggleActiveMutation.mutate({ id: plan.id, is_active: !plan.is_active })
                   }
-                  onDelete={() => {
-                    if (confirm(`Delete "${plan.name}"? This action cannot be undone.`)) {
-                      deleteMutation.mutate(plan.id);
-                    }
+                  onDelete={async () => {
+                    const ok = await confirm({
+                      title: 'Delete plan',
+                      message: `Delete "${plan.name}"? This action cannot be undone.`,
+                      confirmLabel: 'Delete',
+                      tone: 'danger',
+                    });
+                    if (!ok) return;
+                    deleteMutation.mutate(plan.id);
                   }}
                 />
               ))}

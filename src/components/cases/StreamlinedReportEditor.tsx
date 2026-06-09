@@ -17,6 +17,8 @@ import { REPORT_TYPES, type ReportType } from '../../lib/reportTypes';
 import { getIconComponent } from '../../lib/iconMapper';
 import { logger } from '../../lib/logger';
 import { Dialog } from '../ui/Dialog';
+import { Skeleton } from '../ui/Skeleton';
+import { useToast } from '../../hooks/useToast';
 
 interface StreamlinedReportEditorProps {
   isOpen: boolean;
@@ -83,6 +85,7 @@ export function StreamlinedReportEditor({
   existingReport,
   onSuccess,
 }: StreamlinedReportEditorProps) {
+  const toast = useToast();
   const [reportTitle, setReportTitle] = useState('');
   const [sections, setSections] = useState<Record<string, string>>({});
   const [sectionConfigs, setSectionConfigs] = useState<DynamicSectionConfig[]>([]);
@@ -202,7 +205,7 @@ export function StreamlinedReportEditor({
       }
     } catch (error) {
       logger.error('Error loading existing report:', error);
-      alert('Failed to load report. Please try again.');
+      toast.error('Failed to load report. Please try again.');
       onClose();
     } finally {
       setInitialLoading(false);
@@ -218,7 +221,7 @@ export function StreamlinedReportEditor({
 
       const template = await reportsService.getDefaultTemplate(reportType);
       if (!template) {
-        alert('No template found for this report type');
+        toast.error('No template found for this report type');
         onClose();
         return;
       }
@@ -226,7 +229,7 @@ export function StreamlinedReportEditor({
       await loadSectionsFromDatabase(template.id);
     } catch (error) {
       logger.error('Error initializing report:', error);
-      alert('Failed to initialize report. Please try again.');
+      toast.error('Failed to initialize report. Please try again.');
       onClose();
     } finally {
       setInitialLoading(false);
@@ -282,7 +285,7 @@ export function StreamlinedReportEditor({
 
   const handleSubmit = async () => {
     if (!reportTitle.trim()) {
-      alert('Please enter a report title');
+      toast.warning('Please enter a report title');
       return;
     }
 
@@ -292,7 +295,7 @@ export function StreamlinedReportEditor({
     );
 
     if (incompleteSections.length > 0) {
-      alert(
+      toast.warning(
         `Please complete all required sections: ${incompleteSections
           .map((s) => s.title)
           .join(', ')}`
@@ -322,7 +325,7 @@ export function StreamlinedReportEditor({
       } else {
         const template = await reportsService.getDefaultTemplate(reportType);
         if (!template) {
-          alert('Template not found');
+          toast.error('Template not found');
           return;
         }
 
@@ -339,7 +342,7 @@ export function StreamlinedReportEditor({
       onClose();
     } catch (error) {
       logger.error(`Error ${reportId || existingReport ? 'updating' : 'creating'} report:`, error);
-      alert(`Failed to ${reportId || existingReport ? 'update' : 'create'} report. Please try again.`);
+      toast.error(`Failed to ${reportId || existingReport ? 'update' : 'create'} report. Please try again.`);
     } finally {
       setLoading(false);
     }
@@ -363,10 +366,15 @@ export function StreamlinedReportEditor({
         label="Loading report"
         closeOnBackdrop={false}
         closeOnEscape={false}
-        className="w-auto max-w-none bg-white p-8 flex flex-col items-center gap-4"
+        className="w-[28rem] max-w-none bg-white p-8 flex flex-col gap-4"
       >
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        <p className="text-slate-600">Loading report sections...</p>
+        <Skeleton className="h-6 w-48" />
+        <div className="space-y-3">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-5/6" />
+          <Skeleton className="h-4 w-2/3" />
+        </div>
+        <p className="text-slate-600 text-center pt-2">Loading report sections...</p>
       </Dialog>
     );
   }

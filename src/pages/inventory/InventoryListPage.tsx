@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../hooks/useToast';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
 import AddInventoryModal from '../../components/inventory/AddInventoryModal';
 import InventoryDetailModal from '../../components/inventory/InventoryDetailModal';
 import DeleteInventoryConfirmationModal from '../../components/inventory/DeleteInventoryConfirmationModal';
@@ -448,9 +449,18 @@ export default function InventoryListPage() {
       )}
 
       {loading ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading inventory...</p>
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
+          <div className="space-y-3">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4">
+                <Skeleton className="h-10 w-10 rounded-lg" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-6 w-20 rounded-full" />
+                <Skeleton className="h-8 w-16" />
+              </div>
+            ))}
+          </div>
         </div>
       ) : items.length === 0 ? (
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">

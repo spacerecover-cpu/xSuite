@@ -16,7 +16,9 @@ import {
 } from '../../lib/employeeOnboardingService';
 import { ChecklistFormModal } from '../../components/onboarding/ChecklistFormModal';
 import { AssignChecklistModal } from '../../components/onboarding/AssignChecklistModal';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 const taskStatusColor: Record<string, string> = {
   pending: 'text-slate-500',
@@ -252,6 +254,8 @@ function ChecklistCard({
 
 export const EmployeeOnboardingPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<'active' | 'templates'>('active');
   const [showChecklistModal, setShowChecklistModal] = useState(false);
   const [editingChecklist, setEditingChecklist] = useState<ChecklistWithItems | null>(null);
@@ -368,8 +372,10 @@ export const EmployeeOnboardingPage: React.FC = () => {
       {activeTab === 'active' && (
         <>
           {loadingEmployees ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-36 rounded-2xl" />
+              ))}
             </div>
           ) : employeesWithTasks.length === 0 ? (
             <div className="text-center py-16">
@@ -398,8 +404,10 @@ export const EmployeeOnboardingPage: React.FC = () => {
       {activeTab === 'templates' && (
         <>
           {loadingChecklists ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} className="h-40 rounded-2xl" />
+              ))}
             </div>
           ) : checklists.length === 0 ? (
             <div className="text-center py-16">
@@ -417,8 +425,14 @@ export const EmployeeOnboardingPage: React.FC = () => {
                   key={checklist.id}
                   checklist={checklist}
                   onEdit={c => { setEditingChecklist(c); setShowChecklistModal(true); }}
-                  onDelete={id => {
-                    if (confirm('Delete this checklist?')) {
+                  onDelete={async id => {
+                    const ok = await confirm({
+                      title: 'Delete Checklist',
+                      message: 'Delete this checklist?',
+                      confirmLabel: 'Delete',
+                      tone: 'danger',
+                    });
+                    if (ok) {
                       deleteChecklistMutation.mutate(id);
                     }
                   }}

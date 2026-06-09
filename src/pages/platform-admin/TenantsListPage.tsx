@@ -6,12 +6,14 @@ import { getTenantsList, suspendTenant, reactivateTenant } from '../../lib/platf
 import { platformAdminKeys } from '../../lib/queryKeys';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
-import toast from 'react-hot-toast';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { useToast } from '../../hooks/useToast';
 
 export const TenantsListPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const toast = useToast();
 
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
@@ -145,8 +147,12 @@ export const TenantsListPage: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
         </div>
       ) : tenants && tenants.length > 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

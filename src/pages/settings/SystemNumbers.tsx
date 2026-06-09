@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/ui/Badge';
 import { ChevronLeft, Hash, Search } from 'lucide-react';
@@ -235,9 +236,10 @@ export const SystemNumbers: React.FC = () => {
             </div>
 
             {isLoading ? (
-              <div className="text-center py-16">
-                <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-                <p className="text-slate-500 mt-4">Loading sequences...</p>
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                ))}
               </div>
             ) : (
               <div className="space-y-3">

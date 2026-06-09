@@ -7,9 +7,11 @@ import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
 
 export const PayrollSettingsPage: React.FC = () => {
   const toast = useToast();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
 
   const { data: settings, isLoading } = useQuery({
@@ -88,8 +90,14 @@ export const PayrollSettingsPage: React.FC = () => {
     updateSettingsMutation.mutate(formData);
   };
 
-  const handleReset = () => {
-    if (confirm('Are you sure you want to reset all settings to default values?')) {
+  const handleReset = async () => {
+    const ok = await confirm({
+      title: 'Reset Settings',
+      message: 'Are you sure you want to reset all settings to default values?',
+      confirmLabel: 'Reset',
+      tone: 'danger',
+    });
+    if (ok) {
       resetSettingsMutation.mutate();
     }
   };

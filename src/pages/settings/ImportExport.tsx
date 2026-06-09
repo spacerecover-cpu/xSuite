@@ -14,6 +14,7 @@ import {
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { ENTITY_CONFIGS, EntityType, getJobs, getEntityCount } from '../../lib/importExportService';
@@ -214,9 +215,16 @@ export const ImportExport: React.FC = () => {
         <h2 className="text-lg font-semibold text-slate-900 mb-4">Recent Activity</h2>
         <Card>
           {loadingJobs ? (
-            <div className="p-8 text-center">
-              <div className="inline-block w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-              <p className="text-slate-500 mt-3">Loading activity...</p>
+            <div className="divide-y divide-slate-200">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="p-4 flex items-center gap-4">
+                  <Skeleton className="w-5 h-5 rounded" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-1/3" />
+                    <Skeleton className="h-3 w-1/4" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : recentJobs && recentJobs.length > 0 ? (
             <div className="divide-y divide-slate-200">

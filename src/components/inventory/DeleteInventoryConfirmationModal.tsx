@@ -2,6 +2,7 @@ import { useId, useState, useEffect } from 'react';
 import { AlertTriangle, Trash2, RefreshCw, X } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
+import { Skeleton } from '../ui/Skeleton';
 import { getInventoryStatusTypes, type InventoryStatusType } from '../../lib/inventoryService';
 import { logger } from '../../lib/logger';
 
@@ -102,8 +103,9 @@ export default function DeleteInventoryConfirmationModal({
         </div>
 
         {loadingStatusTypes ? (
-          <div className="flex justify-center py-4 mb-6">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+          <div className="mb-6">
+            <Skeleton className="h-4 w-32 mb-2" />
+            <Skeleton className="h-12 w-full" />
           </div>
         ) : (
           <div className="mb-6">

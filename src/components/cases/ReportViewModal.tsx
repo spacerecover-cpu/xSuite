@@ -16,6 +16,9 @@ import {
 import { format } from 'date-fns';
 import { EmailDocumentModal } from './EmailDocumentModal';
 import { logger } from '../../lib/logger';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
+import { Skeleton } from '../ui/Skeleton';
 
 interface ReportViewModalProps {
   isOpen: boolean;
@@ -36,6 +39,8 @@ export default function ReportViewModal({
   onApprove,
   onSend,
 }: ReportViewModalProps) {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [report, setReport] = useState<Report | null>(null);
   const [, setSections] = useState<ReportSectionData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,7 +119,7 @@ export default function ReportViewModal({
       await reportPDFService.downloadReportPDF(reportId);
     } catch (error) {
       logger.error('Error downloading PDF:', error);
-      alert('Failed to download PDF. Please try again.');
+      toast.error('Failed to download PDF. Please try again.');
     } finally {
       setDownloadingPDF(false);
     }
@@ -123,13 +128,19 @@ export default function ReportViewModal({
   const handleApprove = async () => {
     if (!report) return;
 
-    if (confirm('Are you sure you want to approve this report?')) {
+    const ok = await confirm({
+      title: 'Approve Report',
+      message: 'Are you sure you want to approve this report?',
+      confirmLabel: 'Approve',
+      tone: 'danger',
+    });
+    if (ok) {
       try {
         await onApprove?.(report.id);
         await loadReport();
       } catch (error) {
         logger.error('Error approving report:', error);
-        alert('Failed to approve report');
+        toast.error('Failed to approve report');
       }
     }
   };
@@ -138,17 +149,23 @@ export default function ReportViewModal({
     if (!report) return;
 
     if (report.status !== 'approved') {
-      alert('Report must be approved before sending to customer');
+      toast.warning('Report must be approved before sending to customer');
       return;
     }
 
-    if (confirm('Send this report to the customer?')) {
+    const ok = await confirm({
+      title: 'Send to Customer',
+      message: 'Send this report to the customer?',
+      confirmLabel: 'Send',
+      tone: 'danger',
+    });
+    if (ok) {
       try {
         await onSend?.(report.id);
         await loadReport();
       } catch (error) {
         logger.error('Error sending report:', error);
-        alert('Failed to send report');
+        toast.error('Failed to send report');
       }
     }
   };
@@ -269,11 +286,17 @@ export default function ReportViewModal({
           )}
 
           {!pdfError && !pdfBlobUrl && (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-sm text-gray-600">Generating PDF preview...</p>
+            <div className="h-full border border-gray-300 rounded-lg p-8 space-y-4">
+              <Skeleton className="h-8 w-1/2 mx-auto" />
+              <Skeleton className="h-4 w-3/4 mx-auto" />
+              <div className="space-y-3 pt-6">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
               </div>
+              <p className="text-sm text-gray-600 text-center pt-4">Generating PDF preview...</p>
             </div>
           )}
 

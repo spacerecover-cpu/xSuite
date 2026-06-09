@@ -7,6 +7,7 @@ import { getDashboardStats, getMRRTrend, getPlanDistribution, getAtRiskTenants }
 import { platformAdminKeys } from '../../lib/queryKeys';
 import { StatsCard } from '../../components/ui/StatsCard';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { chartAxis, chartCategorical, chartGrid } from '../../lib/chartTheme';
 
 export const PlatformDashboard: React.FC = () => {
@@ -35,10 +36,16 @@ export const PlatformDashboard: React.FC = () => {
 
   if (statsLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-600">Loading dashboard...</p>
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-72" />
+          <Skeleton className="h-72" />
         </div>
       </div>
     );

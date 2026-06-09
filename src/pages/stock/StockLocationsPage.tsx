@@ -4,6 +4,7 @@ import { MapPin, Plus, Pencil, Check, X } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { useToast } from '../../hooks/useToast';
 import {
   getStockLocations,
@@ -131,8 +132,10 @@ const StockLocationsPage: React.FC = () => {
       )}
 
       {isLoading ? (
-        <div className="py-12 flex items-center justify-center">
-          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="space-y-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full rounded-lg" />
+          ))}
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

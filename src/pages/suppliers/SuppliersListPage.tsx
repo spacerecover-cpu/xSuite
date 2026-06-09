@@ -5,6 +5,7 @@ import { EmptyState } from '../../components/shared/EmptyState';
 import { ExportButton } from '../../components/shared/ExportButton';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
 import SupplierFormModal from '../../components/suppliers/SupplierFormModal';
 import { supabase } from '../../lib/supabaseClient';
 import { useToast } from '../../hooks/useToast';
@@ -413,9 +414,21 @@ export default function SuppliersListPage() {
       </div>
 
       {loading ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading suppliers...</p>
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+          <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+            <Skeleton className="h-4 w-32" />
+          </div>
+          <div className="divide-y divide-slate-100">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-6 py-4">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-6 w-20 rounded-full" />
+              </div>
+            ))}
+          </div>
         </div>
       ) : filteredSuppliers.length === 0 ? (
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200">

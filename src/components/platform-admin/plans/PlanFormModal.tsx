@@ -4,7 +4,7 @@ import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
 import { createSubscriptionPlan } from '../../../lib/billingService';
 import { platformAdminKeys } from '../../../lib/queryKeys';
-import toast from 'react-hot-toast';
+import { useToast } from '../../../hooks/useToast';
 import type { Database } from '../../../types/database.types';
 
 type PlanInsert = Database['public']['Tables']['subscription_plans']['Insert'];
@@ -19,6 +19,7 @@ const generateSlug = (name: string): string =>
 
 export const PlanFormModal: React.FC<PlanFormModalProps> = ({ isOpen, onClose }) => {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const nameInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<Partial<PlanInsert>>({
     name: '',

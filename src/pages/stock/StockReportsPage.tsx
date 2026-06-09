@@ -20,6 +20,7 @@ import {
   Cell,
 } from 'recharts';
 import { PageHeader } from '../../components/shared/PageHeader';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { useCurrency } from '../../hooks/useCurrency';
 import { chartAxis, chartCategorical, chartTooltipBorder } from '../../lib/chartTheme';
 import {
@@ -224,8 +225,10 @@ export const StockReportsPage: React.FC = () => {
         </div>
 
         {loadingVal ? (
-          <div className="py-8 flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="py-8 space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full rounded-lg" />
+            ))}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -339,8 +342,10 @@ export const StockReportsPage: React.FC = () => {
         />
 
         {loadingSales ? (
-          <div className="py-8 flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="py-8 space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full rounded-lg" />
+            ))}
           </div>
         ) : (
           <>
@@ -448,8 +453,10 @@ export const StockReportsPage: React.FC = () => {
         />
 
         {loadingTop ? (
-          <div className="py-8 flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="py-8 space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full rounded-lg" />
+            ))}
           </div>
         ) : topItems.length === 0 ? (
           <div className="py-8 text-center text-slate-400 text-sm">
@@ -546,8 +553,10 @@ export const StockReportsPage: React.FC = () => {
         />
 
         {loadingLow ? (
-          <div className="py-8 flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="py-8 space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full rounded-lg" />
+            ))}
           </div>
         ) : lowStockItems.length === 0 ? (
           <div className="py-8 text-center">

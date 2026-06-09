@@ -17,8 +17,11 @@ import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { useTranslation } from 'react-i18next';
 import { logger } from '../../lib/logger';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
 
 const CATEGORY_CONFIG = {
   general: { label: 'General', color: '#3b82f6', bgColor: '#eff6ff' },
@@ -32,6 +35,8 @@ const CATEGORY_CONFIG = {
 };
 
 export const ReportSectionsPage: React.FC = () => {
+  const toast = useToast();
+  const confirm = useConfirm();
   const navigate = useNavigate();
   useTranslation();
   const [sections, setSections] = useState<ReportSection[]>([]);
@@ -97,11 +102,17 @@ export const ReportSectionsPage: React.FC = () => {
 
   const handleDeleteSection = async (section: ReportSection) => {
     if (section.is_system) {
-      alert('System sections cannot be deleted');
+      toast.error('System sections cannot be deleted');
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete "${section.section_name}"?`)) {
+    const ok = await confirm({
+      title: 'Delete Section',
+      message: `Are you sure you want to delete "${section.section_name}"?`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) {
       return;
     }
 
@@ -110,7 +121,7 @@ export const ReportSectionsPage: React.FC = () => {
       await loadSections();
     } catch (error) {
       logger.error('Error deleting section:', error);
-      alert('Failed to delete section');
+      toast.error('Failed to delete section');
     }
   };
 
@@ -234,9 +245,23 @@ export const ReportSectionsPage: React.FC = () => {
 
       {/* Sections Grid */}
       {isLoading ? (
-        <div className="text-center py-12">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading sections...</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i} className="p-5 space-y-3">
+              <div className="flex items-start justify-between">
+                <Skeleton className="w-10 h-10 rounded-lg" />
+                <Skeleton className="h-5 w-16" />
+              </div>
+              <Skeleton className="h-5 w-3/4" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-1/2" />
+              <div className="flex items-center gap-2 pt-4 border-t border-slate-100">
+                <Skeleton className="h-8 flex-1" />
+                <Skeleton className="h-8 w-9" />
+                <Skeleton className="h-8 w-9" />
+              </div>
+            </Card>
+          ))}
         </div>
       ) : filteredSections.length === 0 ? (
         <Card className="p-12 text-center">

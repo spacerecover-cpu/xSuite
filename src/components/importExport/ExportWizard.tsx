@@ -12,6 +12,7 @@ import {
 } from '../../lib/importExportService';
 import { supabase } from '../../lib/supabaseClient';
 import { logger } from '../../lib/logger';
+import { useToast } from '../../hooks/useToast';
 import type { Database } from '../../types/database.types';
 
 type TableName = keyof Database['public']['Tables'];
@@ -24,6 +25,7 @@ interface ExportWizardProps {
 type ExportFormat = 'csv' | 'excel';
 
 export const ExportWizard: React.FC<ExportWizardProps> = ({ entityType, onClose }) => {
+  const toast = useToast();
   const [step, setStep] = useState(1);
   const [format, setFormat] = useState<ExportFormat>('csv');
   const [dateFrom, setDateFrom] = useState('');
@@ -92,7 +94,7 @@ export const ExportWizard: React.FC<ExportWizardProps> = ({ entityType, onClose 
     },
     onError: (error: unknown) => {
       logger.error('Export failed:', error);
-      alert(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     },
   });
 

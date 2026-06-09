@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Send, Building2, Calendar, AlertCircle, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { TicketStatusBadge } from '../../components/platform-admin/tickets/TicketStatusBadge';
 import { TicketPriorityBadge } from '../../components/platform-admin/tickets/TicketPriorityBadge';
@@ -99,8 +100,15 @@ export const TicketDetailPage: React.FC = () => {
 
   if (ticketLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+      <div className="space-y-6">
+        <Skeleton className="h-10 w-64" />
+        <div className="grid grid-cols-3 gap-6">
+          <div className="col-span-2 space-y-4">
+            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+          <Skeleton className="h-64 w-full" />
+        </div>
       </div>
     );
   }
@@ -154,8 +162,10 @@ export const TicketDetailPage: React.FC = () => {
             <h3 className="text-lg font-semibold text-slate-900 mb-4">Conversation</h3>
             <div className="space-y-4 max-h-[500px] overflow-y-auto mb-6">
               {messagesLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+                <div className="space-y-4">
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
                 </div>
               ) : messages.length === 0 ? (
                 <p className="text-center text-slate-500 py-8">No messages yet</p>

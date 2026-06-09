@@ -24,6 +24,8 @@ import { generateSecurePassword } from '../../lib/passwordUtils';
 import { CustomerPurchasesTab } from '../../components/customers/CustomerPurchasesTab';
 import { CustomerCasesTab } from '../../components/customers/CustomerCasesTab';
 import { CustomerFinancialTab } from '../../components/customers/CustomerFinancialTab';
+import { useConfirm } from '../../hooks/useConfirm';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 type TabId = 'overview' | 'cases' | 'financial' | 'communications' | 'purchases';
 
@@ -75,6 +77,7 @@ export const CustomerProfilePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [showGeneratePasswordModal, setShowGeneratePasswordModal] = useState(false);
@@ -340,10 +343,15 @@ export const CustomerProfilePage: React.FC = () => {
     generatePasswordMutation.mutate();
   };
 
-  const handleDisablePortalAccess = () => {
-    if (window.confirm('Are you sure you want to disable portal access for this customer? They will no longer be able to log in.')) {
-      disablePortalAccessMutation.mutate();
-    }
+  const handleDisablePortalAccess = async () => {
+    const ok = await confirm({
+      title: 'Disable Portal Access',
+      message: 'Are you sure you want to disable portal access for this customer? They will no longer be able to log in.',
+      confirmLabel: 'Disable Access',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    disablePortalAccessMutation.mutate();
   };
 
   const handleSubmitEdit = (e: React.FormEvent) => {
@@ -353,10 +361,32 @@ export const CustomerProfilePage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-8 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading customer profile...</p>
+      <div className="p-8 max-w-[1600px] mx-auto">
+        <Skeleton className="h-5 w-40 mb-6" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="lg:col-span-2 space-y-6">
+            <div className="rounded-2xl border border-slate-200 p-6">
+              <div className="flex items-start gap-6">
+                <Skeleton className="w-20 h-20 rounded-full flex-shrink-0" />
+                <div className="flex-1 space-y-3">
+                  <Skeleton className="h-7 w-1/2" />
+                  <Skeleton className="h-4 w-1/3" />
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-4 w-1/2" />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 p-6 space-y-4">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-24 w-full rounded-xl" />
+            <Skeleton className="h-9 w-full rounded-lg" />
+          </div>
+        </div>
+        <div className="rounded-2xl border border-slate-200 p-6 space-y-4">
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-5/6" />
         </div>
       </div>
     );

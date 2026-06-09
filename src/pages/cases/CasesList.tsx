@@ -17,6 +17,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useUsageLimit } from '../../hooks/useFeatureGate';
 import { canPerformAction } from '../../lib/featureGateService';
 import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 interface Case {
   id: string;
@@ -51,6 +53,7 @@ interface Case {
 export const CasesList: React.FC = () => {
   const navigate = useNavigate();
   const toast = useToast();
+  const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile } = useAuth();
   const { usage: caseUsage } = useUsageLimit('max_cases_per_month');
@@ -326,10 +329,13 @@ export const CasesList: React.FC = () => {
       return;
     }
     const n = selection.selectedCount;
-    // Native confirm — destructive enough to warrant a hard stop. Don't
-    // build a custom modal until users actually request progress bars or
-    // bulk-archive undo; YAGNI.
-    if (!window.confirm(`Archive ${n} case${n === 1 ? '' : 's'}? They'll be hidden from lists but recoverable.`)) {
+    const ok = await confirm({
+      title: 'Archive Cases',
+      message: `Archive ${n} case${n === 1 ? '' : 's'}? They'll be hidden from lists but recoverable.`,
+      confirmLabel: 'Archive',
+      tone: 'danger',
+    });
+    if (!ok) {
       return;
     }
     setIsArchiving(true);
@@ -607,9 +613,22 @@ export const CasesList: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading cases...</p>
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+          <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+            <Skeleton className="h-4 w-32" />
+          </div>
+          <div className="divide-y divide-slate-200">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-6 px-6 py-4">
+                <Skeleton className="h-4 w-4 rounded" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-5 w-16 rounded-full" />
+                <Skeleton className="h-4 w-32 flex-1" />
+                <Skeleton className="h-5 w-24 rounded-full" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            ))}
+          </div>
         </div>
       ) : cases.length === 0 ? (
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200">

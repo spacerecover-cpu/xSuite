@@ -4,6 +4,7 @@ import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { SearchableSelect } from '../ui/SearchableSelect';
+import { Skeleton } from '../ui/Skeleton';
 import { supabase, getTenantId } from '../../lib/supabaseClient';
 import { useCurrency } from '../../hooks/useCurrency';
 import { logger } from '../../lib/logger';
@@ -367,8 +368,22 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({ isOpen, onClose, 
       <form onSubmit={handleSubmit}>
 
         {(loading || currencyLoading) ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+          <div className="overflow-y-auto pr-2">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+              {[0, 1].map((col) => (
+                <div key={col} className="bg-info-muted rounded-lg p-4 border border-info/20">
+                  <Skeleton className="h-6 w-40 mb-3" />
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i}>
+                        <Skeleton className="h-3 w-24 mb-2" />
+                        <Skeleton className="h-9 w-full" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="overflow-y-auto pr-2">

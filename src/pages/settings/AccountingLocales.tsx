@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { useTenantConfig } from '../../contexts/TenantConfigContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { LocaleFormModal } from './LocaleFormModal';
@@ -163,9 +164,13 @@ export const AccountingLocales: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <div className="text-center py-12">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading locales...</p>
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+          <Skeleton className="h-11 w-full" />
+          <div className="divide-y divide-slate-200">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full" />
+            ))}
+          </div>
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">

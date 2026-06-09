@@ -17,6 +17,7 @@ import { logger } from '../../lib/logger';
 import { updateCompany } from '../../lib/companyService';
 import { CustomerCasesTab } from '../../components/customers/CustomerCasesTab';
 import { CustomerFinancialTab } from '../../components/customers/CustomerFinancialTab';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 interface Company {
   id: string;
@@ -371,10 +372,25 @@ export const CompanyProfilePage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-8 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading company profile...</p>
+      <div className="p-8 max-w-[1600px] mx-auto">
+        <Skeleton className="h-5 w-40 mb-6" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="lg:col-span-2 space-y-6">
+            <div className="rounded-2xl border border-slate-200 p-6">
+              <div className="flex items-start gap-6">
+                <Skeleton className="w-16 h-16 rounded-xl flex-shrink-0" />
+                <div className="flex-1 space-y-3">
+                  <Skeleton className="h-7 w-1/2" />
+                  <Skeleton className="h-4 w-1/3" />
+                  <Skeleton className="h-4 w-2/3" />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 p-6 space-y-3">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-20 w-full rounded-xl" />
+          </div>
         </div>
       </div>
     );

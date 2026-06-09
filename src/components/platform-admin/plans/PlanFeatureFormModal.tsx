@@ -4,7 +4,7 @@ import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
 import { createPlanFeature, updatePlanFeature } from '../../../lib/billingService';
 import { platformAdminKeys } from '../../../lib/queryKeys';
-import toast from 'react-hot-toast';
+import { useToast } from '../../../hooks/useToast';
 import type { Database } from '../../../types/database.types';
 
 type PlanFeature = Database['public']['Tables']['plan_features']['Row'];
@@ -42,6 +42,7 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
   feature,
 }) => {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const isEditing = !!feature;
 
   const [formData, setFormData] = useState({

@@ -7,6 +7,7 @@ import { Badge } from '../../components/ui/Badge';
 import { DataTable } from '../../components/shared/DataTable';
 import { tenantService } from '../../lib/tenantService';
 import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
 import type { Database } from '../../types/database.types';
 import type { Column } from '../../components/shared/DataTable';
 import { logger } from '../../lib/logger';
@@ -26,6 +27,7 @@ export const TenantManagement = () => {
   const [tenantStats, setTenantStats] = useState<Record<string, TenantStats>>({});
   const [loading, setLoading] = useState(true);
   const toast = useToast();
+  const confirm = useConfirm();
 
   const loadTenants = async () => {
     try {
@@ -50,7 +52,13 @@ export const TenantManagement = () => {
   }, []);
 
   const handleSuspend = async (tenantId: string) => {
-    if (!confirm('Are you sure you want to suspend this tenant? They will lose access immediately.')) {
+    const ok = await confirm({
+      title: 'Suspend Tenant',
+      message: 'Are you sure you want to suspend this tenant? They will lose access immediately.',
+      confirmLabel: 'Suspend',
+      tone: 'danger',
+    });
+    if (!ok) {
       return;
     }
 

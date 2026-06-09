@@ -15,6 +15,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { PDFDownloadButton } from '../../components/shared/PDFDownloadButton';
 import { QuoteDocument } from '../../components/documents/QuoteDocument';
 import { QuoteFormModal } from '../../components/cases/QuoteFormModal';
@@ -195,9 +196,9 @@ export const QuoteDetailPage: React.FC = () => {
   if (isLoading) {
     return (
       <div className="p-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-slate-200 rounded w-1/4"></div>
-          <div className="h-64 bg-slate-200 rounded"></div>
+        <div className="space-y-4">
+          <Skeleton className="h-8 w-1/4" />
+          <Skeleton className="h-64 w-full" />
         </div>
       </div>
     );

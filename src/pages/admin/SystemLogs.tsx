@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
 import type { BadgeVariant } from '../../lib/ui/variants';
 import { Search, Download, AlertCircle, AlertTriangle, Info, Bug } from 'lucide-react';
 import { format } from 'date-fns';
@@ -223,8 +224,16 @@ export const SystemLogs: React.FC = () => {
         </div>
 
         {loading && (
-          <div className="text-center py-12">
-            <div className="inline-block w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
+          <div className="divide-y divide-slate-200">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="p-4 flex items-start gap-3">
+                <Skeleton className="w-8 h-8 rounded-lg" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-1/2" />
+                  <Skeleton className="h-3 w-1/3" />
+                </div>
+              </div>
+            ))}
           </div>
         )}
 

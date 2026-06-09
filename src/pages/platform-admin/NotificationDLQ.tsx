@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
 import {
   AlertOctagon,
   AlertTriangle,
@@ -10,7 +9,6 @@ import {
   Clock,
   Eye,
   Inbox,
-  Loader2,
   RefreshCw,
   RotateCcw,
   XCircle,
@@ -20,6 +18,9 @@ import { supabase } from '../../lib/supabaseClient';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
 import {
   type DLQChannel,
   type DLQEvent,
@@ -86,6 +87,8 @@ function previewPayload(payload: unknown): string {
 const NotificationDLQ: React.FC = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const confirm = useConfirm();
 
   const [eventTypeFilter, setEventTypeFilter] = useState<string>('');
   const [channelFilter, setChannelFilter] = useState<DLQChannel>('all');
@@ -179,8 +182,14 @@ const NotificationDLQ: React.FC = () => {
 
   if (accessLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="max-w-7xl mx-auto space-y-6">
+        <Skeleton className="h-8 w-72" />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+        </div>
+        <Skeleton className="h-48" />
       </div>
     );
   }
@@ -317,8 +326,11 @@ const NotificationDLQ: React.FC = () => {
       </div>
 
       {eventsLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
         </div>
       ) : events.length === 0 ? (
         <div className="bg-white rounded-lg border border-slate-200 p-12 text-center">
@@ -415,10 +427,15 @@ const NotificationDLQ: React.FC = () => {
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => {
-                              if (window.confirm('Mark this event as resolved? It will be soft-deleted.')) {
-                                resolveMutation.mutate(event.id);
-                              }
+                            onClick={async () => {
+                              const ok = await confirm({
+                                title: 'Mark resolved',
+                                message: 'Mark this event as resolved? It will be soft-deleted.',
+                                confirmLabel: 'Mark resolved',
+                                tone: 'danger',
+                              });
+                              if (!ok) return;
+                              resolveMutation.mutate(event.id);
                             }}
                             disabled={resolveMutation.isPending}
                             className="p-1.5 hover:bg-success/10 text-success rounded-lg transition-colors disabled:opacity-50"

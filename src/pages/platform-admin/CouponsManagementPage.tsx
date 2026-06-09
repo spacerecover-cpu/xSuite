@@ -5,7 +5,8 @@ import { Button } from '../../components/ui/Button';
 import { getAllCoupons, softDeleteCoupon } from '../../lib/billingService';
 import { platformAdminKeys } from '../../lib/queryKeys';
 import { CouponFormModal } from '../../components/platform-admin/coupons/CouponFormModal';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
 import type { Database } from '../../types/database.types';
 
 type BillingCoupon = Database['public']['Tables']['billing_coupons']['Row'];
@@ -19,6 +20,8 @@ const tabs: Array<{ id: TabType; label: string }> = [
 
 export const CouponsManagementPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<TabType>('active');
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<BillingCoupon | undefined>();
@@ -150,10 +153,15 @@ export const CouponsManagementPage: React.FC = () => {
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => {
-                            if (confirm(`Delete coupon "${coupon.code}"?`)) {
-                              deleteMutation.mutate(coupon.id);
-                            }
+                          onClick={async () => {
+                            const ok = await confirm({
+                              title: 'Delete coupon',
+                              message: `Delete coupon "${coupon.code}"?`,
+                              confirmLabel: 'Delete',
+                              tone: 'danger',
+                            });
+                            if (!ok) return;
+                            deleteMutation.mutate(coupon.id);
                           }}
                           className="p-1.5 text-slate-400 hover:text-danger hover:bg-danger-muted rounded-lg transition-colors"
                           title="Delete"

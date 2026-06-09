@@ -20,6 +20,8 @@ import { downloadCSV } from '../../lib/csvExport';
 import { formatDate } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 interface Customer {
   id: string;
@@ -78,6 +80,7 @@ interface City {
 export const CustomersListPage: React.FC = () => {
   const navigate = useNavigate();
   const toast = useToast();
+  const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
@@ -422,12 +425,13 @@ export const CustomersListPage: React.FC = () => {
     // Be explicit about the cascade reality — archiving a customer
     // doesn't archive their cases, but those cases will render with
     // a missing-customer placeholder until restored.
-    if (!window.confirm(
-      `Archive ${n} customer${n === 1 ? '' : 's'}?\n\n` +
-      `Their cases and invoices will remain but will show "Unknown customer" until the customer is restored.`
-    )) {
-      return;
-    }
+    const ok = await confirm({
+      title: `Archive ${n} customer${n === 1 ? '' : 's'}?`,
+      message: `Their cases and invoices will remain but will show "Unknown customer" until the customer is restored.`,
+      confirmLabel: 'Archive',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setIsArchiving(true);
     try {
       const { error } = await supabase
@@ -668,9 +672,18 @@ export const CustomersListPage: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading customers...</p>
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4">
+              <Skeleton className="w-10 h-10 rounded-full flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-1/3" />
+                <Skeleton className="h-3 w-1/4" />
+              </div>
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-6 w-16 rounded-full" />
+            </div>
+          ))}
         </div>
       ) : filteredCustomers.length === 0 ? (
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
