@@ -9843,6 +9843,7 @@ export type Database = {
           pay_day: number | null
           pay_frequency: string | null
           settings: Json | null
+          social_security_rate: number
           tax_calculation_method: string | null
           tenant_id: string
           updated_at: string
@@ -9856,6 +9857,7 @@ export type Database = {
           pay_day?: number | null
           pay_frequency?: string | null
           settings?: Json | null
+          social_security_rate?: number
           tax_calculation_method?: string | null
           tenant_id: string
           updated_at?: string
@@ -9869,6 +9871,7 @@ export type Database = {
           pay_day?: number | null
           pay_frequency?: string | null
           settings?: Json | null
+          social_security_rate?: number
           tax_calculation_method?: string | null
           tenant_id?: string
           updated_at?: string
