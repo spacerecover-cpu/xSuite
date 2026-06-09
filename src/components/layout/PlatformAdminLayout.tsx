@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { ContentLoadingFallback } from '../shared/ContentLoadingFallback';
 import { LayoutDashboard, Users, Ticket, Megaphone, LogOut, Settings, ChevronRight, CreditCard, Tag, AlertOctagon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { PlatformAdminProvider } from '../../contexts/PlatformAdminContext';
@@ -106,7 +107,9 @@ export const PlatformAdminLayout: React.FC = () => {
           </div>
 
           <div className="p-8">
-            <Outlet />
+            <Suspense fallback={<ContentLoadingFallback />}>
+              <Outlet />
+            </Suspense>
           </div>
         </main>
       </div>

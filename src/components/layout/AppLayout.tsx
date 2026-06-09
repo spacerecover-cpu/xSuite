@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
+import { ContentLoadingFallback } from '../shared/ContentLoadingFallback';
 import { ChevronRight, Search, Command } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { StockAlertsDropdown } from '../stock/StockAlertsDropdown';
@@ -147,7 +148,9 @@ export const AppLayout: React.FC = () => {
         </header>
 
         <main id="main-content" tabIndex={-1} className="flex-1 p-6 overflow-auto focus:outline-none">
-          <Outlet />
+          <Suspense fallback={<ContentLoadingFallback />}>
+            <Outlet />
+          </Suspense>
         </main>
         </div>
       </div>

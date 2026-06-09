@@ -16,17 +16,33 @@ import { AppLayout } from './components/layout/AppLayout';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { PortalLayout } from './components/layout/PortalLayout';
 import { PlatformAdminLayout } from './components/layout/PlatformAdminLayout';
+import { logger } from './lib/logger';
+import { isChunkLoadError } from './lib/chunkError';
 
 function lazyWithRetry(factory: () => Promise<{ default: React.ComponentType<unknown> }>) {
   return lazy(() =>
-    factory().catch((error) => {
-      const key = 'chunk_reload_retry';
-      const lastRetry = sessionStorage.getItem(key);
-      const now = Date.now();
-      if (!lastRetry || now - Number(lastRetry) > 10000) {
-        sessionStorage.setItem(key, String(now));
-        window.location.reload();
+    factory().catch((error: unknown) => {
+      // A failed dynamic import is almost always a stale chunk after a new
+      // deploy: the running tab references a content hash that no longer exists
+      // on the server. Reload once to pull the fresh index.html + new hashes.
+      // The no-store header on index.html (public/_headers) guarantees the
+      // reload itself isn't served from a stale edge/browser cache.
+      if (isChunkLoadError(error)) {
+        const key = 'chunk_reload_at';
+        const last = Number(sessionStorage.getItem(key) || 0);
+        const now = Date.now();
+        // Throttle to once per 20s so a genuinely broken deploy can't trap the
+        // user in a reload loop; after that we fall through to the ErrorBoundary,
+        // which shows a clear "new version available" recovery screen.
+        if (now - last > 20000) {
+          sessionStorage.setItem(key, String(now));
+          window.location.reload();
+          // Keep Suspense pending across the reload instead of flashing the
+          // error boundary with a transient import failure.
+          return new Promise<{ default: React.ComponentType<unknown> }>(() => {});
+        }
       }
+      logger.error('Failed to load route chunk', error);
       throw error;
     })
   );

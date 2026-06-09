@@ -13,7 +13,21 @@
 //
 // See facebook/react#11538 for the upstream discussion.
 
+import { logger } from './logger';
+
 let installed = false;
+let reported = false;
+
+// One-shot telemetry: fires when the guard actually deviates from native DOM
+// behavior, i.e. a translator/extension has re-parented React-managed nodes.
+// This is the signal that the silent DOM-guard path is active in production — a
+// candidate cause of "navigation does nothing until a reload" freezes. Reported
+// once per session to avoid flooding; behavior is otherwise unchanged.
+function reportGuardEngaged(op: string): void {
+  if (reported) return;
+  reported = true;
+  logger.warn(`DOM translation guard engaged (${op}) — external DOM mutation detected`);
+}
 
 export function installDomTranslationGuard(): void {
   if (installed) return;
@@ -25,6 +39,7 @@ export function installDomTranslationGuard(): void {
     // The node was re-parented out from under React (e.g. into a translator's
     // <font> wrapper). Removing it here would throw; hand it back untouched.
     if (child.parentNode !== this) {
+      reportGuardEngaged('removeChild');
       return child;
     }
     return originalRemoveChild.call(this, child) as T;
@@ -40,6 +55,7 @@ export function installDomTranslationGuard(): void {
     // keeps the new node in the tree (React reconciles position on the next
     // pass) instead of throwing and losing it.
     if (child && child.parentNode !== this) {
+      reportGuardEngaged('insertBefore');
       return originalInsertBefore.call(this, node, null) as T;
     }
     return originalInsertBefore.call(this, node, child) as T;

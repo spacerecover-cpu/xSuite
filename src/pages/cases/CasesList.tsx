@@ -120,7 +120,7 @@ export const CasesList: React.FC = () => {
     },
   });
 
-  const { data: cases = [], isLoading, refetch, isFetching } = useQuery({
+  const { data: cases = [], isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['cases', currentPage, searchTerm, filterStatus, filterPriority],
     queryFn: async () => {
       const from = (currentPage - 1) * CASES_PER_PAGE;
@@ -628,6 +628,27 @@ export const CasesList: React.FC = () => {
                 <Skeleton className="h-4 w-24" />
               </div>
             ))}
+          </div>
+        </div>
+      ) : isError ? (
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
+          <div
+            className="flex flex-col items-center text-center px-6 py-16"
+            role="alert"
+            aria-live="assertive"
+          >
+            <div className="w-14 h-14 rounded-full bg-danger-muted flex items-center justify-center mb-4">
+              <AlertCircle className="w-7 h-7 text-danger" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900 mb-1">Couldn't load cases</h3>
+            <p className="text-sm text-slate-500 max-w-md mb-6">
+              {(error as Error)?.message ||
+                'Something went wrong while fetching cases. Please try again.'}
+            </p>
+            <Button onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+              {isFetching ? 'Retrying…' : 'Retry'}
+            </Button>
           </div>
         </div>
       ) : cases.length === 0 ? (

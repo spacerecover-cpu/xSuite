@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { ContentLoadingFallback } from '../shared/ContentLoadingFallback';
 import { usePortalAuth } from '../../contexts/PortalAuthContext';
 import { useTenantFeature } from '../../contexts/TenantConfigContext';
 import { CustomerAvatar } from '../ui/CustomerAvatar';
@@ -230,7 +231,9 @@ export const PortalLayout: React.FC = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Outlet />
+        <Suspense fallback={<ContentLoadingFallback />}>
+          <Outlet />
+        </Suspense>
       </main>
 
       <footer className="bg-white border-t border-slate-200 mt-12">

@@ -15335,6 +15335,29 @@ export type Database = {
         Returns: undefined
       }
       approve_quote: { Args: { p_quote_id: string }; Returns: undefined }
+      assign_inventory_to_case: {
+        Args: { p_case_id: string; p_item_id: string; p_notes?: string }
+        Returns: {
+          assigned_at: string | null
+          assigned_by: string | null
+          case_id: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          item_id: string
+          notes: string | null
+          purpose: string | null
+          returned_at: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "inventory_case_assignments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       authenticate_portal_customer: {
         Args: { p_email: string; p_password: string }
         Returns: Json
@@ -15648,6 +15671,29 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      post_stock_adjustment: {
+        Args: { p_approved_by: string; p_session_id: string }
+        Returns: {
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          deleted_at: string | null
+          id: string
+          notes: string | null
+          reason: string | null
+          session_number: string | null
+          started_by: string | null
+          status: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "stock_adjustment_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       process_time_based_events: { Args: never; Returns: Json }
       promote_device_to_primary: {
         Args: { p_case_id: string; p_device_id: string }
@@ -15682,6 +15728,118 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "payments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      record_stock_receipt: {
+        Args: { p_item_id: string; p_options?: Json; p_quantity: number }
+        Returns: {
+          barcode: string | null
+          brand: string | null
+          capacity: string | null
+          category_id: string | null
+          cost_price: number | null
+          created_at: string
+          created_by: string | null
+          current_quantity: number | null
+          deleted_at: string | null
+          description: string | null
+          dimensions: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          is_featured: boolean
+          is_saleable: boolean | null
+          item_type: string | null
+          location: string | null
+          location_id: string | null
+          minimum_quantity: number | null
+          model: string | null
+          name: string
+          notes: string | null
+          photos: string[] | null
+          quantity_available: number | null
+          quantity_on_hand: number | null
+          quantity_reserved: number | null
+          reorder_level: number | null
+          reorder_quantity: number | null
+          selling_price: number | null
+          sku: string | null
+          specifications: Json | null
+          supplier_id: string | null
+          tax_inclusive: boolean
+          tax_rate: number | null
+          tenant_id: string
+          unit: string | null
+          unit_of_measure: string | null
+          updated_at: string
+          updated_by: string | null
+          warranty_months: number | null
+          weight: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "stock_items"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      record_stock_sale: {
+        Args: { p_items: Json; p_sale: Json }
+        Returns: {
+          case_id: string | null
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          deleted_at: string | null
+          discount_amount: number | null
+          id: string
+          invoice_id: string | null
+          notes: string | null
+          payment_method_id: string | null
+          payment_status: string
+          sale_date: string | null
+          sale_number: string | null
+          status: string | null
+          subtotal: number | null
+          tax_amount: number | null
+          tenant_id: string
+          total_amount: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "stock_sales"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      record_stock_usage_for_case: {
+        Args: {
+          p_case_id: string
+          p_item_id: string
+          p_notes?: string
+          p_quantity: number
+        }
+        Returns: {
+          created_at: string
+          id: string
+          item_id: string
+          notes: string | null
+          performed_by: string | null
+          quantity: number
+          reference_id: string | null
+          reference_type: string | null
+          tenant_id: string
+          total_cost: number | null
+          transaction_type: string
+          unit_cost: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "stock_transactions"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -15799,6 +15957,29 @@ export type Database = {
           p_to_status_id: string
         }
         Returns: Json
+      }
+      unassign_inventory_from_case: {
+        Args: { p_assignment_id: string; p_notes?: string }
+        Returns: {
+          assigned_at: string | null
+          assigned_by: string | null
+          case_id: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          item_id: string
+          notes: string | null
+          purpose: string | null
+          returned_at: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "inventory_case_assignments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       update_case_note: {
         Args: { p_content: string; p_note_id: string }
