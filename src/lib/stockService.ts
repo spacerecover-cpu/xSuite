@@ -407,33 +407,18 @@ export async function recordStockUsage(
   caseId: string,
   notes?: string
 ): Promise<void> {
-  const item = await getStockItem(itemId);
-  if (!item) throw new Error('Stock item not found');
-
-  const current = item.current_quantity ?? 0;
-  if (current < quantity) throw new Error('Insufficient stock');
-
-  const newQty = current - quantity;
-  // Preserve NULL when no cost is known so downstream COGS/valuation reports stay honest.
-  const unitCost = item.cost_price ?? null;
-
-  const { error: updateError } = await supabase
-    .from('stock_items')
-    .update({ current_quantity: newQty, updated_at: new Date().toISOString() })
-    .eq('id', itemId);
-  if (updateError) throw updateError;
-
-  await supabase.from('stock_transactions').insert({
-    tenant_id: requireTenantId(),
-    item_id: itemId,
-    transaction_type: 'used',
-    quantity: -quantity,
-    reference_type: 'case',
-    reference_id: caseId,
-    unit_cost: unitCost,
-    total_cost: unitCost !== null ? unitCost * quantity : null,
-    notes: notes ?? null,
+  // Single atomic transaction (RPC): locks the stock row, decrements the writable
+  // quantity_on_hand (current_quantity is a generated mirror — writing it directly
+  // 400s), writes the 'used' stock_transaction, and logs the chain-of-custody +
+  // case-history events so consuming a physical part against a case is forensically
+  // traceable. Replaces the prior non-atomic read→update→insert sequence.
+  const { error } = await supabase.rpc('record_stock_usage_for_case', {
+    p_item_id: itemId,
+    p_quantity: quantity,
+    p_case_id: caseId,
+    p_notes: notes ?? undefined,
   });
+  if (error) throw error;
 }
 
 // ============================================================
@@ -489,115 +474,38 @@ export async function getSalesByCustomer(customerId: string): Promise<StockSaleW
 }
 
 export async function createStockSale(data: StockSaleCreateData): Promise<StockSale> {
-  const saleNumberResult = await supabase.rpc('get_next_number', { p_scope: 'stock_sale' });
-  const saleNumber = saleNumberResult.data;
-
-  let subtotal = 0;
-  const taxAmount = 0;
-  const itemsWithTotals = data.items.map((item) => {
-    const lineTotal = item.quantity * item.unit_price;
-    subtotal += lineTotal;
-    return { ...item, line_total: lineTotal };
+  // Atomic, race-safe path: the entire sale (header + line items + per-item
+  // quantity decrement + stock_transactions ledger rows + serial-number flips)
+  // runs in ONE transaction inside the record_stock_sale RPC, which FOR UPDATE
+  // locks each stock_items row and RAISES on oversell. This replaces the former
+  // non-atomic browser-side write sequence (separate sale insert, per-item
+  // UPDATE, per-item INSERT) that could leave quantities and the ledger diverged
+  // on a mid-loop failure and allowed concurrent sales to oversell below zero.
+  //
+  // NOTE: server-side computes subtotal/discount/total and the sale number; the
+  // RPC also recomputes them defensively. stock_items.current_quantity is a
+  // GENERATED column over quantity_on_hand, so the RPC writes quantity_on_hand
+  // (the real balance column) and the generated columns recompute automatically.
+  const { data: sale, error } = await supabase.rpc('record_stock_sale', {
+    p_sale: {
+      customer_id: data.customer_id,
+      case_id: data.case_id ?? null,
+      notes: data.notes ?? null,
+      payment_method: data.payment_method ?? null,
+      discount_type: data.discount_type ?? null,
+      discount_value: data.discount_value ?? null,
+    },
+    p_items: data.items.map((item) => ({
+      stock_item_id: item.stock_item_id,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      cost_price: item.cost_price ?? null,
+      serial_number: item.serial_number ?? null,
+    })),
   });
-
-  let discountAmount = 0;
-  if (data.discount_type === 'percentage' && data.discount_value) {
-    discountAmount = (subtotal * data.discount_value) / 100;
-  } else if (data.discount_type === 'fixed' && data.discount_value) {
-    discountAmount = data.discount_value;
-  }
-
-  const totalAmount = subtotal - discountAmount + taxAmount;
-
-  // NOTE: stock_sales v1.0.0 dropped company_id, payment_method, discount_type/value,
-  // payment_status, invoice_id. Status field replaces payment_status.
-  // TODO(B8): if a sale needs to record payment_method/discount_type, those need a migration
-  // or to be persisted in notes.
-  const tenantId = requireTenantId();
-  const saleInsert: StockSaleInsert = {
-    tenant_id: tenantId,
-    sale_number: saleNumber,
-    customer_id: data.customer_id,
-    case_id: data.case_id ?? null,
-    notes: data.notes ?? null,
-    subtotal,
-    tax_amount: taxAmount,
-    discount_amount: discountAmount,
-    total_amount: totalAmount,
-    status: data.payment_method === 'added_to_invoice' ? 'pending' : 'paid',
-  };
-
-  const { data: sale, error: saleError } = await supabase
-    .from('stock_sales')
-    .insert(saleInsert)
-    .select()
-    .maybeSingle();
-  if (saleError) throw saleError;
+  if (error) throw error;
   if (!sale) throw new Error('Failed to create stock sale');
-
-  // NOTE: stock_sale_items v1.0.0 schema: item_id (not stock_item_id), discount (not discount_amount),
-  // total (not line_total). No cost_price, serial_number, or warranty_* columns.
-  // TODO(B8): cost_price/serial_number/warranty tracking on sale lines needs migration or
-  // alternative storage (e.g. link through stock_serial_numbers, derive cost from stock_items).
-  const saleItemsInsert = itemsWithTotals.map((item) => ({
-    tenant_id: tenantId,
-    sale_id: sale.id,
-    item_id: item.stock_item_id,
-    quantity: item.quantity,
-    unit_price: item.unit_price,
-    discount: 0,
-    tax_amount: 0,
-    total: item.line_total,
-  }));
-
-  const { error: itemsError } = await supabase.from('stock_sale_items').insert(saleItemsInsert);
-  if (itemsError) throw itemsError;
-
-  const itemIds = data.items.map((item) => item.stock_item_id);
-  const { data: stockItemsData } = await supabase
-    .from('stock_items')
-    .select('*')
-    .in('id', itemIds)
-    .is('deleted_at', null);
-  const stockItemsMap = new Map((stockItemsData ?? []).map((si) => [si.id, si]));
-
-  for (const item of data.items) {
-    const stockItem = stockItemsMap.get(item.stock_item_id);
-    if (!stockItem) continue;
-
-    const currentQty = stockItem.current_quantity ?? 0;
-    const newQty = currentQty - item.quantity;
-    await supabase
-      .from('stock_items')
-      .update({ current_quantity: Math.max(0, newQty), updated_at: new Date().toISOString() })
-      .eq('id', item.stock_item_id);
-
-    // Preserve NULL when no cost is known so downstream COGS/valuation reports stay honest.
-    const unitCost = item.cost_price ?? stockItem.cost_price ?? null;
-    await supabase.from('stock_transactions').insert({
-      tenant_id: tenantId,
-      item_id: item.stock_item_id,
-      transaction_type: 'sold',
-      quantity: -item.quantity,
-      reference_type: 'sale',
-      reference_id: sale.id,
-      unit_cost: unitCost,
-      total_cost: unitCost !== null ? unitCost * item.quantity : null,
-    });
-
-    if (item.serial_number) {
-      // NOTE: stock_serial_numbers v1.0.0 schema lacks sale_id, sold_to_customer_id, sold_date.
-      // Just flip status — sale linkage can be reconstructed via stock_sale_items + transactions.
-      // TODO(B8): if sold_to_customer_id is product needed, add via migration.
-      await supabase
-        .from('stock_serial_numbers')
-        .update({ status: 'sold' })
-        .eq('item_id', item.stock_item_id)
-        .eq('serial_number', item.serial_number);
-    }
-  }
-
-  return sale;
+  return sale as StockSale;
 }
 
 export async function updateStockSale(id: string, data: Partial<StockSaleInsert>): Promise<StockSale> {
@@ -788,45 +696,18 @@ export async function createStockAdjustment(
 }
 
 export async function approveStockAdjustment(id: string, approvedBy: string): Promise<void> {
-  const adjustment = await getStockAdjustment(id);
-  if (!adjustment) throw new Error('Adjustment not found');
-
-  for (const item of adjustment.items) {
-    if (item.counted_quantity === null || item.expected_quantity === null) continue;
-    const variance = item.counted_quantity - item.expected_quantity;
-    if (variance === 0) continue;
-
-    const stockItem = await getStockItem(item.item_id);
-    if (!stockItem) continue;
-
-    const currentQty = stockItem.current_quantity ?? 0;
-    const newQty = currentQty + variance;
-    await supabase
-      .from('stock_items')
-      .update({ current_quantity: Math.max(0, newQty), updated_at: new Date().toISOString() })
-      .eq('id', item.item_id);
-
-    await supabase.from('stock_transactions').insert({
-      tenant_id: requireTenantId(),
-      item_id: item.item_id,
-      transaction_type: 'adjusted',
-      quantity: variance,
-      reference_type: 'adjustment',
-      reference_id: id,
-      notes: `Adjustment #${adjustment.session_number}: ${adjustment.reason ?? ''}`,
-    });
-  }
-
-  // NOTE: stock_adjustment_sessions v1.0.0 has completed_by/completed_at, not approved_by/approved_at.
-  await supabase
-    .from('stock_adjustment_sessions')
-    .update({
-      status: 'approved',
-      completed_by: approvedBy,
-      completed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id);
+  // Atomic path: applying every counted-vs-expected variance to quantity_on_hand,
+  // writing the stock_transactions ledger rows, and marking the session
+  // approved/completed all happen in ONE transaction inside post_stock_adjustment,
+  // which FOR UPDATE locks each stock_items row and RAISES if a negative variance
+  // would drive on-hand below zero. This replaces the former non-atomic browser-side
+  // loop (per-item read, per-item UPDATE, per-item INSERT, then a separate session
+  // update) that could leave quantities and the ledger diverged on a mid-loop failure.
+  const { error } = await supabase.rpc('post_stock_adjustment', {
+    p_session_id: id,
+    p_approved_by: approvedBy,
+  });
+  if (error) throw error;
 }
 
 // ============================================================

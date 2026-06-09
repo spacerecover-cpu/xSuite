@@ -314,28 +314,32 @@ export async function assignInventoryToCase(
   caseId: string,
   notes?: string
 ): Promise<AssignmentWithDetails> {
+  // Pre-flight UX guard (keeps the friendly "already assigned to case X" message).
+  // The authoritative single-custody guard now lives inside the RPC, which also
+  // runs the insert, the status flip (reserve the unique asset), the chain-of-custody
+  // event, and case-history/audit writes in one atomic transaction.
   const availability = await checkItemAvailability(inventoryItemId);
 
   if (!availability.available) {
     throw new Error(availability.reason || 'Item is not available for assignment');
   }
 
-  const { data: user } = await supabase.auth.getUser();
-  const tenantId = await getCurrentTenantId();
+  const { data: assignmentId, error } = await supabase.rpc('assign_inventory_to_case', {
+    p_item_id: inventoryItemId,
+    p_case_id: caseId,
+    p_notes: notes ?? undefined,
+  });
 
-  if (!tenantId) {
-    throw new Error('Unable to resolve tenant for inventory assignment');
+  if (error) {
+    logger.error('Error assigning inventory to case:', error);
+    throw error;
   }
 
-  const { data, error } = await supabase
+  // The RPC returns the new inventory_case_assignments row; re-fetch with embeds
+  // so callers keep the same decorated shape they relied on before.
+  const newId = (assignmentId as { id?: string } | null)?.id;
+  const { data, error: fetchError } = await supabase
     .from('inventory_case_assignments')
-    .insert({
-      item_id: inventoryItemId,
-      case_id: caseId,
-      assigned_by: user?.user?.id ?? null,
-      notes: notes ?? null,
-      tenant_id: tenantId,
-    })
     .select(
       `
       *,
@@ -343,11 +347,16 @@ export async function assignInventoryToCase(
       case:cases (id, case_no, title, status)
     `
     )
+    .eq(newId ? 'id' : 'item_id', newId ?? inventoryItemId)
+    .is('returned_at', null)
+    .is('deleted_at', null)
+    .order('assigned_at', { ascending: false })
+    .limit(1)
     .maybeSingle();
 
-  if (error) {
-    logger.error('Error assigning inventory to case:', error);
-    throw error;
+  if (fetchError) {
+    logger.error('Error loading assignment after RPC:', fetchError);
+    throw fetchError;
   }
 
   if (!data) {
@@ -356,22 +365,6 @@ export async function assignInventoryToCase(
 
   const profiles = await fetchProfileMap([data.assigned_by]);
   return decorate(data as AssignmentRowWithEmbeds, profiles);
-}
-
-async function getCurrentTenantId(): Promise<string | null> {
-  const { data, error } = await supabase.rpc('get_current_tenant_id');
-  if (error) {
-    logger.warn('get_current_tenant_id rpc failed; falling back to profile lookup:', error);
-    const { data: user } = await supabase.auth.getUser();
-    if (!user?.user?.id) return null;
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('tenant_id')
-      .eq('id', user.user.id)
-      .maybeSingle();
-    return profile?.tenant_id ?? null;
-  }
-  return data ?? null;
 }
 
 function annotateNotes(existing: string | null, marker: string, usageNotes?: string): string {
@@ -559,28 +552,14 @@ export async function unassignInventoryItem(
   assignmentId: string,
   notes?: string
 ): Promise<void> {
-  const { data: existing, error: fetchError } = await supabase
-    .from('inventory_case_assignments')
-    .select('notes')
-    .eq('id', assignmentId)
-    .maybeSingle();
-
-  if (fetchError) {
-    logger.error('Error loading assignment before unassign:', fetchError);
-    throw fetchError;
-  }
-
-  const composedNotes = notes
-    ? annotateNotes(existing?.notes ?? null, '[returned]', notes)
-    : existing?.notes ?? null;
-
-  const { error } = await supabase
-    .from('inventory_case_assignments')
-    .update({
-      returned_at: new Date().toISOString(),
-      notes: composedNotes,
-    })
-    .eq('id', assignmentId);
+  // Single atomic transaction: marks the assignment returned, releases the unique
+  // asset back to "Available", and logs the return chain-of-custody + case-history
+  // + audit events. The RPC composes the "[returned]" note marker internally, so the
+  // prior read-then-write here is no longer needed.
+  const { error } = await supabase.rpc('unassign_inventory_from_case', {
+    p_assignment_id: assignmentId,
+    p_notes: notes ?? undefined,
+  });
 
   if (error) {
     logger.error('Error unassigning inventory item:', error);
