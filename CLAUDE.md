@@ -540,6 +540,7 @@ type IntegrityCheckResult = 'passed' | 'failed' | 'warning' | 'not_applicable';
 - Do not write to a banned legacy table name (see Schema Discipline section)
 - Do not import from `src/types/database.ts` (legacy file; replaced by `database.types.ts`)
 - Do not bypass the migration PR template for schema changes
+- Do not reuse a work branch after its PR is merged — PRs here are squash-merged and the branch deleted, so pushing to the old name recreates it carrying already-merged commits (conflicting diffs). Start each new piece of work on a fresh branch cut from `main`
 
 ---
 
