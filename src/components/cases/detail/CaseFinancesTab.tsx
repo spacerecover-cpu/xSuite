@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, DollarSign, Plus, Eye, CreditCard, RefreshCw, Lock, ExternalLink, TrendingUp, TrendingDown, Minus, Receipt, Wallet } from 'lucide-react';
+import { FileText, DollarSign, Plus, Eye, CreditCard, RefreshCw, Lock, ExternalLink, TrendingUp, TrendingDown, Minus, Receipt, Wallet, Send } from 'lucide-react';
 import { CreditCard as Edit } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '../../ui/Button';
@@ -69,6 +69,7 @@ interface CaseFinancesTabProps {
   onSetViewingQuote: (q: unknown) => void;
   onSetViewingInvoice: (inv: unknown) => void;
   onHandleRecordPayment: (invoice: CaseInvoiceRow) => void;
+  onHandleIssueInvoice: (invoice: CaseInvoiceRow) => void;
   onSetConvertingInvoice: (inv: CaseInvoiceRow) => void;
   onSetShowConvertProformaModal: (v: boolean) => void;
   quotesService: QuoteServiceLike;
@@ -89,6 +90,7 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
   onSetViewingQuote,
   onSetViewingInvoice,
   onHandleRecordPayment,
+  onHandleIssueInvoice,
   onSetConvertingInvoice,
   onSetShowConvertProformaModal,
   quotesService,
@@ -380,7 +382,18 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
                               <Edit className="w-4 h-4" />
                             </Button>
                           )}
-                          {invoice.invoice_type === 'tax_invoice' && (invoice.balance_due ?? 0) > 0 && invoice.status !== 'paid' && invoice.status !== 'void' && (
+                          {invoice.invoice_type === 'tax_invoice' && invoice.status === 'draft' && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => onHandleIssueInvoice(invoice)}
+                              title="Issue Invoice — enables payment recording"
+                              style={{ backgroundColor: 'rgb(var(--color-info))', color: 'rgb(var(--color-info-foreground))' }}
+                            >
+                              <Send className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {invoice.invoice_type === 'tax_invoice' && invoice.status !== 'draft' && (invoice.balance_due ?? 0) > 0 && invoice.status !== 'paid' && invoice.status !== 'void' && (
                             <Button
                               variant="secondary"
                               size="sm"

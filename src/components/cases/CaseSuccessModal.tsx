@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
-import { CheckCircle, FileText, Tag, FileCheck, Mail } from 'lucide-react';
+import { CheckCircle, FileText, Tag, FileCheck, Mail, ClipboardSignature } from 'lucide-react';
 import { EmailDocumentModal } from './EmailDocumentModal';
 
 interface CaseSuccessModalProps {
@@ -12,6 +12,7 @@ interface CaseSuccessModalProps {
   customerEmail?: string;
   onClose: () => void;
   onPrintReceipt: () => void;
+  onPrintCustomerCopy: () => void;
   onPrintLabel: () => void;
 }
 
@@ -22,6 +23,7 @@ export const CaseSuccessModal: React.FC<CaseSuccessModalProps> = ({
   customerEmail,
   onClose,
   onPrintReceipt,
+  onPrintCustomerCopy,
   onPrintLabel,
 }) => {
   const navigate = useNavigate();
@@ -68,6 +70,14 @@ export const CaseSuccessModal: React.FC<CaseSuccessModalProps> = ({
           >
             <FileText className="w-5 h-5" />
             Print Office Check-in Receipt
+          </button>
+
+          <button
+            onClick={onPrintCustomerCopy}
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 border-2 border-info text-info rounded-lg hover:bg-info-muted transition-all font-medium"
+          >
+            <ClipboardSignature className="w-5 h-5" />
+            Print Customer Check-in Copy
           </button>
 
           <button

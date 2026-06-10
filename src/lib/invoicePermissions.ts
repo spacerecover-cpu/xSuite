@@ -120,6 +120,12 @@ export function canRecordPayment(inv: InvoiceFinancials): boolean {
   );
 }
 
+/** A draft tax invoice must be issued (draft → sent) before payments can be
+ *  recorded against it — money is only taken against an issued document. */
+export function canIssueInvoice(inv: InvoiceFinancials): boolean {
+  return inv.invoice_type === 'tax_invoice' && (inv.status ?? 'draft') === 'draft';
+}
+
 export function canDeleteInvoice(inv: InvoiceFinancials): boolean {
   const status = inv.status ?? 'draft';
   return status === 'draft' && deriveSettlement(inv) === 'unpaid';

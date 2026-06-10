@@ -487,9 +487,11 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             <div className="border border-dashed border-slate-300 rounded-lg p-6 text-center">
               <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
               <p className="text-sm text-slate-500">
-                {selectedCaseId
-                  ? 'No invoices selected. Add invoices to allocate this payment.'
-                  : 'Select a case first to see available invoices.'}
+                {selectedCaseId && unpaidInvoices.length === 0
+                  ? 'No payable invoices on this case. Draft invoices must be issued first — use Issue Invoice on the invoice.'
+                  : selectedCaseId
+                    ? 'No invoices selected. Add invoices to allocate this payment.'
+                    : 'Select a case first to see available invoices.'}
               </p>
             </div>
           )}
