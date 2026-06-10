@@ -1733,45 +1733,75 @@ export type Database = {
       case_follow_ups: {
         Row: {
           assigned_to: string | null
+          attempt_count: number
+          auto_send: boolean
           case_id: string
+          channel: string
           completed_at: string | null
           created_at: string
           created_by: string | null
           deleted_at: string | null
           follow_up_date: string
           id: string
+          last_error: string | null
+          message: string | null
           notes: string | null
+          quote_id: string | null
+          send_to: string | null
+          sent_at: string | null
           status: string | null
+          subject: string | null
+          template_id: string | null
           tenant_id: string
           type: string | null
           updated_at: string
         }
         Insert: {
           assigned_to?: string | null
+          attempt_count?: number
+          auto_send?: boolean
           case_id: string
+          channel?: string
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
           follow_up_date: string
           id?: string
+          last_error?: string | null
+          message?: string | null
           notes?: string | null
+          quote_id?: string | null
+          send_to?: string | null
+          sent_at?: string | null
           status?: string | null
+          subject?: string | null
+          template_id?: string | null
           tenant_id: string
           type?: string | null
           updated_at?: string
         }
         Update: {
           assigned_to?: string | null
+          attempt_count?: number
+          auto_send?: boolean
           case_id?: string
+          channel?: string
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
           follow_up_date?: string
           id?: string
+          last_error?: string | null
+          message?: string | null
           notes?: string | null
+          quote_id?: string | null
+          send_to?: string | null
+          sent_at?: string | null
           status?: string | null
+          subject?: string | null
+          template_id?: string | null
           tenant_id?: string
           type?: string | null
           updated_at?: string
@@ -1782,6 +1812,20 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_follow_ups_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_follow_ups_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "document_templates"
             referencedColumns: ["id"]
           },
           {
@@ -4777,6 +4821,7 @@ export type Database = {
           default_price: number | null
           deleted_at: string | null
           description: string | null
+          document_type: string | null
           id: string
           is_active: boolean | null
           is_default: boolean | null
@@ -4801,6 +4846,7 @@ export type Database = {
           default_price?: number | null
           deleted_at?: string | null
           description?: string | null
+          document_type?: string | null
           id?: string
           is_active?: boolean | null
           is_default?: boolean | null
@@ -4825,6 +4871,7 @@ export type Database = {
           default_price?: number | null
           deleted_at?: string | null
           description?: string | null
+          document_type?: string | null
           id?: string
           is_active?: boolean | null
           is_default?: boolean | null
@@ -7669,6 +7716,7 @@ export type Database = {
           is_active: boolean | null
           name: string
           template_data: Json | null
+          tenant_id: string | null
           updated_at: string
         }
         Insert: {
@@ -7678,6 +7726,7 @@ export type Database = {
           is_active?: boolean | null
           name: string
           template_data?: Json | null
+          tenant_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -7687,9 +7736,18 @@ export type Database = {
           is_active?: boolean | null
           name?: string
           template_data?: Json | null
+          tenant_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "master_case_report_templates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       master_case_statuses: {
         Row: {
@@ -11589,6 +11647,7 @@ export type Database = {
           section_name: string | null
           section_name_ar: string | null
           section_type: string | null
+          tenant_id: string | null
           updated_at: string
         }
         Insert: {
@@ -11610,6 +11669,7 @@ export type Database = {
           section_name?: string | null
           section_name_ar?: string | null
           section_type?: string | null
+          tenant_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -11631,9 +11691,18 @@ export type Database = {
           section_name?: string | null
           section_name_ar?: string | null
           section_type?: string | null
+          tenant_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "report_section_library_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       report_section_presets: {
         Row: {
@@ -11643,6 +11712,7 @@ export type Database = {
           id: string
           name: string
           section_library_id: string | null
+          tenant_id: string | null
           updated_at: string
           usage_count: number | null
         }
@@ -11653,6 +11723,7 @@ export type Database = {
           id?: string
           name: string
           section_library_id?: string | null
+          tenant_id?: string | null
           updated_at?: string
           usage_count?: number | null
         }
@@ -11663,6 +11734,7 @@ export type Database = {
           id?: string
           name?: string
           section_library_id?: string | null
+          tenant_id?: string | null
           updated_at?: string
           usage_count?: number | null
         }
@@ -11672,6 +11744,13 @@ export type Database = {
             columns: ["section_library_id"]
             isOneToOne: false
             referencedRelation: "report_section_library"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_section_presets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -11684,6 +11763,7 @@ export type Database = {
           section_id: string | null
           sort_order: number | null
           template_id: string | null
+          tenant_id: string | null
         }
         Insert: {
           created_at?: string
@@ -11692,6 +11772,7 @@ export type Database = {
           section_id?: string | null
           sort_order?: number | null
           template_id?: string | null
+          tenant_id?: string | null
         }
         Update: {
           created_at?: string
@@ -11700,6 +11781,7 @@ export type Database = {
           section_id?: string | null
           sort_order?: number | null
           template_id?: string | null
+          tenant_id?: string | null
         }
         Relationships: [
           {
@@ -11714,6 +11796,13 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "master_case_report_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_template_section_mappings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -15603,6 +15692,8 @@ export type Database = {
           p_case_id: string
           p_content?: string
           p_direction?: string
+          p_sent_by?: string
+          p_sent_to?: string
           p_subject?: string
           p_type: string
         }
@@ -15694,6 +15785,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      process_due_case_follow_ups: { Args: never; Returns: Json }
       process_time_based_events: { Args: never; Returns: Json }
       promote_device_to_primary: {
         Args: { p_case_id: string; p_device_id: string }
@@ -15851,6 +15943,38 @@ export type Database = {
       render_notification_template: {
         Args: { p_payload: Json; p_template: string }
         Returns: string
+      }
+      respond_to_custody_transfer: {
+        Args: { p_action: string; p_payload?: Json; p_transfer_id: string }
+        Returns: {
+          accepted_at: string | null
+          case_id: string
+          created_at: string
+          deleted_at: string | null
+          device_id: string | null
+          from_location: string | null
+          from_person_id: string | null
+          from_person_name: string
+          id: string
+          notes: string | null
+          rejected_at: string | null
+          rejection_reason: string | null
+          tenant_id: string
+          to_location: string | null
+          to_person_id: string | null
+          to_person_name: string
+          transfer_reason: string
+          transfer_status:
+            | Database["public"]["Enums"]["custody_transfer_status"]
+            | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "chain_of_custody_transfers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       reverse_financial_transaction: {
         Args: { p_reason?: string; p_transaction_id: string }
