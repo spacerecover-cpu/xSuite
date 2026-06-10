@@ -115,9 +115,6 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
         case_id: prefilledData.case_id || '',
         amount: prefilledData.amount || 0,
       }));
-      if (singleInvoiceMode && invoiceId) {
-        setAllocations(new Map([[invoiceId, prefilledData.amount || 0]]));
-      }
     }
   }, [prefilledData, isOpen, singleInvoiceMode, invoiceId]);
 
@@ -200,6 +197,23 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
       }
     }
   }, [formData.case_id, cases, singleInvoiceMode]);
+
+  // Single-invoice mode has exactly one target, so the allocation always
+  // mirrors the received amount (clamped to outstanding) — there is nothing
+  // to select. Callers don't all pass prefilledData (InvoiceDetailPage
+  // doesn't), so seed from the FETCHED invoice: default to paying it off in
+  // full when the modal opens with no amount.
+  const singleOutstanding = round3((singleInvoice as PayableInvoice | null)?.balance_due || 0);
+
+  useEffect(() => {
+    if (!isOpen || !singleInvoiceMode || !singleInvoice) return;
+    setFormData(prev => (prev.amount > 0 ? prev : { ...prev, amount: singleOutstanding }));
+  }, [isOpen, singleInvoiceMode, singleInvoice, singleOutstanding]);
+
+  useEffect(() => {
+    if (!isOpen || !singleInvoiceMode || !invoiceId || !singleInvoice) return;
+    setAllocations(new Map([[invoiceId, round3(Math.min(Math.max(formData.amount, 0), singleOutstanding))]]));
+  }, [isOpen, singleInvoiceMode, invoiceId, singleInvoice, singleOutstanding, formData.amount]);
 
   const payable: PayableInvoice[] = useMemo(() => {
     if (singleInvoiceMode) {
@@ -324,9 +338,11 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
       </div>
       {!remainingZero && formData.amount > 0 && (
         <p className={`mt-2 text-xs ${remaining < 0 ? 'text-danger' : 'text-warning'}`}>
-          {remaining < 0
-            ? `Applied exceeds the received amount by ${formatCurrencyValue(Math.abs(remaining))} — reduce an allocation.`
-            : `Apply ${formatCurrencyValue(remaining)} more, or reduce the received amount to match.`}
+          {singleInvoiceMode
+            ? `Amount exceeds this invoice's outstanding balance by ${formatCurrencyValue(remaining)} — reduce it to ${formatCurrencyValue(singleOutstanding)} or less.`
+            : remaining < 0
+              ? `Applied exceeds the received amount by ${formatCurrencyValue(Math.abs(remaining))} — reduce an allocation.`
+              : `Apply ${formatCurrencyValue(remaining)} more, or reduce the received amount to match.`}
         </p>
       )}
     </div>
@@ -508,6 +524,12 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
                     </div>
                   )}
 
+                  {singleInvoiceMode && singleInvoice && singleOutstanding <= 0 && (
+                    <div className="rounded-lg border border-border bg-success-muted/40 p-4 text-center text-sm text-slate-700">
+                      This invoice is fully settled — there is nothing left to pay.
+                    </div>
+                  )}
+
                   {!invoicesLoading && payable.length === 0 && (
                     <div className="rounded-lg border border-border bg-surface-muted p-6 text-center">
                       <Receipt className="w-8 h-8 text-slate-400 mx-auto mb-2" />
@@ -570,7 +592,7 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
                             </div>
                           </div>
                         </label>
-                        {isSelected && (
+                        {isSelected && !singleInvoiceMode && (
                           <div className="px-3 pb-3 pl-10">
                             <div className="flex items-center gap-2">
                               <label htmlFor={`amount-${invoice.id}`} className="text-xs font-medium text-slate-700 whitespace-nowrap">
