@@ -14,7 +14,7 @@ import { ImageUpload } from '../../components/ui/ImageUpload';
 import { PhotoViewerModal } from '../../components/ui/PhotoViewerModal';
 import {
   ChevronLeft, User, Mail, Phone, MapPin, Building2,
-  Calendar, FileText, DollarSign, MessageSquare, Eye, Link as LinkIcon,
+  Calendar, FileText, DollarSign, MessageSquare, MessageCircle, Eye, Link as LinkIcon,
   Copy, RefreshCw, Ban, Check, AlertTriangle, ShoppingBag
 } from 'lucide-react';
 import { formatDate } from '../../lib/format';
@@ -24,6 +24,8 @@ import { generateSecurePassword } from '../../lib/passwordUtils';
 import { CustomerPurchasesTab } from '../../components/customers/CustomerPurchasesTab';
 import { CustomerCasesTab } from '../../components/customers/CustomerCasesTab';
 import { CustomerFinancialTab } from '../../components/customers/CustomerFinancialTab';
+import { EmailDocumentModal } from '../../components/cases/EmailDocumentModal';
+import { SendMessageModal } from '../../components/communications/SendMessageModal';
 import { useConfirm } from '../../hooks/useConfirm';
 import { Skeleton } from '../../components/ui/Skeleton';
 
@@ -103,6 +105,8 @@ export const CustomerProfilePage: React.FC = () => {
     notes: '',
     profile_photo_url: '',
   });
+  const [showComposeEmail, setShowComposeEmail] = useState(false);
+  const [composeMessageChannel, setComposeMessageChannel] = useState<'whatsapp' | 'sms' | null>(null);
 
   const { data: customer, isLoading } = useQuery({
     queryKey: ['customer', id],
@@ -776,13 +780,35 @@ export const CustomerProfilePage: React.FC = () => {
 
           {activeTab === 'communications' && (
             <div>
+              <div className="flex items-center justify-end gap-2 mb-4">
+                <Button variant="secondary" size="sm" onClick={() => setShowComposeEmail(true)}>
+                  <Mail className="w-4 h-4 mr-2" />
+                  Email
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setComposeMessageChannel('whatsapp')}
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  WhatsApp
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setComposeMessageChannel('sms')}
+                >
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  SMS
+                </Button>
+              </div>
               {communications.length === 0 ? (
                 <div className="text-center py-12 text-slate-500">
                   <MessageSquare className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                   <p className="text-lg">No communications logged yet</p>
-                  <Button variant="secondary" className="mt-4">
-                    Log Communication
-                  </Button>
+                  <p className="text-sm mt-1">
+                    Use the buttons above to email or message this customer with a template.
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -1092,6 +1118,34 @@ export const CustomerProfilePage: React.FC = () => {
           onClose={() => setIsPhotoViewerOpen(false)}
           imageUrl={customer.profile_photo_url}
           altText={`${customer.customer_name} profile photo`}
+        />
+      )}
+
+      {showComposeEmail && id && (
+        <EmailDocumentModal
+          isOpen={showComposeEmail}
+          onClose={() => {
+            setShowComposeEmail(false);
+            queryClient.invalidateQueries({ queryKey: ['customer_communications', id] });
+          }}
+          customerId={id}
+          customerName={customer.customer_name}
+          customerEmail={customer.email ?? undefined}
+          companyName="Data Recovery"
+        />
+      )}
+
+      {composeMessageChannel && id && (
+        <SendMessageModal
+          isOpen={!!composeMessageChannel}
+          onClose={() => setComposeMessageChannel(null)}
+          channel={composeMessageChannel}
+          customerId={id}
+          defaultPhone={customer.mobile_number || customer.phone || ''}
+          contextRefs={{ customerId: id }}
+          onLogged={() =>
+            queryClient.invalidateQueries({ queryKey: ['customer_communications', id] })
+          }
         />
       )}
     </div>

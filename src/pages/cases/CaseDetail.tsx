@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { getNextCaseNumber } from '../../lib/caseService';
-import { ArrowLeft, MessageCircle, Printer, FileText, Tag, CheckCircle2, Copy, User, HardDrive, FileStack, AlertCircle, Calendar, Package, Activity, Settings, History, Users, DollarSign, Trash2, Grid2x2 as Grid, Eye } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Printer, FileText, Tag, CheckCircle2, Copy, User, HardDrive, FileStack, AlertCircle, Calendar, Package, Activity, Settings, History, Users, DollarSign, Trash2, Grid2x2 as Grid, Eye, Mail } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -17,7 +17,8 @@ import { CaseStageBanner } from '../../components/cases/detail/CaseStageBanner';
 import type { CasePhase } from '../../lib/caseStateMachineService';
 import { useTenantFeatures } from '../../contexts/TenantConfigContext';
 import { CASE_TAB_FEATURE } from '../../lib/features/registry';
-import { openWhatsAppChat, isValidWhatsAppNumber, logWhatsAppCommunication } from '../../lib/whatsappUtils';
+import { SendMessageModal } from '../../components/communications/SendMessageModal';
+import { CaseCommunicationsTab } from '../../components/cases/detail/CaseCommunicationsTab';
 import { DeviceCheckoutModal } from '../../components/cases/DeviceCheckoutModal';
 import { DuplicateCaseConfirmationModal } from '../../components/cases/DuplicateCaseConfirmationModal';
 import { DeleteCaseConfirmationModal } from '../../components/cases/DeleteCaseConfirmationModal';
@@ -56,9 +57,8 @@ import {
 import { useCaseModals } from '../../components/cases/detail/useCaseModals';
 import { useCaseQueries } from '../../components/cases/detail/useCaseQueries';
 import { useCaseMutations } from '../../components/cases/detail/useCaseMutations';
-import { logger } from '../../lib/logger';
 
-type TabType = 'overview' | 'client' | 'devices' | 'clones' | 'reports' | 'quotes' | 'files' | 'engineers' | 'recovery_qa' | 'notes' | 'portal' | 'history' | 'stock';
+type TabType = 'overview' | 'client' | 'devices' | 'clones' | 'reports' | 'quotes' | 'communications' | 'files' | 'engineers' | 'recovery_qa' | 'notes' | 'portal' | 'history' | 'stock';
 
 export const CaseDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -153,29 +153,11 @@ export const CaseDetail: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['invoices'] });
   };
 
-  const handleWhatsApp = async () => {
-    if (!caseData) return;
-
-    const phoneNumber = caseData.contact?.mobile_number || caseData.customer?.mobile_number;
-
-    if (!phoneNumber || !isValidWhatsAppNumber(phoneNumber)) {
-      toast.error('No valid WhatsApp number available for this customer');
-      return;
-    }
-
-    try {
-      openWhatsAppChat({
-        phoneNumber,
-        caseNumber: caseData.case_no ?? '',
-        customerName: caseData.customer?.customer_name || 'Customer',
-        status: caseData.status ?? undefined,
-      });
-
-      await logWhatsAppCommunication(supabase, id!, phoneNumber, `Case ${caseData.case_no ?? ''} update`);
-    } catch (error) {
-      logger.error('Error opening WhatsApp:', error);
-      toast.error('Failed to open WhatsApp. Please check the phone number.');
-    }
+  // Header quick action — opens the templated WhatsApp handoff modal (renders
+  // a tenant template with case context, logs to case_communications).
+  const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
+  const handleWhatsApp = () => {
+    setWhatsAppModalOpen(true);
   };
 
   const handlePrintOfficeReceipt = () => {
@@ -263,6 +245,7 @@ export const CaseDetail: React.FC = () => {
     { id: 'clones', label: 'Clone Drives', icon: Copy },
     { id: 'reports', label: 'Reports', icon: FileText },
     { id: 'quotes', label: 'Quotes/Invoices', icon: DollarSign },
+    { id: 'communications', label: 'Communications', icon: Mail },
     { id: 'stock', label: 'Backup Devices', icon: Package },
     { id: 'files', label: 'Files', icon: FileStack },
     { id: 'engineers', label: 'Engineers', icon: Users },
@@ -762,6 +745,19 @@ export const CaseDetail: React.FC = () => {
             />
           )}
 
+          {/* Communications Tab */}
+          {activeTab === 'communications' && (
+            <CaseCommunicationsTab
+              caseId={id!}
+              caseNumber={caseData.case_no || caseData.case_number || ''}
+              customerId={caseData.customer_id}
+              customerName={caseData.customer?.customer_name || 'Customer'}
+              customerEmail={caseData.customer?.email ?? undefined}
+              customerPhone={caseData.contact?.mobile_number || caseData.customer?.mobile_number || caseData.customer?.phone || ''}
+              companyName="Data Recovery"
+            />
+          )}
+
           {/* Client Portal Tab */}
           {activeTab === 'portal' && (
             <CasePortalTab
@@ -793,6 +789,19 @@ export const CaseDetail: React.FC = () => {
             />
           )}
         </>
+      )}
+
+      {/* WhatsApp handoff (header quick action) */}
+      {whatsAppModalOpen && caseData && (
+        <SendMessageModal
+          isOpen={whatsAppModalOpen}
+          onClose={() => setWhatsAppModalOpen(false)}
+          channel="whatsapp"
+          caseId={id!}
+          customerId={caseData.customer_id ?? undefined}
+          defaultPhone={caseData.contact?.mobile_number || caseData.customer?.mobile_number || caseData.customer?.phone || ''}
+          contextRefs={{ caseId: id! }}
+        />
       )}
 
       {/* Checkout Modal */}

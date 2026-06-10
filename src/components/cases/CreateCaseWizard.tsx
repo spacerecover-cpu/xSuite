@@ -1067,6 +1067,8 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
         <CaseSuccessModal
           caseNumber={createdCase.case_no}
           caseId={createdCase.id}
+          customerName={customers.find((c) => c.id === formData.customer_id)?.customer_name}
+          customerEmail={customers.find((c) => c.id === formData.customer_id)?.email ?? undefined}
           onClose={() => {
             setShowSuccessModal(false);
             onClose();

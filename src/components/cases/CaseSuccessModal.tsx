@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
-import { CheckCircle, FileText, Tag, FileCheck } from 'lucide-react';
+import { CheckCircle, FileText, Tag, FileCheck, Mail } from 'lucide-react';
+import { EmailDocumentModal } from './EmailDocumentModal';
 
 interface CaseSuccessModalProps {
   caseNumber: string;
   caseId: string;
+  customerName?: string;
+  customerEmail?: string;
   onClose: () => void;
   onPrintReceipt: () => void;
   onPrintLabel: () => void;
@@ -15,11 +18,14 @@ interface CaseSuccessModalProps {
 export const CaseSuccessModal: React.FC<CaseSuccessModalProps> = ({
   caseNumber,
   caseId,
+  customerName,
+  customerEmail,
   onClose,
   onPrintReceipt,
   onPrintLabel,
 }) => {
   const navigate = useNavigate();
+  const [showIntakeEmail, setShowIntakeEmail] = useState(false);
 
   const handleGoToCaseProfile = () => {
     navigate(`/cases/${caseId}`);
@@ -71,6 +77,14 @@ export const CaseSuccessModal: React.FC<CaseSuccessModalProps> = ({
             <Tag className="w-5 h-5" />
             Print Case Label
           </button>
+
+          <button
+            onClick={() => setShowIntakeEmail(true)}
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 border-2 border-primary text-primary rounded-lg hover:bg-primary/10 transition-all font-medium"
+          >
+            <Mail className="w-5 h-5" />
+            Email Intake Confirmation
+          </button>
         </div>
 
         <button
@@ -80,6 +94,19 @@ export const CaseSuccessModal: React.FC<CaseSuccessModalProps> = ({
           Create Another Case
         </button>
       </div>
+
+      {showIntakeEmail && (
+        <EmailDocumentModal
+          isOpen={showIntakeEmail}
+          onClose={() => setShowIntakeEmail(false)}
+          documentType="office_receipt"
+          caseId={caseId}
+          caseNumber={caseNumber}
+          customerName={customerName || 'Customer'}
+          customerEmail={customerEmail}
+          companyName="Data Recovery"
+        />
+      )}
     </Modal>
   );
 };

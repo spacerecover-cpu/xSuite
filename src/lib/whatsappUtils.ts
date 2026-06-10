@@ -6,8 +6,9 @@ import { logger } from './logger';
 
 interface WhatsAppMessageOptions {
   phoneNumber: string;
-  caseNumber: string;
-  customerName: string;
+  /** Required unless customMessage is provided (template-driven handoff). */
+  caseNumber?: string;
+  customerName?: string;
   status?: string;
   companyName?: string;
   customMessage?: string;
@@ -74,8 +75,8 @@ export const openWhatsAppChat = (options: WhatsAppMessageOptions): void => {
     const formattedPhone = formatPhoneForWhatsApp(options.phoneNumber);
 
     const message = options.customMessage || generateCaseUpdateMessage(
-      options.caseNumber,
-      options.customerName,
+      options.caseNumber ?? '',
+      options.customerName ?? 'Customer',
       options.status || 'received',
       options.companyName
     );

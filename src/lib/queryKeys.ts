@@ -120,6 +120,13 @@ export const stockKeys = {
   transfer: (id: string) => [...stockKeys.all, 'transfer', id] as const,
 };
 
+export const communicationKeys = {
+  all: ['communications'] as const,
+  byCase: (caseId: string) => [...communicationKeys.all, 'case', caseId] as const,
+  byCustomer: (customerId: string) =>
+    [...communicationKeys.all, 'customer', customerId] as const,
+};
+
 export const reportKeys = {
   all: ['case-reports'] as const,
   hub: (filters: Record<string, unknown>) => [...reportKeys.all, 'hub', filters] as const,

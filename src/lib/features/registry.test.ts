@@ -10,7 +10,7 @@ import {
 // The tab ids that exist in src/pages/cases/CaseDetail.tsx. Kept here so a tab
 // rename/removal that desyncs the registry fails loudly.
 const REAL_CASE_TAB_IDS = [
-  'overview', 'client', 'devices', 'clones', 'reports', 'quotes',
+  'overview', 'client', 'devices', 'clones', 'reports', 'quotes', 'communications',
   'stock', 'files', 'engineers', 'recovery_qa', 'notes', 'portal', 'history',
 ];
 
