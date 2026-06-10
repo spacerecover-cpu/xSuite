@@ -57,6 +57,7 @@ const CategoryDetail = lazyWithRetry(() => import('./pages/settings/CategoryDeta
 const SystemNumbers = lazyWithRetry(() => import('./pages/settings/SystemNumbers').then(m => ({ default: m.SystemNumbers as React.ComponentType<unknown> })));
 const GeneralSettings = lazyWithRetry(() => import('./pages/settings/GeneralSettings').then(m => ({ default: m.GeneralSettings as React.ComponentType<unknown> })));
 const AppearanceSettings = lazyWithRetry(() => import('./pages/settings/AppearanceSettings').then(m => ({ default: m.AppearanceSettings as React.ComponentType<unknown> })));
+const TableColumnsSettings = lazyWithRetry(() => import('./pages/settings/TableColumnsSettings').then(m => ({ default: m.TableColumnsSettings as React.ComponentType<unknown> })));
 const FeaturesSettings = lazyWithRetry(() => import('./pages/settings/FeaturesSettings').then(m => ({ default: m.FeaturesSettings as React.ComponentType<unknown> })));
 const ClientsList = lazyWithRetry(() => import('./pages/clients/ClientsList').then(m => ({ default: m.ClientsList as React.ComponentType<unknown> })));
 const CustomersListPage = lazyWithRetry(() => import('./pages/customers/CustomersListPage').then(m => ({ default: m.CustomersListPage as React.ComponentType<unknown> })));
@@ -602,6 +603,14 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={['owner', 'admin']}>
                     <AppearanceSettings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="table-columns"
+                element={
+                  <ProtectedRoute allowedRoles={['owner', 'admin']}>
+                    <TableColumnsSettings />
                   </ProtectedRoute>
                 }
               />

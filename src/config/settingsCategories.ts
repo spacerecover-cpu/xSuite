@@ -14,6 +14,7 @@ import {
   Bell,
   Coins,
   SlidersHorizontal,
+  Columns3,
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 
@@ -72,6 +73,16 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     tables: [],
     actionLabel: 'Choose Theme',
     description: 'Pick the look and feel of xSuite for everyone in your workspace.',
+  },
+  {
+    id: 'table-columns',
+    title: 'Table Columns',
+    icon: Columns3,
+    backgroundColor: '#475569',
+    borderColor: '#475569',
+    tables: [],
+    actionLabel: 'Configure Columns',
+    description: 'Choose the default and locked columns your team sees on the Cases table.',
   },
   {
     id: 'features',

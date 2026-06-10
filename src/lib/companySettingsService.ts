@@ -1,8 +1,11 @@
 import { supabase } from './supabaseClient';
 import { logger } from './logger';
+import type { Json } from '../types/database.types';
 
 export interface CompanySettings {
   id: string;
+  /** Generic tenant-scoped UI/config bucket (e.g. table_columns — see tablePrefsService). */
+  metadata?: Json | null;
   basic_info: {
     company_name?: string;
     legal_name?: string;

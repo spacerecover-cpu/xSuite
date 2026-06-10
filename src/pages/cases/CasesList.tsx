@@ -1,17 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Button } from '../../components/ui/Button';
-import { Badge } from '../../components/ui/Badge';
 import { Plus, Search, Filter, Briefcase, AlertCircle, CheckCircle, RefreshCw, ChevronLeft, ChevronRight, Archive, Download } from 'lucide-react';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { ExportButton } from '../../components/shared/ExportButton';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { downloadCSV } from '../../lib/csvExport';
-import { formatDate } from '../../lib/format';
+import { ConfigurableDataTable } from '../../components/ui/ConfigurableDataTable';
+import { ColumnPickerPopover } from '../../components/ui/ColumnPickerPopover';
+import { casesColumns, casesRegistryMeta, pickPrimaryDevice, CASES_TABLE_KEY } from '../../lib/tables/casesColumns';
+import type { CaseListRow } from '../../lib/tables/casesColumns';
+import { useTableViewPrefs } from '../../hooks/useTableViewPrefs';
 import { CreateCaseWizard } from '../../components/cases/CreateCaseWizard';
 import { useCasesRealtime } from '../../hooks/useCasesRealtime';
 import { useAuth } from '../../contexts/AuthContext';
@@ -44,12 +47,27 @@ interface Case {
   devices: {
     id: string;
     serial_no: string | null;
+    is_primary: boolean | null;
+    model: string | null;
+    brand: { name: string } | null;
+    capacity: { name: string; gb_value: number | null } | null;
     device_type: {
       id: string;
       name: string;
     } | null;
   }[];
 }
+
+/** Shape of the devices embed on the CSV-export queries. */
+type ExportDevice = {
+  serial_number: string | null;
+  model: string | null;
+  is_primary: boolean | null;
+  catalog_device_types: { name: string } | null;
+  catalog_device_capacities: { name: string } | null;
+};
+const exportPrimaryDevice = (r: Record<string, unknown>) =>
+  pickPrimaryDevice((r.case_devices as ExportDevice[] | null) ?? undefined);
 
 export const CasesList: React.FC = () => {
   const navigate = useNavigate();
@@ -146,7 +164,7 @@ export const CasesList: React.FC = () => {
           created_by,
           assigned_engineer_id,
           customer:customers_enhanced!customer_id (id, customer_number, customer_name, mobile_number),
-          devices:case_devices (id, serial_number, device_type_id, catalog_device_types (id, name))
+          devices:case_devices (id, serial_number, model, is_primary, device_type_id, catalog_device_types (id, name), catalog_device_brands (name), catalog_device_capacities (name, gb_value))
         `)
         .is('deleted_at', null);
 
@@ -167,6 +185,7 @@ export const CasesList: React.FC = () => {
 
       const { data, error } = await query
         .order('created_at', { ascending: false })
+        .order('is_primary', { referencedTable: 'case_devices', ascending: false })
         .order('created_at', { referencedTable: 'case_devices', ascending: true })
         .range(from, to);
 
@@ -193,6 +212,10 @@ export const CasesList: React.FC = () => {
         devices: (caseItem.devices || []).map((device) => ({
           id: device.id,
           serial_no: device.serial_number,
+          is_primary: device.is_primary,
+          model: device.model,
+          brand: device.catalog_device_brands,
+          capacity: device.catalog_device_capacities,
           device_type: device.catalog_device_types,
         })),
       }));
@@ -299,6 +322,41 @@ export const CasesList: React.FC = () => {
     return statusItem?.name || status;
   };
 
+  // Tenant-configurable columns: registry defaults ← tenant config ← user prefs.
+  const { view, setVisibleAndOrder, setWidths, resetPrefs } = useTableViewPrefs(
+    CASES_TABLE_KEY,
+    casesRegistryMeta,
+  );
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- color/name lookups derive from caseStatuses/casePriorities
+  const tableRows = useMemo<CaseListRow[]>(
+    () =>
+      cases.map((c) => {
+        const primary = pickPrimaryDevice(c.devices);
+        return {
+          id: c.id,
+          case_no: c.case_no,
+          priority: c.priority,
+          priority_color: getPriorityColor(c.priority),
+          status: c.status,
+          status_name: getStatusName(c.status),
+          status_color: getStatusColor(c.status),
+          customer_name: c.customer?.customer_name ?? null,
+          customer_mobile: c.customer?.mobile_number ?? null,
+          client_reference: c.client_reference,
+          created_at: c.created_at,
+          created_by_name: c.created_by_profile?.full_name ?? null,
+          device_type: primary?.device_type?.name ?? null,
+          device_model: primary?.model ?? null,
+          device_brand: primary?.brand?.name ?? null,
+          device_capacity: primary?.capacity?.name ?? null,
+          serial_primary: primary?.serial_no ?? null,
+          device_count: c.devices?.length ?? 0,
+        };
+      }),
+    [cases, caseStatuses, casePriorities],
+  );
+
   const handleCreateCase = async () => {
     const check = await canPerformAction('max_cases_per_month');
     if (!check.allowed) {
@@ -311,16 +369,12 @@ export const CasesList: React.FC = () => {
     setIsWizardOpen(true);
   };
 
-  // IDs visible on the current page — drives the header "select all"
-  // checkbox state. Selection state itself spans all pages.
-  const visibleIds = cases.map((c) => c.id);
-
   const handleBulkExport = async () => {
     if (selection.selectedCount === 0) return;
     const ids = Array.from(selection.selectedIds);
     const { data, error } = await supabase
       .from('cases')
-      .select('case_no, title, priority, status, client_reference, created_at, customers_enhanced:customer_id(customer_name)')
+      .select('case_no, title, priority, status, client_reference, created_at, customers_enhanced:customer_id(customer_name), case_devices(serial_number, model, is_primary, catalog_device_types(name), catalog_device_capacities(name))')
       .in('id', ids);
     if (error) {
       toast.error('Failed to export selected cases');
@@ -338,6 +392,10 @@ export const CasesList: React.FC = () => {
           label: 'Customer',
         },
         { key: 'client_reference', label: 'Client Ref' },
+        { key: (r) => exportPrimaryDevice(r)?.catalog_device_types?.name, label: 'Device Type' },
+        { key: (r) => exportPrimaryDevice(r)?.model, label: 'Device Model' },
+        { key: (r) => exportPrimaryDevice(r)?.serial_number, label: 'Serial Number' },
+        { key: (r) => exportPrimaryDevice(r)?.catalog_device_capacities?.name, label: 'Capacity' },
         {
           key: 'created_at',
           label: 'Created',
@@ -560,6 +618,13 @@ export const CasesList: React.FC = () => {
               )}
             </Button>
 
+            <ColumnPickerPopover
+              columns={casesColumns.map((c) => ({ key: c.key, label: c.label }))}
+              view={view}
+              onApply={setVisibleAndOrder}
+              onReset={resetPrefs}
+            />
+
             {/* Fetches everything matching the active filter — not just
                 the current page — so accountant handoff CSVs aren't
                 truncated to one paginated screen. */}
@@ -575,6 +640,10 @@ export const CasesList: React.FC = () => {
                   label: 'Customer',
                 },
                 { key: 'client_reference', label: 'Client Ref' },
+                { key: (r) => exportPrimaryDevice(r)?.catalog_device_types?.name, label: 'Device Type' },
+                { key: (r) => exportPrimaryDevice(r)?.model, label: 'Device Model' },
+                { key: (r) => exportPrimaryDevice(r)?.serial_number, label: 'Serial Number' },
+                { key: (r) => exportPrimaryDevice(r)?.catalog_device_capacities?.name, label: 'Capacity' },
                 {
                   key: 'created_at',
                   label: 'Created',
@@ -584,7 +653,7 @@ export const CasesList: React.FC = () => {
               getRows={async () => {
                 let q = supabase
                   .from('cases')
-                  .select('case_no, title, priority, status, client_reference, created_at, customers_enhanced:customer_id(customer_name)')
+                  .select('case_no, title, priority, status, client_reference, created_at, customers_enhanced:customer_id(customer_name), case_devices(serial_number, model, is_primary, catalog_device_types(name), catalog_device_capacities(name))')
                   .is('deleted_at', null);
                 if (searchTerm) {
                   const s = sanitizeFilterValue(searchTerm);
@@ -695,162 +764,16 @@ export const CasesList: React.FC = () => {
       ) : (
         <>
           <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="px-4 py-4 w-10">
-                      <input
-                        type="checkbox"
-                        checked={selection.allSelected(visibleIds)}
-                        // indeterminate state — set imperatively because React
-                        // doesn't support it via prop; ref callback fires on
-                        // every render so the state stays accurate.
-                        ref={(el) => {
-                          if (el) {
-                            el.indeterminate =
-                              !selection.allSelected(visibleIds) && selection.someSelected(visibleIds);
-                          }
-                        }}
-                        onChange={(e) => selection.setMany(visibleIds, e.target.checked)}
-                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
-                        aria-label="Select all on this page"
-                      />
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Case ID
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Priority
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Customer
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Contact Number
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Client Ref
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Device Type
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Serial Number
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Created At
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {cases.map((caseItem) => (
-                  <tr
-                    key={caseItem.id}
-                    onClick={() => navigate(`/cases/${caseItem.id}`)}
-                    className={`hover:bg-slate-50 transition-colors cursor-pointer ${
-                      selection.isSelected(caseItem.id) ? 'bg-info-muted/30' : ''
-                    }`}
-                  >
-                    <td
-                      className="px-4 py-4 w-10"
-                      // Stop event propagation so clicking the checkbox
-                      // doesn't also navigate to the case detail page.
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selection.isSelected(caseItem.id)}
-                        onChange={() => selection.toggle(caseItem.id)}
-                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
-                        aria-label={`Select case ${caseItem.case_no}`}
-                      />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="font-semibold text-primary">
-                        {caseItem.case_no}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge
-                        variant="custom"
-                        color={getPriorityColor(caseItem.priority)}
-                        size="sm"
-                      >
-                        {caseItem.priority}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {caseItem.customer ? (
-                        <div className="font-medium text-slate-900">
-                          {caseItem.customer.customer_name}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {caseItem.customer?.mobile_number ? (
-                        <div className="text-sm text-slate-700 flex items-center gap-1">
-                          <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                          </svg>
-                          {caseItem.customer.mobile_number}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {caseItem.client_reference ? (
-                        <span className="text-sm text-slate-700">
-                          {caseItem.client_reference}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge
-                        variant="custom"
-                        color={getStatusColor(caseItem.status)}
-                        size="sm"
-                      >
-                        {getStatusName(caseItem.status)}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {caseItem.devices && caseItem.devices.length > 0 && caseItem.devices[0].device_type ? (
-                        <span className="text-sm text-slate-700">
-                          {caseItem.devices[0].device_type.name}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {caseItem.devices && caseItem.devices.length > 0 ? (
-                        <div className="text-sm text-slate-700">
-                          {caseItem.devices
-                            .filter(d => d.serial_no)
-                            .map(d => d.serial_no)
-                            .join(', ') || <span className="text-slate-400">-</span>}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                      {formatDate(caseItem.created_at)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            <ConfigurableDataTable
+              rows={tableRows}
+              columns={casesColumns}
+              view={view}
+              rowKey={(r) => r.id}
+              onRowClick={(r) => navigate(`/cases/${r.id}`)}
+              selection={selection}
+              onWidthsChange={setWidths}
+              rowAriaLabel={(r) => `case ${r.case_no}`}
+            />
           </div>
 
           {totalPages > 1 && (
