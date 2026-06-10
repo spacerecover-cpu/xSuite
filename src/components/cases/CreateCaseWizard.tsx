@@ -10,7 +10,7 @@ import { CustomerFormModal } from '../customers/CustomerFormModal';
 import { CaseSuccessModal } from './CaseSuccessModal';
 import { ServerBulkDrivesModal } from './ServerBulkDrivesModal';
 import { UsageLimitGuard } from '../shared/UsageLimitGuard';
-import { printReceipt, printLabel } from '../../lib/printUtils';
+import { printReceipt, printLabel, printCustomerCopy } from '../../lib/printUtils';
 import {
   Users,
   HardDrive,
@@ -1077,6 +1077,9 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
           }}
           onPrintReceipt={() => {
             printReceipt(createdCase.id, createdCase.case_no);
+          }}
+          onPrintCustomerCopy={() => {
+            printCustomerCopy(createdCase.id, createdCase.case_no);
           }}
           onPrintLabel={() => {
             printLabel(createdCase.id, createdCase.case_no);

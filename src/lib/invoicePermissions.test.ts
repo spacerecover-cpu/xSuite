@@ -3,6 +3,7 @@ import {
   getPaymentSummary,
   getInvoiceEditability,
   canRecordPayment,
+  canIssueInvoice,
   canDeleteInvoice,
   RESTRICTED_EDITABLE_FIELDS,
   type InvoiceFinancials,
@@ -94,6 +95,20 @@ describe('canRecordPayment', () => {
     expect(canRecordPayment({ ...base, invoice_type: 'proforma', status: 'sent' })).toBe(false);
     expect(canRecordPayment({ ...base, status: 'draft' })).toBe(false);
     expect(canRecordPayment({ ...base, status: 'cancelled' })).toBe(false);
+  });
+});
+
+describe('canIssueInvoice', () => {
+  it('allows issuing a draft tax invoice (the step that makes it payable)', () => {
+    expect(canIssueInvoice({ ...base, status: 'draft' })).toBe(true);
+    expect(canIssueInvoice({ ...base })).toBe(true); // status defaults to draft
+  });
+
+  it('forbids issuing proformas and already-issued/terminal invoices', () => {
+    expect(canIssueInvoice({ ...base, invoice_type: 'proforma', status: 'draft' })).toBe(false);
+    expect(canIssueInvoice({ ...base, status: 'sent' })).toBe(false);
+    expect(canIssueInvoice({ ...base, status: 'paid' })).toBe(false);
+    expect(canIssueInvoice({ ...base, status: 'void' })).toBe(false);
   });
 });
 

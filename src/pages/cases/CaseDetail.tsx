@@ -207,6 +207,19 @@ export const CaseDetail: React.FC = () => {
     })();
   };
 
+  const handleIssueInvoice = (invoice: { id: string; invoice_number?: string | null }): void => {
+    void (async () => {
+      try {
+        await invoiceService.issueInvoice(invoice.id);
+        toast.success(`Invoice ${invoice.invoice_number ?? ''} issued — payments can now be recorded`.trim());
+        queryClient.invalidateQueries({ queryKey: ['invoices', 'case', id] });
+        queryClient.invalidateQueries({ queryKey: ['case_financial_summary', id] });
+      } catch (e) {
+        toast.error((e as Error).message || 'Failed to issue invoice');
+      }
+    })();
+  };
+
   const handleDuplicateCase = () => {
     modals.setShowDuplicateModal(true);
   };
@@ -682,6 +695,7 @@ export const CaseDetail: React.FC = () => {
               onSetViewingQuote={modals.setViewingQuote}
               onSetViewingInvoice={modals.setViewingInvoice}
               onHandleRecordPayment={handleRecordPayment}
+              onHandleIssueInvoice={handleIssueInvoice}
               onSetConvertingInvoice={modals.setConvertingInvoice}
               onSetShowConvertProformaModal={modals.setShowConvertProformaModal}
               quotesService={quotesService}

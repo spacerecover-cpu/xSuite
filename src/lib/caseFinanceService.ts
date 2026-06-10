@@ -42,15 +42,18 @@ export async function getCaseFinancialSummary(caseId: string): Promise<CaseFinan
     supabase
       .from('quotes')
       .select('id, total_amount, total_amount_base, status')
-      .eq('case_id', caseId),
+      .eq('case_id', caseId)
+      .is('deleted_at', null),
     supabase
       .from('invoices')
-      .select('id, total_amount, total_amount_base, amount_paid, amount_paid_base, status')
-      .eq('case_id', caseId),
+      .select('id, invoice_type, total_amount, total_amount_base, amount_paid, amount_paid_base, status')
+      .eq('case_id', caseId)
+      .is('deleted_at', null),
     supabase
       .from('expenses')
       .select('id, amount, amount_base, status')
       .eq('case_id', caseId)
+      .is('deleted_at', null)
       .in('status', ['approved', 'paid']),
   ]);
 
@@ -64,8 +67,15 @@ export async function getCaseFinancialSummary(caseId: string): Promise<CaseFinan
     .filter(q => q.status !== 'rejected')
     .reduce((sum, q) => sum + baseAmount(q, 'total_amount'), 0);
 
-  const totalInvoiced = invoices.reduce((sum, inv) => sum + baseAmount(inv, 'total_amount'), 0);
-  const totalPaid = invoices.reduce((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
+  // Only tax invoices are receivables. A converted proforma and the tax invoice
+  // it became are the SAME bill — counting both doubled "Invoiced" (e.g. 630 →
+  // 1,260). Void/cancelled invoices aren't owed either.
+  const billableInvoices = invoices.filter(
+    inv => inv.invoice_type === 'tax_invoice' && inv.status !== 'void' && inv.status !== 'cancelled',
+  );
+
+  const totalInvoiced = billableInvoices.reduce((sum, inv) => sum + baseAmount(inv, 'total_amount'), 0);
+  const totalPaid = billableInvoices.reduce((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
   const totalExpenses = expenses.reduce((sum, exp) => sum + baseAmount(exp, 'amount'), 0);
   const outstandingBalance = totalInvoiced - totalPaid;
   const netRevenue = totalPaid - totalExpenses;
@@ -80,8 +90,8 @@ export async function getCaseFinancialSummary(caseId: string): Promise<CaseFinan
     outstandingBalance,
     profitMargin,
     quotesCount: quotes.length,
-    invoicesCount: invoices.length,
-    paymentsCount: invoices.filter(inv => (inv.amount_paid || 0) > 0).length,
+    invoicesCount: billableInvoices.length,
+    paymentsCount: billableInvoices.filter(inv => (inv.amount_paid || 0) > 0).length,
     expensesCount: expenses.length,
   };
 }

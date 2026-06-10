@@ -396,7 +396,7 @@ export const getCasesWithUnpaidInvoices = async () => {
       )
     `)
     .eq('invoice_type', 'tax_invoice')
-    .in('status', ['draft', 'sent', 'partial', 'overdue'])
+    .in('status', ['sent', 'partial', 'overdue'])
     .gt('balance_due', 0);
 
   if (error) throw error;
@@ -428,7 +428,9 @@ export const getUnpaidInvoicesByCase = async (caseId: string) => {
     `)
     .eq('case_id', caseId)
     .eq('invoice_type', 'tax_invoice')
-    .in('status', ['draft', 'sent', 'partial', 'overdue'])
+    // Drafts are excluded by design: an invoice must be ISSUED before payment
+    // (canRecordPayment); the Issue action on the invoice moves draft → sent.
+    .in('status', ['sent', 'partial', 'overdue'])
     .gt('balance_due', 0)
     .order('invoice_date', { ascending: false });
 

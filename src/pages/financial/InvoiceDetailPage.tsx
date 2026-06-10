@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchInvoiceById, convertProformaToTaxInvoice, getConversionHistory, updateInvoice, toInvoiceEditInitialData, getPaymentHistory } from '../../lib/invoiceService';
+import { fetchInvoiceById, convertProformaToTaxInvoice, getConversionHistory, updateInvoice, toInvoiceEditInitialData, getPaymentHistory, issueInvoice } from '../../lib/invoiceService';
 import type { Invoice, InvoiceItem, InvoiceWithDetails } from '../../lib/invoiceService';
-import { getInvoiceEditability, canRecordPayment as invoiceCanRecordPayment, getPaymentSummary } from '../../lib/invoicePermissions';
+import { getInvoiceEditability, canRecordPayment as invoiceCanRecordPayment, canIssueInvoice as invoiceCanIssue, getPaymentSummary } from '../../lib/invoicePermissions';
 import { PaymentSummaryBar } from '../../components/financial/PaymentSummaryBar';
 import { PaymentHistoryTable } from '../../components/financial/PaymentHistoryTable';
 import { PageHeader } from '../../components/shared/PageHeader';
@@ -18,7 +18,7 @@ import { usePDFDownload } from '../../hooks/usePDFDownload';
 import { useProfileNames } from '../../hooks/useProfileNames';
 import { AuditInfo } from '../../components/ui/AuditInfo';
 import { useToast } from '../../hooks/useToast';
-import { FileText, ArrowLeft, CreditCard as Edit, DollarSign, AlertCircle, RefreshCw, CheckCircle, ArrowRight, Lock, Receipt } from 'lucide-react';
+import { FileText, ArrowLeft, CreditCard as Edit, DollarSign, AlertCircle, RefreshCw, CheckCircle, ArrowRight, Lock, Receipt, Send } from 'lucide-react';
 import { RecordReceiptModal } from '../../components/banking/RecordReceiptModal';
 import { InvoiceFormModal } from '../../components/cases/InvoiceFormModal';
 import { logger } from '../../lib/logger';
@@ -120,6 +120,19 @@ export const InvoiceDetailPage: React.FC = () => {
     }
   };
 
+  const handleIssueInvoice = async () => {
+    if (!id) return;
+    try {
+      await issueInvoice(id);
+      toast.success('Invoice issued — payments can now be recorded');
+      queryClient.invalidateQueries({ queryKey: ['invoice', id] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    } catch (error) {
+      logger.error('Error issuing invoice:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to issue invoice');
+    }
+  };
+
   const handleViewConversionHistory = async () => {
     if (!invoice || !id) return;
 
@@ -204,6 +217,7 @@ export const InvoiceDetailPage: React.FC = () => {
   const editability = getInvoiceEditability(invoice);
   const canEdit = editability.mode !== 'none';
   const canRecordPayment = invoiceCanRecordPayment(invoice);
+  const canIssue = invoiceCanIssue(invoice);
   const canConvert = invoice.invoice_type === 'proforma' && invoice.status !== 'converted';
   const hasConversionHistory = invoice.invoice_type === 'tax_invoice' && !!invoice.converted_from_quote_id;
   const wasConvertedFromProforma = invoice.invoice_type === 'tax_invoice' && !!invoice.converted_from_quote_id;
@@ -569,6 +583,13 @@ export const InvoiceDetailPage: React.FC = () => {
                   >
                     <Edit className="w-4 h-4 mr-2" />
                     Edit Invoice
+                  </Button>
+                )}
+
+                {canIssue && (
+                  <Button onClick={handleIssueInvoice} className="w-full">
+                    <Send className="w-4 h-4 mr-2" />
+                    Issue Invoice
                   </Button>
                 )}
 

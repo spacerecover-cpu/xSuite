@@ -2,7 +2,7 @@ import { supabase, resolveTenantId } from './supabaseClient';
 import type { Database } from '../types/database.types';
 import { checkRateLimit, RATE_LIMITS } from './rateLimiter';
 import { logAuditTrail } from './auditTrailService';
-import { logInvoiceCreated, logInvoicePayment } from './chainOfCustodyService';
+import { logInvoiceCreated, logInvoicePayment, logInvoiceStatusChanged } from './chainOfCustodyService';
 import { logger } from './logger';
 import { sanitizeUuidFields as sanitizeUuids, dropEmptyKeys } from './dataValidation';
 import { sanitizeFilterValue } from './postgrestSanitizer';
@@ -670,6 +670,55 @@ export const deleteInvoice = async (id: string) => {
   if (error) throw error;
 };
 
+/**
+ * Issue a draft tax invoice (draft → sent, stamping sent_at). Payments can only
+ * be recorded against issued invoices (canRecordPayment), so this is the
+ * explicit step that makes a converted/new invoice payable.
+ */
+export const issueInvoice = async (id: string) => {
+  const { data: inv, error: fetchError } = await supabase
+    .from('invoices')
+    .select('id, status, invoice_type, case_id, invoice_number')
+    .eq('id', id)
+    .maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!inv) throw new Error('Invoice not found');
+  if (inv.invoice_type !== 'tax_invoice') {
+    throw new Error('Only Tax Invoices are issued for payment. Convert the proforma first.');
+  }
+  if ((inv.status ?? 'draft') !== 'draft') {
+    throw new Error('Only draft invoices can be issued.');
+  }
+
+  const sentAt = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('invoices')
+    .update({ status: 'sent', sent_at: sentAt })
+    .eq('id', id)
+    .eq('status', 'draft')
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('Invoice was already issued.');
+
+  await logAuditTrail('update', 'invoices', id, { status: 'draft' }, { status: 'sent', sent_at: sentAt });
+
+  if (inv.case_id) {
+    try {
+      await logInvoiceStatusChanged({
+        caseId: inv.case_id,
+        invoiceNo: inv.invoice_number ?? id,
+        oldStatus: 'draft',
+        newStatus: 'sent',
+      });
+    } catch (custodyError) {
+      logger.error('Invoice issued but chain-of-custody event failed:', custodyError);
+    }
+  }
+
+  return data;
+};
+
 export const updateInvoiceStatus = async (
   id: string,
   status: string,
@@ -1122,6 +1171,7 @@ export const invoiceService = {
   createInvoice,
   updateInvoice,
   deleteInvoice,
+  issueInvoice,
   updateInvoiceStatus,
   getInvoiceStats,
   recordPayment,
