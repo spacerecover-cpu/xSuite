@@ -26,6 +26,7 @@ const EVENT_LABELS: Record<string, string> = {
   'case.phase_changed': 'Case status changed',
   'case.phase_changed.customer': 'Case status changed',
   'case.sla_breach': 'SLA breach alert',
+  'case.follow_up_due': 'Scheduled follow-up due',
   'quote.expiring_soon': 'Quote expiring soon',
   'invoice.overdue.7d': 'Invoice overdue 7+ days',
   'invoice.overdue.14d': 'Invoice overdue 14+ days',

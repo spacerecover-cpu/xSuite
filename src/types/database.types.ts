@@ -1733,45 +1733,75 @@ export type Database = {
       case_follow_ups: {
         Row: {
           assigned_to: string | null
+          attempt_count: number
+          auto_send: boolean
           case_id: string
+          channel: string
           completed_at: string | null
           created_at: string
           created_by: string | null
           deleted_at: string | null
           follow_up_date: string
           id: string
+          last_error: string | null
+          message: string | null
           notes: string | null
+          quote_id: string | null
+          send_to: string | null
+          sent_at: string | null
           status: string | null
+          subject: string | null
+          template_id: string | null
           tenant_id: string
           type: string | null
           updated_at: string
         }
         Insert: {
           assigned_to?: string | null
+          attempt_count?: number
+          auto_send?: boolean
           case_id: string
+          channel?: string
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
           follow_up_date: string
           id?: string
+          last_error?: string | null
+          message?: string | null
           notes?: string | null
+          quote_id?: string | null
+          send_to?: string | null
+          sent_at?: string | null
           status?: string | null
+          subject?: string | null
+          template_id?: string | null
           tenant_id: string
           type?: string | null
           updated_at?: string
         }
         Update: {
           assigned_to?: string | null
+          attempt_count?: number
+          auto_send?: boolean
           case_id?: string
+          channel?: string
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
           follow_up_date?: string
           id?: string
+          last_error?: string | null
+          message?: string | null
           notes?: string | null
+          quote_id?: string | null
+          send_to?: string | null
+          sent_at?: string | null
           status?: string | null
+          subject?: string | null
+          template_id?: string | null
           tenant_id?: string
           type?: string | null
           updated_at?: string
@@ -1782,6 +1812,20 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_follow_ups_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_follow_ups_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "document_templates"
             referencedColumns: ["id"]
           },
           {
@@ -15741,6 +15785,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      process_due_case_follow_ups: { Args: never; Returns: Json }
       process_time_based_events: { Args: never; Returns: Json }
       promote_device_to_primary: {
         Args: { p_case_id: string; p_device_id: string }

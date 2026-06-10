@@ -8,6 +8,7 @@ import {
   Send,
   Inbox,
   StickyNote,
+  CalendarClock,
 } from 'lucide-react';
 import { Card } from '../../ui/Card';
 import { Badge } from '../../ui/Badge';
@@ -18,6 +19,8 @@ import { listCaseCommunications } from '../../../lib/communicationsService';
 import { communicationKeys } from '../../../lib/queryKeys';
 import { EmailDocumentModal } from '../EmailDocumentModal';
 import { SendMessageModal } from '../../communications/SendMessageModal';
+import { FollowUpFormModal } from '../../communications/FollowUpFormModal';
+import { useTenantFeature } from '../../../contexts/TenantConfigContext';
 
 interface CaseCommunicationsTabProps {
   caseId: string;
@@ -48,6 +51,8 @@ export const CaseCommunicationsTab: React.FC<CaseCommunicationsTabProps> = ({
   const queryClient = useQueryClient();
   const [showEmail, setShowEmail] = useState(false);
   const [messageChannel, setMessageChannel] = useState<'whatsapp' | 'sms' | null>(null);
+  const [showFollowUp, setShowFollowUp] = useState(false);
+  const followUpsEnabled = useTenantFeature('automation.case_follow_ups');
 
   const { data: communications = [], isLoading } = useQuery({
     queryKey: communicationKeys.byCase(caseId),
@@ -85,6 +90,12 @@ export const CaseCommunicationsTab: React.FC<CaseCommunicationsTabProps> = ({
               <MessageSquare className="w-4 h-4 mr-2" />
               SMS
             </Button>
+            {followUpsEnabled && (
+              <Button size="sm" onClick={() => setShowFollowUp(true)}>
+                <CalendarClock className="w-4 h-4 mr-2" />
+                Schedule Follow-up
+              </Button>
+            )}
           </div>
         </div>
 
@@ -186,6 +197,15 @@ export const CaseCommunicationsTab: React.FC<CaseCommunicationsTabProps> = ({
           defaultPhone={customerPhone ?? ''}
           contextRefs={{ caseId, customerId: customerId ?? undefined }}
           onLogged={refresh}
+        />
+      )}
+
+      {showFollowUp && (
+        <FollowUpFormModal
+          isOpen={showFollowUp}
+          onClose={() => setShowFollowUp(false)}
+          caseId={caseId}
+          defaultEmail={customerEmail ?? undefined}
         />
       )}
     </Card>

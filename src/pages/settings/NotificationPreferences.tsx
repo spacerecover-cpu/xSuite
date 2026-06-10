@@ -70,6 +70,10 @@ const EVENT_GROUPS: EventGroup[] = [
         label: 'SLA breach alerts',
         allowedRoles: ['owner', 'admin', 'manager', 'technician'],
       },
+      {
+        eventType: 'case.follow_up_due',
+        label: 'Scheduled follow-up due',
+      },
     ],
   },
   {

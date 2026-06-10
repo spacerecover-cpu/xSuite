@@ -26,8 +26,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
 import { supabase } from '../../lib/supabaseClient';
 import { convertQuoteToInvoice } from '../../lib/invoiceService';
-import { ArrowLeft, CreditCard as Edit, Trash2, Send, CheckCircle, XCircle, FileText, Copy, Clock, FileCheck, AlertCircle, Receipt } from 'lucide-react';
+import { ArrowLeft, CreditCard as Edit, Trash2, Send, CheckCircle, XCircle, FileText, Copy, Clock, FileCheck, AlertCircle, Receipt, CalendarClock } from 'lucide-react';
 import { BackupDeviceRecommendation } from '../../components/quotes/BackupDeviceRecommendation';
+import { FollowUpFormModal } from '../../components/communications/FollowUpFormModal';
+import { useTenantFeature } from '../../contexts/TenantConfigContext';
 import { logger } from '../../lib/logger';
 
 const statusConfig = {
@@ -58,6 +60,8 @@ export const QuoteDetailPage: React.FC = () => {
   } = usePDFDownload();
   const { profile: _profile } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showQuoteChaseModal, setShowQuoteChaseModal] = useState(false);
+  const followUpsEnabled = useTenantFeature('automation.case_follow_ups');
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -579,6 +583,17 @@ export const QuoteDetailPage: React.FC = () => {
                   </Button>
                 )}
 
+                {followUpsEnabled && quote.case_id && (
+                  <Button
+                    onClick={() => setShowQuoteChaseModal(true)}
+                    variant="secondary"
+                    className="w-full"
+                  >
+                    <CalendarClock className="w-4 h-4 mr-2" />
+                    Schedule Quote Chase
+                  </Button>
+                )}
+
                 <Button
                   onClick={() => duplicateMutation.mutate()}
                   variant="secondary"
@@ -775,6 +790,18 @@ export const QuoteDetailPage: React.FC = () => {
           companyId={quote.company_id}
           initialData={quote ? toQuoteEditInitialData(quote as unknown as Record<string, unknown>) : undefined}
           clientReference={quote.client_reference}
+        />
+      )}
+
+      {/* Quote chase follow-up */}
+      {showQuoteChaseModal && quote?.case_id && (
+        <FollowUpFormModal
+          isOpen={showQuoteChaseModal}
+          onClose={() => setShowQuoteChaseModal(false)}
+          caseId={quote.case_id}
+          quoteId={quote.id}
+          defaultType="quote_chase"
+          defaultInDays={3}
         />
       )}
 

@@ -120,6 +120,12 @@ export const stockKeys = {
   transfer: (id: string) => [...stockKeys.all, 'transfer', id] as const,
 };
 
+export const followUpKeys = {
+  all: ['follow-ups'] as const,
+  byCase: (caseId: string) => [...followUpKeys.all, 'case', caseId] as const,
+  due: () => [...followUpKeys.all, 'due'] as const,
+};
+
 export const communicationKeys = {
   all: ['communications'] as const,
   byCase: (caseId: string) => [...communicationKeys.all, 'case', caseId] as const,

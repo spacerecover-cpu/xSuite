@@ -36,6 +36,9 @@ export const NOTIFICATION_EVENT_VARIABLES: Record<string, string[]> = {
     'case_no', 'priority', 'phase', 'status_name', 'target_hours',
     'hours_in_phase', 'case_id',
   ],
+  'case.follow_up_due': [
+    'case_no', 'follow_up_type', 'notes', 'case_id', 'follow_up_id', 'quote_id',
+  ],
   'quote.expiring_soon': [
     'quote_number', 'valid_until', 'hours_until_expiry', 'total_amount',
     'currency', 'quote_id', 'case_id', 'customer_id',
@@ -94,6 +97,8 @@ export const SAMPLE_EVENT_PAYLOAD: Record<string, string> = {
   status: 'completed',
   alert_type: 'low_stock',
   message: 'Donor drives (2.5" 1TB) below minimum level',
+  follow_up_type: 'quote_chase',
+  follow_up_id: '00000000-0000-0000-0000-000000000000',
   case_id: '00000000-0000-0000-0000-000000000000',
   customer_id: '00000000-0000-0000-0000-000000000000',
   quote_id: '00000000-0000-0000-0000-000000000000',
