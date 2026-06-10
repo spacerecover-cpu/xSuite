@@ -223,6 +223,9 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices', 'case', id] });
       queryClient.invalidateQueries({ queryKey: ['case_financial_summary', id] });
+      // Case Payment History reads from this key — without it the list stays
+      // frozen on the prior payment while the summary/invoice already updated.
+      queryClient.invalidateQueries({ queryKey: ['case_payments', id] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       modals.setShowRecordPaymentModal(false);
       modals.setSelectedInvoiceForPayment(null);
