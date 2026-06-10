@@ -18,7 +18,7 @@
 | 1 | Lead / Customer Enquiry | _no lead entity_ → starts at `customers_enhanced` (+ `customer_communications`) |
 | 2 | Case Creation | `cases` (+ `number_sequences`); created in `CreateCaseWizard`, not `caseService` |
 | 3 | Device Intake | `case_devices` (multi-device array; primary = `patient` role) |
-| 4 | Device Labeling & Tracking | case-level `CaseLabelDocument`; `chain_of_custody` (built, not init'd at intake) |
+| 4 | Device Labeling & Tracking | case-level `CaseLabelDocument`; `chain_of_custody` (init'd at intake via `trg_log_device_received_custody` since v1.2.0) |
 | 5 | Initial Inspection / Condition | `case_devices.condition_id`; `device_diagnostics` (insert fails — see workflow doc) |
 | 6 | Diagnosis / Fault / Recoverability | `case_devices.symptoms` + `catalog_service_problems` (flat label, no severity) |
 | 7 | Quotation & Approval | `quotes` (internal) vs `case_quotes` (portal read — 0 rows; loop broken) |
@@ -602,6 +602,16 @@ const formatted = formatCurrencyWithConfig(amount, currency);
 - ~370 source files retokenized across UI, layout, financial, banking, cases, portal, auth, settings, platform-admin, HR, payroll, inventory, stock, suppliers, templates, companies, customers, quotes, kb, dashboard, users, admin, resources, print, onboarding, plus shared components. Zero banned `purple-*`/`indigo-*`/`violet-*` classes or banned hex codes (`#1E5BB8`, `#4A5568`, `#6A7A8A`, `#8b5cf6`, `#6366f1`, `#a855f7`) remain in `src/` except the intentionally-fixed `src/lib/deviceIconMapper.ts` SVG strings.
 - New files: `src/contexts/ThemeContext.tsx`, `src/lib/tenantThemeService.ts`, `src/lib/chartTheme.ts`, `src/pages/settings/AppearanceSettings.tsx`.
 - See the **Theming** section above for the full token vocabulary and rules.
+
+### Version 1.2.0 — Custody Write Paths, Audit Actor Stamping & Relationship Integrity
+**Date**: 2026-06-10
+**Migrations**: `custody_ledger_write_paths`, `audit_actor_fields`, `single_primary_company_per_customer`, `custody_baseline_for_existing_devices` (spec: `docs/platform-review-2026-06-10.md`)
+
+- **Chain of custody now has lifecycle write paths** (the ledger previously had 0 rows DB-wide): `trg_log_device_received_custody` AFTER INSERT ON `case_devices` logs `DEVICE_RECEIVED`/`in_custody` at intake (DB-side — no client path can skip it); `log_case_checkout` additionally writes `DEVICE_CHECKED_OUT`/`CASE_CHECKED_OUT` (`checked_out`) ledger events; `log_chain_of_custody` gained `DEFAULT NULL` on `p_device_id` (clients previously sent `''`, failing the uuid cast on every case-level event); pre-rollout devices received one labelled retroactive `CUSTODY_BASELINE_ESTABLISHED` event. Frontend: financial custody events (quote/invoice/payment) wired into the services; History tab split into Chain of Custody + Case Activity (`case_job_history`) views.
+- **Audit actor stamping moved into the DB**: `set_audit_actor_fields()` BEFORE INSERT/UPDATE trigger on `cases`, `invoices`, `quotes`, `customers_enhanced`, `companies`, `case_internal_notes`, `case_devices`; `updated_by uuid` added to `case_internal_notes` + `case_devices`. Frontend: shared `AuditInfo` component + `formatDateTimeWithConfig` (tenant-timezone via `Intl`) rolled out to case/quote/invoice/customer/notes surfaces.
+- **Customer↔company integrity**: single-primary partial unique index `uq_customer_primary_company` + data fix (9 linked customers had no primary); relationship management UI (`ManageCompaniesModal`, manager+) with audited add/set-primary/end and explicit open-case re-pointing; all relationship readers now filter `deleted_at`.
+- Tenant-configurable case table columns: registry + `company_settings.metadata.table_columns` (tenant defaults/locked) + `user_preferences.preferences.tables` (user overrides); fit-to-width rendering (no horizontal scroll). No schema change.
+- `database.types.ts` regenerated.
 
 ### Future Migration Guidelines
 

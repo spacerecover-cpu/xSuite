@@ -1,5 +1,11 @@
 # Platform Review — 2026-06-10
 
+> **Implementation status (same day):** all four items implemented on this branch per the
+> recommendations below — see `docs/superpowers/plans/2026-06-10-platform-review-implementation.md`
+> for the executed plan. Explicitly deferred to their own specs: custody P2 hardening
+> (hash chaining, persisted entry numbers, `verify_custody_chain`) and item 2 phase 3
+> (named saved views).
+
 Detailed analysis, recommendations, and implementation approach for four requested items:
 
 1. [Customer company change option](#1--customer-company-change-option)
