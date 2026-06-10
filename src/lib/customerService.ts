@@ -237,21 +237,29 @@ export async function endCompanyRelationship(relationshipId: string, reason: str
   if (rel.customer_id) await syncDenormalizedCompanyName(rel.customer_id);
 }
 
-/** Open (non-terminal) cases that reference a company for this customer —
- *  the impact surface shown before relationship changes. */
-export async function getOpenCasesForCompany(customerId: string, companyId: string): Promise<
-  Array<{ id: string; case_no: string | null; status: string | null }>
-> {
-  const { data: terminalStatuses, error: statusError } = await supabase
+export interface OpenCaseRef {
+  id: string;
+  case_no: string | null;
+  status: string | null;
+  company_id: string | null;
+}
+
+async function getTerminalStatusNames(): Promise<string[]> {
+  const { data, error } = await supabase
     .from('master_case_statuses')
     .select('name')
     .in('type', ['completed', 'delivered', 'cancelled']);
-  if (statusError) throw statusError;
-  const terminalNames = (terminalStatuses ?? []).map((s) => s.name);
+  if (error) throw error;
+  return (data ?? []).map((s) => s.name);
+}
 
+/** Open (non-terminal) cases that reference a company for this customer —
+ *  the impact surface shown before relationship changes. */
+export async function getOpenCasesForCompany(customerId: string, companyId: string): Promise<OpenCaseRef[]> {
+  const terminalNames = await getTerminalStatusNames();
   let query = supabase
     .from('cases')
-    .select('id, case_no, status')
+    .select('id, case_no, status, company_id')
     .eq('customer_id', customerId)
     .eq('company_id', companyId)
     .is('deleted_at', null);
@@ -261,6 +269,69 @@ export async function getOpenCasesForCompany(customerId: string, companyId: stri
   const { data, error } = await query.order('created_at', { ascending: false });
   if (error) throw error;
   return data ?? [];
+}
+
+/** Open (non-terminal) cases for this customer that are still pinned to ANY
+ *  company — the cases that become personal when the customer is made
+ *  individual. */
+export async function getOpenCompanyCasesForCustomer(customerId: string): Promise<OpenCaseRef[]> {
+  const terminalNames = await getTerminalStatusNames();
+  let query = supabase
+    .from('cases')
+    .select('id, case_no, status, company_id')
+    .eq('customer_id', customerId)
+    .not('company_id', 'is', null)
+    .is('deleted_at', null);
+  if (terminalNames.length > 0) {
+    query = query.not('status', 'in', `(${terminalNames.map((n) => `"${n}"`).join(',')})`);
+  }
+  const { data, error } = await query.order('created_at', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * Convert a business contact into an individual customer: re-point every open
+ * company-pinned case to personal (company_id = null, audited per case), then
+ * soft-delete all active company links. Issued quotes/invoices and closed
+ * cases keep their company snapshot — history is never rewritten.
+ */
+export async function makeCustomerIndividual(
+  customerId: string,
+  reason: string,
+): Promise<{ repointedCases: number; endedLinks: number }> {
+  // 1. Re-point open company-pinned cases to personal (each logged on the case).
+  const openCases = await getOpenCompanyCasesForCustomer(customerId);
+  for (const c of openCases) {
+    await repointCaseCompany(c.id, c.company_id, null);
+  }
+
+  // 2. Soft-delete every active link in one write (no per-link primary churn).
+  const relationships = await getCompanyRelationships(customerId);
+  if (relationships.length > 0) {
+    const { error } = await supabase
+      .from('customer_company_relationships')
+      .update({ deleted_at: new Date().toISOString(), is_primary: false })
+      .eq('customer_id', customerId)
+      .is('deleted_at', null);
+    if (error) throw error;
+    for (const rel of relationships) {
+      await logAuditTrail('company_unlinked', 'customer_company_relationships', rel.id, {
+        company_id: rel.company_id,
+        is_primary: rel.is_primary,
+      }, { reason, via: 'make_individual' });
+    }
+  }
+
+  // 3. Clear the denormalized name and record the conversion itself.
+  await syncDenormalizedCompanyName(customerId);
+  await logAuditTrail('customer_converted_to_individual', 'customers_enhanced', customerId, {}, {
+    reason,
+    repointed_cases: openCases.length,
+    ended_links: relationships.length,
+  });
+
+  return { repointedCases: openCases.length, endedLinks: relationships.length };
 }
 
 /** Re-point an open case to another company, keeping the audited case history

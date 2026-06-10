@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Building2, Star } from 'lucide-react';
+import { AlertTriangle, Building2, Star, UserMinus } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -13,6 +13,8 @@ import {
   endCompanyRelationship,
   getCompanyRelationships,
   getOpenCasesForCompany,
+  getOpenCompanyCasesForCustomer,
+  makeCustomerIndividual,
   repointCaseCompany,
   setPrimaryCompany,
   type CompanyRelationshipRecord,
@@ -27,7 +29,8 @@ interface ManageCompaniesModalProps {
 
 type PendingAction =
   | { type: 'set_primary'; relationship: CompanyRelationshipRecord }
-  | { type: 'end'; relationship: CompanyRelationshipRecord };
+  | { type: 'end'; relationship: CompanyRelationshipRecord }
+  | { type: 'make_individual' };
 
 const companyLabel = (rel: CompanyRelationshipRecord) =>
   rel.companies?.company_name ?? rel.companies?.name ?? 'Unknown company';
@@ -74,17 +77,26 @@ export const ManageCompaniesModal: React.FC<ManageCompaniesModalProps> = ({
     enabled: isOpen,
   });
 
-  // Impact surface for the pending action: open cases that reference the
+  // Impact surface for a per-company action: open cases that reference the
   // affected company (terminal cases are never touched).
-  const affected = pending
-    ? pending.type === 'set_primary'
+  const affected =
+    pending?.type === 'set_primary'
       ? relationships.find((r) => r.is_primary) ?? null
-      : pending.relationship
-    : null;
+      : pending?.type === 'end'
+        ? pending.relationship
+        : null;
   const { data: openCases = [] } = useQuery({
     queryKey: ['open_cases_for_company', customerId, affected?.company_id],
     queryFn: () => getOpenCasesForCompany(customerId, affected!.company_id),
     enabled: isOpen && !!affected,
+  });
+
+  // Impact surface for "make individual": every open case still pinned to any
+  // company — all become personal.
+  const { data: individualCases = [] } = useQuery({
+    queryKey: ['open_company_cases_for_customer', customerId],
+    queryFn: () => getOpenCompanyCasesForCustomer(customerId),
+    enabled: isOpen && pending?.type === 'make_individual',
   });
 
   const linkedIds = useMemo(() => new Set(relationships.map((r) => r.company_id)), [relationships]);
@@ -132,6 +144,10 @@ export const ManageCompaniesModal: React.FC<ManageCompaniesModalProps> = ({
   const confirmMutation = useMutation({
     mutationFn: async () => {
       if (!pending) return;
+      if (pending.type === 'make_individual') {
+        await makeCustomerIndividual(customerId, endReason.trim());
+        return;
+      }
       const target = pending.relationship;
       if (pending.type === 'set_primary') {
         const oldPrimary = relationships.find((r) => r.is_primary) ?? null;
@@ -142,9 +158,9 @@ export const ManageCompaniesModal: React.FC<ManageCompaniesModalProps> = ({
           }
         }
       } else {
-        if (relationships.length === 1 && openCases.length > 0) {
+        if (relationships.length === 1) {
           throw new Error(
-            'Cannot end the only company link while open cases reference it. Link the correct company first.',
+            'This is the only linked company. Use "Make individual" to remove it and set open cases to personal.',
           );
         }
         await endCompanyRelationship(target.id, endReason.trim());
@@ -158,7 +174,13 @@ export const ManageCompaniesModal: React.FC<ManageCompaniesModalProps> = ({
       }
     },
     onSuccess: () => {
-      toast.success(pending?.type === 'end' ? 'Company link ended' : 'Primary company updated');
+      toast.success(
+        pending?.type === 'make_individual'
+          ? `${customerName} is now an individual customer`
+          : pending?.type === 'end'
+            ? 'Company link ended'
+            : 'Primary company updated',
+      );
       resetPending();
       invalidate();
     },
@@ -166,7 +188,8 @@ export const ManageCompaniesModal: React.FC<ManageCompaniesModalProps> = ({
   });
 
   const confirmDisabled =
-    confirmMutation.isPending || (pending?.type === 'end' && endReason.trim().length === 0);
+    confirmMutation.isPending ||
+    ((pending?.type === 'end' || pending?.type === 'make_individual') && endReason.trim().length === 0);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Companies — ${customerName}`} icon={Building2} size="lg">
@@ -223,6 +246,19 @@ export const ManageCompaniesModal: React.FC<ManageCompaniesModalProps> = ({
               ))}
             </ul>
           )}
+          {relationships.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                resetPending();
+                setPending({ type: 'make_individual' });
+              }}
+              className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-danger hover:underline"
+            >
+              <UserMinus className="h-4 w-4" aria-hidden="true" />
+              Remove all companies — make individual
+            </button>
+          )}
         </div>
 
         {/* Confirm panel with impact analysis */}
@@ -232,22 +268,44 @@ export const ManageCompaniesModal: React.FC<ManageCompaniesModalProps> = ({
               <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-warning" aria-hidden="true" />
               <div className="flex-1 space-y-3 text-sm">
                 <p className="font-medium text-slate-900">
-                  {pending.type === 'set_primary'
-                    ? `Make ${companyLabel(pending.relationship)} the primary company?`
-                    : `End the link to ${companyLabel(pending.relationship)}?`}
+                  {pending.type === 'make_individual'
+                    ? `Make ${customerName} an individual customer?`
+                    : pending.type === 'set_primary'
+                      ? `Make ${companyLabel(pending.relationship)} the primary company?`
+                      : `End the link to ${companyLabel(pending.relationship)}?`}
                 </p>
                 <p className="text-slate-700">
+                  {pending.type === 'make_individual'
+                    ? 'All company links will be removed and future quotes and invoices will be issued to the individual. '
+                    : ''}
                   Issued quotes, invoices and closed cases keep their original company — history is
                   never rewritten.
                 </p>
-                {pending.type === 'end' && (
+                {(pending.type === 'end' || pending.type === 'make_individual') && (
                   <Input
                     label="Reason (recorded in the audit trail)"
                     value={endReason}
                     onChange={(e) => setEndReason(e.target.value)}
-                    placeholder="e.g. Contact moved to a different employer"
+                    placeholder={
+                      pending.type === 'make_individual'
+                        ? 'e.g. No longer purchasing through a company'
+                        : 'e.g. Contact moved to a different employer'
+                    }
                     required
                   />
+                )}
+                {pending.type === 'make_individual' && individualCases.length > 0 && (
+                  <div className="rounded-md border border-slate-200 bg-surface p-3">
+                    <p className="mb-1 font-medium text-slate-800">
+                      {individualCases.length} open case{individualCases.length === 1 ? '' : 's'} will be set to no
+                      company (personal):
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {individualCases.slice(0, 6).map((c) => c.case_no).filter(Boolean).join(', ')}
+                      {individualCases.length > 6 ? '…' : ''}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">Each change is logged on the case.</p>
+                  </div>
                 )}
                 {affected && openCases.length > 0 && (
                   <div className="rounded-md border border-slate-200 bg-surface p-3">
