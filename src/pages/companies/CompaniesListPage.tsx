@@ -118,6 +118,7 @@ export const CompaniesListPage: React.FC = () => {
             .select('customers_enhanced (id, customer_name)')
             .eq('company_id', company.id)
             .eq('is_primary', true)
+            .is('deleted_at', null)
             .maybeSingle();
 
           return { ...company, primary_contact: relationship?.customers_enhanced || null };

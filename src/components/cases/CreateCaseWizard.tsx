@@ -404,6 +404,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
           .from('customer_company_relationships')
           .select('company_id')
           .eq('customer_id', formData.customer_id)
+          .is('deleted_at', null)
           .order('is_primary', { ascending: false })
           .limit(1)
           .maybeSingle();

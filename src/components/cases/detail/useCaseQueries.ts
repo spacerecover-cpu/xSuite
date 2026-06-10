@@ -105,6 +105,7 @@ export function useCaseQueries(
                 )
               `)
               .eq('customer_id', caseRecord.customer_id)
+              .is('deleted_at', null)
               .order('is_primary', { ascending: false })
               .limit(1)
               .maybeSingle();

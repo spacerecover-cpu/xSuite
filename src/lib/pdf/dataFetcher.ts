@@ -515,6 +515,7 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
       .select('companies (id, name, company_name)')
       .eq('customer_id', quoteRow.customer_id)
       .eq('is_primary', true)
+      .is('deleted_at', null)
       .maybeSingle();
 
     customerAssociatedCompany = relationshipData?.companies ?? null;
@@ -682,6 +683,7 @@ async function fetchInvoiceDetails(invoiceId: string): Promise<InvoiceData> {
       .select('companies (id, name, company_name)')
       .eq('customer_id', invoiceRow.customer_id)
       .eq('is_primary', true)
+      .is('deleted_at', null)
       .maybeSingle();
 
     customerAssociatedCompany = relationshipData?.companies ?? null;

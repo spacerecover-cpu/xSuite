@@ -127,6 +127,7 @@ export const CompanyProfilePage: React.FC = () => {
           )
         `)
         .eq('company_id', id)
+        .is('deleted_at', null)
         .order('is_primary', { ascending: false });
 
       if (error) {

@@ -308,6 +308,7 @@ export const fetchInvoiceById = async (id: string): Promise<InvoiceWithDetails |
       `)
       .eq('customer_id', data.customer_id)
       .eq('is_primary', true)
+      .is('deleted_at', null)
       .maybeSingle();
 
     if (relationshipData?.companies) {

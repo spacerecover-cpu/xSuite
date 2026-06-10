@@ -275,6 +275,7 @@ export const fetchQuoteById = async (id: string): Promise<QuoteWithDetails | nul
       `)
       .eq('customer_id', data.customer_id)
       .eq('is_primary', true)
+      .is('deleted_at', null)
       .maybeSingle();
 
     if (relationshipData?.companies) {
