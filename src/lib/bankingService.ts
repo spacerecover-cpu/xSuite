@@ -905,7 +905,12 @@ export const bankingService = {
     }));
   },
 
-  async getInvoicesByCase(caseId: string) {
+  // Payment-allocation sources. Only OPEN, PAYABLE tax documents may receive
+  // allocations: proformas are not payable documents, converted shells point
+  // at their tax invoice, drafts haven't been issued, void/cancelled are dead,
+  // and balance_due=0 has nothing to allocate. Oldest due first (the
+  // Xero/QuickBooks auto-apply order).
+  async getOpenInvoicesByCase(caseId: string) {
     const { data, error } = await supabase
       .from('invoices')
       .select(`
@@ -921,11 +926,46 @@ export const bankingService = {
         currency
       `)
       .eq('case_id', caseId)
+      .eq('invoice_type', 'tax_invoice')
+      .not('status', 'in', '(converted,void,cancelled,draft)')
+      .gt('balance_due', 0)
       .is('deleted_at', null)
-      .order('invoice_date', { ascending: false });
+      .order('due_date', { ascending: true, nullsFirst: false })
+      .limit(200);
 
     if (error) throw error;
     return data ?? [];
+  },
+
+  // Read-only statement context for the collapsed "settled" disclosure.
+  async getSettledInvoicesByCase(caseId: string) {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('id, invoice_number, invoice_date, status, total_amount, amount_paid, currency')
+      .eq('case_id', caseId)
+      .eq('invoice_type', 'tax_invoice')
+      .eq('payment_status', 'paid')
+      .neq('status', 'converted')
+      .is('deleted_at', null)
+      .order('invoice_date', { ascending: false })
+      .limit(20);
+
+    if (error) throw error;
+    return data ?? [];
+  },
+
+  // Single-invoice mode fetches its target directly so the flow still works
+  // if the invoice slipped out of the open set between page load and click.
+  async getInvoiceForPayment(invoiceId: string) {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('id, invoice_number, invoice_date, due_date, invoice_type, status, total_amount, amount_paid, balance_due, currency')
+      .eq('id', invoiceId)
+      .is('deleted_at', null)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
   },
 
   async createReceiptWithAllocations(
