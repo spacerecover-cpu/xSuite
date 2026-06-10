@@ -75,6 +75,7 @@ export interface Invoice {
   payment_terms?: string;
   sent_at?: string | null;
   created_by?: string;
+  updated_by?: string | null;
   /** @deprecated TODO(B8): not persisted — invoices table has no `template_id` column */
   template_id?: string | null;
   /** @deprecated TODO(B8): not persisted — invoices table has no `accounting_locale_id` column */

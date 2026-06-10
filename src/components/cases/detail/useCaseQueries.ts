@@ -36,6 +36,7 @@ export function useCaseQueries(
           contact_id,
           service_type_id,
           created_by,
+          updated_by,
           assigned_engineer_id,
           assigned_to,
           company_id
@@ -51,7 +52,7 @@ export function useCaseQueries(
         throw new Error(`Case ${id} not found`);
       }
 
-      const [customerData, contactData, serviceTypeData, createdByData, assignedEngineerData, companyData] = await Promise.all([
+      const [customerData, contactData, serviceTypeData, createdByData, assignedEngineerData, companyData, updatedByData] = await Promise.all([
         caseRecord.customer_id
           ? supabase
               .from('customers_enhanced')
@@ -115,6 +116,13 @@ export function useCaseQueries(
           }
           return Promise.resolve({ data: null });
         })(),
+        caseRecord.updated_by
+          ? supabase
+              .from('profiles')
+              .select('id, full_name')
+              .eq('id', caseRecord.updated_by)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
       ]);
 
       const result = {
@@ -125,6 +133,7 @@ export function useCaseQueries(
         created_by_profile: createdByData.data,
         assigned_engineer: assignedEngineerData.data,
         company: companyData.data,
+        updated_by_profile: updatedByData.data,
       };
 
       return result;
@@ -393,7 +402,8 @@ export function useCaseQueries(
           content,
           created_by,
           created_at,
-          updated_at
+          updated_at,
+          updated_by
         `)
         .eq('case_id', id)
         .order('created_at', { ascending: false });

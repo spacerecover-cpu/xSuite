@@ -18,6 +18,8 @@ import {
   Copy, RefreshCw, Ban, Check, AlertTriangle, ShoppingBag
 } from 'lucide-react';
 import { formatDate } from '../../lib/format';
+import { useProfileNames } from '../../hooks/useProfileNames';
+import { AuditInfo } from '../../components/ui/AuditInfo';
 import { uploadCustomerProfilePhoto, deleteCustomerProfilePhoto } from '../../lib/fileStorageService';
 import { generatePortalLoginUrl, generateCustomerPortalCredentialsText } from '../../lib/portalUrlService';
 import { generateSecurePassword } from '../../lib/passwordUtils';
@@ -48,6 +50,9 @@ interface Customer {
   notes: string | null;
   is_active: boolean | null;
   created_at: string;
+  created_by: string | null;
+  updated_at: string | null;
+  updated_by: string | null;
   customer_groups: { id: string; name: string } | null;
   geo_countries: { id: string; name: string } | null;
   geo_cities: { id: string; name: string } | null;
@@ -128,6 +133,7 @@ export const CustomerProfilePage: React.FC = () => {
     },
     enabled: !!id,
   });
+  const { nameOf } = useProfileNames([customer?.created_by, customer?.updated_by]);
 
   const { data: companies = [] } = useQuery({
     queryKey: ['customer_companies', id],
@@ -506,10 +512,13 @@ export const CustomerProfilePage: React.FC = () => {
                       <span>{[customer.geo_cities?.name, customer.geo_countries?.name].filter(Boolean).join(', ')}</span>
                     </div>
                   )}
-                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <Calendar className="w-4 h-4 text-slate-400" />
-                    <span>Joined {formatDate(customer.created_at)}</span>
-                  </div>
+                  <AuditInfo
+                    createdAt={customer.created_at}
+                    createdLabel="Joined"
+                    createdByName={nameOf(customer.created_by)}
+                    updatedAt={customer.updated_at}
+                    updatedByName={nameOf(customer.updated_by)}
+                  />
                 </div>
 
                 {customer.address && (

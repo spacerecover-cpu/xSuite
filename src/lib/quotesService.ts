@@ -59,6 +59,7 @@ export interface Quote {
   terms?: string | null;
   notes?: string;
   created_by?: string;
+  updated_by?: string | null;
   approved_by?: string;
   /** @deprecated TODO(B8): not persisted — quotes table has no `converted_to_case_id` column */
   converted_to_case_id?: string;

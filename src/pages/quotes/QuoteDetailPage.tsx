@@ -22,6 +22,8 @@ import { QuoteFormModal } from '../../components/cases/QuoteFormModal';
 import { ConvertToInvoiceModal } from '../../components/cases/ConvertToInvoiceModal';
 import { useCurrency } from '../../hooks/useCurrency';
 import { usePDFDownload } from '../../hooks/usePDFDownload';
+import { useProfileNames } from '../../hooks/useProfileNames';
+import { AuditInfo } from '../../components/ui/AuditInfo';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
 import { supabase } from '../../lib/supabaseClient';
@@ -76,6 +78,7 @@ export const QuoteDetailPage: React.FC = () => {
     queryFn: () => fetchQuoteById(id!),
     enabled: !!id,
   });
+  const { nameOf } = useProfileNames([quote?.created_by, quote?.updated_by]);
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteQuote(id!),
@@ -655,12 +658,13 @@ export const QuoteDetailPage: React.FC = () => {
             <Card className="p-6">
               <h3 className="text-lg font-semibold text-slate-900 mb-4">Quote Details</h3>
               <div className="space-y-3 text-sm">
-                <div>
-                  <span className="text-slate-600">Created:</span>
-                  <span className="ml-2 text-slate-900 font-medium">
-                    {quote.created_at ? new Date(quote.created_at).toLocaleDateString() : 'N/A'}
-                  </span>
-                </div>
+                <AuditInfo
+                  variant="stacked"
+                  createdAt={quote.created_at}
+                  createdByName={nameOf(quote.created_by)}
+                  updatedAt={quote.updated_at}
+                  updatedByName={nameOf(quote.updated_by)}
+                />
                 {quote.valid_until && (
                   <div>
                     <span className="text-slate-600">Valid Until:</span>

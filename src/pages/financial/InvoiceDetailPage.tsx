@@ -15,6 +15,8 @@ import { PDFDownloadButton } from '../../components/shared/PDFDownloadButton';
 import { InvoiceDocument } from '../../components/documents/InvoiceDocument';
 import { useCurrency } from '../../hooks/useCurrency';
 import { usePDFDownload } from '../../hooks/usePDFDownload';
+import { useProfileNames } from '../../hooks/useProfileNames';
+import { AuditInfo } from '../../components/ui/AuditInfo';
 import { useToast } from '../../hooks/useToast';
 import { FileText, ArrowLeft, CreditCard as Edit, DollarSign, AlertCircle, RefreshCw, CheckCircle, ArrowRight, Lock, Receipt } from 'lucide-react';
 import { RecordReceiptModal } from '../../components/banking/RecordReceiptModal';
@@ -75,6 +77,7 @@ export const InvoiceDetailPage: React.FC = () => {
     queryFn: () => fetchInvoiceById(id!),
     enabled: !!id,
   });
+  const { nameOf } = useProfileNames([invoice?.created_by, invoice?.updated_by]);
 
   const { data: payments = [] } = useQuery({
     queryKey: ['invoice_payments', id],
@@ -620,6 +623,13 @@ export const InvoiceDetailPage: React.FC = () => {
                     {new Date(invoice.due_date).toLocaleDateString()}
                   </span>
                 </div>
+                <AuditInfo
+                  variant="stacked"
+                  createdAt={invoice.created_at}
+                  createdByName={nameOf(invoice.created_by)}
+                  updatedAt={invoice.updated_at}
+                  updatedByName={nameOf(invoice.updated_by)}
+                />
                 <div className="pt-2 border-t">
                   <span className="text-slate-600">Total:</span>
                   <span className="ml-2 text-slate-900 font-bold">

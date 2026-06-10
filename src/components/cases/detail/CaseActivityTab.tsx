@@ -4,7 +4,8 @@ import { Activity, ArrowRight } from 'lucide-react';
 import { supabase } from '../../../lib/supabaseClient';
 import { caseKeys } from '../../../lib/queryKeys';
 import { formatActionType } from '../../../lib/chainOfCustodyService';
-import { formatDateTime } from '../../../lib/format';
+import { formatDateTimeWithConfig } from '../../../lib/format';
+import { useDateTimeConfig } from '../../../contexts/TenantConfigContext';
 import { Skeleton } from '../../ui/Skeleton';
 
 interface ActivityEntry {
@@ -56,6 +57,7 @@ function DetailsBlock({ details }: { details: string | null }) {
  * forensic Chain of Custody ledger, which tracks physical device handling.
  */
 export const CaseActivityTab: React.FC<{ caseId: string }> = ({ caseId }) => {
+  const dateTimeConfig = useDateTimeConfig();
   const { data: entries = [], isLoading, isError, error } = useQuery({
     queryKey: caseKeys.activity(caseId),
     queryFn: async (): Promise<ActivityEntry[]> => {
@@ -127,8 +129,8 @@ export const CaseActivityTab: React.FC<{ caseId: string }> = ({ caseId }) => {
             <div className="rounded-lg border border-slate-200 bg-surface p-3">
               <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                 <p className="text-sm font-semibold text-slate-900">{formatActionType(entry.action)}</p>
-                <p className="text-xs text-slate-500" title={entry.created_at}>
-                  {formatDateTime(entry.created_at)} · {entry.actor_name}
+                <p className="text-xs text-slate-500" title={`UTC: ${entry.created_at}`}>
+                  {formatDateTimeWithConfig(entry.created_at, dateTimeConfig)} · {entry.actor_name}
                 </p>
               </div>
               {entry.old_value || entry.new_value ? (

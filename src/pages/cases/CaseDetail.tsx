@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { getNextCaseNumber } from '../../lib/caseService';
-import { ArrowLeft, MessageCircle, Printer, FileText, Tag, CheckCircle2, Copy, User, HardDrive, FileStack, AlertCircle, Calendar, Package, Activity, Settings, History, Users, DollarSign, Trash2, Grid2x2 as Grid, Eye, Mail } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Printer, FileText, Tag, CheckCircle2, Copy, User, HardDrive, FileStack, AlertCircle, Package, Activity, Settings, History, Users, DollarSign, Trash2, Grid2x2 as Grid, Eye, Mail } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -29,6 +29,7 @@ import { PreserveLongTermModal } from '../../components/cases/PreserveLongTermMo
 import type { CreateCloneDriveFormValues } from '../../components/cases/CreateCloneDriveModal';
 import { ChainOfCustodyTab } from '../../components/cases/ChainOfCustodyTab';
 import { CaseActivityTab } from '../../components/cases/detail/CaseActivityTab';
+import { AuditInfo } from '../../components/ui/AuditInfo';
 import { ReportTypeSelectionModal } from '../../components/cases/ReportTypeSelectionModal';
 import { StreamlinedReportEditor } from '../../components/cases/StreamlinedReportEditor';
 import ReportViewModal from '../../components/cases/ReportViewModal';
@@ -337,16 +338,13 @@ export const CaseDetail: React.FC = () => {
                 {getStatusDisplayName(caseData.status)}
               </Badge>
             </div>
-            <div className="flex items-center gap-4 mt-2 text-sm text-slate-500 flex-wrap">
-              <span className="flex items-center gap-1">
-                <Calendar className="w-4 h-4" />
-                Created {formatDate(caseData.created_at)}
-              </span>
-              <span className="flex items-center gap-1">
-                <User className="w-4 h-4" />
-                by {caseData.created_by_profile?.full_name || 'System'}
-              </span>
-            </div>
+            <AuditInfo
+              className="mt-2"
+              createdAt={caseData.created_at}
+              createdByName={caseData.created_by_profile?.full_name}
+              updatedAt={caseData.updated_at}
+              updatedByName={caseData.updated_by_profile?.full_name}
+            />
           </div>
 
           {/* Action Buttons */}
@@ -737,6 +735,7 @@ export const CaseDetail: React.FC = () => {
                 created_at: n.created_at,
                 updated_at: n.updated_at,
                 created_by: n.created_by,
+                updated_by: n.updated_by,
               }))}
               newNote={modals.newNote}
               onNoteChange={modals.setNewNote}

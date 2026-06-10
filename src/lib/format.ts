@@ -156,6 +156,54 @@ export const formatDateTime = (date: string | Date, localeCode?: string): string
   return formatDate(date, 'MMM dd, yyyy HH:mm', localeCode);
 };
 
+/** The slice of DateTimeConfig the audit formatter needs (structural, so it is
+ *  testable without the tenant-config context). */
+export interface AuditDateTimeConfig {
+  timezone?: string | null;
+  timeFormat?: '12h' | '24h' | null;
+}
+
+/**
+ * Tenant-timezone date-time for audit surfaces ("Created … by …").
+ * Timestamps are stored as UTC timestamptz; this renders them in the tenant's
+ * IANA timezone with an explicit zone label so "when" is unambiguous in
+ * disputes. Month-name format is deliberate — numeric day/month order varies
+ * by tenant and audit strings must not be misread. Built on Intl (no extra
+ * dependency; date-fns cannot do timezones).
+ */
+export const formatDateTimeWithConfig = (
+  date: string | Date | null | undefined,
+  config?: AuditDateTimeConfig | null,
+  opts?: { withTz?: boolean },
+): string => {
+  if (!date) return '';
+  const dateObj = typeof date === 'string' ? parseISO(date) : date;
+  if (Number.isNaN(dateObj.getTime())) return '';
+
+  const timeZone = config?.timezone || undefined;
+  const hour12 = (config?.timeFormat ?? '24h') === '12h';
+  const withTz = opts?.withTz ?? true;
+  const baseOptions: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12,
+  };
+  try {
+    return new Intl.DateTimeFormat(DEFAULT_LOCALE, {
+      ...baseOptions,
+      ...(timeZone ? { timeZone } : {}),
+      ...(withTz && timeZone ? { timeZoneName: 'short' } : {}),
+    }).format(dateObj);
+  } catch {
+    // Unknown IANA zone in tenant config — degrade to browser-local time
+    // rather than rendering nothing.
+    return new Intl.DateTimeFormat(DEFAULT_LOCALE, baseOptions).format(dateObj);
+  }
+};
+
 /**
  * Normalize a date value to the `yyyy-MM-dd` string an `<input type="date">`
  * requires. Postgres `timestamptz` columns come back as full ISO strings
