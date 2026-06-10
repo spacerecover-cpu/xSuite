@@ -12,7 +12,14 @@ WITH tenant_tables AS (
                               -- core/platform + system-template tables that legitimately allow
                               -- NULL tenant_id (platform admins; platform logs; system-default
                               -- notification templates) and so cannot satisfy the NOT-NULL rule
-                              'profiles', 'platform_audit_logs', 'notification_templates')
+                              'profiles', 'platform_audit_logs', 'notification_templates',
+                              -- report-definition tables use the same global+tenant-override
+                              -- pattern (20260610050104): tenant_id NULL = system row readable
+                              -- by all tenants; tenant rows scoped by per-row policies. The
+                              -- NOT-NULL / RESTRICTIVE-isolation / audit-trigger rules cannot
+                              -- apply to mixed system+tenant tables.
+                              'master_case_report_templates', 'report_section_library',
+                              'report_section_presets', 'report_template_section_mappings')
 ),
 violations AS (
   SELECT
