@@ -319,6 +319,11 @@ export interface InvoicePaymentLine {
   status: string | null;
   recorded_by: string | null;
   notes: string | null;
+  /** RCPT/PAYM document number this allocation came from. */
+  doc_number?: string | null;
+  source?: 'payment' | 'receipt';
+  /** Invoice balance after this entry (statement-style, oldest-first). */
+  running_balance?: number;
 }
 
 export interface InvoiceDocumentData {
