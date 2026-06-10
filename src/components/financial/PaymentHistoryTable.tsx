@@ -15,16 +15,11 @@ const STATUS_CLASS: Record<string, string> = {
   refunded: 'bg-danger-muted text-danger',
 };
 
-const StatusChip: React.FC<{ status: string | null }> = ({ status }) => {
-  if (!status) return <span className="text-slate-400">—</span>;
-  const cls = STATUS_CLASS[status] ?? 'bg-slate-100 text-slate-600';
-  return <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium capitalize ${cls}`}>{status}</span>;
-};
-
 /**
- * The full payment trail for a financial document: date, amount, method,
- * reference, transaction id, recorded-by, status, notes. Supports multiple and
- * partial payments; renders a helpful empty state.
+ * The full payment trail for an invoice — receipts, allocated payments, and
+ * legacy direct payments merged oldest-first with a running balance (see
+ * src/lib/paymentLedger.ts). Statement-style: the last row's balance is the
+ * invoice's current outstanding.
  */
 export const PaymentHistoryTable: React.FC<PaymentHistoryTableProps> = ({ entries, formatMoney, formatDate }) => {
   if (entries.length === 0) {
@@ -32,6 +27,7 @@ export const PaymentHistoryTable: React.FC<PaymentHistoryTableProps> = ({ entrie
       <div className="rounded-lg border border-dashed border-slate-200 bg-white p-6 text-center">
         <Receipt className="mx-auto mb-2 h-6 w-6 text-slate-300" />
         <p className="text-sm text-slate-500">No payments recorded yet</p>
+        <p className="mt-1 text-xs text-slate-400">Use Record Payment to register the first one.</p>
       </div>
     );
   }
@@ -42,28 +38,50 @@ export const PaymentHistoryTable: React.FC<PaymentHistoryTableProps> = ({ entrie
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs text-slate-500">
             <th scope="col" className="px-3 py-2 font-medium">Date</th>
+            <th scope="col" className="px-3 py-2 font-medium">Document</th>
             <th scope="col" className="px-3 py-2 font-medium">Method</th>
             <th scope="col" className="px-3 py-2 font-medium">Reference</th>
-            <th scope="col" className="px-3 py-2 font-medium">Transaction ID</th>
             <th scope="col" className="px-3 py-2 font-medium">Recorded by</th>
-            <th scope="col" className="px-3 py-2 font-medium">Status</th>
-            <th scope="col" className="px-3 py-2 font-medium">Notes</th>
             <th scope="col" className="px-3 py-2 text-right font-medium">Amount</th>
+            <th scope="col" className="px-3 py-2 text-right font-medium">Balance</th>
           </tr>
         </thead>
         <tbody>
-          {entries.map((e) => (
-            <tr key={e.id} className="border-b border-slate-100 last:border-0 align-top">
-              <td className="px-3 py-2 whitespace-nowrap text-slate-700 tabular-nums">{formatDate(e.payment_date)}</td>
-              <td className="px-3 py-2 text-slate-700">{e.method ?? '—'}</td>
-              <td className="px-3 py-2 text-slate-700">{e.reference ?? '—'}</td>
-              <td className="px-3 py-2 font-mono text-xs text-slate-500">{e.transaction_id ?? '—'}</td>
-              <td className="px-3 py-2 text-slate-700">{e.recorded_by ?? '—'}</td>
-              <td className="px-3 py-2"><StatusChip status={e.status} /></td>
-              <td className="px-3 py-2 max-w-[16rem] truncate text-slate-500" title={e.notes ?? undefined}>{e.notes ?? '—'}</td>
-              <td className="px-3 py-2 text-right font-medium text-slate-900 tabular-nums whitespace-nowrap">{formatMoney(e.amount)}</td>
-            </tr>
-          ))}
+          {entries.map((e) => {
+            const abnormal = e.status && e.status !== 'completed';
+            return (
+              <tr key={e.id} className="border-b border-slate-100 last:border-0 align-top" title={e.notes ?? undefined}>
+                <td className="px-3 py-2 whitespace-nowrap text-slate-700 tabular-nums">{formatDate(e.payment_date)}</td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                        e.source === 'receipt' ? 'bg-info-muted text-info' : 'bg-primary/10 text-primary'
+                      }`}
+                    >
+                      {e.source}
+                    </span>
+                    <span className="font-medium text-slate-800">{e.doc_number ?? '—'}</span>
+                    {abnormal && (
+                      <span
+                        className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium capitalize ${STATUS_CLASS[e.status!] ?? 'bg-slate-100 text-slate-600'}`}
+                      >
+                        {e.status}
+                      </span>
+                    )}
+                  </div>
+                  {e.transaction_id && (
+                    <p className="mt-0.5 font-mono text-[10px] text-slate-400">{e.transaction_id}</p>
+                  )}
+                </td>
+                <td className="px-3 py-2 text-slate-700">{e.method ?? '—'}</td>
+                <td className="px-3 py-2 max-w-[12rem] truncate text-slate-700">{e.reference ?? '—'}</td>
+                <td className="px-3 py-2 text-slate-700">{e.recorded_by ?? '—'}</td>
+                <td className="px-3 py-2 text-right font-medium text-success tabular-nums whitespace-nowrap">{formatMoney(e.amount)}</td>
+                <td className="px-3 py-2 text-right font-semibold text-slate-900 tabular-nums whitespace-nowrap">{formatMoney(e.running_balance)}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

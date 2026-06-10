@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient';
+import { fetchInvoicePaymentLedger } from '../paymentLedger';
 import { getOrCreateCompanySettings } from '../companySettingsService';
 import type {
   CaseData,
@@ -607,46 +608,24 @@ export async function fetchInvoiceData(invoiceId: string): Promise<InvoiceDocume
   };
 }
 
-type RawInvoicePayment = {
-  payment_date: string | null;
-  amount: number | string | null;
-  reference: string | null;
-  transaction_id: string | null;
-  status: string | null;
-  notes: string | null;
-  created_by: string | null;
-  payment_method: { name: string | null } | null;
-};
-
-// Payment trail for the invoice PDF. Mirrors invoiceService.getPaymentHistory but
-// kept local so the pdf module stays free of the (lazily-loaded) invoiceService.
+// Payment trail for the invoice PDF: the unified ledger (receipts + allocated
+// payments + legacy direct payments with running balances). paymentLedger is
+// dependency-light (supabase client only), so the pdf module still stays free
+// of the lazily-loaded invoiceService.
 async function fetchInvoicePaymentHistory(invoiceId: string): Promise<InvoicePaymentLine[]> {
-  const { data } = await supabase
-    .from('payments')
-    .select('payment_date, amount, reference, transaction_id, status, notes, created_by, payment_method:master_payment_methods(name)')
-    .eq('invoice_id', invoiceId)
-    .is('deleted_at', null)
-    .order('payment_date', { ascending: false });
-
-  const rows = (data ?? []) as unknown as RawInvoicePayment[];
-  const ids = Array.from(new Set(rows.map((r) => r.created_by).filter((v): v is string => !!v)));
-  let nameById: Record<string, string> = {};
-  if (ids.length > 0) {
-    const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', ids);
-    nameById = Object.fromEntries(
-      (profiles ?? []).map((p: { id: string; full_name: string | null }) => [p.id, p.full_name ?? '']),
-    );
-  }
-
-  return rows.map((r) => ({
-    payment_date: r.payment_date ?? null,
-    amount: typeof r.amount === 'number' ? r.amount : Number(r.amount ?? 0),
-    method: r.payment_method?.name ?? null,
-    reference: r.reference ?? null,
-    transaction_id: r.transaction_id ?? null,
-    status: r.status ?? null,
-    recorded_by: r.created_by ? (nameById[r.created_by] ?? null) : null,
-    notes: r.notes ?? null,
+  const entries = await fetchInvoicePaymentLedger(invoiceId);
+  return entries.map((e) => ({
+    payment_date: e.payment_date,
+    amount: e.amount,
+    method: e.method,
+    reference: e.reference,
+    transaction_id: e.transaction_id,
+    status: e.status,
+    recorded_by: e.recorded_by,
+    notes: e.notes,
+    doc_number: e.doc_number,
+    source: e.source,
+    running_balance: e.running_balance,
   }));
 }
 

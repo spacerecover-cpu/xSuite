@@ -893,80 +893,16 @@ export const recordPayment = async (
   return payment;
 };
 
-export interface PaymentHistoryEntry {
-  id: string;
-  payment_number: string | null;
-  payment_date: string | null;
-  amount: number;
-  currency: string | null;
-  method: string | null;
-  reference: string | null;
-  transaction_id: string | null;
-  status: string | null;
-  notes: string | null;
-  recorded_by: string | null;
-}
+// Unified payment ledger: receipts (receipt_allocations), allocated payments
+// (payment_allocations) and legacy direct payments merged into one
+// date-ordered statement with running balances — src/lib/paymentLedger.ts.
+// The old payments-only query here was why money recorded through the
+// Record Payment modal (receipts path) showed in no payment history surface.
+export type { InvoiceLedgerEntry as PaymentHistoryEntry } from './paymentLedger';
 
-interface RawPaymentRow {
-  id: string;
-  payment_number?: string | null;
-  payment_date?: string | null;
-  amount?: number | string | null;
-  currency?: string | null;
-  reference?: string | null;
-  transaction_id?: string | null;
-  status?: string | null;
-  notes?: string | null;
-  created_by?: string | null;
-  payment_method?: { name: string | null } | null;
-}
-
-// Pure shaping of payment rows into the UI/PDF/portal payment-history trail.
-// Kept separate from the fetch so it is unit-testable without Supabase.
-export function mapPaymentHistory(
-  rows: RawPaymentRow[],
-  nameById: Record<string, string>,
-): PaymentHistoryEntry[] {
-  return rows.map((r) => ({
-    id: r.id,
-    payment_number: r.payment_number ?? null,
-    payment_date: r.payment_date ?? null,
-    amount: typeof r.amount === 'number' ? r.amount : Number(r.amount ?? 0),
-    currency: r.currency ?? null,
-    method: r.payment_method?.name ?? null,
-    reference: r.reference ?? null,
-    transaction_id: r.transaction_id ?? null,
-    status: r.status ?? null,
-    notes: r.notes ?? null,
-    recorded_by: r.created_by ? (nameById[r.created_by] ?? null) : null,
-  }));
-}
-
-// payments has no FK to profiles, so the recorder name is resolved with a second
-// batched fetch and joined in `mapPaymentHistory`.
-export const getPaymentHistory = async (invoiceId: string): Promise<PaymentHistoryEntry[]> => {
-  const { data, error } = await supabase
-    .from('payments')
-    .select(
-      'id, payment_number, payment_date, amount, currency, reference, transaction_id, status, notes, created_by, payment_method:master_payment_methods(name)',
-    )
-    .eq('invoice_id', invoiceId)
-    .is('deleted_at', null)
-    .order('payment_date', { ascending: false });
-
-  if (error) throw error;
-  const rows = (data ?? []) as unknown as RawPaymentRow[];
-
-  const ids = Array.from(new Set(rows.map((r) => r.created_by).filter((v): v is string => !!v)));
-  let nameById: Record<string, string> = {};
-  if (ids.length > 0) {
-    const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', ids);
-    nameById = Object.fromEntries(
-      (profiles ?? []).map((p: { id: string; full_name: string | null }) => [p.id, p.full_name ?? '']),
-    );
-  }
-
-  return mapPaymentHistory(rows, nameById);
+export const getPaymentHistory = async (invoiceId: string) => {
+  const { fetchInvoicePaymentLedger } = await import('./paymentLedger');
+  return fetchInvoicePaymentLedger(invoiceId);
 };
 
 export const convertProformaToTaxInvoice = async (
