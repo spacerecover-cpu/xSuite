@@ -196,6 +196,12 @@ export const Sidebar: React.FC = () => {
               badgeColor="blue"
               isCollapsed={isCollapsed}
             />
+            <ProtectedSidebarNavItem
+              to="/case-reports"
+              icon={FileText}
+              label="Case Reports"
+              isCollapsed={isCollapsed}
+            />
           </SidebarSection>
 
           {canViewFinance && (

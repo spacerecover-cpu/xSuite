@@ -658,6 +658,65 @@ class ReportPDFService {
     };
   }
 
+  /**
+   * Persist the exact PDF artifact released to the customer (provability —
+   * the lab must be able to prove WHAT was delivered, lifecycle stages 12/16).
+   * Uploads to the private case-report-pdfs bucket under
+   * {tenant_id}/{report_id}/... and stamps generated_at/generated_by plus
+   * content.pdf_file_path on the report. Called by the send-to-customer flow
+   * BEFORE the status flips to 'sent'.
+   */
+  async persistReportPDF(reportId: string): Promise<{ path: string }> {
+    const result = await this.generateReportAsBlob(reportId);
+    if (!result.success || !result.blob || !result.filename) {
+      throw new Error(result.error || 'Failed to generate report PDF');
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (!profile?.tenant_id) throw new Error('No active tenant');
+
+    const path = `${profile.tenant_id}/${reportId}/${Date.now()}-${result.filename}`;
+    const { error: uploadError } = await supabase.storage
+      .from('case-report-pdfs')
+      .upload(path, result.blob, { contentType: 'application/pdf', upsert: false });
+    if (uploadError) {
+      logger.error('Error persisting report PDF:', uploadError);
+      throw uploadError;
+    }
+
+    const { data: existing } = await supabase
+      .from('case_reports')
+      .select('content')
+      .eq('id', reportId)
+      .maybeSingle();
+    const content: JsonObject = isJsonObject(existing?.content)
+      ? { ...existing.content }
+      : {};
+    content.pdf_file_path = path;
+
+    const { error: stampError } = await supabase
+      .from('case_reports')
+      .update({
+        generated_at: new Date().toISOString(),
+        generated_by: user.id,
+        content: content as Json,
+      })
+      .eq('id', reportId);
+    if (stampError) {
+      logger.error('Error stamping report after PDF persist:', stampError);
+      throw stampError;
+    }
+
+    return { path };
+  }
+
   async downloadReportPDF(reportId: string) {
     try {
       await this.generateReportPDF(reportId, true);

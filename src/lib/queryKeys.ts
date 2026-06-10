@@ -120,6 +120,14 @@ export const stockKeys = {
   transfer: (id: string) => [...stockKeys.all, 'transfer', id] as const,
 };
 
+export const reportKeys = {
+  all: ['case-reports'] as const,
+  hub: (filters: Record<string, unknown>) => [...reportKeys.all, 'hub', filters] as const,
+  templates: (reportType?: string) => [...reportKeys.all, 'templates', reportType ?? 'all'] as const,
+  templateSections: (templateId: string) =>
+    [...reportKeys.all, 'template-sections', templateId] as const,
+};
+
 export const templateKeys = {
   all: ['document-templates'] as const,
   list: (typeCode: string, documentType?: string) =>

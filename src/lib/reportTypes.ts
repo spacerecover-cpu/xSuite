@@ -140,6 +140,8 @@ export interface ReportTemplate {
   };
   is_active: boolean;
   is_default: boolean;
+  /** NULL = shared system template; non-NULL = tenant override (clone-to-edit). */
+  tenant_id?: string | null;
   created_at: string;
   updated_at: string;
 }

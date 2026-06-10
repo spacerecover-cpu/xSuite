@@ -1,6 +1,7 @@
 export const ROUTE_TO_MODULE_KEY: { [key: string]: string } = {
   '/': 'dashboard',
   '/cases': 'cases',
+  '/case-reports': 'cases',
   '/invoices': 'invoices',
   '/payments': 'payments',
   '/expenses': 'expenses',

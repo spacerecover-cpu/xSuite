@@ -7672,6 +7672,7 @@ export type Database = {
           is_active: boolean | null
           name: string
           template_data: Json | null
+          tenant_id: string | null
           updated_at: string
         }
         Insert: {
@@ -7681,6 +7682,7 @@ export type Database = {
           is_active?: boolean | null
           name: string
           template_data?: Json | null
+          tenant_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -7690,9 +7692,18 @@ export type Database = {
           is_active?: boolean | null
           name?: string
           template_data?: Json | null
+          tenant_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "master_case_report_templates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       master_case_statuses: {
         Row: {
@@ -11592,6 +11603,7 @@ export type Database = {
           section_name: string | null
           section_name_ar: string | null
           section_type: string | null
+          tenant_id: string | null
           updated_at: string
         }
         Insert: {
@@ -11613,6 +11625,7 @@ export type Database = {
           section_name?: string | null
           section_name_ar?: string | null
           section_type?: string | null
+          tenant_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -11634,9 +11647,18 @@ export type Database = {
           section_name?: string | null
           section_name_ar?: string | null
           section_type?: string | null
+          tenant_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "report_section_library_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       report_section_presets: {
         Row: {
@@ -11646,6 +11668,7 @@ export type Database = {
           id: string
           name: string
           section_library_id: string | null
+          tenant_id: string | null
           updated_at: string
           usage_count: number | null
         }
@@ -11656,6 +11679,7 @@ export type Database = {
           id?: string
           name: string
           section_library_id?: string | null
+          tenant_id?: string | null
           updated_at?: string
           usage_count?: number | null
         }
@@ -11666,6 +11690,7 @@ export type Database = {
           id?: string
           name?: string
           section_library_id?: string | null
+          tenant_id?: string | null
           updated_at?: string
           usage_count?: number | null
         }
@@ -11675,6 +11700,13 @@ export type Database = {
             columns: ["section_library_id"]
             isOneToOne: false
             referencedRelation: "report_section_library"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_section_presets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -11687,6 +11719,7 @@ export type Database = {
           section_id: string | null
           sort_order: number | null
           template_id: string | null
+          tenant_id: string | null
         }
         Insert: {
           created_at?: string
@@ -11695,6 +11728,7 @@ export type Database = {
           section_id?: string | null
           sort_order?: number | null
           template_id?: string | null
+          tenant_id?: string | null
         }
         Update: {
           created_at?: string
@@ -11703,6 +11737,7 @@ export type Database = {
           section_id?: string | null
           sort_order?: number | null
           template_id?: string | null
+          tenant_id?: string | null
         }
         Relationships: [
           {
@@ -11717,6 +11752,13 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "master_case_report_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_template_section_mappings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]

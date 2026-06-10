@@ -65,6 +65,7 @@ const CompaniesListPage = lazyWithRetry(() => import('./pages/companies/Companie
 const CompanyProfilePage = lazyWithRetry(() => import('./pages/companies/CompanyProfilePage').then(m => ({ default: m.CompanyProfilePage as React.ComponentType<unknown> })));
 const CasesList = lazyWithRetry(() => import('./pages/cases/CasesList').then(m => ({ default: m.CasesList as React.ComponentType<unknown> })));
 const CaseDetail = lazyWithRetry(() => import('./pages/cases/CaseDetail').then(m => ({ default: m.CaseDetail as React.ComponentType<unknown> })));
+const CaseReportsHub = lazyWithRetry(() => import('./pages/cases/CaseReportsHub').then(m => ({ default: m.CaseReportsHub as React.ComponentType<unknown> })));
 const HRDashboard = lazyWithRetry(() => import('./pages/hr/HRDashboard').then(m => ({ default: m.HRDashboard as React.ComponentType<unknown> })));
 const EmployeesList = lazyWithRetry(() => import('./pages/hr/EmployeesList').then(m => ({ default: m.EmployeesList as React.ComponentType<unknown> })));
 const EmployeeProfilePage = lazyWithRetry(() => import('./pages/hr/EmployeeProfilePage').then(m => ({ default: m.EmployeeProfilePage as React.ComponentType<unknown> })));
@@ -261,6 +262,7 @@ function App() {
             <Route path="notifications" element={<NotificationsHistory />} />
             <Route path="cases" element={<CasesList />} />
             <Route path="cases/:id" element={<CaseDetail />} />
+            <Route path="case-reports" element={<CaseReportsHub />} />
             <Route path="clients" element={<ClientsList />} />
             <Route path="customers" element={<CustomersListPage />} />
             <Route path="customers/:id" element={<CustomerProfilePage />} />

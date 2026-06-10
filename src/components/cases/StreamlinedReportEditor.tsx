@@ -95,6 +95,10 @@ export function StreamlinedReportEditor({
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
+  const [forensicCocId, setForensicCocId] = useState('');
+  const [cocOptions, setCocOptions] = useState<Array<{ id: string; label: string }>>([]);
+
+  const isEditMode = !!(reportId || existingReport);
 
   useEffect(() => {
     if (isOpen) {
@@ -105,6 +109,28 @@ export function StreamlinedReportEditor({
       }
     }
   }, [isOpen, reportType, reportId, existingReport]);
+
+  // Forensic reports embed a chain-of-custody section; let the author pick the
+  // custody record to anchor it instead of requiring a manual DB update.
+  useEffect(() => {
+    if (!isOpen || reportType !== 'forensic' || isEditMode) return;
+    let cancelled = false;
+    reportsService
+      .getChainOfCustodyForReport(caseId)
+      .then((events) => {
+        if (cancelled) return;
+        setCocOptions(
+          events.map((event) => ({
+            id: event.id,
+            label: `${event.action}${event.actor_name ? ` — ${event.actor_name}` : ''} (${new Date(event.created_at).toLocaleDateString()})`,
+          }))
+        );
+      })
+      .catch((error) => logger.error('Error loading custody records:', error));
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, reportType, isEditMode, caseId]);
 
   const loadSectionsFromDatabase = async (templateId: string): Promise<void> => {
     try {
@@ -305,8 +331,6 @@ export function StreamlinedReportEditor({
 
     setLoading(true);
     try {
-      const isEditMode = !!(reportId || existingReport);
-
       const sectionsData = allSectionConfigs.map((config) => ({
         key: config.key,
         title: config.title,
@@ -334,7 +358,8 @@ export function StreamlinedReportEditor({
           reportType,
           reportTitle,
           template.id,
-          sectionsData
+          sectionsData,
+          forensicCocId || undefined
         );
       }
 
@@ -447,6 +472,33 @@ export function StreamlinedReportEditor({
             </button>
           </div>
         </div>
+
+        {reportType === 'forensic' && !isEditMode && (
+          <div className="flex items-center gap-3 px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex-shrink-0">
+            <label className="text-xs font-medium text-slate-600 whitespace-nowrap">
+              Chain of custody record
+            </label>
+            <select
+              value={forensicCocId}
+              onChange={(e) => setForensicCocId(e.target.value)}
+              className="flex-1 max-w-md px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            >
+              <option value="">
+                {cocOptions.length === 0
+                  ? 'No custody records on this case'
+                  : 'Link a custody record (optional)'}
+              </option>
+              {cocOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-slate-400">
+              Anchors the forensic report's custody section
+            </span>
+          </div>
+        )}
 
         <div className="flex-1 flex overflow-hidden">
           <div className="w-64 border-r border-slate-200 bg-slate-50 flex flex-col">

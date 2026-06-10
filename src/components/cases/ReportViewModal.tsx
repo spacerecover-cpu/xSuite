@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Download, Edit, FileText, CheckCircle, Send, AlertCircle, Mail, Printer } from 'lucide-react';
+import { Download, Edit, FileText, CheckCircle, Send, AlertCircle, Mail, Printer, ClipboardCheck } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -145,6 +145,26 @@ export default function ReportViewModal({
     }
   };
 
+  const handleSubmitForReview = async () => {
+    if (!report) return;
+
+    const ok = await confirm({
+      title: 'Submit for Review',
+      message: 'Submit this report for review? It can no longer be edited while in review.',
+      confirmLabel: 'Submit',
+    });
+    if (ok) {
+      try {
+        await reportsService.submitForReview(report.id);
+        await loadReport();
+        toast.success('Report submitted for review');
+      } catch (error) {
+        logger.error('Error submitting report for review:', error);
+        toast.error('Failed to submit report for review');
+      }
+    }
+  };
+
   const handleSendToCustomer = async () => {
     if (!report) return;
 
@@ -155,17 +175,22 @@ export default function ReportViewModal({
 
     const ok = await confirm({
       title: 'Send to Customer',
-      message: 'Send this report to the customer?',
+      message:
+        'Send this report to the customer? The exact PDF being released is archived as the delivery record.',
       confirmLabel: 'Send',
       tone: 'danger',
     });
     if (ok) {
       try {
+        // Persist the released artifact BEFORE flipping the status — if the
+        // archive write fails the report stays unsent (provability gate).
+        const { reportPDFService } = await import('../../lib/reportPDFService');
+        await reportPDFService.persistReportPDF(report.id);
         await onSend?.(report.id);
         await loadReport();
       } catch (error) {
         logger.error('Error sending report:', error);
-        toast.error('Failed to send report');
+        toast.error('Failed to send report (the delivery PDF could not be archived)');
       }
     }
   };
@@ -260,6 +285,18 @@ export default function ReportViewModal({
             <span className="text-slate-400">
               {format(new Date(report.created_at), 'MMM dd, yyyy HH:mm')}
             </span>
+            {report.reviewed_at && (
+              <>
+                <span className="mx-2 text-slate-300">|</span>
+                <span className="text-slate-500">Reviewed By</span>
+                <span className="mx-2 font-medium text-slate-900">
+                  {report.reviewed_by_profile?.full_name || 'Unknown'}
+                </span>
+                <span className="text-slate-400">
+                  {format(new Date(report.reviewed_at), 'MMM dd, yyyy HH:mm')}
+                </span>
+              </>
+            )}
           </div>
 
           {/* Version Notes */}
@@ -317,6 +354,12 @@ export default function ReportViewModal({
               <Button variant="ghost" onClick={onEdit}>
                 <Edit className="w-4 h-4 mr-2" />
                 Edit
+              </Button>
+            )}
+            {report.status === 'draft' && (
+              <Button variant="secondary" onClick={handleSubmitForReview}>
+                <ClipboardCheck className="w-4 h-4 mr-2" />
+                Submit for Review
               </Button>
             )}
             {report.is_latest_version && onNewVersion && (
