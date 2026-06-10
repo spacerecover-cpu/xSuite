@@ -1433,6 +1433,7 @@ export type Database = {
           symptoms: string | null
           tenant_id: string
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           accessories?: string[] | null
@@ -1469,6 +1470,7 @@ export type Database = {
           symptoms?: string | null
           tenant_id: string
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           accessories?: string[] | null
@@ -1505,6 +1507,7 @@ export type Database = {
           symptoms?: string | null
           tenant_id?: string
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -1847,6 +1850,7 @@ export type Database = {
           id: string
           tenant_id: string
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           case_id: string
@@ -1857,6 +1861,7 @@ export type Database = {
           id?: string
           tenant_id: string
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           case_id?: string
@@ -1867,6 +1872,7 @@ export type Database = {
           id?: string
           tenant_id?: string
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -15600,6 +15606,7 @@ export type Database = {
           symptoms: string | null
           tenant_id: string
           updated_at: string
+          updated_by: string | null
         }[]
         SetofOptions: {
           from: "*"
@@ -15711,12 +15718,12 @@ export type Database = {
       }
       log_chain_of_custody: {
         Args: {
-          p_action: string
-          p_action_category: string
+          p_action?: string
+          p_action_category?: string
           p_case_id: string
           p_custody_status?: string
           p_description?: string
-          p_device_id: string
+          p_device_id?: string
           p_location?: string
           p_metadata?: Json
         }
@@ -16116,6 +16123,7 @@ export type Database = {
           id: string
           tenant_id: string
           updated_at: string
+          updated_by: string | null
         }
         SetofOptions: {
           from: "*"
