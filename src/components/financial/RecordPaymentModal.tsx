@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -11,6 +11,7 @@ import {
   getUnpaidInvoicesByCase,
 } from '../../lib/paymentsService';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useToast } from '../../hooks/useToast';
 import {
   DollarSign,
   Calendar,
@@ -20,6 +21,7 @@ import {
   CheckCircle,
   Briefcase,
   User,
+  AlertTriangle,
 } from 'lucide-react';
 import { logger } from '../../lib/logger';
 
@@ -71,7 +73,8 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   preselectedCaseId,
   preselectedInvoiceId,
 }) => {
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, currencyFormat } = useCurrency();
+  const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [totalAmount, setTotalAmount] = useState<number>(0);
@@ -148,6 +151,33 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
     }
   }, [preselectedInvoiceId, unpaidInvoices]);
 
+  // Most cases carry a single open invoice — seed it when the case is picked
+  // so the invoice total/due are visible immediately and the amounts start in
+  // sync. Once per case selection, so a deliberate row removal sticks.
+  const seededCaseRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      !preselectedInvoiceId &&
+      selectedCaseId &&
+      seededCaseRef.current !== selectedCaseId &&
+      unpaidInvoices.length === 1 &&
+      allocations.length === 0
+    ) {
+      seededCaseRef.current = selectedCaseId;
+      const invoice = unpaidInvoices[0];
+      const balanceDue = invoice.balance_due ?? 0;
+      setAllocations([{
+        invoice_id: invoice.id,
+        invoice_number: invoice.invoice_number ?? '',
+        total_amount: invoice.total_amount ?? 0,
+        balance_due: balanceDue,
+        allocation_amount: balanceDue,
+        status: invoice.status ?? 'draft',
+      }]);
+      setTotalAmount(balanceDue);
+    }
+  }, [preselectedInvoiceId, selectedCaseId, unpaidInvoices, allocations.length]);
+
   const handleCaseChange = (caseId: string) => {
     setSelectedCaseId(caseId);
     setAllocations([]);
@@ -193,9 +223,31 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
     setTotalAmount(total);
   };
 
+  const roundToCurrency = (n: number) => {
+    const factor = Math.pow(10, currencyFormat.decimalPlaces);
+    return Math.round(n * factor) / factor;
+  };
+
+  // Two-way sync: typing the payment amount distributes it across the listed
+  // invoices in order, each clamped to its due. record_payment requires
+  // allocations to sum EXACTLY to the amount, so the user never has to
+  // reconcile the two by hand (the old one-way sync caused 400s on partials).
+  const handleTotalAmountChange = (value: number) => {
+    setTotalAmount(value);
+    setAllocations((prev) => {
+      let remaining = roundToCurrency(value);
+      return prev.map((a) => {
+        const take = roundToCurrency(Math.min(remaining, a.balance_due));
+        remaining = roundToCurrency(remaining - take);
+        return { ...a, allocation_amount: take };
+      });
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (totalAmount <= 0 || !selectedCaseId) return;
+    if (totalAmount <= 0 || !selectedCaseId || isSubmitting) return;
+    if (Math.abs(totalAllocated - totalAmount) > 1e-6) return;
 
     setIsSubmitting(true);
     try {
@@ -218,6 +270,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       handleClose();
     } catch (error) {
       logger.error('Error recording payment:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to record payment');
     } finally {
       setIsSubmitting(false);
     }
@@ -240,6 +293,9 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   );
 
   const totalAllocated = allocations.reduce((sum, a) => sum + a.allocation_amount, 0);
+  // record_payment rejects any difference (money conservation) — block the
+  // submit client-side and explain, instead of surfacing a server 400.
+  const allocationMismatch = allocations.length > 0 && Math.abs(totalAllocated - totalAmount) > 1e-6;
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Record Payment" size="lg" closeOnBackdrop={false}>
@@ -308,7 +364,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
-              Total Amount
+              Payment Amount
             </label>
             <div className="relative">
               <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
@@ -317,10 +373,13 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 step="0.01"
                 min="0"
                 value={totalAmount}
-                onChange={(e) => setTotalAmount(parseFloat(e.target.value) || 0)}
-                className="pl-10"
+                onChange={(e) => handleTotalAmountChange(parseFloat(e.target.value) || 0)}
+                className="pl-10 pr-14 text-lg font-semibold tabular-nums"
                 required
               />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-400 pointer-events-none">
+                {currencyFormat.currencyCode}
+              </span>
             </div>
           </div>
         </div>
@@ -416,6 +475,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 <thead className="bg-slate-50">
                   <tr>
                     <th className="text-left py-2 px-3 text-xs font-semibold text-slate-600">Invoice</th>
+                    <th className="text-right py-2 px-3 text-xs font-semibold text-slate-600">Invoice Total</th>
                     <th className="text-right py-2 px-3 text-xs font-semibold text-slate-600">Due</th>
                     <th className="text-right py-2 px-3 text-xs font-semibold text-slate-600">Allocate</th>
                     <th className="w-10"></th>
@@ -439,7 +499,10 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                           </div>
                         </div>
                       </td>
-                      <td className="py-2 px-3 text-right text-sm text-slate-600">
+                      <td className="py-2 px-3 text-right text-sm text-slate-600 tabular-nums">
+                        {formatCurrency(alloc.total_amount)}
+                      </td>
+                      <td className="py-2 px-3 text-right text-sm font-semibold text-slate-900 tabular-nums">
                         {formatCurrency(alloc.balance_due)}
                       </td>
                       <td className="py-2 px-3">
@@ -472,13 +535,30 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 </tbody>
                 <tfoot className="bg-slate-50">
                   <tr>
-                    <td colSpan={2} className="py-2 px-3 text-right text-sm font-semibold text-slate-700">
+                    <td colSpan={3} className="py-2 px-3 text-right text-sm font-semibold text-slate-700">
                       Total Allocated:
                     </td>
-                    <td className="py-2 px-3 text-right text-sm font-bold text-primary">
+                    <td className="py-2 px-3 text-right text-sm font-bold text-primary tabular-nums">
                       {formatCurrency(totalAllocated)}
                     </td>
                     <td></td>
+                  </tr>
+                  <tr className={allocationMismatch ? 'bg-warning-muted' : 'bg-success-muted/50'}>
+                    <td colSpan={5} className="py-2 px-3">
+                      {allocationMismatch ? (
+                        <p className="flex items-center gap-1.5 text-sm font-medium text-warning" role="alert">
+                          <AlertTriangle className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+                          {totalAmount - totalAllocated > 0
+                            ? `${formatCurrency(totalAmount - totalAllocated)} of the payment is unallocated — it exceeds the listed invoices' due. Reduce the amount or add another invoice.`
+                            : `Allocated ${formatCurrency(totalAllocated)} exceeds the payment amount ${formatCurrency(totalAmount)} — lower the allocations or raise the amount.`}
+                        </p>
+                      ) : (
+                        <p className="flex items-center gap-1.5 text-sm text-success">
+                          <CheckCircle className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+                          Payment fully allocated
+                        </p>
+                      )}
+                    </td>
                   </tr>
                 </tfoot>
               </table>
@@ -517,7 +597,8 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           </Button>
           <Button
             type="submit"
-            disabled={isSubmitting || totalAmount <= 0 || !selectedCaseId}
+            disabled={isSubmitting || totalAmount <= 0 || !selectedCaseId || allocations.length === 0 || allocationMismatch}
+            title={allocationMismatch ? 'The allocation must equal the payment amount before recording' : undefined}
             className="flex items-center gap-2"
             variant="primary"
           >
