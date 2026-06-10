@@ -364,9 +364,16 @@ export const toInvoiceEditInitialData = (invoice: Record<string, unknown>): Reco
     '',
 });
 
-export const getNextInvoiceNumber = async (_invoiceType?: 'proforma' | 'tax_invoice'): Promise<string> => {
-  // Live function signature: get_next_invoice_number() — takes no args.
-  // _invoiceType retained for API compatibility but ignored.
+export const getNextInvoiceNumber = async (invoiceType?: 'proforma' | 'tax_invoice'): Promise<string> => {
+  // Separate series per document family: proformas are not tax documents and
+  // must not consume tax-invoice sequence numbers (sequential tax numbering —
+  // EU VAT Art. 226 / GCC VAT). Tax invoices stay on the 'invoices' scope
+  // (INVO-); proformas draw from 'proforma_invoices' (PRO-).
+  if (invoiceType === 'proforma') {
+    const { data, error } = await supabase.rpc('get_next_number', { p_scope: 'proforma_invoices' });
+    if (error) throw error;
+    return (data ?? '') as string;
+  }
   const { data, error } = await supabase.rpc('get_next_invoice_number');
 
   if (error) throw error;

@@ -6983,7 +6983,7 @@ export type Database = {
           proforma_invoice_id: string | null
           rate_source: string
           sent_at: string | null
-          status: string | null
+          status: string
           status_id: string | null
           subtotal: number | null
           subtotal_base: number | null
@@ -7032,7 +7032,7 @@ export type Database = {
           proforma_invoice_id?: string | null
           rate_source?: string
           sent_at?: string | null
-          status?: string | null
+          status?: string
           status_id?: string | null
           subtotal?: number | null
           subtotal_base?: number | null
@@ -7081,7 +7081,7 @@ export type Database = {
           proforma_invoice_id?: string | null
           rate_source?: string
           sent_at?: string | null
-          status?: string | null
+          status?: string
           status_id?: string | null
           subtotal?: number | null
           subtotal_base?: number | null

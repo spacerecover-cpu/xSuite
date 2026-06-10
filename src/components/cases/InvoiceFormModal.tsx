@@ -271,19 +271,11 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
         if (initialData?.invoice_number) {
           setInvoiceNumber(initialData.invoice_number);
         } else {
-          try {
-            const { data: nextNumber, error } = await supabase
-              .rpc('get_next_number', { p_scope: 'invoice' });
-
-            if (!error && nextNumber) {
-              setInvoiceNumber(nextNumber);
-            } else {
-              setInvoiceNumber('INV-000001');
-            }
-          } catch (error) {
-            logger.error('Error fetching next invoice number:', error);
-            setInvoiceNumber('INV-000001');
-          }
+          // Never fetch a number for preview: get_next_number INCREMENTS the
+          // sequence, so every modal open burned a number from a parallel
+          // 'invoice' scope that createInvoice never used (it draws from
+          // 'invoices'/'proforma_invoices' at save time). Display-only hint.
+          setInvoiceNumber('Auto-assigned on save');
         }
 
         const activeCaseId = selectedCaseId || caseId;
