@@ -15944,6 +15944,38 @@ export type Database = {
         Args: { p_payload: Json; p_template: string }
         Returns: string
       }
+      respond_to_custody_transfer: {
+        Args: { p_action: string; p_payload?: Json; p_transfer_id: string }
+        Returns: {
+          accepted_at: string | null
+          case_id: string
+          created_at: string
+          deleted_at: string | null
+          device_id: string | null
+          from_location: string | null
+          from_person_id: string | null
+          from_person_name: string
+          id: string
+          notes: string | null
+          rejected_at: string | null
+          rejection_reason: string | null
+          tenant_id: string
+          to_location: string | null
+          to_person_id: string | null
+          to_person_name: string
+          transfer_reason: string
+          transfer_status:
+            | Database["public"]["Enums"]["custody_transfer_status"]
+            | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "chain_of_custody_transfers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       reverse_financial_transaction: {
         Args: { p_reason?: string; p_transaction_id: string }
         Returns: {

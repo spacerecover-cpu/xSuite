@@ -491,49 +491,20 @@ export async function acceptCustodyTransfer(params: {
   newSealNumber?: string;
   signature?: string;
 }): Promise<CustodyTransfer> {
-  // Fetch existing notes so we merge with rather than overwrite the
-  // packed transfer fields from initiateCustodyTransfer.
-  const { data: existing, error: fetchError } = await supabase
-    .from('chain_of_custody_transfers')
-    .select('notes')
-    .eq('id', params.transferId)
-    .maybeSingle();
-
-  if (fetchError) {
-    logger.error('Error fetching custody transfer for accept:', fetchError);
-    throw fetchError;
-  }
-
-  let mergedNotes: Record<string, any> = {};
-  if (existing?.notes) {
-    try {
-      const parsed = JSON.parse(existing.notes);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        mergedNotes = parsed as Record<string, any>;
-      }
-    } catch {
-      // Preserve legacy free-text notes
-      mergedNotes = { _raw: existing.notes };
-    }
-  }
-  mergedNotes.condition_after = params.conditionAfter;
-  mergedNotes.seal_intact = params.sealIntact;
-  mergedNotes.new_seal_number = params.newSealNumber;
-  mergedNotes.to_signature = params.signature;
-  mergedNotes.condition_verified = true;
-
-  const updatePayload: Database['public']['Tables']['chain_of_custody_transfers']['Update'] = {
-    transfer_status: 'accepted',
-    accepted_at: new Date().toISOString(),
-    notes: JSON.stringify(mergedNotes),
-  };
-
-  const { data, error } = await supabase
-    .from('chain_of_custody_transfers')
-    .update(updatePayload)
-    .eq('id', params.transferId)
-    .select()
-    .maybeSingle();
+  // The transfers table is append-only for clients (guard trigger + revoked
+  // grants), so the pending -> accepted transition only exists through the
+  // SECURITY DEFINER RPC. It merges the response fields into the packed-notes
+  // JSON and writes the chain_of_custody event server-side.
+  const { data, error } = await supabase.rpc('respond_to_custody_transfer', {
+    p_transfer_id: params.transferId,
+    p_action: 'accept',
+    p_payload: {
+      condition_after: params.conditionAfter ?? null,
+      seal_intact: params.sealIntact ?? null,
+      new_seal_number: params.newSealNumber ?? null,
+      signature: params.signature ?? null,
+    },
+  });
 
   if (error) {
     logger.error('Error accepting custody transfer:', error);
@@ -544,17 +515,6 @@ export async function acceptCustodyTransfer(params: {
     throw new Error(`Custody transfer ${params.transferId} not found`);
   }
 
-  await logChainOfCustody({
-    caseId: data.case_id,
-    actionCategory: 'transfer',
-    actionType: 'CUSTODY_TRANSFER_ACCEPTED',
-    actionDescription: `Custody transfer accepted by ${data.to_person_name}`,
-    metadata: {
-      transfer_id: data.id,
-      seal_intact: params.sealIntact,
-    },
-  });
-
   return mapCustodyTransferRow(data);
 }
 
@@ -562,18 +522,11 @@ export async function rejectCustodyTransfer(params: {
   transferId: string;
   rejectionReason: string;
 }): Promise<CustodyTransfer> {
-  const updatePayload: Database['public']['Tables']['chain_of_custody_transfers']['Update'] = {
-    transfer_status: 'rejected',
-    rejected_at: new Date().toISOString(),
-    rejection_reason: params.rejectionReason,
-  };
-
-  const { data, error } = await supabase
-    .from('chain_of_custody_transfers')
-    .update(updatePayload)
-    .eq('id', params.transferId)
-    .select()
-    .maybeSingle();
+  const { data, error } = await supabase.rpc('respond_to_custody_transfer', {
+    p_transfer_id: params.transferId,
+    p_action: 'reject',
+    p_payload: { rejection_reason: params.rejectionReason },
+  });
 
   if (error) {
     logger.error('Error rejecting custody transfer:', error);
@@ -583,17 +536,6 @@ export async function rejectCustodyTransfer(params: {
   if (!data) {
     throw new Error(`Custody transfer ${params.transferId} not found`);
   }
-
-  await logChainOfCustody({
-    caseId: data.case_id,
-    actionCategory: 'transfer',
-    actionType: 'CUSTODY_TRANSFER_REJECTED',
-    actionDescription: `Custody transfer rejected: ${params.rejectionReason}`,
-    metadata: {
-      transfer_id: data.id,
-      reason: params.rejectionReason,
-    },
-  });
 
   return mapCustodyTransferRow(data);
 }

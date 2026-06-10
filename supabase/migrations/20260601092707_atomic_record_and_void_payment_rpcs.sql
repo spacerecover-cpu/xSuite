@@ -1,3 +1,11 @@
+-- Replay-safety (preview branches): _fin_currency_decimals is LANGUAGE sql, so
+-- its body is validated at CREATE. On a fresh preview database bootstrapped
+-- from the 2026-04-09 baseline, master_currency_codes.decimal_places does not
+-- exist yet (added out-of-band 20260529194317, applied to prod via MCP), which
+-- would abort the replay. Defer body validation; prod already has this
+-- migration registered, so this header never runs there.
+SET LOCAL check_function_bodies = off;
+
 -- =====================================================================
 -- Phase 1 — Atomic money RPCs for the data-recovery financial layer.
 -- record_payment / void_payment run as single transactions, lock target
