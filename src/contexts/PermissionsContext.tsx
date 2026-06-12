@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './AuthContext';
 import { rolePermissionsService, Module, RolePermissions } from '../lib/rolePermissionsService';
 import { logger } from '../lib/logger';
@@ -18,9 +18,10 @@ export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [permissions, setPermissions] = useState<RolePermissions | null>(null);
   const [accessibleModules, setAccessibleModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(true);
+  const role = profile?.role ?? null;
 
-  const loadPermissions = async () => {
-    if (!profile?.role) {
+  const loadPermissions = useCallback(async () => {
+    if (!role) {
       setPermissions(null);
       setAccessibleModules([]);
       setLoading(false);
@@ -30,7 +31,6 @@ export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ c
     try {
       setLoading(true);
 
-      const role = profile.role;
       if (role === 'manager' || role === 'viewer') {
         setPermissions(null);
         setAccessibleModules([]);
@@ -51,30 +51,33 @@ export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ c
     } finally {
       setLoading(false);
     }
-  };
+  }, [role]);
 
   useEffect(() => {
     loadPermissions();
-  }, [profile?.role]);
+  }, [loadPermissions]);
 
-  const hasModuleAccess = (moduleKey: string): boolean => {
-    if (!profile?.role) return false;
-    if (['owner', 'admin'].includes(profile.role)) return true;
+  const hasModuleAccess = useCallback((moduleKey: string): boolean => {
+    if (!role) return false;
+    if (['owner', 'admin'].includes(role)) return true;
     return permissions?.accessibleModules.has(moduleKey) || false;
-  };
+  }, [role, permissions]);
 
-  const refreshPermissions = async () => {
+  const refreshPermissions = useCallback(async () => {
     rolePermissionsService.clearCache();
     await loadPermissions();
-  };
+  }, [loadPermissions]);
 
-  const value: PermissionsContextType = {
+  // Memoized: this provider re-renders whenever any ancestor provider does, and
+  // an unstable value re-rendered every usePermissions consumer (each sidebar
+  // item among them) on unrelated state changes.
+  const value: PermissionsContextType = useMemo(() => ({
     permissions,
     accessibleModules,
     loading,
     hasModuleAccess,
     refreshPermissions,
-  };
+  }), [permissions, accessibleModules, loading, hasModuleAccess, refreshPermissions]);
 
   return <PermissionsContext.Provider value={value}>{children}</PermissionsContext.Provider>;
 };

@@ -15557,6 +15557,7 @@ export type Database = {
       get_current_tenant_id: { Args: never; Returns: string }
       get_expense_stats_base: { Args: never; Returns: Json }
       get_invoice_stats_base: { Args: { p_case_id?: string }; Returns: Json }
+      get_low_stock_count: { Args: never; Returns: number }
       get_my_role: { Args: never; Returns: string }
       get_next_case_number: { Args: never; Returns: string }
       get_next_company_number: { Args: never; Returns: string }

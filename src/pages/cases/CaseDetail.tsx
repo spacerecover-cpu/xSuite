@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { getNextCaseNumber } from '../../lib/caseService';
@@ -12,23 +12,18 @@ import { formatDate } from '../../lib/format';
 import { quotesService } from '../../lib/quotesService';
 import { invoiceService } from '../../lib/invoiceService';
 import { useCurrency } from '../../hooks/useCurrency';
-import { CaseBackupDevicesTab } from '../../components/cases/CaseBackupDevicesTab';
 import { CaseStageBanner } from '../../components/cases/detail/CaseStageBanner';
 import type { CasePhase } from '../../lib/caseStateMachineService';
 import { useTenantFeatures } from '../../contexts/TenantConfigContext';
 import { CASE_TAB_FEATURE } from '../../lib/features/registry';
 import { SendMessageModal } from '../../components/communications/SendMessageModal';
-import { CaseCommunicationsTab } from '../../components/cases/detail/CaseCommunicationsTab';
 import { DeviceCheckoutModal } from '../../components/cases/DeviceCheckoutModal';
 import { DuplicateCaseConfirmationModal } from '../../components/cases/DuplicateCaseConfirmationModal';
 import { DeleteCaseConfirmationModal } from '../../components/cases/DeleteCaseConfirmationModal';
-import { ClientTab } from '../../components/cases/ClientTab';
 import { DeviceFormModal } from '../../components/cases/DeviceFormModal';
 import { MarkAsDeliveredModal } from '../../components/cases/MarkAsDeliveredModal';
 import { PreserveLongTermModal } from '../../components/cases/PreserveLongTermModal';
 import type { CreateCloneDriveFormValues } from '../../components/cases/CreateCloneDriveModal';
-import { ChainOfCustodyTab } from '../../components/cases/ChainOfCustodyTab';
-import { CaseActivityTab } from '../../components/cases/detail/CaseActivityTab';
 import { AuditInfo } from '../../components/ui/AuditInfo';
 import { ReportTypeSelectionModal } from '../../components/cases/ReportTypeSelectionModal';
 import { StreamlinedReportEditor } from '../../components/cases/StreamlinedReportEditor';
@@ -44,21 +39,31 @@ import { createQuote as createQuoteService, type Quote as QuoteShape, type Quote
 import { createInvoice as createInvoiceService, updateInvoice as updateInvoiceService, convertProformaToTaxInvoice, type Invoice as InvoiceShape, type InvoiceItem as InvoiceItemShape } from '../../lib/invoiceService';
 import type { Payment as PaymentShape } from '../../lib/paymentsService';
 import type { Database } from '../../types/database.types';
-import {
-  CaseOverviewTab,
-  CaseDevicesTab,
-  CaseCloneDrivesTab,
-  CaseReportsTab,
-  CaseFinancesTab,
-  CaseFilesTab,
-  CaseEngineersTab,
-  CaseRecoveryQaTab,
-  CaseNotesTab,
-  CasePortalTab,
-} from '../../components/cases/detail';
+import { CaseOverviewTab } from '../../components/cases/detail/CaseOverviewTab';
+import { lazyWithRetry } from '../../lib/lazyWithRetry';
+import { ContentLoadingFallback } from '../../components/shared/ContentLoadingFallback';
 import { useCaseModals } from '../../components/cases/detail/useCaseModals';
 import { useCaseQueries } from '../../components/cases/detail/useCaseQueries';
 import { useCaseMutations } from '../../components/cases/detail/useCaseMutations';
+
+// Every tab except the default Overview is code-split (direct file imports, not
+// the barrel, so each panel gets its own chunk). CaseDetail was the heaviest
+// route chunk in the app (~312K raw) because all 14 panels shipped eagerly;
+// now they load on first activation and stay cached for the session.
+const ClientTab = lazyWithRetry(() => import('../../components/cases/ClientTab').then(m => ({ default: m.ClientTab })));
+const CaseBackupDevicesTab = lazyWithRetry(() => import('../../components/cases/CaseBackupDevicesTab').then(m => ({ default: m.CaseBackupDevicesTab })));
+const ChainOfCustodyTab = lazyWithRetry(() => import('../../components/cases/ChainOfCustodyTab').then(m => ({ default: m.ChainOfCustodyTab })));
+const CaseCommunicationsTab = lazyWithRetry(() => import('../../components/cases/detail/CaseCommunicationsTab').then(m => ({ default: m.CaseCommunicationsTab })));
+const CaseActivityTab = lazyWithRetry(() => import('../../components/cases/detail/CaseActivityTab').then(m => ({ default: m.CaseActivityTab })));
+const CaseDevicesTab = lazyWithRetry(() => import('../../components/cases/detail/CaseDevicesTab').then(m => ({ default: m.CaseDevicesTab })));
+const CaseCloneDrivesTab = lazyWithRetry(() => import('../../components/cases/detail/CaseCloneDrivesTab').then(m => ({ default: m.CaseCloneDrivesTab })));
+const CaseReportsTab = lazyWithRetry(() => import('../../components/cases/detail/CaseReportsTab').then(m => ({ default: m.CaseReportsTab })));
+const CaseFinancesTab = lazyWithRetry(() => import('../../components/cases/detail/CaseFinancesTab').then(m => ({ default: m.CaseFinancesTab })));
+const CaseFilesTab = lazyWithRetry(() => import('../../components/cases/detail/CaseFilesTab').then(m => ({ default: m.CaseFilesTab })));
+const CaseEngineersTab = lazyWithRetry(() => import('../../components/cases/detail/CaseEngineersTab').then(m => ({ default: m.CaseEngineersTab })));
+const CaseRecoveryQaTab = lazyWithRetry(() => import('../../components/cases/detail/CaseRecoveryQaTab').then(m => ({ default: m.CaseRecoveryQaTab })));
+const CaseNotesTab = lazyWithRetry(() => import('../../components/cases/detail/CaseNotesTab').then(m => ({ default: m.CaseNotesTab })));
+const CasePortalTab = lazyWithRetry(() => import('../../components/cases/detail/CasePortalTab').then(m => ({ default: m.CasePortalTab })));
 
 type TabType = 'overview' | 'client' | 'devices' | 'clones' | 'reports' | 'quotes' | 'communications' | 'files' | 'engineers' | 'recovery_qa' | 'notes' | 'portal' | 'history' | 'stock';
 
@@ -546,9 +551,9 @@ export const CaseDetail: React.FC = () => {
         />
       )}
 
-      {/* Other tabs content */}
+      {/* Other tabs content (code-split; fallback covers first activation) */}
       {activeTab !== 'overview' && (
-        <>
+        <Suspense fallback={<ContentLoadingFallback />}>
           {/* Client Tab */}
           {activeTab === 'client' && (
             <ClientTab caseId={id!} caseData={caseData} />
@@ -841,7 +846,7 @@ export const CaseDetail: React.FC = () => {
               )}
             </div>
           )}
-        </>
+        </Suspense>
       )}
 
       {/* WhatsApp handoff (header quick action) */}

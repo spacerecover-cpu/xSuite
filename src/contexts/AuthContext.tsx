@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
 import { mfaService } from '../lib/mfaService';
@@ -49,8 +49,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [passwordResetRequired, setPasswordResetRequired] = useState(false);
   const [mfaPending, setMfaPending] = useState(false);
   const profileCache = useRef<Profile | null>(null);
+  const profileFetchInFlight = useRef<string | null>(null);
 
   const fetchProfile = useCallback(async (userId: string) => {
+    // Boot fires this twice (getSession() resolution AND the INITIAL_SESSION
+    // auth event); dedupe concurrent fetches for the same user. Sequential
+    // calls (refreshProfile) still go through.
+    if (profileFetchInFlight.current === userId) return;
+    profileFetchInFlight.current = userId;
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -84,6 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logger.error('Error fetching profile:', error);
       setProfileStatus('error');
     } finally {
+      profileFetchInFlight.current = null;
       setLoading(false);
     }
   }, []);
@@ -102,13 +109,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       (async () => {
         if (!mounted) return;
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          await fetchProfile(session.user.id);
+          // TOKEN_REFRESHED fires roughly hourly for the SAME user; re-fetching
+          // the profile then produced a new profile identity and re-rendered
+          // every consumer for no data change. All other events (sign-in, user
+          // switch, USER_UPDATED) keep the existing refetch behaviour so role /
+          // deactivation changes still propagate.
+          const sameUser = profileCache.current?.id === session.user.id;
+          if (!(event === 'TOKEN_REFRESHED' && sameUser)) {
+            await fetchProfile(session.user.id);
+          }
         } else {
           setProfile(null);
           profileCache.current = null;
@@ -156,11 +171,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [user]);
 
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     if (user) {
       await fetchProfile(user.id);
     }
-  };
+  }, [user, fetchProfile]);
 
   const checkMFAStatus = useCallback(async () => {
     try {
@@ -175,16 +190,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setMfaPending(false);
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     if (error) throw error;
     await checkMFAStatus();
-  };
+  }, [checkMFAStatus]);
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = useCallback(async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -192,9 +207,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
     });
     if (error) throw error;
-  };
+  }, []);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = useCallback(async (email: string, password: string, fullName: string) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -205,9 +220,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
     });
     if (error) throw error;
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     profileCache.current = null;
     setProfile(null);
     setProfileStatus('loading');
@@ -217,10 +232,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       logger.error('Sign out error:', e);
     }
-  };
+  }, []);
+
+  // Memoized so the context only changes when auth state actually changes —
+  // 59 files consume useAuth(), so an unstable value re-renders most of the app.
+  const value = useMemo(
+    () => ({ user, profile, session, loading, profileStatus, passwordResetRequired, mfaPending, signIn, signInWithGoogle, signUp, signOut, refreshProfile, completeMFAChallenge }),
+    [user, profile, session, loading, profileStatus, passwordResetRequired, mfaPending, signIn, signInWithGoogle, signUp, signOut, refreshProfile, completeMFAChallenge]
+  );
 
   return (
-    <AuthContext.Provider value={{ user, profile, session, loading, profileStatus, passwordResetRequired, mfaPending, signIn, signInWithGoogle, signUp, signOut, refreshProfile, completeMFAChallenge }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
