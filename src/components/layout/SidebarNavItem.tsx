@@ -1,5 +1,5 @@
-import React, { useState, useTransition } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useLocation, useNavigation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -21,29 +21,17 @@ export const SidebarNavItem: React.FC<SidebarNavItemProps> = ({
   isCollapsed = false,
 }) => {
   const location = useLocation();
-  const navigate = useNavigate();
+  const navigation = useNavigation();
   const isActive = location.pathname === to || (to !== '/' && location.pathname.startsWith(to));
   const [isHovered, setIsHovered] = useState(false);
-  // Route chunks are lazy: navigation to a not-yet-loaded section suspends
-  // inside a React transition, which keeps the old screen visible with no
-  // fallback. Routing through our own useTransition makes that wait observable
-  // (isPending) so the first click gives immediate feedback instead of looking
-  // like it was swallowed.
-  const [isPending, startTransition] = useTransition();
-
-  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    // Preserve native link behaviour for new-tab/middle/modified clicks.
-    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
-      return;
-    }
-    e.preventDefault();
-    // Already pending for this item or already on the exact page: don't push
-    // another history entry.
-    if (isPending || location.pathname === to) return;
-    startTransition(() => {
-      navigate(to);
-    });
-  };
+  // Route chunks resolve inside the router (route.lazy), so while a section's
+  // chunk downloads the navigation is in 'loading' state with the DESTINATION
+  // in navigation.location. Matching it against this item's target gives the
+  // clicked item an immediate pending indicator — the first click is visibly
+  // acknowledged instead of looking swallowed.
+  const pendingPath = navigation.state === 'loading' ? navigation.location.pathname : null;
+  const isPending =
+    pendingPath !== null && (pendingPath === to || (to !== '/' && pendingPath.startsWith(to)));
 
   const badgeColorClasses = {
     blue: 'bg-info text-info-foreground',
@@ -108,7 +96,6 @@ export const SidebarNavItem: React.FC<SidebarNavItemProps> = ({
         ...(isCollapsed ? {} : { padding: '9px 10px' }),
         ...getItemStyle(),
       }}
-      onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       title={isCollapsed ? label : undefined}
