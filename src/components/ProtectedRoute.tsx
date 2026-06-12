@@ -1,10 +1,11 @@
 import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { PendingApprovalScreen } from './PendingApprovalScreen';
 
 interface ProtectedRouteProps {
-  children: React.ReactNode;
+  /** Omit to use the guard as a pathless layout route — children render via <Outlet/>. */
+  children?: React.ReactNode;
   allowedRoles?: Array<'owner' | 'admin' | 'manager' | 'technician' | 'sales' | 'accounts' | 'hr' | 'viewer'>;
 }
 
@@ -109,5 +110,5 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
     );
   }
 
-  return <>{children}</>;
+  return <>{children ?? <Outlet />}</>;
 };

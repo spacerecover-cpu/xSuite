@@ -128,7 +128,6 @@ export const CompaniesListPage: React.FC = () => {
       return companiesWithContacts as unknown as Company[];
     },
     staleTime: 30000,
-    refetchOnMount: true,
     retry: 2,
   });
 

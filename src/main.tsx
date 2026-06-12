@@ -62,8 +62,12 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 60000,
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
+      // refetchOnMount must stay at the default (true): invalidateQueries only
+      // refetches ACTIVE queries, so screens you are not currently on are merely
+      // marked stale and rely on the next mount to refetch. With it false, every
+      // cross-screen invalidation was silently lost and the UI needed a manual
+      // browser refresh. Same reasoning for window focus in a multi-user lab.
+      refetchOnWindowFocus: true,
       refetchOnReconnect: true,
       retry: 2,
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),

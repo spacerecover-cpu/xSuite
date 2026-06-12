@@ -1,11 +1,12 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Outlet } from 'react-router-dom';
 import { useTenantFeature } from '../contexts/TenantConfigContext';
 
 interface FeatureRouteProps {
   /** A tenant feature key from the registry (e.g. 'nav.financial'). */
   featureKey: string;
-  children: React.ReactNode;
+  /** Omit to use the guard as a pathless layout route — children render via <Outlet/>. */
+  children?: React.ReactNode;
   /** Where to send the user when the feature is disabled. Defaults to the dashboard. */
   redirectTo?: string;
 }
@@ -24,7 +25,7 @@ export const FeatureRoute: React.FC<FeatureRouteProps> = ({
 }) => {
   const enabled = useTenantFeature(featureKey);
   if (!enabled) return <Navigate to={redirectTo} replace />;
-  return <>{children}</>;
+  return <>{children ?? <Outlet />}</>;
 };
 
 export default FeatureRoute;

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigation } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 interface SidebarNavItemProps {
@@ -20,8 +21,17 @@ export const SidebarNavItem: React.FC<SidebarNavItemProps> = ({
   isCollapsed = false,
 }) => {
   const location = useLocation();
+  const navigation = useNavigation();
   const isActive = location.pathname === to || (to !== '/' && location.pathname.startsWith(to));
   const [isHovered, setIsHovered] = useState(false);
+  // Route chunks resolve inside the router (route.lazy), so while a section's
+  // chunk downloads the navigation is in 'loading' state with the DESTINATION
+  // in navigation.location. Matching it against this item's target gives the
+  // clicked item an immediate pending indicator — the first click is visibly
+  // acknowledged instead of looking swallowed.
+  const pendingPath = navigation.state === 'loading' ? navigation.location.pathname : null;
+  const isPending =
+    pendingPath !== null && (pendingPath === to || (to !== '/' && pendingPath.startsWith(to)));
 
   const badgeColorClasses = {
     blue: 'bg-info text-info-foreground',
@@ -39,6 +49,12 @@ export const SidebarNavItem: React.FC<SidebarNavItemProps> = ({
         borderLeft: '4px solid rgb(var(--color-primary))',
       };
     }
+    if (isPending) {
+      return {
+        background: 'rgb(var(--color-primary) / 0.07)',
+        borderLeft: '4px solid rgb(var(--color-primary) / 0.6)',
+      };
+    }
     if (isHovered) {
       return {
         background: 'rgb(var(--color-primary) / 0.04)',
@@ -52,19 +68,19 @@ export const SidebarNavItem: React.FC<SidebarNavItemProps> = ({
   };
 
   const getIconBoxStyle = () => {
-    if (isActive) return { background: 'rgb(var(--color-primary) / 0.12)' };
+    if (isActive || isPending) return { background: 'rgb(var(--color-primary) / 0.12)' };
     if (isHovered) return { background: '#D4DCE8' };
     return { background: '#E8ECF2' };
   };
 
   const getIconColor = () => {
-    if (isActive) return 'rgb(var(--color-primary))';
+    if (isActive || isPending) return 'rgb(var(--color-primary))';
     if (isHovered) return 'rgb(var(--color-primary))';
     return '#4A6080';
   };
 
   const getLabelColor = () => {
-    if (isActive) return 'rgb(var(--color-primary))';
+    if (isActive || isPending) return 'rgb(var(--color-primary))';
     if (isHovered) return 'rgb(var(--color-primary))';
     return '#2C3A4A';
   };
@@ -84,6 +100,7 @@ export const SidebarNavItem: React.FC<SidebarNavItemProps> = ({
       onMouseLeave={() => setIsHovered(false)}
       title={isCollapsed ? label : undefined}
       aria-current={isActive ? 'page' : undefined}
+      aria-busy={isPending || undefined}
     >
       {isCollapsed && isActive && (
         <div
@@ -103,15 +120,22 @@ export const SidebarNavItem: React.FC<SidebarNavItemProps> = ({
           ...getIconBoxStyle(),
         }}
       >
-        <Icon
-          style={{
-            width: '15px',
-            height: '15px',
-            color: getIconColor(),
-            strokeWidth: 1.5,
-            transition: 'color 0.18s ease',
-          }}
-        />
+        {isPending ? (
+          <Loader2
+            className="animate-spin"
+            style={{ width: '15px', height: '15px', color: getIconColor(), strokeWidth: 1.5 }}
+          />
+        ) : (
+          <Icon
+            style={{
+              width: '15px',
+              height: '15px',
+              color: getIconColor(),
+              strokeWidth: 1.5,
+              transition: 'color 0.18s ease',
+            }}
+          />
+        )}
       </div>
 
       {!isCollapsed && (

@@ -50,7 +50,11 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id: string) {
-          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/') || id.includes('node_modules/react-router-dom')) {
+          // react-is must be named here explicitly: it is a shared dep of recharts
+          // and app code, and without a home the bundler co-locates it inside
+          // chart-libs — which then makes the whole eager graph (login included)
+          // statically import the 320K recharts chunk just to reach react-is.
+          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/') || id.includes('node_modules/react-is') || id.includes('node_modules/react-router-dom')) {
             return 'react-vendor';
           }
           if (id.includes('node_modules/@supabase')) {
@@ -62,9 +66,12 @@ export default defineConfig({
           if (id.includes('node_modules/react-hook-form')) {
             return 'form-libs';
           }
-          if (id.includes('node_modules/recharts')) {
-            return 'chart-libs';
-          }
+          // recharts deliberately has NO manualChunks entry: pinning it to a
+          // named chunk made rolldown co-locate a shared CJS helper module in
+          // that chunk, which turned the 320K chart bundle into a static
+          // dependency of the whole eager graph (login screen included).
+          // Unpinned, recharts splits into a lazy chunk reachable only from
+          // the two chart pages (PlatformDashboard, StockReportsPage).
           if (id.includes('node_modules/pdfmake')) {
             return 'pdfmake-libs';
           }
