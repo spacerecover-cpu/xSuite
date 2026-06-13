@@ -451,6 +451,40 @@ export interface ChainOfCustodyDocumentData {
   companySettings: CompanySettingsData;
 }
 
+export interface CreditNoteLineItem {
+  description: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+}
+
+export interface CreditNoteData {
+  credit_note_number: string | null;
+  credit_note_date: string | null;
+  credit_type: string | null;
+  status: string | null;
+  reason_code: string | null;
+  reason_notes: string | null;
+  subtotal: number | null;
+  tax_rate: number | null;
+  tax_amount: number | null;
+  total_amount: number | null;
+  applied_amount: number | null;
+  invoice_number: string | null;
+  customer_name: string | null;
+  company_name: string | null;
+  case_no: string | null;
+  currency_symbol: string;
+  currency_position: 'before' | 'after';
+  decimal_places: number;
+  items: CreditNoteLineItem[];
+}
+
+export interface CreditNoteDocumentData {
+  creditNoteData: CreditNoteData;
+  companySettings: CompanySettingsData;
+}
+
 export type DocumentType =
   | 'office_receipt'
   | 'customer_copy'
@@ -458,6 +492,7 @@ export type DocumentType =
   | 'case_label'
   | 'quote'
   | 'invoice'
+  | 'credit_note'
   | 'payment_receipt'
   | 'payslip'
   | 'chain_of_custody';
