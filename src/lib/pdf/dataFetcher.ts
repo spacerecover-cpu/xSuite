@@ -11,6 +11,7 @@ import type {
   QuoteItemData,
   InvoiceData,
   InvoiceDocumentData,
+  CreditNoteDocumentData,
   InvoicePaymentLine,
   InvoiceItemData,
   PaymentReceiptData,
@@ -606,6 +607,88 @@ export async function fetchInvoiceData(invoiceId: string): Promise<InvoiceDocume
     invoiceData: invoiceResult,
     companySettings: settingsResult,
     paymentHistory,
+  };
+}
+
+export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditNoteDocumentData> {
+  const { data: cnRow, error } = await supabase
+    .from('credit_notes')
+    .select('*')
+    .eq('id', creditNoteId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error fetching credit note data:', error);
+    throw new Error('Failed to load credit note data');
+  }
+  if (!cnRow) {
+    throw new Error('Credit note not found');
+  }
+
+  // Related records fetched separately (mirrors fetchInvoiceDetails — no embed/alias drift).
+  const [settings, invoiceRes, customerRes, companyRes, caseRes, itemsRes, localeRes] = await Promise.all([
+    fetchCompanySettings(),
+    cnRow.invoice_id
+      ? supabase.from('invoices').select('invoice_number').eq('id', cnRow.invoice_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    cnRow.customer_id
+      ? supabase.from('customers_enhanced').select('customer_name').eq('id', cnRow.customer_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    cnRow.company_id
+      ? supabase.from('companies').select('company_name, name').eq('id', cnRow.company_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    cnRow.case_id
+      ? supabase.from('cases').select('case_no').eq('id', cnRow.case_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from('credit_note_items')
+      .select('description, quantity, unit_price, total')
+      .eq('credit_note_id', creditNoteId)
+      .is('deleted_at', null)
+      .order('sort_order', { ascending: true }),
+    supabase
+      .from('accounting_locales')
+      .select('currency_symbol, currency_position, decimal_places')
+      .eq('is_default', true)
+      .eq('is_active', true)
+      .maybeSingle(),
+  ]);
+
+  const invoice = invoiceRes.data as { invoice_number?: string | null } | null;
+  const customer = customerRes.data as { customer_name?: string | null } | null;
+  const company = companyRes.data as { company_name?: string | null; name?: string | null } | null;
+  const caseRow = caseRes.data as { case_no?: string | null } | null;
+  const locale = localeRes.data as { currency_symbol?: string; currency_position?: string; decimal_places?: number } | null;
+  const items = (itemsRes.data ?? []) as Array<{ description?: string | null; quantity?: number | null; unit_price?: number | null; total?: number | null }>;
+
+  return {
+    creditNoteData: {
+      credit_note_number: cnRow.credit_note_number ?? null,
+      credit_note_date: cnRow.credit_note_date ?? null,
+      credit_type: cnRow.credit_type ?? null,
+      status: cnRow.status ?? null,
+      reason_code: cnRow.reason_code ?? null,
+      reason_notes: cnRow.reason_notes ?? null,
+      subtotal: cnRow.subtotal ?? null,
+      tax_rate: cnRow.tax_rate ?? null,
+      tax_amount: cnRow.tax_amount ?? null,
+      total_amount: cnRow.total_amount ?? null,
+      applied_amount: cnRow.applied_amount ?? null,
+      invoice_number: invoice?.invoice_number ?? null,
+      customer_name: customer?.customer_name ?? null,
+      company_name: company?.company_name ?? company?.name ?? null,
+      case_no: caseRow?.case_no ?? null,
+      currency_symbol: locale?.currency_symbol || 'USD',
+      currency_position: locale?.currency_position === 'before' ? 'before' : 'after',
+      decimal_places: typeof locale?.decimal_places === 'number' ? locale.decimal_places : 2,
+      items: items.map((it) => ({
+        description: it.description ?? '',
+        quantity: typeof it.quantity === 'number' ? it.quantity : 0,
+        unit_price: typeof it.unit_price === 'number' ? it.unit_price : 0,
+        line_total: typeof it.total === 'number' ? it.total : 0,
+      })),
+    },
+    companySettings: settings,
   };
 }
 
