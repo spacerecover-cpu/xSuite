@@ -1274,6 +1274,92 @@ export type Database = {
           },
         ]
       }
+      branding_themes: {
+        Row: {
+          accent_color: string | null
+          created_at: string
+          created_by: string | null
+          default_margins: Json
+          default_orientation: string
+          default_paper_size: string
+          deleted_at: string | null
+          favicon_url: string | null
+          font_family: string
+          footer_text: string | null
+          id: string
+          is_default: boolean
+          language_defaults: Json
+          logo_light_url: string | null
+          logo_url: string | null
+          metadata: Json
+          name: string
+          qr_config: Json
+          socials: Json
+          tenant_id: string
+          terms_text: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          accent_color?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_margins?: Json
+          default_orientation?: string
+          default_paper_size?: string
+          deleted_at?: string | null
+          favicon_url?: string | null
+          font_family?: string
+          footer_text?: string | null
+          id?: string
+          is_default?: boolean
+          language_defaults?: Json
+          logo_light_url?: string | null
+          logo_url?: string | null
+          metadata?: Json
+          name: string
+          qr_config?: Json
+          socials?: Json
+          tenant_id: string
+          terms_text?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          accent_color?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_margins?: Json
+          default_orientation?: string
+          default_paper_size?: string
+          deleted_at?: string | null
+          favicon_url?: string | null
+          font_family?: string
+          footer_text?: string | null
+          id?: string
+          is_default?: boolean
+          language_defaults?: Json
+          logo_light_url?: string | null
+          logo_url?: string | null
+          metadata?: Json
+          name?: string
+          qr_config?: Json
+          socials?: Json
+          tenant_id?: string
+          terms_text?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "branding_themes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_attachments: {
         Row: {
           case_id: string
@@ -2412,6 +2498,7 @@ export type Database = {
           report_number: string | null
           status: string | null
           template_id: string | null
+          template_version_id: string | null
           tenant_id: string
           title: string
           updated_at: string
@@ -2428,6 +2515,7 @@ export type Database = {
           report_number?: string | null
           status?: string | null
           template_id?: string | null
+          template_version_id?: string | null
           tenant_id: string
           title: string
           updated_at?: string
@@ -2444,6 +2532,7 @@ export type Database = {
           report_number?: string | null
           status?: string | null
           template_id?: string | null
+          template_version_id?: string | null
           tenant_id?: string
           title?: string
           updated_at?: string
@@ -2461,6 +2550,13 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "master_case_report_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_reports_template_version_id_fkey"
+            columns: ["template_version_id"]
+            isOneToOne: false
+            referencedRelation: "document_template_versions"
             referencedColumns: ["id"]
           },
           {
@@ -5066,6 +5162,66 @@ export type Database = {
           },
         ]
       }
+      document_template_versions: {
+        Row: {
+          change_note: string | null
+          config: Json
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          id: string
+          is_deployed: boolean
+          template_id: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+          version_number: number
+        }
+        Insert: {
+          change_note?: string | null
+          config: Json
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          is_deployed?: boolean
+          template_id: string
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+          version_number: number
+        }
+        Update: {
+          change_note?: string | null
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          is_deployed?: boolean
+          template_id?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_template_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "document_templates_pdf"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_template_versions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_templates: {
         Row: {
           category_id: string | null
@@ -5162,6 +5318,72 @@ export type Database = {
             columns: ["type_id"]
             isOneToOne: false
             referencedRelation: "master_template_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_templates_pdf: {
+        Row: {
+          branding_theme_id: string | null
+          config: Json
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          document_type: string
+          id: string
+          is_default: boolean
+          language_mode: string
+          metadata: Json
+          name: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          branding_theme_id?: string | null
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          document_type: string
+          id?: string
+          is_default?: boolean
+          language_mode?: string
+          metadata?: Json
+          name: string
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          branding_theme_id?: string | null
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          document_type?: string
+          id?: string
+          is_default?: boolean
+          language_mode?: string
+          metadata?: Json
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_templates_pdf_branding_theme_id_fkey"
+            columns: ["branding_theme_id"]
+            isOneToOne: false
+            referencedRelation: "branding_themes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_templates_pdf_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -7246,6 +7468,7 @@ export type Database = {
           tax_amount: number | null
           tax_amount_base: number | null
           tax_rate: number | null
+          template_version_id: string | null
           tenant_id: string
           terms: string | null
           title: string | null
@@ -7297,6 +7520,7 @@ export type Database = {
           tax_amount?: number | null
           tax_amount_base?: number | null
           tax_rate?: number | null
+          template_version_id?: string | null
           tenant_id: string
           terms?: string | null
           title?: string | null
@@ -7348,6 +7572,7 @@ export type Database = {
           tax_amount?: number | null
           tax_amount_base?: number | null
           tax_rate?: number | null
+          template_version_id?: string | null
           tenant_id?: string
           terms?: string | null
           title?: string | null
@@ -7419,6 +7644,13 @@ export type Database = {
             columns: ["status_id"]
             isOneToOne: false
             referencedRelation: "master_invoice_statuses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_template_version_id_fkey"
+            columns: ["template_version_id"]
+            isOneToOne: false
+            referencedRelation: "document_template_versions"
             referencedColumns: ["id"]
           },
           {
@@ -7971,6 +8203,7 @@ export type Database = {
       master_case_report_templates: {
         Row: {
           created_at: string
+          deleted_at: string | null
           description: string | null
           id: string
           is_active: boolean | null
@@ -7981,6 +8214,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
@@ -7991,6 +8225,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
@@ -11146,6 +11381,7 @@ export type Database = {
           tax_amount: number | null
           tax_amount_base: number | null
           tax_rate: number | null
+          template_version_id: string | null
           tenant_id: string
           terms: string | null
           title: string | null
@@ -11186,6 +11422,7 @@ export type Database = {
           tax_amount?: number | null
           tax_amount_base?: number | null
           tax_rate?: number | null
+          template_version_id?: string | null
           tenant_id: string
           terms?: string | null
           title?: string | null
@@ -11226,6 +11463,7 @@ export type Database = {
           tax_amount?: number | null
           tax_amount_base?: number | null
           tax_rate?: number | null
+          template_version_id?: string | null
           tenant_id?: string
           terms?: string | null
           title?: string | null
@@ -11283,6 +11521,13 @@ export type Database = {
             columns: ["status_id"]
             isOneToOne: false
             referencedRelation: "master_quote_statuses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_template_version_id_fkey"
+            columns: ["template_version_id"]
+            isOneToOne: false
+            referencedRelation: "document_template_versions"
             referencedColumns: ["id"]
           },
           {
@@ -11894,6 +12139,7 @@ export type Database = {
           created_at: string
           default_content: string | null
           default_content_template: string | null
+          deleted_at: string | null
           display_order: number | null
           icon: string | null
           id: string
@@ -11916,6 +12162,7 @@ export type Database = {
           created_at?: string
           default_content?: string | null
           default_content_template?: string | null
+          deleted_at?: string | null
           display_order?: number | null
           icon?: string | null
           id?: string
@@ -11938,6 +12185,7 @@ export type Database = {
           created_at?: string
           default_content?: string | null
           default_content_template?: string | null
+          deleted_at?: string | null
           display_order?: number | null
           icon?: string | null
           id?: string
@@ -11969,6 +12217,7 @@ export type Database = {
           content: string | null
           created_at: string
           created_by: string | null
+          deleted_at: string | null
           id: string
           name: string
           section_library_id: string | null
@@ -11980,6 +12229,7 @@ export type Database = {
           content?: string | null
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           id?: string
           name: string
           section_library_id?: string | null
@@ -11991,6 +12241,7 @@ export type Database = {
           content?: string | null
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           id?: string
           name?: string
           section_library_id?: string | null
