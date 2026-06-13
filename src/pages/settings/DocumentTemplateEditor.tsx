@@ -169,6 +169,9 @@ export const DocumentTemplateEditor: React.FC<DocumentTemplateEditorProps> = ({
       language: { ...prev.language, mode, primary: mode === 'ar' ? 'ar' : prev.language?.primary ?? 'en' },
     }));
 
+  const setBranding = (patch: Partial<{ accent: string; watermark: string | null }>) =>
+    setOverride((prev) => ({ ...prev, branding: { ...prev.branding, ...patch } }));
+
   /** Merge a section-level override by key onto the existing override list. */
   const patchSection = (
     key: string,
@@ -346,6 +349,48 @@ export const DocumentTemplateEditor: React.FC<DocumentTemplateEditorProps> = ({
               options={LANGUAGE_OPTIONS}
               hint="Bilingual modes show English and Arabic together."
             />
+          </Card>
+
+          {/* Branding — opt-in accent + watermark (PDFs neutral by default) */}
+          <Card variant="bordered" className="p-5">
+            <h2 className="font-semibold text-slate-900 mb-1">Branding</h2>
+            <p className="text-sm text-slate-500 mb-4">
+              PDFs stay neutral by default. Opt into a brand accent and add a watermark.
+              The logo is managed in General settings.
+            </p>
+            <label className="mb-3 flex items-center justify-between rounded-lg border border-slate-200 bg-white p-3 cursor-pointer">
+              <span className="text-sm font-medium text-slate-800">Use a brand accent color</span>
+              <input
+                type="checkbox"
+                checked={resolved.branding.accent !== 'inherit'}
+                onChange={(e) => setBranding({ accent: e.target.checked ? '#162660' : 'inherit' })}
+                className="h-4 w-4 rounded border-slate-300 text-primary focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </label>
+            {resolved.branding.accent !== 'inherit' && (
+              <div className="mb-4 flex items-center gap-3">
+                <input
+                  type="color"
+                  aria-label="Accent color"
+                  value={/^#[0-9a-fA-F]{6}$/.test(resolved.branding.accent) ? resolved.branding.accent : '#162660'}
+                  onChange={(e) => setBranding({ accent: e.target.value })}
+                  className="h-9 w-12 rounded border border-slate-300 bg-white p-1"
+                />
+                <Input
+                  aria-label="Accent color hex"
+                  value={resolved.branding.accent}
+                  onChange={(e) => setBranding({ accent: e.target.value })}
+                />
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Watermark text</label>
+              <Input
+                placeholder="e.g. DRAFT, CONFIDENTIAL (blank for none)"
+                value={resolved.branding.watermark ?? ''}
+                onChange={(e) => setBranding({ watermark: e.target.value || null })}
+              />
+            </div>
           </Card>
 
           {/* Sections — visibility, order, per-section labels */}

@@ -13,6 +13,7 @@ import { PDF_COLORS } from '../../styles';
 import { buildCompanyAddress } from '../../utils';
 import type { EngineContext, EngineDocData, SectionRenderer } from '../types';
 import { resolveLabel } from '../labels';
+import { resolveAccentColors } from '../branding';
 
 export const renderHeader: SectionRenderer = (
   engine: EngineContext,
@@ -76,10 +77,14 @@ export const renderHeader: SectionRenderer = (
     });
   }
 
-  // Brand divider rule under the company block.
+  // Brand divider rule under the company block. NEUTRAL by default: the rule
+  // color is `PDF_COLORS.primary` unless the tenant has opted into an accent hex
+  // (`config.branding.accent` is an explicit hex, not `'inherit'`), in which case
+  // it adopts that accent — one of the two bounded accent surfaces (M7).
+  const ruleColor = resolveAccentColors(config.branding).rule;
   out.push({
     canvas: [
-      { type: 'line', x1: 0, y1: 0, x2: 525, y2: 0, lineWidth: 0.5, lineColor: PDF_COLORS.primary },
+      { type: 'line', x1: 0, y1: 0, x2: 525, y2: 0, lineWidth: 0.5, lineColor: ruleColor },
     ],
     margin: [0, 0, 0, 12],
   });

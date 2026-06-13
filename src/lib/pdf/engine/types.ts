@@ -129,12 +129,308 @@ export interface PaymentHistoryBlock {
 }
 
 /**
+ * Case identification / job header for an INTAKE (office_receipt / customer_copy)
+ * or CHECKOUT (checkout_form) document, rendered as a bilingual info box of
+ * label/value rows — the case-level counterpart to {@link PartyBlock}. The
+ * adapter pre-formats every value (case no, status, priority, received date/time,
+ * assigned technician, service type, problem description); renderers stay dumb.
+ *
+ * Mirrors the "Case Details" box in `documents/OfficeReceiptDocument.ts`
+ * (lines ~143-156) and `documents/CheckoutFormDocument.ts` (lines ~138-144).
+ */
+export interface CaseInfoBlock {
+  /** Box heading (e.g. "Case Details" / "تفاصيل الحالة"). */
+  title: LabelText;
+  /** Labelled detail rows, e.g. `{ label: {en:'Case ID:'}, value: 'CASE-0042' }`. */
+  rows: Array<{ label: LabelText; value: string }>;
+}
+
+/**
+ * The device-intake/return TABLE for case documents — a config-driven column
+ * list plus pre-stringified rows, the device-level counterpart to
+ * {@link EngineDocData.lineItems}. The adapter resolves the columns (which to
+ * show, in what order, with which bilingual headers) into {@link ResolvedColumn}s
+ * and stringifies each cell, including any role label; the renderer lays out the
+ * header + body, applies per-column alignment, RTL-mirrors via `mirrorColumns`,
+ * and colours the `role` cell via `getRoleBadgeColors` / `getSimpleRoleLabel`.
+ *
+ * Generalized from the "Device(s) Received / Returned" table in
+ * `documents/OfficeReceiptDocument.ts` (lines ~182-265) and
+ * `documents/CheckoutFormDocument.ts` (lines ~193-276). Default columns:
+ * type / brand / model / serial / capacity / condition / role / notes.
+ */
+export interface DevicesBlock {
+  /** Section heading (e.g. "Device(s) Received" / "الأجهزة المستلمة"). */
+  title: LabelText;
+  /** Resolved, ordered columns (key ties to a field in each {@link rows} record). */
+  columns: ResolvedColumn[];
+  /** One record per device; values already stringified by the adapter. */
+  rows: Array<Record<string, string>>;
+}
+
+/**
+ * The CHECKOUT collector block for a return/checkout document: who physically
+ * collected the device(s) and when. The adapter pre-formats every value (name,
+ * mobile, ID, checkout date, notes); the renderer lays them out as a bilingual
+ * info box and (separately, via the shared signature section) draws the
+ * signature lines. Rendered only on checkout documents.
+ *
+ * Mirrors the "Collection Information" box in
+ * `documents/CheckoutFormDocument.ts` (lines ~146-167).
+ */
+export interface CollectorBlock {
+  /** Box heading (e.g. "Collection Information" / "معلومات الاستلام"). */
+  title: LabelText;
+  /** Labelled rows: collector name / mobile / national ID / checkout date / notes. */
+  rows: Array<{ label: LabelText; value: string }>;
+}
+
+/**
+ * A consent / Terms-&-Conditions text block for intake & checkout documents —
+ * a bilingual title plus already-resolved body prose, optionally with a policy
+ * link. Distinct from the financial {@link TermsBlock}: that one drives the
+ * Payment-Terms/Notes + bank two-column layout; this one is a single
+ * acknowledgement/consent box (the customer authorizes the lab to proceed, or
+ * acknowledges checkout/T&C).
+ *
+ * Generalized from the acknowledgement boxes in
+ * `documents/OfficeReceiptDocument.ts` (terms section, lines ~267-277),
+ * `documents/CustomerCopyDocument.ts` (lines ~265-326), and
+ * `documents/CheckoutFormDocument.ts` (lines ~278-334).
+ */
+export interface LegalTermsBlock {
+  /** Box heading (e.g. "Terms & Conditions" / "الشروط والأحكام"). */
+  title: LabelText;
+  /** Consent / T&C body prose. Already language-resolved by the adapter. */
+  body: LabelText;
+  /** Optional policy URL rendered as a link under the body. */
+  policyUrl?: string | null;
+}
+
+/**
+ * The forensic chain-of-custody ENTRIES table for a Chain-of-Custody report —
+ * a config-driven column list plus pre-stringified rows, one per ledger entry
+ * (entry no, occurred-at, action category + type, actor + role, evidence ref,
+ * and optionally hash / signature). The adapter resolves which columns to show
+ * (in what order, with which bilingual headers) into {@link ResolvedColumn}s and
+ * stringifies every cell; the renderer lays out the header + body, applies
+ * per-column alignment, RTL-mirrors via `mirrorColumns`, and colour-codes the
+ * `actionCategory` cell (mirroring the legacy category palette). The legal
+ * notice is a single already-resolved line rendered above (or below) the table.
+ *
+ * Generalized from the entries table + legal notice in
+ * `documents/ChainOfCustodyDocument.ts` (lines ~196-288, legal notice ~81-121).
+ * The adapter passes the RAW `action_category` (e.g. `'critical_event'`) in the
+ * `actionCategory` field so the renderer can map it to the category colour;
+ * every other cell is already display-formatted. `hash` / `signature` columns
+ * are only included by the adapter when {@link includeHashes} /
+ * {@link includeSignatures} is set, keeping this block self-describing.
+ */
+export interface CustodyLogBlock {
+  /** Section heading (e.g. "Chain of Custody Entries" / "سجل سلسلة الحيازة"). */
+  title: LabelText;
+  /** Resolved, ordered columns (key ties to a field in each {@link rows} record). */
+  columns: ResolvedColumn[];
+  /** One record per ledger entry; values already stringified by the adapter. */
+  rows: Array<Record<string, string>>;
+  /**
+   * The forensic legal-notice line (immutability / tamper warning), already
+   * language-resolved by the adapter, rendered as a highlighted box above the
+   * table. Omitted to render no notice.
+   */
+  legalNotice?: LabelText;
+  /** Whether the adapter included a hash column (drives nothing here; documentary). */
+  includeHashes?: boolean;
+  /** Whether the adapter included a signature column (documentary). */
+  includeSignatures?: boolean;
+}
+
+/**
+ * The compact case-LABEL layout for a physical device/case label: a large
+ * centered case number, an optional priority badge, the received date, and a
+ * short device-summary list. Every value is pre-formatted by the adapter; the
+ * renderer only lays them out print-friendly on the small label page.
+ *
+ * Generalized from `documents/CaseLabelDocument.ts` (large case-number block
+ * lines ~53-71, priority badge ~34-48, received date ~73-89, device summary
+ * ~139-198). Unlike the financial/intake blocks this one is its own self-
+ * contained document body — the engine renders just these fields on a label-
+ * sized page. `priority` is the RAW priority string (e.g. `'critical'`) so the
+ * renderer can colour the badge via `getPriorityColor`.
+ */
+export interface CaseLabelBlock {
+  /** Pre-formatted case number shown large + centered (e.g. "CASE-0042"). */
+  caseNumber: string;
+  /** Raw priority string for the badge (e.g. `'critical'`); omitted to hide it. */
+  priority?: string;
+  /** Pre-formatted received date/time string; omitted to hide the received line. */
+  receivedAt?: string;
+  /** Short device-summary lines (e.g. ["Seagate ST2000 — HDD", "+2 more"]). */
+  deviceSummary?: string[];
+  /** Optional bilingual caption under the case number (e.g. "CASE NUMBER"). */
+  subtitle?: LabelText;
+}
+
+/**
+ * The payslip employee/period header — employee name + number, the pay period,
+ * payment date, and the working-days/hours rows — rendered as one bilingual info
+ * box of label/value rows (the payslip counterpart to {@link CaseInfoBlock}).
+ * The adapter pre-formats every value (name, period name + start/end, payment
+ * date, days worked/absent, regular/overtime hours); the renderer stays dumb.
+ *
+ * Generalized from the "Employee Information" + "Attendance Summary" boxes in
+ * `documents/PayslipDocument.ts` (lines ~83-149).
+ */
+export interface PayslipInfoBlock {
+  /** Box heading (e.g. "Employee Information" / "معلومات الموظف"). */
+  title: LabelText;
+  /** Labelled rows: name / number / pay period / payment date / days / hours. */
+  rows: Array<{ label: LabelText; value: string }>;
+}
+
+/**
+ * A component table for a payslip — earnings OR deductions. Three columns:
+ * component / calculation / amount, plus a pre-formatted total row. The adapter
+ * pre-stringifies every cell (including the right-aligned, currency-formatted
+ * amounts and the total); the renderer lays out the header + body + total and
+ * RTL-mirrors the columns. Both {@link EngineDocData.earnings} and
+ * {@link EngineDocData.deductions} use this same shape.
+ *
+ * Generalized from `buildComponentTable` in `documents/PayslipDocument.ts`
+ * (lines ~151-207).
+ */
+export interface PayComponentBlock {
+  /** Section heading (e.g. "Earnings" / "الإيرادات", "Deductions" / "الخصومات"). */
+  title: LabelText;
+  /** Bilingual column headers (component / calculation / amount). */
+  columns: { component: LabelText; calculation: LabelText; amount: LabelText };
+  /** One row per component; values already stringified by the adapter. */
+  rows: Array<{ component: string; calculation: string; amount: string }>;
+  /** Pre-formatted total: its label (e.g. "Total Earnings") and amount string. */
+  total: { label: LabelText; amount: string };
+}
+
+/**
+ * The emphasized Net Salary line on a payslip — a single bilingual label plus
+ * the pre-formatted net amount, rendered in the boxed, larger treatment (the
+ * payslip's grand-total equivalent). Distinct from {@link EngineDocData.totals}:
+ * a payslip net is one self-contained highlighted block, not a stack of totals
+ * lines.
+ *
+ * Generalized from the `netSalarySection` in `documents/PayslipDocument.ts`
+ * (lines ~209-234).
+ */
+export interface NetPayBlock {
+  /** Net-salary label (e.g. "Net Salary" / "صافي الراتب"). */
+  label: LabelText;
+  /** Pre-formatted net amount string (currency applied by the adapter). */
+  amount: string;
+}
+
+/**
+ * The compact STOCK-LABEL body for a physical stock label: item name, optional
+ * category + brand, and a short detail list (SKU / barcode / price / location).
+ * Every value is pre-formatted by the adapter; the renderer only lays them out
+ * print-friendly on the small custom label page. Optional fields are omitted to
+ * hide their row, exactly like the legacy builder's conditional pushes.
+ *
+ * Generalized from `buildSingleLabel` in `documents/StockLabelDocument.ts`
+ * (lines ~15-125). The label is its own self-contained document body — the
+ * engine renders just these fields on the custom label-sized page.
+ */
+export interface StockLabelBlock {
+  /** Item name shown large + bold (the label's focal point). */
+  name: string;
+  /** Optional category caption (top-right), e.g. "Internal HDD". */
+  category?: string;
+  /** Optional brand line under the name. */
+  brand?: string;
+  /** Optional SKU detail row. */
+  sku?: string;
+  /** Optional barcode detail row (monospace value). */
+  barcode?: string;
+  /** Optional pre-formatted price detail row (currency applied by the adapter). */
+  price?: string;
+  /** Optional location detail row. */
+  location?: string;
+  /** Optional company name caption (top-left). */
+  companyName?: string;
+  /** Bilingual detail-row labels (SKU / Barcode / Price / Location). */
+  labels?: {
+    sku?: LabelText;
+    barcode?: LabelText;
+    price?: LabelText;
+    location?: LabelText;
+  };
+}
+
+/**
+ * The ordered, DB-DRIVEN dynamic sections of a case REPORT — each a bilingual
+ * section header plus a free-prose content body. This is the engine counterpart
+ * to the `case_report_sections` rows the legacy `documents/ReportDocument.ts`
+ * iterates (its `visibleSections.forEach`, lines ~411-495): a tenant/template
+ * supplies an arbitrary list of titled sections (diagnostic findings, proposed
+ * solutions, recovery time, failure-cause analysis, recommendations, …) and the
+ * renderer lays each out as a boxed heading + paragraph-preserving content.
+ *
+ * The adapter pre-resolves each section's title into a {@link LabelText} (real
+ * EN/AR strings, never a hardcoded null) and pre-cleans the content to PLAIN
+ * TEXT — stripping HTML the same way the legacy `stripHtmlTags` helper does, so
+ * paragraph breaks survive as `\n` newlines — and may pass an explicit `order`.
+ * The renderer is stable for ANY number of sections (zero → renders nothing).
+ *
+ * NOTE: the forensic chain-of-custody timeline is NOT modelled here. That reuses
+ * the existing {@link CustodyLogBlock} / `custodyLog` block, exactly as the
+ * legacy builder special-cases the `chain_of_custody` section into its own
+ * timeline rather than a prose box.
+ */
+export interface ReportSectionsBlock {
+  /**
+   * The ordered dynamic sections. Each is a bilingual header + plain-text body.
+   * `order` is optional; when present the renderer sorts ascending by it (ties
+   * keep input order), otherwise input order is preserved.
+   */
+  sections: Array<{ title: LabelText; content: string; order?: number }>;
+}
+
+/**
+ * The device DIAGNOSTICS info box for a case REPORT — the "Media Details" /
+ * "Component Diagnostics" block rendered as bilingual label/value rows (the
+ * report counterpart to {@link CaseInfoBlock}). The adapter pre-formats every
+ * value and chooses the field set by device kind: HDD diagnostics (heads / PCB /
+ * motor / surface status) vs SSD diagnostics (controller / memory-chips status,
+ * controller model, NAND type), plus shared rows (type / model / capacity /
+ * serial / physical-damage notes). The renderer stays dumb — it only lays the
+ * supplied rows out; the HDD-vs-SSD branching lives entirely in the adapter.
+ *
+ * Generalized from the Media-Details + Component-Diagnostics block hand-written
+ * in `documents/ReportDocument.ts` (lines ~300-400), where the HDD branch reads
+ * `heads_status` / `pcb_status` / `motor_status` / `surface_status` and the SSD
+ * branch reads `controller_status` / `memory_chips_status` / `controller_model`
+ * / `nand_type` off `diagnosticsData.device_type_category`. Returns nothing when
+ * no rows are supplied.
+ */
+export interface DiagnosticsBlock {
+  /** Box heading (e.g. "Media Details" / "تفاصيل الوسائط"). */
+  title: LabelText;
+  /** Labelled rows: type/model/capacity/serial + the kind-specific diagnostics. */
+  rows: Array<{ label: LabelText; value: string }>;
+  /**
+   * The RAW device kind/category the adapter branched on (e.g. `'hdd'` / `'ssd'`),
+   * passed through for documentary/diagnostic purposes; the renderer does not
+   * branch on it (the adapter already chose the rows). Omitted when unknown.
+   */
+  deviceKind?: string;
+}
+
+/**
  * The document-agnostic shape every section renderer consumes. Adapters
  * (one per source `*DocumentData`) map their domain data into this shape; the
  * engine never sees invoice/quote/etc. specifics. Optional members let one
  * shape serve financial docs (lineItems/totals/bank), intake docs (parties +
- * meta), and labels (title + qr) alike — a section renderer simply returns
- * `null` when its slice of data is absent.
+ * caseInfo + devices + legalTerms), checkout docs (collector), and labels
+ * (title + qr) alike — a section renderer simply returns `null` when its slice
+ * of data is absent.
  */
 export interface EngineDocData {
   /** Bilingual document title (e.g. EN "TAX INVOICE" / AR "فاتورة ضريبية"). */
@@ -145,6 +441,29 @@ export interface EngineDocData {
   parties: { from?: PartyBlock; to?: PartyBlock };
   /** Free-form metadata rows (doc no, dates, job id, …) shown in a meta box. */
   meta: Array<{ label: LabelText; value: string }>;
+  /**
+   * Case identification / job header for intake & checkout documents (case no,
+   * status, priority, received date/time, assigned technician, service type,
+   * problem description), or absent on documents with no case context.
+   */
+  caseInfo?: CaseInfoBlock | null;
+  /**
+   * Device intake/return table for case documents (type/brand/model/serial/
+   * capacity/condition/role/notes), or absent when the document tracks no
+   * physical devices.
+   */
+  devices?: DevicesBlock | null;
+  /**
+   * Checkout collector block (who collected the device(s) + checkout date/notes),
+   * or absent on non-checkout documents.
+   */
+  collector?: CollectorBlock | null;
+  /**
+   * Consent / Terms-&-Conditions acknowledgement box for intake & checkout
+   * documents, or absent to omit. Distinct from the financial {@link terms}
+   * block (Payment-Terms/Notes + bank).
+   */
+  legalTerms?: LegalTermsBlock | null;
   /** Line-item table: resolved columns + already-stringified/numeric cells. */
   lineItems?: {
     columns: ResolvedColumn[];
@@ -173,6 +492,53 @@ export interface EngineDocData {
   paymentHistory?: PaymentHistoryBlock | null;
   /** Signature line labels (e.g. ["Received by", "Authorized by"]). */
   signatures?: LabelText[];
+  /**
+   * Forensic chain-of-custody entries table (entry no / occurred-at / action
+   * category + type / actor + role / evidence ref / optional hash+signature)
+   * plus the legal notice, or absent on documents with no custody ledger.
+   */
+  custodyLog?: CustodyLogBlock | null;
+  /**
+   * Device diagnostics info box for a case REPORT (Media Details / Component
+   * Diagnostics — type/model/capacity/serial plus the HDD- or SSD-specific
+   * component-status rows the adapter selected), or absent on non-report docs.
+   */
+  diagnostics?: DiagnosticsBlock | null;
+  /**
+   * The ordered, DB-driven dynamic sections of a case REPORT (each a bilingual
+   * header + prose body), or absent on non-report documents. The custody
+   * timeline is NOT here — it reuses {@link custodyLog}.
+   */
+  reportSections?: ReportSectionsBlock | null;
+  /**
+   * Case-label body (large case number, priority badge, received date, device
+   * summary), or absent on non-label documents.
+   */
+  caseLabel?: CaseLabelBlock | null;
+  /**
+   * Payslip employee/period header (name, number, pay period, payment date,
+   * working days/hours), or absent on non-payslip documents.
+   */
+  payslipInfo?: PayslipInfoBlock | null;
+  /**
+   * Payslip earnings component table (component / calculation / amount + total),
+   * or absent on non-payslip documents.
+   */
+  earnings?: PayComponentBlock | null;
+  /**
+   * Payslip deductions component table (component / calculation / amount + total),
+   * or absent on non-payslip documents.
+   */
+  deductions?: PayComponentBlock | null;
+  /**
+   * Payslip emphasized Net Salary line, or absent on non-payslip documents.
+   */
+  netPay?: NetPayBlock | null;
+  /**
+   * Stock-label body (item name, category, brand, SKU/barcode/price/location),
+   * or absent on non-stock-label documents.
+   */
+  stockLabel?: StockLabelBlock | null;
   /** Caption shown under the QR code, or `null` when no QR is rendered. */
   qrCaption?: string | null;
 }

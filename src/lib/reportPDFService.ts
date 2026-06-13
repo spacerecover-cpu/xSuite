@@ -7,6 +7,19 @@ import { withTimeout, createTranslationContext } from './pdf/translationContext'
 import { logger } from './logger';
 import type { Database, Json } from '../types/database.types';
 import { type LanguageCode } from './documentTranslations';
+import type { TDocumentDefinitions } from 'pdfmake/interfaces';
+import type { TranslationContext } from './pdf/types';
+import { isPdfEngineEnabled } from './pdf/engine/featureFlag';
+import { renderTemplate } from './pdf/engine/renderTemplate';
+import { applyTenantLanguage } from './pdf/engine/applyTenantLanguage';
+import { toEngineData as toReportEngineData } from './pdf/engine/adapters/reportAdapter';
+import {
+  BUILT_IN_TEMPLATE_CONFIGS,
+  resolveTemplateConfig,
+  type DocumentTemplateConfig,
+  type TemplateConfigOverride,
+} from './pdf/templateConfig';
+import { getDeployedVersionByType, readConfig } from './documentTemplateService';
 
 type CaseReportRow = Database['public']['Tables']['case_reports']['Row'];
 type CaseReportSectionRow = Database['public']['Tables']['case_report_sections']['Row'];
@@ -145,6 +158,52 @@ export interface PDFBlobResult {
 
 class ReportPDFService {
   /**
+   * Build the report pdfmake doc-definition via the NEW config-driven engine.
+   *
+   * Flag-guarded: this is only reached when `isPdfEngineEnabled('report')` is
+   * true (default OFF). It resolves the tenant's deployed report template (if
+   * any) as the doc-type cascade layer over the built-in 'report' default,
+   * normalizes the report data through the adapter, and assembles via
+   * `renderTemplate` (reusing `createPdfWithFonts` at the call site, exactly as
+   * the legacy path does). With no tenant template seeded it falls back to the
+   * built-in config, so the path works without any DB seeding. Mirrors
+   * `buildInvoiceDocumentViaEngine` in `pdf/pdfService.ts`.
+   */
+  private async buildReportDocViaEngine(
+    data: ReportData,
+    ctx: TranslationContext,
+    logoBase64: string | null,
+    qrCodeBase64: string | null,
+  ): Promise<TDocumentDefinitions> {
+    // Doc-type override layer: the tenant's deployed report template config, if
+    // one exists. Resolution failures must never break PDF generation — fall
+    // back to the built-in default.
+    let docTypeOverride: TemplateConfigOverride | undefined;
+    try {
+      const deployed = await getDeployedVersionByType('report');
+      if (deployed) {
+        docTypeOverride = readConfig(deployed.config);
+      }
+    } catch (err) {
+      logger.error('[Report PDF Service] Report engine: template resolution failed, using built-in default:', err);
+    }
+
+    const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+      BUILT_IN_TEMPLATE_CONFIGS.report,
+      /* theme */ undefined,
+      /* docType */ docTypeOverride,
+      /* instance */ undefined,
+    );
+
+    // Bridge the tenant's document-language setting into the resolved config so
+    // the engine renders bilingual/RTL when the tenant is configured for it.
+    const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+
+    const engineData = toReportEngineData(data, languageAwareConfig);
+    return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64);
+  }
+
+  /**
    * Generate report PDF using pdfmake for consistent styling with receipts
    */
   async generateReportPDF(reportId: string, download: boolean = true): Promise<PDFGenerationResult> {
@@ -198,7 +257,9 @@ class ReportPDFService {
 
       const qrCodeCaption = data.companySettings.branding?.qr_code_general_caption || 'Scan for more information';
 
-      const docDefinition = buildReportDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+      const docDefinition = isPdfEngineEnabled('report')
+        ? await this.buildReportDocViaEngine(data, ctx, logoBase64, qrCodeBase64)
+        : buildReportDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
 
       const filename = `Report_${data.report.report_number || 'Draft'}_${new Date().toISOString().split('T')[0]}.pdf`;
 
@@ -300,7 +361,9 @@ class ReportPDFService {
 
       const qrCodeCaption = data.companySettings.branding?.qr_code_general_caption || 'Scan for more information';
 
-      const docDefinition = buildReportDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+      const docDefinition = isPdfEngineEnabled('report')
+        ? await this.buildReportDocViaEngine(data, ctx, logoBase64, qrCodeBase64)
+        : buildReportDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
       const filename = `Report_${data.report.report_number || 'Draft'}_${new Date().toISOString().split('T')[0]}.pdf`;
 
       const blobPromise = new Promise<{ blobUrl: string; blob: Blob }>((resolve, reject) => {

@@ -26,7 +26,12 @@ describe('BUILT_IN_TEMPLATE_CONFIGS', () => {
     for (const docType of ALL_DOC_TYPES) {
       const cfg = BUILT_IN_TEMPLATE_CONFIGS[docType];
       expect(cfg, `missing default for ${docType}`).toBeDefined();
-      expect(cfg.paper.size).toBe('A4');
+      // Paper size must be one of the supported values; a 'custom' size (physical
+      // labels) must additionally carry a [width, height] dimensions pair.
+      expect(['A4', 'Letter', 'custom']).toContain(cfg.paper.size);
+      if (cfg.paper.size === 'custom') {
+        expect(cfg.paper.dimensions, `custom paper for ${docType} needs dimensions`).toHaveLength(2);
+      }
       expect(cfg.branding.logo).toBe(true);
       expect(cfg.language.mode).toBe('en');
       expect(cfg.sections.length).toBeGreaterThan(0);

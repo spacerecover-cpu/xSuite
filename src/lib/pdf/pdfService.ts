@@ -13,14 +13,20 @@ import { buildChainOfCustodyDocument } from './documents/ChainOfCustodyDocument'
 import { loadImageAsBase64 } from './utils';
 import { logPDFGeneration } from './loggingService';
 import { withTimeout, createTranslationContext } from './translationContext';
-import type { DocumentType, InvoiceDocumentData, QuoteDocumentData, PaymentReceiptDocumentData, TranslationContext } from './types';
+import type { DocumentType, InvoiceDocumentData, QuoteDocumentData, PaymentReceiptDocumentData, PayslipDocumentData, ChainOfCustodyDocumentData, ReceiptData, TranslationContext } from './types';
 import { type LanguageCode } from '../documentTranslations';
 import type { TDocumentDefinitions } from 'pdfmake/interfaces';
 import { isPdfEngineEnabled } from './engine/featureFlag';
 import { renderTemplate } from './engine/renderTemplate';
+import { applyTenantLanguage } from './engine/applyTenantLanguage';
 import { toEngineData } from './engine/adapters/invoiceAdapter';
 import { toEngineData as toQuoteEngineData } from './engine/adapters/quoteAdapter';
 import { toEngineData as toPaymentReceiptEngineData } from './engine/adapters/paymentReceiptAdapter';
+import { toEngineData as toReceiptEngineData, type ReceiptVariant } from './engine/adapters/receiptAdapter';
+import { toEngineData as toCheckoutEngineData } from './engine/adapters/checkoutAdapter';
+import { toEngineData as toCaseLabelEngineData } from './engine/adapters/caseLabelAdapter';
+import { toEngineData as toChainOfCustodyEngineData } from './engine/adapters/chainOfCustodyAdapter';
+import { toEngineData as toPayslipEngineData } from './engine/adapters/payslipAdapter';
 import {
   BUILT_IN_TEMPLATE_CONFIGS,
   resolveTemplateConfig,
@@ -65,8 +71,12 @@ async function buildInvoiceDocumentViaEngine(
     /* instance */ undefined,
   );
 
-  const engineData = toEngineData(data, resolvedConfig);
-  return renderTemplate(resolvedConfig, engineData, ctx, logoBase64, qrCodeBase64);
+  // Bridge the tenant's document-language setting into the resolved config so
+  // the engine renders bilingual/RTL when the tenant is configured for it.
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+
+  const engineData = toEngineData(data, languageAwareConfig);
+  return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64);
 }
 
 /**
@@ -102,8 +112,10 @@ async function buildQuoteViaEngine(
     /* instance */ undefined,
   );
 
-  const engineData = toQuoteEngineData(data, resolvedConfig);
-  return renderTemplate(resolvedConfig, engineData, ctx, logoBase64, qrCodeBase64);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+
+  const engineData = toQuoteEngineData(data, languageAwareConfig);
+  return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64);
 }
 
 /**
@@ -136,8 +148,216 @@ async function buildPaymentReceiptViaEngine(
     /* instance */ undefined,
   );
 
-  const engineData = toPaymentReceiptEngineData(data, resolvedConfig);
-  return renderTemplate(resolvedConfig, engineData, ctx, logoBase64, qrCodeBase64);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+
+  const engineData = toPaymentReceiptEngineData(data, languageAwareConfig);
+  return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64);
+}
+
+/**
+ * Build the payslip pdfmake doc-definition via the NEW config-driven engine.
+ * Flag-guarded: only reached when `isPdfEngineEnabled('payslip')` is true.
+ * Mirrors {@link buildPaymentReceiptViaEngine} with the 'payslip' built-in config
+ * and the payslip adapter. A payslip is HR-internal: it has no QR and no party
+ * blocks, so no logo/QR images are loaded (the header still draws the company
+ * identity from `companySettings`).
+ */
+async function buildPayslipViaEngine(
+  data: PayslipDocumentData,
+  ctx: TranslationContext,
+): Promise<TDocumentDefinitions> {
+  let docTypeOverride: TemplateConfigOverride | undefined;
+  try {
+    const deployed = await getDeployedVersionByType('payslip');
+    if (deployed) {
+      docTypeOverride = readConfig(deployed.config);
+    }
+  } catch (err) {
+    console.error('[PDF Service] Payslip engine: template resolution failed, using built-in default:', err);
+  }
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+    BUILT_IN_TEMPLATE_CONFIGS.payslip,
+    /* theme */ undefined,
+    /* docType */ docTypeOverride,
+    /* instance */ undefined,
+  );
+
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+
+  const engineData = toPayslipEngineData(data, languageAwareConfig);
+  return renderTemplate(languageAwareConfig, engineData, ctx, null, null);
+}
+
+/**
+ * Build a case INTAKE (office_receipt / customer_copy) pdfmake doc-definition via
+ * the NEW config-driven engine. Flag-guarded: only reached when
+ * `isPdfEngineEnabled('office_receipt' | 'customer_copy')` is true. Mirrors
+ * {@link buildInvoiceDocumentViaEngine}: resolve the tenant's deployed template
+ * for the given doc type (if any) as the doc-type cascade layer over the built-in
+ * default, normalize through the receipt adapter for the matching variant, and
+ * assemble via `renderTemplate`. Falls back to the built-in config when no tenant
+ * template is seeded, so the path works without any DB seeding.
+ */
+async function buildOfficeReceiptViaEngine(
+  data: ReceiptData,
+  ctx: TranslationContext,
+  logoBase64: string | null,
+  qrCodeBase64: string | null,
+  docType: 'office_receipt' | 'customer_copy',
+  variant: ReceiptVariant,
+): Promise<TDocumentDefinitions> {
+  let docTypeOverride: TemplateConfigOverride | undefined;
+  try {
+    const deployed = await getDeployedVersionByType(docType);
+    if (deployed) {
+      docTypeOverride = readConfig(deployed.config);
+    }
+  } catch (err) {
+    console.error(`[PDF Service] ${docType} engine: template resolution failed, using built-in default:`, err);
+  }
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+    BUILT_IN_TEMPLATE_CONFIGS[docType],
+    /* theme */ undefined,
+    /* docType */ docTypeOverride,
+    /* instance */ undefined,
+  );
+
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+
+  const engineData = toReceiptEngineData(data, languageAwareConfig, variant);
+  return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64);
+}
+
+/**
+ * Build the customer_copy intake doc via the engine. Thin wrapper over
+ * {@link buildOfficeReceiptViaEngine} with the 'customer_copy' config + the
+ * customer-facing receipt variant.
+ */
+function buildCustomerCopyViaEngine(
+  data: ReceiptData,
+  ctx: TranslationContext,
+  logoBase64: string | null,
+  qrCodeBase64: string | null,
+): Promise<TDocumentDefinitions> {
+  return buildOfficeReceiptViaEngine(data, ctx, logoBase64, qrCodeBase64, 'customer_copy', 'customer');
+}
+
+/**
+ * Build the checkout_form (device return) pdfmake doc-definition via the NEW
+ * config-driven engine. Flag-guarded: only reached when
+ * `isPdfEngineEnabled('checkout_form')` is true. Mirrors
+ * {@link buildOfficeReceiptViaEngine} with the 'checkout_form' built-in config
+ * and the checkout adapter (case-info + device return table + collector +
+ * signature + consent box).
+ */
+async function buildCheckoutFormViaEngine(
+  data: ReceiptData,
+  ctx: TranslationContext,
+  logoBase64: string | null,
+  qrCodeBase64: string | null,
+): Promise<TDocumentDefinitions> {
+  let docTypeOverride: TemplateConfigOverride | undefined;
+  try {
+    const deployed = await getDeployedVersionByType('checkout_form');
+    if (deployed) {
+      docTypeOverride = readConfig(deployed.config);
+    }
+  } catch (err) {
+    console.error('[PDF Service] Checkout form engine: template resolution failed, using built-in default:', err);
+  }
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+    BUILT_IN_TEMPLATE_CONFIGS.checkout_form,
+    /* theme */ undefined,
+    /* docType */ docTypeOverride,
+    /* instance */ undefined,
+  );
+
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+
+  const engineData = toCheckoutEngineData(data, languageAwareConfig);
+  return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64);
+}
+
+/**
+ * Build the case_label pdfmake doc-definition via the NEW config-driven engine.
+ * Flag-guarded: only reached when `isPdfEngineEnabled('case_label')` is true.
+ * Mirrors {@link buildOfficeReceiptViaEngine}: resolve the tenant's deployed
+ * case_label template (if any) as the doc-type cascade layer over the built-in
+ * 'case_label' default, normalize the receipt data through the case-label
+ * adapter (large case number + priority badge + received date + device summary),
+ * and assemble via `renderTemplate`. Falls back to the built-in config when no
+ * tenant template is seeded, so the path works without any DB seeding.
+ */
+async function buildCaseLabelViaEngine(
+  data: ReceiptData,
+  ctx: TranslationContext,
+  logoBase64: string | null,
+  qrCodeBase64: string | null,
+): Promise<TDocumentDefinitions> {
+  let docTypeOverride: TemplateConfigOverride | undefined;
+  try {
+    const deployed = await getDeployedVersionByType('case_label');
+    if (deployed) {
+      docTypeOverride = readConfig(deployed.config);
+    }
+  } catch (err) {
+    console.error('[PDF Service] Case label engine: template resolution failed, using built-in default:', err);
+  }
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+    BUILT_IN_TEMPLATE_CONFIGS.case_label,
+    /* theme */ undefined,
+    /* docType */ docTypeOverride,
+    /* instance */ undefined,
+  );
+
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+
+  const engineData = toCaseLabelEngineData(data, languageAwareConfig);
+  return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64);
+}
+
+/**
+ * Build the chain_of_custody pdfmake doc-definition via the NEW config-driven
+ * engine. Flag-guarded: only reached when
+ * `isPdfEngineEnabled('chain_of_custody')` is true. Mirrors
+ * {@link buildCaseLabelViaEngine}: resolve the tenant's deployed
+ * chain_of_custody template (if any) as the doc-type cascade layer over the
+ * built-in 'chain_of_custody' default, normalize the ledger data through the
+ * chain-of-custody adapter (case-info header + entries table + legal notice +
+ * optional hash/signature columns), and assemble via `renderTemplate`. Falls
+ * back to the built-in config when no tenant template is seeded.
+ */
+async function buildChainOfCustodyViaEngine(
+  data: ChainOfCustodyDocumentData,
+  ctx: TranslationContext,
+  logoBase64: string | null,
+  qrCodeBase64: string | null,
+): Promise<TDocumentDefinitions> {
+  let docTypeOverride: TemplateConfigOverride | undefined;
+  try {
+    const deployed = await getDeployedVersionByType('chain_of_custody');
+    if (deployed) {
+      docTypeOverride = readConfig(deployed.config);
+    }
+  } catch (err) {
+    console.error('[PDF Service] Chain of custody engine: template resolution failed, using built-in default:', err);
+  }
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+    BUILT_IN_TEMPLATE_CONFIGS.chain_of_custody,
+    /* theme */ undefined,
+    /* docType */ docTypeOverride,
+    /* instance */ undefined,
+  );
+
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+
+  const engineData = toChainOfCustodyEngineData(data, languageAwareConfig);
+  return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64);
 }
 
 const PDF_GENERATION_TIMEOUT = 45000; // 45 seconds
@@ -214,7 +434,9 @@ export async function generateOfficeReceipt(caseId: string, download: boolean = 
 
     const qrCodeCaption = data.companySettings.branding?.qr_code_general_caption || 'Scan for more information';
 
-    const docDefinition = buildOfficeReceiptDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+    const docDefinition = isPdfEngineEnabled('office_receipt')
+      ? await buildOfficeReceiptViaEngine(data, ctx, logoBase64, qrCodeBase64, 'office_receipt', 'office')
+      : buildOfficeReceiptDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
 
     const filename = `Office_Receipt_${data.caseData.case_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 
@@ -293,7 +515,9 @@ export async function generateCustomerCopy(caseId: string, download: boolean = t
 
     const qrCodeCaption = data.companySettings.branding?.qr_code_general_caption || 'Scan for more information';
 
-    const docDefinition = buildCustomerCopyDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+    const docDefinition = isPdfEngineEnabled('customer_copy')
+      ? await buildCustomerCopyViaEngine(data, ctx, logoBase64, qrCodeBase64)
+      : buildCustomerCopyDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
 
     const filename = `Customer_Copy_${data.caseData.case_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 
@@ -342,7 +566,9 @@ export async function generateCheckoutForm(caseId: string, download: boolean = t
 
     const qrCodeCaption = data.companySettings.branding?.qr_code_general_caption || 'Scan for more information';
 
-    const docDefinition = buildCheckoutFormDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+    const docDefinition = isPdfEngineEnabled('checkout_form')
+      ? await buildCheckoutFormViaEngine(data, ctx, logoBase64, qrCodeBase64)
+      : buildCheckoutFormDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
 
     const filename = `Checkout_Form_${data.caseData.case_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 
@@ -389,7 +615,9 @@ export async function generateCaseLabel(caseId: string, download: boolean = true
         : Promise.resolve(null),
     ]);
 
-    const docDefinition = buildCaseLabelDocument(data, ctx, logoBase64, qrCodeBase64);
+    const docDefinition = isPdfEngineEnabled('case_label')
+      ? await buildCaseLabelViaEngine(data, ctx, logoBase64, qrCodeBase64)
+      : buildCaseLabelDocument(data, ctx, logoBase64, qrCodeBase64);
 
     const filename = `Label_${data.caseData.case_number}.pdf`;
 
@@ -758,7 +986,9 @@ export async function generatePayslip(recordId: string, download: boolean = true
     }
 
     const ctx = createTranslationContext(mode, languageCode);
-    const docDefinition = buildPayslipDocument(data, ctx);
+    const docDefinition = isPdfEngineEnabled('payslip')
+      ? await buildPayslipViaEngine(data, ctx)
+      : buildPayslipDocument(data, ctx);
     const filename = `Payslip_${data.payslipData.employee.employee_number}_${data.payslipData.payroll_period.period_name}.pdf`;
 
     if (download) {
@@ -805,7 +1035,21 @@ export async function generateChainOfCustody(
     }
 
     const ctx = createTranslationContext(mode, languageCode);
-    const docDefinition = buildChainOfCustodyDocument(data, ctx);
+
+    let docDefinition: TDocumentDefinitions;
+    if (isPdfEngineEnabled('chain_of_custody')) {
+      const [logoBase64, qrCodeBase64] = await Promise.all([
+        data.companySettings.branding?.logo_url
+          ? withTimeout(loadImageAsBase64(data.companySettings.branding.logo_url), 5000, 'Logo loading timeout')
+          : Promise.resolve(null),
+        data.companySettings.branding?.qr_code_general_url
+          ? withTimeout(loadImageAsBase64(data.companySettings.branding.qr_code_general_url), 5000, 'QR code loading timeout')
+          : Promise.resolve(null),
+      ]);
+      docDefinition = await buildChainOfCustodyViaEngine(data, ctx, logoBase64, qrCodeBase64);
+    } else {
+      docDefinition = buildChainOfCustodyDocument(data, ctx);
+    }
     const filename = `Chain_of_Custody_${caseNumber}_${new Date().toISOString().split('T')[0]}.pdf`;
 
     if (download) {
@@ -897,7 +1141,9 @@ export async function generateOfficeReceiptAsBlob(caseId: string): Promise<PDFBl
 
     const qrCodeCaption = data.companySettings.branding?.qr_code_general_caption || 'Scan for more information';
 
-    const docDefinition = buildOfficeReceiptDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+    const docDefinition = isPdfEngineEnabled('office_receipt')
+      ? await buildOfficeReceiptViaEngine(data, ctx, logoBase64, qrCodeBase64, 'office_receipt', 'office')
+      : buildOfficeReceiptDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
     const filename = `Office_Receipt_${data.caseData.case_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 
     const blobPromise = new Promise<{ blobUrl: string; blob: Blob }>((resolve, reject) => {
@@ -988,7 +1234,9 @@ export async function generateCustomerCopyAsBlob(caseId: string): Promise<PDFBlo
 
     const qrCodeCaption = data.companySettings.branding?.qr_code_general_caption || 'Scan for more information';
 
-    const docDefinition = buildCustomerCopyDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+    const docDefinition = isPdfEngineEnabled('customer_copy')
+      ? await buildCustomerCopyViaEngine(data, ctx, logoBase64, qrCodeBase64)
+      : buildCustomerCopyDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
     const filename = `Customer_Copy_${data.caseData.case_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 
     return new Promise((resolve) => {
@@ -1031,7 +1279,9 @@ export async function generateCheckoutFormAsBlob(caseId: string): Promise<PDFBlo
 
     const qrCodeCaption = data.companySettings.branding?.qr_code_general_caption || 'Scan for more information';
 
-    const docDefinition = buildCheckoutFormDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+    const docDefinition = isPdfEngineEnabled('checkout_form')
+      ? await buildCheckoutFormViaEngine(data, ctx, logoBase64, qrCodeBase64)
+      : buildCheckoutFormDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
     const filename = `Checkout_Form_${data.caseData.case_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 
     return new Promise((resolve) => {
@@ -1072,7 +1322,9 @@ export async function generateCaseLabelAsBlob(caseId: string): Promise<PDFBlobRe
         : Promise.resolve(null),
     ]);
 
-    const docDefinition = buildCaseLabelDocument(data, ctx, logoBase64, qrCodeBase64);
+    const docDefinition = isPdfEngineEnabled('case_label')
+      ? await buildCaseLabelViaEngine(data, ctx, logoBase64, qrCodeBase64)
+      : buildCaseLabelDocument(data, ctx, logoBase64, qrCodeBase64);
     const filename = `Label_${data.caseData.case_number}.pdf`;
 
     return new Promise((resolve) => {
@@ -1220,7 +1472,9 @@ export async function generatePayslipAsBlob(recordId: string): Promise<PDFBlobRe
     await initializePDFFonts(languageCode);
     const ctx = createTranslationContext(languageSettings?.mode || 'english_only', languageCode);
 
-    const docDefinition = buildPayslipDocument(data, ctx);
+    const docDefinition = isPdfEngineEnabled('payslip')
+      ? await buildPayslipViaEngine(data, ctx)
+      : buildPayslipDocument(data, ctx);
     const filename = `Payslip_${data.payslipData.employee.employee_number}_${data.payslipData.payroll_period.period_name}.pdf`;
 
     return new Promise((resolve) => {
@@ -1247,7 +1501,16 @@ export async function generateChainOfCustodyAsBlob(
     await initializePDFFonts(languageCode);
     const ctx = createTranslationContext(languageSettings?.mode || 'english_only', languageCode);
 
-    const docDefinition = buildChainOfCustodyDocument(data, ctx);
+    let docDefinition: TDocumentDefinitions;
+    if (isPdfEngineEnabled('chain_of_custody')) {
+      const [logoBase64, qrCodeBase64] = await Promise.all([
+        data.companySettings.branding?.logo_url ? loadImageAsBase64(data.companySettings.branding.logo_url) : Promise.resolve(null),
+        data.companySettings.branding?.qr_code_general_url ? loadImageAsBase64(data.companySettings.branding.qr_code_general_url) : Promise.resolve(null),
+      ]);
+      docDefinition = await buildChainOfCustodyViaEngine(data, ctx, logoBase64, qrCodeBase64);
+    } else {
+      docDefinition = buildChainOfCustodyDocument(data, ctx);
+    }
     const filename = `Chain_of_Custody_${caseNumber}_${new Date().toISOString().split('T')[0]}.pdf`;
 
     return new Promise((resolve) => {

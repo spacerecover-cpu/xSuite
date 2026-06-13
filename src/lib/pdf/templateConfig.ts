@@ -33,11 +33,24 @@ export interface LanguageConfig {
   primary: 'en' | 'ar';
 }
 
-/** Page geometry. `margins` is pdfmake order: [top, right, bottom, left]. */
+/**
+ * Page geometry. `margins` is pdfmake order: [top, right, bottom, left].
+ *
+ * `size` is normally a predefined sheet (`'A4'` / `'Letter'`). For physical
+ * LABELS (stock / case labels), set `size: 'custom'` and supply `dimensions`
+ * as a `[width, height]` pair in POINTS (1pt = 1/72"); `renderTemplate` then
+ * passes that literal page box to pdfmake instead of a predefined size. This
+ * mirrors the legacy `StockLabelDocument`'s `pageSize: { width: 283, height: 170 }`
+ * label sheet. `dimensions` is ignored for the predefined sizes, and a `'custom'`
+ * size with no `dimensions` falls back to A4 — so existing configs (which never
+ * set `'custom'`) are completely unaffected.
+ */
 export interface PaperConfig {
-  size: 'A4' | 'Letter';
+  size: 'A4' | 'Letter' | 'custom';
   orientation: 'portrait' | 'landscape';
   margins: [number, number, number, number];
+  /** Literal page box `[width, height]` in points; used only when `size === 'custom'`. */
+  dimensions?: [number, number];
 }
 
 /**
@@ -148,11 +161,24 @@ const A4_PORTRAIT: PaperConfig = {
   margins: [40, 40, 40, 40],
 };
 
-/** Compact label paper (case / stock labels print on a small landscape sheet). */
+/** Compact case-label paper (case labels print on a small landscape sheet). */
 const LABEL_PAPER: PaperConfig = {
   size: 'A4',
   orientation: 'landscape',
   margins: [16, 16, 16, 16],
+};
+
+/**
+ * Physical stock-label paper — a small custom sheet matching the legacy
+ * `StockLabelDocument`'s `{ width: 283, height: 170 }` (points) label, with the
+ * same tight 12pt margins. `size: 'custom'` tells `renderTemplate` to use the
+ * literal `dimensions` box rather than a predefined sheet.
+ */
+const STOCK_LABEL_PAPER: PaperConfig = {
+  size: 'custom',
+  orientation: 'portrait',
+  dimensions: [283, 170],
+  margins: [12, 12, 12, 12],
 };
 
 const NEUTRAL_BRANDING: BrandingConfig = {
@@ -224,16 +250,22 @@ function financialSections(): SectionConfig[] {
   ];
 }
 
-/** An intake/checkout document base section set (devices, not money). */
+/**
+ * An intake document base section set (office_receipt / customer_copy):
+ * case-info header + device-intake table + consent box, not money. Uses the
+ * case-doc section keys (`caseInfo`, `devices`, `legalTerms`) and ends with the
+ * signature lines, then `qr` + `footer` (promoted to the repeating page footer).
+ */
 function intakeSections(): SectionConfig[] {
   return [
     section('header', 0),
     section('parties', 1),
     section('caseInfo', 2),
     section('devices', 3),
-    section('terms', 4),
+    section('legalTerms', 4),
     section('signature', 5),
-    section('footer', 6),
+    section('qr', 6),
+    section('footer', 7),
   ];
 }
 
@@ -284,7 +316,7 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
       return {
         ...base,
         sections: intakeSections(),
-        labels: { documentTitle: { en: 'CUSTOMER COPY', ar: 'نسخة العميل' } },
+        labels: { documentTitle: { en: 'DEVICE CHECK-IN RECEIPT', ar: 'إيصال استلام جهاز' } },
       };
     case 'checkout_form':
       return {
@@ -295,9 +327,10 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
           section('caseInfo', 2),
           section('devices', 3),
           section('collector', 4),
-          section('terms', 5),
+          section('legalTerms', 5),
           section('signature', 6),
-          section('footer', 7),
+          section('qr', 7),
+          section('footer', 8),
         ],
         labels: { documentTitle: { en: 'DEVICE CHECKOUT / RETURN FORM', ar: 'نموذج تسليم الجهاز' } },
       };
@@ -306,20 +339,24 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
         ...base,
         paper: LABEL_PAPER,
         sections: [
+          // Header is OPTIONAL on a compact label (off by default): the label
+          // body (large case number + priority + received date + device summary)
+          // is the self-contained focal content. A tenant may switch it on to
+          // print the company identity above the label.
           section('header', 0, { visible: false }),
-          section('caseInfo', 1),
-          section('qr', 2),
+          section('caseLabel', 1),
+          section('footer', 2),
         ],
         labels: { documentTitle: { en: 'CASE LABEL', ar: 'ملصق الحالة' } },
       };
     case 'stock_label':
       return {
         ...base,
-        paper: LABEL_PAPER,
+        paper: STOCK_LABEL_PAPER,
         sections: [
           section('header', 0, { visible: false }),
-          section('stockInfo', 1),
-          section('qr', 2),
+          section('stockLabel', 1),
+          section('qr', 2, { visible: false }),
         ],
         labels: { documentTitle: { en: 'STOCK LABEL', ar: 'ملصق المخزون' } },
       };
@@ -328,12 +365,16 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
         ...base,
         sections: [
           section('header', 0),
-          section('employee', 1),
-          section('period', 2),
-          section('earnings', 3),
-          section('deductions', 4),
-          section('totals', 5, { lines: { gross: true, deductions: true, net: true } }),
-          section('footer', 6),
+          // payslipInfo = employee identity + pay period + payment date +
+          // working-days/hours rows, in one bilingual info box (generalized from
+          // the legacy "Employee Information" + "Attendance Summary" boxes).
+          section('payslipInfo', 1),
+          section('earnings', 2),
+          section('deductions', 3),
+          // netPay = the emphasized Net Salary line (its own block, not a totals
+          // line, mirroring the legacy boxed net-salary treatment).
+          section('netPay', 4),
+          section('footer', 5),
         ],
         labels: { documentTitle: { en: 'PAYSLIP', ar: 'قسيمة الراتب' } },
       };
@@ -344,15 +385,24 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
           section('header', 0),
           section('caseInfo', 1),
           section('custodyLog', 2, {
+            // The adapter owns the DATA + default column set (entry / action /
+            // description / actor / date-time / category, plus optional hash &
+            // signature gated on the report options). These config entries let a
+            // tenant rename / resize / toggle those columns; the adapter merges
+            // them by key. Order here mirrors the legacy entries table.
             columns: [
-              { key: 'entry', visible: true, label: { en: '#', ar: 'رقم' }, width: 24 },
-              { key: 'action', visible: true, label: { en: 'Action', ar: 'الإجراء' } },
-              { key: 'actor', visible: true, label: { en: 'Actor', ar: 'المنفّذ' } },
-              { key: 'occurredAt', visible: true, label: { en: 'Date/Time', ar: 'التاريخ/الوقت' } },
-              { key: 'hash', visible: true, label: { en: 'Hash', ar: 'البصمة' } },
+              { key: 'entry', visible: true, label: { en: 'Entry #', ar: 'رقم' }, width: 38 },
+              { key: 'action', visible: true, label: { en: 'Action Type', ar: 'نوع الإجراء' }, width: 65 },
+              { key: 'description', visible: true, label: { en: 'Description', ar: 'الوصف' } },
+              { key: 'actor', visible: true, label: { en: 'Actor', ar: 'المنفّذ' }, width: 80 },
+              { key: 'occurredAt', visible: true, label: { en: 'Date/Time', ar: 'التاريخ/الوقت' }, width: 70 },
+              { key: 'actionCategory', visible: true, label: { en: 'Category', ar: 'الفئة' }, width: 65 },
             ],
           }),
-          section('signature', 3),
+          // Signature lines are OPTIONAL on a custody report (off by default):
+          // the immutable ledger + hashes are the evidentiary record. A tenant
+          // may switch them on for a wet-ink custodian/witness sign-off.
+          section('signature', 3, { visible: false }),
           section('footer', 4),
         ],
         labels: { documentTitle: { en: 'CHAIN OF CUSTODY', ar: 'سلسلة الحيازة' } },
@@ -362,12 +412,29 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
         ...base,
         sections: [
           section('header', 0),
+          // caseInfo = customer + report meta in one bilingual info box
+          // (generalized from the legacy Customer Information + Report Details
+          // boxes). diagnostics = the HDD/SSD-aware Media Details / Component
+          // Diagnostics box. reportSections = the ordered DB-driven prose
+          // sections.
           section('caseInfo', 1),
-          section('summary', 2),
-          section('findings', 3),
-          section('sections', 4),
-          section('signature', 5),
-          section('footer', 6),
+          section('diagnostics', 2),
+          section('reportSections', 3),
+          // custodyLog is OPTIONAL: only forensic reports with custody events
+          // populate it (the adapter returns no block otherwise, so the section
+          // renders nothing). Its columns are the report timeline's
+          // event/description/actor/date-time; a tenant may rename/resize/toggle
+          // them and the adapter merges by key.
+          section('custodyLog', 4, {
+            columns: [
+              { key: 'entry', visible: true, label: { en: 'Entry #', ar: 'رقم' }, width: 38 },
+              { key: 'action', visible: true, label: { en: 'Event', ar: 'الحدث' }, width: 90 },
+              { key: 'description', visible: true, label: { en: 'Description', ar: 'الوصف' } },
+              { key: 'actor', visible: true, label: { en: 'Actor', ar: 'المنفّذ' }, width: 80 },
+              { key: 'occurredAt', visible: true, label: { en: 'Date/Time', ar: 'التاريخ/الوقت' }, width: 75 },
+            ],
+          }),
+          section('footer', 5),
         ],
         labels: { documentTitle: { en: 'CASE REPORT', ar: 'تقرير الحالة' } },
       };
