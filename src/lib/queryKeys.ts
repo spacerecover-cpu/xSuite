@@ -45,6 +45,12 @@ export const paymentKeys = {
   list: (filters: Record<string, unknown>) => [...paymentKeys.lists(), filters] as const,
 };
 
+export const creditNoteKeys = {
+  all: ['credit_notes'] as const,
+  byInvoice: (invoiceId: string) => [...creditNoteKeys.all, 'invoice', invoiceId] as const,
+  byCase: (caseId: string) => [...creditNoteKeys.all, 'case', caseId] as const,
+};
+
 export const inventoryKeys = {
   all: ['inventory'] as const,
   lists: () => [...inventoryKeys.all, 'list'] as const,
