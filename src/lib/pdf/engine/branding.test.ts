@@ -32,9 +32,6 @@ const englishCtx: TranslationContext = {
   fontFamily: 'Roboto',
 };
 
-const TINY_PNG =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-
 /** A minimal financial EngineDocData with a section that emits a bilingual section title. */
 function makeData(): EngineDocData {
   return {
