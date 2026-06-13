@@ -156,6 +156,29 @@ export const templateKeys = {
   context: (refs: Record<string, unknown>) => [...templateKeys.all, 'context', refs] as const,
 };
 
+export const brandingThemeKeys = {
+  all: ['branding-themes'] as const,
+  list: () => [...brandingThemeKeys.all, 'list'] as const,
+  detail: (id: string) => [...brandingThemeKeys.all, 'detail', id] as const,
+};
+
+export const documentTemplatePdfKeys = {
+  all: ['document-templates-pdf'] as const,
+  list: () => [...documentTemplatePdfKeys.all, 'list'] as const,
+  detail: (id: string) => [...documentTemplatePdfKeys.all, 'detail', id] as const,
+  byType: (documentType: string) =>
+    [...documentTemplatePdfKeys.all, 'by-type', documentType] as const,
+};
+
+export const documentTemplateVersionKeys = {
+  all: ['document-template-versions'] as const,
+  list: (templateId: string) =>
+    [...documentTemplateVersionKeys.all, 'list', templateId] as const,
+  detail: (id: string) => [...documentTemplateVersionKeys.all, 'detail', id] as const,
+  deployed: (templateId: string) =>
+    [...documentTemplateVersionKeys.all, 'deployed', templateId] as const,
+};
+
 export const masterDataKeys = {
   deviceTypes: () => ['master', 'device-types'] as const,
   deviceBrands: () => ['master', 'device-brands'] as const,

@@ -27,8 +27,21 @@
       "Bash(git cherry-pick *)",
       "Bash(bash scripts/check-tsc.sh)",
       "Bash(git checkout *)",
-      "mcp__Supabase__get_advisors",
-      "mcp__Supabase__generate_typescript_types"
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(curl -so /dev/null -w \"%{http_code}\\\\n\" https://mcp.supabase.com/mcp)",
+      "Bash(curl -so /dev/null -w \"%{http_code}\\\\n\" \"https://mcp.supabase.com?project_ref=ssmbegiyjivrcwgcqutu\")",
+      "Bash(curl *)",
+      "Bash(xargs -n1 basename)",
+      "Bash(git merge *)",
+      "Bash(git stash *)",
+      "Bash(perl -0777 *)",
+      "Bash(python3 -c \"import json; json.load\\(open\\('.claude/settings.local.json'\\)\\); print\\('valid JSON'\\)\")",
+      "Bash(grep -niA6 \"fresh.branch\\\\|branch per\\\\|per work item\\\\|one branch per\" CLAUDE.md)",
+      "Bash(gh pr *)",
+      "Bash(git branch *)",
+      "Bash(xargs -n1 git branch -D)",
+      "WebSearch"
     ]
   },
   "enableAllProjectMcpServers": true,
