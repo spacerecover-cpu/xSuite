@@ -11,6 +11,7 @@ import type { TDocumentDefinitions } from 'pdfmake/interfaces';
 import type { TranslationContext } from './pdf/types';
 import { isPdfEngineEnabled } from './pdf/engine/featureFlag';
 import { renderTemplate } from './pdf/engine/renderTemplate';
+import { applyTenantLanguage } from './pdf/engine/applyTenantLanguage';
 import { toEngineData as toReportEngineData } from './pdf/engine/adapters/reportAdapter';
 import {
   BUILT_IN_TEMPLATE_CONFIGS,
@@ -194,8 +195,12 @@ class ReportPDFService {
       /* instance */ undefined,
     );
 
-    const engineData = toReportEngineData(data, resolvedConfig);
-    return renderTemplate(resolvedConfig, engineData, ctx, logoBase64, qrCodeBase64);
+    // Bridge the tenant's document-language setting into the resolved config so
+    // the engine renders bilingual/RTL when the tenant is configured for it.
+    const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+
+    const engineData = toReportEngineData(data, languageAwareConfig);
+    return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64);
   }
 
   /**

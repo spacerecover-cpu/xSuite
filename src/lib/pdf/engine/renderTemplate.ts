@@ -17,14 +17,15 @@
  * builders — it is the additive engine entry point.
  */
 
-import type { Content, DynamicContent, PageOrientation, PageSize, TDocumentDefinitions } from 'pdfmake/interfaces';
-import { getStylesWithFont } from '../styles';
+import type { Content, DynamicContent, PageOrientation, PageSize, StyleDictionary, TDocumentDefinitions, Watermark } from 'pdfmake/interfaces';
+import { getStylesWithFont, PDF_STYLES } from '../styles';
 import type { DocumentTemplateConfig } from '../templateConfig';
 import type { TranslationContext } from '../types';
 import type { EngineContext, EngineDocData } from './types';
 import { SECTION_REGISTRY } from './registry';
 import { buildPageFooter } from './sections/footer';
 import { engineLayoutDirection, engineDefaultFont } from './rtl';
+import { resolveAccentColors, resolveWatermark } from './branding';
 
 /** Section keys that can be promoted to the repeating page footer. */
 const PAGE_FOOTER_KEYS = new Set(['footer', 'qr']);
@@ -118,6 +119,36 @@ export function renderTemplate(
       ? { font: defaultFont, alignment: 'right' as const }
       : { font: defaultFont };
 
+  // 6. OPT-IN branding (M7) — NEUTRAL by default.
+  // PDFs do not theme: with `branding.accent === 'inherit'` (the default) the
+  // resolved colors equal the neutral `PDF_COLORS.primary` the legacy builders
+  // use, so this is a no-op. Only an EXPLICIT hex opts the SMALL accent surface
+  // set (header divider rule + section-title text) into that color; the rule
+  // color is read off `config.branding` directly by the header renderer, and the
+  // section-title text color is applied here by overriding the two named styles
+  // (`sectionTitle`, `bilingualHeader`) that every section heading routes
+  // through. Body text, tables, totals, and status colors are never accented.
+  const accent = resolveAccentColors(config.branding);
+  const styles: StyleDictionary = getStylesWithFont(defaultFont);
+  styles.sectionTitle = { ...styles.sectionTitle, color: accent.sectionTitle };
+  styles.bilingualHeader = { ...styles.bilingualHeader, color: accent.sectionTitle };
+
+  // Optional text watermark: a non-empty `branding.watermark` becomes a pdfmake
+  // page watermark, reusing the shared `watermark` style's visual params (light
+  // 60pt bold, low opacity) so it reads as a background wash on every page. An
+  // empty/absent watermark emits no key at all (no watermark — the default).
+  const watermarkText = resolveWatermark(config.branding);
+  const watermark: Watermark | undefined = watermarkText
+    ? {
+        text: watermarkText,
+        font: defaultFont,
+        color: PDF_STYLES.watermark.color as string,
+        opacity: PDF_STYLES.watermark.opacity as number,
+        bold: true,
+        fontSize: PDF_STYLES.watermark.fontSize as number,
+      }
+    : undefined;
+
   return {
     pageSize,
     pageOrientation,
@@ -125,8 +156,9 @@ export function renderTemplate(
     defaultStyle,
     // Styles inherit the same font family so the named styles (tableHeader,
     // bilingualHeader, …) render in the Arabic family under RTL too.
-    styles: getStylesWithFont(defaultFont),
+    styles,
     content,
     ...(footer ? { footer } : {}),
+    ...(watermark ? { watermark } : {}),
   };
 }

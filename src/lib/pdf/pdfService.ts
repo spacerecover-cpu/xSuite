@@ -18,6 +18,7 @@ import { type LanguageCode } from '../documentTranslations';
 import type { TDocumentDefinitions } from 'pdfmake/interfaces';
 import { isPdfEngineEnabled } from './engine/featureFlag';
 import { renderTemplate } from './engine/renderTemplate';
+import { applyTenantLanguage } from './engine/applyTenantLanguage';
 import { toEngineData } from './engine/adapters/invoiceAdapter';
 import { toEngineData as toQuoteEngineData } from './engine/adapters/quoteAdapter';
 import { toEngineData as toPaymentReceiptEngineData } from './engine/adapters/paymentReceiptAdapter';
@@ -70,8 +71,12 @@ async function buildInvoiceDocumentViaEngine(
     /* instance */ undefined,
   );
 
-  const engineData = toEngineData(data, resolvedConfig);
-  return renderTemplate(resolvedConfig, engineData, ctx, logoBase64, qrCodeBase64);
+  // Bridge the tenant's document-language setting into the resolved config so
+  // the engine renders bilingual/RTL when the tenant is configured for it.
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+
+  const engineData = toEngineData(data, languageAwareConfig);
+  return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64);
 }
 
 /**
@@ -107,8 +112,10 @@ async function buildQuoteViaEngine(
     /* instance */ undefined,
   );
 
-  const engineData = toQuoteEngineData(data, resolvedConfig);
-  return renderTemplate(resolvedConfig, engineData, ctx, logoBase64, qrCodeBase64);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+
+  const engineData = toQuoteEngineData(data, languageAwareConfig);
+  return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64);
 }
 
 /**
@@ -141,8 +148,10 @@ async function buildPaymentReceiptViaEngine(
     /* instance */ undefined,
   );
 
-  const engineData = toPaymentReceiptEngineData(data, resolvedConfig);
-  return renderTemplate(resolvedConfig, engineData, ctx, logoBase64, qrCodeBase64);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+
+  const engineData = toPaymentReceiptEngineData(data, languageAwareConfig);
+  return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64);
 }
 
 /**
@@ -174,8 +183,10 @@ async function buildPayslipViaEngine(
     /* instance */ undefined,
   );
 
-  const engineData = toPayslipEngineData(data, resolvedConfig);
-  return renderTemplate(resolvedConfig, engineData, ctx, null, null);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+
+  const engineData = toPayslipEngineData(data, languageAwareConfig);
+  return renderTemplate(languageAwareConfig, engineData, ctx, null, null);
 }
 
 /**
@@ -213,8 +224,10 @@ async function buildOfficeReceiptViaEngine(
     /* instance */ undefined,
   );
 
-  const engineData = toReceiptEngineData(data, resolvedConfig, variant);
-  return renderTemplate(resolvedConfig, engineData, ctx, logoBase64, qrCodeBase64);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+
+  const engineData = toReceiptEngineData(data, languageAwareConfig, variant);
+  return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64);
 }
 
 /**
@@ -262,8 +275,10 @@ async function buildCheckoutFormViaEngine(
     /* instance */ undefined,
   );
 
-  const engineData = toCheckoutEngineData(data, resolvedConfig);
-  return renderTemplate(resolvedConfig, engineData, ctx, logoBase64, qrCodeBase64);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+
+  const engineData = toCheckoutEngineData(data, languageAwareConfig);
+  return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64);
 }
 
 /**
@@ -299,8 +314,10 @@ async function buildCaseLabelViaEngine(
     /* instance */ undefined,
   );
 
-  const engineData = toCaseLabelEngineData(data, resolvedConfig);
-  return renderTemplate(resolvedConfig, engineData, ctx, logoBase64, qrCodeBase64);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+
+  const engineData = toCaseLabelEngineData(data, languageAwareConfig);
+  return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64);
 }
 
 /**
@@ -337,8 +354,10 @@ async function buildChainOfCustodyViaEngine(
     /* instance */ undefined,
   );
 
-  const engineData = toChainOfCustodyEngineData(data, resolvedConfig);
-  return renderTemplate(resolvedConfig, engineData, ctx, logoBase64, qrCodeBase64);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+
+  const engineData = toChainOfCustodyEngineData(data, languageAwareConfig);
+  return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64);
 }
 
 const PDF_GENERATION_TIMEOUT = 45000; // 45 seconds
