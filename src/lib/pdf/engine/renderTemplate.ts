@@ -24,6 +24,7 @@ import type { TranslationContext } from '../types';
 import type { EngineContext, EngineDocData } from './types';
 import { SECTION_REGISTRY } from './registry';
 import { buildPageFooter } from './sections/footer';
+import { engineLayoutDirection, engineDefaultFont } from './rtl';
 
 /** Section keys that can be promoted to the repeating page footer. */
 const PAGE_FOOTER_KEYS = new Set(['footer', 'qr']);
@@ -94,12 +95,28 @@ export function renderTemplate(
     ? buildPageFooter(engine, data) ?? undefined
     : undefined;
 
+  // 5. RTL document defaults (M6). When the resolved language puts Arabic in the
+  // lead, the whole document flows right-to-left: the defaultStyle font becomes
+  // the Arabic family (so glyphs shape) and the default alignment becomes right.
+  // Section renderers additionally mirror their tables — they read direction off
+  // `config.language` the same way (via `engine/rtl`), so the document default
+  // and the per-section behavior stay in lock-step. LTR keeps the tenant font and
+  // no document-level alignment override, leaving English-only output unchanged.
+  const direction = engineLayoutDirection(config.language);
+  const defaultFont = engineDefaultFont(config.language, ctx.fontFamily);
+  const defaultStyle =
+    direction === 'rtl'
+      ? { font: defaultFont, alignment: 'right' as const }
+      : { font: defaultFont };
+
   return {
     pageSize,
     pageOrientation,
     pageMargins,
-    defaultStyle: { font: ctx.fontFamily },
-    styles: getStylesWithFont(ctx.fontFamily),
+    defaultStyle,
+    // Styles inherit the same font family so the named styles (tableHeader,
+    // bilingualHeader, …) render in the Arabic family under RTL too.
+    styles: getStylesWithFont(defaultFont),
     content,
     ...(footer ? { footer } : {}),
   };

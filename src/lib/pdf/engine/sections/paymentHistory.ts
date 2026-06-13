@@ -9,10 +9,34 @@
  * whenever there are no rows (proforma, or no payments yet).
  */
 
-import type { Content, TableCell } from 'pdfmake/interfaces';
+import type { Content, TableCell, Size } from 'pdfmake/interfaces';
 import { PDF_COLORS } from '../../styles';
 import { resolveLabel } from '../labels';
-import type { EngineContext, EngineDocData, SectionRenderer } from '../types';
+import { engineLayoutDirection, mirrorAlign } from '../rtl';
+import type {
+  EngineContext,
+  EngineDocData,
+  LabelText,
+  PaymentHistoryRow,
+  SectionRenderer,
+} from '../types';
+
+/**
+ * One payment-history column described as DATA: its header label, the row field
+ * it reads, its width, and its base (LTR) alignment. Building the table from
+ * this list — instead of seven hardcoded cells — lets the RTL path reverse the
+ * column order and swap left/right alignments with the same `engine/rtl` helpers
+ * the line-item table uses.
+ */
+interface HistoryColumn {
+  label: LabelText;
+  field: keyof PaymentHistoryRow;
+  width: Size;
+  align: 'left' | 'right';
+  /** Value cell color (amount is success-green, balance bold default). */
+  valueColor: string;
+  valueBold?: boolean;
+}
 
 export const renderPaymentHistory: SectionRenderer = (
   engine: EngineContext,
@@ -22,30 +46,50 @@ export const renderPaymentHistory: SectionRenderer = (
   if (!history || history.rows.length === 0) return null;
 
   const { language } = engine.config;
+  const direction = engineLayoutDirection(language);
   const { columns } = history;
 
-  const headerRow: TableCell[] = [
-    { text: resolveLabel(columns.date, language), fontSize: 8, bold: true, color: PDF_COLORS.textLight },
-    { text: resolveLabel(columns.document, language), fontSize: 8, bold: true, color: PDF_COLORS.textLight },
-    { text: resolveLabel(columns.method, language), fontSize: 8, bold: true, color: PDF_COLORS.textLight },
-    { text: resolveLabel(columns.reference, language), fontSize: 8, bold: true, color: PDF_COLORS.textLight },
-    { text: resolveLabel(columns.recordedBy, language), fontSize: 8, bold: true, color: PDF_COLORS.textLight },
-    { text: resolveLabel(columns.amount, language), fontSize: 8, bold: true, color: PDF_COLORS.textLight, alignment: 'right' },
-    { text: resolveLabel(columns.balance, language), fontSize: 8, bold: true, color: PDF_COLORS.textLight, alignment: 'right' },
+  // Column order matches the legacy statement layout (date → … → balance). Only
+  // the description column star-sizes; the rest auto-size.
+  const baseColumns: HistoryColumn[] = [
+    { label: columns.date, field: 'date', width: 'auto', align: 'left', valueColor: PDF_COLORS.text },
+    { label: columns.document, field: 'document', width: 'auto', align: 'left', valueColor: PDF_COLORS.text },
+    { label: columns.method, field: 'method', width: 'auto', align: 'left', valueColor: PDF_COLORS.text },
+    { label: columns.reference, field: 'reference', width: '*', align: 'left', valueColor: PDF_COLORS.text },
+    { label: columns.recordedBy, field: 'recordedBy', width: 'auto', align: 'left', valueColor: PDF_COLORS.text },
+    { label: columns.amount, field: 'amount', width: 'auto', align: 'right', valueColor: PDF_COLORS.success },
+    { label: columns.balance, field: 'runningBalance', width: 'auto', align: 'right', valueColor: PDF_COLORS.text, valueBold: true },
   ];
+
+  // Under RTL, reverse the columns and swap each cell's left/right alignment so
+  // the statement reads right-to-left. LTR keeps the array as-is (legacy order).
+  const ordered =
+    direction === 'rtl'
+      ? [...baseColumns].reverse().map((c) => ({ ...c, align: mirrorAlign(c.align) as 'left' | 'right' }))
+      : baseColumns;
+
+  const headerRow: TableCell[] = ordered.map((c) => ({
+    text: resolveLabel(c.label, language),
+    fontSize: 8,
+    bold: true,
+    color: PDF_COLORS.textLight,
+    alignment: c.align,
+  }));
 
   const body: TableCell[][] = [headerRow];
   for (const r of history.rows) {
-    body.push([
-      { text: r.date, fontSize: 8, color: PDF_COLORS.text },
-      { text: r.document, fontSize: 8, color: PDF_COLORS.text },
-      { text: r.method, fontSize: 8, color: PDF_COLORS.text },
-      { text: r.reference, fontSize: 8, color: PDF_COLORS.text },
-      { text: r.recordedBy, fontSize: 8, color: PDF_COLORS.text },
-      { text: r.amount, fontSize: 8, color: PDF_COLORS.success, alignment: 'right' },
-      { text: r.runningBalance, fontSize: 8, bold: true, color: PDF_COLORS.text, alignment: 'right' },
-    ]);
+    body.push(
+      ordered.map((c) => ({
+        text: r[c.field],
+        fontSize: 8,
+        color: c.valueColor,
+        alignment: c.align,
+        ...(c.valueBold ? { bold: true } : {}),
+      })),
+    );
   }
+
+  const widths: Size[] = ordered.map((c) => c.width);
 
   return {
     margin: [0, 10, 0, 0],
@@ -60,7 +104,7 @@ export const renderPaymentHistory: SectionRenderer = (
       {
         table: {
           headerRows: 1,
-          widths: ['auto', 'auto', 'auto', '*', 'auto', 'auto', 'auto'],
+          widths,
           body,
         },
         layout: {

@@ -12,7 +12,7 @@
 
 import type { Content } from 'pdfmake/interfaces';
 import { PDF_COLORS } from '../../styles';
-import { resolveLabel } from '../labels';
+import { bilingualLabelRuns } from '../rtl';
 import type { EngineContext, EngineDocData, SectionRenderer } from '../types';
 
 export const renderTotals: SectionRenderer = (
@@ -23,10 +23,17 @@ export const renderTotals: SectionRenderer = (
   if (!totals || totals.length === 0) return null;
 
   const { language } = engine.config;
+  // English runs render in the tenant's Latin font; Arabic runs are pinned to
+  // the Arabic family by `bilingualLabelRuns`. The currency/number value stays a
+  // SEPARATE run so it keeps LTR ordering within the RTL flow (never reversed).
+  const baseFont = engine.ctx.fontFamily;
   const rows: Content[] = [];
 
   for (const line of totals) {
-    const labelText = resolveLabel(line.label, language);
+    // Per-run label so Arabic shapes in its own font even when the document
+    // default is Latin (bilingual, English-primary). Totals are intrinsically
+    // right-anchored, so labels stay right-aligned in BOTH LTR and RTL.
+    const labelRuns = bilingualLabelRuns(line.label, language, baseFont);
 
     if (line.emphasis) {
       // Grand-total: boxed, larger, brand-colored value.
@@ -35,7 +42,7 @@ export const renderTotals: SectionRenderer = (
           widths: ['*', 100],
           body: [
             [
-              { text: labelText, fontSize: 10, bold: true, color: PDF_COLORS.text, alignment: 'right', border: [false, false, false, false], margin: [0, 3, 0, 3] },
+              { text: labelRuns, fontSize: 10, bold: true, color: PDF_COLORS.text, alignment: 'right', border: [false, false, false, false], margin: [0, 3, 0, 3] },
               { text: line.value, fontSize: 11, bold: true, color: PDF_COLORS.primary, alignment: 'right', border: [false, false, false, false], margin: [0, 3, 0, 3] },
             ],
           ],
@@ -52,7 +59,7 @@ export const renderTotals: SectionRenderer = (
     } else {
       rows.push({
         columns: [
-          { text: labelText, fontSize: 9, color: PDF_COLORS.textLight, width: '*', alignment: 'right' },
+          { text: labelRuns, fontSize: 9, color: PDF_COLORS.textLight, width: '*', alignment: 'right' },
           { text: line.value, fontSize: 9, bold: true, color: PDF_COLORS.text, width: 100, alignment: 'right' },
         ],
         margin: [0, 2, 0, 2],
