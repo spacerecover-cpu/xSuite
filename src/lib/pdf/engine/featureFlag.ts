@@ -7,8 +7,10 @@
  * Only the literal string `'true'` on the matching env var opts a document type
  * into the engine — any other value (unset, `'false'`, `'1'`, …) stays OFF.
  *
- * Today only `'invoice'` has a wired engine branch (the M3 pilot), driven by
- * `VITE_PDF_ENGINE_INVOICE`. Other document types always return `false` here.
+ * `'invoice'` (the M3 pilot), `'quote'`, and `'payment_receipt'` each have a
+ * wired engine branch, driven by `VITE_PDF_ENGINE_INVOICE`,
+ * `VITE_PDF_ENGINE_QUOTE`, and `VITE_PDF_ENGINE_PAYMENT_RECEIPT` respectively.
+ * Other document types always return `false` here.
  *
  * NOTE: this is a build-time, ALL-tenants switch. Per-tenant rollout (reading a
  * tenant flag / a deployed-template opt-in) is a later milestone — deliberately
@@ -18,6 +20,8 @@
 /** Env var name per supported document type. Absent types are never enabled. */
 const FLAG_ENV_BY_TYPE: Record<string, string> = {
   invoice: 'VITE_PDF_ENGINE_INVOICE',
+  quote: 'VITE_PDF_ENGINE_QUOTE',
+  payment_receipt: 'VITE_PDF_ENGINE_PAYMENT_RECEIPT',
 };
 
 /**

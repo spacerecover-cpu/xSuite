@@ -220,9 +220,14 @@ describe('renderTemplate — section order & visibility', () => {
 });
 
 describe('renderTemplate — bilingual Arabic labels (null-Arabic-title guard)', () => {
-  it('renders the Arabic document title from config.labels in bilingual mode', () => {
-    // Bilingual side-by-side, Arabic-leading, with a tenant-customized Arabic
-    // title. The engine must surface the ACTUAL Arabic string, not null.
+  it('renders the real Arabic document title in bilingual mode (not null)', () => {
+    // Bilingual side-by-side, Arabic-leading. The engine must surface the ACTUAL
+    // Arabic string, never null (the null-Arabic-title regression this engine
+    // was built to fix). M5 GAP 1: the header now prefers the adapter-supplied
+    // `data.documentTitle` over the static `config.labels.documentTitle`, so the
+    // rendered Arabic title is the one the DATA carries (`makeData()`'s
+    // `documentTitle.ar`). The config still customizes the EN/AR labels for
+    // tenants who don't supply a data title, but the data title wins when set.
     const config: DocumentTemplateConfig = resolveTemplateConfig(
       BUILT_IN_TEMPLATE_CONFIGS.invoice,
       undefined,
@@ -231,12 +236,13 @@ describe('renderTemplate — bilingual Arabic labels (null-Arabic-title guard)',
         labels: { documentTitle: { en: 'TAX INVOICE', ar: 'فاتورة ضريبية مخصصة' } },
       },
     );
-    const def = renderTemplate(config, makeData(), bilingualCtx, null, TINY_PNG);
+    const data = makeData();
+    const def = renderTemplate(config, data, bilingualCtx, null, TINY_PNG);
     const texts = allTexts(def);
 
-    // The exact Arabic label from config.labels must appear somewhere in output.
-    const arabicTitle = config.labels.documentTitle.ar as string;
-    expect(arabicTitle).toBe('فاتورة ضريبية مخصصة');
+    // The REAL Arabic title from the data (not null) must appear in the output.
+    const arabicTitle = data.documentTitle.ar as string;
+    expect(arabicTitle).toBe('فاتورة ضريبية');
     expect(texts.some((t) => t.includes(arabicTitle))).toBe(true);
   });
 

@@ -67,6 +67,68 @@ export interface BankBlock {
 }
 
 /**
+ * A single titled prose stack inside the terms/notes area — e.g. "Payment Terms"
+ * with its body, then "Notes" with its body. Modeling them as discrete blocks
+ * (instead of one flat string) mirrors the legacy `InvoiceDocument.ts` layout,
+ * where Payment Terms and Notes are separate stacked headings.
+ */
+export interface TermsTextBlock {
+  /** Bilingual heading (e.g. "Payment Terms", "Notes"). */
+  title: LabelText;
+  /** Body prose. Already-resolved by the adapter. */
+  body: string;
+}
+
+/**
+ * The terms/notes region. Either a single legacy-flat `{ title, body }` box, or
+ * a structured set of `blocks` (Payment Terms / Notes stacks). When `blocks` is
+ * present the renderer lays the stacks alongside the {@link BankBlock} box,
+ * matching the hand-written builder's terms+bank two-column row.
+ */
+export interface TermsBlock {
+  /** Heading for the legacy single-box form. Ignored when `blocks` is set. */
+  title: LabelText;
+  /** Legacy single body string. Ignored when `blocks` is set. */
+  body?: string;
+  /** Structured Payment Terms / Notes stacks (preferred). */
+  blocks?: TermsTextBlock[];
+}
+
+/**
+ * One row of the payment-history statement table, pre-formatted by the adapter.
+ * Mirrors `InvoiceDocument.ts`'s `paymentHistorySection` columns: date /
+ * document / method / reference / recorded-by / amount / running-balance.
+ */
+export interface PaymentHistoryRow {
+  date: string;
+  document: string;
+  method: string;
+  reference: string;
+  recordedBy: string;
+  amount: string;
+  runningBalance: string;
+}
+
+/**
+ * The payment-history block: a bilingual title plus the statement rows. Rendered
+ * only on non-proforma invoices that have recorded payments.
+ */
+export interface PaymentHistoryBlock {
+  title: LabelText;
+  /** Column header labels, keyed to {@link PaymentHistoryRow} fields. */
+  columns: {
+    date: LabelText;
+    document: LabelText;
+    method: LabelText;
+    reference: LabelText;
+    recordedBy: LabelText;
+    amount: LabelText;
+    balance: LabelText;
+  };
+  rows: PaymentHistoryRow[];
+}
+
+/**
  * The document-agnostic shape every section renderer consumes. Adapters
  * (one per source `*DocumentData`) map their domain data into this shape; the
  * engine never sees invoice/quote/etc. specifics. Optional members let one
@@ -90,10 +152,25 @@ export interface EngineDocData {
   };
   /** Totals lines (subtotal/vat/total/…). `emphasis` flags the grand total. */
   totals?: Array<{ label: LabelText; value: string; emphasis?: boolean }>;
-  /** Terms & conditions / notes block, or `null` to omit. */
-  terms?: { title: LabelText; body: string } | null;
+  /**
+   * Terms & conditions / notes block, or `null` to omit.
+   *
+   * Two shapes are accepted so the renderer can match the legacy builders:
+   * - Legacy-flat: a single `{ title, body }` (one EN/AR terms box).
+   * - Structured: an ordered list of `blocks`, each a labelled stack (e.g.
+   *   "Payment Terms" then "Notes"), rendered alongside the bank box. This
+   *   mirrors `InvoiceDocument.ts`'s separate Payment Terms / Notes stacks
+   *   rather than collapsing them into one flat string.
+   */
+  terms?: TermsBlock | null;
   /** Bank details block, or `null` to omit. */
   bank?: BankBlock | null;
+  /**
+   * Payment-history statement (date/document/method/reference/recorded-by/
+   * amount/running-balance), or `null`/absent to omit. Populated by the adapter
+   * for non-proforma invoices that have recorded payments.
+   */
+  paymentHistory?: PaymentHistoryBlock | null;
   /** Signature line labels (e.g. ["Received by", "Authorized by"]). */
   signatures?: LabelText[];
   /** Caption shown under the QR code, or `null` when no QR is rendered. */

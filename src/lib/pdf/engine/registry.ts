@@ -16,6 +16,7 @@ import { renderHeader } from './sections/header';
 import { renderParties, renderMeta } from './sections/infoBoxes';
 import { renderLineItems } from './sections/lineItemTable';
 import { renderTotals } from './sections/totals';
+import { renderPaymentHistory } from './sections/paymentHistory';
 import { renderTerms } from './sections/terms';
 import { renderBank } from './sections/bank';
 import { renderSignature } from './sections/signature';
@@ -28,6 +29,7 @@ export const SECTION_REGISTRY: Record<string, SectionRenderer> = {
   meta: renderMeta,
   lineItems: renderLineItems,
   totals: renderTotals,
+  paymentHistory: renderPaymentHistory,
   terms: renderTerms,
   bank: renderBank,
   signature: renderSignature,

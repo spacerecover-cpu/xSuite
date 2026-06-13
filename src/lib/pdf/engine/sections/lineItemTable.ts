@@ -18,6 +18,7 @@ import type {
   SectionRenderer,
 } from '../types';
 import { isBilingualMode, en, ar, resolveLabel } from '../labels';
+import { engineLayoutDirection, mirrorColumns } from '../rtl';
 
 function headerAlignment(col: ResolvedColumn): 'left' | 'center' | 'right' {
   return col.align ?? 'left';
@@ -31,7 +32,11 @@ export const renderLineItems: SectionRenderer = (
   if (!li) return null;
 
   const { language } = engine.config;
-  const columns = li.columns.filter((c) => c.visible);
+  const direction = engineLayoutDirection(language);
+  // Under RTL, mirror the column order (reverse) and swap each column's
+  // left/right alignment so the table reads right-to-left. `mirrorColumns`
+  // returns the input unchanged for LTR, so English-only output is untouched.
+  const columns = mirrorColumns(li.columns.filter((c) => c.visible), direction);
   if (columns.length === 0) return null;
 
   const bilingual = isBilingualMode(language);

@@ -84,9 +84,16 @@ export const renderHeader: SectionRenderer = (
     margin: [0, 0, 0, 12],
   });
 
-  // Centered document title. Title text comes from config labels via the
-  // language mode (e.g. "TAX INVOICE | فاتورة ضريبية" when bilingual).
-  const titleLabel = config.labels.documentTitle ?? data.documentTitle;
+  // Centered document title. Precedence: the ADAPTER-computed title wins when it
+  // supplies one (e.g. a PROFORMA invoice renders "PROFORMA INVOICE | فاتورة مبدئية"
+  // even though the built-in config carries the static "TAX INVOICE"), then the
+  // tenant-configurable `config.labels.documentTitle`, then a sane default. The
+  // adapter's title is the source of truth for instance-specific variants the
+  // static config can't know (proforma vs tax invoice, draft vs issued, …).
+  const titleLabel =
+    (data.documentTitle && data.documentTitle.en)
+      ? data.documentTitle
+      : (config.labels.documentTitle ?? { en: 'DOCUMENT' });
   out.push({
     text: resolveLabel(titleLabel, config.language),
     fontSize: 16,

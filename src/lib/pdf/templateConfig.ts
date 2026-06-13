@@ -200,12 +200,27 @@ function financialSections(): SectionConfig[] {
     section('meta', 2),
     section('lineItems', 3, { columns: lineItemColumns() }),
     section('totals', 4, {
-      lines: { subtotal: true, discount: true, vat: true, total: true, amountInWords: false },
+      lines: {
+        subtotal: true,
+        discount: true,
+        vat: true,
+        total: true,
+        // Amount Paid / Balance Due lines: emitted by the invoice adapter for
+        // non-proforma invoices with a recorded payment. Off for quotes (no
+        // payment concept) — the adapter is the gate, this is the config toggle.
+        amountPaid: true,
+        balanceDue: true,
+        amountInWords: false,
+      },
     }),
-    section('terms', 5),
-    section('signature', 6, { visible: false }),
-    section('qr', 7),
-    section('footer', 8),
+    // Payment-history statement — rendered between totals and terms, mirroring
+    // the legacy InvoiceDocument layout. Returns null on docs with no history
+    // (proforma, quotes), so it is harmless on the shared financial base.
+    section('paymentHistory', 5),
+    section('terms', 6),
+    section('signature', 7, { visible: false }),
+    section('qr', 8),
+    section('footer', 9),
   ];
 }
 
@@ -250,7 +265,10 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
           section('parties', 1),
           section('meta', 2),
           section('totals', 3, { lines: { amountReceived: true, amountInWords: false } }),
-          section('terms', 4, { visible: false }),
+          // Terms is visible: the payment-receipt adapter routes notes (and the
+          // bank box) through the terms section's structured-blocks layout. It
+          // returns null when there are no notes/bank, so it is harmless when empty.
+          section('terms', 4),
           section('qr', 5),
           section('footer', 6),
         ],

@@ -4,14 +4,17 @@
  * (see `documents/InvoiceDocument.ts` lines ~504-623), reusing `createSocialFooter`
  * for the tagline/website/social treatment.
  *
- * Modeling note: the hand-written builders attach this as a pdfmake page
- * `footer` callback so it repeats on every page. The engine renders it as the
- * last block in the content stream (a single, document-end footer). Promoting
- * it to a repeating page footer is a `renderTemplate` concern for a later
- * milestone; see the M2 design doc.
+ * Two consumers:
+ * - {@link renderFooter}: the in-content section renderer (used when a tenant
+ *   reorders the footer into the body stream, or for non-paged previews).
+ * - {@link buildPageFooter}: a pdfmake page-`footer` callback factory so the
+ *   footer/QR repeat on EVERY page, matching the hand-written builders. The
+ *   assembler (`renderTemplate`) prefers this when the config has visible
+ *   `footer`/`qr` sections, and drops those sections from the content stream so
+ *   the footer is not also rendered inline.
  */
 
-import type { Content } from 'pdfmake/interfaces';
+import type { Content, DynamicContent } from 'pdfmake/interfaces';
 import { PDF_COLORS, createSocialFooter } from '../../styles';
 import type { EngineContext, EngineDocData, SectionRenderer } from '../types';
 
@@ -66,3 +69,101 @@ export const renderFooter: SectionRenderer = (
 
   return { stack: [divider, social] };
 };
+
+/**
+ * Build a pdfmake page-`footer` callback that repeats the footer (divider +
+ * tagline + website, optionally with a left-aligned QR) on every page —
+ * mirroring `documents/InvoiceDocument.ts`'s `footer: (currentPage, pageCount)`
+ * closure (lines ~504-623).
+ *
+ * Returns `null` when there is nothing to show (no tagline, no website/socials,
+ * no QR) so generic documents without those sections get no page footer.
+ *
+ * Layout parity with the legacy builder:
+ * - With a QR: a divider rule, then a row of [QR + caption | spacer | tagline +
+ *   website right-aligned], with page-edge margins `[35, 0, 35, 25]`.
+ * - Without a QR: a divider rule, then a centered tagline + website stack,
+ *   margins `[35, 10, 35, 25]`.
+ */
+export function buildPageFooter(
+  engine: EngineContext,
+  data: EngineDocData,
+): DynamicContent | null {
+  const settings = data.identity;
+  const tagline = settings.branding?.brand_tagline || null;
+  const online = settings.online_presence;
+  const qr = engine.qrCodeBase64;
+  const caption = data.qrCaption ?? null;
+
+  const hasSocial =
+    !!online &&
+    (!!online.website || !!online.facebook || !!online.twitter || !!online.linkedin || !!online.instagram);
+  if (!tagline && !hasSocial && !qr) return null;
+
+  const dividerLine: Content = {
+    canvas: [
+      { type: 'line', x1: 0, y1: 0, x2: 525, y2: 0, lineWidth: 0.5, lineColor: PDF_COLORS.primary },
+    ],
+    margin: [0, 0, 0, 10],
+  };
+
+  return (): Content => {
+    if (qr) {
+      const footerStack: Content[] = [];
+      if (tagline) {
+        footerStack.push({
+          text: tagline,
+          fontSize: 10,
+          bold: true,
+          color: PDF_COLORS.primary,
+          alignment: 'right',
+          margin: [0, 5, 0, 1],
+        });
+      }
+      if (online?.website) {
+        footerStack.push({
+          text: online.website,
+          fontSize: 8,
+          color: PDF_COLORS.textLight,
+          alignment: 'right',
+          margin: [0, 0, 0, 0],
+        });
+      }
+
+      return {
+        stack: [
+          dividerLine,
+          {
+            columns: [
+              {
+                width: 'auto',
+                stack: [
+                  { image: qr, width: 60, height: 60, alignment: 'left', margin: [0, 0, 0, 2] },
+                  ...(caption
+                    ? [{ text: caption, fontSize: 8, color: PDF_COLORS.text, alignment: 'left' as const, margin: [0, 0, 0, 0] as [number, number, number, number] }]
+                    : []),
+                ],
+              },
+              { text: '', width: '*' },
+              { width: 'auto', stack: footerStack },
+            ],
+          },
+        ],
+        margin: [35, 0, 35, 25],
+      };
+    }
+
+    const footerLines: Content[] = [];
+    if (tagline) {
+      footerLines.push({ text: tagline, fontSize: 10, bold: true, color: PDF_COLORS.primary, alignment: 'center' });
+    }
+    if (online?.website) {
+      footerLines.push({ text: online.website, fontSize: 8, color: PDF_COLORS.textLight, alignment: 'center', margin: [0, 2, 0, 0] });
+    }
+
+    return {
+      stack: [dividerLine, { stack: footerLines }],
+      margin: [35, 10, 35, 25],
+    };
+  };
+}

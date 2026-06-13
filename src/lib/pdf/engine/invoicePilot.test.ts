@@ -192,14 +192,14 @@ describe('invoice pilot — engine renders a complete, valid invoice', () => {
     expect(joined).toContain('OMR 1470.000'); // grand total
   });
 
-  it('exposes the proforma vs tax title on the adapter output', () => {
-    // PARITY NOTE: the adapter DOES compute the proforma/tax title from
-    // invoice_type (this is the source of truth), but the header section
-    // renderer currently prefers `config.labels.documentTitle` over
-    // `data.documentTitle` (see sections/header.ts), so with the built-in
-    // config the rendered title is the config's static "TAX INVOICE". We
-    // therefore assert the adapter contract here (the engine-internal title
-    // precedence is an M2 concern, out of scope for the M3 wiring).
+  it('renders the proforma vs tax title from the adapter (title precedence)', () => {
+    // M5 GAP 1 (closed): the adapter computes the proforma/tax title from
+    // invoice_type (the source of truth), and the header section renderer now
+    // PREFERS `data.documentTitle` over the config's static label. So with the
+    // built-in 'invoice' config — whose `labels.documentTitle` is the static
+    // "TAX INVOICE" — a proforma invoice still renders "PROFORMA INVOICE".
+
+    // Adapter contract still holds...
     const taxData = toEngineData(makeInvoiceData(), BUILT_IN_TEMPLATE_CONFIGS.invoice);
     expect(taxData.documentTitle.en).toBe('TAX INVOICE');
     expect(taxData.documentTitle.ar).toBe('فاتورة ضريبية');
@@ -210,6 +210,16 @@ describe('invoice pilot — engine renders a complete, valid invoice', () => {
     );
     expect(proformaData.documentTitle.en).toBe('PROFORMA INVOICE');
     expect(proformaData.documentTitle.ar).toBe('فاتورة مبدئية');
+
+    // ...and the RENDERED output now reflects it (the precedence fix). A tax
+    // invoice renders "TAX INVOICE"; a proforma renders "PROFORMA INVOICE" and
+    // never the config's static "TAX INVOICE".
+    const taxTexts = allTexts(renderInvoice(makeInvoiceData()));
+    expect(taxTexts.some((t) => t.includes('TAX INVOICE'))).toBe(true);
+
+    const proformaTexts = allTexts(renderInvoice(makeInvoiceData({ invoice_type: 'proforma' })));
+    expect(proformaTexts.some((t) => t.includes('PROFORMA INVOICE'))).toBe(true);
+    expect(proformaTexts.some((t) => t.includes('TAX INVOICE'))).toBe(false);
   });
 
   it('surfaces the Arabic title in bilingual mode (null-Arabic-title guard)', () => {

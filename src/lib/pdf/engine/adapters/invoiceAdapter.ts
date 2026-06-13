@@ -127,6 +127,8 @@ export function toEngineData(
   const taxRate = invoiceData.tax_rate || 0;
   const taxAmount = (discountedSubtotal * taxRate) / 100;
   const totalAmount = discountedSubtotal + taxAmount;
+  const amountPaid = invoiceData.amount_paid || 0;
+  const balanceDue = totalAmount - amountPaid;
 
   const lines = totalsLines(config);
   const on = (key: string): boolean => lines[key] !== false; // default-on unless explicitly false
@@ -145,12 +147,32 @@ export function toEngineData(
   if (on('total')) {
     totals.push({ label: { en: 'Total:', ar: 'الإجمالي:' }, value: money(totalAmount), emphasis: true });
   }
+  // Amount Paid / Balance Due — only on non-proforma invoices with a recorded
+  // payment, matching InvoiceDocument.ts (lines ~296-314).
+  if (!isProforma && amountPaid > 0) {
+    if (on('amountPaid')) {
+      totals.push({ label: { en: 'Amount Paid:', ar: 'المبلغ المدفوع:' }, value: money(amountPaid) });
+    }
+    if (on('balanceDue')) {
+      totals.push({ label: { en: 'Balance Due:', ar: 'الرصيد المستحق:' }, value: money(balanceDue) });
+    }
+  }
 
-  // ---- Terms / notes -------------------------------------------------------
-  const termsBody = [invoiceData.payment_terms, invoiceData.notes].filter(Boolean).join('\n\n');
-  const terms: EngineDocData['terms'] = termsBody
-    ? { title: { en: 'Payment Terms', ar: 'شروط الدفع' }, body: termsBody }
-    : null;
+  // ---- Terms / notes (structured: Payment Terms + Notes stacks) ------------
+  // Mirrors InvoiceDocument.ts's separate Payment Terms / Notes headings rather
+  // than collapsing them into one flat string. The bank box (below) renders in
+  // the right column of the same row via the terms section.
+  const termsBlocks: NonNullable<NonNullable<EngineDocData['terms']>['blocks']> = [];
+  if (invoiceData.payment_terms) {
+    termsBlocks.push({ title: { en: 'Payment Terms', ar: 'شروط الدفع' }, body: invoiceData.payment_terms });
+  }
+  if (invoiceData.notes) {
+    termsBlocks.push({ title: { en: 'Notes', ar: 'ملاحظات' }, body: invoiceData.notes });
+  }
+  const terms: EngineDocData['terms'] =
+    termsBlocks.length > 0
+      ? { title: { en: 'Payment Terms', ar: 'شروط الدفع' }, blocks: termsBlocks }
+      : null;
 
   // ---- Bank ----------------------------------------------------------------
   let bank: BankBlock | null = null;
@@ -167,6 +189,36 @@ export function toEngineData(
     }
   }
 
+  // ---- Payment history -----------------------------------------------------
+  // Mirrors InvoiceDocument.ts's paymentHistorySection: rendered only on
+  // non-proforma invoices that actually have recorded payments. Every cell is
+  // pre-formatted here (currency / dates / '-' fallbacks) so the renderer is dumb.
+  const rawHistory = invoice.paymentHistory ?? [];
+  const paymentHistory: EngineDocData['paymentHistory'] =
+    !isProforma && rawHistory.length > 0
+      ? {
+          title: { en: 'Payment History', ar: 'سجل الدفعات' },
+          columns: {
+            date: { en: 'Date', ar: 'التاريخ' },
+            document: { en: 'Document', ar: 'المستند' },
+            method: { en: 'Method', ar: 'الطريقة' },
+            reference: { en: 'Reference', ar: 'المرجع' },
+            recordedBy: { en: 'Recorded By', ar: 'سجلها' },
+            amount: { en: 'Amount', ar: 'المبلغ' },
+            balance: { en: 'Balance', ar: 'الرصيد' },
+          },
+          rows: rawHistory.map((p) => ({
+            date: p.payment_date ? formatDate(p.payment_date) : '-',
+            document: p.doc_number || '-',
+            method: p.method || '-',
+            reference: p.reference || '-',
+            recordedBy: p.recorded_by || '-',
+            amount: money(p.amount),
+            runningBalance: p.running_balance !== undefined ? money(p.running_balance) : '-',
+          })),
+        }
+      : null;
+
   return {
     documentTitle,
     identity: companySettings,
@@ -174,6 +226,7 @@ export function toEngineData(
     meta,
     lineItems: { columns, rows },
     totals,
+    paymentHistory,
     terms,
     bank,
     qrCaption: 'Scan to pay this invoice',
