@@ -233,6 +233,14 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
   const remainingZero = isZero(remaining);
   const allocatedRows = Array.from(allocations.values()).filter(v => v > 0).length;
 
+  // The "Unapplied" gauge answers "is the receipt fully allocated?" (received −
+  // applied). On a partial payment that hits zero the moment applied = received,
+  // saying nothing about what is STILL OWED — the question a lab actually asks.
+  // Surface that separately so a 0 unapplied is never misread as "fully paid".
+  const outstandingAfter = round3(Math.max(totalOutstanding - totalAllocated, 0));
+  const outstandingAfterZero = isZero(outstandingAfter);
+  const showOutstandingAfter = totalOutstanding > 0 || totalAllocated > 0;
+
   const canSubmit =
     !isSubmitting &&
     !!formData.account_id &&
@@ -332,7 +340,7 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
           <p className="font-bold tabular-nums text-primary">{formatCurrencyValue(totalAllocated)}</p>
         </div>
         <div>
-          <p className="text-xs text-slate-500 mb-0.5">Remaining</p>
+          <p className="text-xs text-slate-500 mb-0.5">Unapplied</p>
           <p className={`font-bold tabular-nums ${meterTone}`}>{formatCurrencyValue(remaining)}</p>
         </div>
       </div>
@@ -344,6 +352,28 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
               ? `Applied exceeds the received amount by ${formatCurrencyValue(Math.abs(remaining))} — reduce an allocation.`
               : `Apply ${formatCurrencyValue(remaining)} more, or reduce the received amount to match.`}
         </p>
+      )}
+      {showOutstandingAfter && (
+        <div className="mt-3 pt-3 border-t border-border">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-xs text-slate-500">
+              {totalAllocated > 0
+                ? singleInvoiceMode ? 'Invoice balance after this payment' : 'Still outstanding after this payment'
+                : singleInvoiceMode ? 'Invoice outstanding' : 'Outstanding on this case'}
+            </span>
+            <span className={`text-sm font-bold tabular-nums ${outstandingAfterZero && totalAllocated > 0 ? 'text-success' : 'text-slate-900'}`}>
+              {formatCurrencyValue(outstandingAfter)}
+            </span>
+          </div>
+          {outstandingAfterZero && totalAllocated > 0 && (
+            <p className="mt-1 flex items-center gap-1 text-xs text-success">
+              <Check className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
+              {singleInvoiceMode
+                ? 'This payment settles the invoice in full.'
+                : 'This payment clears all open invoices on the case.'}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
@@ -668,7 +698,7 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
 
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
           {!canSubmit && formData.amount > 0 && !remainingZero && (
-            <p className="mr-auto text-xs text-slate-500">Remaining must reach zero to record</p>
+            <p className="mr-auto text-xs text-slate-500">Unapplied amount must reach zero to record</p>
           )}
           <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
             Cancel
