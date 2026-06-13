@@ -13,12 +13,14 @@ import { buildChainOfCustodyDocument } from './documents/ChainOfCustodyDocument'
 import { loadImageAsBase64 } from './utils';
 import { logPDFGeneration } from './loggingService';
 import { withTimeout, createTranslationContext } from './translationContext';
-import type { DocumentType, InvoiceDocumentData, TranslationContext } from './types';
+import type { DocumentType, InvoiceDocumentData, QuoteDocumentData, PaymentReceiptDocumentData, TranslationContext } from './types';
 import { type LanguageCode } from '../documentTranslations';
 import type { TDocumentDefinitions } from 'pdfmake/interfaces';
 import { isPdfEngineEnabled } from './engine/featureFlag';
 import { renderTemplate } from './engine/renderTemplate';
 import { toEngineData } from './engine/adapters/invoiceAdapter';
+import { toEngineData as toQuoteEngineData } from './engine/adapters/quoteAdapter';
+import { toEngineData as toPaymentReceiptEngineData } from './engine/adapters/paymentReceiptAdapter';
 import {
   BUILT_IN_TEMPLATE_CONFIGS,
   resolveTemplateConfig,
@@ -64,6 +66,77 @@ async function buildInvoiceDocumentViaEngine(
   );
 
   const engineData = toEngineData(data, resolvedConfig);
+  return renderTemplate(resolvedConfig, engineData, ctx, logoBase64, qrCodeBase64);
+}
+
+/**
+ * Build the quote pdfmake doc-definition via the NEW config-driven engine.
+ *
+ * Flag-guarded: only reached when `isPdfEngineEnabled('quote')` is true. Mirrors
+ * {@link buildInvoiceDocumentViaEngine}: resolve the tenant's deployed quote
+ * template (if any) as the doc-type cascade layer over the built-in 'quote'
+ * default, normalize through the quote adapter, and assemble via
+ * `renderTemplate`. With no tenant template seeded it falls back to the built-in
+ * config, so the path works without any DB seeding.
+ */
+async function buildQuoteViaEngine(
+  data: QuoteDocumentData,
+  ctx: TranslationContext,
+  logoBase64: string | null,
+  qrCodeBase64: string | null,
+): Promise<TDocumentDefinitions> {
+  let docTypeOverride: TemplateConfigOverride | undefined;
+  try {
+    const deployed = await getDeployedVersionByType('quote');
+    if (deployed) {
+      docTypeOverride = readConfig(deployed.config);
+    }
+  } catch (err) {
+    console.error('[PDF Service] Quote engine: template resolution failed, using built-in default:', err);
+  }
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+    BUILT_IN_TEMPLATE_CONFIGS.quote,
+    /* theme */ undefined,
+    /* docType */ docTypeOverride,
+    /* instance */ undefined,
+  );
+
+  const engineData = toQuoteEngineData(data, resolvedConfig);
+  return renderTemplate(resolvedConfig, engineData, ctx, logoBase64, qrCodeBase64);
+}
+
+/**
+ * Build the payment-receipt pdfmake doc-definition via the NEW config-driven
+ * engine. Flag-guarded: only reached when
+ * `isPdfEngineEnabled('payment_receipt')` is true. Mirrors
+ * {@link buildInvoiceDocumentViaEngine} with the 'payment_receipt' built-in
+ * config and the payment-receipt adapter.
+ */
+async function buildPaymentReceiptViaEngine(
+  data: PaymentReceiptDocumentData,
+  ctx: TranslationContext,
+  logoBase64: string | null,
+  qrCodeBase64: string | null,
+): Promise<TDocumentDefinitions> {
+  let docTypeOverride: TemplateConfigOverride | undefined;
+  try {
+    const deployed = await getDeployedVersionByType('payment_receipt');
+    if (deployed) {
+      docTypeOverride = readConfig(deployed.config);
+    }
+  } catch (err) {
+    console.error('[PDF Service] Payment receipt engine: template resolution failed, using built-in default:', err);
+  }
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+    BUILT_IN_TEMPLATE_CONFIGS.payment_receipt,
+    /* theme */ undefined,
+    /* docType */ docTypeOverride,
+    /* instance */ undefined,
+  );
+
+  const engineData = toPaymentReceiptEngineData(data, resolvedConfig);
   return renderTemplate(resolvedConfig, engineData, ctx, logoBase64, qrCodeBase64);
 }
 
@@ -386,7 +459,9 @@ export async function generateQuote(quoteId: string, download: boolean = true): 
 
     const qrCodeCaption = data.companySettings.branding?.qr_code_quote_caption || 'Scan to approve this quote';
 
-    const docDefinition = buildQuoteDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+    const docDefinition = isPdfEngineEnabled('quote')
+      ? await buildQuoteViaEngine(data, ctx, logoBase64, qrCodeBase64)
+      : buildQuoteDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
 
     const filename = `Quote_${data.quoteData.quote_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 
@@ -639,7 +714,9 @@ export async function generatePaymentReceipt(paymentId: string, download: boolea
     ]);
 
     const qrCodeCaption = data.companySettings.branding?.qr_code_general_caption || 'Scan for more information';
-    const docDefinition = buildPaymentReceiptDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+    const docDefinition = isPdfEngineEnabled('payment_receipt')
+      ? await buildPaymentReceiptViaEngine(data, ctx, logoBase64, qrCodeBase64)
+      : buildPaymentReceiptDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
     const filename = `Payment_Receipt_${data.paymentData.receipt_number || paymentId}_${new Date().toISOString().split('T')[0]}.pdf`;
 
     if (download) {
@@ -1038,7 +1115,9 @@ export async function generateQuoteAsBlob(quoteId: string): Promise<PDFBlobResul
 
     const qrCodeCaption = data.companySettings.branding?.qr_code_quote_caption || 'Scan to approve this quote';
 
-    const docDefinition = buildQuoteDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+    const docDefinition = isPdfEngineEnabled('quote')
+      ? await buildQuoteViaEngine(data, ctx, logoBase64, qrCodeBase64)
+      : buildQuoteDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
     const filename = `Quote_${data.quoteData.quote_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 
     return new Promise((resolve) => {
@@ -1116,7 +1195,9 @@ export async function generatePaymentReceiptAsBlob(paymentId: string): Promise<P
     ]);
     const qrCodeCaption = data.companySettings.branding?.qr_code_general_caption || 'Scan for more information';
 
-    const docDefinition = buildPaymentReceiptDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+    const docDefinition = isPdfEngineEnabled('payment_receipt')
+      ? await buildPaymentReceiptViaEngine(data, ctx, logoBase64, qrCodeBase64)
+      : buildPaymentReceiptDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
     const filename = `Payment_Receipt_${data.paymentData.receipt_number || paymentId}_${new Date().toISOString().split('T')[0]}.pdf`;
 
     return new Promise((resolve) => {

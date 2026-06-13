@@ -265,7 +265,10 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
           section('parties', 1),
           section('meta', 2),
           section('totals', 3, { lines: { amountReceived: true, amountInWords: false } }),
-          section('terms', 4, { visible: false }),
+          // Terms is visible: the payment-receipt adapter routes notes (and the
+          // bank box) through the terms section's structured-blocks layout. It
+          // returns null when there are no notes/bank, so it is harmless when empty.
+          section('terms', 4),
           section('qr', 5),
           section('footer', 6),
         ],
