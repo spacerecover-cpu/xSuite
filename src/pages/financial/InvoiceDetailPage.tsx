@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchInvoiceById, convertProformaToTaxInvoice, getConversionHistory, updateInvoice, toInvoiceEditInitialData, getPaymentHistory, issueInvoice } from '../../lib/invoiceService';
 import type { Invoice, InvoiceItem, InvoiceWithDetails } from '../../lib/invoiceService';
-import { getInvoiceEditability, canRecordPayment as invoiceCanRecordPayment, canIssueInvoice as invoiceCanIssue, getPaymentSummary } from '../../lib/invoicePermissions';
+import { getInvoiceEditability, canRecordPayment as invoiceCanRecordPayment, canIssueInvoice as invoiceCanIssue, canCreditInvoice as invoiceCanCredit, getPaymentSummary } from '../../lib/invoicePermissions';
 import { PaymentSummaryBar } from '../../components/financial/PaymentSummaryBar';
 import { PaymentHistoryTable } from '../../components/financial/PaymentHistoryTable';
 import { PageHeader } from '../../components/shared/PageHeader';
@@ -18,9 +18,12 @@ import { usePDFDownload } from '../../hooks/usePDFDownload';
 import { useProfileNames } from '../../hooks/useProfileNames';
 import { AuditInfo } from '../../components/ui/AuditInfo';
 import { useToast } from '../../hooks/useToast';
-import { FileText, ArrowLeft, CreditCard as Edit, DollarSign, AlertCircle, RefreshCw, CheckCircle, ArrowRight, Lock, Receipt, Send } from 'lucide-react';
+import { FileText, ArrowLeft, CreditCard as Edit, DollarSign, AlertCircle, RefreshCw, CheckCircle, ArrowRight, Lock, Receipt, Send, FileMinus } from 'lucide-react';
 import { RecordReceiptModal } from '../../components/banking/RecordReceiptModal';
 import { InvoiceFormModal } from '../../components/cases/InvoiceFormModal';
+import { CreditNoteModal } from '../../components/financial/CreditNoteModal';
+import { getCreditNotesByInvoice } from '../../lib/creditNoteService';
+import { creditNoteKeys } from '../../lib/queryKeys';
 import { logger } from '../../lib/logger';
 import { supabase } from '../../lib/supabaseClient';
 import type { PaymentReceipt } from '../../lib/bankingService';
@@ -67,6 +70,7 @@ export const InvoiceDetailPage: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showCreditNoteModal, setShowCreditNoteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<InvoiceWithDetails | null>(null);
   const [showConversionHistoryModal, setShowConversionHistoryModal] = useState(false);
@@ -82,6 +86,12 @@ export const InvoiceDetailPage: React.FC = () => {
   const { data: payments = [] } = useQuery({
     queryKey: ['invoice_payments', id],
     queryFn: () => getPaymentHistory(id!),
+    enabled: !!id,
+  });
+
+  const { data: creditNotes = [] } = useQuery({
+    queryKey: creditNoteKeys.byInvoice(id!),
+    queryFn: () => getCreditNotesByInvoice(id!),
     enabled: !!id,
   });
 
@@ -159,6 +169,13 @@ export const InvoiceDetailPage: React.FC = () => {
     setShowPaymentModal(false);
   };
 
+  const handleCreditNoteSaved = () => {
+    queryClient.invalidateQueries({ queryKey: ['invoice', id] });
+    queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    queryClient.invalidateQueries({ queryKey: creditNoteKeys.byInvoice(id!) });
+    setShowCreditNoteModal(false);
+  };
+
   const handleOpenEdit = async () => {
     if (!id) return;
     // Re-fetch with line items so the form can pre-fill items (the detail
@@ -217,6 +234,7 @@ export const InvoiceDetailPage: React.FC = () => {
   const editability = getInvoiceEditability(invoice);
   const canEdit = editability.mode !== 'none';
   const canRecordPayment = invoiceCanRecordPayment(invoice);
+  const canCredit = invoiceCanCredit(invoice);
   const canIssue = invoiceCanIssue(invoice);
   const canConvert = invoice.invoice_type === 'proforma' && invoice.status !== 'converted';
   const hasConversionHistory = invoice.invoice_type === 'tax_invoice' && !!invoice.converted_from_quote_id;
@@ -604,6 +622,17 @@ export const InvoiceDetailPage: React.FC = () => {
                   </Button>
                 )}
 
+                {canCredit && (
+                  <Button
+                    onClick={() => setShowCreditNoteModal(true)}
+                    variant="secondary"
+                    className="w-full"
+                  >
+                    <FileMinus className="w-4 h-4 mr-2" />
+                    Create Credit Note
+                  </Button>
+                )}
+
                 {canConvert && (
                   <Button
                     onClick={handleConvertToTax}
@@ -693,6 +722,38 @@ export const InvoiceDetailPage: React.FC = () => {
                 />
               </div>
             </Card>
+
+            {creditNotes.length > 0 && (
+              <Card className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <FileMinus className="w-4 h-4 text-slate-600" />
+                  <h3 className="text-lg font-semibold text-slate-900">Credit Notes</h3>
+                </div>
+                <div className="divide-y divide-border">
+                  {creditNotes.map((cn) => (
+                    <div key={cn.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-900">{cn.credit_note_number}</p>
+                        <p className="text-xs text-slate-500">
+                          {cn.credit_note_date ? new Date(cn.credit_note_date).toLocaleDateString() : '—'}
+                          {cn.reason_code ? ` · ${cn.reason_code.replace(/_/g, ' ')}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {cn.status === 'void' && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Void</span>
+                        )}
+                        <span
+                          className={`font-semibold tabular-nums ${cn.status === 'void' ? 'text-slate-400 line-through' : 'text-slate-900'}`}
+                        >
+                          −{formatCurrency(cn.total_amount || 0)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
           </div>
         </div>
       </div>
@@ -733,6 +794,27 @@ export const InvoiceDetailPage: React.FC = () => {
             );
             handlePaymentRecorded();
           }}
+        />
+      )}
+
+      {/* Credit Note Modal */}
+      {showCreditNoteModal && invoice && (
+        <CreditNoteModal
+          isOpen={showCreditNoteModal}
+          onClose={() => setShowCreditNoteModal(false)}
+          invoice={{
+            id: invoice.id!,
+            invoice_number: invoice.invoice_number,
+            total_amount: invoice.total_amount,
+            amount_paid: invoice.amount_paid,
+            balance_due: invoice.balance_due,
+            tax_amount: invoice.tax_amount,
+            currency: invoice.currency,
+            case_id: invoice.case_id,
+            customer_id: invoice.customer_id,
+            company_id: invoice.company_id,
+          }}
+          onSaved={handleCreditNoteSaved}
         />
       )}
 

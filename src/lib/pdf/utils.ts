@@ -35,9 +35,17 @@ export function formatCurrency(
 
 export function formatCapacity(capacity: string | null | undefined): string {
   if (!capacity) return '-';
-  const num = parseFloat(capacity);
-  if (isNaN(num)) return capacity;
+  const trimmed = capacity.trim();
+  if (!trimmed) return '-';
+  // Capacity comes from catalog_device_capacities.name — a label that already
+  // carries a unit (e.g. "2TB", "500 GB"). Return it as-is. parseFloat would
+  // strip the unit ("2TB" -> 2) and the value would be wrongly re-labelled
+  // "2 GB" on the receipt/checkout PDFs.
+  if (/[a-zA-Z]/.test(trimmed)) return trimmed;
 
+  // Legacy fallback: a bare number is interpreted as a GB count.
+  const num = parseFloat(trimmed);
+  if (isNaN(num)) return trimmed;
   if (num >= 1000) {
     return `${(num / 1000).toFixed(1)} TB`;
   }
