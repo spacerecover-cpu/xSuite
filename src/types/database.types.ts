@@ -4229,6 +4229,254 @@ export type Database = {
           },
         ]
       }
+      credit_note_allocations: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          credit_note_id: string
+          deleted_at: string | null
+          id: string
+          invoice_id: string
+          tenant_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          credit_note_id: string
+          deleted_at?: string | null
+          id?: string
+          invoice_id: string
+          tenant_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          credit_note_id?: string
+          deleted_at?: string | null
+          id?: string
+          invoice_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_note_allocations_credit_note_id_fkey"
+            columns: ["credit_note_id"]
+            isOneToOne: false
+            referencedRelation: "credit_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_note_allocations_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_note_allocations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_note_items: {
+        Row: {
+          created_at: string
+          credit_note_id: string
+          deleted_at: string | null
+          description: string
+          discount: number
+          id: string
+          quantity: number
+          sort_order: number
+          tax_amount: number
+          tax_rate: number
+          tenant_id: string
+          total: number
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          credit_note_id: string
+          deleted_at?: string | null
+          description?: string
+          discount?: number
+          id?: string
+          quantity?: number
+          sort_order?: number
+          tax_amount?: number
+          tax_rate?: number
+          tenant_id: string
+          total?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          credit_note_id?: string
+          deleted_at?: string | null
+          description?: string
+          discount?: number
+          id?: string
+          quantity?: number
+          sort_order?: number
+          tax_amount?: number
+          tax_rate?: number
+          tenant_id?: string
+          total?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_note_items_credit_note_id_fkey"
+            columns: ["credit_note_id"]
+            isOneToOne: false
+            referencedRelation: "credit_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_note_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_notes: {
+        Row: {
+          applied_amount: number
+          approved_at: string | null
+          approved_by: string | null
+          case_id: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          credit_note_date: string
+          credit_note_number: string
+          credit_type: string
+          currency: string
+          customer_id: string | null
+          deleted_at: string | null
+          exchange_rate: number
+          id: string
+          invoice_id: string | null
+          rate_source: string
+          reason_code: string | null
+          reason_notes: string | null
+          refunded_amount: number
+          status: string
+          subtotal: number
+          subtotal_base: number
+          tax_amount: number
+          tax_amount_base: number
+          tax_rate: number
+          tenant_id: string
+          total_amount: number
+          total_amount_base: number
+          updated_at: string
+          updated_by: string | null
+          voided_at: string | null
+        }
+        Insert: {
+          applied_amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          case_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          credit_note_date?: string
+          credit_note_number: string
+          credit_type?: string
+          currency?: string
+          customer_id?: string | null
+          deleted_at?: string | null
+          exchange_rate?: number
+          id?: string
+          invoice_id?: string | null
+          rate_source?: string
+          reason_code?: string | null
+          reason_notes?: string | null
+          refunded_amount?: number
+          status?: string
+          subtotal?: number
+          subtotal_base?: number
+          tax_amount?: number
+          tax_amount_base?: number
+          tax_rate?: number
+          tenant_id: string
+          total_amount?: number
+          total_amount_base?: number
+          updated_at?: string
+          updated_by?: string | null
+          voided_at?: string | null
+        }
+        Update: {
+          applied_amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          case_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          credit_note_date?: string
+          credit_note_number?: string
+          credit_type?: string
+          currency?: string
+          customer_id?: string | null
+          deleted_at?: string | null
+          exchange_rate?: number
+          id?: string
+          invoice_id?: string | null
+          rate_source?: string
+          reason_code?: string | null
+          reason_notes?: string | null
+          refunded_amount?: number
+          status?: string
+          subtotal?: number
+          subtotal_base?: number
+          tax_amount?: number
+          tax_amount_base?: number
+          tax_rate?: number
+          tenant_id?: string
+          total_amount?: number
+          total_amount_base?: number
+          updated_at?: string
+          updated_by?: string | null
+          voided_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_notes_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_notes_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_notes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_communications: {
         Row: {
           content: string | null
@@ -6970,6 +7218,8 @@ export type Database = {
           converted_to_invoice_id: string | null
           created_at: string
           created_by: string | null
+          credited_amount: number
+          credited_amount_base: number
           currency: string | null
           customer_id: string | null
           deleted_at: string | null
@@ -7019,6 +7269,8 @@ export type Database = {
           converted_to_invoice_id?: string | null
           created_at?: string
           created_by?: string | null
+          credited_amount?: number
+          credited_amount_base?: number
           currency?: string | null
           customer_id?: string | null
           deleted_at?: string | null
@@ -7068,6 +7320,8 @@ export type Database = {
           converted_to_invoice_id?: string | null
           created_at?: string
           created_by?: string | null
+          credited_amount?: number
+          credited_amount_base?: number
           currency?: string | null
           customer_id?: string | null
           deleted_at?: string | null
@@ -15429,6 +15683,49 @@ export type Database = {
         Args: { p_customer_id: string }
         Returns: undefined
       }
+      apply_credit_note: {
+        Args: { p_allocations: Json; p_credit_note_id: string }
+        Returns: {
+          applied_amount: number
+          approved_at: string | null
+          approved_by: string | null
+          case_id: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          credit_note_date: string
+          credit_note_number: string
+          credit_type: string
+          currency: string
+          customer_id: string | null
+          deleted_at: string | null
+          exchange_rate: number
+          id: string
+          invoice_id: string | null
+          rate_source: string
+          reason_code: string | null
+          reason_notes: string | null
+          refunded_amount: number
+          status: string
+          subtotal: number
+          subtotal_base: number
+          tax_amount: number
+          tax_amount_base: number
+          tax_rate: number
+          tenant_id: string
+          total_amount: number
+          total_amount_base: number
+          updated_at: string
+          updated_by: string | null
+          voided_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "credit_notes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       approve_quote: { Args: { p_quote_id: string }; Returns: undefined }
       assign_inventory_to_case: {
         Args: { p_case_id: string; p_item_id: string; p_notes?: string }
@@ -15659,6 +15956,49 @@ export type Database = {
       is_staff_user: { Args: never; Returns: boolean }
       is_tenant_admin: { Args: never; Returns: boolean }
       is_tenant_owner: { Args: never; Returns: boolean }
+      issue_credit_note: {
+        Args: { p_cn: Json; p_items: Json }
+        Returns: {
+          applied_amount: number
+          approved_at: string | null
+          approved_by: string | null
+          case_id: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          credit_note_date: string
+          credit_note_number: string
+          credit_type: string
+          currency: string
+          customer_id: string | null
+          deleted_at: string | null
+          exchange_rate: number
+          id: string
+          invoice_id: string | null
+          rate_source: string
+          reason_code: string | null
+          reason_notes: string | null
+          refunded_amount: number
+          status: string
+          subtotal: number
+          subtotal_base: number
+          tax_amount: number
+          tax_amount_base: number
+          tax_rate: number
+          tenant_id: string
+          total_amount: number
+          total_amount_base: number
+          updated_at: string
+          updated_by: string | null
+          voided_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "credit_notes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       log_audit_trail:
         | {
             Args: {
@@ -16141,6 +16481,49 @@ export type Database = {
           p_scope: string
         }
         Returns: undefined
+      }
+      void_credit_note: {
+        Args: { p_credit_note_id: string; p_reason: string }
+        Returns: {
+          applied_amount: number
+          approved_at: string | null
+          approved_by: string | null
+          case_id: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          credit_note_date: string
+          credit_note_number: string
+          credit_type: string
+          currency: string
+          customer_id: string | null
+          deleted_at: string | null
+          exchange_rate: number
+          id: string
+          invoice_id: string | null
+          rate_source: string
+          reason_code: string | null
+          reason_notes: string | null
+          refunded_amount: number
+          status: string
+          subtotal: number
+          subtotal_base: number
+          tax_amount: number
+          tax_amount_base: number
+          tax_rate: number
+          tenant_id: string
+          total_amount: number
+          total_amount_base: number
+          updated_at: string
+          updated_by: string | null
+          voided_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "credit_notes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       void_payment: {
         Args: { p_payment_id: string }
