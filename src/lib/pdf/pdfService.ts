@@ -13,8 +13,59 @@ import { buildChainOfCustodyDocument } from './documents/ChainOfCustodyDocument'
 import { loadImageAsBase64 } from './utils';
 import { logPDFGeneration } from './loggingService';
 import { withTimeout, createTranslationContext } from './translationContext';
-import type { DocumentType } from './types';
+import type { DocumentType, InvoiceDocumentData, TranslationContext } from './types';
 import { type LanguageCode } from '../documentTranslations';
+import type { TDocumentDefinitions } from 'pdfmake/interfaces';
+import { isPdfEngineEnabled } from './engine/featureFlag';
+import { renderTemplate } from './engine/renderTemplate';
+import { toEngineData } from './engine/adapters/invoiceAdapter';
+import {
+  BUILT_IN_TEMPLATE_CONFIGS,
+  resolveTemplateConfig,
+  type DocumentTemplateConfig,
+  type TemplateConfigOverride,
+} from './templateConfig';
+import { getDeployedVersionByType, readConfig } from '../documentTemplateService';
+
+/**
+ * Build the invoice pdfmake doc-definition via the NEW config-driven engine.
+ *
+ * Flag-guarded: this is only reached when `isPdfEngineEnabled('invoice')` is
+ * true. It resolves the tenant's deployed invoice template (if any) as the
+ * doc-type cascade layer over the built-in 'invoice' default, normalizes the
+ * invoice data through the adapter, and assembles via `renderTemplate`. With no
+ * tenant template seeded it falls back to the built-in config, so the path
+ * works without any DB seeding.
+ */
+async function buildInvoiceDocumentViaEngine(
+  data: InvoiceDocumentData,
+  ctx: TranslationContext,
+  logoBase64: string | null,
+  qrCodeBase64: string | null,
+): Promise<TDocumentDefinitions> {
+  // Doc-type override layer: the tenant's deployed invoice template config, if
+  // one exists. Resolution failures must never break PDF generation — fall back
+  // to the built-in default.
+  let docTypeOverride: TemplateConfigOverride | undefined;
+  try {
+    const deployed = await getDeployedVersionByType('invoice');
+    if (deployed) {
+      docTypeOverride = readConfig(deployed.config);
+    }
+  } catch (err) {
+    console.error('[PDF Service] Invoice engine: template resolution failed, using built-in default:', err);
+  }
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+    BUILT_IN_TEMPLATE_CONFIGS.invoice,
+    /* theme */ undefined,
+    /* docType */ docTypeOverride,
+    /* instance */ undefined,
+  );
+
+  const engineData = toEngineData(data, resolvedConfig);
+  return renderTemplate(resolvedConfig, engineData, ctx, logoBase64, qrCodeBase64);
+}
 
 const PDF_GENERATION_TIMEOUT = 45000; // 45 seconds
 
@@ -435,7 +486,9 @@ export async function generateInvoice(invoiceId: string, download: boolean = tru
 
     const qrCodeCaption = data.companySettings.branding?.qr_code_invoice_caption || 'Scan to pay this invoice';
 
-    const docDefinition = buildInvoiceDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+    const docDefinition = isPdfEngineEnabled('invoice')
+      ? await buildInvoiceDocumentViaEngine(data, ctx, logoBase64, qrCodeBase64)
+      : buildInvoiceDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
 
     const invoiceType = data.invoiceData.invoice_type === 'proforma' ? 'Proforma' : 'Tax';
     const filename = `${invoiceType}_Invoice_${data.invoiceData.invoice_number}_${new Date().toISOString().split('T')[0]}.pdf`;
@@ -1028,7 +1081,9 @@ export async function generateInvoiceAsBlob(invoiceId: string): Promise<PDFBlobR
 
     const qrCodeCaption = data.companySettings.branding?.qr_code_invoice_caption || 'Scan to pay this invoice';
 
-    const docDefinition = buildInvoiceDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+    const docDefinition = isPdfEngineEnabled('invoice')
+      ? await buildInvoiceDocumentViaEngine(data, ctx, logoBase64, qrCodeBase64)
+      : buildInvoiceDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
     const invoiceType = data.invoiceData.invoice_type === 'proforma' ? 'Proforma' : 'Tax';
     const filename = `${invoiceType}_Invoice_${data.invoiceData.invoice_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 

@@ -110,6 +110,8 @@ export const SettingsDashboard: React.FC = () => {
       navigate('/settings/general-settings');
     } else if (categoryId === 'templates') {
       navigate('/templates');
+    } else if (categoryId === 'documents') {
+      navigate('/settings/documents');
     } else if (categoryId === 'report-sections') {
       navigate('/settings/report-sections');
     } else if (categoryId === 'localization') {

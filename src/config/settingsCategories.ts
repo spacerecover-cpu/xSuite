@@ -15,6 +15,7 @@ import {
   Coins,
   SlidersHorizontal,
   Columns3,
+  FileStack,
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 
@@ -191,6 +192,16 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     tables: [],
     actionLabel: 'Manage Categories',
     description: 'Email templates, document templates, and print layouts',
+  },
+  {
+    id: 'documents',
+    title: 'Documents',
+    icon: FileStack,
+    backgroundColor: '#0369a1',
+    borderColor: '#0369a1',
+    tables: [],
+    actionLabel: 'Customize Documents',
+    description: 'Customize how invoices, quotes, and receipts look when printed or emailed.',
   },
   {
     id: 'report-sections',

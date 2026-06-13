@@ -23,6 +23,7 @@ import {
   Settings,
   UserCog,
   Shield,
+  FileStack,
   HardDrive,
   LogOut,
   ChevronLeft,
@@ -480,6 +481,12 @@ export const Sidebar: React.FC = () => {
                 to="/settings"
                 icon={Settings}
                 label="Settings"
+                isCollapsed={isCollapsed}
+              />
+              <ProtectedSidebarNavItem
+                to="/settings/documents"
+                icon={FileStack}
+                label="Documents"
                 isCollapsed={isCollapsed}
               />
               <ProtectedSidebarNavItem

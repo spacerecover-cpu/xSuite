@@ -28,6 +28,8 @@ import { resolveTenantId } from './supabaseClient';
 import { logger } from './logger';
 import type { Database, Json } from '../types/database.types';
 import type { TemplateConfigOverride } from './pdf/templateConfig';
+import { BUILT_IN_TEMPLATE_CONFIGS } from './pdf/templateConfig';
+import { getOrCreateCompanySettings } from './companySettingsService';
 
 // ---------------------------------------------------------------------------
 // Row / Insert / Update aliases (generated types are the source of truth)
@@ -456,4 +458,91 @@ export async function softDeleteVersion(id: string): Promise<void> {
     logger.error('Error soft-deleting template version:', error);
     throw error;
   }
+}
+
+// ===========================================================================
+// Doc-type resolution helpers (engine entry points)
+// ===========================================================================
+
+/**
+ * Resolve the deployed version for a tenant's default template of a given
+ * `document_type`, or `null` when the tenant has no template / no deployed
+ * version for that type yet (callers then fall back to the built-in config).
+ *
+ * This is the single read the PDF engine needs to pull a tenant's customized
+ * doc-type config: template-by-type → its deployed version. RLS scopes both
+ * reads to the caller's tenant.
+ */
+export async function getDeployedVersionByType(
+  documentType: string,
+): Promise<DocumentTemplateVersion | null> {
+  const template = await getDocumentTemplateByType(documentType);
+  if (!template) return null;
+  return getDeployedVersion(template.id);
+}
+
+/**
+ * Idempotently ensure the tenant has a complete, deployable invoice template:
+ *   1. a `branding_themes` row (seeded from `company_settings.branding`:
+ *      logo_url, brand_tagline → footer_text, accent_color),
+ *   2. a `document_templates_pdf` row for `document_type = 'invoice'`
+ *      (`is_default = true`, `config` = the built-in invoice config), and
+ *   3. a deployed `document_template_versions` row (version 1, `is_deployed`).
+ *
+ * Safe to call repeatedly: existing rows are reused (no duplicates), and an
+ * already-deployed version short-circuits version creation. Uses the existing
+ * RLS-respecting CRUD only — no service_role, no RPC. The trigger remains the
+ * authoritative `tenant_id` stamp; `tenantId` is passed through for the
+ * client-side insert path.
+ *
+ * @returns the (created or pre-existing) deployed invoice version.
+ */
+export async function getOrCreateDefaultInvoiceTemplate(
+  tenantId: string,
+): Promise<DocumentTemplateVersion> {
+  const builtIn = BUILT_IN_TEMPLATE_CONFIGS.invoice;
+
+  // ---- 1. Branding theme seeded from company settings ----------------------
+  // Reuse the tenant's default theme when present; otherwise seed one from the
+  // existing company branding so the invoice template has a theme to bind to.
+  const themes = await listBrandingThemes();
+  let theme: BrandingTheme | undefined = themes.find((t) => t.is_default) ?? themes[0];
+  if (!theme) {
+    const settings = await getOrCreateCompanySettings();
+    const branding = settings.branding ?? {};
+    theme = await createBrandingTheme({
+      tenant_id: tenantId,
+      name: 'Default',
+      is_default: true,
+      ...(branding.logo_url ? { logo_url: branding.logo_url } : {}),
+      ...(branding.brand_tagline ? { footer_text: branding.brand_tagline } : {}),
+      ...(branding.accent_color ? { accent_color: branding.accent_color } : {}),
+    });
+  }
+
+  // ---- 2. document_templates_pdf row (one per tenant + 'invoice') ----------
+  let template = await getDocumentTemplateByType('invoice');
+  if (!template) {
+    template = await upsertDocumentTemplate('invoice', {
+      tenant_id: tenantId,
+      name: 'Invoice',
+      is_default: true,
+      branding_theme_id: theme.id,
+      // Persist the full built-in invoice config as the template baseline.
+      config: builtIn as unknown as Json,
+    });
+  }
+
+  // ---- 3. Deployed version 1 -----------------------------------------------
+  const deployed = await getDeployedVersion(template.id);
+  if (deployed) return deployed;
+
+  // No deployed version yet: create version 1 carrying the built-in config and
+  // publish it so the engine has something to read.
+  const version = await createVersion(
+    template.id,
+    builtIn as unknown as TemplateConfigPayload,
+    { changeNote: 'Initial default invoice template', tenant_id: tenantId },
+  );
+  return publishVersion(template.id, version.id);
 }
