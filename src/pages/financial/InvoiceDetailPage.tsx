@@ -18,11 +18,11 @@ import { usePDFDownload } from '../../hooks/usePDFDownload';
 import { useProfileNames } from '../../hooks/useProfileNames';
 import { AuditInfo } from '../../components/ui/AuditInfo';
 import { useToast } from '../../hooks/useToast';
-import { FileText, ArrowLeft, CreditCard as Edit, DollarSign, AlertCircle, RefreshCw, CheckCircle, ArrowRight, Lock, Receipt, Send, FileMinus } from 'lucide-react';
+import { FileText, ArrowLeft, CreditCard as Edit, DollarSign, AlertCircle, RefreshCw, CheckCircle, ArrowRight, Lock, Receipt, Send, FileMinus, Download } from 'lucide-react';
 import { RecordReceiptModal } from '../../components/banking/RecordReceiptModal';
 import { InvoiceFormModal } from '../../components/cases/InvoiceFormModal';
 import { CreditNoteModal } from '../../components/financial/CreditNoteModal';
-import { getCreditNotesByInvoice } from '../../lib/creditNoteService';
+import { getCreditNotesByInvoice, generateCreditNotePDF } from '../../lib/creditNoteService';
 import { creditNoteKeys } from '../../lib/queryKeys';
 import { logger } from '../../lib/logger';
 import { supabase } from '../../lib/supabaseClient';
@@ -71,6 +71,7 @@ export const InvoiceDetailPage: React.FC = () => {
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showCreditNoteModal, setShowCreditNoteModal] = useState(false);
+  const [downloadingCnId, setDownloadingCnId] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<InvoiceWithDetails | null>(null);
   const [showConversionHistoryModal, setShowConversionHistoryModal] = useState(false);
@@ -174,6 +175,19 @@ export const InvoiceDetailPage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['invoices'] });
     queryClient.invalidateQueries({ queryKey: creditNoteKeys.byInvoice(id!) });
     setShowCreditNoteModal(false);
+  };
+
+  const handleDownloadCreditNote = async (creditNoteId: string) => {
+    setDownloadingCnId(creditNoteId);
+    try {
+      const res = await generateCreditNotePDF(creditNoteId, true);
+      if (!res.success) toast.error(res.error || 'Failed to generate credit note PDF');
+    } catch (err) {
+      logger.error('Error generating credit note PDF:', err);
+      toast.error('Failed to generate credit note PDF');
+    } finally {
+      setDownloadingCnId(null);
+    }
   };
 
   const handleOpenEdit = async () => {
@@ -748,6 +762,20 @@ export const InvoiceDetailPage: React.FC = () => {
                         >
                           −{formatCurrency(cn.total_amount || 0)}
                         </span>
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadCreditNote(cn.id)}
+                          disabled={downloadingCnId === cn.id}
+                          className="p-1 text-slate-400 hover:text-primary disabled:opacity-50"
+                          title="Download credit note PDF"
+                          aria-label="Download credit note PDF"
+                        >
+                          {downloadingCnId === cn.id ? (
+                            <span className="block w-4 h-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          ) : (
+                            <Download className="w-4 h-4" />
+                          )}
+                        </button>
                       </div>
                     </div>
                   ))}
