@@ -1,11 +1,12 @@
 import { initializePDFFonts, createPdfWithFonts } from './fonts';
-import { fetchReceiptData, fetchQuoteData, fetchInvoiceData, fetchPaymentReceiptData, fetchPayslipData, fetchChainOfCustodyData } from './dataFetcher';
+import { fetchReceiptData, fetchQuoteData, fetchInvoiceData, fetchCreditNoteData, fetchPaymentReceiptData, fetchPayslipData, fetchChainOfCustodyData } from './dataFetcher';
 import { buildOfficeReceiptDocument } from './documents/OfficeReceiptDocument';
 import { buildCustomerCopyDocument } from './documents/CustomerCopyDocument';
 import { buildCheckoutFormDocument } from './documents/CheckoutFormDocument';
 import { buildCaseLabelDocument } from './documents/CaseLabelDocument';
 import { buildQuoteDocument } from './documents/QuoteDocument';
 import { buildInvoiceDocument } from './documents/InvoiceDocument';
+import { buildCreditNoteDocument } from './documents/CreditNoteDocument';
 import { buildPaymentReceiptDocument } from './documents/PaymentReceiptDocument';
 import { buildPayslipDocument } from './documents/PayslipDocument';
 import { buildChainOfCustodyDocument } from './documents/ChainOfCustodyDocument';
@@ -482,6 +483,74 @@ export async function generateInvoice(invoiceId: string, download: boolean = tru
       error: errorMessage,
       errorCode,
     };
+  }
+}
+
+export async function generateCreditNote(creditNoteId: string, download: boolean = true): Promise<PDFGenerationResult> {
+  const startTime = Date.now();
+  let languageCode: LanguageCode | null = null;
+  let mode: 'english_only' | 'bilingual' = 'english_only';
+  let fontSource: 'local' | 'cdn' | 'fallback' = 'local';
+
+  try {
+    const data = await withTimeout(fetchCreditNoteData(creditNoteId), 10000, 'Failed to fetch credit note data');
+
+    const languageSettings = data.companySettings.localization?.document_language_settings;
+    languageCode = (languageSettings?.secondary_language as LanguageCode) || null;
+    mode = languageSettings?.mode || 'english_only';
+
+    const fontsLoaded = await withTimeout(initializePDFFonts(languageCode), 15000, 'Font initialization timeout');
+    if (!fontsLoaded && languageCode) {
+      languageCode = null;
+      mode = 'english_only';
+      fontSource = 'fallback';
+    }
+
+    const ctx = createTranslationContext(mode, languageCode);
+
+    const logoBase64 = data.companySettings.branding?.logo_url
+      ? await withTimeout(loadImageAsBase64(data.companySettings.branding.logo_url), 5000, 'Logo loading timeout')
+      : null;
+
+    const docDefinition = buildCreditNoteDocument(data, ctx, logoBase64);
+    const filename = `Credit_Note_${data.creditNoteData.credit_note_number || 'draft'}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    if (download) {
+      createPdfWithFonts(docDefinition).download(filename);
+    } else {
+      createPdfWithFonts(docDefinition).open();
+    }
+
+    await logPDFGeneration({
+      caseId: '',
+      documentType: 'credit_note',
+      languageCode,
+      mode,
+      success: true,
+      durationMs: Date.now() - startTime,
+      fontSource,
+    });
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to generate credit note';
+    const errorCode = error instanceof Error && error.message.includes('timeout') ? 'TIMEOUT' : 'GENERATION_FAILED';
+
+    console.error('[PDF Service] Error generating credit note:', error);
+
+    await logPDFGeneration({
+      caseId: '',
+      documentType: 'credit_note',
+      languageCode,
+      mode,
+      success: false,
+      durationMs: Date.now() - startTime,
+      errorMessage,
+      errorCode,
+      fontSource,
+    });
+
+    return { success: false, error: errorMessage, errorCode };
   }
 }
 

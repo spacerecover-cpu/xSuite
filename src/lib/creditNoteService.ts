@@ -90,3 +90,9 @@ export async function getCreditNotesByCase(caseId: string): Promise<CreditNote[]
   if (error) throw new Error(error.message);
   return (data ?? []) as CreditNote[];
 }
+
+// Lazy-import pdfService so pdfmake stays out of any bundle that only reads credit notes.
+export async function generateCreditNotePDF(creditNoteId: string, download = true) {
+  const { generateCreditNote } = await import('./pdf/pdfService');
+  return generateCreditNote(creditNoteId, download);
+}
