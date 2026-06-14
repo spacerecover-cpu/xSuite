@@ -13,7 +13,7 @@ import { PDF_COLORS } from '../../styles';
 import { buildCompanyAddress } from '../../utils';
 import type { EngineContext, EngineDocData, SectionRenderer } from '../types';
 import { resolveLabel } from '../labels';
-import { resolveAccentColors } from '../branding';
+import { resolveColors } from '../branding';
 
 export const renderHeader: SectionRenderer = (
   engine: EngineContext,
@@ -78,10 +78,12 @@ export const renderHeader: SectionRenderer = (
   }
 
   // Brand divider rule under the company block. NEUTRAL by default: the rule
-  // color is `PDF_COLORS.primary` unless the tenant has opted into an accent hex
-  // (`config.branding.accent` is an explicit hex, not `'inherit'`), in which case
-  // it adopts that accent — one of the two bounded accent surfaces (M7).
-  const ruleColor = resolveAccentColors(config.branding).rule;
+  // color is `PDF_COLORS.primary` unless the tenant has opted into an accent —
+  // either the legacy `branding.accent` hex or the premium `colors.accent`
+  // (which supersedes it). `resolveColors` applies that precedence; with no
+  // opt-in it returns the neutral primary, so the default is unchanged.
+  const colors = resolveColors(config);
+  const ruleColor = colors.accent;
   out.push({
     canvas: [
       { type: 'line', x1: 0, y1: 0, x2: 525, y2: 0, lineWidth: 0.5, lineColor: ruleColor },
@@ -103,7 +105,10 @@ export const renderHeader: SectionRenderer = (
     text: resolveLabel(titleLabel, config.language),
     fontSize: 16,
     bold: true,
-    color: PDF_COLORS.primaryDark,
+    // The title adopts the accent only when the premium `colors` group is set;
+    // the legacy accent (branding.accent alone) stays bounded to rule + section
+    // titles, so M7 behavior is unchanged.
+    color: config.colors ? colors.accent : PDF_COLORS.primaryDark,
     alignment: 'center',
     margin: [0, 0, 0, 6],
   });
