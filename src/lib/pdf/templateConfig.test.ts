@@ -295,3 +295,19 @@ describe('resolveTemplateConfig — premium control groups', () => {
     expect(JSON.stringify(base)).toBe(before);
   });
 });
+
+describe('translationPolicy cascade', () => {
+  const base = BUILT_IN_TEMPLATE_CONFIGS.invoice;
+  it('is absent by default (→ all behavior)', () => {
+    expect(resolveTemplateConfig(base).translationPolicy).toBeUndefined();
+  });
+  it('takes an override and deep-merges groups', () => {
+    const a = resolveTemplateConfig(base, { translationPolicy: { mode: 'custom', groups: { parties: false } } });
+    expect(a.translationPolicy).toEqual({ mode: 'custom', groups: { parties: false } });
+    const b = resolveTemplateConfig(base,
+      { translationPolicy: { mode: 'custom', groups: { parties: false } } },
+      { translationPolicy: { groups: { meta: false } } },
+    );
+    expect(b.translationPolicy).toEqual({ mode: 'custom', groups: { parties: false, meta: false } });
+  });
+});

@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
 import { Input } from '../../../ui/Input';
 import { Select } from '../../../ui/Select';
 import { FieldGroup, ToggleRow } from '../controls';
-import type { LanguageMode, SectionConfig } from '../../../../lib/pdf/templateConfig';
+import type { LanguageMode, SectionConfig, TranslationPolicyConfig } from '../../../../lib/pdf/templateConfig';
 import type { StudioApi } from '../TemplateStudio';
 
 /** Sections whose content depends on record data — a hint avoids "I toggled it but nothing showed". */
@@ -80,6 +80,41 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
             { value: 'bilingual_sidebyside', label: 'Bilingual — side by side (English | Arabic)' },
           ]}
         />
+      </FieldGroup>
+
+      <FieldGroup title="Translation" description="Which labels render bilingually. Only affects bilingual documents; data values always stay as entered.">
+        {(api.resolved.language.mode === 'en' || api.resolved.language.mode === 'ar') && (
+          <p className="text-xs text-slate-500">Only applies to bilingual documents — set a bilingual document language above to use this.</p>
+        )}
+        <Select
+          label="Translate"
+          value={api.resolved.translationPolicy?.mode ?? 'all'}
+          onChange={(e) => api.setTranslationPolicy({ mode: e.target.value as NonNullable<TranslationPolicyConfig['mode']> })}
+          options={[
+            { value: 'all', label: 'All labels (customer/employee field labels too)' },
+            { value: 'system_only', label: 'System labels only (keep customer/employee field labels single-language)' },
+            { value: 'custom', label: 'Custom — choose per block' },
+          ]}
+        />
+        {api.resolved.translationPolicy?.mode === 'custom' && (
+          <div className="space-y-2">
+            {([
+              ['parties', 'Customer / party details'],
+              ['meta', 'Document details'],
+              ['caseInfo', 'Case information'],
+              ['collector', 'Collector'],
+              ['payslip', 'Payslip'],
+              ['diagnostics', 'Diagnostics'],
+            ] as const).map(([group, label]) => (
+              <ToggleRow
+                key={group}
+                label={`Translate ${label} labels`}
+                checked={api.resolved.translationPolicy?.groups?.[group] ?? true}
+                onChange={(v) => api.setTranslationGroup(group, v)}
+              />
+            ))}
+          </div>
+        )}
       </FieldGroup>
 
       {hasPartiesAndDetails && (

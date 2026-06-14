@@ -284,6 +284,26 @@ export interface LayoutConfig {
   partiesMetaSideBySide?: boolean;
 }
 
+export type TranslationPolicyMode = 'all' | 'system_only' | 'custom';
+
+/** Per data-block field-label bilingual toggle (used only when mode === 'custom'). */
+export interface TranslationPolicyGroups {
+  parties?: boolean;
+  meta?: boolean;
+  caseInfo?: boolean;
+  collector?: boolean;
+  payslip?: boolean;
+  diagnostics?: boolean;
+}
+
+/** Controls which FIELD-ROW labels render bilingually (no effect on data values). */
+export interface TranslationPolicyConfig {
+  /** Default 'all' (every label bilingual when the document is bilingual). */
+  mode?: TranslationPolicyMode;
+  /** Per-group field-label toggle for mode === 'custom' (default true = bilingual). */
+  groups?: TranslationPolicyGroups;
+}
+
 /** The resolved, render-ready template configuration for one document. */
 export interface DocumentTemplateConfig {
   paper: PaperConfig;
@@ -305,6 +325,7 @@ export interface DocumentTemplateConfig {
   pageFitting?: PageFittingConfig;
   watermark?: WatermarkConfig;
   layout?: LayoutConfig;
+  translationPolicy?: TranslationPolicyConfig;
 }
 
 /**
@@ -355,6 +376,7 @@ export interface TemplateConfigOverride {
   pageFitting?: PageFittingConfig;
   watermark?: WatermarkConfig;
   layout?: LayoutConfig;
+  translationPolicy?: TranslationPolicyConfig;
 }
 
 /** Partial section override; `key` identifies the target section. */
@@ -853,6 +875,17 @@ function mergeOrganization(
   };
 }
 
+/** Merge translation policy, deep-merging the `groups` toggles by key. */
+function mergeTranslationPolicy(
+  base: TranslationPolicyConfig | undefined,
+  override: TranslationPolicyConfig | undefined,
+): TranslationPolicyConfig | undefined {
+  if (!base) return override;
+  if (!override) return base;
+  const groups = mergeGroup(base.groups, override.groups);
+  return { ...base, ...override, ...(groups ? { groups } : {}) };
+}
+
 function applyOverride(
   base: DocumentTemplateConfig,
   override: TemplateConfigOverride | undefined,
@@ -878,6 +911,7 @@ function applyOverride(
     pageFitting: mergeGroup(base.pageFitting, override.pageFitting),
     watermark: mergeGroup(base.watermark, override.watermark),
     layout: mergeGroup(base.layout, override.layout),
+    translationPolicy: mergeTranslationPolicy(base.translationPolicy, override.translationPolicy),
   };
 }
 

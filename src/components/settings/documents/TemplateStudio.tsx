@@ -33,6 +33,7 @@ import {
   type TaxBarConfig,
   type TemplateConfigOverride,
   type TemplateDocumentType,
+  type TranslationPolicyConfig,
   type TypographyConfig,
   type TypographyStyleKey,
   type WatermarkConfig,
@@ -70,6 +71,8 @@ export interface StudioApi {
   setTaxBar: (patch: Partial<TaxBarConfig>) => void;
   setTable: (patch: Partial<TableConfig>) => void;
   setLayout: (patch: Partial<LayoutConfig>) => void;
+  setTranslationPolicy: (patch: Partial<TranslationPolicyConfig>) => void;
+  setTranslationGroup: (group: keyof NonNullable<TranslationPolicyConfig['groups']>, value: boolean) => void;
   setPageFitting: (patch: Partial<PageFittingConfig>) => void;
   patchSection: (key: string, patch: { visible?: boolean; order?: number }) => void;
   patchColumn: (key: string, patch: { visible?: boolean; labelEn?: string; labelAr?: string }) => void;
@@ -265,6 +268,15 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       setTaxBar: (patch) => mergeGroup('taxBar', patch),
       setTable: (patch) => mergeGroup('table', patch),
       setLayout: (patch) => mergeGroup('layout', patch),
+      setTranslationPolicy: (patch) => mergeGroup('translationPolicy', patch),
+      setTranslationGroup: (group, value) =>
+        setOverride((prev) => ({
+          ...prev,
+          translationPolicy: {
+            ...prev.translationPolicy,
+            groups: { ...prev.translationPolicy?.groups, [group]: value },
+          },
+        })),
       setPageFitting: (patch) => mergeGroup('pageFitting', patch),
       patchSection: (key, patch) =>
         setOverride((prev) => {

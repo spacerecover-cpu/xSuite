@@ -7,7 +7,7 @@
  * `LabelText.ar` instead of passing `null` into the bilingual style helpers.
  */
 
-import type { LanguageConfig } from '../templateConfig';
+import type { LanguageConfig, TranslationPolicyConfig } from '../templateConfig';
 import type { LabelText } from './types';
 
 /** True when the document shows both languages (stacked or side-by-side). */
@@ -52,6 +52,33 @@ export function ar(label: LabelText): string | null {
  * helpers, prefer passing `en()`/`ar()` separately so the helper can right-align
  * the Arabic column.
  */
+export type TranslationGroup =
+  | 'parties' | 'meta' | 'caseInfo' | 'collector' | 'payslip' | 'diagnostics';
+
+/** Whether a data block's FIELD-ROW labels render bilingually under the policy. */
+export function fieldLabelsBilingual(
+  policy: TranslationPolicyConfig | undefined,
+  group: TranslationGroup,
+): boolean {
+  if (!policy || !policy.mode || policy.mode === 'all') return true;
+  if (policy.mode === 'system_only') return false;
+  return policy.groups?.[group] ?? true; // custom
+}
+
+/**
+ * The LanguageConfig a data block should use for its FIELD-ROW labels: the full
+ * (bilingual) config when the group is translated, else a primary-only config so
+ * the field labels render in a single language. Box TITLES keep the full config.
+ */
+export function fieldLabelLanguage(
+  language: LanguageConfig,
+  policy: TranslationPolicyConfig | undefined,
+  group: TranslationGroup,
+): LanguageConfig {
+  if (!isBilingualMode(language) || fieldLabelsBilingual(policy, group)) return language;
+  return { mode: language.primary === 'ar' ? 'ar' : 'en', primary: language.primary };
+}
+
 export function resolveLabel(label: LabelText, language: LanguageConfig): string {
   const english = label.en ?? '';
   const arabic = label.ar ?? null;
