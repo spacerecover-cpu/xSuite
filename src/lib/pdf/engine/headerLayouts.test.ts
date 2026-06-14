@@ -32,7 +32,7 @@ function data(): EngineDocData {
 
 function engine(override?: TemplateConfigOverride): EngineContext {
   const config = resolveTemplateConfig(BUILT_IN_TEMPLATE_CONFIGS.quote, undefined, override);
-  return { config, ctx, logoBase64: 'LOGO', qrCodeBase64: null };
+  return { config, ctx, logo: 'LOGO', qrCodeBase64: null };
 }
 
 function collectText(node: unknown, out: string[]): void {
