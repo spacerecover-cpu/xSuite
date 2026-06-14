@@ -45,10 +45,13 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
     [api.resolved.sections],
   );
 
-  // The side-by-side parties/meta layout only makes sense when the document has
-  // both a customer/party block and a document-details block.
-  const hasPartiesAndMeta = useMemo(
-    () => ordered.some((s) => s.key === 'parties') && ordered.some((s) => s.key === 'meta'),
+  // The side-by-side layout only makes sense when the document has both a
+  // customer/party block and a document-details block — the financial "meta" box
+  // or, on intake/checkout docs, the "case information" box.
+  const hasPartiesAndDetails = useMemo(
+    () =>
+      ordered.some((s) => s.key === 'parties') &&
+      ordered.some((s) => s.key === 'meta' || s.key === 'caseInfo'),
     [ordered],
   );
 
@@ -79,11 +82,11 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
         />
       </FieldGroup>
 
-      {hasPartiesAndMeta && (
+      {hasPartiesAndDetails && (
         <FieldGroup title="Layout" description="How the customer and document-details blocks are arranged.">
           <ToggleRow
             label="Customer & document details side by side"
-            description="Place the customer block and the document-details block in two columns to fill the space; off stacks them full-width."
+            description="Place the customer block and the details block (document details, or case information) in two columns to fill the space; off stacks them full-width."
             checked={api.resolved.layout?.partiesMetaSideBySide ?? false}
             onChange={(v) => api.setLayout({ partiesMetaSideBySide: v })}
           />
