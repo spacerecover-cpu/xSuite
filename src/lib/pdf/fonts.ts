@@ -16,6 +16,21 @@ export const PDF_FONTS: Record<string, { normal: string; bold: string; italics: 
     italics: 'Roboto-Italic.ttf',
     bolditalics: 'Roboto-BoldItalic.ttf',
   },
+  // `Courier` is referenced by hash-value / barcode runs (chain-of-custody hash
+  // table, legacy builder) for a monospace look. This pdfmake build only renders
+  // fonts present in the VFS, and there is no Courier .ttf — so leaving it
+  // undeclared made pdfmake throw "Font 'Courier' is not defined" ASYNC during
+  // rasterization, which never fires the getBlob callback → the preview hangs
+  // forever. Map it to the Roboto faces already in the VFS so those runs render
+  // (slightly less monospace, but legible) instead of hanging. This changes only
+  // rasterization, not any doc-definition structure, so golden snapshots that
+  // record `font: 'Courier'` stay valid.
+  Courier: {
+    normal: 'Roboto-Regular.ttf',
+    bold: 'Roboto-Bold.ttf',
+    italics: 'Roboto-Italic.ttf',
+    bolditalics: 'Roboto-BoldItalic.ttf',
+  },
   Tajawal: {
     normal: 'Tajawal-Regular.ttf',
     bold: 'Tajawal-Bold.ttf',

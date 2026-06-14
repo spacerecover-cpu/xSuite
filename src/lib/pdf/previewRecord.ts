@@ -18,7 +18,11 @@ import { toEngineData as toQuoteEngineData } from './engine/adapters/quoteAdapte
 import { toEngineData as toPaymentReceiptEngineData } from './engine/adapters/paymentReceiptAdapter';
 import { renderTemplate } from './engine/renderTemplate';
 import { createPdfWithFonts } from './fonts';
+import { withTimeout } from './translationContext';
 import { loadImageAsBase64 } from './utils';
+
+/** Hard cap so a stuck pdfmake rasterization surfaces as an error, never an infinite spinner. */
+const PREVIEW_TIMEOUT_MS = 15000;
 import type { EngineDocData } from './engine/types';
 import type { DocumentTemplateConfig, TemplateDocumentType } from './templateConfig';
 import type { TranslationContext } from './types';
@@ -124,11 +128,16 @@ export async function previewDocumentForRecord(
   }
 
   const docDefinition = renderTemplate(config, engineData, PREVIEW_CTX_EN, logo, qr);
-  return new Promise<string>((resolve, reject) => {
+  const render = new Promise<string>((resolve, reject) => {
     try {
-      createPdfWithFonts(docDefinition).getBlob((blob: Blob) => resolve(URL.createObjectURL(blob)));
+      createPdfWithFonts(docDefinition).getBlob(
+        (blob: Blob) => resolve(URL.createObjectURL(blob)),
+        undefined,
+        (err: unknown) => reject(err instanceof Error ? err : new Error('PDF rasterization failed')),
+      );
     } catch (err) {
       reject(err instanceof Error ? err : new Error('Failed to render record preview'));
     }
   });
+  return withTimeout(render, PREVIEW_TIMEOUT_MS, 'Preview render timed out');
 }
