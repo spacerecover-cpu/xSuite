@@ -282,6 +282,19 @@ export async function preloadAllFonts(): Promise<void> {
   if (!loadedFontFamilies.has('Roboto')) {
     await loadAndCacheFonts('roboto', 'Roboto');
   }
+  // The document template studio can preview ANY language (single Arabic or
+  // bilingual), and the engine's doc-definition references the Arabic family
+  // (Tajawal) for those modes. Those font files must be in the VFS too — without
+  // them pdfmake throws "file not found" ASYNC at rasterization, which surfaces as
+  // "Could not render the preview". Load them here so Arabic/bilingual previews
+  // render. Failures are non-fatal (loadAndCacheFonts swallows errors): a missing
+  // Arabic font degrades to the base font, it never hangs the preview.
+  if (!loadedFontFamilies.has('Tajawal')) {
+    await loadAndCacheFonts('tajawal', 'Tajawal');
+  }
+  if (!loadedFontFamilies.has('NotoSansArabic')) {
+    await loadAndCacheFonts('arabic', 'NotoSansArabic');
+  }
   initVFSWithBaseFont();
 }
 

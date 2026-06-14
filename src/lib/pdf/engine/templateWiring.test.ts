@@ -32,18 +32,20 @@ function collectStrings(node: unknown, out: string[]): void {
   Object.values(o).forEach((v) => collectStrings(v, out));
 }
 
-/** Find a columns node whose subtree contains BOTH needles. */
-function findColumnsWithBoth(node: unknown, a: string, b: string): boolean {
+/** Find a `columns` or `table` grouping node whose subtree contains BOTH needles. */
+function findGroupWithBoth(node: unknown, a: string, b: string): boolean {
   if (node == null || typeof node !== 'object') return false;
-  if (Array.isArray(node)) return node.some((c) => findColumnsWithBoth(c, a, b));
+  if (Array.isArray(node)) return node.some((c) => findGroupWithBoth(c, a, b));
   const o = node as Record<string, unknown>;
-  if (Array.isArray(o.columns)) {
-    const strings: string[] = [];
-    collectStrings(o.columns, strings);
-    const joined = strings.join(' ');
-    if (joined.includes(a) && joined.includes(b)) return true;
+  for (const key of ['columns', 'table'] as const) {
+    if (o[key] != null && typeof o[key] === 'object') {
+      const strings: string[] = [];
+      collectStrings(o[key], strings);
+      const joined = strings.join(' ');
+      if (joined.includes(a) && joined.includes(b)) return true;
+    }
   }
-  return Object.values(o).some((v) => findColumnsWithBoth(v, a, b));
+  return Object.values(o).some((v) => findGroupWithBoth(v, a, b));
 }
 
 describe('resolveLabel: bilingual modes are distinct', () => {
@@ -128,13 +130,32 @@ describe('invoice adapter: generic QR payload + signatures', () => {
   });
 });
 
+describe('adapters: missing detail rows are omitted (not printed as "-")', () => {
+  it('omits the Company row when no company is present', () => {
+    const data = invoiceToEngine(sampleInvoiceData(), BUILT_IN_TEMPLATE_CONFIGS.invoice);
+    const rows = data.parties.to?.rows ?? [];
+    expect(rows.map((r) => r.label.en)).not.toContain('Company:');
+    // a present detail still renders
+    expect(rows.map((r) => r.label.en)).toContain('Phone:');
+    // no row carries a "-" placeholder value
+    expect(rows.map((r) => r.value)).not.toContain('-');
+  });
+
+  it('omits the Reference row when client_reference is absent', () => {
+    const sample = sampleInvoiceData();
+    delete (sample.invoiceData as { client_reference?: string }).client_reference;
+    const data = invoiceToEngine(sample, BUILT_IN_TEMPLATE_CONFIGS.invoice);
+    expect((data.parties.to?.rows ?? []).map((r) => r.label.en)).not.toContain('Reference:');
+  });
+});
+
 describe('renderTemplate: parties + meta side by side', () => {
-  it('combines the customer block and document-details block into one columns row (default on for invoices)', () => {
+  it('combines the customer block and document-details block into one equal-height panel (default on for invoices)', () => {
     const config = BUILT_IN_TEMPLATE_CONFIGS.invoice;
     expect(config.layout?.partiesMetaSideBySide).toBe(true);
     const data = invoiceToEngine(sampleInvoiceData(), config);
     const def = renderTemplate(config, data, ctx, null, null);
-    expect(findColumnsWithBoth(def.content, 'Jane Client', 'INV-0042')).toBe(true);
+    expect(findGroupWithBoth(def.content, 'Jane Client', 'INV-0042')).toBe(true);
   });
 
   it('stacks them when the layout flag is off', () => {
@@ -143,7 +164,7 @@ describe('renderTemplate: parties + meta side by side', () => {
     });
     const data = invoiceToEngine(sampleInvoiceData(), config);
     const def = renderTemplate(config, data, ctx, null, null);
-    expect(findColumnsWithBoth(def.content, 'Jane Client', 'INV-0042')).toBe(false);
+    expect(findGroupWithBoth(def.content, 'Jane Client', 'INV-0042')).toBe(false);
     const strings: string[] = [];
     collectStrings(def.content, strings);
     const joined = strings.join(' ');

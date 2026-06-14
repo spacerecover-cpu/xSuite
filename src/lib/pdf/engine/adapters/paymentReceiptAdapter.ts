@@ -19,7 +19,7 @@
 
 import type { PaymentReceiptDocumentData } from '../../types';
 import type { DocumentTemplateConfig } from '../../templateConfig';
-import { formatDate, safeString } from '../../utils';
+import { formatDate } from '../../utils';
 import type {
   BankBlock,
   EngineDocData,
@@ -54,27 +54,33 @@ export function toEngineData(
   // ---- Recipient (customer / company) party --------------------------------
   const customerName = paymentData.customer?.customer_name || 'N/A';
   const companyNameDisplay = paymentData.company?.company_name;
-  const customerEmail = paymentData.customer?.email || 'N/A';
-  const customerPhone =
-    paymentData.customer?.mobile_number || paymentData.customer?.phone_number || 'N/A';
+  const customerEmail = paymentData.customer?.email;
+  const customerPhone = paymentData.customer?.mobile_number || paymentData.customer?.phone_number;
+
+  // Only include a detail row when the value is present — missing details are
+  // omitted rather than printed as a "-" placeholder.
+  const toRows: PartyBlock['rows'] = [];
+  if (companyNameDisplay) toRows.push({ label: { en: 'Company:', ar: 'الشركة:' }, value: companyNameDisplay });
+  if (customerPhone) toRows.push({ label: { en: 'Phone:', ar: 'الهاتف:' }, value: customerPhone });
+  if (customerEmail) toRows.push({ label: { en: 'Email:', ar: 'البريد:' }, value: customerEmail });
 
   const to: PartyBlock = {
     title: { en: 'Customer Information', ar: 'معلومات العميل' },
     name: customerName,
-    rows: [
-      { label: { en: 'Company:', ar: 'الشركة:' }, value: safeString(companyNameDisplay) },
-      { label: { en: 'Phone:', ar: 'الهاتف:' }, value: customerPhone },
-      { label: { en: 'Email:', ar: 'البريد:' }, value: customerEmail },
-    ],
+    rows: toRows,
   };
 
   // ---- Meta (payment details) ----------------------------------------------
   const meta: EngineDocData['meta'] = [
     { label: { en: 'Receipt No:', ar: 'رقم الإيصال:' }, value: paymentData.receipt_number || 'Draft' },
     { label: { en: 'Payment Date:', ar: 'تاريخ الدفع:' }, value: formatDate(paymentData.payment_date, 'dd MMM yyyy') },
-    { label: { en: 'Method:', ar: 'الطريقة:' }, value: safeString(paymentData.payment_method) },
-    { label: { en: 'Reference:', ar: 'المرجع:' }, value: safeString(paymentData.reference_number) },
   ];
+  if (paymentData.payment_method) {
+    meta.push({ label: { en: 'Method:', ar: 'الطريقة:' }, value: paymentData.payment_method });
+  }
+  if (paymentData.reference_number) {
+    meta.push({ label: { en: 'Reference:', ar: 'المرجع:' }, value: paymentData.reference_number });
+  }
   if (paymentData.invoice?.invoice_number) {
     meta.push({ label: { en: 'Invoice No:', ar: 'رقم الفاتورة:' }, value: paymentData.invoice.invoice_number });
   }

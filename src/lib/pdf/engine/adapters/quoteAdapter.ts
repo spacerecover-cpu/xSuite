@@ -83,24 +83,25 @@ export function toEngineData(
   const customerEmail =
     quoteData.customer?.email ||
     quoteData.cases?.contact_email ||
-    quoteData.company?.email ||
-    'N/A';
+    quoteData.company?.email;
   const customerPhone =
     quoteData.customer?.mobile_number ||
     quoteData.customer?.phone_number ||
     quoteData.cases?.contact_phone ||
-    quoteData.company?.phone_number ||
-    'N/A';
+    quoteData.company?.phone_number;
+
+  // Only include a detail row when the value is present — missing details are
+  // omitted rather than printed as a "-" placeholder.
+  const toRows: PartyBlock['rows'] = [];
+  if (companyNameDisplay) toRows.push({ label: { en: 'Company:', ar: 'الشركة:' }, value: companyNameDisplay });
+  if (customerPhone) toRows.push({ label: { en: 'Phone:', ar: 'الهاتف:' }, value: customerPhone });
+  if (customerEmail) toRows.push({ label: { en: 'Email:', ar: 'البريد:' }, value: customerEmail });
+  if (quoteData.client_reference) toRows.push({ label: { en: 'Reference:', ar: 'المرجع:' }, value: quoteData.client_reference });
 
   const to: PartyBlock = {
     title: { en: 'Customer Information', ar: 'معلومات العميل' },
     name: customerName,
-    rows: [
-      { label: { en: 'Company:', ar: 'الشركة:' }, value: safeString(companyNameDisplay) },
-      { label: { en: 'Phone:', ar: 'الهاتف:' }, value: customerPhone },
-      { label: { en: 'Email:', ar: 'البريد:' }, value: customerEmail },
-      { label: { en: 'Reference:', ar: 'المرجع:' }, value: safeString(quoteData.client_reference) },
-    ],
+    rows: toRows,
   };
 
   // ---- Meta (quote details) ------------------------------------------------

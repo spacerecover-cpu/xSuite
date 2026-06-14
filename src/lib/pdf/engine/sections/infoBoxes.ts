@@ -9,7 +9,7 @@
  * `null` the hand-written builders hardcoded.
  */
 
-import type { Content } from 'pdfmake/interfaces';
+import type { Content, TableCell } from 'pdfmake/interfaces';
 import { PDF_COLORS, createBilingualInfoBox } from '../../styles';
 import { safeString } from '../../utils';
 import { getGeneralIconSvg } from '../../../deviceIconMapper';
@@ -38,15 +38,14 @@ function infoRow(
   };
 }
 
-function partyBox(
-  party: PartyBlock,
-  engine: EngineContext,
-  iconSvg: string,
-): Content {
-  const { language } = engine.config;
-  const bilingual = isBilingualMode(language);
-  const labelWidth = bilingual ? 150 : 90;
+/** The bilingual-aware label column width for the current language mode. */
+function labelWidthFor(language: EngineContext['config']['language']): number {
+  return isBilingualMode(language) ? 150 : 90;
+}
 
+/** The label/value rows for a party block (name first, then its detail rows). */
+function partyRows(party: PartyBlock, language: EngineContext['config']['language']): object[] {
+  const labelWidth = labelWidthFor(language);
   const rows: object[] = [];
   if (party.name) {
     rows.push(infoRow({ en: 'Name:', ar: 'الاسم:' }, party.name, language, labelWidth));
@@ -54,12 +53,22 @@ function partyBox(
   for (const r of party.rows) {
     rows.push(infoRow(r.label, r.value, language, labelWidth));
   }
+  return rows;
+}
+
+function partyBox(
+  party: PartyBlock,
+  engine: EngineContext,
+  iconSvg: string,
+): Content {
+  const { language } = engine.config;
+  const bilingual = isBilingualMode(language);
 
   // Pass the real Arabic title when bilingual; null collapses the AR column.
   return createBilingualInfoBox(
     en(party.title),
     bilingual ? ar(party.title) : null,
-    rows,
+    partyRows(party, language),
     iconSvg,
   ) as Content;
 }
@@ -74,28 +83,46 @@ function buildPartyBoxes(engine: EngineContext, data: EngineDocData): Content[] 
   return boxes;
 }
 
+/** The meta (document-details) box title — a tenant label, or a sensible default. */
+function metaTitleLabel(engine: EngineContext): LabelText {
+  return engine.config.labels.meta ?? engine.config.labels.details ?? { en: 'Details', ar: 'التفاصيل' };
+}
+
+/** The label/value rows for the meta (document-details) block. */
+function metaRows(engine: EngineContext, data: EngineDocData): object[] {
+  const { language } = engine.config;
+  const labelWidth = labelWidthFor(language);
+  return (data.meta ?? []).map((m) => infoRow(m.label, m.value, language, labelWidth));
+}
+
 /** Build the meta (document-details) info box, or null when there is nothing to show. */
 function buildMetaBox(engine: EngineContext, data: EngineDocData): Content | null {
   if (!data.meta || data.meta.length === 0) return null;
-
-  const { language } = engine.config;
-  const bilingual = isBilingualMode(language);
-  const labelWidth = bilingual ? 150 : 90;
-  const fileIcon = getGeneralIconSvg('fileText');
-
-  const rows: object[] = data.meta.map((m) => infoRow(m.label, m.value, language, labelWidth));
-
-  // Title taken from a config label if the tenant set one ("meta"/"details"),
-  // else a sensible bilingual default.
-  const metaTitle: LabelText =
-    engine.config.labels.meta ?? engine.config.labels.details ?? { en: 'Details', ar: 'التفاصيل' };
-
+  const bilingual = isBilingualMode(engine.config.language);
+  const metaTitle = metaTitleLabel(engine);
   return createBilingualInfoBox(
     en(metaTitle),
     bilingual ? ar(metaTitle) : null,
-    rows,
-    fileIcon,
+    metaRows(engine, data),
+    getGeneralIconSvg('fileText'),
   ) as Content;
+}
+
+/**
+ * The header-band content (icon + English title left, Arabic title right) — the
+ * same arrangement `createBilingualInfoBox` uses, reused by the equal-height
+ * split panel so both layouts look identical.
+ */
+function bandHeaderColumns(iconSvg: string, titleEn: string, titleAr: string | null): object {
+  return {
+    columns: [
+      iconSvg ? { svg: iconSvg, width: 13, height: 13, margin: [0, 0, 0, 0] } : { text: '', width: 0 },
+      { text: titleEn, style: 'bilingualHeader', width: 'auto' },
+      { text: '', width: '*' },
+      titleAr ? { text: titleAr, style: 'bilingualHeader', alignment: 'right', width: 'auto' } : { text: '', width: 0 },
+    ],
+    columnGap: 6,
+  };
 }
 
 /**
@@ -137,34 +164,69 @@ export const renderMeta: SectionRenderer = (
 };
 
 /**
- * Combined parties + meta layout: the (single) customer/party box on one side
- * and the document-details box on the other, in two balanced columns — the
- * standard invoice/quote letterhead that fills the empty space beside a lone
- * customer block. Used by `renderTemplate` when `config.layout.partiesMetaSideBySide`
- * is on. Under RTL the columns mirror (customer on the right). Degrades to a
- * single full-width box when only one of the two is present.
+ * Combined parties + meta layout: the (single) customer/party box and the
+ * document-details box side by side — the standard invoice/quote letterhead that
+ * fills the empty space beside a lone customer block. Used by `renderTemplate`
+ * when `config.layout.partiesMetaSideBySide` is on.
+ *
+ * The two halves are rendered as a single 2-column / 2-row table (header bands on
+ * top, content below) so they are GUARANTEED the same height — a table row sizes
+ * every cell to the tallest, so the shorter side's box stretches to match. Under
+ * RTL the customer column moves to the right. When only one of the two is present
+ * it degrades to the standalone full-width renderer.
  */
 export function renderPartiesMeta(
   engine: EngineContext,
   data: EngineDocData,
 ): Content | null {
-  const partyBoxes = buildPartyBoxes(engine, data);
-  const metaBox = buildMetaBox(engine, data);
+  const { language } = engine.config;
+  const bilingual = isBilingualMode(language);
 
-  const partyContent: Content | null =
-    partyBoxes.length === 0 ? null : partyBoxes.length === 1 ? partyBoxes[0] : { stack: partyBoxes };
+  // The single party present (recipient preferred, else issuer). `renderTemplate`
+  // only routes here when there is at most one party box.
+  const party = data.parties.to ?? data.parties.from ?? null;
+  const partyIcon = getGeneralIconSvg(data.parties.to ? 'user' : 'fileText');
+  const hasMeta = !!data.meta && data.meta.length > 0;
 
-  if (!partyContent && !metaBox) return null;
-  if (!partyContent) return { stack: [metaBox as Content], margin: [0, 0, 0, 8] };
-  if (!metaBox) return { stack: [partyContent], margin: [0, 0, 0, 8] };
+  // One side missing → fall back to the standalone full-width renderer.
+  if (!party && !hasMeta) return null;
+  if (!party) return renderMeta(engine, data);
+  if (!hasMeta) return renderParties(engine, data);
 
-  const partyCol = { width: '50%', stack: [partyContent] };
-  const metaCol = { width: '50%', stack: [metaBox] };
-  const gap = { width: 8, text: '' };
-  const rtl = engineLayoutDirection(engine.config.language) === 'rtl';
+  const metaTitle = metaTitleLabel(engine);
+  const band = PDF_COLORS.background;
+
+  const partyHeaderCell = {
+    ...bandHeaderColumns(partyIcon, en(party.title), bilingual ? ar(party.title) : null),
+    fillColor: band,
+    margin: [6, 4, 6, 4],
+  };
+  const metaHeaderCell = {
+    ...bandHeaderColumns(getGeneralIconSvg('fileText'), en(metaTitle), bilingual ? ar(metaTitle) : null),
+    fillColor: band,
+    margin: [6, 4, 6, 4],
+  };
+  const partyContentCell = { stack: partyRows(party, language), margin: [8, 5, 8, 6] };
+  const metaContentCell = { stack: metaRows(engine, data), margin: [8, 5, 8, 6] };
+
+  const rtl = engineLayoutDirection(language) === 'rtl';
+  const headerRow = rtl ? [metaHeaderCell, partyHeaderCell] : [partyHeaderCell, metaHeaderCell];
+  const contentRow = rtl ? [metaContentCell, partyContentCell] : [partyContentCell, metaContentCell];
+  // pdfmake content shapes are composed loosely here (as elsewhere in the engine);
+  // cast the assembled body to the table-cell matrix type.
+  const body = [headerRow, contentRow] as unknown as TableCell[][];
 
   return {
-    columns: rtl ? [metaCol, gap, partyCol] : [partyCol, gap, metaCol],
+    table: {
+      widths: ['*', '*'],
+      body,
+    },
+    layout: {
+      hLineWidth: () => 0.5,
+      vLineWidth: () => 0.5,
+      hLineColor: () => PDF_COLORS.border,
+      vLineColor: () => PDF_COLORS.border,
+    },
     margin: [0, 0, 0, 8],
   };
 }
