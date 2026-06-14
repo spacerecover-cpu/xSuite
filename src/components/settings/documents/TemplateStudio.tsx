@@ -114,6 +114,11 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   const builtIn = BUILT_IN_TEMPLATE_CONFIGS[docType];
   const [override, setOverride] = useState<TemplateConfigOverride>(initialOverride);
   const [activeTab, setActiveTab] = useState<TabId>('general');
+  // Preview data source: 'sample' synthetic data, or a real record id.
+  const [dataSource, setDataSource] = useState<string>('sample');
+  const [records, setRecords] = useState<{ id: string; label: string }[]>([]);
+  const recordPreviewSupported =
+    docType === 'invoice' || docType === 'quote' || docType === 'payment_receipt';
 
   const resolved = useMemo(
     () => resolveTemplateConfig(builtIn, undefined, override),
@@ -132,12 +137,16 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
     setPreviewError(null);
     const timer = setTimeout(async () => {
       try {
-        const [{ preloadAllFonts }, { previewTemplate }] = await Promise.all([
-          import('../../../lib/pdf/fonts'),
-          import('../../../lib/pdf/engine/previewTemplate'),
-        ]);
+        const { preloadAllFonts } = await import('../../../lib/pdf/fonts');
         await preloadAllFonts();
-        const url = await previewTemplate(resolved);
+        let url: string;
+        if (dataSource === 'sample') {
+          const { previewTemplate } = await import('../../../lib/pdf/engine/previewTemplate');
+          url = await previewTemplate(resolved);
+        } else {
+          const { previewDocumentForRecord } = await import('../../../lib/pdf/previewRecord');
+          url = await previewDocumentForRecord(docType, dataSource, resolved);
+        }
         if (cancelled) {
           URL.revokeObjectURL(url);
           return;
@@ -157,11 +166,31 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [resolved]);
+  }, [resolved, dataSource, docType]);
 
   useEffect(() => () => {
     if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
   }, []);
+
+  // Load recent records for the data-source picker (financial doc types only).
+  useEffect(() => {
+    if (!recordPreviewSupported) {
+      setRecords([]);
+      return;
+    }
+    let cancelled = false;
+    import('../../../lib/pdf/previewRecord')
+      .then(({ listPreviewRecords }) => listPreviewRecords(docType))
+      .then((r) => {
+        if (!cancelled) setRecords(r);
+      })
+      .catch(() => {
+        if (!cancelled) setRecords([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [docType, recordPreviewSupported]);
 
   // ---- Mutators -----------------------------------------------------------
   const api: StudioApi = useMemo(() => {
@@ -365,14 +394,31 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
         {/* Live preview */}
         <div className="lg:sticky lg:top-5 lg:self-start">
           <Card variant="bordered" className="overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-2.5">
               <span className="text-sm font-medium text-slate-700">Live preview</span>
-              {previewLoading && (
-                <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Updating…
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {recordPreviewSupported && records.length > 0 && (
+                  <select
+                    aria-label="Preview data source"
+                    value={dataSource}
+                    onChange={(e) => setDataSource(e.target.value)}
+                    className="max-w-[170px] rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="sample">Sample data</option>
+                    {records.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {previewLoading && (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Updating…
+                  </span>
+                )}
+              </div>
             </div>
             <div className="relative h-[calc(100vh-12rem)] min-h-[480px] bg-slate-100">
               {previewError ? (
