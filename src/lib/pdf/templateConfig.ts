@@ -539,12 +539,15 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
         ...base,
         sections: intakeSections(),
         labels: { documentTitle: { en: 'DEVICE CHECK-IN RECEIPT', ar: 'إيصال استلام جهاز' } },
+        // Customer block (left) + case-details block (right) side by side.
+        layout: { partiesMetaSideBySide: true },
       };
     case 'customer_copy':
       return {
         ...base,
         sections: intakeSections(),
         labels: { documentTitle: { en: 'DEVICE CHECK-IN RECEIPT', ar: 'إيصال استلام جهاز' } },
+        layout: { partiesMetaSideBySide: true },
       };
     case 'checkout_form':
       return {
@@ -561,6 +564,7 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
           section('footer', 8),
         ],
         labels: { documentTitle: { en: 'DEVICE CHECKOUT / RETURN FORM', ar: 'نموذج تسليم الجهاز' } },
+        layout: { partiesMetaSideBySide: true },
       };
     case 'case_label':
       return {

@@ -23,7 +23,7 @@ import type { DocumentTemplateConfig, TypographyStyleKey } from '../templateConf
 import type { TranslationContext } from '../types';
 import type { EngineContext, EngineDocData } from './types';
 import { SECTION_REGISTRY } from './registry';
-import { renderPartiesMeta } from './sections/infoBoxes';
+import { renderPartiesMeta, partiesDetailsKey } from './sections/infoBoxes';
 import { buildPageFooter } from './sections/footer';
 import { engineLayoutDirection, engineDefaultFont } from './rtl';
 import {
@@ -115,31 +115,31 @@ export function renderTemplate(
   // instead of inline content.
   const bodyEnd = promoteToPageFooter ? trailingFrom : ordered.length;
 
-  // Optional side-by-side parties + meta layout: when enabled and both sections
-  // are visible AND the parties block is a single box (one of from/to — the
-  // common financial case), render them as two columns at the position of the
-  // first of the pair and drop the standalone one. Falls back to the normal
-  // stacked dispatch otherwise (e.g. both from+to present, or one absent).
-  const partiesVisible = ordered.some((s) => s.key === 'parties' && (!promoteToPageFooter || ordered.indexOf(s) < bodyEnd));
-  const metaVisible = ordered.some((s) => s.key === 'meta' && (!promoteToPageFooter || ordered.indexOf(s) < bodyEnd));
-  const singlePartyBox = !(data.parties?.from && data.parties?.to);
-  const combinePartiesMeta =
+  // Optional side-by-side customer + details layout. The "details" half is the
+  // financial meta box, or (for intake / checkout docs) the case-info box. When
+  // enabled and both are visible AND the parties block is a single box (one of
+  // from/to — the common case), render them as one equal-height panel at the
+  // position of the first of the pair and drop the standalone details section.
+  // Falls back to the normal stacked dispatch otherwise (e.g. both from+to
+  // present, or one side absent).
+  const isVisible = (key: string) => ordered.some((s) => s.key === key);
+  const detailsKey = partiesDetailsKey(data);
+  const combineParties =
     !!config.layout?.partiesMetaSideBySide &&
-    partiesVisible &&
-    metaVisible &&
-    singlePartyBox &&
-    !!data.meta &&
-    data.meta.length > 0;
-  let partiesMetaEmitted = false;
+    isVisible('parties') &&
+    !!detailsKey &&
+    isVisible(detailsKey) &&
+    !(data.parties?.from && data.parties?.to);
+  let partiesComboEmitted = false;
 
   const content: Content[] = [];
   for (let i = 0; i < bodyEnd; i++) {
     const section = ordered[i];
 
-    if (combinePartiesMeta && (section.key === 'parties' || section.key === 'meta')) {
-      if (partiesMetaEmitted) continue; // the second of the pair — already rendered
+    if (combineParties && (section.key === 'parties' || section.key === detailsKey)) {
+      if (partiesComboEmitted) continue; // the second of the pair — already rendered
       const combined = renderPartiesMeta(engine, data);
-      partiesMetaEmitted = true;
+      partiesComboEmitted = true;
       if (combined) content.push(combined);
       continue;
     }

@@ -126,6 +126,41 @@ function bandHeaderColumns(iconSvg: string, titleEn: string, titleAr: string | n
 }
 
 /**
+ * The "document details" half that sits beside the customer block: the financial
+ * meta box (invoice/quote/receipt) or — for intake / checkout docs — the
+ * case-info box. Returns its title + rendered rows, or null when neither exists.
+ */
+function detailsHalf(
+  engine: EngineContext,
+  data: EngineDocData,
+): { title: LabelText; rows: object[] } | null {
+  const { language } = engine.config;
+  const labelWidth = labelWidthFor(language);
+  if (data.meta && data.meta.length > 0) {
+    return { title: metaTitleLabel(engine), rows: data.meta.map((m) => infoRow(m.label, m.value, language, labelWidth)) };
+  }
+  if (data.caseInfo && data.caseInfo.rows.length > 0) {
+    return {
+      title: data.caseInfo.title,
+      rows: data.caseInfo.rows.map((r) => infoRow(r.label, r.value, language, labelWidth)),
+    };
+  }
+  return null;
+}
+
+/**
+ * Which section key supplies the "document details" half paired beside the
+ * customer block — `meta` (financial) or `caseInfo` (intake/checkout) — so
+ * `renderTemplate` knows which standalone section to drop when combining. Null
+ * when neither is present.
+ */
+export function partiesDetailsKey(data: EngineDocData): 'meta' | 'caseInfo' | null {
+  if (data.meta && data.meta.length > 0) return 'meta';
+  if (data.caseInfo && data.caseInfo.rows.length > 0) return 'caseInfo';
+  return null;
+}
+
+/**
  * Parties section: issuer (`from`) and/or recipient (`to`) side by side. When
  * only one is present it spans full width; when both, they split 50/50.
  */
@@ -164,16 +199,17 @@ export const renderMeta: SectionRenderer = (
 };
 
 /**
- * Combined parties + meta layout: the (single) customer/party box and the
- * document-details box side by side — the standard invoice/quote letterhead that
- * fills the empty space beside a lone customer block. Used by `renderTemplate`
- * when `config.layout.partiesMetaSideBySide` is on.
+ * Combined parties + details layout: the (single) customer/party box and the
+ * document-details box side by side — the standard letterhead that fills the
+ * empty space beside a lone customer block. The "details" half is the financial
+ * meta box, or the case-info box for intake/checkout docs. Used by
+ * `renderTemplate` when `config.layout.partiesMetaSideBySide` is on.
  *
  * The two halves are rendered as a single 2-column / 2-row table (header bands on
  * top, content below) so they are GUARANTEED the same height — a table row sizes
  * every cell to the tallest, so the shorter side's box stretches to match. Under
  * RTL the customer column moves to the right. When only one of the two is present
- * it degrades to the standalone full-width renderer.
+ * it degrades to a single full-width box.
  */
 export function renderPartiesMeta(
   engine: EngineContext,
@@ -186,14 +222,25 @@ export function renderPartiesMeta(
   // only routes here when there is at most one party box.
   const party = data.parties.to ?? data.parties.from ?? null;
   const partyIcon = getGeneralIconSvg(data.parties.to ? 'user' : 'fileText');
-  const hasMeta = !!data.meta && data.meta.length > 0;
+  const details = detailsHalf(engine, data);
 
-  // One side missing → fall back to the standalone full-width renderer.
-  if (!party && !hasMeta) return null;
-  if (!party) return renderMeta(engine, data);
-  if (!hasMeta) return renderParties(engine, data);
+  // One side missing → fall back to a single full-width box.
+  if (!party && !details) return null;
+  if (!party) {
+    return {
+      stack: [
+        createBilingualInfoBox(
+          en(details!.title),
+          bilingual ? ar(details!.title) : null,
+          details!.rows,
+          getGeneralIconSvg('fileText'),
+        ) as Content,
+      ],
+      margin: [0, 0, 0, 8],
+    };
+  }
+  if (!details) return renderParties(engine, data);
 
-  const metaTitle = metaTitleLabel(engine);
   const band = PDF_COLORS.background;
 
   const partyHeaderCell = {
@@ -201,17 +248,17 @@ export function renderPartiesMeta(
     fillColor: band,
     margin: [6, 4, 6, 4],
   };
-  const metaHeaderCell = {
-    ...bandHeaderColumns(getGeneralIconSvg('fileText'), en(metaTitle), bilingual ? ar(metaTitle) : null),
+  const detailsHeaderCell = {
+    ...bandHeaderColumns(getGeneralIconSvg('fileText'), en(details.title), bilingual ? ar(details.title) : null),
     fillColor: band,
     margin: [6, 4, 6, 4],
   };
   const partyContentCell = { stack: partyRows(party, language), margin: [8, 5, 8, 6] };
-  const metaContentCell = { stack: metaRows(engine, data), margin: [8, 5, 8, 6] };
+  const detailsContentCell = { stack: details.rows, margin: [8, 5, 8, 6] };
 
   const rtl = engineLayoutDirection(language) === 'rtl';
-  const headerRow = rtl ? [metaHeaderCell, partyHeaderCell] : [partyHeaderCell, metaHeaderCell];
-  const contentRow = rtl ? [metaContentCell, partyContentCell] : [partyContentCell, metaContentCell];
+  const headerRow = rtl ? [detailsHeaderCell, partyHeaderCell] : [partyHeaderCell, detailsHeaderCell];
+  const contentRow = rtl ? [detailsContentCell, partyContentCell] : [partyContentCell, detailsContentCell];
   // pdfmake content shapes are composed loosely here (as elsewhere in the engine);
   // cast the assembled body to the table-cell matrix type.
   const body = [headerRow, contentRow] as unknown as TableCell[][];

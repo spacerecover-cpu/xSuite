@@ -3,7 +3,7 @@ import { renderTemplate } from './renderTemplate';
 import { renderSignature } from './sections/signature';
 import { resolveLabel } from './labels';
 import { toEngineData as invoiceToEngine } from './adapters/invoiceAdapter';
-import { sampleInvoiceData } from './sampleData';
+import { sampleInvoiceData, buildPreviewEngineData } from './sampleData';
 import { BUILT_IN_TEMPLATE_CONFIGS, resolveTemplateConfig } from '../templateConfig';
 import type { LanguageConfig } from '../templateConfig';
 import type { EngineContext, EngineDocData } from './types';
@@ -170,5 +170,16 @@ describe('renderTemplate: parties + meta side by side', () => {
     const joined = strings.join(' ');
     expect(joined).toContain('Jane Client');
     expect(joined).toContain('INV-0042');
+  });
+
+  it('pairs the customer block with the CASE-INFO block on intake/checkout docs (default on)', () => {
+    for (const docType of ['office_receipt', 'customer_copy', 'checkout_form'] as const) {
+      const config = BUILT_IN_TEMPLATE_CONFIGS[docType];
+      expect(config.layout?.partiesMetaSideBySide).toBe(true);
+      const data = buildPreviewEngineData(docType, config);
+      const def = renderTemplate(config, data, ctx, null, null);
+      // Customer name + Case ID end up in the same equal-height panel.
+      expect(findGroupWithBoth(def.content, 'Jane Client', 'CASE-0007')).toBe(true);
+    }
   });
 });
