@@ -170,6 +170,18 @@ export const deleteLogo = async (
   return deleteCompanyAsset(filePath, BUCKETS.ASSETS);
 };
 
+export const uploadStamp = async (file: File, metadata?: Partial<FileMetadata>): Promise<UploadResult> =>
+  uploadCompanyAsset(file, BUCKETS.ASSETS, 'stamps', metadata);
+
+export const uploadSignature = async (file: File, metadata?: Partial<FileMetadata>): Promise<UploadResult> =>
+  uploadCompanyAsset(file, BUCKETS.ASSETS, 'signatures', metadata);
+
+export const deleteStamp = async (filePath: string): Promise<{ success: boolean; error?: string }> =>
+  deleteCompanyAsset(filePath, BUCKETS.ASSETS);
+
+export const deleteSignature = async (filePath: string): Promise<{ success: boolean; error?: string }> =>
+  deleteCompanyAsset(filePath, BUCKETS.ASSETS);
+
 export const deleteQRCode = async (
   filePath: string
 ): Promise<{ success: boolean; error?: string }> => {
