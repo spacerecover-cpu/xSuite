@@ -76,6 +76,14 @@ describe('buildLogoNode', () => {
   it('returns null for a missing logo', () => {
     expect(buildLogoNode(null, { width: 130 })).toBeNull();
   });
+  it('sets opacity when provided', () => {
+    const node = buildLogoNode('data:image/png;base64,AAAA', { width: 80, opacity: 0.3 }) as { opacity?: number };
+    expect(node.opacity).toBe(0.3);
+  });
+  it('omits opacity when not provided', () => {
+    const node = buildLogoNode('data:image/png;base64,AAAA', { width: 80 }) as { opacity?: number };
+    expect(node.opacity).toBeUndefined();
+  });
 });
 
 describe('resolveBrandingImage', () => {

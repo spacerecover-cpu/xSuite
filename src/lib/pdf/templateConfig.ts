@@ -268,6 +268,20 @@ export interface WatermarkConfig {
   fontSize?: number;
 }
 
+export interface SignatureImageOptions {
+  show?: boolean;
+  width?: number;
+  placement?: 'left' | 'center' | 'right';
+}
+export interface StampImageOptions extends SignatureImageOptions {
+  /** 0–1 image opacity for a semi-transparent seal. */
+  opacity?: number;
+}
+export interface SignatureImagesConfig {
+  stamp?: StampImageOptions;
+  signature?: SignatureImageOptions;
+}
+
 /**
  * Document body LAYOUT options (opt-in). Absent → legacy stacked layout.
  */
@@ -326,6 +340,7 @@ export interface DocumentTemplateConfig {
   watermark?: WatermarkConfig;
   layout?: LayoutConfig;
   translationPolicy?: TranslationPolicyConfig;
+  signatureImages?: SignatureImagesConfig;
 }
 
 /**
@@ -377,6 +392,7 @@ export interface TemplateConfigOverride {
   watermark?: WatermarkConfig;
   layout?: LayoutConfig;
   translationPolicy?: TranslationPolicyConfig;
+  signatureImages?: SignatureImagesConfig;
 }
 
 /** Partial section override; `key` identifies the target section. */
@@ -875,6 +891,18 @@ function mergeOrganization(
   };
 }
 
+/** Merge signature-images config, deep-merging stamp + signature option objects. */
+function mergeSignatureImages(
+  base: SignatureImagesConfig | undefined,
+  override: SignatureImagesConfig | undefined,
+): SignatureImagesConfig | undefined {
+  if (!base) return override;
+  if (!override) return base;
+  const stamp = mergeGroup(base.stamp, override.stamp);
+  const signature = mergeGroup(base.signature, override.signature);
+  return { ...base, ...override, ...(stamp ? { stamp } : {}), ...(signature ? { signature } : {}) };
+}
+
 /** Merge translation policy, deep-merging the `groups` toggles by key. */
 function mergeTranslationPolicy(
   base: TranslationPolicyConfig | undefined,
@@ -912,6 +940,7 @@ function applyOverride(
     watermark: mergeGroup(base.watermark, override.watermark),
     layout: mergeGroup(base.layout, override.layout),
     translationPolicy: mergeTranslationPolicy(base.translationPolicy, override.translationPolicy),
+    signatureImages: mergeSignatureImages(base.signatureImages, override.signatureImages),
   };
 }
 

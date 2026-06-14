@@ -311,3 +311,17 @@ describe('translationPolicy cascade', () => {
     expect(b.translationPolicy).toEqual({ mode: 'custom', groups: { parties: false, meta: false } });
   });
 });
+
+describe('signatureImages cascade', () => {
+  const base = BUILT_IN_TEMPLATE_CONFIGS.office_receipt;
+  it('absent by default', () => {
+    expect(resolveTemplateConfig(base).signatureImages).toBeUndefined();
+  });
+  it('deep-merges stamp + signature across layers', () => {
+    const r = resolveTemplateConfig(base,
+      { signatureImages: { stamp: { show: true, width: 90 } } },
+      { signatureImages: { signature: { show: true } } },
+    );
+    expect(r.signatureImages).toEqual({ stamp: { show: true, width: 90 }, signature: { show: true } });
+  });
+});
