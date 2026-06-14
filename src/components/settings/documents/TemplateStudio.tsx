@@ -142,7 +142,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
         let url: string;
         if (dataSource === 'sample') {
           const { previewTemplate } = await import('../../../lib/pdf/engine/previewTemplate');
-          url = await previewTemplate(resolved);
+          url = await previewTemplate(docType, resolved);
         } else {
           const { previewDocumentForRecord } = await import('../../../lib/pdf/previewRecord');
           url = await previewDocumentForRecord(docType, dataSource, resolved);
