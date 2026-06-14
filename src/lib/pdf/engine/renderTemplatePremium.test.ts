@@ -205,3 +205,33 @@ describe('renderTemplate — watermark settings', () => {
     expect(wm.fontSize).toBe(80);
   });
 });
+
+describe('renderTemplate — page fitting / density', () => {
+  const baseMargins = BUILT_IN_TEMPLATE_CONFIGS.invoice.paper.margins;
+  const baseCell = (PDF_STYLES.tableCell as { fontSize?: number }).fontSize ?? 0;
+
+  it('does not change margins or sizes by default (parity)', () => {
+    const def = renderTemplate(BUILT_IN_TEMPLATE_CONFIGS.invoice, makeData(), englishCtx, null, null);
+    expect(def.pageMargins).toEqual(baseMargins);
+    expect(styleSize(def, 'tableCell')).toBe(baseCell);
+  });
+
+  it('comfortable density is a no-op', () => {
+    const config = resolveTemplateConfig(BUILT_IN_TEMPLATE_CONFIGS.invoice, undefined, {
+      pageFitting: { density: 'comfortable' },
+    });
+    const def = renderTemplate(config, makeData(), englishCtx, null, null);
+    expect(def.pageMargins).toEqual(baseMargins);
+    expect(styleSize(def, 'tableCell')).toBe(baseCell);
+  });
+
+  it('compact density tightens margins and shrinks fonts', () => {
+    const config = resolveTemplateConfig(BUILT_IN_TEMPLATE_CONFIGS.invoice, undefined, {
+      pageFitting: { density: 'compact' },
+    });
+    const def = renderTemplate(config, makeData(), englishCtx, null, null);
+    const margins = def.pageMargins as [number, number, number, number];
+    expect(margins[0]).toBeLessThan(baseMargins[0]);
+    expect(styleSize(def, 'tableCell')!).toBeLessThan(baseCell);
+  });
+});

@@ -27,10 +27,18 @@ import { buildPageFooter } from './sections/footer';
 import { engineLayoutDirection, engineDefaultFont } from './rtl';
 import {
   resolveColors,
+  resolvePageFitting,
   resolvePageNumbers,
   resolveTypography,
   resolveWatermarkSettings,
 } from './branding';
+
+/** Spacing/size multiplier per density preset (comfortable = identity/legacy). */
+const DENSITY_SCALE: Record<'comfortable' | 'compact' | 'dense', number> = {
+  comfortable: 1,
+  compact: 0.88,
+  dense: 0.78,
+};
 
 /** Section keys that can be promoted to the repeating page footer. */
 const PAGE_FOOTER_KEYS = new Set(['footer', 'qr']);
@@ -75,7 +83,7 @@ export function renderTemplate(
     pageSize = config.paper.size === 'Letter' ? 'LETTER' : 'A4';
   }
   const pageOrientation: PageOrientation = config.paper.orientation;
-  const pageMargins = config.paper.margins;
+  let pageMargins: [number, number, number, number] = config.paper.margins;
 
   // 2. Visible sections, ascending order, dispatched via the registry.
   const ordered = [...config.sections]
@@ -160,6 +168,31 @@ export function renderTemplate(
     styles.tableCellRight = { ...styles.tableCellRight, color: colors.text };
     styles.label = { ...styles.label, color: colors.label };
     styles.totalValue = { ...styles.totalValue, color: colors.accent };
+  }
+
+  // 6b. Page fitting / density (opt-in). Density tightens margins + font sizes;
+  // auto-fit applies an extra reduction (never below the legibility floor) to
+  // keep the document on one page. Absent `pageFitting` (or comfortable with no
+  // auto-fit) → scale 1 → no change (parity).
+  if (config.pageFitting) {
+    const fitting = resolvePageFitting(config);
+    const densityScale = DENSITY_SCALE[fitting.density];
+    const scale = fitting.autoFitOnePage ? Math.max(fitting.minScale, densityScale * 0.9) : densityScale;
+    if (scale !== 1) {
+      const m = config.paper.margins;
+      pageMargins = [
+        Math.round(m[0] * scale),
+        Math.round(m[1] * scale),
+        Math.round(m[2] * scale),
+        Math.round(m[3] * scale),
+      ];
+      for (const key of Object.keys(styles)) {
+        const style = styles[key] as { fontSize?: number };
+        if (typeof style.fontSize === 'number') {
+          styles[key] = { ...styles[key], fontSize: Math.round(style.fontSize * scale * 10) / 10 };
+        }
+      }
+    }
   }
 
   // 7. Repeating page footer (divider + tagline + website + optional QR) plus an
