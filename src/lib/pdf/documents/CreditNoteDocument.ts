@@ -8,6 +8,7 @@ import {
 } from '../styles';
 import { formatDate, buildCompanyAddress, safeString } from '../utils';
 import { getGeneralIconSvg } from '../../deviceIconMapper';
+import { buildLogoNode } from '../brandingImage';
 
 const humanize = (s: string | null | undefined): string =>
   s ? s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '-';
@@ -43,10 +44,11 @@ export function buildCreditNoteDocument(
 
   const headerContent: Content[] = [];
 
-  if (logoBase64) {
+  const creditNoteLogoNode = buildLogoNode(logoBase64, { width: 130, margin: [0, 0, 0, 5] });
+  if (creditNoteLogoNode) {
     headerContent.push({
       columns: [
-        { image: logoBase64, width: 130, margin: [0, 0, 0, 5] },
+        creditNoteLogoNode,
         {
           stack: [
             { text: legalName, fontSize: 14, bold: true, color: PDF_COLORS.text, alignment: 'right' },

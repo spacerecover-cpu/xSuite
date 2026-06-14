@@ -109,7 +109,7 @@ export const TemplateGalleryModal: React.FC<TemplateGalleryModalProps> = ({
       ]);
       await preloadAllFonts();
       const config = resolveTemplateConfig(BUILT_IN_TEMPLATE_CONFIGS[docType], undefined, preset.config);
-      const url = await previewTemplate(docType, config);
+      const { url } = await previewTemplate(docType, config);
       if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
       lastUrlRef.current = url;
       setPreviewUrl(url);

@@ -361,3 +361,16 @@ describe('PDF builder characterization (golden snapshots)', () => {
     expect(characterize(buildChainOfCustodyDocument(chainOfCustodyFixture, ctx))).toMatchSnapshot();
   });
 });
+
+describe('legacy builder logo — svg routing', () => {
+  it('renders an svg logo as an svg node, not an image', () => {
+    const markup =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>';
+    const svg = 'data:image/svg+xml;base64,' + Buffer.from(markup, 'utf-8').toString('base64');
+    const def = JSON.stringify(buildInvoiceDocument(invoiceFixture, ctx, svg));
+    // The decoded svg markup only reaches the output when routed through
+    // buildLogoNode as an { svg } node; the raw data-url must NOT appear as an image.
+    expect(def).toContain(JSON.stringify(markup));
+    expect(def).not.toContain(`"image":${JSON.stringify(svg)}`);
+  });
+});

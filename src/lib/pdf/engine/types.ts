@@ -654,7 +654,8 @@ export interface EngineDocData {
 export interface EngineContext {
   config: DocumentTemplateConfig;
   ctx: TranslationContext;
-  logoBase64?: string | null;
+  /** The logo: a base64 data-URL string OR a classified BrandingImage, or null. */
+  logo?: import('../brandingImage').BrandingImage | string | null;
   qrCodeBase64?: string | null;
 }
 

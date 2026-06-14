@@ -25,6 +25,7 @@ import { renderTemplate } from './renderTemplate';
 import { createPdfWithFonts } from '../fonts';
 import { withTimeout } from '../translationContext';
 import { buildPreviewEngineData, sampleInvoiceData } from './sampleData';
+import { brandingImageWarning, placeholderLogoSvg, type BrandingImage } from '../brandingImage';
 
 // Re-exported for any caller/test that wants the canonical invoice sample.
 export { sampleInvoiceData };
@@ -55,6 +56,24 @@ const PREVIEW_CTX_EN: TranslationContext = {
   fontFamily: 'Roboto',
 };
 
+export interface PreviewResult {
+  url: string;
+  warnings: string[];
+}
+
+/**
+ * Decide which logo a sample preview should draw: the real resolved logo when
+ * present, else a labeled placeholder box (so the layout still shows where the
+ * logo goes), plus any warning to surface in the Studio.
+ */
+export function resolvePreviewLogo(
+  resolved: BrandingImage | null | undefined,
+): { logo: BrandingImage; warnings: string[] } {
+  if (resolved && resolved.kind !== 'none') return { logo: resolved, warnings: [] };
+  const warning = brandingImageWarning(resolved ?? { kind: 'none', reason: 'empty' });
+  return { logo: placeholderLogoSvg('LOGO'), warnings: warning ? [warning] : [] };
+}
+
 /**
  * Render a live preview of `config` for `docType` from representative sample data
  * and return a blob object-URL suitable for an `<iframe src>`.
@@ -63,24 +82,24 @@ const PREVIEW_CTX_EN: TranslationContext = {
  * @param config  The resolved template config to preview (the cascade result the
  *                editor is currently editing).
  * @param ctx     Optional translation context; defaults to English/LTR/Roboto.
- * @returns A `blob:` URL — the caller MUST `URL.revokeObjectURL` it when done.
+ * @param logo    Optional resolved tenant logo. When present it is drawn as-is;
+ *                otherwise a labeled placeholder box is used and a warning is
+ *                surfaced in the returned result.
+ * @returns A {@link PreviewResult} — `url` is a `blob:` URL the caller MUST
+ *          `URL.revokeObjectURL` when done; `warnings` is non-blocking copy.
  */
 export function previewTemplate(
   docType: TemplateDocumentType,
   config: DocumentTemplateConfig,
   ctx: TranslationContext = PREVIEW_CTX_EN,
-): Promise<string> {
+  logo?: BrandingImage | null,
+): Promise<PreviewResult> {
   const engineData = buildPreviewEngineData(docType, config);
-  // Logo uses the gray placeholder so the header logo branch renders; the QR is
+  // Draw the real logo when resolved, else a labeled placeholder box; the QR is
   // passed as null so the QR surfaces render the REAL `qrPayload` (a native,
   // scannable pdfmake QR) instead of the meaningless 1×1 placeholder square.
-  const docDefinition = renderTemplate(
-    config,
-    engineData,
-    ctx,
-    PREVIEW_PLACEHOLDER_IMAGE,
-    null,
-  );
+  const { logo: previewLogo, warnings } = resolvePreviewLogo(logo);
+  const docDefinition = renderTemplate(config, engineData, ctx, previewLogo, null);
 
   // Wire pdfmake's error callback so a rasterization failure REJECTS (rather
   // than leaving the promise pending forever → infinite "Updating…" spinner),
@@ -98,5 +117,5 @@ export function previewTemplate(
     }
   });
 
-  return withTimeout(render, PREVIEW_TIMEOUT_MS, 'Preview render timed out');
+  return withTimeout(render, PREVIEW_TIMEOUT_MS, 'Preview render timed out').then((url) => ({ url, warnings }));
 }

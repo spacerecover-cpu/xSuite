@@ -75,6 +75,24 @@ export const HeaderFooterTab: React.FC<{ api: StudioApi }> = ({ api }) => {
             onChange={(v) => api.setHeader({ logoHeight: v > 0 ? v : undefined })}
           />
         </div>
+        <div className="grid grid-cols-2 gap-3">
+          <NumberField
+            label="Logo bottom margin"
+            suffix="pt"
+            value={header?.logoMarginBottom ?? 5}
+            min={0}
+            max={40}
+            onChange={(v) => api.setHeader({ logoMarginBottom: v })}
+          />
+          <NumberField
+            label="Logo max height"
+            suffix="pt, 0 = none"
+            value={header?.logoMaxHeight ?? 0}
+            min={0}
+            max={200}
+            onChange={(v) => api.setHeader({ logoMaxHeight: v > 0 ? v : undefined })}
+          />
+        </div>
       </FieldGroup>
 
       <FieldGroup title="Divider" description="The rule under the letterhead.">

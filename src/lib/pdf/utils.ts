@@ -1,4 +1,5 @@
 import { format } from 'date-fns';
+import { logger } from '../logger';
 import type { CompanySettingsData, TranslationContext } from './types';
 
 export function formatDate(date: string | Date | null | undefined, formatStr: string = 'dd/MM/yyyy'): string {
@@ -137,19 +138,23 @@ export async function loadImageAsBase64(url: string): Promise<string | null> {
 
   try {
     const response = await fetch(url);
-    if (!response.ok) return null;
+    if (!response.ok) {
+      logger.warn(`[pdf] image fetch failed (${response.status}) for ${url}`);
+      return null;
+    }
 
     const blob = await response.blob();
     return new Promise((resolve) => {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        resolve(result);
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => {
+        logger.warn(`[pdf] image decode failed for ${url}`);
+        resolve(null);
       };
-      reader.onerror = () => resolve(null);
       reader.readAsDataURL(blob);
     });
-  } catch {
+  } catch (err) {
+    logger.warn(`[pdf] image load error for ${url}:`, err);
     return null;
   }
 }

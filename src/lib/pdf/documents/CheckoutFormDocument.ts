@@ -10,6 +10,7 @@ import {
 } from '../styles';
 import { formatDate, formatCapacity, buildCompanyAddress, safeString } from '../utils';
 import { getDeviceIconSvg, getGeneralIconSvg } from '../../deviceIconMapper';
+import { buildLogoNode } from '../brandingImage';
 
 export function buildCheckoutFormDocument(
   data: ReceiptData,
@@ -37,14 +38,11 @@ export function buildCheckoutFormDocument(
 
   const headerContent: Content[] = [];
 
-  if (logoBase64) {
+  const checkoutFormLogoNode = buildLogoNode(logoBase64, { width: 130, margin: [0, 0, 0, 5] });
+  if (checkoutFormLogoNode) {
     headerContent.push({
       columns: [
-        {
-          image: logoBase64,
-          width: 130,
-          margin: [0, 0, 0, 5],
-        },
+        checkoutFormLogoNode,
         {
           stack: [
             { text: legalName, fontSize: 14, bold: true, color: PDF_COLORS.text, alignment: 'right' },

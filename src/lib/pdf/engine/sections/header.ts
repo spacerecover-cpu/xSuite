@@ -21,6 +21,7 @@ import type { EngineContext, EngineDocData, SectionRenderer } from '../types';
 import { resolveLabel } from '../labels';
 import { resolveColors, resolveHeader, resolveOrganization } from '../branding';
 import type { ResolvedHeader } from '../branding';
+import { buildLogoNode, classifyLogo } from '../../brandingImage';
 
 type Align = 'left' | 'center' | 'right';
 
@@ -28,7 +29,7 @@ export const renderHeader: SectionRenderer = (
   engine: EngineContext,
   data: EngineDocData,
 ): Content[] => {
-  const { config, logoBase64 } = engine;
+  const { config, logo } = engine;
   const settings = data.identity;
   const colors = resolveColors(config);
 
@@ -61,7 +62,7 @@ export const renderHeader: SectionRenderer = (
     margin: [0, 0, 0, 6],
   };
 
-  const showLogo = config.branding.logo && !!logoBase64;
+  const showLogo = config.branding.logo && classifyLogo(logo).kind !== 'none';
 
   // ── LEGACY path — byte-identical to the original letterhead (parity) ───────
   if (!config.header && !config.organization) {
@@ -69,7 +70,7 @@ export const renderHeader: SectionRenderer = (
     if (showLogo) {
       out.push({
         columns: [
-          { image: logoBase64 as string, width: 130, margin: [0, 0, 0, 5] },
+          buildLogoNode(logo, { width: 130, margin: [0, 0, 0, 5] })!,
           {
             stack: [
               { text: legalName, fontSize: 14, bold: true, color: PDF_COLORS.text, alignment: 'right' },
@@ -120,13 +121,7 @@ export const renderHeader: SectionRenderer = (
   const header = resolveHeader(config);
   const org = config.organization ? resolveOrganization(config) : null;
   const wantLogo = showLogo && (org ? org.show.logo : true);
-  const logoImage = wantLogo
-    ? {
-        image: logoBase64 as string,
-        width: header.logoWidth,
-        ...(header.logoHeight ? { height: header.logoHeight } : {}),
-      }
-    : null;
+  const brandLogo = wantLogo ? classifyLogo(logo) : null;
 
   const nameColor = config.colors ? colors.text : PDF_COLORS.text;
   const mutedColor = config.colors ? colors.label : PDF_COLORS.textLight;
@@ -167,18 +162,18 @@ export const renderHeader: SectionRenderer = (
   };
 
   const primaryName = org?.source === 'manual' ? org.manual.legalName ?? legalName : legalName;
-  const out: Content[] = [buildLetterhead(header, logoImage, identityLines, primaryName, nameColor)];
+  const out: Content[] = [buildLetterhead(header, brandLogo, identityLines, primaryName, nameColor)];
   if (header.divider !== 'none') out.push(buildDivider(header, colors.accent));
   out.push(titleBlock);
   return out;
 };
 
-type LogoImage = { image: string; width: number; height?: number } | null;
+type BrandLogo = import('../../brandingImage').BrandingImage | null;
 
 /** A vertically-stacked logo (top) + identity block, used by the centered layouts. */
-function stackedLetterhead(logo: LogoImage, lines: Content[]): Content[] {
+function stackedLetterhead(logoNode: Content | null, lines: Content[]): Content[] {
   const items: Content[] = [];
-  if (logo) items.push({ ...logo, alignment: 'center', margin: [0, 0, 0, 4] });
+  if (logoNode) items.push(logoNode);
   items.push(...lines);
   return items;
 }
@@ -186,25 +181,26 @@ function stackedLetterhead(logo: LogoImage, lines: Content[]): Content[] {
 /** Arrange the letterhead (logo + identity) for the chosen header layout. */
 function buildLetterhead(
   header: ResolvedHeader,
-  logo: LogoImage,
+  logo: BrandLogo,
   identityLines: (align: Align) => Content[],
   primaryName: string,
   nameColor: string,
 ): Content {
   const margin: [number, number, number, number] = [0, 0, 0, 12];
+  const h = header.logoHeight ?? undefined;
 
   switch (header.layout) {
     case 'modern':
-      // Centered logo stacked over a centered identity block.
-      return { stack: stackedLetterhead(logo, identityLines('center')), alignment: 'center', margin };
+      return {
+        stack: stackedLetterhead(buildLogoNode(logo, { width: header.logoWidth, height: h, alignment: 'center', margin: [0, 0, 0, 4] }), identityLines('center')),
+        alignment: 'center',
+        margin,
+      };
 
     case 'minimal':
-      // One-line company name with the logo inline — a lean letterhead.
       return {
         columns: [
-          logo
-            ? { image: logo.image, width: Math.min(logo.width, 90), ...(logo.height ? { height: logo.height } : {}), margin: [0, 0, 10, 0] }
-            : { text: '', width: 'auto' },
+          buildLogoNode(logo, { width: Math.min(header.logoWidth, 90), height: h, margin: [0, 0, 10, 0] }) ?? { text: '', width: 'auto' },
           { text: primaryName, fontSize: 13, bold: true, color: nameColor, alignment: 'left', margin: [0, 6, 0, 0], width: '*' },
         ],
         columnGap: 8,
@@ -212,11 +208,10 @@ function buildLetterhead(
       };
 
     case 'boxed':
-      // Identity inside a bordered box, logo above it.
       return {
         table: {
           widths: ['*'],
-          body: [[{ stack: stackedLetterhead(logo, identityLines('center')), alignment: 'center', margin: [8, 8, 8, 8] }]],
+          body: [[{ stack: stackedLetterhead(buildLogoNode(logo, { width: header.logoWidth, height: h, alignment: 'center', margin: [0, 0, 0, 4] }), identityLines('center')), alignment: 'center', margin: [8, 8, 8, 8] }]],
         },
         layout: {
           hLineWidth: () => 0.5,
@@ -228,22 +223,16 @@ function buildLetterhead(
       };
 
     case 'split': {
-      // Logo on the placement edge, identity opposite, in two balanced columns.
       const logoLeft = header.logoPlacement !== 'right';
-      const logoCol = logo
-        ? { image: logo.image, width: logo.width, ...(logo.height ? { height: logo.height } : {}), alignment: (logoLeft ? 'left' : 'right') as Align }
-        : { text: '', width: 'auto' as const };
+      const logoCol = buildLogoNode(logo, { width: header.logoWidth, height: h, alignment: (logoLeft ? 'left' : 'right') }) ?? { text: '', width: 'auto' as const };
       const idCol = { stack: identityLines(logoLeft ? 'right' : 'left'), width: '*' as const };
       return { columns: logoLeft ? [logoCol, idCol] : [idCol, logoCol], columnGap: 12, margin };
     }
 
     case 'spreadsheet':
-      // Dense top band: logo + identity inline, tight rhythm (Tally-style).
       return {
         columns: [
-          logo
-            ? { image: logo.image, width: Math.min(logo.width, 80), ...(logo.height ? { height: logo.height } : {}) }
-            : { text: '', width: 'auto' },
+          buildLogoNode(logo, { width: Math.min(header.logoWidth, 80), height: h }) ?? { text: '', width: 'auto' },
           { stack: identityLines('right'), width: '*' },
         ],
         columnGap: 8,
@@ -252,21 +241,14 @@ function buildLetterhead(
 
     case 'classic':
     default: {
-      // Logo on the placement edge; identity stacked on the opposite edge.
-      if (!logo) {
+      if (!logo || logo.kind === 'none') {
         return { stack: identityLines('center'), margin };
       }
       if (header.logoPlacement === 'center') {
-        return { stack: stackedLetterhead(logo, identityLines('center')), alignment: 'center', margin };
+        return { stack: stackedLetterhead(buildLogoNode(logo, { width: header.logoWidth, height: h, maxHeight: header.logoMaxHeight, alignment: 'center', margin: [0, 0, 0, 4] }), identityLines('center')), alignment: 'center', margin };
       }
       const logoLeft = header.logoPlacement !== 'right';
-      const logoCol = {
-        image: logo.image,
-        width: logo.width,
-        ...(logo.height ? { height: logo.height } : {}),
-        margin: [0, 0, 0, 5] as [number, number, number, number],
-        alignment: (logoLeft ? 'left' : 'right') as Align,
-      };
+      const logoCol = buildLogoNode(logo, { width: header.logoWidth, height: h, maxHeight: header.logoMaxHeight, margin: [0, 0, 0, header.logoMarginBottom], alignment: (logoLeft ? 'left' : 'right') })!;
       const idCol = { stack: identityLines(logoLeft ? 'right' : 'left'), width: '*' as const };
       return { columns: logoLeft ? [logoCol, idCol] : [idCol, logoCol], margin };
     }

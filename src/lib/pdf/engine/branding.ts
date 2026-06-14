@@ -226,6 +226,8 @@ export interface ResolvedHeader {
   logoPlacement: LogoPlacement;
   logoWidth: number;
   logoHeight: number | null;
+  logoMarginBottom: number;
+  logoMaxHeight: number | null;
   addressZone: AddressZone;
   divider: DividerStyle;
   dividerNudge: { start: number; end: number; vertical: number };
@@ -240,6 +242,8 @@ export function resolveHeader(config: Pick<DocumentTemplateConfig, 'header'>): R
     logoPlacement: h?.logoPlacement ?? 'left',
     logoWidth: typeof h?.logoWidth === 'number' && h.logoWidth > 0 ? h.logoWidth : 130,
     logoHeight: typeof h?.logoHeight === 'number' && h.logoHeight > 0 ? h.logoHeight : null,
+    logoMarginBottom: typeof h?.logoMarginBottom === 'number' && h.logoMarginBottom >= 0 ? h.logoMarginBottom : 5,
+    logoMaxHeight: typeof h?.logoMaxHeight === 'number' && h.logoMaxHeight > 0 ? h.logoMaxHeight : null,
     addressZone: h?.addressZone ?? 'right',
     divider: h?.divider ?? 'thin',
     dividerNudge: {

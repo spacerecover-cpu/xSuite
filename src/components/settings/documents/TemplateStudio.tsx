@@ -38,6 +38,8 @@ import {
   type WatermarkConfig,
 } from '../../../lib/pdf/templateConfig';
 import { DOC_TYPE_LABELS } from '../../../pages/settings/documentTypeMeta';
+import { getCompanyLogo } from '../../../lib/fileStorageService';
+import { resolveBrandingImage, type BrandingImage } from '../../../lib/pdf/brandingImage';
 import { GeneralTab } from './tabs/GeneralTab';
 import { HeaderFooterTab } from './tabs/HeaderFooterTab';
 import { TransactionTab } from './tabs/TransactionTab';
@@ -131,6 +133,8 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(true);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [tenantLogo, setTenantLogo] = useState<BrandingImage | null>(null);
+  const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
   const lastUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -142,12 +146,13 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
         const { preloadAllFonts } = await import('../../../lib/pdf/fonts');
         await preloadAllFonts();
         let url: string;
+        let warnings: string[] = [];
         if (dataSource === 'sample') {
           const { previewTemplate } = await import('../../../lib/pdf/engine/previewTemplate');
-          url = await previewTemplate(docType, resolved);
+          ({ url, warnings } = await previewTemplate(docType, resolved, undefined, tenantLogo));
         } else {
           const { previewDocumentForRecord } = await import('../../../lib/pdf/previewRecord');
-          url = await previewDocumentForRecord(docType, dataSource, resolved);
+          ({ url, warnings } = await previewDocumentForRecord(docType, dataSource, resolved));
         }
         if (cancelled) {
           URL.revokeObjectURL(url);
@@ -156,6 +161,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
         if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
         lastUrlRef.current = url;
         setPreviewUrl(url);
+        setPreviewWarnings(warnings);
       } catch (err) {
         if (cancelled) return;
         logger.error('[TemplateStudio] preview failed:', err);
@@ -168,10 +174,21 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [resolved, dataSource, docType]);
+  }, [resolved, dataSource, docType, tenantLogo]);
 
   useEffect(() => () => {
     if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
+  }, []);
+
+  // Resolve the real tenant logo once so the sample preview can draw it (and so
+  // a missing/broken logo surfaces a non-blocking warning chip).
+  useEffect(() => {
+    let cancelled = false;
+    getCompanyLogo('primary')
+      .then((url) => resolveBrandingImage(url))
+      .then((img) => { if (!cancelled) setTenantLogo(img); })
+      .catch(() => { if (!cancelled) setTenantLogo({ kind: 'none', reason: 'empty' }); });
+    return () => { cancelled = true; };
   }, []);
 
   // Load recent records for the data-source picker (financial doc types only).
@@ -423,6 +440,18 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
                 )}
               </div>
             </div>
+            {previewWarnings.length > 0 && (
+              <div className="flex flex-wrap gap-2 border-b border-slate-200 px-4 py-2">
+                {previewWarnings.map((w) => (
+                  <span
+                    key={w}
+                    className="inline-flex items-center gap-1 rounded-md bg-warning-muted px-2 py-1 text-xs font-medium text-warning-foreground"
+                  >
+                    {w}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="relative h-[calc(100vh-12rem)] min-h-[480px] bg-slate-100">
               {previewError ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">

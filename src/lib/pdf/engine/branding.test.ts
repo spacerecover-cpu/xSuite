@@ -6,6 +6,7 @@ import {
   resolveAccentHex,
   resolveWatermark,
   isAccentOptIn,
+  resolveHeader,
 } from './branding';
 import type { EngineDocData } from './types';
 import type { TranslationContext } from '../types';
@@ -204,5 +205,18 @@ describe('renderTemplate — watermark', () => {
     const lineColors: string[] = [];
     collectLineColors(def.content as Content, lineColors);
     expect(lineColors).toContain(ACCENT_HEX);
+  });
+});
+
+describe('resolveHeader logo margin/maxHeight', () => {
+  it('defaults logoMarginBottom to 5 and logoMaxHeight to null', () => {
+    const r = resolveHeader({ header: {} });
+    expect(r.logoMarginBottom).toBe(5);
+    expect(r.logoMaxHeight).toBeNull();
+  });
+  it('passes through configured values', () => {
+    const r = resolveHeader({ header: { logoMarginBottom: 12, logoMaxHeight: 40 } });
+    expect(r.logoMarginBottom).toBe(12);
+    expect(r.logoMaxHeight).toBe(40);
   });
 });

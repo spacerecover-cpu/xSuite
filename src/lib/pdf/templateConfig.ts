@@ -156,6 +156,10 @@ export interface HeaderConfig {
   /** Logo box in points. Default width 130, height auto-from-width. */
   logoWidth?: number;
   logoHeight?: number;
+  /** Bottom margin under the logo in points. Default 5 (today's value). */
+  logoMarginBottom?: number;
+  /** Cap the logo height in points (aspect-preserving via pdfmake `fit`). 0/undefined = no cap. */
+  logoMaxHeight?: number;
   /** Address zone in the 3-zone layouts. Default `'right'`. */
   addressZone?: AddressZone;
   /** Divider rule under the letterhead. Default `'thin'` (0.5pt today). */
