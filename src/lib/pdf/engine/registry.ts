@@ -11,9 +11,11 @@
  * `earnings`, `deductions`, `netPay`), the stock-label key (`stockLabel`), and
  * the case-report keys (`diagnostics` for the device diagnostics info box and
  * `reportSections` for the ordered DB-driven prose sections — the custody
- * timeline reuses `custodyLog`). Remaining document-specific keys (`summary`,
- * `findings`) are intentionally NOT registered yet — they belong to later
- * milestones and are skipped until then.
+ * timeline reuses `custodyLog`). The forensic custody sections restored for
+ * legacy parity (`custodySummary` aggregate box, `hashVerification` hash table,
+ * `digitalSignatures` signature table) ARE registered. The remaining
+ * document-specific key (`findings`) is intentionally NOT registered yet — it
+ * belongs to a later milestone and is skipped until then.
  */
 
 import type { SectionRenderer } from './types';
@@ -24,6 +26,9 @@ import { renderDevices } from './sections/devices';
 import { renderCollector } from './sections/collector';
 import { renderLegalTerms } from './sections/legalTerms';
 import { renderCustodyLog } from './sections/custodyLog';
+import { renderCustodySummary } from './sections/custodySummary';
+import { renderHashVerification } from './sections/hashVerification';
+import { renderDigitalSignatures } from './sections/digitalSignatures';
 import { renderDiagnostics } from './sections/reportDiagnostics';
 import { renderReportSections } from './sections/reportSections';
 import { renderCaseLabel } from './sections/caseLabel';
@@ -50,6 +55,9 @@ export const SECTION_REGISTRY: Record<string, SectionRenderer> = {
   collector: renderCollector,
   legalTerms: renderLegalTerms,
   custodyLog: renderCustodyLog,
+  custodySummary: renderCustodySummary,
+  hashVerification: renderHashVerification,
+  digitalSignatures: renderDigitalSignatures,
   diagnostics: renderDiagnostics,
   reportSections: renderReportSections,
   caseLabel: renderCaseLabel,
