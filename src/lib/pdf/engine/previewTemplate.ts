@@ -23,17 +23,28 @@ import type { DocumentTemplateConfig, TemplateDocumentType } from '../templateCo
 import type { TranslationContext } from '../types';
 import { renderTemplate } from './renderTemplate';
 import { createPdfWithFonts } from '../fonts';
+import { withTimeout } from '../translationContext';
 import { buildPreviewEngineData, sampleInvoiceData } from './sampleData';
 
 // Re-exported for any caller/test that wants the canonical invoice sample.
 export { sampleInvoiceData };
 
+/** Hard cap so a stuck pdfmake rasterization surfaces as an error, never an infinite spinner. */
+const PREVIEW_TIMEOUT_MS = 15000;
+
 /**
- * A 1×1 transparent PNG so the QR/logo image branches execute without needing a
- * real asset. Kept tiny and inline — the preview is about layout, not artwork.
+ * A VALID 1×1 light-gray PNG (8-bit RGB) used as the placeholder logo/QR so the
+ * header/QR image branches render in the preview.
+ *
+ * NB: the previous placeholder was a 1-bit-grayscale PNG, which pdfmake's PNG
+ * decoder rejects ("Incomplete or corrupt PNG file"). pdfmake throws that error
+ * ASYNCHRONOUSLY, so it never fires the getBlob callback — the preview promise
+ * never settles and the pane spins on "Updating…" forever. An 8-bit RGB PNG
+ * decodes cleanly. Exported so the rasterization regression test uses the exact
+ * same asset the preview does.
  */
-const TINY_PNG =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+export const PREVIEW_PLACEHOLDER_IMAGE =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGN48OABAAVEAqEuYekCAAAAAElFTkSuQmCC';
 
 /** A neutral English/LTR context — a preview always renders even before Arabic fonts load. */
 const PREVIEW_CTX_EN: TranslationContext = {
@@ -60,15 +71,29 @@ export function previewTemplate(
   ctx: TranslationContext = PREVIEW_CTX_EN,
 ): Promise<string> {
   const engineData = buildPreviewEngineData(docType, config);
-  const docDefinition = renderTemplate(config, engineData, ctx, TINY_PNG, TINY_PNG);
+  const docDefinition = renderTemplate(
+    config,
+    engineData,
+    ctx,
+    PREVIEW_PLACEHOLDER_IMAGE,
+    PREVIEW_PLACEHOLDER_IMAGE,
+  );
 
-  return new Promise<string>((resolve, reject) => {
+  // Wire pdfmake's error callback so a rasterization failure REJECTS (rather
+  // than leaving the promise pending forever → infinite "Updating…" spinner),
+  // and cap it with a timeout as a last-resort guard. Mirrors the proven
+  // pattern in pdfService.generateOfficeReceiptAsBlob.
+  const render = new Promise<string>((resolve, reject) => {
     try {
-      createPdfWithFonts(docDefinition).getBlob((blob: Blob) => {
-        resolve(URL.createObjectURL(blob));
-      });
+      createPdfWithFonts(docDefinition).getBlob(
+        (blob: Blob) => resolve(URL.createObjectURL(blob)),
+        undefined,
+        (err: unknown) => reject(err instanceof Error ? err : new Error('PDF rasterization failed')),
+      );
     } catch (err) {
       reject(err instanceof Error ? err : new Error('Failed to render template preview'));
     }
   });
+
+  return withTimeout(render, PREVIEW_TIMEOUT_MS, 'Preview render timed out');
 }
