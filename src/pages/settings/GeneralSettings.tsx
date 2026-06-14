@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
-import { uploadLogo, uploadQRCode, deleteLogo, deleteQRCode } from '../../lib/fileStorageService';
+import { uploadLogo, uploadQRCode, deleteLogo, deleteQRCode, uploadStamp, uploadSignature } from '../../lib/fileStorageService';
 import { SUPPORTED_LANGUAGES, type LanguageCode } from '../../lib/documentTranslations';
 import type { Database } from '../../types/database.types';
 import { Button } from '../../components/ui/Button';
@@ -441,7 +441,7 @@ export const GeneralSettings: React.FC = () => {
   const handleLogoUpload = async (
     file: File | null,
     _previewUrl: string | null,
-    type: 'primary' | 'light' | 'favicon'
+    type: 'primary' | 'light' | 'favicon' | 'stamp' | 'signature'
   ) => {
     if (!file || !formData) return;
 
@@ -455,36 +455,63 @@ export const GeneralSettings: React.FC = () => {
           ? branding.logo_file_path
           : type === 'light'
           ? branding.logo_light_file_path
+          : type === 'stamp'
+          ? branding.stamp_file_path
+          : type === 'signature'
+          ? branding.signature_file_path
           : branding.favicon_file_path;
       const oldFilePath = typeof oldFilePathRaw === 'string' ? oldFilePathRaw : '';
 
-      if (oldFilePath) {
+      if (oldFilePath && (type === 'primary' || type === 'light' || type === 'favicon')) {
         await deleteLogo(oldFilePath);
       }
 
-      const result = await uploadLogo(file, type);
+      const result =
+        type === 'stamp'
+          ? await uploadStamp(file)
+          : type === 'signature'
+          ? await uploadSignature(file)
+          : await uploadLogo(file, type as 'primary' | 'light' | 'favicon');
 
       if (result.success && result.filePath && result.publicUrl) {
         const urlField =
-          type === 'primary' ? 'logo_url' : type === 'light' ? 'logo_light_url' : 'favicon_url';
+          type === 'primary'
+            ? 'logo_url'
+            : type === 'light'
+            ? 'logo_light_url'
+            : type === 'stamp'
+            ? 'stamp_url'
+            : type === 'signature'
+            ? 'signature_url'
+            : 'favicon_url';
         const pathField =
           type === 'primary'
             ? 'logo_file_path'
             : type === 'light'
             ? 'logo_light_file_path'
+            : type === 'stamp'
+            ? 'stamp_file_path'
+            : type === 'signature'
+            ? 'signature_file_path'
             : 'favicon_file_path';
+        const metadataField =
+          type === 'stamp'
+            ? 'stamp_metadata'
+            : type === 'signature'
+            ? 'signature_metadata'
+            : 'logo_metadata';
 
-        const existingLogoMetadata =
-          branding.logo_metadata && typeof branding.logo_metadata === 'object'
-            ? (branding.logo_metadata as Record<string, unknown>)
+        const existingMetadata =
+          branding[metadataField] && typeof branding[metadataField] === 'object'
+            ? (branding[metadataField] as Record<string, unknown>)
             : {};
 
         const updatedBranding: JsonObject = {
           ...branding,
           [urlField]: result.publicUrl,
           [pathField]: result.filePath,
-          logo_metadata: {
-            ...existingLogoMetadata,
+          [metadataField]: {
+            ...existingMetadata,
             width: result.metadata?.width,
             height: result.metadata?.height,
             size_bytes: result.metadata?.size,
@@ -1067,6 +1094,24 @@ export const GeneralSettings: React.FC = () => {
                   description="Browser tab icon"
                   recommendedDimensions="64 × 64px"
                   maxSizeMB={1}
+                  bucketName="company-assets"
+                />
+                <ImageUpload
+                  value={toStr(formData.branding?.stamp_url)}
+                  onChange={(file, previewUrl) => handleLogoUpload(file, previewUrl, 'stamp')}
+                  label="Company Stamp"
+                  description="Seal placed in the signature area of documents"
+                  recommendedDimensions="300 × 300px"
+                  maxSizeMB={2}
+                  bucketName="company-assets"
+                />
+                <ImageUpload
+                  value={toStr(formData.branding?.signature_url)}
+                  onChange={(file, previewUrl) => handleLogoUpload(file, previewUrl, 'signature')}
+                  label="Signature"
+                  description="Authorized signature image"
+                  recommendedDimensions="400 × 150px"
+                  maxSizeMB={2}
                   bucketName="company-assets"
                 />
               </div>
