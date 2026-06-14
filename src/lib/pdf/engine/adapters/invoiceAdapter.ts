@@ -13,6 +13,7 @@
 import type { InvoiceDocumentData } from '../../types';
 import type { DocumentTemplateConfig, ColumnConfig } from '../../templateConfig';
 import { formatDate, safeString } from '../../utils';
+import { amountInWordsAr, amountInWordsEn } from '../amountInWords';
 import type {
   BankBlock,
   EngineDocData,
@@ -156,6 +157,15 @@ export function toEngineData(
     if (on('balanceDue')) {
       totals.push({ label: { en: 'Balance Due:', ar: 'الرصيد المستحق:' }, value: money(balanceDue) });
     }
+  }
+  // Amount in words (opt-in; off by default). Language-aware: Arabic-lead modes
+  // spell in Arabic, bilingual shows both.
+  if (lines.amountInWords === true) {
+    const mode = config.language.mode;
+    const enWords = amountInWordsEn(totalAmount, currencySymbol);
+    const arWords = amountInWordsAr(totalAmount, currencySymbol);
+    const value = mode === 'ar' ? arWords : mode.startsWith('bilingual') ? `${enWords}  ·  ${arWords}` : enWords;
+    totals.push({ label: { en: 'Amount in Words:', ar: 'المبلغ بالحروف:' }, value });
   }
 
   // ---- Terms / notes (structured: Payment Terms + Notes stacks) ------------

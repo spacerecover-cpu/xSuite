@@ -425,8 +425,11 @@ function financialSections(): SectionConfig[] {
     section('header', 0),
     section('parties', 1),
     section('meta', 2),
-    section('lineItems', 3, { columns: lineItemColumns() }),
-    section('totals', 4, {
+    // VAT/GST identification bar — hidden by default (opt-in for GCC tax
+    // invoices); renders nothing unless `config.taxBar.enabled` and visible.
+    section('taxBar', 3, { visible: false }),
+    section('lineItems', 4, { columns: lineItemColumns() }),
+    section('totals', 5, {
       lines: {
         subtotal: true,
         discount: true,
@@ -443,11 +446,11 @@ function financialSections(): SectionConfig[] {
     // Payment-history statement — rendered between totals and terms, mirroring
     // the legacy InvoiceDocument layout. Returns null on docs with no history
     // (proforma, quotes), so it is harmless on the shared financial base.
-    section('paymentHistory', 5),
-    section('terms', 6),
-    section('signature', 7, { visible: false }),
-    section('qr', 8),
-    section('footer', 9),
+    section('paymentHistory', 6),
+    section('terms', 7),
+    section('signature', 8, { visible: false }),
+    section('qr', 9),
+    section('footer', 10),
   ];
 }
 

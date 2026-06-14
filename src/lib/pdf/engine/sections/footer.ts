@@ -17,6 +17,7 @@
 import type { Content, DynamicContent } from 'pdfmake/interfaces';
 import { PDF_COLORS, createSocialFooter } from '../../styles';
 import type { EngineContext, EngineDocData, SectionRenderer } from '../types';
+import { resolveFooter } from '../branding';
 
 export const renderFooter: SectionRenderer = (
   engine: EngineContext,
@@ -95,10 +96,14 @@ export function buildPageFooter(
   const qr = engine.qrCodeBase64;
   const caption = data.qrCaption ?? null;
 
+  // Footer config (opt-in): a custom text + styling override. Absent → today's
+  // identity-driven footer (parity).
+  const fcfg = engine.config.footer ? resolveFooter(engine.config) : null;
+
   const hasSocial =
     !!online &&
     (!!online.website || !!online.facebook || !!online.twitter || !!online.linkedin || !!online.instagram);
-  if (!tagline && !hasSocial && !qr) return null;
+  if (!tagline && !hasSocial && !qr && !fcfg?.customText) return null;
 
   const dividerLine: Content = {
     canvas: [
@@ -108,6 +113,32 @@ export function buildPageFooter(
   };
 
   return (): Content => {
+    // Opt-in custom footer: styled text (+ website), optionally beside the QR.
+    if (fcfg) {
+      const text = fcfg.customText ?? tagline ?? '';
+      const lines: Content[] = [];
+      if (text) lines.push({ text, fontSize: fcfg.fontSize, bold: true, color: fcfg.fontColor, alignment: fcfg.alignment });
+      if (online?.website) {
+        lines.push({ text: online.website, fontSize: Math.max(7, fcfg.fontSize - 1), color: fcfg.fontColor, alignment: fcfg.alignment, margin: [0, 2, 0, 0] });
+      }
+      if (qr) {
+        return {
+          stack: [
+            dividerLine,
+            {
+              columns: [
+                { width: 'auto', stack: [{ image: qr, width: 60, height: 60, alignment: 'left' }] },
+                { text: '', width: '*' },
+                { width: 'auto', stack: lines },
+              ],
+            },
+          ],
+          margin: [35, 0, 35, 25],
+        };
+      }
+      return { stack: [dividerLine, { stack: lines }], margin: [35, 10, 35, 25] };
+    }
+
     if (qr) {
       const footerStack: Content[] = [];
       if (tagline) {

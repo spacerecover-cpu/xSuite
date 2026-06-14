@@ -18,17 +18,48 @@
  */
 
 import type { Content, DynamicContent, PageOrientation, PageSize, StyleDictionary, TDocumentDefinitions, Watermark } from 'pdfmake/interfaces';
-import { getStylesWithFont, PDF_STYLES } from '../styles';
-import type { DocumentTemplateConfig } from '../templateConfig';
+import { getStylesWithFont, PDF_COLORS, PDF_STYLES } from '../styles';
+import type { DocumentTemplateConfig, TypographyStyleKey } from '../templateConfig';
 import type { TranslationContext } from '../types';
 import type { EngineContext, EngineDocData } from './types';
 import { SECTION_REGISTRY } from './registry';
 import { buildPageFooter } from './sections/footer';
 import { engineLayoutDirection, engineDefaultFont } from './rtl';
-import { resolveAccentColors, resolveWatermark } from './branding';
+import {
+  resolveColors,
+  resolvePageFitting,
+  resolvePageNumbers,
+  resolveTypography,
+  resolveWatermarkSettings,
+} from './branding';
+
+/** Spacing/size multiplier per density preset (comfortable = identity/legacy). */
+const DENSITY_SCALE: Record<'comfortable' | 'compact' | 'dense', number> = {
+  comfortable: 1,
+  compact: 0.88,
+  dense: 0.78,
+};
 
 /** Section keys that can be promoted to the repeating page footer. */
 const PAGE_FOOTER_KEYS = new Set(['footer', 'qr']);
+
+/** Named styles the typography group rescales when a tenant configures it. */
+const TYPOGRAPHY_STYLE_KEYS: TypographyStyleKey[] = [
+  'documentTitle',
+  'sectionTitle',
+  'tableHeader',
+  'tableCell',
+  'label',
+  'value',
+  'totalValue',
+  'footer',
+  'termsText',
+];
+
+/** Substitute `{page}` / `{pages}` tokens in a page-number format string. */
+function formatPageNumber(format: string, page: number, pages: number): string {
+  return format.replace(/\{page\}/g, String(page)).replace(/\{pages\}/g, String(pages));
+}
 
 export function renderTemplate(
   config: DocumentTemplateConfig,
@@ -52,7 +83,7 @@ export function renderTemplate(
     pageSize = config.paper.size === 'Letter' ? 'LETTER' : 'A4';
   }
   const pageOrientation: PageOrientation = config.paper.orientation;
-  const pageMargins = config.paper.margins;
+  let pageMargins: [number, number, number, number] = config.paper.margins;
 
   // 2. Visible sections, ascending order, dispatched via the registry.
   const ordered = [...config.sections]
@@ -96,58 +127,116 @@ export function renderTemplate(
     }
   }
 
-  // 4. Repeating page footer (divider + tagline + website + optional QR),
-  // mirroring the hand-written builders' `footer:` callback. `buildPageFooter`
-  // returns null when there is nothing to render, in which case the trailing
-  // sections simply contribute nothing (the same outcome as the in-content
-  // renderers returning null for empty data).
-  const footer: DynamicContent | undefined = promoteToPageFooter
-    ? buildPageFooter(engine, data) ?? undefined
-    : undefined;
-
-  // 5. RTL document defaults (M6). When the resolved language puts Arabic in the
-  // lead, the whole document flows right-to-left: the defaultStyle font becomes
-  // the Arabic family (so glyphs shape) and the default alignment becomes right.
-  // Section renderers additionally mirror their tables — they read direction off
-  // `config.language` the same way (via `engine/rtl`), so the document default
-  // and the per-section behavior stay in lock-step. LTR keeps the tenant font and
-  // no document-level alignment override, leaving English-only output unchanged.
+  // 4. RTL + typography document defaults. Under RTL (Arabic-lead) the document
+  // flows right-to-left and keeps the Arabic family so glyphs shape; LTR uses the
+  // tenant font, which the typography group may swap. Absent typography → today's
+  // font (parity).
   const direction = engineLayoutDirection(config.language);
-  const defaultFont = engineDefaultFont(config.language, ctx.fontFamily);
+  const rtlFont = engineDefaultFont(config.language, ctx.fontFamily);
+  const typography = resolveTypography(config, rtlFont);
+  const baseFont = direction === 'rtl' ? rtlFont : typography.fontFamily;
   const defaultStyle =
     direction === 'rtl'
-      ? { font: defaultFont, alignment: 'right' as const }
-      : { font: defaultFont };
+      ? { font: baseFont, alignment: 'right' as const }
+      : { font: baseFont };
 
-  // 6. OPT-IN branding (M7) — NEUTRAL by default.
-  // PDFs do not theme: with `branding.accent === 'inherit'` (the default) the
-  // resolved colors equal the neutral `PDF_COLORS.primary` the legacy builders
-  // use, so this is a no-op. Only an EXPLICIT hex opts the SMALL accent surface
-  // set (header divider rule + section-title text) into that color; the rule
-  // color is read off `config.branding` directly by the header renderer, and the
-  // section-title text color is applied here by overriding the two named styles
-  // (`sectionTitle`, `bilingualHeader`) that every section heading routes
-  // through. Body text, tables, totals, and status colors are never accented.
-  const accent = resolveAccentColors(config.branding);
-  const styles: StyleDictionary = getStylesWithFont(defaultFont);
-  styles.sectionTitle = { ...styles.sectionTitle, color: accent.sectionTitle };
-  styles.bilingualHeader = { ...styles.bilingualHeader, color: accent.sectionTitle };
+  // 5. Styles from the base font. When a typography group is present, rescale the
+  // named styles (absolute per-style size wins, else the built-in size × scale);
+  // absent → today's sizes (parity).
+  const styles: StyleDictionary = getStylesWithFont(baseFont);
+  if (config.typography) {
+    for (const key of TYPOGRAPHY_STYLE_KEYS) {
+      styles[key] = { ...styles[key], fontSize: typography.sizeFor(key) };
+    }
+  }
 
-  // Optional text watermark: a non-empty `branding.watermark` becomes a pdfmake
-  // page watermark, reusing the shared `watermark` style's visual params (light
-  // 60pt bold, low opacity) so it reads as a background wash on every page. An
-  // empty/absent watermark emits no key at all (no watermark — the default).
-  const watermarkText = resolveWatermark(config.branding);
-  const watermark: Watermark | undefined = watermarkText
-    ? {
-        text: watermarkText,
-        font: defaultFont,
-        color: PDF_STYLES.watermark.color as string,
-        opacity: PDF_STYLES.watermark.opacity as number,
-        bold: true,
-        fontSize: PDF_STYLES.watermark.fontSize as number,
+  // 6. Colors — NEUTRAL by default. With no `colors` group and `branding.accent`
+  // === 'inherit', `resolveColors` returns the legacy `PDF_COLORS`, so this is a
+  // no-op. The accent (colors.accent → branding.accent → neutral) always drives
+  // the section-title + bilingual-header text (and, in `header.ts`, the divider
+  // rule + document title). The full body palette (text / label / total) is
+  // applied ONLY when a `colors` group is present, so unconfigured templates are
+  // byte-for-byte unchanged.
+  const colors = resolveColors(config);
+  styles.sectionTitle = { ...styles.sectionTitle, color: colors.accent };
+  styles.bilingualHeader = { ...styles.bilingualHeader, color: colors.accent };
+  if (config.colors) {
+    styles.value = { ...styles.value, color: colors.text };
+    styles.valueBold = { ...styles.valueBold, color: colors.text };
+    styles.tableCell = { ...styles.tableCell, color: colors.text };
+    styles.tableCellCenter = { ...styles.tableCellCenter, color: colors.text };
+    styles.tableCellRight = { ...styles.tableCellRight, color: colors.text };
+    styles.label = { ...styles.label, color: colors.label };
+    styles.totalValue = { ...styles.totalValue, color: colors.accent };
+  }
+
+  // 6b. Page fitting / density (opt-in). Density tightens margins + font sizes;
+  // auto-fit applies an extra reduction (never below the legibility floor) to
+  // keep the document on one page. Absent `pageFitting` (or comfortable with no
+  // auto-fit) → scale 1 → no change (parity).
+  if (config.pageFitting) {
+    const fitting = resolvePageFitting(config);
+    const densityScale = DENSITY_SCALE[fitting.density];
+    const scale = fitting.autoFitOnePage ? Math.max(fitting.minScale, densityScale * 0.9) : densityScale;
+    if (scale !== 1) {
+      const m = config.paper.margins;
+      pageMargins = [
+        Math.round(m[0] * scale),
+        Math.round(m[1] * scale),
+        Math.round(m[2] * scale),
+        Math.round(m[3] * scale),
+      ];
+      for (const key of Object.keys(styles)) {
+        const style = styles[key] as { fontSize?: number };
+        if (typeof style.fontSize === 'number') {
+          styles[key] = { ...styles[key], fontSize: Math.round(style.fontSize * scale * 10) / 10 };
+        }
       }
-    : undefined;
+    }
+  }
+
+  // 7. Repeating page footer (divider + tagline + website + optional QR) plus an
+  // optional page-number line. `buildPageFooter` returns null when there is
+  // nothing to render. Page numbers (opt-in) append a line driven by
+  // `pageNumbers.format`; when disabled (default) the footer is exactly the base
+  // footer — parity preserved.
+  const baseFooter = promoteToPageFooter ? buildPageFooter(engine, data) : null;
+  const pageNumbers = resolvePageNumbers(config);
+  let footer: DynamicContent | undefined;
+  if (pageNumbers.enabled) {
+    footer = (currentPage, pageCount, currentPageSize) => {
+      const base = baseFooter ? baseFooter(currentPage, pageCount, currentPageSize) : null;
+      const numberLine: Content = {
+        text: formatPageNumber(pageNumbers.format, currentPage, pageCount),
+        alignment: pageNumbers.position,
+        fontSize: 8,
+        color: PDF_COLORS.textMuted,
+        margin: [40, 4, 40, 0],
+      };
+      return base
+        ? { stack: [base, numberLine] }
+        : { stack: [numberLine], margin: [0, 0, 0, 16] };
+    };
+  } else if (baseFooter) {
+    footer = baseFooter;
+  }
+
+  // 8. Optional watermark. Absent → no key (default = none). The legacy
+  // `branding.watermark` path keeps its exact prior shape (no `angle`) for parity;
+  // only the new `watermark` group adds the configurable angle.
+  const wm = resolveWatermarkSettings(config);
+  const watermark: Watermark | undefined =
+    wm && wm.text
+      ? {
+          text: wm.text,
+          font: baseFont,
+          color: PDF_STYLES.watermark.color as string,
+          opacity: wm.opacity,
+          bold: true,
+          fontSize: wm.fontSize,
+          ...(config.watermark ? { angle: wm.angle } : {}),
+        }
+      : undefined;
 
   return {
     pageSize,

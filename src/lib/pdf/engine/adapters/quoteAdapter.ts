@@ -19,6 +19,7 @@
 import type { QuoteDocumentData } from '../../types';
 import type { DocumentTemplateConfig, ColumnConfig } from '../../templateConfig';
 import { formatDate, safeString } from '../../utils';
+import { amountInWordsAr, amountInWordsEn } from '../amountInWords';
 import type {
   BankBlock,
   EngineDocData,
@@ -155,6 +156,16 @@ export function toEngineData(
   }
   if (on('total')) {
     totals.push({ label: { en: 'Total:', ar: 'الإجمالي:' }, value: money(totalAmount), emphasis: true });
+  }
+  // Amount in words (opt-in; off by default). Language-aware.
+  if (lines.amountInWords === true) {
+    const mode = config.language.mode;
+    const enWords = amountInWordsEn(totalAmount, currencySymbol);
+    const arWords = amountInWordsAr(totalAmount, currencySymbol);
+    totals.push({
+      label: { en: 'Amount in Words:', ar: 'المبلغ بالحروف:' },
+      value: mode === 'ar' ? arWords : mode.startsWith('bilingual') ? `${enWords}  ·  ${arWords}` : enWords,
+    });
   }
 
   // ---- Terms / notes (structured: Terms & Conditions + Notes stacks) -------

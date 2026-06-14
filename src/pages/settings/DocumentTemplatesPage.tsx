@@ -10,6 +10,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Lock,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -38,7 +39,8 @@ import type {
   TemplateDocumentType,
 } from '../../lib/pdf/templateConfig';
 import { DOCUMENT_TYPES, DOC_TYPE_LABELS } from './documentTypeMeta';
-import { DocumentTemplateEditor } from './DocumentTemplateEditor';
+import { TemplateStudio } from '../../components/settings/documents/TemplateStudio';
+import { TemplateGalleryModal } from '../../components/settings/documents/TemplateGalleryModal';
 
 /** Roles allowed to edit document templates (manager and above). */
 const EDITOR_ROLES = ['owner', 'admin', 'manager'] as const;
@@ -77,6 +79,18 @@ export const DocumentTemplatesPage: React.FC = () => {
   const canEdit = !!profile?.role && (EDITOR_ROLES as readonly string[]).includes(profile.role);
 
   const [editing, setEditing] = useState<TemplateDocumentType | null>(null);
+  const [galleryFor, setGalleryFor] = useState<TemplateDocumentType | null>(null);
+  // A preset selected from the gallery seeds the Studio; the nonce remounts it
+  // so an already-open Studio re-seeds when a template is applied.
+  const [seedOverride, setSeedOverride] = useState<TemplateConfigOverride | null>(null);
+  const [seedNonce, setSeedNonce] = useState(0);
+
+  const openTemplateFrom = (docType: TemplateDocumentType, override: TemplateConfigOverride) => {
+    setSeedOverride(override);
+    setSeedNonce((n) => n + 1);
+    setEditing(docType);
+    setGalleryFor(null);
+  };
 
   const {
     data: overview,
@@ -176,20 +190,39 @@ export const DocumentTemplatesPage: React.FC = () => {
     });
   };
 
+  const galleryModal = (
+    <TemplateGalleryModal
+      isOpen={!!galleryFor}
+      docType={galleryFor ?? 'invoice'}
+      onClose={() => setGalleryFor(null)}
+      onUse={(config) => galleryFor && openTemplateFrom(galleryFor, config)}
+      onBlank={() => galleryFor && openTemplateFrom(galleryFor, {})}
+    />
+  );
+
   // ---- Editor sub-view -----------------------------------------------------
   if (editing) {
     const state = overview?.[editing];
-    const initialOverride: TemplateConfigOverride = state?.deployed
-      ? readConfig(state.deployed.config)
-      : {};
+    // A gallery-selected preset seeds the Studio; otherwise start from the
+    // tenant's deployed config (or the built-in default for a fresh type).
+    const initialOverride: TemplateConfigOverride =
+      seedOverride ?? (state?.deployed ? readConfig(state.deployed.config) : {});
     return (
-      <DocumentTemplateEditor
-        docType={editing}
-        initialOverride={initialOverride}
-        isSaving={saveMutation.isPending}
-        onBack={() => setEditing(null)}
-        onSave={(override) => saveMutation.mutate({ docType: editing, override })}
-      />
+      <>
+        <TemplateStudio
+          key={`${editing}-${seedNonce}`}
+          docType={editing}
+          initialOverride={initialOverride}
+          isSaving={saveMutation.isPending}
+          onBack={() => {
+            setEditing(null);
+            setSeedOverride(null);
+          }}
+          onOpenGallery={() => setGalleryFor(editing)}
+          onSave={(override) => saveMutation.mutate({ docType: editing, override })}
+        />
+        {galleryModal}
+      </>
     );
   }
 
@@ -294,13 +327,25 @@ export const DocumentTemplatesPage: React.FC = () => {
                     variant={canEdit ? 'primary' : 'secondary'}
                     size="sm"
                     className="flex-1"
-                    onClick={() => setEditing(type)}
+                    onClick={() => {
+                      setSeedOverride(null);
+                      setEditing(type);
+                    }}
                   >
                     <Pencil className="w-3.5 h-3.5 mr-1.5" />
                     {canEdit ? 'Edit' : 'Preview'}
                   </Button>
                   {canEdit && (
                     <>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        aria-label={`Browse ${label} templates`}
+                        title="Browse templates"
+                        onClick={() => setGalleryFor(type)}
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                      </Button>
                       <Button
                         variant="secondary"
                         size="sm"
@@ -330,6 +375,8 @@ export const DocumentTemplatesPage: React.FC = () => {
           })}
         </div>
       )}
+
+      {galleryModal}
     </div>
   );
 };
