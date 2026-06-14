@@ -34,6 +34,33 @@ import {
   type TemplateConfigOverride,
 } from './templateConfig';
 import { getDeployedVersionByType, readConfig } from '../documentTemplateService';
+import { resolveBrandingImage, type BrandingImage } from './brandingImage';
+import type { SignatureImagesConfig } from './templateConfig';
+
+/**
+ * Resolve the deployed `signatureImages` config for a generated (legacy-path)
+ * document type. Reads the tenant's deployed doc-type template (if any) as the
+ * cascade layer over the built-in default, then returns the resolved
+ * `signatureImages` group. Wrapped so a missing/failed template lookup never
+ * breaks generation — it simply leaves the feature off (`undefined`).
+ */
+async function resolveSignatureImagesConfig(
+  docType: 'office_receipt' | 'customer_copy' | 'checkout_form',
+): Promise<SignatureImagesConfig | undefined> {
+  try {
+    const deployed = await getDeployedVersionByType(docType);
+    const cfg = resolveTemplateConfig(
+      BUILT_IN_TEMPLATE_CONFIGS[docType],
+      /* theme */ undefined,
+      /* docType */ deployed ? readConfig(deployed.config) : undefined,
+      /* instance */ undefined,
+    );
+    return cfg.signatureImages;
+  } catch (err) {
+    console.error(`[PDF Service] ${docType}: signatureImages resolution failed, feature off:`, err);
+    return undefined;
+  }
+}
 
 /**
  * Build the invoice pdfmake doc-definition via the NEW config-driven engine.
@@ -206,6 +233,8 @@ async function buildOfficeReceiptViaEngine(
   qrCodeBase64: string | null,
   docType: 'office_receipt' | 'customer_copy',
   variant: ReceiptVariant,
+  stampImage?: BrandingImage | string | null,
+  signatureImage?: BrandingImage | string | null,
 ): Promise<TDocumentDefinitions> {
   let docTypeOverride: TemplateConfigOverride | undefined;
   try {
@@ -227,7 +256,7 @@ async function buildOfficeReceiptViaEngine(
   const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
 
   const engineData = toReceiptEngineData(data, languageAwareConfig, variant);
-  return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64);
+  return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64, stampImage, signatureImage);
 }
 
 /**
@@ -240,8 +269,19 @@ function buildCustomerCopyViaEngine(
   ctx: TranslationContext,
   logoBase64: string | null,
   qrCodeBase64: string | null,
+  stampImage?: BrandingImage | string | null,
+  signatureImage?: BrandingImage | string | null,
 ): Promise<TDocumentDefinitions> {
-  return buildOfficeReceiptViaEngine(data, ctx, logoBase64, qrCodeBase64, 'customer_copy', 'customer');
+  return buildOfficeReceiptViaEngine(
+    data,
+    ctx,
+    logoBase64,
+    qrCodeBase64,
+    'customer_copy',
+    'customer',
+    stampImage,
+    signatureImage,
+  );
 }
 
 /**
@@ -257,6 +297,8 @@ async function buildCheckoutFormViaEngine(
   ctx: TranslationContext,
   logoBase64: string | null,
   qrCodeBase64: string | null,
+  stampImage?: BrandingImage | string | null,
+  signatureImage?: BrandingImage | string | null,
 ): Promise<TDocumentDefinitions> {
   let docTypeOverride: TemplateConfigOverride | undefined;
   try {
@@ -278,7 +320,7 @@ async function buildCheckoutFormViaEngine(
   const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
 
   const engineData = toCheckoutEngineData(data, languageAwareConfig);
-  return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64);
+  return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qrCodeBase64, stampImage, signatureImage);
 }
 
 /**
@@ -415,7 +457,7 @@ export async function generateOfficeReceipt(caseId: string, download: boolean = 
 
     const ctx = createTranslationContext(mode, languageCode);
 
-    const [logoBase64, qrCodeBase64] = await Promise.all([
+    const [logoBase64, qrCodeBase64, stampImg, sigImg] = await Promise.all([
       data.companySettings.branding?.logo_url
         ? withTimeout(
             loadImageAsBase64(data.companySettings.branding.logo_url),
@@ -430,13 +472,16 @@ export async function generateOfficeReceipt(caseId: string, download: boolean = 
             'QR code loading timeout'
           )
         : Promise.resolve(null),
+      resolveBrandingImage(data.companySettings.branding?.stamp_url),
+      resolveBrandingImage(data.companySettings.branding?.signature_url),
     ]);
 
     const qrCodeCaption = data.companySettings.branding?.qr_code_general_caption || 'Scan for more information';
+    const signatureImages = await resolveSignatureImagesConfig('office_receipt');
 
     const docDefinition = isPdfEngineEnabled('office_receipt')
-      ? await buildOfficeReceiptViaEngine(data, ctx, logoBase64, qrCodeBase64, 'office_receipt', 'office')
-      : buildOfficeReceiptDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+      ? await buildOfficeReceiptViaEngine(data, ctx, logoBase64, qrCodeBase64, 'office_receipt', 'office', stampImg, sigImg)
+      : buildOfficeReceiptDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption, stampImg, sigImg, signatureImages);
 
     const filename = `Office_Receipt_${data.caseData.case_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 
@@ -504,19 +549,23 @@ export async function generateCustomerCopy(caseId: string, download: boolean = t
 
     const ctx = createTranslationContext(mode, languageCode);
 
-    const [logoBase64, qrCodeBase64] = await Promise.all([
+    const [logoBase64, qrCodeBase64, stampImg, sigImg] = await Promise.all([
       data.companySettings.branding?.logo_url
         ? loadImageAsBase64(data.companySettings.branding.logo_url)
         : Promise.resolve(null),
       data.companySettings.branding?.qr_code_general_url
         ? loadImageAsBase64(data.companySettings.branding.qr_code_general_url)
         : Promise.resolve(null),
+      resolveBrandingImage(data.companySettings.branding?.stamp_url),
+      resolveBrandingImage(data.companySettings.branding?.signature_url),
     ]);
 
     const qrCodeCaption = data.companySettings.branding?.qr_code_general_caption || 'Scan for more information';
 
+    // customer_copy's legacy builder has no signature block; the engine builder
+    // reads its own resolved signatureImages, so it only needs the image inputs.
     const docDefinition = isPdfEngineEnabled('customer_copy')
-      ? await buildCustomerCopyViaEngine(data, ctx, logoBase64, qrCodeBase64)
+      ? await buildCustomerCopyViaEngine(data, ctx, logoBase64, qrCodeBase64, stampImg, sigImg)
       : buildCustomerCopyDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
 
     const filename = `Customer_Copy_${data.caseData.case_number}_${new Date().toISOString().split('T')[0]}.pdf`;
@@ -555,20 +604,23 @@ export async function generateCheckoutForm(caseId: string, download: boolean = t
 
     const ctx = createTranslationContext(mode, languageCode);
 
-    const [logoBase64, qrCodeBase64] = await Promise.all([
+    const [logoBase64, qrCodeBase64, stampImg, sigImg] = await Promise.all([
       data.companySettings.branding?.logo_url
         ? loadImageAsBase64(data.companySettings.branding.logo_url)
         : Promise.resolve(null),
       data.companySettings.branding?.qr_code_general_url
         ? loadImageAsBase64(data.companySettings.branding.qr_code_general_url)
         : Promise.resolve(null),
+      resolveBrandingImage(data.companySettings.branding?.stamp_url),
+      resolveBrandingImage(data.companySettings.branding?.signature_url),
     ]);
 
     const qrCodeCaption = data.companySettings.branding?.qr_code_general_caption || 'Scan for more information';
+    const signatureImages = await resolveSignatureImagesConfig('checkout_form');
 
     const docDefinition = isPdfEngineEnabled('checkout_form')
-      ? await buildCheckoutFormViaEngine(data, ctx, logoBase64, qrCodeBase64)
-      : buildCheckoutFormDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+      ? await buildCheckoutFormViaEngine(data, ctx, logoBase64, qrCodeBase64, stampImg, sigImg)
+      : buildCheckoutFormDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption, stampImg, sigImg, signatureImages);
 
     const filename = `Checkout_Form_${data.caseData.case_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 
@@ -1122,7 +1174,7 @@ export async function generateOfficeReceiptAsBlob(caseId: string): Promise<PDFBl
 
     const ctx = createTranslationContext(mode, languageCode);
 
-    const [logoBase64, qrCodeBase64] = await Promise.all([
+    const [logoBase64, qrCodeBase64, stampImg, sigImg] = await Promise.all([
       data.companySettings.branding?.logo_url
         ? withTimeout(
             loadImageAsBase64(data.companySettings.branding.logo_url),
@@ -1137,13 +1189,16 @@ export async function generateOfficeReceiptAsBlob(caseId: string): Promise<PDFBl
             'QR code loading timeout'
           )
         : Promise.resolve(null),
+      resolveBrandingImage(data.companySettings.branding?.stamp_url),
+      resolveBrandingImage(data.companySettings.branding?.signature_url),
     ]);
 
     const qrCodeCaption = data.companySettings.branding?.qr_code_general_caption || 'Scan for more information';
+    const signatureImages = await resolveSignatureImagesConfig('office_receipt');
 
     const docDefinition = isPdfEngineEnabled('office_receipt')
-      ? await buildOfficeReceiptViaEngine(data, ctx, logoBase64, qrCodeBase64, 'office_receipt', 'office')
-      : buildOfficeReceiptDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+      ? await buildOfficeReceiptViaEngine(data, ctx, logoBase64, qrCodeBase64, 'office_receipt', 'office', stampImg, sigImg)
+      : buildOfficeReceiptDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption, stampImg, sigImg, signatureImages);
     const filename = `Office_Receipt_${data.caseData.case_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 
     const blobPromise = new Promise<{ blobUrl: string; blob: Blob }>((resolve, reject) => {
@@ -1223,19 +1278,23 @@ export async function generateCustomerCopyAsBlob(caseId: string): Promise<PDFBlo
       languageCode
     );
 
-    const [logoBase64, qrCodeBase64] = await Promise.all([
+    const [logoBase64, qrCodeBase64, stampImg, sigImg] = await Promise.all([
       data.companySettings.branding?.logo_url
         ? loadImageAsBase64(data.companySettings.branding.logo_url)
         : Promise.resolve(null),
       data.companySettings.branding?.qr_code_general_url
         ? loadImageAsBase64(data.companySettings.branding.qr_code_general_url)
         : Promise.resolve(null),
+      resolveBrandingImage(data.companySettings.branding?.stamp_url),
+      resolveBrandingImage(data.companySettings.branding?.signature_url),
     ]);
 
     const qrCodeCaption = data.companySettings.branding?.qr_code_general_caption || 'Scan for more information';
 
+    // customer_copy's legacy builder has no signature block; the engine builder
+    // reads its own resolved signatureImages, so it only needs the image inputs.
     const docDefinition = isPdfEngineEnabled('customer_copy')
-      ? await buildCustomerCopyViaEngine(data, ctx, logoBase64, qrCodeBase64)
+      ? await buildCustomerCopyViaEngine(data, ctx, logoBase64, qrCodeBase64, stampImg, sigImg)
       : buildCustomerCopyDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
     const filename = `Customer_Copy_${data.caseData.case_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 
@@ -1268,20 +1327,23 @@ export async function generateCheckoutFormAsBlob(caseId: string): Promise<PDFBlo
       languageCode
     );
 
-    const [logoBase64, qrCodeBase64] = await Promise.all([
+    const [logoBase64, qrCodeBase64, stampImg, sigImg] = await Promise.all([
       data.companySettings.branding?.logo_url
         ? loadImageAsBase64(data.companySettings.branding.logo_url)
         : Promise.resolve(null),
       data.companySettings.branding?.qr_code_general_url
         ? loadImageAsBase64(data.companySettings.branding.qr_code_general_url)
         : Promise.resolve(null),
+      resolveBrandingImage(data.companySettings.branding?.stamp_url),
+      resolveBrandingImage(data.companySettings.branding?.signature_url),
     ]);
 
     const qrCodeCaption = data.companySettings.branding?.qr_code_general_caption || 'Scan for more information';
+    const signatureImages = await resolveSignatureImagesConfig('checkout_form');
 
     const docDefinition = isPdfEngineEnabled('checkout_form')
-      ? await buildCheckoutFormViaEngine(data, ctx, logoBase64, qrCodeBase64)
-      : buildCheckoutFormDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+      ? await buildCheckoutFormViaEngine(data, ctx, logoBase64, qrCodeBase64, stampImg, sigImg)
+      : buildCheckoutFormDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption, stampImg, sigImg, signatureImages);
     const filename = `Checkout_Form_${data.caseData.case_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 
     return new Promise((resolve) => {
