@@ -27,7 +27,7 @@ import type {
   LabelText,
   SectionRenderer,
 } from '../types';
-import { isBilingualMode, en, ar, resolveLabel } from '../labels';
+import { isBilingualMode, en, ar, resolveLabel, fieldLabelLanguage } from '../labels';
 
 function infoRow(
   label: LabelText,
@@ -59,10 +59,11 @@ export const renderDiagnostics: SectionRenderer = (
 
   const { language } = engine.config;
   const bilingual = isBilingualMode(language);
-  const labelWidth = bilingual ? 150 : 90;
+  const labelLang = fieldLabelLanguage(language, engine.config.translationPolicy, 'diagnostics');
+  const labelWidth = isBilingualMode(labelLang) ? 150 : 90;
   const mediaIcon = getGeneralIconSvg('fileText');
 
-  const rows: object[] = diagnostics.rows.map((r) => infoRow(r.label, r.value, language, labelWidth));
+  const rows: object[] = diagnostics.rows.map((r) => infoRow(r.label, r.value, labelLang, labelWidth));
 
   const box = createBilingualInfoBox(
     en(diagnostics.title, 'Media Details'),

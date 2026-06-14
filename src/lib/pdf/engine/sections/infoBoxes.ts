@@ -20,7 +20,7 @@ import type {
   PartyBlock,
   SectionRenderer,
 } from '../types';
-import { isBilingualMode, en, ar, resolveLabel } from '../labels';
+import { isBilingualMode, en, ar, resolveLabel, fieldLabelLanguage } from '../labels';
 import { engineLayoutDirection } from '../rtl';
 
 function infoRow(
@@ -43,15 +43,20 @@ function labelWidthFor(language: EngineContext['config']['language']): number {
   return isBilingualMode(language) ? 150 : 90;
 }
 
-/** The label/value rows for a party block (name first, then its detail rows). */
-function partyRows(party: PartyBlock, language: EngineContext['config']['language']): object[] {
-  const labelWidth = labelWidthFor(language);
+/**
+ * The label/value rows for a party block (name first, then its detail rows).
+ * `labelLang` is the (policy-resolved) language used for the FIELD-ROW labels and
+ * the label-column width — it is the full bilingual config when the `parties`
+ * group is translated, else primary-only when suppressed.
+ */
+function partyRows(party: PartyBlock, labelLang: EngineContext['config']['language']): object[] {
+  const labelWidth = labelWidthFor(labelLang);
   const rows: object[] = [];
   if (party.name) {
-    rows.push(infoRow({ en: 'Name:', ar: 'الاسم:' }, party.name, language, labelWidth));
+    rows.push(infoRow({ en: 'Name:', ar: 'الاسم:' }, party.name, labelLang, labelWidth));
   }
   for (const r of party.rows) {
-    rows.push(infoRow(r.label, r.value, language, labelWidth));
+    rows.push(infoRow(r.label, r.value, labelLang, labelWidth));
   }
   return rows;
 }
@@ -63,12 +68,15 @@ function partyBox(
 ): Content {
   const { language } = engine.config;
   const bilingual = isBilingualMode(language);
+  const labelLang = fieldLabelLanguage(language, engine.config.translationPolicy, 'parties');
 
   // Pass the real Arabic title when bilingual; null collapses the AR column.
+  // The TITLE stays on `language` (always bilingual); the field rows use
+  // `labelLang` so the policy can suppress the per-row Arabic labels.
   return createBilingualInfoBox(
     en(party.title),
     bilingual ? ar(party.title) : null,
-    partyRows(party, language),
+    partyRows(party, labelLang),
     iconSvg,
   ) as Content;
 }
@@ -91,8 +99,9 @@ function metaTitleLabel(engine: EngineContext): LabelText {
 /** The label/value rows for the meta (document-details) block. */
 function metaRows(engine: EngineContext, data: EngineDocData): object[] {
   const { language } = engine.config;
-  const labelWidth = labelWidthFor(language);
-  return (data.meta ?? []).map((m) => infoRow(m.label, m.value, language, labelWidth));
+  const labelLang = fieldLabelLanguage(language, engine.config.translationPolicy, 'meta');
+  const labelWidth = labelWidthFor(labelLang);
+  return (data.meta ?? []).map((m) => infoRow(m.label, m.value, labelLang, labelWidth));
 }
 
 /** Build the meta (document-details) info box, or null when there is nothing to show. */
@@ -135,14 +144,17 @@ function detailsHalf(
   data: EngineDocData,
 ): { title: LabelText; rows: object[] } | null {
   const { language } = engine.config;
-  const labelWidth = labelWidthFor(language);
   if (data.meta && data.meta.length > 0) {
-    return { title: metaTitleLabel(engine), rows: data.meta.map((m) => infoRow(m.label, m.value, language, labelWidth)) };
+    const metaLabelLang = fieldLabelLanguage(language, engine.config.translationPolicy, 'meta');
+    const metaLabelWidth = labelWidthFor(metaLabelLang);
+    return { title: metaTitleLabel(engine), rows: data.meta.map((m) => infoRow(m.label, m.value, metaLabelLang, metaLabelWidth)) };
   }
   if (data.caseInfo && data.caseInfo.rows.length > 0) {
+    const caseLabelLang = fieldLabelLanguage(language, engine.config.translationPolicy, 'caseInfo');
+    const caseLabelWidth = labelWidthFor(caseLabelLang);
     return {
       title: data.caseInfo.title,
-      rows: data.caseInfo.rows.map((r) => infoRow(r.label, r.value, language, labelWidth)),
+      rows: data.caseInfo.rows.map((r) => infoRow(r.label, r.value, caseLabelLang, caseLabelWidth)),
     };
   }
   return null;
@@ -217,6 +229,7 @@ export function renderPartiesMeta(
 ): Content | null {
   const { language } = engine.config;
   const bilingual = isBilingualMode(language);
+  const partyLabelLang = fieldLabelLanguage(language, engine.config.translationPolicy, 'parties');
 
   // The single party present (recipient preferred, else issuer). `renderTemplate`
   // only routes here when there is at most one party box.
@@ -253,7 +266,7 @@ export function renderPartiesMeta(
     fillColor: band,
     margin: [6, 4, 6, 4],
   };
-  const partyContentCell = { stack: partyRows(party, language), margin: [8, 5, 8, 6] };
+  const partyContentCell = { stack: partyRows(party, partyLabelLang), margin: [8, 5, 8, 6] };
   const detailsContentCell = { stack: details.rows, margin: [8, 5, 8, 6] };
 
   const rtl = engineLayoutDirection(language) === 'rtl';
