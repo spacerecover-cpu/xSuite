@@ -81,32 +81,35 @@ export function toEngineData(
   const customerEmail =
     invoiceData.customer?.email ||
     invoiceData.cases?.contact_email ||
-    invoiceData.company?.email ||
-    'N/A';
+    invoiceData.company?.email;
   const customerPhone =
     invoiceData.customer?.mobile_number ||
     invoiceData.customer?.phone_number ||
     invoiceData.cases?.contact_phone ||
-    invoiceData.company?.phone_number ||
-    'N/A';
+    invoiceData.company?.phone_number;
+
+  // Only include a detail row when the value is actually present — a missing
+  // detail is omitted entirely rather than printed as a "-" placeholder.
+  const toRows: PartyBlock['rows'] = [];
+  if (companyNameDisplay) toRows.push({ label: { en: 'Company:', ar: 'الشركة:' }, value: companyNameDisplay });
+  if (customerPhone) toRows.push({ label: { en: 'Phone:', ar: 'الهاتف:' }, value: customerPhone });
+  if (customerEmail) toRows.push({ label: { en: 'Email:', ar: 'البريد:' }, value: customerEmail });
+  if (invoiceData.client_reference) toRows.push({ label: { en: 'Reference:', ar: 'المرجع:' }, value: invoiceData.client_reference });
 
   const to: PartyBlock = {
     title: { en: 'Customer Information', ar: 'معلومات العميل' },
     name: customerName,
-    rows: [
-      { label: { en: 'Company:', ar: 'الشركة:' }, value: safeString(companyNameDisplay) },
-      { label: { en: 'Phone:', ar: 'الهاتف:' }, value: customerPhone },
-      { label: { en: 'Email:', ar: 'البريد:' }, value: customerEmail },
-      { label: { en: 'Reference:', ar: 'المرجع:' }, value: safeString(invoiceData.client_reference) },
-    ],
+    rows: toRows,
   };
 
   // ---- Meta (invoice details) ----------------------------------------------
   const meta: EngineDocData['meta'] = [
     { label: { en: 'Invoice No:', ar: 'رقم الفاتورة:' }, value: invoiceData.invoice_number || 'Draft' },
     { label: { en: 'Invoice Date:', ar: 'تاريخ الفاتورة:' }, value: formatDate(invoiceData.invoice_date, 'dd MMM yyyy') },
-    { label: { en: 'Due Date:', ar: 'تاريخ الاستحقاق:' }, value: formatDate(invoiceData.due_date, 'dd MMM yyyy') },
   ];
+  if (invoiceData.due_date) {
+    meta.push({ label: { en: 'Due Date:', ar: 'تاريخ الاستحقاق:' }, value: formatDate(invoiceData.due_date, 'dd MMM yyyy') });
+  }
   if (invoiceData.cases?.case_no) {
     meta.push({ label: { en: 'Job ID:', ar: 'رقم المهمة:' }, value: invoiceData.cases.case_no });
   }
