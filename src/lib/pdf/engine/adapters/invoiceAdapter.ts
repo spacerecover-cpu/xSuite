@@ -14,6 +14,7 @@ import type { InvoiceDocumentData } from '../../types';
 import type { DocumentTemplateConfig, ColumnConfig } from '../../templateConfig';
 import { formatDate, safeString } from '../../utils';
 import { amountInWordsAr, amountInWordsEn } from '../amountInWords';
+import { buildZatcaTlvBase64 } from '../zatcaQr';
 import type {
   BankBlock,
   EngineDocData,
@@ -229,6 +230,30 @@ export function toEngineData(
         }
       : null;
 
+  // ---- ZATCA / GCC e-invoice QR (opt-in via the tax bar) -------------------
+  // Only built when the tenant has enabled the VAT/GST identification bar (the
+  // GCC opt-in) and both a seller name and a registration number are available.
+  // Rendered natively by the QR surfaces (pdfmake `qr`), so no QR dependency.
+  let zatcaPayload: string | null = null;
+  if (config.taxBar?.enabled) {
+    const sellerName =
+      companySettings.basic_info?.legal_name || companySettings.basic_info?.company_name || '';
+    const vatNumber =
+      (config.taxBar.source === 'manual' ? config.taxBar.value : companySettings.basic_info?.vat_number) || '';
+    if (sellerName && vatNumber) {
+      const timestamp = invoiceData.invoice_date
+        ? new Date(invoiceData.invoice_date).toISOString()
+        : new Date().toISOString();
+      zatcaPayload = buildZatcaTlvBase64({
+        sellerName,
+        vatNumber,
+        timestamp,
+        total: totalAmount.toFixed(2),
+        vatAmount: taxAmount.toFixed(2),
+      });
+    }
+  }
+
   return {
     documentTitle,
     identity: companySettings,
@@ -239,6 +264,7 @@ export function toEngineData(
     paymentHistory,
     terms,
     bank,
-    qrCaption: 'Scan to pay this invoice',
+    qrCaption: zatcaPayload ? 'ZATCA e-invoice QR' : 'Scan to pay this invoice',
+    zatcaPayload,
   };
 }

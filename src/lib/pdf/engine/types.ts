@@ -629,6 +629,12 @@ export interface EngineDocData {
   stockLabel?: StockLabelBlock | null;
   /** Caption shown under the QR code, or `null` when no QR is rendered. */
   qrCaption?: string | null;
+  /**
+   * ZATCA / GCC e-invoice QR payload (base64 TLV), or null/absent. When present,
+   * the QR surfaces render it natively via pdfmake's `qr` type instead of the
+   * pre-loaded image QR. Set by the invoice adapter when the tax bar is enabled.
+   */
+  zatcaPayload?: string | null;
 }
 
 /**

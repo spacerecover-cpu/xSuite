@@ -18,6 +18,7 @@ import type { Content, DynamicContent } from 'pdfmake/interfaces';
 import { PDF_COLORS, createSocialFooter } from '../../styles';
 import type { EngineContext, EngineDocData, SectionRenderer } from '../types';
 import { resolveFooter } from '../branding';
+import { qrContentNode } from './qr';
 
 export const renderFooter: SectionRenderer = (
   engine: EngineContext,
@@ -27,12 +28,14 @@ export const renderFooter: SectionRenderer = (
   const tagline = settings.branding?.brand_tagline || undefined;
   const online = settings.online_presence;
   const qr = engine.qrCodeBase64;
+  const zatca = data.zatcaPayload;
+  const qrNode = qrContentNode(zatca, qr, 60, [0, 0, 0, 2]);
 
   // Nothing to show: no tagline, no website, no socials, no QR.
   const hasSocial =
     !!online &&
     (!!online.website || !!online.facebook || !!online.twitter || !!online.linkedin || !!online.instagram);
-  if (!tagline && !hasSocial && !qr) return null;
+  if (!tagline && !hasSocial && !qrNode) return null;
 
   const divider: Content = {
     canvas: [
@@ -43,7 +46,7 @@ export const renderFooter: SectionRenderer = (
 
   const social = createSocialFooter(online, tagline) as Content;
 
-  if (qr) {
+  if (qrNode) {
     const caption = data.qrCaption ?? null;
     return {
       stack: [
@@ -53,7 +56,7 @@ export const renderFooter: SectionRenderer = (
             {
               width: 'auto',
               stack: [
-                { image: qr, width: 60, height: 60, alignment: 'left', margin: [0, 0, 0, 2] },
+                qrNode,
                 ...(caption
                   ? [{ text: caption, fontSize: 8, color: PDF_COLORS.text, alignment: 'left' as const }]
                   : []),
@@ -94,6 +97,7 @@ export function buildPageFooter(
   const tagline = settings.branding?.brand_tagline || null;
   const online = settings.online_presence;
   const qr = engine.qrCodeBase64;
+  const zatca = data.zatcaPayload;
   const caption = data.qrCaption ?? null;
 
   // Footer config (opt-in): a custom text + styling override. Absent → today's
@@ -103,7 +107,8 @@ export function buildPageFooter(
   const hasSocial =
     !!online &&
     (!!online.website || !!online.facebook || !!online.twitter || !!online.linkedin || !!online.instagram);
-  if (!tagline && !hasSocial && !qr && !fcfg?.customText) return null;
+  const hasQr = !!qr || !!zatca;
+  if (!tagline && !hasSocial && !hasQr && !fcfg?.customText) return null;
 
   const dividerLine: Content = {
     canvas: [
@@ -121,13 +126,14 @@ export function buildPageFooter(
       if (online?.website) {
         lines.push({ text: online.website, fontSize: Math.max(7, fcfg.fontSize - 1), color: fcfg.fontColor, alignment: fcfg.alignment, margin: [0, 2, 0, 0] });
       }
-      if (qr) {
+      const fcfgQrNode = qrContentNode(zatca, qr, 60, [0, 0, 0, 0]);
+      if (fcfgQrNode) {
         return {
           stack: [
             dividerLine,
             {
               columns: [
-                { width: 'auto', stack: [{ image: qr, width: 60, height: 60, alignment: 'left' }] },
+                { width: 'auto', stack: [fcfgQrNode] },
                 { text: '', width: '*' },
                 { width: 'auto', stack: lines },
               ],
@@ -139,7 +145,8 @@ export function buildPageFooter(
       return { stack: [dividerLine, { stack: lines }], margin: [35, 10, 35, 25] };
     }
 
-    if (qr) {
+    const qrNode = qrContentNode(zatca, qr, 60, [0, 0, 0, 2]);
+    if (qrNode) {
       const footerStack: Content[] = [];
       if (tagline) {
         footerStack.push({
@@ -169,7 +176,7 @@ export function buildPageFooter(
               {
                 width: 'auto',
                 stack: [
-                  { image: qr, width: 60, height: 60, alignment: 'left', margin: [0, 0, 0, 2] },
+                  qrNode,
                   ...(caption
                     ? [{ text: caption, fontSize: 8, color: PDF_COLORS.text, alignment: 'left' as const, margin: [0, 0, 0, 0] as [number, number, number, number] }]
                     : []),
