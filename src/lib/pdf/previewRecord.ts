@@ -20,6 +20,8 @@ import { renderTemplate } from './engine/renderTemplate';
 import { createPdfWithFonts } from './fonts';
 import { withTimeout } from './translationContext';
 import { loadImageAsBase64 } from './utils';
+import { resolveBrandingImage, brandingImageWarning, type BrandingImage } from './brandingImage';
+import type { PreviewResult } from './engine/previewTemplate';
 
 /** Hard cap so a stuck pdfmake rasterization surfaces as an error, never an infinite spinner. */
 const PREVIEW_TIMEOUT_MS = 15000;
@@ -97,30 +99,30 @@ export async function previewDocumentForRecord(
   docType: TemplateDocumentType,
   recordId: string,
   config: DocumentTemplateConfig,
-): Promise<string> {
+): Promise<PreviewResult> {
   let engineData: EngineDocData;
-  let logo: string | null = null;
+  let logo: BrandingImage = { kind: 'none', reason: 'empty' };
   let qr: string | null = null;
 
   if (docType === 'invoice') {
     const data = await fetchInvoiceData(recordId);
     engineData = toInvoiceEngineData(data, config);
     [logo, qr] = await Promise.all([
-      safeImage(data.companySettings.branding?.logo_url),
+      resolveBrandingImage(data.companySettings.branding?.logo_url),
       safeImage(data.companySettings.branding?.qr_code_invoice_url),
     ]);
   } else if (docType === 'quote') {
     const data = await fetchQuoteData(recordId);
     engineData = toQuoteEngineData(data, config);
     [logo, qr] = await Promise.all([
-      safeImage(data.companySettings.branding?.logo_url),
+      resolveBrandingImage(data.companySettings.branding?.logo_url),
       safeImage(data.companySettings.branding?.qr_code_quote_url),
     ]);
   } else if (docType === 'payment_receipt') {
     const data = await fetchPaymentReceiptData(recordId);
     engineData = toPaymentReceiptEngineData(data, config);
     [logo, qr] = await Promise.all([
-      safeImage(data.companySettings.branding?.logo_url),
+      resolveBrandingImage(data.companySettings.branding?.logo_url),
       safeImage(data.companySettings.branding?.qr_code_general_url),
     ]);
   } else {
@@ -128,6 +130,8 @@ export async function previewDocumentForRecord(
   }
 
   const docDefinition = renderTemplate(config, engineData, PREVIEW_CTX_EN, logo, qr);
+  const warning = brandingImageWarning(logo);
+  const warnings = warning ? [warning] : [];
   const render = new Promise<string>((resolve, reject) => {
     try {
       createPdfWithFonts(docDefinition).getBlob(
@@ -139,5 +143,5 @@ export async function previewDocumentForRecord(
       reject(err instanceof Error ? err : new Error('Failed to render record preview'));
     }
   });
-  return withTimeout(render, PREVIEW_TIMEOUT_MS, 'Preview render timed out');
+  return withTimeout(render, PREVIEW_TIMEOUT_MS, 'Preview render timed out').then((url) => ({ url, warnings }));
 }
