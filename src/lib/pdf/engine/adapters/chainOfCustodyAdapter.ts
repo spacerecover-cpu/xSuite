@@ -29,7 +29,10 @@ import { formatDate, safeString } from '../../utils';
 import type {
   CaseInfoBlock,
   CustodyLogBlock,
+  CustodySummaryBlock,
+  DigitalSignaturesBlock,
   EngineDocData,
+  HashVerificationBlock,
   LabelText,
   ResolvedColumn,
 } from '../types';
@@ -52,16 +55,19 @@ const COLUMN_ALIGN: Record<string, 'left' | 'center' | 'right'> = {
   actor: 'left',
   occurredAt: 'center',
   actionCategory: 'center',
-  hash: 'left',
-  signature: 'left',
 };
 
 /**
  * The base custody-log columns the legacy entries table renders, in order:
  * Entry # / Action Type / Description / Actor / Date/Time / Category. The
  * `actionCategory` key is the coloured-badge column (`renderCustodyLog` maps the
- * RAW category to its fill). The optional `hash` / `signature` columns are
- * appended only when the report options ask for them.
+ * RAW category to its fill).
+ *
+ * Hashes and signatures are NOT inline columns here — matching the legacy builder,
+ * they live in their own dedicated sections (`hashVerification` /
+ * `digitalSignatures`), emitted by this adapter only when the report options ask
+ * for them. The custody-log entries table is the same six columns whether or not
+ * those options are on.
  *
  * The built-in `chain_of_custody` config carries a partial `custodyLog.columns`
  * set; we honour any tenant-configured columns (visibility / labels / widths /
@@ -86,24 +92,18 @@ function configColumns(config: DocumentTemplateConfig): ColumnConfig[] {
 }
 
 /**
- * Resolve the custody columns to render. The adapter's base set (with the
- * optional hash/signature columns) defines the DATA keys + default labels; a
- * tenant config may override visibility / label / width / order per column. We
- * merge by key: config columns win for visibility/label/width, but keys the
- * adapter does not produce data for are dropped so we never render an empty
- * column the renderer can't fill.
+ * Resolve the custody columns to render. The adapter's base set defines the DATA
+ * keys + default labels; a tenant config may override visibility / label / width
+ * / order per column. We merge by key: config columns win for visibility / label
+ * / width, but keys the adapter does not produce data for are dropped so we never
+ * render an empty column the renderer can't fill.
+ *
+ * Hashes / signatures are NOT columns here — they are dedicated sections (see
+ * `hashVerificationBlock` / `digitalSignaturesBlock`), matching the legacy
+ * builder's separate Hash Verification + Digital Signatures tables.
  */
-function resolveCustodyColumns(
-  config: DocumentTemplateConfig,
-  options: ChainOfCustodyDocumentData['options'],
-): ResolvedColumn[] {
+function resolveCustodyColumns(config: DocumentTemplateConfig): ResolvedColumn[] {
   const cols = baseCustodyColumns();
-  if (options?.includeHashes) {
-    cols.push({ key: 'hash', visible: true, label: { en: 'Hash', ar: 'البصمة' }, align: 'left' });
-  }
-  if (options?.includeSignatures) {
-    cols.push({ key: 'signature', visible: true, label: { en: 'Signature', ar: 'التوقيع' }, align: 'left' });
-  }
 
   const overrides = new Map(configColumns(config).map((c) => [c.key, c]));
   return cols.map((c) => {
@@ -135,8 +135,6 @@ function entryRow(entry: ChainOfCustodyEntryData): Record<string, string> {
     // RAW category passes straight through; renderCustodyLog maps it to the
     // humanized label + badge colour (or a '-' dash cell when empty).
     actionCategory: entry.action_category ?? '',
-    hash: safeString(entry.hash_value),
-    signature: entry.digital_signature ? `✓ ${safeString(entry.hash_algorithm) || 'Signed'}` : '-',
   };
 }
 
@@ -154,6 +152,100 @@ function caseInfoBlock(caseNumber: string): CaseInfoBlock {
         value: formatDate(new Date().toISOString(), 'dd/MM/yyyy HH:mm'),
       },
     ],
+  };
+}
+
+/**
+ * The forensic custody SUMMARY box. Mirrors the legacy `buildSummarySection`
+ * (`documents/ChainOfCustodyDocument.ts` lines ~123-194): total entries, the
+ * count of DISTINCT action categories, the count of DISTINCT actors, and the
+ * first→last occurred-at date range (formatted `dd/MM/yyyy HH:mm`, '-' when no
+ * entries). The renderer stays dumb; all the derivation lives here.
+ */
+function custodySummaryBlock(entries: ChainOfCustodyEntryData[]): CustodySummaryBlock {
+  const categories = new Set(entries.map((e) => e.action_category));
+  const actors = new Set(entries.map((e) => e.actor_name));
+
+  let dateRange = '-';
+  if (entries.length > 0) {
+    const sortedByDate = [...entries].sort(
+      (a, b) => new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime(),
+    );
+    const first = formatDate(sortedByDate[0].occurred_at, 'dd/MM/yyyy HH:mm');
+    const last = formatDate(sortedByDate[sortedByDate.length - 1].occurred_at, 'dd/MM/yyyy HH:mm');
+    dateRange = `${first} - ${last}`;
+  }
+
+  return {
+    title: { en: 'Summary', ar: 'ملخص' },
+    rows: [
+      { label: { en: 'Total Entries:', ar: 'إجمالي الإدخالات:' }, value: String(entries.length) },
+      { label: { en: 'Action Categories:', ar: 'فئات الإجراءات:' }, value: String(categories.size) },
+      { label: { en: 'Unique Actors:', ar: 'المنفّذون الفريدون:' }, value: String(actors.size) },
+      { label: { en: 'Date Range:', ar: 'النطاق الزمني:' }, value: dateRange },
+    ],
+  };
+}
+
+/**
+ * The forensic HASH-VERIFICATION table — one row per entry that carries a hash,
+ * with columns entry # / algorithm / hash value (parity with the legacy
+ * `buildHashSection`, lines ~290-340). Returns null when no entry has a hash
+ * (the caller already gates on `options.includeHashes`; this guards the data so
+ * an empty table is never emitted, matching the legacy early-return).
+ */
+function hashVerificationBlock(entries: ChainOfCustodyEntryData[]): HashVerificationBlock | null {
+  const hashed = entries.filter((e) => e.hash_value);
+  if (hashed.length === 0) return null;
+
+  const columns: ResolvedColumn[] = [
+    { key: 'entry', visible: true, label: { en: 'Entry #', ar: 'رقم' }, width: 50, align: 'center' },
+    { key: 'algorithm', visible: true, label: { en: 'Algorithm', ar: 'الخوارزمية' }, width: 60, align: 'left' },
+    { key: 'hash', visible: true, label: { en: 'Hash Value', ar: 'قيمة البصمة' }, align: 'left' },
+  ];
+
+  return {
+    title: { en: 'Hash Verification', ar: 'التحقق من البصمة' },
+    columns,
+    rows: hashed.map((entry) => ({
+      entry: `#${padEntryNumber(entry.entry_number)}`,
+      algorithm: safeString(entry.hash_algorithm),
+      hash: safeString(entry.hash_value),
+    })),
+  };
+}
+
+/**
+ * The forensic DIGITAL-SIGNATURES table — one row per entry that carries a
+ * digital signature, with columns entry # / signer / role / signature / date
+ * (parity with the legacy `buildSignatureSection`, lines ~342-395: it drew a
+ * per-entry "✓ Digitally Signed" badge with the signer name + date; the engine
+ * renders the same evidentiary facts as a structured table). Returns null when
+ * no entry is signed (the caller gates on `options.includeSignatures`; this
+ * guards the data so an empty table is never emitted).
+ */
+function digitalSignaturesBlock(entries: ChainOfCustodyEntryData[]): DigitalSignaturesBlock | null {
+  const signed = entries.filter((e) => e.digital_signature);
+  if (signed.length === 0) return null;
+
+  const columns: ResolvedColumn[] = [
+    { key: 'entry', visible: true, label: { en: 'Entry #', ar: 'رقم' }, width: 50, align: 'center' },
+    { key: 'signer', visible: true, label: { en: 'Signer', ar: 'الموقّع' }, width: 90, align: 'left' },
+    { key: 'role', visible: true, label: { en: 'Role', ar: 'الدور' }, width: 70, align: 'left' },
+    { key: 'signature', visible: true, label: { en: 'Signature', ar: 'التوقيع' }, align: 'left' },
+    { key: 'date', visible: true, label: { en: 'Date', ar: 'التاريخ' }, width: 75, align: 'center' },
+  ];
+
+  return {
+    title: { en: 'Digital Signatures', ar: 'التوقيعات الرقمية' },
+    columns,
+    rows: signed.map((entry) => ({
+      entry: `#${padEntryNumber(entry.entry_number)}`,
+      signer: safeString(entry.actor_name),
+      role: entry.actor_role ? safeString(entry.actor_role) : '-',
+      signature: `✓ ${safeString(entry.digital_signature)}`,
+      date: formatDate(entry.occurred_at, 'dd/MM/yyyy HH:mm'),
+    })),
   };
 }
 
@@ -183,7 +275,7 @@ export function toEngineData(
   const caseInfo: CaseInfoBlock = caseInfoBlock(caseNumber);
 
   // ---- Custody-log entries table -------------------------------------------
-  const columns = resolveCustodyColumns(config, options);
+  const columns = resolveCustodyColumns(config);
   const custodyLog: CustodyLogBlock = {
     title: { en: 'Chain of Custody Entries', ar: 'سجل سلسلة الحيازة' },
     columns,
@@ -192,6 +284,23 @@ export function toEngineData(
     includeHashes: !!options?.includeHashes,
     includeSignatures: !!options?.includeSignatures,
   };
+
+  // ---- Forensic summary box (always emitted) -------------------------------
+  // Restores the legacy Summary box: total entries, action categories, unique
+  // actors, date range.
+  const custodySummary: CustodySummaryBlock = custodySummaryBlock(entries);
+
+  // ---- Hash verification + digital signatures (option-gated) ---------------
+  // Matching the legacy gating: the Hash Verification table is emitted ONLY when
+  // `includeHashes` is on (and some entry actually carries a hash); the Digital
+  // Signatures table ONLY when `includeSignatures` is on (and some entry is
+  // signed). When the option is off the block is null and its renderer is a no-op.
+  const hashVerification: HashVerificationBlock | null = options?.includeHashes
+    ? hashVerificationBlock(entries)
+    : null;
+  const digitalSignatures: DigitalSignaturesBlock | null = options?.includeSignatures
+    ? digitalSignaturesBlock(entries)
+    : null;
 
   // ---- Signature lines -----------------------------------------------------
   const signatures: LabelText[] = [
@@ -206,6 +315,9 @@ export function toEngineData(
     meta: [],
     caseInfo,
     custodyLog,
+    custodySummary,
+    hashVerification,
+    digitalSignatures,
     signatures,
     // Custody reports carry no money, devices, or party blocks.
     paymentHistory: null,

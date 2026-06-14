@@ -386,10 +386,12 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
           section('caseInfo', 1),
           section('custodyLog', 2, {
             // The adapter owns the DATA + default column set (entry / action /
-            // description / actor / date-time / category, plus optional hash &
-            // signature gated on the report options). These config entries let a
-            // tenant rename / resize / toggle those columns; the adapter merges
-            // them by key. Order here mirrors the legacy entries table.
+            // description / actor / date-time / category). These config entries
+            // let a tenant rename / resize / toggle those columns; the adapter
+            // merges them by key. Order here mirrors the legacy entries table.
+            // Hashes / signatures are NOT columns — they render in their own
+            // dedicated sections below (custodySummary / hashVerification /
+            // digitalSignatures), matching the legacy builder's separate tables.
             columns: [
               { key: 'entry', visible: true, label: { en: 'Entry #', ar: 'رقم' }, width: 38 },
               { key: 'action', visible: true, label: { en: 'Action Type', ar: 'نوع الإجراء' }, width: 65 },
@@ -399,11 +401,20 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
               { key: 'actionCategory', visible: true, label: { en: 'Category', ar: 'الفئة' }, width: 65 },
             ],
           }),
+          // Forensic summary box (total entries / categories / actors / date
+          // range) — always rendered, restoring the legacy Summary section.
+          section('custodySummary', 3),
+          // Hash Verification + Digital Signatures tables — the adapter only
+          // emits these blocks when the report's includeHashes / includeSignatures
+          // options are on (and some entry carries the data), so the sections
+          // render nothing otherwise. They mirror the legacy dedicated tables.
+          section('hashVerification', 4),
+          section('digitalSignatures', 5),
           // Signature lines are OPTIONAL on a custody report (off by default):
           // the immutable ledger + hashes are the evidentiary record. A tenant
           // may switch them on for a wet-ink custodian/witness sign-off.
-          section('signature', 3, { visible: false }),
-          section('footer', 4),
+          section('signature', 6, { visible: false }),
+          section('footer', 7),
         ],
         labels: { documentTitle: { en: 'CHAIN OF CUSTODY', ar: 'سلسلة الحيازة' } },
       };

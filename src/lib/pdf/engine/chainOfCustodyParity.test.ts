@@ -196,6 +196,35 @@ describe('chain of custody parity — engine output matches the legacy builder',
     expect(engine).toContain(probe);
   });
 
+  it('reproduces the legacy Summary box rows (total / categories / actors / date range) in both', () => {
+    const data = makeData();
+    const legacy = allTexts(buildChainOfCustodyDocument(data, englishCtx));
+    const engine = allTexts(renderEngine(data));
+
+    // Summary labels (legacy `buildSummarySection`) appear in both outputs.
+    for (const probe of [
+      'Total Entries:',
+      'Action Categories:',
+      'Unique Actors:',
+      'Date Range:',
+    ]) {
+      expect(legacy.some((t) => t.includes(probe))).toBe(true);
+      expect(engine.some((t) => t.includes(probe))).toBe(true);
+    }
+    // The derived counts match the synthetic data: 3 entries, 3 distinct
+    // categories (creation / evidence_handling / critical_event), 3 distinct
+    // actors. The legacy box splits label + value into separate runs, so the
+    // value is its own text leaf ("3").
+    const legacyJoined = legacy.join('|');
+    const engineJoined = engine.join('|');
+    // Date range first→last (both ends are the 13/06/2026 day in the fixture).
+    expect(legacyJoined).toContain('13/06/2026');
+    expect(engineJoined).toContain('13/06/2026');
+    // Total entries value (3) present in both summary boxes.
+    expect(legacy.some((t) => t.includes('Total Entries:') || t.trim() === '3')).toBe(true);
+    expect(engine.some((t) => t.includes('Total Entries:') || t.trim() === '3')).toBe(true);
+  });
+
   it('includes hash values when the includeHashes option is set', () => {
     const data = makeData({ includeHashes: true });
     const engine = allTexts(renderEngine(data)).join('|');
@@ -203,10 +232,53 @@ describe('chain of custody parity — engine output matches the legacy builder',
     expect(engine).toContain('f6e5d4c3b2a1');
   });
 
+  it('reproduces the legacy Hash Verification table (entry / algorithm / hash) when includeHashes is on', () => {
+    const data = makeData({ includeHashes: true });
+    const legacy = allTexts(buildChainOfCustodyDocument(data, englishCtx));
+    const engine = allTexts(renderEngine(data));
+
+    // Section heading + algorithm + the per-entry hash values are present in both.
+    for (const probe of ['Hash Verification', 'SHA-256', 'a1b2c3d4e5f6', 'f6e5d4c3b2a1']) {
+      expect(legacy.some((t) => t.includes(probe))).toBe(true);
+      expect(engine.some((t) => t.includes(probe))).toBe(true);
+    }
+    // The hashed entries carry their padded entry numbers in the hash table.
+    for (const probe of ['#0001', '#0002']) {
+      expect(engine.some((t) => t.includes(probe))).toBe(true);
+    }
+  });
+
   it('omits the hash column when includeHashes is not set', () => {
     const data = makeData();
     const engine = allTexts(renderEngine(data)).join('|');
     expect(engine).not.toContain('a1b2c3d4e5f6');
+    // The Hash Verification section heading is omitted entirely when the option is off.
+    expect(engine).not.toContain('Hash Verification');
+  });
+
+  it('reproduces the legacy Digital Signatures table (signer / role / signature / date) when includeSignatures is on', () => {
+    const data = makeData({ includeSignatures: true });
+    const legacy = allTexts(buildChainOfCustodyDocument(data, englishCtx));
+    const engine = allTexts(renderEngine(data));
+
+    // Section heading present in both; the engine table carries signer + role +
+    // signature reference + date for each signed entry.
+    expect(legacy.some((t) => t.includes('Digital Signatures'))).toBe(true);
+    expect(engine.some((t) => t.includes('Digital Signatures'))).toBe(true);
+    for (const probe of ['Sam Reception', 'Lina Engineer', 'sig-0001', 'sig-0002', 'receptionist', 'technician']) {
+      expect(engine.some((t) => t.includes(probe))).toBe(true);
+    }
+    // Only the two signed entries (#0001, #0002) appear; the unsigned #0003 does not
+    // contribute a signature row.
+    const engineJoined = engine.join('|');
+    expect(engineJoined).not.toContain('sig-0003');
+  });
+
+  it('omits the Digital Signatures section when includeSignatures is not set', () => {
+    const data = makeData();
+    const engine = allTexts(renderEngine(data)).join('|');
+    expect(engine).not.toContain('Digital Signatures');
+    expect(engine).not.toContain('sig-0001');
   });
 
   it('emits a footer on the engine custody report (tagline + website)', () => {

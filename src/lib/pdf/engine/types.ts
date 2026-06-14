@@ -246,6 +246,75 @@ export interface CustodyLogBlock {
 }
 
 /**
+ * The forensic custody SUMMARY box for a Chain-of-Custody report — a single
+ * bilingual info box of pre-computed label/value rows (total entries, action
+ * categories, unique actors, date range). The adapter derives every value from
+ * the ledger entries (counts, distinct-category/actor sets, first→last
+ * occurred-at span); the renderer stays dumb and only lays the rows out.
+ *
+ * Restored from the legacy `buildSummarySection` in
+ * `documents/ChainOfCustodyDocument.ts` (lines ~123-194), which the M2 engine
+ * folded away. Reproduces that box's four rows so the engine custody report is
+ * forensically complete (total/categories/actors/date-range) before the
+ * chain_of_custody flag flips. Returns nothing when no rows are supplied.
+ */
+export interface CustodySummaryBlock {
+  /** Box heading (e.g. "Summary" / "ملخص"). */
+  title: LabelText;
+  /** Labelled rows: total entries / action categories / unique actors / date range. */
+  rows: Array<{ label: LabelText; value: string }>;
+}
+
+/**
+ * The forensic HASH-VERIFICATION table for a Chain-of-Custody report — one row
+ * per ledger entry that carries a cryptographic hash, with three columns:
+ * entry # / algorithm / hash value. The adapter resolves the columns into
+ * {@link ResolvedColumn}s and stringifies every cell; the renderer lays the
+ * header + body out, applies per-column alignment, and RTL-mirrors via
+ * `mirrorColumns`, exactly like the custody-log / payment-history tables.
+ *
+ * Restored from the legacy `buildHashSection` in
+ * `documents/ChainOfCustodyDocument.ts` (lines ~290-340). The adapter emits this
+ * block ONLY when `options.includeHashes` is set and at least one entry has a
+ * `hash_value` (matching the legacy gating); otherwise the block is absent and
+ * the renderer returns nothing.
+ */
+export interface HashVerificationBlock {
+  /** Section heading (e.g. "Hash Verification" / "التحقق من البصمة"). */
+  title: LabelText;
+  /** Resolved, ordered columns (entry / algorithm / hash). */
+  columns: ResolvedColumn[];
+  /** One record per hashed entry; values already stringified by the adapter. */
+  rows: Array<Record<string, string>>;
+}
+
+/**
+ * The forensic DIGITAL-SIGNATURES table for a Chain-of-Custody report — one row
+ * per ledger entry that carries a digital signature, with columns: entry # /
+ * signer / role / signature / date. The adapter resolves the columns into
+ * {@link ResolvedColumn}s and stringifies every cell; the renderer lays the
+ * header + body out, applies per-column alignment, and RTL-mirrors via
+ * `mirrorColumns`, exactly like the custody-log / payment-history tables.
+ *
+ * Restored from the legacy `buildSignatureSection` in
+ * `documents/ChainOfCustodyDocument.ts` (lines ~342-395). The legacy builder drew
+ * a per-entry "✓ Digitally Signed" badge with the signer name + date; the engine
+ * renders the same evidentiary facts (signer, role, signature ref, date) as a
+ * structured table for parity + RTL fidelity. The adapter emits this block ONLY
+ * when `options.includeSignatures` is set and at least one entry has a
+ * `digital_signature` (matching the legacy gating); otherwise the block is absent
+ * and the renderer returns nothing.
+ */
+export interface DigitalSignaturesBlock {
+  /** Section heading (e.g. "Digital Signatures" / "التوقيعات الرقمية"). */
+  title: LabelText;
+  /** Resolved, ordered columns (entry / signer / role / signature / date). */
+  columns: ResolvedColumn[];
+  /** One record per signed entry; values already stringified by the adapter. */
+  rows: Array<Record<string, string>>;
+}
+
+/**
  * The compact case-LABEL layout for a physical device/case label: a large
  * centered case number, an optional priority badge, the received date, and a
  * short device-summary list. Every value is pre-formatted by the adapter; the
@@ -498,6 +567,25 @@ export interface EngineDocData {
    * plus the legal notice, or absent on documents with no custody ledger.
    */
   custodyLog?: CustodyLogBlock | null;
+  /**
+   * Forensic custody SUMMARY box for a Chain-of-Custody report (total entries /
+   * action categories / unique actors / date range), or absent on documents with
+   * no custody ledger. Restored from the legacy builder's Summary box.
+   */
+  custodySummary?: CustodySummaryBlock | null;
+  /**
+   * Forensic HASH-VERIFICATION table for a Chain-of-Custody report (entry /
+   * algorithm / hash), or absent. Emitted by the adapter ONLY when the report's
+   * `includeHashes` option is on and at least one entry carries a hash.
+   */
+  hashVerification?: HashVerificationBlock | null;
+  /**
+   * Forensic DIGITAL-SIGNATURES table for a Chain-of-Custody report (entry /
+   * signer / role / signature / date), or absent. Emitted by the adapter ONLY
+   * when the report's `includeSignatures` option is on and at least one entry
+   * carries a digital signature.
+   */
+  digitalSignatures?: DigitalSignaturesBlock | null;
   /**
    * Device diagnostics info box for a case REPORT (Media Details / Component
    * Diagnostics — type/model/capacity/serial plus the HDD- or SSD-specific
