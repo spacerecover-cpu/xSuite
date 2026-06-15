@@ -9,6 +9,7 @@
   import noRawTailwindColors from './eslint-rules/no-raw-tailwind-colors.js';
   import noRawStyleColors from './eslint-rules/no-raw-style-colors.js';
   import noUnfilteredItemEmbed from './eslint-rules/no-unfiltered-item-embed.js';
+  import noRawCurrencyAggregation from './eslint-rules/no-raw-currency-aggregation.js';
 
   // Hoisted so the main config and the fixed-surface override below share one
   // identical xsuite plugin object (flat config resolves plugin rules per block).
@@ -19,6 +20,7 @@
       'no-raw-tailwind-colors': noRawTailwindColors,
       'no-raw-style-colors': noRawStyleColors,
       'no-unfiltered-item-embed': noUnfilteredItemEmbed,
+      'no-raw-currency-aggregation': noRawCurrencyAggregation,
     },
   };
 
@@ -81,6 +83,10 @@
         // neutral-chrome are baselined OFF per-file below (same pattern as
         // no-raw-tailwind-colors).
         'xsuite/no-raw-style-colors': 'error',
+        // D7/D8: cross-document money sums must use the *_base shadow. Starts as
+        // 'warn' to surface any residual raw aggregations without breaking the
+        // gate; flip to 'error' once the flagged set is confirmed empty/handled.
+        'xsuite/no-raw-currency-aggregation': 'warn',
         '@typescript-eslint/no-unused-vars': ['error', {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
