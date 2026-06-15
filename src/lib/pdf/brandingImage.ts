@@ -64,6 +64,7 @@ export interface LogoNodeOptions {
   maxHeight?: number | null;
   margin?: [number, number, number, number];
   alignment?: 'left' | 'center' | 'right';
+  opacity?: number;
 }
 
 /**
@@ -86,6 +87,7 @@ export function buildLogoNode(
   }
   if (opts.margin) node.margin = opts.margin;
   if (opts.alignment) node.alignment = opts.alignment;
+  if (opts.opacity != null) node.opacity = opts.opacity;
   if (img.kind === 'raster') node.image = img.dataUrl;
   else node.svg = img.markup;
   return node as unknown as Content;

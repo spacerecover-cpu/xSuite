@@ -29,6 +29,9 @@ import {
   type PageFittingConfig,
   type PageNumbersConfig,
   type PaperConfig,
+  type SignatureImageOptions,
+  type SignatureImagesConfig,
+  type StampImageOptions,
   type TableConfig,
   type TaxBarConfig,
   type TemplateConfigOverride,
@@ -39,7 +42,7 @@ import {
   type WatermarkConfig,
 } from '../../../lib/pdf/templateConfig';
 import { DOC_TYPE_LABELS } from '../../../pages/settings/documentTypeMeta';
-import { getCompanyLogo } from '../../../lib/fileStorageService';
+import { getCompanyLogo, getCompanyStamp, getCompanySignature } from '../../../lib/fileStorageService';
 import { resolveBrandingImage, type BrandingImage } from '../../../lib/pdf/brandingImage';
 import { GeneralTab } from './tabs/GeneralTab';
 import { HeaderFooterTab } from './tabs/HeaderFooterTab';
@@ -68,6 +71,8 @@ export interface StudioApi {
   setOrganization: (patch: Partial<OrganizationConfig>) => void;
   setOrgShow: (key: keyof NonNullable<OrganizationConfig['show']>, value: boolean) => void;
   setOrgManual: (key: keyof NonNullable<OrganizationConfig['manual']>, value: string) => void;
+  setStampOptions: (patch: Partial<StampImageOptions>) => void;
+  setSignatureOptions: (patch: Partial<SignatureImageOptions>) => void;
   setTaxBar: (patch: Partial<TaxBarConfig>) => void;
   setTable: (patch: Partial<TableConfig>) => void;
   setLayout: (patch: Partial<LayoutConfig>) => void;
@@ -137,6 +142,8 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   const [previewLoading, setPreviewLoading] = useState(true);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [tenantLogo, setTenantLogo] = useState<BrandingImage | null>(null);
+  const [tenantStamp, setTenantStamp] = useState<BrandingImage | null>(null);
+  const [tenantSignature, setTenantSignature] = useState<BrandingImage | null>(null);
   const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
   const lastUrlRef = useRef<string | null>(null);
 
@@ -152,7 +159,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
         let warnings: string[] = [];
         if (dataSource === 'sample') {
           const { previewTemplate } = await import('../../../lib/pdf/engine/previewTemplate');
-          ({ url, warnings } = await previewTemplate(docType, resolved, undefined, tenantLogo));
+          ({ url, warnings } = await previewTemplate(docType, resolved, undefined, tenantLogo, tenantStamp, tenantSignature));
         } else {
           const { previewDocumentForRecord } = await import('../../../lib/pdf/previewRecord');
           ({ url, warnings } = await previewDocumentForRecord(docType, dataSource, resolved));
@@ -177,20 +184,29 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [resolved, dataSource, docType, tenantLogo]);
+  }, [resolved, dataSource, docType, tenantLogo, tenantStamp, tenantSignature]);
 
   useEffect(() => () => {
     if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
   }, []);
 
-  // Resolve the real tenant logo once so the sample preview can draw it (and so
-  // a missing/broken logo surfaces a non-blocking warning chip).
+  // Resolve the real tenant logo, stamp, and signature once so the sample
+  // preview can draw them (and so a missing/broken logo surfaces a non-blocking
+  // warning chip).
   useEffect(() => {
     let cancelled = false;
     getCompanyLogo('primary')
       .then((url) => resolveBrandingImage(url))
       .then((img) => { if (!cancelled) setTenantLogo(img); })
       .catch(() => { if (!cancelled) setTenantLogo({ kind: 'none', reason: 'empty' }); });
+    getCompanyStamp()
+      .then((url) => resolveBrandingImage(url))
+      .then((img) => { if (!cancelled) setTenantStamp(img); })
+      .catch(() => { if (!cancelled) setTenantStamp({ kind: 'none', reason: 'empty' }); });
+    getCompanySignature()
+      .then((url) => resolveBrandingImage(url))
+      .then((img) => { if (!cancelled) setTenantSignature(img); })
+      .catch(() => { if (!cancelled) setTenantSignature({ kind: 'none', reason: 'empty' }); });
     return () => { cancelled = true; };
   }, []);
 
@@ -265,6 +281,22 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
           ...prev,
           organization: { ...prev.organization, manual: { ...prev.organization?.manual, [key]: value } },
         })),
+      setStampOptions: (patch) =>
+        setOverride((prev) => {
+          const signatureImages: SignatureImagesConfig = {
+            ...prev.signatureImages,
+            stamp: { ...prev.signatureImages?.stamp, ...patch },
+          };
+          return { ...prev, signatureImages };
+        }),
+      setSignatureOptions: (patch) =>
+        setOverride((prev) => {
+          const signatureImages: SignatureImagesConfig = {
+            ...prev.signatureImages,
+            signature: { ...prev.signatureImages?.signature, ...patch },
+          };
+          return { ...prev, signatureImages };
+        }),
       setTaxBar: (patch) => mergeGroup('taxBar', patch),
       setTable: (patch) => mergeGroup('table', patch),
       setLayout: (patch) => mergeGroup('layout', patch),

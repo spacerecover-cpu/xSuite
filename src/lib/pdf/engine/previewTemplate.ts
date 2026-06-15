@@ -85,6 +85,8 @@ export function resolvePreviewLogo(
  * @param logo    Optional resolved tenant logo. When present it is drawn as-is;
  *                otherwise a labeled placeholder box is used and a warning is
  *                surfaced in the returned result.
+ * @param stampImage     Optional resolved tenant stamp drawn in the signature area.
+ * @param signatureImage Optional resolved tenant signature drawn in the signature area.
  * @returns A {@link PreviewResult} — `url` is a `blob:` URL the caller MUST
  *          `URL.revokeObjectURL` when done; `warnings` is non-blocking copy.
  */
@@ -93,13 +95,23 @@ export function previewTemplate(
   config: DocumentTemplateConfig,
   ctx: TranslationContext = PREVIEW_CTX_EN,
   logo?: BrandingImage | null,
+  stampImage?: BrandingImage | null,
+  signatureImage?: BrandingImage | null,
 ): Promise<PreviewResult> {
   const engineData = buildPreviewEngineData(docType, config);
   // Draw the real logo when resolved, else a labeled placeholder box; the QR is
   // passed as null so the QR surfaces render the REAL `qrPayload` (a native,
   // scannable pdfmake QR) instead of the meaningless 1×1 placeholder square.
   const { logo: previewLogo, warnings } = resolvePreviewLogo(logo);
-  const docDefinition = renderTemplate(config, engineData, ctx, previewLogo, null);
+  const docDefinition = renderTemplate(
+    config,
+    engineData,
+    ctx,
+    previewLogo,
+    null,
+    stampImage ?? null,
+    signatureImage ?? null,
+  );
 
   // Wire pdfmake's error callback so a rasterization failure REJECTS (rather
   // than leaving the promise pending forever → infinite "Updating…" spinner),

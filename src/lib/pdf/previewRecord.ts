@@ -103,33 +103,41 @@ export async function previewDocumentForRecord(
   let engineData: EngineDocData;
   let logo: BrandingImage = { kind: 'none', reason: 'empty' };
   let qr: string | null = null;
+  let stamp: BrandingImage = { kind: 'none', reason: 'empty' };
+  let signature: BrandingImage = { kind: 'none', reason: 'empty' };
 
   if (docType === 'invoice') {
     const data = await fetchInvoiceData(recordId);
     engineData = toInvoiceEngineData(data, config);
-    [logo, qr] = await Promise.all([
+    [logo, qr, stamp, signature] = await Promise.all([
       resolveBrandingImage(data.companySettings.branding?.logo_url),
       safeImage(data.companySettings.branding?.qr_code_invoice_url),
+      resolveBrandingImage(data.companySettings.branding?.stamp_url),
+      resolveBrandingImage(data.companySettings.branding?.signature_url),
     ]);
   } else if (docType === 'quote') {
     const data = await fetchQuoteData(recordId);
     engineData = toQuoteEngineData(data, config);
-    [logo, qr] = await Promise.all([
+    [logo, qr, stamp, signature] = await Promise.all([
       resolveBrandingImage(data.companySettings.branding?.logo_url),
       safeImage(data.companySettings.branding?.qr_code_quote_url),
+      resolveBrandingImage(data.companySettings.branding?.stamp_url),
+      resolveBrandingImage(data.companySettings.branding?.signature_url),
     ]);
   } else if (docType === 'payment_receipt') {
     const data = await fetchPaymentReceiptData(recordId);
     engineData = toPaymentReceiptEngineData(data, config);
-    [logo, qr] = await Promise.all([
+    [logo, qr, stamp, signature] = await Promise.all([
       resolveBrandingImage(data.companySettings.branding?.logo_url),
       safeImage(data.companySettings.branding?.qr_code_general_url),
+      resolveBrandingImage(data.companySettings.branding?.stamp_url),
+      resolveBrandingImage(data.companySettings.branding?.signature_url),
     ]);
   } else {
     throw new Error(`Record preview is not supported for "${docType}"`);
   }
 
-  const docDefinition = renderTemplate(config, engineData, PREVIEW_CTX_EN, logo, qr);
+  const docDefinition = renderTemplate(config, engineData, PREVIEW_CTX_EN, logo, qr, stamp, signature);
   const warning = brandingImageWarning(logo);
   const warnings = warning ? [warning] : [];
   const render = new Promise<string>((resolve, reject) => {

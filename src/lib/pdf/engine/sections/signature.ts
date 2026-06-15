@@ -1,20 +1,16 @@
 /**
- * Signature section — one or more signature lines laid out in a row. Reuses
- * `createSignatureBlock` from `styles.ts`. Labels come from
- * {@link EngineDocData.signatures}, resolved through the language mode.
- *
- * The section is opt-in (hidden by default on financial docs), so when a tenant
- * makes it visible we must always render at least one line — even for documents
- * whose adapter does not populate {@link EngineDocData.signatures} (e.g. the
- * invoice / quote adapters). A single "Authorized Signature" line is the default.
+ * Signature section — signature lines, plus an optional company stamp and
+ * signature image (Phase 3). Reuses `createSignatureBlock` and `buildLogoNode`.
+ * Default (no signatureImages config / no images) returns the original single
+ * columns block unchanged for parity.
  */
 
 import type { Content } from 'pdfmake/interfaces';
 import { createSignatureBlock } from '../../styles';
 import { resolveLabel } from '../labels';
+import { buildLogoNode, classifyLogo } from '../../brandingImage';
 import type { EngineContext, EngineDocData, LabelText, SectionRenderer } from '../types';
 
-/** Default signature line when the document supplies none but the block is shown. */
 const DEFAULT_SIGNATURES: LabelText[] = [{ en: 'Authorized Signature', ar: 'التوقيع المعتمد' }];
 
 export const renderSignature: SectionRenderer = (
@@ -22,18 +18,41 @@ export const renderSignature: SectionRenderer = (
   data: EngineDocData,
 ): Content | null => {
   const sigs = data.signatures && data.signatures.length > 0 ? data.signatures : DEFAULT_SIGNATURES;
+  const { language, signatureImages } = engine.config;
 
-  const { language } = engine.config;
   const blocks: object[] = sigs.map(
     (label) => createSignatureBlock(resolveLabel(label, language)) as object,
   );
-
-  // Spread the blocks across the row with star spacers between them.
   const columns: object[] = [];
   blocks.forEach((b, i) => {
     columns.push(b);
     if (i < blocks.length - 1) columns.push({ text: '', width: '*' });
   });
 
-  return { columns, margin: [0, 24, 0, 8] } as Content;
+  const stamp = signatureImages?.stamp;
+  const sig = signatureImages?.signature;
+  const stampNode =
+    stamp?.show && classifyLogo(engine.stampImage).kind !== 'none'
+      ? buildLogoNode(engine.stampImage, {
+          width: stamp.width ?? 110,
+          alignment: stamp.placement ?? 'right',
+          opacity: stamp.opacity,
+          margin: [0, 0, 0, 4],
+        })
+      : null;
+  const sigNode =
+    sig?.show && classifyLogo(engine.signatureImage).kind !== 'none'
+      ? buildLogoNode(engine.signatureImage, { width: sig.width ?? 140, alignment: 'left', margin: [0, 0, 0, 2] })
+      : null;
+
+  // Parity: with no images, return the original single block unchanged.
+  if (!stampNode && !sigNode) {
+    return { columns, margin: [0, 24, 0, 8] } as Content;
+  }
+
+  const stack: Content[] = [];
+  if (stampNode) stack.push(stampNode as Content);
+  if (sigNode) stack.push(sigNode as Content);
+  stack.push({ columns, margin: [0, 4, 0, 8] } as Content);
+  return { stack } as Content;
 };

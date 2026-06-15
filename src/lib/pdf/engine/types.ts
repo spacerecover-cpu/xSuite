@@ -657,6 +657,8 @@ export interface EngineContext {
   /** The logo: a base64 data-URL string OR a classified BrandingImage, or null. */
   logo?: import('../brandingImage').BrandingImage | string | null;
   qrCodeBase64?: string | null;
+  stampImage?: import('../brandingImage').BrandingImage | string | null;
+  signatureImage?: import('../brandingImage').BrandingImage | string | null;
 }
 
 /**

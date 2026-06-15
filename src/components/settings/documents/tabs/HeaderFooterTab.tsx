@@ -175,6 +175,62 @@ export const HeaderFooterTab: React.FC<{ api: StudioApi }> = ({ api }) => {
           againstLabel="on white"
         />
       </FieldGroup>
+
+      <FieldGroup
+        title="Stamp & signature"
+        description="Place an uploaded company stamp and signature in the signature area. Upload the images in Settings → General."
+      >
+        <ToggleRow
+          label="Show company stamp"
+          checked={resolved.signatureImages?.stamp?.show ?? false}
+          onChange={(v) => api.setStampOptions({ show: v })}
+        />
+        {resolved.signatureImages?.stamp?.show && (
+          <div className="grid grid-cols-3 gap-3">
+            <NumberField
+              label="Stamp width"
+              suffix="pt"
+              value={resolved.signatureImages?.stamp?.width ?? 110}
+              min={40}
+              max={220}
+              onChange={(v) => api.setStampOptions({ width: v })}
+            />
+            <SegmentedControl<'left' | 'center' | 'right'>
+              label="Placement"
+              value={resolved.signatureImages?.stamp?.placement ?? 'right'}
+              onChange={(v) => api.setStampOptions({ placement: v })}
+              options={[
+                { value: 'left', label: 'Left' },
+                { value: 'center', label: 'Center' },
+                { value: 'right', label: 'Right' },
+              ]}
+            />
+            <NumberField
+              label="Opacity"
+              value={resolved.signatureImages?.stamp?.opacity ?? 1}
+              min={0.1}
+              max={1}
+              step={0.1}
+              onChange={(v) => api.setStampOptions({ opacity: v })}
+            />
+          </div>
+        )}
+        <ToggleRow
+          label="Show signature image"
+          checked={resolved.signatureImages?.signature?.show ?? false}
+          onChange={(v) => api.setSignatureOptions({ show: v })}
+        />
+        {resolved.signatureImages?.signature?.show && (
+          <NumberField
+            label="Signature width"
+            suffix="pt"
+            value={resolved.signatureImages?.signature?.width ?? 140}
+            min={60}
+            max={260}
+            onChange={(v) => api.setSignatureOptions({ width: v })}
+          />
+        )}
+      </FieldGroup>
     </div>
   );
 };

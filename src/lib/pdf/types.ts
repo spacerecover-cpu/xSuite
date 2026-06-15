@@ -86,6 +86,8 @@ export interface CompanySettingsData {
   };
   branding?: {
     logo_url?: string;
+    stamp_url?: string;
+    signature_url?: string;
     brand_tagline?: string;
     primary_color?: string;
     qr_code_invoice_url?: string;

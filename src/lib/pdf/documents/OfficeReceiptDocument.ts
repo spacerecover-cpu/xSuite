@@ -13,14 +13,17 @@ import {
 } from '../styles';
 import { formatDate, formatCapacity, buildCompanyAddress, safeString } from '../utils';
 import { getDeviceIconSvg, getGeneralIconSvg } from '../../deviceIconMapper';
-import { buildLogoNode } from '../brandingImage';
+import { buildLogoNode, classifyLogo } from '../brandingImage';
 
 export function buildOfficeReceiptDocument(
   data: ReceiptData,
   ctx: TranslationContext,
   logoBase64?: string | null,
   qrCodeBase64?: string | null,
-  qrCodeCaption?: string | null
+  qrCodeCaption?: string | null,
+  stampImage?: import('../brandingImage').BrandingImage | string | null,
+  signatureImage?: import('../brandingImage').BrandingImage | string | null,
+  signatureImages?: import('../templateConfig').SignatureImagesConfig,
 ): TDocumentDefinitions {
   const { caseData, devices, companySettings } = data;
   const { t, isBilingual, fontFamily } = ctx;
@@ -285,14 +288,44 @@ export function buildOfficeReceiptDocument(
   const arabicCustomerSig = isBilingual ? (t('customerSignature', '').split(' | ')[1] || 'توقيع العميل') : null;
   const arabicCompanySig = isBilingual ? (t('companyRepresentative', '').split(' | ')[1] || 'ممثل الشركة') : null;
 
-  const signatureSection: Content = {
+  const stampNode =
+    signatureImages?.stamp?.show && classifyLogo(stampImage).kind !== 'none'
+      ? buildLogoNode(stampImage, {
+          width: signatureImages.stamp.width ?? 110,
+          alignment: signatureImages.stamp.placement ?? 'right',
+          opacity: signatureImages.stamp.opacity,
+          margin: [0, 0, 0, 4],
+        })
+      : null;
+  const signatureNode =
+    signatureImages?.signature?.show && classifyLogo(signatureImage).kind !== 'none'
+      ? buildLogoNode(signatureImage, {
+          width: signatureImages.signature.width ?? 140,
+          alignment: 'left',
+          margin: [0, 0, 0, 2],
+        })
+      : null;
+
+  // The signature image reads as signed: it sits just above the customer
+  // signature line. The stamp seal floats above the band, aligned per placement.
+  const customerColumn: Content = signatureNode
+    ? {
+        stack: [signatureNode as Content, createBilingualSignatureBlock('Customer Signature', arabicCustomerSig) as Content],
+      }
+    : (createBilingualSignatureBlock('Customer Signature', arabicCustomerSig) as Content);
+
+  const signatureColumns: Content = {
     columns: [
-      createBilingualSignatureBlock('Customer Signature', arabicCustomerSig) as Content,
+      customerColumn,
       { text: '', width: '*' },
       createBilingualSignatureBlock('Company Representative', arabicCompanySig) as Content,
     ],
     margin: [0, 0, 0, 0],
   };
+
+  const signatureSection: Content = stampNode
+    ? { stack: [stampNode as Content, signatureColumns] }
+    : signatureColumns;
 
   const tagline = companySettings.branding?.brand_tagline || undefined;
 

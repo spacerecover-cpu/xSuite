@@ -68,8 +68,10 @@ export function renderTemplate(
   ctx: TranslationContext,
   logo?: import('../brandingImage').BrandingImage | string | null,
   qrCodeBase64?: string | null,
+  stampImage?: import('../brandingImage').BrandingImage | string | null,
+  signatureImage?: import('../brandingImage').BrandingImage | string | null,
 ): TDocumentDefinitions {
-  const engine: EngineContext = { config, ctx, logo, qrCodeBase64 };
+  const engine: EngineContext = { config, ctx, logo, qrCodeBase64, stampImage, signatureImage };
 
   // 1. Page geometry from config.paper. A `'custom'` size (physical labels)
   // becomes a literal `{ width, height }` page box from `paper.dimensions`; the

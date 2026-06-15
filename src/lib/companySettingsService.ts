@@ -59,6 +59,12 @@ export interface CompanySettings {
     qr_code_label_caption?: string;
     qr_code_general_url?: string;
     qr_code_general_caption?: string;
+    stamp_url?: string;
+    stamp_file_path?: string;
+    stamp_metadata?: Record<string, Json>;
+    signature_url?: string;
+    signature_file_path?: string;
+    signature_metadata?: Record<string, Json>;
   };
   online_presence: {
     website?: string;
