@@ -7,6 +7,8 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { supabase } from '../../lib/supabaseClient';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useTaxConfig } from '../../contexts/TenantConfigContext';
+import { resolveDefaultRate, resolveTaxLabel } from './taxFieldConfig';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
 import { getSupportedCurrencies, getBaseCurrency, getConversionRate, type SupportedCurrency } from '../../lib/currencyService';
@@ -99,6 +101,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
   clientReference,
 }) => {
   const { currencyFormat } = useCurrency();
+  const taxConfig = useTaxConfig();
   const toast = useToast();
   const caseSelectId = useId();
   const statusId = useId();
@@ -125,7 +128,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
     notes: initialData?.notes || '',
     discount_amount: initialData?.discount_amount || 0,
     discount_type: initialData?.discount_type || 'fixed',
-    tax_rate: initialData?.tax_rate || 5,
+    tax_rate: resolveDefaultRate(initialData?.tax_rate, taxConfig.defaultRate),
     client_reference: initialData?.client_reference || clientReference || '',
     bank_account_id: initialData?.bank_account_id || null,
     currency: initialData?.currency || '',
@@ -166,7 +169,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
         notes: initialData.notes || '',
         discount_amount: initialData.discount_amount || 0,
         discount_type: initialData.discount_type || 'fixed',
-        tax_rate: initialData.tax_rate || 5,
+        tax_rate: resolveDefaultRate(initialData.tax_rate, taxConfig.defaultRate),
         client_reference: initialData.client_reference || clientReference || '',
         bank_account_id: initialData.bank_account_id || null,
         currency: initialData.currency || '',
@@ -890,7 +893,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                   </>
                 )}
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-700">VAT ({invoiceData.tax_rate}%)</span>
+                  <span className="text-slate-700">{resolveTaxLabel(taxConfig.label, invoiceData.tax_rate)}</span>
                   <span className="font-medium text-slate-900">
                     {fmtDoc(taxAmount)}
                   </span>
