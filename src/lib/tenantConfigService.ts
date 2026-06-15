@@ -2,6 +2,9 @@ import { supabase } from './supabaseClient';
 import type { TenantConfig, TaxSystem, Theme } from '../types/tenantConfig';
 import { DEFAULT_TENANT_CONFIG, DEFAULT_THEME, THEMES, REQUIRED_SENTINEL } from '../types/tenantConfig';
 import { logger } from './logger';
+import { resolveCountryConfigKey } from './country/registry';
+import { buildConfigLayers } from './country/buildConfigLayers';
+import type { ConfigLayers } from './country/resolveCountryConfig';
 
 const configCache = new Map<string, { config: TenantConfig; timestamp: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -20,6 +23,7 @@ async function fetchTenantConfig(tenantId: string): Promise<TenantConfig> {
       .from('tenants')
       .select(`
         id, name, theme, ui_language,
+        resolved_country_config, country_config_overrides,
         currency_code, currency_symbol, decimal_places,
         tax_system, tax_label, tax_number_label, tax_number, default_tax_rate,
         locale_code, timezone, date_format, fiscal_year_start,
@@ -57,7 +61,75 @@ async function fetchTenantConfig(tenantId: string): Promise<TenantConfig> {
       ? (rawFlags as Record<string, boolean>)
       : {};
 
-  return { ...mapRowToConfig(data, defaultLocale), featureFlags };
+  const layers = buildConfigLayers(
+    {
+      resolved_country_config: (data as Record<string, unknown>).resolved_country_config,
+      country_config_overrides: (data as Record<string, unknown>).country_config_overrides,
+    },
+    defaultLocale as Record<string, unknown> | null,
+  );
+  // Engine path: resolve every required field through the cascade. A missing
+  // required key throws CountryConfigError, which propagates to the provider's
+  // blocking "not configured" state (§4.5) — never a silent US fallback.
+  const resolved = resolveTenantConfigFromLayers(data as Record<string, unknown>, layers);
+  return { ...resolved, featureFlags };
+}
+
+/**
+ * Pure: a tenant base row (id/name/theme) + the assembled DISPLAY ConfigLayers →
+ * TenantConfig, resolving every JURISDICTION-required field through the engine
+ * (resolveCountryConfigKey). A missing required key THROWS CountryConfigError —
+ * fail-loud, never a US literal (D2/D3). Cosmetic display fields (symbol,
+ * separators, position) read from the snapshot bag with safe display fallbacks
+ * because they are tenant-chosen, not statutory. This is the testable seam (no DB).
+ */
+export function resolveTenantConfigFromLayers(
+  base: Record<string, unknown>,
+  layers: ConfigLayers,
+): TenantConfig {
+  const snap = (layers.country ?? {}) as Record<string, unknown>;
+  const get = <T>(key: string): T => resolveCountryConfigKey<T>(layers, key); // throws on unresolved required
+
+  return {
+    tenantId: base.id as string,
+    tenantName: base.name as string,
+    countryCode: (snap['country.code'] as string) || (base.countryCode as string) || '',
+    countryName: (snap['country.name'] as string) || (base.countryName as string) || '',
+    currency: {
+      code: get<string>('currency.code'), // required → throws if unresolved
+      symbol: (snap['currency.symbol'] as string) || '',
+      name: (snap['currency.name'] as string) || (get<string>('currency.code')),
+      decimalPlaces: (snap['currency.decimal_places'] as number) ?? 2,
+      decimalSeparator: (snap['currency.decimal_separator'] as string) || '.',
+      thousandsSeparator: (snap['currency.thousands_separator'] as string) ?? ',',
+      position: ((snap['currency.position'] as string) || 'before') as 'before' | 'after',
+    },
+    tax: {
+      system: ((snap['tax.system'] as string) || 'NONE') as TaxSystem,
+      label: get<string>('tax.label'), // required → throws if unresolved (D9)
+      numberLabel: (snap['tax.number_label'] as string) || 'Tax ID',
+      numberFormat: (snap['tax.number_format'] as string) || null,
+      numberPlaceholder: (snap['tax.number_placeholder'] as string) || null,
+      defaultRate: get<number>('tax.default_rate'), // required → throws (D10)
+      invoiceRequired: (snap['tax.invoice_required'] as boolean) || false,
+    },
+    dateTime: {
+      dateFormat: get<string>('datetime.date_format'),
+      timeFormat: ((snap['datetime.time_format'] as string) || '24h') as '12h' | '24h',
+      timezone: get<string>('datetime.timezone'),
+      weekStartsOn: ((snap['datetime.week_starts_on'] as number) ?? 0) as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      fiscalYearStart: (snap['datetime.fiscal_year_start'] as string) || '01-01',
+    },
+    locale: {
+      localeCode: get<string>('locale.code'),
+      // UI language is a deliberate tenant choice, not a country fact (the seed of
+      // the jurisdiction-derived-vs-tenant-chosen split, tenantConfigService.ts:108).
+      languageCode: (base.ui_language as string) || 'en',
+      postalCodeLabel: (snap['address.postal_code_label'] as string) || 'Postal Code',
+    },
+    theme: THEMES.includes(base.theme as Theme) ? (base.theme as Theme) : DEFAULT_THEME,
+    featureFlags: {},
+  };
 }
 
 /**
@@ -137,6 +209,18 @@ export async function updateTenantUiLanguage(tenantId: string, language: 'en' | 
     .eq('id', tenantId);
   if (error) {
     logger.error('Failed to update tenant UI language:', error);
+    throw error;
+  }
+  invalidateTenantConfigCache(tenantId);
+}
+
+/** Re-applies the DISPLAY country config to a tenant after a geo_countries
+ *  correction (§4.3/§10b). Statutory rate/FX is NOT re-synced — it resolves live
+ *  effective-dated at commit. Invalidates the cache so the next read is fresh. */
+export async function resyncTenantCountryConfig(tenantId: string): Promise<void> {
+  const { error } = await supabase.rpc('resync_tenant_country_config', { p_tenant_id: tenantId });
+  if (error) {
+    logger.error('Failed to resync tenant country config:', error);
     throw error;
   }
   invalidateTenantConfigCache(tenantId);
