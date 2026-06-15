@@ -118,9 +118,21 @@ describe('i18n en/ar dictionary parity guard', () => {
     expect(Object.keys(arKeys).length).toBeGreaterThan(0);
   });
 
-  it('has zero en leaf keys missing from ar', () => {
-    const missing = Object.keys(enKeys).filter((key) => !(key in arKeys));
+  // portal.* is the Country Engine Phase 2 portal slice (A3): en-authoritative with a
+  // reused-verified Arabic SUBSET + English fallback (fallbackLng:'en'), pending human
+  // Arabic translation (the plan forbids machine-translating statutory portal copy).
+  // It is intentionally exempt from full en/ar parity here — re-include it once the
+  // portal Arabic is human-verified. All other namespaces remain fully bilingual.
+  const isPortal = (key: string) => key.startsWith('portal.');
+
+  it('has zero en leaf keys missing from ar (excluding the en-fallback portal slice)', () => {
+    const missing = Object.keys(enKeys).filter((key) => !isPortal(key) && !(key in arKeys));
     expect(missing).toEqual([]);
+  });
+
+  it('every portal Arabic key is a real portal English key (no orphan ar)', () => {
+    const orphans = Object.keys(arKeys).filter((key) => isPortal(key) && !(key in enKeys));
+    expect(orphans).toEqual([]);
   });
 
   it('has the full Arabic CLDR plural set for every en plural-base key', () => {
@@ -128,6 +140,7 @@ describe('i18n en/ar dictionary parity guard', () => {
     // plurals (_one/_other); we require ar to carry _zero/_one/_two/_few/_many/_other.
     const pluralBases = new Set<string>();
     for (const key of Object.keys(enKeys)) {
+      if (isPortal(key)) continue; // portal slice exempt (en-fallback; see parity note above)
       if (PLURAL_SUFFIX_RE.test(key)) {
         pluralBases.add(key.replace(PLURAL_SUFFIX_RE, ''));
       }
