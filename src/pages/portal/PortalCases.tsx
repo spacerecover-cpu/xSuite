@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { usePortalAuth } from '../../contexts/PortalAuthContext';
 import { supabase } from '../../lib/supabaseClient';
 import { Card } from '../../components/ui/Card';
@@ -38,13 +39,14 @@ interface CaseHistory {
 }
 
 export const PortalCases: React.FC = () => {
+  const { t } = useTranslation();
   const { customer } = usePortalAuth();
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   useEffect(() => {
-    document.title = 'My Cases — Customer Portal';
-  }, []);
+    document.title = t('portal.cases.tabTitle');
+  }, [t]);
 
   const { data: casePriorities = [] } = useQuery({
     queryKey: ['case_priorities'],
@@ -160,8 +162,8 @@ export const PortalCases: React.FC = () => {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">My Cases</h1>
-          <p className="text-slate-600">Track the status of your data recovery cases</p>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">{t('portal.cases.heading')}</h1>
+          <p className="text-slate-600">{t('portal.cases.subtitle')}</p>
         </div>
         <div className="grid grid-cols-1 gap-4">
           {[0, 1, 2].map((i) => (
@@ -188,9 +190,9 @@ export const PortalCases: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">My Cases</h1>
+        <h1 className="text-2xl font-bold text-slate-900 mb-2">{t('portal.cases.heading')}</h1>
         <p className="text-slate-600">
-          Track the status of your data recovery cases
+          {t('portal.cases.subtitle')}
         </p>
       </div>
 
@@ -199,17 +201,17 @@ export const PortalCases: React.FC = () => {
           role="alert"
           className="rounded-lg border border-danger/30 bg-danger-muted p-4 text-sm"
         >
-          <p className="text-danger">Failed to load your cases. Please try again.</p>
-          <button onClick={() => refetch()} className="mt-2 text-primary underline">Retry</button>
+          <p className="text-danger">{t('portal.cases.loadError')}</p>
+          <button onClick={() => refetch()} className="mt-2 text-primary underline">{t('portal.cases.retry')}</button>
         </div>
       )}
 
       {cases.length === 0 && !isError ? (
         <Card className="p-12 text-center">
           <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" aria-hidden="true" />
-          <p className="text-lg text-slate-600 mb-2">No cases found</p>
+          <p className="text-lg text-slate-600 mb-2">{t('portal.cases.noCasesFound')}</p>
           <p className="text-sm text-slate-500">
-            Your data recovery cases will appear here once created
+            {t('portal.cases.noCasesSubtitle')}
           </p>
         </Card>
       ) : (
@@ -221,7 +223,7 @@ export const PortalCases: React.FC = () => {
               onClick={() => handleViewDetails(caseItem)}
               role="button"
               tabIndex={0}
-              aria-label={`Open case ${caseItem.case_no}`}
+              aria-label={t('portal.cases.openCase', { caseNo: caseItem.case_no })}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
@@ -252,12 +254,12 @@ export const PortalCases: React.FC = () => {
 
               <div className="flex items-center justify-between text-sm text-slate-500 pt-4 border-t border-slate-200">
                 <div className="flex items-center gap-4">
-                  <span>Created: {formatDate(caseItem.created_at)}</span>
+                  <span>{t('portal.cases.createdDate', { date: formatDate(caseItem.created_at) })}</span>
                   {caseItem.estimated_completion && (
-                    <span>Due: {formatDate(caseItem.estimated_completion)}</span>
+                    <span>{t('portal.cases.dueDate', { date: formatDate(caseItem.estimated_completion) })}</span>
                   )}
                 </div>
-                <span className="text-primary font-medium">View Details →</span>
+                <span className="text-primary font-medium">{t('portal.cases.viewDetails')}</span>
               </div>
             </Card>
           ))}
@@ -267,7 +269,7 @@ export const PortalCases: React.FC = () => {
       <Modal
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
-        title="Case Details"
+        title={t('portal.cases.caseDetails')}
       >
         {selectedCase && (
           <div className="space-y-6">
@@ -299,7 +301,7 @@ export const PortalCases: React.FC = () => {
               <div>
                 <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-2">
                   <Package className="w-4 h-4" />
-                  Devices
+                  {t('portal.cases.devices')}
                 </h3>
                 <div className="space-y-3">
                   {caseDevices.map((device) => (
@@ -307,13 +309,13 @@ export const PortalCases: React.FC = () => {
                       <div className="grid grid-cols-2 gap-3 text-sm">
                         {device.model && (
                           <div>
-                            <span className="text-slate-500">Model:</span>
+                            <span className="text-slate-500">{t('portal.cases.deviceModel')}</span>
                             <span className="ml-2 font-medium text-slate-900">{device.model}</span>
                           </div>
                         )}
                         {device.serial_number && (
                           <div>
-                            <span className="text-slate-500">Serial:</span>
+                            <span className="text-slate-500">{t('portal.cases.deviceSerial')}</span>
                             <span className="ml-2 font-medium text-slate-900">{device.serial_number}</span>
                           </div>
                         )}
@@ -330,7 +332,7 @@ export const PortalCases: React.FC = () => {
             {caseHistory.length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider mb-3">
-                  Status History
+                  {t('portal.cases.statusHistory')}
                 </h3>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {caseHistory.map((history) => (
@@ -348,12 +350,12 @@ export const PortalCases: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-4 text-sm pt-4 border-t border-slate-200">
               <div>
-                <p className="text-slate-500 mb-1">Created</p>
+                <p className="text-slate-500 mb-1">{t('portal.cases.createdLabel')}</p>
                 <p className="font-medium text-slate-900">{formatDate(selectedCase.created_at)}</p>
               </div>
               {selectedCase.estimated_completion && (
                 <div>
-                  <p className="text-slate-500 mb-1">Due Date</p>
+                  <p className="text-slate-500 mb-1">{t('portal.cases.dueDateLabel')}</p>
                   <p className="font-medium text-slate-900">{formatDate(selectedCase.estimated_completion)}</p>
                 </div>
               )}

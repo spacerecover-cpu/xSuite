@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { usePortalAuth } from '../../contexts/PortalAuthContext';
 import { supabase } from '../../lib/supabaseClient';
 import { Card } from '../../components/ui/Card';
@@ -59,14 +60,15 @@ function statusBadgeVariant(status: string | null): StatusBadgeVariant {
 }
 
 export const PortalPayments: React.FC = () => {
+  const { t } = useTranslation();
   const { customer } = usePortalAuth();
   const { formatCurrency } = useCurrency();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
-    document.title = 'My Payments — Customer Portal';
-  }, []);
+    document.title = t('portal.payments.tabTitle');
+  }, [t]);
 
   const {
     data: payments,
@@ -107,11 +109,11 @@ export const PortalPayments: React.FC = () => {
     try {
       const result = await generatePaymentReceipt(paymentId, true);
       if (!result.success) {
-        setDownloadError(result.error ?? 'Failed to generate receipt PDF.');
+        setDownloadError(result.error ?? t('portal.payments.loadError'));
       }
     } catch (err) {
       logger.error('Portal payment receipt download failed:', err);
-      setDownloadError('Failed to generate receipt PDF. Please try again.');
+      setDownloadError(t('portal.payments.loadError'));
     } finally {
       setDownloadingId(null);
     }
@@ -120,17 +122,17 @@ export const PortalPayments: React.FC = () => {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">My Payments</h1>
+        <h1 className="text-2xl font-bold text-slate-900">{t('portal.payments.heading')}</h1>
         <p className="text-slate-500 mt-1">
-          View your payment history and download receipts for your records.
+          {t('portal.payments.subtitle')}
         </p>
       </div>
 
       {isError && (
         <div role="alert" className="rounded-lg border border-danger/30 bg-danger-muted p-4 text-sm">
-          <p className="text-danger">Some payment data failed to load. Please try again.</p>
+          <p className="text-danger">{t('portal.payments.loadError')}</p>
           <button onClick={() => refetch()} className="mt-2 text-primary underline">
-            Retry
+            {t('portal.payments.retry')}
           </button>
         </div>
       )}
@@ -139,14 +141,14 @@ export const PortalPayments: React.FC = () => {
         <div role="alert" className="rounded-lg border border-warning/30 bg-warning-muted p-4 text-sm flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" aria-hidden="true" />
           <div className="flex-1">
-            <p className="font-medium text-slate-900">Download failed</p>
+            <p className="font-medium text-slate-900">{t('portal.payments.downloadFailed')}</p>
             <p className="text-slate-600 mt-1">{downloadError}</p>
           </div>
           <button
             onClick={() => setDownloadError(null)}
             className="text-slate-500 hover:text-slate-700 text-xs underline"
           >
-            Dismiss
+            {t('portal.payments.dismiss')}
           </button>
         </div>
       )}
@@ -158,7 +160,7 @@ export const PortalPayments: React.FC = () => {
               <Receipt className="w-5 h-5 text-info" aria-hidden="true" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">Total Payments</p>
+              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">{t('portal.payments.totalPayments')}</p>
               <p className="text-2xl font-bold text-slate-900">{list.length}</p>
             </div>
           </div>
@@ -169,7 +171,7 @@ export const PortalPayments: React.FC = () => {
               <DollarSign className="w-5 h-5 text-success" aria-hidden="true" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">Total Paid</p>
+              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">{t('portal.payments.totalPaid')}</p>
               <p className="text-2xl font-bold text-slate-900">{formatCurrency(totalPaid)}</p>
             </div>
           </div>
@@ -179,17 +181,17 @@ export const PortalPayments: React.FC = () => {
       <Card className="overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
           <Receipt className="w-5 h-5 text-slate-600" />
-          <h2 className="text-lg font-semibold text-slate-900">Payment History</h2>
+          <h2 className="text-lg font-semibold text-slate-900">{t('portal.payments.paymentHistory')}</h2>
         </div>
 
         {isLoading ? (
-          <div className="p-8 text-center text-slate-500">Loading payments...</div>
+          <div className="p-8 text-center text-slate-500">{t('portal.payments.loadingPayments')}</div>
         ) : list.length === 0 ? (
           <div className="p-12 text-center">
             <Receipt className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500 font-medium">No payments yet</p>
+            <p className="text-slate-500 font-medium">{t('portal.payments.noPaymentsYet')}</p>
             <p className="text-slate-400 text-sm mt-1">
-              Your payment receipts will appear here once payments are recorded.
+              {t('portal.payments.noPaymentsSubtitle')}
             </p>
           </div>
         ) : (
@@ -226,19 +228,19 @@ export const PortalPayments: React.FC = () => {
                         {invoiceNumber && (
                           <span className="flex items-center gap-1">
                             <FileText className="w-3.5 h-3.5" aria-hidden="true" />
-                            Invoice {invoiceNumber}
+                            {t('portal.payments.invoiceLabel', { number: invoiceNumber })}
                           </span>
                         )}
                         {caseNo && (
                           <span className="flex items-center gap-1">
-                            Case {caseNo}
+                            {t('portal.payments.caseLabel', { caseNo })}
                           </span>
                         )}
                         {payment.reference && (
-                          <span className="text-slate-400">Ref: {payment.reference}</span>
+                          <span className="text-slate-400">{t('portal.payments.refLabel', { ref: payment.reference })}</span>
                         )}
                         {payment.transaction_id && (
-                          <span className="text-slate-400">Txn: {payment.transaction_id}</span>
+                          <span className="text-slate-400">{t('portal.payments.txnLabel', { txn: payment.transaction_id })}</span>
                         )}
                       </div>
 
@@ -257,7 +259,7 @@ export const PortalPayments: React.FC = () => {
                         className="text-xs"
                       >
                         <Download className="w-3.5 h-3.5 mr-1.5" aria-hidden="true" />
-                        {isDownloading ? 'Generating...' : 'Download Receipt'}
+                        {isDownloading ? t('portal.payments.generating') : t('portal.payments.downloadReceipt')}
                       </Button>
                     </div>
                   </div>

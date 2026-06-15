@@ -1,9 +1,12 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import portalEn from '../locales/portal.en.json';
+import portalAr from '../locales/portal.ar.json';
 
 const resources = {
   en: {
     translation: {
+      portal: portalEn,
       common: {
         save: 'Save',
         cancel: 'Cancel',
@@ -521,6 +524,7 @@ const resources = {
   },
   ar: {
     translation: {
+      portal: portalAr,
       common: {
         save: 'حفظ',
         cancel: 'إلغاء',

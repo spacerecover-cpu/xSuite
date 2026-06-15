@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { usePortalAuth } from '../../contexts/PortalAuthContext';
 import { supabase } from '../../lib/supabaseClient';
 import { Card } from '../../components/ui/Card';
@@ -21,11 +22,12 @@ interface Communication {
 }
 
 export const PortalCommunications: React.FC = () => {
+  const { t } = useTranslation();
   const { customer } = usePortalAuth();
 
   useEffect(() => {
-    document.title = 'Messages — Customer Portal';
-  }, []);
+    document.title = t('portal.communications.tabTitle');
+  }, [t]);
 
   const { data: communications = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['portal_communications', customer?.id],
@@ -93,8 +95,8 @@ export const PortalCommunications: React.FC = () => {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">Communications</h1>
-          <p className="text-slate-600">View messages and updates regarding your cases</p>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">{t('portal.communications.heading')}</h1>
+          <p className="text-slate-600">{t('portal.communications.subtitle')}</p>
         </div>
         <div className="space-y-4">
           {[0, 1, 2].map((i) => (
@@ -120,25 +122,25 @@ export const PortalCommunications: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">Communications</h1>
+        <h1 className="text-2xl font-bold text-slate-900 mb-2">{t('portal.communications.heading')}</h1>
         <p className="text-slate-600">
-          View messages and updates regarding your cases
+          {t('portal.communications.subtitle')}
         </p>
       </div>
 
       {isError && (
         <div role="alert" className="rounded-lg border border-danger/30 bg-danger-muted p-4 text-sm">
-          <p className="text-danger">Failed to load messages. Please try again.</p>
-          <button onClick={() => refetch()} className="mt-2 text-primary underline">Retry</button>
+          <p className="text-danger">{t('portal.communications.loadError')}</p>
+          <button onClick={() => refetch()} className="mt-2 text-primary underline">{t('portal.communications.retry')}</button>
         </div>
       )}
 
       {communications.length === 0 && !isError ? (
         <Card className="p-12 text-center">
           <MessageSquare className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <p className="text-lg text-slate-600 mb-2">No communications yet</p>
+          <p className="text-lg text-slate-600 mb-2">{t('portal.communications.noCommsYet')}</p>
           <p className="text-sm text-slate-500">
-            Communications regarding your cases will appear here
+            {t('portal.communications.noCommsSubtitle')}
           </p>
         </Card>
       ) : (
@@ -182,7 +184,7 @@ export const PortalCommunications: React.FC = () => {
 
                   {comm.profiles && (
                     <p className="text-xs text-slate-500">
-                      From: {comm.profiles.full_name}
+                      {t('portal.communications.from', { name: comm.profiles.full_name })}
                     </p>
                   )}
                 </div>
