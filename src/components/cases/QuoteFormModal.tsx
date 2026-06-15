@@ -7,6 +7,8 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { supabase } from '../../lib/supabaseClient';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useTaxConfig } from '../../contexts/TenantConfigContext';
+import { resolveDefaultRate, resolveTaxLabel } from './taxFieldConfig';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
 import { getSupportedCurrencies, getBaseCurrency, getConversionRate, type SupportedCurrency } from '../../lib/currencyService';
@@ -75,6 +77,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
   clientReference,
 }) => {
   const { currencyFormat } = useCurrency();
+  const taxConfig = useTaxConfig();
   const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
@@ -110,7 +113,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
     status: asString(initialData?.status) ?? 'draft',
     valid_until: asString(initialData?.valid_until) ?? getDefaultValidUntil(),
     client_reference: asString(initialData?.client_reference) ?? clientReference ?? '',
-    tax_rate: asNumber(initialData?.tax_rate) ?? 5,
+    tax_rate: resolveDefaultRate(asNumber(initialData?.tax_rate), taxConfig.defaultRate),
     discount_amount: asNumber(initialData?.discount_amount) ?? 0,
     discount_type: asString(initialData?.discount_type) ?? 'fixed',
     terms_and_conditions: asString(initialData?.terms_and_conditions) ?? '',
@@ -125,7 +128,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
         status: asString(initialData.status) ?? 'draft',
         valid_until: asString(initialData.valid_until) ?? getDefaultValidUntil(),
         client_reference: asString(initialData.client_reference) ?? clientReference ?? '',
-        tax_rate: asNumber(initialData.tax_rate) ?? 5,
+        tax_rate: resolveDefaultRate(asNumber(initialData.tax_rate), taxConfig.defaultRate),
         discount_amount: asNumber(initialData.discount_amount) ?? 0,
         discount_type: asString(initialData.discount_type) ?? 'fixed',
         terms_and_conditions: asString(initialData.terms_and_conditions) ?? '',
@@ -721,7 +724,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                   </>
                 )}
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-700">VAT ({quoteData.tax_rate}%)</span>
+                  <span className="text-slate-700">{resolveTaxLabel(taxConfig.label, quoteData.tax_rate)}</span>
                   <span className="font-medium text-slate-900">
                     {fmtDoc(taxAmount)}
                   </span>

@@ -1,5 +1,8 @@
 import { supabase, resolveTenantId } from './supabaseClient';
 import type { Database, Json } from '../types/database.types';
+import { resolveRateContext } from './currencyService';
+import { buildPayrollBaseColumns } from './payrollBase';
+import { baseAmount } from './financialMath';
 
 type PayrollPeriod = Database['public']['Tables']['payroll_periods']['Row'];
 type PayrollPeriodInsert = Database['public']['Tables']['payroll_periods']['Insert'];
@@ -352,6 +355,13 @@ export const payrollService = {
     const socialSecurityRate = settings.social_security_rate ?? 0.07;
     const overtimeMultiplier = settings.overtime_rate_multiplier.regular;
 
+    // Multi-currency closure (D7): freeze currency + rate + *_base on each payroll
+    // record. Resolve ONE rate context per run at the tenant base currency. We
+    // deliberately do NOT pass settings.currency.code here: it defaults to 'USD'
+    // (a fail-loud violation) and would convert base-currency salaries as if they
+    // were USD. Per-employee functional-currency payroll is Phase 3 (D5), not here.
+    const rc = await resolveRateContext(undefined, period.end_date, null);
+
     // Loan repayments are collected here and posted only AFTER payroll_records
     // are committed (below), so a failed records insert can never leave loans
     // deducted with no payroll record behind them.
@@ -402,6 +412,10 @@ export const payrollService = {
         total_earnings: totalEarnings,
         total_deductions: totalDeductions,
         net_salary: netSalary,
+        ...buildPayrollBaseColumns(
+          { total_earnings: totalEarnings, total_deductions: totalDeductions, net_salary: netSalary },
+          rc,
+        ),
         status: 'calculated',
       });
 
@@ -432,11 +446,14 @@ export const payrollService = {
         await this.recordLoanRepayment(repayment);
       }
 
+      // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency: records[] is built in this one processPayroll run under a single resolved rate context (rc); summing the document amounts is correct here
       const totalGross = records.reduce((sum, r) => sum + Number(r.total_earnings ?? 0), 0);
+      // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency: records[] is built in this one processPayroll run under a single resolved rate context (rc); summing the document amounts is correct here
       const totalDeductions = records.reduce(
         (sum, r) => sum + Number(r.total_deductions ?? 0),
         0
       );
+      // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency: records[] is built in this one processPayroll run under a single resolved rate context (rc); summing the document amounts is correct here
       const totalNet = records.reduce((sum, r) => sum + Number(r.net_salary ?? 0), 0);
 
       await this.updatePayrollPeriod(periodId, {
@@ -846,11 +863,11 @@ export const payrollService = {
     if (currentPeriod) {
       const { data: records } = await supabase
         .from('payroll_records')
-        .select('net_salary, status')
+        .select('net_salary, net_salary_base, status')
         .eq('period_id', currentPeriod.id)
         .is('deleted_at', null);
 
-      totalPayroll = records?.reduce((sum, r) => sum + (r.net_salary || 0), 0) || 0;
+      totalPayroll = records?.reduce((sum, r) => sum + baseAmount(r, 'net_salary'), 0) || 0;
       processedThisMonth = records?.filter(r => r.status === 'paid' || r.status === 'approved').length || 0;
     }
 

@@ -1,11 +1,13 @@
 import React, { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { usePortalAuth } from '../../contexts/PortalAuthContext';
 import { supabase } from '../../lib/supabaseClient';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { ShoppingBag, Package, Calendar, DollarSign } from 'lucide-react';
 import { formatDate } from '../../lib/format';
+import { baseAmount } from '../../lib/financialMath';
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -19,11 +21,12 @@ type StockItemEmbed = {
 } | null;
 
 export const PortalPurchasesPage: React.FC = () => {
+  const { t } = useTranslation();
   const { customer } = usePortalAuth();
 
   useEffect(() => {
-    document.title = 'My Purchases — Customer Portal';
-  }, []);
+    document.title = t('portal.purchases.tabTitle');
+  }, [t]);
 
   const {
     data: purchases,
@@ -37,7 +40,7 @@ export const PortalPurchasesPage: React.FC = () => {
       const { data, error } = await supabase
         .from('stock_sales')
         .select(`
-          id, sale_number, created_at, total_amount, status,
+          id, sale_number, created_at, total_amount, total_amount_base, status,
           stock_sale_items (
             id, quantity, unit_price, total,
             stock_items ( id, name, brand, sku )
@@ -52,25 +55,25 @@ export const PortalPurchasesPage: React.FC = () => {
     enabled: !!customer?.id,
   });
 
-  const totalSpent = (purchases ?? []).reduce((sum, s) => sum + (s.total_amount ?? 0), 0);
+  const totalSpent = (purchases ?? []).reduce((sum, s) => sum + baseAmount(s, 'total_amount'), 0);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">My Purchases</h1>
-        <p className="text-slate-500 mt-1">View your purchased devices and order history.</p>
+        <h1 className="text-2xl font-bold text-slate-900">{t('portal.purchases.heading')}</h1>
+        <p className="text-slate-500 mt-1">{t('portal.purchases.subtitle')}</p>
       </div>
 
       {purchasesError && (
         <div role="alert" className="rounded-lg border border-danger/30 bg-danger-muted p-4 text-sm">
-          <p className="text-danger">Some purchase data failed to load. Please try again.</p>
+          <p className="text-danger">{t('portal.purchases.loadError')}</p>
           <button
             onClick={() => {
               refetchPurchases();
             }}
             className="mt-2 text-primary underline"
           >
-            Retry
+            {t('portal.purchases.retry')}
           </button>
         </div>
       )}
@@ -82,7 +85,7 @@ export const PortalPurchasesPage: React.FC = () => {
               <ShoppingBag className="w-5 h-5 text-info" aria-hidden="true" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">Total Orders</p>
+              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">{t('portal.purchases.totalOrders')}</p>
               <p className="text-2xl font-bold text-slate-900">{purchases?.length ?? 0}</p>
             </div>
           </div>
@@ -93,7 +96,7 @@ export const PortalPurchasesPage: React.FC = () => {
               <DollarSign className="w-5 h-5 text-warning" aria-hidden="true" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">Total Spent</p>
+              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">{t('portal.purchases.totalSpent')}</p>
               <p className="text-2xl font-bold text-slate-900">{formatCurrency(totalSpent)}</p>
             </div>
           </div>
@@ -103,15 +106,15 @@ export const PortalPurchasesPage: React.FC = () => {
       <Card className="overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
           <ShoppingBag className="w-5 h-5 text-slate-600" />
-          <h2 className="text-lg font-semibold text-slate-900">Purchase History</h2>
+          <h2 className="text-lg font-semibold text-slate-900">{t('portal.purchases.purchaseHistory')}</h2>
         </div>
         {loadingPurchases ? (
-          <div className="p-8 text-center text-slate-500">Loading purchases...</div>
+          <div className="p-8 text-center text-slate-500">{t('portal.purchases.loadingPurchases')}</div>
         ) : !purchases?.length ? (
           <div className="p-12 text-center">
             <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500 font-medium">No purchases yet</p>
-            <p className="text-slate-400 text-sm mt-1">Your purchased devices will appear here.</p>
+            <p className="text-slate-500 font-medium">{t('portal.purchases.noPurchasesYet')}</p>
+            <p className="text-slate-400 text-sm mt-1">{t('portal.purchases.noPurchasesSubtitle')}</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
@@ -142,7 +145,7 @@ export const PortalPurchasesPage: React.FC = () => {
                               <Package className="w-4 h-4 text-slate-400 flex-shrink-0" />
                               <div>
                                 <span className="text-sm font-medium text-slate-800">
-                                  {si?.brand ? `${si.brand} ` : ''}{si?.name ?? 'Device'}
+                                  {si?.brand ? `${si.brand} ` : ''}{si?.name ?? t('portal.purchases.device')}
                                 </span>
                                 {si?.sku && <span className="text-xs text-slate-500 ml-1">({si.sku})</span>}
                                 <span className="text-xs text-slate-500 ml-2">× {item.quantity}</span>

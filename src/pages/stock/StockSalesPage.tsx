@@ -16,6 +16,7 @@ import {
   type StockSaleWithDetails,
   type SalesFilters,
 } from '../../lib/stockService';
+import { baseAmount } from '../../lib/financialMath';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { StockSalesTable } from '../../components/stock/StockSalesTable';
@@ -84,7 +85,11 @@ export const StockSalesPage: React.FC = () => {
   );
 
   const todayRevenue = useMemo(
-    () => todaySales.reduce((sum, s) => sum + (s.total_amount ?? 0), 0),
+    () =>
+      todaySales.reduce(
+        (sum, s) => sum + baseAmount(s as unknown as Record<string, unknown>, 'total_amount'),
+        0
+      ),
     [todaySales]
   );
 
@@ -95,7 +100,11 @@ export const StockSalesPage: React.FC = () => {
   });
 
   const monthRevenue = useMemo(
-    () => monthlySalesData.reduce((sum, s) => sum + (s.total_amount ?? 0), 0),
+    () =>
+      monthlySalesData.reduce(
+        (sum, s) => sum + baseAmount(s as unknown as Record<string, unknown>, 'total_amount'),
+        0
+      ),
     [monthlySalesData]
   );
 

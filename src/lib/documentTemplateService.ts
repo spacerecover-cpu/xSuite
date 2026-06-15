@@ -465,20 +465,83 @@ export async function softDeleteVersion(id: string): Promise<void> {
 // ===========================================================================
 
 /**
- * Resolve the deployed version for a tenant's default template of a given
- * `document_type`, or `null` when the tenant has no template / no deployed
- * version for that type yet (callers then fall back to the built-in config).
+ * Resolve the deployed version for a tenant's template of a given
+ * `document_type`, respecting an optional per-(legal_entity, business_unit)
+ * scope. Resolution order (most-specific first, each falling through to next):
  *
- * This is the single read the PDF engine needs to pull a tenant's customized
- * doc-type config: template-by-type → its deployed version. RLS scopes both
- * reads to the caller's tenant.
+ *   1. (legal_entity_id, business_unit_id)  — when both provided
+ *   2. (legal_entity_id, NULL)               — when legalEntityId provided
+ *   3. (NULL, NULL)                          — tenant default (always last)
+ *
+ * Existing single-arg callers resolve the tenant default exactly as before
+ * (no behavior change).
+ *
+ * RLS scopes all reads to the caller's tenant.
  */
 export async function getDeployedVersionByType(
   documentType: string,
+  scope?: { legalEntityId?: string; businessUnitId?: string },
 ): Promise<DocumentTemplateVersion | null> {
   const template = await getDocumentTemplateByType(documentType);
   if (!template) return null;
-  return getDeployedVersion(template.id);
+
+  const { legalEntityId, businessUnitId } = scope ?? {};
+
+  // Build the ordered list of scopes to try, most-specific first.
+  const candidates: Array<{ legalEntityId: string | null; businessUnitId: string | null }> = [];
+
+  if (legalEntityId && businessUnitId) {
+    candidates.push({ legalEntityId, businessUnitId });
+  }
+  if (legalEntityId) {
+    candidates.push({ legalEntityId, businessUnitId: null });
+  }
+  // Tenant default is always the final fallback.
+  candidates.push({ legalEntityId: null, businessUnitId: null });
+
+  for (const candidate of candidates) {
+    const version = await getDeployedVersionForScope(template.id, candidate);
+    if (version) return version;
+  }
+
+  return null;
+}
+
+/**
+ * Fetch the deployed version for a template constrained to an exact
+ * (legal_entity_id, business_unit_id) scope. Both values are matched
+ * exactly — pass `null` to match the tenant-default rows.
+ */
+async function getDeployedVersionForScope(
+  templateId: string,
+  scope: { legalEntityId: string | null; businessUnitId: string | null },
+): Promise<DocumentTemplateVersion | null> {
+  let query = supabase
+    .from('document_template_versions')
+    .select('*')
+    .eq('template_id', templateId)
+    .eq('is_deployed', true)
+    .is('deleted_at', null);
+
+  if (scope.legalEntityId === null) {
+    query = query.is('legal_entity_id', null);
+  } else {
+    query = query.eq('legal_entity_id', scope.legalEntityId);
+  }
+
+  if (scope.businessUnitId === null) {
+    query = query.is('business_unit_id', null);
+  } else {
+    query = query.eq('business_unit_id', scope.businessUnitId);
+  }
+
+  const { data, error } = await query.limit(1).maybeSingle();
+
+  if (error) {
+    logger.error('Error fetching deployed version for scope:', error);
+    throw error;
+  }
+  return data ?? null;
 }
 
 /**

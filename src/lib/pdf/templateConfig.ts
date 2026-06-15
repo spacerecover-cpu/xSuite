@@ -318,6 +318,15 @@ export interface TranslationPolicyConfig {
   groups?: TranslationPolicyGroups;
 }
 
+/** Resolved locale slice threaded by applyTenantLocale / the country layer
+ *  (§8d/§8g). Absent = today's neutral PDF default (date 'dd MMM yyyy', Western
+ *  grouping, document-currency decimals). */
+export interface LocaleConfig {
+  dateFormat?: string;
+  groupingStyle?: 'standard' | 'indian';
+  decimalPlaces?: number;
+}
+
 /** The resolved, render-ready template configuration for one document. */
 export interface DocumentTemplateConfig {
   paper: PaperConfig;
@@ -341,6 +350,8 @@ export interface DocumentTemplateConfig {
   layout?: LayoutConfig;
   translationPolicy?: TranslationPolicyConfig;
   signatureImages?: SignatureImagesConfig;
+  /** Resolved date/number locale (§8d). Absent = neutral PDF default. */
+  locale?: LocaleConfig;
 }
 
 /**
@@ -393,6 +404,7 @@ export interface TemplateConfigOverride {
   layout?: LayoutConfig;
   translationPolicy?: TranslationPolicyConfig;
   signatureImages?: SignatureImagesConfig;
+  locale?: LocaleConfig;
 }
 
 /** Partial section override; `key` identifies the target section. */
@@ -941,6 +953,7 @@ function applyOverride(
     layout: mergeGroup(base.layout, override.layout),
     translationPolicy: mergeTranslationPolicy(base.translationPolicy, override.translationPolicy),
     signatureImages: mergeSignatureImages(base.signatureImages, override.signatureImages),
+    locale: mergeGroup(base.locale, override.locale),
   };
 }
 
@@ -970,4 +983,18 @@ export function resolveTemplateConfig(
   resolved = applyOverride(resolved, docType);
   resolved = applyOverride(resolved, instance);
   return resolved;
+}
+
+/** Resolve with a derived COUNTRY layer beneath theme (§8b): the cascade is
+ *  built-in -> country -> theme -> doc-type -> instance. `country` undefined =
+ *  identity, so all existing resolveTemplateConfig call sites are unaffected. */
+export function resolveTemplateConfigWithCountry(
+  builtIn: DocumentTemplateConfig,
+  country?: TemplateConfigOverride,
+  theme?: TemplateConfigOverride,
+  docType?: TemplateConfigOverride,
+  instance?: TemplateConfigOverride,
+): DocumentTemplateConfig {
+  const withCountry = applyOverride(builtIn, country);
+  return resolveTemplateConfig(withCountry, theme, docType, instance);
 }

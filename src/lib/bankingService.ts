@@ -1,6 +1,7 @@
 import { supabase, resolveTenantId } from './supabaseClient';
 import { deriveInvoiceStatus } from './invoiceStatus';
 import { sanitizeFilterValue, isValidUuid } from './postgrestSanitizer';
+import { sumBankBalanceBase } from './financialReportsService';
 import type { Database } from '../types/database.types';
 
 type BankAccountRow = Database['public']['Tables']['bank_accounts']['Row'];
@@ -712,7 +713,7 @@ export const bankingService = {
   }> {
     const { data: accounts } = await supabase
       .from('bank_accounts')
-      .select('account_type, current_balance')
+      .select('account_type, current_balance, current_balance_base, currency')
       .eq('is_active', true)
       .is('deleted_at', null);
 
@@ -721,17 +722,20 @@ export const bankingService = {
       .select('id', { count: 'exact', head: true })
       .eq('is_reconciled', false);
 
-    const bankBalance = accounts
-      ?.filter((a) => a.account_type === 'bank' || a.account_type === 'checking' || a.account_type === 'savings')
-      .reduce((sum, a) => sum + (a.current_balance ?? 0), 0) ?? 0;
+    const bankBalance = sumBankBalanceBase(
+      (accounts ?? []).filter((a) => a.account_type === 'bank' || a.account_type === 'checking' || a.account_type === 'savings'),
+      'current_balance',
+    );
 
-    const cashBalance = accounts
-      ?.filter((a) => a.account_type === 'cash')
-      .reduce((sum, a) => sum + (a.current_balance ?? 0), 0) ?? 0;
+    const cashBalance = sumBankBalanceBase(
+      (accounts ?? []).filter((a) => a.account_type === 'cash'),
+      'current_balance',
+    );
 
-    const mobileBalance = accounts
-      ?.filter((a) => a.account_type === 'mobile')
-      .reduce((sum, a) => sum + (a.current_balance ?? 0), 0) ?? 0;
+    const mobileBalance = sumBankBalanceBase(
+      (accounts ?? []).filter((a) => a.account_type === 'mobile'),
+      'current_balance',
+    );
 
     return {
       totalBankBalance: bankBalance,
@@ -923,6 +927,7 @@ export const bankingService = {
         total_amount,
         amount_paid,
         balance_due,
+        balance_due_base,
         currency
       `)
       .eq('case_id', caseId)
@@ -959,7 +964,7 @@ export const bankingService = {
   async getInvoiceForPayment(invoiceId: string) {
     const { data, error } = await supabase
       .from('invoices')
-      .select('id, invoice_number, invoice_date, due_date, invoice_type, status, total_amount, amount_paid, balance_due, currency')
+      .select('id, invoice_number, invoice_date, due_date, invoice_type, status, total_amount, amount_paid, balance_due, balance_due_base, currency')
       .eq('id', invoiceId)
       .is('deleted_at', null)
       .maybeSingle();

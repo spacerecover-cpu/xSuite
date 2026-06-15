@@ -245,6 +245,10 @@ export const CompanyProfilePage: React.FC = () => {
           if (!quotesError && quotes) {
             totalQuotes = quotes.length;
             approvedQuotes = quotes.filter(q => q.status === 'approved' || q.status === 'accepted').length;
+            // TODO(country-engine): case_quotes has no total_amount_base shadow column,
+            // so this approved/accepted-quote revenue rollup is multi-currency-incorrect
+            // for a future non-base tenant. Blocked on a case_quotes base-shadow migration.
+            // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- BLOCKED: no total_amount_base on case_quotes (deferred migration); a no-op baseAmount would falsely silence a real gap
             totalRevenue = quotes
               .filter(q => q.status === 'approved' || q.status === 'accepted')
               .reduce((sum, q) => sum + (parseFloat(q.total_amount?.toString() || '0')), 0);

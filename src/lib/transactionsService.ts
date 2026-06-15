@@ -6,6 +6,7 @@ export interface Transaction {
   id?: string;
   transaction_date: string;
   amount: number;
+  amount_base?: number | null;
   transaction_type: 'income' | 'expense' | 'asset' | 'equity';
   description?: string;
   category_id?: string | null;
@@ -29,6 +30,7 @@ export interface TransactionWithDetails extends Transaction {
     name: string;
     bank_name: string;
   };
+  [key: string]: unknown;
 }
 
 const DEFAULT_PAGE_SIZE = 100;
@@ -259,9 +261,9 @@ export const getCashFlowSummary = async (filters?: {
     }
 
     if (t.transaction_type === 'income') {
-      grouped[month].income += t.amount;
+      grouped[month].income += baseAmount(t, 'amount');
     } else if (t.transaction_type === 'expense') {
-      grouped[month].expense += t.amount;
+      grouped[month].expense += baseAmount(t, 'amount');
     }
   });
 

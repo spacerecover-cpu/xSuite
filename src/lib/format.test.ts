@@ -22,6 +22,7 @@ import {
   formatDate,
   formatDateTime,
   formatCurrencyWithConfig,
+  formatCurrencyWithSettings,
   toDateInputValue,
 } from './format';
 import type { CurrencyConfig } from '../types/tenantConfig';
@@ -153,6 +154,23 @@ describe('ar path is locale-aware (Gregorian, Western numerals)', () => {
     expect(out).toMatch(/[0-9]/);
     expect(out).not.toMatch(/[٠-٩]/); // no Arabic-Indic digits
     expect(out).toContain('1,234.50');
+  });
+});
+
+describe('formatCurrencyWithSettings grouping (D18)', () => {
+  it('uses the supplied separators, not forced en-US comma grouping', () => {
+    const out = formatCurrencyWithSettings(1234567.5, {
+      currencySymbol: 'OMR', currencyPosition: 'after', decimalPlaces: 3,
+      currencyCode: 'OMR', thousandsSeparator: ' ', decimalSeparator: '.',
+    });
+    expect(out).toBe('1 234 567.500 OMR');
+  });
+  it('defaults to comma/dot grouping when separators are omitted (back-compat)', () => {
+    const out = formatCurrencyWithSettings(1234567.5, {
+      currencySymbol: '$', currencyPosition: 'before', decimalPlaces: 2,
+      currencyCode: 'USD',
+    });
+    expect(out).toBe('$ 1,234,567.50');
   });
 });
 

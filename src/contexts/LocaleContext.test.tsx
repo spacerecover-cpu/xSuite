@@ -26,6 +26,11 @@ const { updateTenantUiLanguage } = vi.hoisted(() => ({
 }));
 vi.mock('../lib/tenantConfigService', () => ({ updateTenantUiLanguage }));
 
+// LocaleProvider hydrates the supported-language set from geo_languages on mount;
+// mock the service so the test stays hermetic and does not pull in the real
+// Supabase client. The provider only calls .then(hydrateLanguages) with the result.
+vi.mock('../lib/languageService', () => ({ fetchActiveLanguages: vi.fn(async () => []) }));
+
 // Import after the mocks are registered.
 import { LocaleProvider, useLocale } from './LocaleContext';
 

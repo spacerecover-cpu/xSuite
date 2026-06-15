@@ -15,6 +15,7 @@ import type { DocumentTemplateConfig, ColumnConfig } from '../../templateConfig'
 import { formatDate, safeString } from '../../utils';
 import { amountInWordsAr, amountInWordsEn } from '../amountInWords';
 import { buildZatcaTlvBase64 } from '../zatcaQr';
+import { shouldEmitZatcaQr } from '../einvoiceRouting';
 import type {
   BankBlock,
   EngineDocData,
@@ -30,6 +31,19 @@ const COLUMN_ALIGN: Record<string, 'left' | 'center' | 'right'> = {
   unitPrice: 'right',
   lineTotal: 'right',
 };
+
+/** Map the seller's free-text country (ISO code or display name) to the ISO-3166
+ *  alpha-2 `SA` when it is Saudi Arabia, else the trimmed/upper raw value (or null).
+ *  Used only to route the KSA-specific ZATCA QR (D11); not a general normalizer. */
+function normalizeSaudi(country: string | null | undefined): string | null {
+  const raw = (country ?? '').trim();
+  if (!raw) return null;
+  const upper = raw.toUpperCase();
+  if (upper === 'SA' || upper === 'KSA' || upper === 'SAUDI ARABIA' || upper === 'SAUDIARABIA') {
+    return 'SA';
+  }
+  return upper;
+}
 
 function resolveColumns(config: DocumentTemplateConfig): ColumnConfig[] {
   const lineItems = config.sections.find((s) => s.key === 'lineItems');
@@ -166,8 +180,8 @@ export function toEngineData(
   // spell in Arabic, bilingual shows both.
   if (lines.amountInWords === true) {
     const mode = config.language.mode;
-    const enWords = amountInWordsEn(totalAmount, currencySymbol);
-    const arWords = amountInWordsAr(totalAmount, currencySymbol);
+    const enWords = amountInWordsEn(totalAmount, currencySymbol, decimalPlaces);
+    const arWords = amountInWordsAr(totalAmount, currencySymbol, decimalPlaces);
     const value = mode === 'ar' ? arWords : mode.startsWith('bilingual') ? `${enWords}  ·  ${arWords}` : enWords;
     totals.push({ label: { en: 'Amount in Words:', ar: 'المبلغ بالحروف:' }, value });
   }
@@ -233,12 +247,18 @@ export function toEngineData(
         }
       : null;
 
-  // ---- ZATCA / GCC e-invoice QR (opt-in via the tax bar) -------------------
-  // Only built when the tenant has enabled the VAT/GST identification bar (the
-  // GCC opt-in) and both a seller name and a registration number are available.
+  // ---- ZATCA / GCC e-invoice QR (country-routed) ---------------------------
+  // The ZATCA TLV is a Saudi-VAT statutory artifact: it is emitted ONLY when the
+  // resolving entity's country + tax system route to KSA (D11) — never on a bare
+  // UI tax-bar toggle, so a non-KSA tenant cannot emit a "compliant" KSA QR. The
+  // tax bar still gates whether the seller VAT identification is present at all.
   // Rendered natively by the QR surfaces (pdfmake `qr`), so no QR dependency.
+  const sellerCountryCode = normalizeSaudi(companySettings.location?.country);
+  // The tax bar is the entity's VAT/GST identification opt-in; within it the
+  // applicable system is VAT (the only ZATCA-eligible system in scope).
+  const taxSystem = config.taxBar?.enabled ? 'VAT' : null;
   let zatcaPayload: string | null = null;
-  if (config.taxBar?.enabled) {
+  if (config.taxBar?.enabled && shouldEmitZatcaQr({ taxSystem, countryCode: sellerCountryCode })) {
     const sellerName =
       companySettings.basic_info?.legal_name || companySettings.basic_info?.company_name || '';
     const vatNumber =

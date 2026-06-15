@@ -35,6 +35,12 @@ ruleTester.run('no-untranslated-jsx-text', rule, {
     { code: 'const A = () => <span>$ — / : ,</span>;' },
     // Number with currency symbol, no letter run.
     { code: 'const A = () => <span>$1,234.00</span>;' },
+    // Translatable attrs routed through t() / dynamic / empty / numeric / non-targeted.
+    { code: "const A = () => <input placeholder={t('portal:search')} />;" },
+    { code: 'const A = () => <input placeholder="" />;' },
+    { code: 'const A = () => <input placeholder="123" />;' },
+    { code: 'const A = () => <input name="email" />;' }, // not a user-facing attr
+    { code: 'const A = () => <img alt={photo.name} />;' }, // dynamic
   ],
   invalid: [
     {
@@ -45,5 +51,10 @@ ruleTester.run('no-untranslated-jsx-text', rule, {
       code: 'const A = () => <button>Submit Order</button>;',
       errors: [{ messageId: 'untranslated' }],
     },
+    // Literal user-facing attribute values must route through t().
+    { code: 'const A = () => <input placeholder="Search cases" />;', errors: [{ messageId: 'untranslatedAttr' }] },
+    { code: 'const A = () => <button title="Close dialog" />;', errors: [{ messageId: 'untranslatedAttr' }] },
+    { code: 'const A = () => <span aria-label="Loading" />;', errors: [{ messageId: 'untranslatedAttr' }] },
+    { code: 'const A = () => <img alt="Device photo" />;', errors: [{ messageId: 'untranslatedAttr' }] },
   ],
 });

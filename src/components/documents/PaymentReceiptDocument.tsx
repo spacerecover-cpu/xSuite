@@ -350,6 +350,7 @@ export const PaymentReceiptDocument: React.FC<PaymentReceiptDocumentProps> = ({
                   fontSize: '12px'
                 }}>
                   {formatCurrency(
+                    // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency (allocations of one payment)
                     payment.allocations.reduce((sum: number, a: Record<string, unknown>) => sum + ((a.amount as number) || 0), 0)
                   )}
                 </td>

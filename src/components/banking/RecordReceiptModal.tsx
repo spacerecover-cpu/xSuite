@@ -6,6 +6,7 @@ import { Input } from '../ui/Input';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { supabase } from '../../lib/supabaseClient';
 import { bankingService } from '../../lib/bankingService';
+import { baseAmount } from '../../lib/financialMath';
 import { useAccountingLocale } from '../../hooks/useAccountingLocale';
 import {
   AlertCircle,
@@ -33,7 +34,7 @@ interface RecordReceiptModalProps {
   invoiceId?: string;
 }
 
-interface PayableInvoice {
+type PayableInvoice = {
   id: string;
   invoice_number: string | null;
   invoice_date: string | null;
@@ -42,7 +43,8 @@ interface PayableInvoice {
   total_amount: number | null;
   amount_paid: number | null;
   balance_due: number | null;
-}
+  balance_due_base: number | null;
+};
 
 // OMR needs 3 decimals; this is safe for 2-decimal currencies too.
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -225,7 +227,7 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
   }, [singleInvoiceMode, singleInvoice, openInvoices]);
 
   const totalOutstanding = useMemo(
-    () => round3(payable.reduce((sum, inv) => sum + (inv.balance_due || 0), 0)),
+    () => round3(payable.reduce((sum, inv) => sum + baseAmount(inv, 'balance_due'), 0)),
     [payable]
   );
   const totalAllocated = round3(Array.from(allocations.values()).reduce((sum, val) => sum + val, 0));

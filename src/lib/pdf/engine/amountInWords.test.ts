@@ -26,6 +26,16 @@ describe('amountInWordsEn', () => {
   it('works without a currency', () => {
     expect(amountInWordsEn(7)).toBe('Seven only');
   });
+
+  it('renders OMR 3-decimal minor units (baisa), not /100 (D13)', () => {
+    expect(amountInWordsEn(1050.5, 'OMR', 3)).toBe('OMR One Thousand Fifty and 500/1000 only');
+  });
+  it('renders JPY with no fractional part (0 decimals)', () => {
+    expect(amountInWordsEn(1050, 'JPY', 0)).toBe('JPY One Thousand Fifty only');
+  });
+  it('defaults to 2 decimals when omitted (back-compat)', () => {
+    expect(amountInWordsEn(1050.5, 'OMR')).toBe('OMR One Thousand Fifty and 50/100 only');
+  });
 });
 
 describe('amountInWordsAr', () => {

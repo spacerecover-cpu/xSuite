@@ -4,6 +4,7 @@ import { logInvoicePayment } from './chainOfCustodyService';
 import { sanitizeFilterValue } from './postgrestSanitizer';
 import { logger } from './logger';
 import { resolveRateContext } from './currencyService';
+import { baseAmount } from './financialMath';
 
 export interface Payment {
   id?: string;
@@ -225,6 +226,7 @@ export const createPayment = async (
       .in('id', invoiceIds);
     for (const inv of allocatedInvoices ?? []) {
       if (!inv.case_id) continue;
+      // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency (allocations of one payment, filtered to a single invoice id; all same currency by construction)
       const allocated = allocations
         .filter((a) => a.invoice_id === inv.id)
         .reduce((sum, a) => sum + a.amount, 0);
@@ -350,7 +352,7 @@ export const getPaymentStats = async (filters?: {
 }) => {
   let query = supabase
     .from('payments')
-    .select('amount, status, payment_date');
+    .select('amount, amount_base, status, payment_date');
 
   if (filters?.dateFrom) {
     query = query.gte('payment_date', filters.dateFrom);
@@ -375,11 +377,11 @@ export const getPaymentStats = async (filters?: {
     completed: rows.filter(p => p.status === 'completed').length,
     pending: rows.filter(p => p.status === 'pending').length,
     today: rows.filter(p => p.payment_date === today).length,
-    totalAmount: rows.reduce((sum, p) => sum + (p.amount || 0), 0),
-    completedAmount: rows.filter(p => p.status === 'completed').reduce((sum, p) => sum + (p.amount || 0), 0),
+    totalAmount: rows.reduce((sum, p) => sum + baseAmount(p, 'amount'), 0),
+    completedAmount: rows.filter(p => p.status === 'completed').reduce((sum, p) => sum + baseAmount(p, 'amount'), 0),
     thisMonthAmount: rows
       .filter(p => p.payment_date !== null && p.payment_date >= thisMonthStart)
-      .reduce((sum, p) => sum + (p.amount || 0), 0),
+      .reduce((sum, p) => sum + baseAmount(p, 'amount'), 0),
   };
 };
 

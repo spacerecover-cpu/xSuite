@@ -8,6 +8,7 @@ import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { Modal } from '../../components/ui/Modal';
 import { formatDate } from '../../lib/format';
+import { baseAmount } from '../../lib/financialMath';
 import { FinancialModuleHeader } from '../../components/financial/FinancialModuleHeader';
 import { FinancialStatsCard } from '../../components/financial/FinancialStatsCard';
 import { ExpenseFormModal } from '../../components/financial/ExpenseFormModal';
@@ -57,6 +58,7 @@ type ExpenseRow = Pick<
   | 'expense_number'
   | 'expense_date'
   | 'amount'
+  | 'amount_base'
   | 'description'
   | 'vendor'
   | 'status'
@@ -114,6 +116,7 @@ export const ExpensesList: React.FC = () => {
             expense_number,
             expense_date,
             amount,
+            amount_base,
             description,
             vendor,
             status,
@@ -244,7 +247,7 @@ export const ExpensesList: React.FC = () => {
 
   const totalExpenses = expenses
     .filter((e) => e.status === 'approved' || e.status === 'paid')
-    .reduce((sum, exp) => sum + (exp.amount ?? 0), 0);
+    .reduce((sum, exp) => sum + baseAmount(exp, 'amount'), 0);
   const pendingExpenses = expenses.filter((e) => e.status === 'pending');
   const approvedExpenses = expenses.filter((e) => e.status === 'approved' || e.status === 'paid');
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { FileText, Download, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { usePortalAuth } from '../../contexts/PortalAuthContext';
@@ -36,13 +37,14 @@ function getCaseNumber(report: PortalReport): string {
 }
 
 export default function PortalReports() {
+  const { t } = useTranslation();
   const { customer } = usePortalAuth();
   const [viewingReportId, setViewingReportId] = useState<string | null>(null);
   const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
 
   useEffect(() => {
-    document.title = 'Reports — Customer Portal';
-  }, []);
+    document.title = t('portal.reports.tabTitle');
+  }, [t]);
 
   const { data: visibility = [] } = useQuery({
     queryKey: ['portal_visibility', customer?.id],
@@ -100,7 +102,7 @@ export default function PortalReports() {
       await refetch();
     } catch (error) {
       logger.error('Error downloading report:', error);
-      alert('Failed to download report. Please try again.');
+      alert(t('portal.reports.failedToDownload'));
     } finally {
       setDownloadingReportId(null);
     }
@@ -117,7 +119,7 @@ export default function PortalReports() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('portal.reports.heading')}</h1>
         </div>
         <div className="space-y-3">
           {[0, 1, 2].map((i) => (
@@ -140,10 +142,10 @@ export default function PortalReports() {
   if (isError) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('portal.reports.heading')}</h1>
         <div role="alert" className="rounded-lg border border-danger/30 bg-danger-muted p-4 text-sm">
-          <p className="text-danger">Failed to load reports. Please try again.</p>
-          <button onClick={() => refetch()} className="mt-2 text-primary underline">Retry</button>
+          <p className="text-danger">{t('portal.reports.loadError')}</p>
+          <button onClick={() => refetch()} className="mt-2 text-primary underline">{t('portal.reports.retry')}</button>
         </div>
       </div>
     );
@@ -153,13 +155,13 @@ export default function PortalReports() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('portal.reports.heading')}</h1>
         </div>
         <Card>
           <div className="text-center py-12">
             <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" aria-hidden="true" />
-            <p className="text-gray-500 mb-2">No reports available</p>
-            <p className="text-sm text-gray-400">Reports will appear here when they are ready</p>
+            <p className="text-gray-500 mb-2">{t('portal.reports.noReportsAvailable')}</p>
+            <p className="text-sm text-gray-400">{t('portal.reports.noReportsSubtitle')}</p>
           </div>
         </Card>
       </div>
@@ -170,20 +172,20 @@ export default function PortalReports() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('portal.reports.heading')}</h1>
           <p className="text-sm text-gray-600 mt-1">
-            View and download reports for your cases
+            {t('portal.reports.subtitle')}
           </p>
         </div>
         <div className="text-sm text-gray-500">
-          {reports.length} {reports.length === 1 ? 'report' : 'reports'}
+          {t(reports.length === 1 ? 'portal.reports.count_one' : 'portal.reports.count_other', { count: reports.length })}
         </div>
       </div>
 
       {Object.entries(groupedReports).map(([caseNumber, caseReports]) => (
         <Card key={caseNumber}>
           <div className="mb-4 pb-3 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Case {caseNumber}</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{t('portal.reports.caseLabel', { caseNumber })}</h2>
           </div>
 
           <div className="space-y-3">
@@ -221,12 +223,12 @@ export default function PortalReports() {
                         <div className="flex items-center gap-4 text-xs text-gray-500">
                           {report.generated_at && (
                             <span>
-                              Generated: {format(new Date(report.generated_at), 'MMM dd, yyyy')}
+                              {t('portal.reports.generated', { date: format(new Date(report.generated_at), 'MMM dd, yyyy') })}
                             </span>
                           )}
                           {!report.generated_at && (
                             <span>
-                              Created: {format(new Date(report.created_at), 'MMM dd, yyyy')}
+                              {t('portal.reports.created', { date: format(new Date(report.created_at), 'MMM dd, yyyy') })}
                             </span>
                           )}
                         </div>
@@ -240,7 +242,7 @@ export default function PortalReports() {
                         onClick={() => handleView(report.id)}
                       >
                         <Eye className="w-4 h-4 mr-1" aria-hidden="true" />
-                        View
+                        {t('portal.reports.view')}
                       </Button>
                       <Button
                         variant="secondary"
@@ -249,7 +251,7 @@ export default function PortalReports() {
                         disabled={downloadingReportId === report.id}
                       >
                         <Download className="w-4 h-4 mr-1" aria-hidden="true" />
-                        {downloadingReportId === report.id ? 'Downloading...' : 'PDF'}
+                        {downloadingReportId === report.id ? t('portal.reports.downloading') : t('portal.reports.pdf')}
                       </Button>
                     </div>
                   </div>
@@ -289,6 +291,7 @@ interface ReportSection {
 }
 
 function PortalReportViewModal({ reportId, onClose }: PortalReportViewModalProps) {
+  const { t } = useTranslation();
   const [report, setReport] = useState<ReportData | null>(null);
   const [sections, setSections] = useState<ReportSection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -326,8 +329,8 @@ function PortalReportViewModal({ reportId, onClose }: PortalReportViewModalProps
 
   if (loading || !report) {
     return (
-      <Modal isOpen={true} onClose={onClose} title="Loading report..." maxWidth="4xl">
-        <div className="text-center py-8 text-slate-500">Loading report...</div>
+      <Modal isOpen={true} onClose={onClose} title={t('portal.reports.loadingReport')} maxWidth="4xl">
+        <div className="text-center py-8 text-slate-500">{t('portal.reports.loadingReport')}</div>
       </Modal>
     );
   }
@@ -343,10 +346,10 @@ function PortalReportViewModal({ reportId, onClose }: PortalReportViewModalProps
     >
       <div className="space-y-6">
         {sections.map((section) => {
-          const safeHtml = sanitizeHtml(section.content || 'No content');
+          const safeHtml = sanitizeHtml(section.content || t('portal.reports.noContent'));
           return (
             <div key={section.id} className="border-l-4 border-primary pl-4">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">{section.title ?? 'Section'}</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">{section.title ?? t('portal.reports.section')}</h3>
               <div
                 className="prose max-w-none text-gray-700"
                 dangerouslySetInnerHTML={{ __html: safeHtml }}
@@ -357,7 +360,7 @@ function PortalReportViewModal({ reportId, onClose }: PortalReportViewModalProps
       </div>
 
       <div className="mt-6 pt-4 border-t flex justify-end">
-        <Button onClick={onClose}>Close</Button>
+        <Button onClick={onClose}>{t('portal.reports.close')}</Button>
       </div>
     </Modal>
   );

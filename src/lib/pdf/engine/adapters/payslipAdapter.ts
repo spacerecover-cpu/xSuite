@@ -61,7 +61,9 @@ export function toEngineData(
   const earningItems = items.filter((i) => i.component_type === 'earning');
   const deductionItems = items.filter((i) => i.component_type === 'deduction');
 
+  // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency (within-document: component items of one payroll record, no amount_base shadow on payslip line items)
   const totalEarnings = earningItems.reduce((sum, i) => sum + Number(i.amount), 0);
+  // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency (within-document: component items of one payroll record, no amount_base shadow on payslip line items)
   const totalDeductions = deductionItems.reduce((sum, i) => sum + Number(i.amount), 0);
 
   // ---- Payslip info header (employee + period + attendance) ----------------

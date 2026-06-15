@@ -13,6 +13,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { useToast } from '../../hooks/useToast';
 import { format } from 'date-fns';
 import { logger } from '../../lib/logger';
+import { baseAmount } from '../../lib/financialMath';
 import type { Database } from '../../types/database.types';
 
 type PurchaseOrderRow = Database['public']['Tables']['purchase_orders']['Row'];
@@ -130,7 +131,7 @@ export default function PurchaseOrdersListPage() {
   const calculateStats = (orderData: PurchaseOrderWithJoins[]) => {
     const pending = orderData.filter((o) => o.status?.name === 'Draft' || o.status?.name === 'Ordered');
     const approved = orderData.filter((o) => o.status?.name === 'Approved' || o.status?.name === 'Received');
-    const totalValue = orderData.reduce((sum, o) => sum + (o.total_amount ?? 0), 0);
+    const totalValue = orderData.reduce((sum, o) => sum + baseAmount(o, 'total_amount'), 0);
 
     setStats({
       total: orderData.length,

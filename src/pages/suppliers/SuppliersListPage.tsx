@@ -12,6 +12,7 @@ import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { useToast } from '../../hooks/useToast';
 import { useCurrency } from '../../hooks/useCurrency';
 import { formatDate } from '../../lib/format';
+import { baseAmount } from '../../lib/financialMath';
 import { logger } from '../../lib/logger';
 
 interface Supplier {
@@ -142,9 +143,9 @@ export default function SuppliersListPage() {
     try {
       const { data: poData } = await supabase
         .from('purchase_orders')
-        .select('total_amount');
+        .select('total_amount, total_amount_base');
 
-      const totalSpend = poData?.reduce((sum, po) => sum + (po.total_amount || 0), 0) || 0;
+      const totalSpend = poData?.reduce((sum, po) => sum + baseAmount(po, 'total_amount'), 0) || 0;
 
       setStats({
         total: supplierData.length,

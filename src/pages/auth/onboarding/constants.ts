@@ -83,9 +83,22 @@ export const step3Schema = z.object({
     .regex(/[a-z]/, 'Needs a lowercase letter')
     .regex(/[0-9]/, 'Needs a number'),
   confirmPassword: z.string(),
+  // Country Engine §9.5: the admin email must be verified (OTP) before the
+  // account can be created. Wired to the existing send-otp-email edge fn.
+  emailVerified: z.boolean().refine(v => v === true, { message: 'Please verify your email' }),
 }).refine(d => d.password === d.confirmPassword, {
   message: 'Passwords do not match',
   path: ['confirmPassword'],
+});
+
+// Conditional jurisdiction step (rendered only when the selected country has a
+// real tax system). Soft on the tax number — the soft/format validation runs in
+// the step via validateTaxNumber(), so the schema only requires presence.
+export const jurisdictionSchema = z.object({
+  legalEntityType: z.string().min(1, 'Select a legal entity type'),
+  taxNumber: z.string().min(1, 'Tax registration number is required'),
+  fiscalYearStart: z.string().min(1, 'Confirm the fiscal year start'),
+  timezone: z.string().min(1, 'Confirm the timezone'),
 });
 
 export const step4Schema = z.object({
@@ -105,6 +118,14 @@ export interface OnboardingFormData {
   email: string;
   password: string;
   confirmPassword: string;
+  emailVerified: boolean;
+  // Country-driven jurisdiction capture (§9.2/§9.5). uiLanguage defaults from the
+  // selected country language; '' means "let the DB sync trigger pick the default".
+  uiLanguage: string;
+  legalEntityType: string;
+  taxNumber: string;
+  fiscalYearStart: string;
+  timezone: string;
   services: string[];
   estimatedCases: string;
   planId: string;
@@ -119,6 +140,12 @@ export const DEFAULT_FORM_DATA: OnboardingFormData = {
   email: '',
   password: '',
   confirmPassword: '',
+  emailVerified: false,
+  uiLanguage: '',
+  legalEntityType: '',
+  taxNumber: '',
+  fiscalYearStart: '',
+  timezone: '',
   services: [],
   estimatedCases: '',
   planId: '',

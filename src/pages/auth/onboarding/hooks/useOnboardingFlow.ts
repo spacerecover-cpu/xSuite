@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { tenantService } from '../../../../lib/tenantService';
 import { supabase } from '../../../../lib/supabaseClient';
+import { geoCountryService } from '../../../../lib/geoCountryService';
+import type { OnboardableCountry } from '../../../../lib/geoCountryService';
+import { resolveUiLanguagePayload } from '../onboardingValidation';
 import { useToast } from '../../../../hooks/useToast';
 import { logger } from '../../../../lib/logger';
 import { STEP_SCHEMAS, DEFAULT_FORM_DATA } from '../constants';
@@ -10,15 +13,7 @@ import type { Database } from '../../../../types/database.types';
 
 type SubscriptionPlan = Database['public']['Tables']['subscription_plans']['Row'];
 
-interface GeoCountry {
-  id: string;
-  code: string;
-  name: string;
-  currency_code: string | null;
-  currency_symbol: string | null;
-  tax_system: string | null;
-  tax_label: string | null;
-}
+type GeoCountry = OnboardableCountry;
 
 const STORAGE_KEY = 'xsuite_onboarding';
 
@@ -80,18 +75,14 @@ export function useOnboardingFlow() {
   }, []);
 
   useEffect(() => {
-    supabase
-      .from('geo_countries')
-      .select('id, code, name, currency_code, currency_symbol, tax_system, tax_label')
-      .eq('is_active', true)
-      .order('name')
-      .then(({ data, error }) => {
-        if (error) {
-          toast.error('Failed to load countries');
-          logger.error(error.message);
-        } else {
-          setCountries(data || []);
-        }
+    // Single source of truth: currency-bearing, onboardable countries only
+    // (fail-loud — a stub country with no real ISO currency is never offered).
+    geoCountryService
+      .listOnboardableCountries()
+      .then((data) => setCountries(data))
+      .catch((err: unknown) => {
+        toast.error('Failed to load countries');
+        logger.error(err instanceof Error ? err.message : String(err));
       });
   }, []);
 
@@ -123,6 +114,7 @@ export function useOnboardingFlow() {
           .from('tenants')
           .select('id')
           .eq('slug', slug)
+          .is('deleted_at', null) // parity with server authority (provision-tenant), §9.7
           .maybeSingle();
         setSlugAvailable(!data);
       } catch {
@@ -186,6 +178,14 @@ export function useOnboardingFlow() {
 
     setSubmitting(true);
     try {
+      const selectedCountry = countries.find((c) => c.id === formData.countryId);
+      // ui_language: send only when the user overrode the country default, so the
+      // DB sync trigger owns the default when untouched (§9.2).
+      const uiLanguageOverride = resolveUiLanguagePayload(
+        selectedCountry?.language_code,
+        formData.uiLanguage,
+      );
+
       await tenantService.createTenant({
         name: formData.companyName,
         slug: formData.slug,
@@ -195,6 +195,13 @@ export function useOnboardingFlow() {
         planId: formData.planId,
         countryId: formData.countryId,
         baseCurrencyCode: formData.baseCurrencyCode,
+        uiLanguage: uiLanguageOverride,
+        // Jurisdiction payload (consumed by provision-tenant → primary legal_entity).
+        // Only present when the country actually has a tax system.
+        legalEntityType: formData.legalEntityType || undefined,
+        taxNumber: formData.taxNumber || undefined,
+        fiscalYearStart: formData.fiscalYearStart || undefined,
+        timezone: formData.timezone || undefined,
       });
 
       sessionStorage.removeItem(STORAGE_KEY);
@@ -206,7 +213,7 @@ export function useOnboardingFlow() {
     } finally {
       setSubmitting(false);
     }
-  }, [formData, validateCurrentStep, navigate, toast]);
+  }, [formData, countries, validateCurrentStep, navigate, toast]);
 
   return {
     step,

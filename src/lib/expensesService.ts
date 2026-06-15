@@ -4,7 +4,7 @@ import { logger } from './logger';
 import type { Database } from '../types/database.types';
 import { createFinancialTransaction } from './financialService';
 import { resolveRateContext, getBaseCurrency, getCurrencyDecimals } from './currencyService';
-import { convertToBase } from './financialMath';
+import { convertToBase, baseAmount } from './financialMath';
 
 type ExpenseInsert = Database['public']['Tables']['expenses']['Insert'];
 type ExpenseAttachmentRow = Database['public']['Tables']['expense_attachments']['Row'];
@@ -513,6 +513,8 @@ export const getExpensesByCategory = async (filters?: {
     .from('expenses')
     .select(`
       amount,
+      amount_base,
+      exchange_rate,
       category:master_expense_categories(id, name)
     `)
     .in('status', ['approved', 'paid']);
@@ -530,6 +532,7 @@ export const getExpensesByCategory = async (filters?: {
 
   type CategoryRow = {
     amount: number;
+    amount_base: number | null;
     category: { id: string; name: string } | null;
   };
 
@@ -542,7 +545,7 @@ export const getExpensesByCategory = async (filters?: {
     if (!categoryTotals[categoryId]) {
       categoryTotals[categoryId] = { name: categoryName, amount: 0 };
     }
-    categoryTotals[categoryId].amount += expense.amount || 0;
+    categoryTotals[categoryId].amount += baseAmount(expense, 'amount');
   });
 
   return Object.entries(categoryTotals)

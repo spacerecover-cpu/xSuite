@@ -259,6 +259,7 @@ export const PaymentViewModal: React.FC<PaymentViewModalProps> = ({
                     <td className="px-4 py-3 text-right">
                       <span className="text-base font-bold text-success">
                         {formatCurrency(
+                          // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-payment rollup rendered in this payment's own currency; payment_allocations has no amount_base and the total must stay native
                           payment.allocations!.reduce(
                             (sum: number, a) => sum + (a.amount || 0),
                             0

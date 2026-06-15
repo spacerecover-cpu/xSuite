@@ -355,3 +355,11 @@ export const platformAdminKeys = {
   couponsList: () => [...platformAdminKeys.coupons(), 'list'] as const,
   couponRedemptions: (couponId: string) => [...platformAdminKeys.coupons(), 'redemptions', couponId] as const,
 };
+
+export const legalEntityKeys = {
+  all: ['legal_entities'] as const,
+  lists: () => [...legalEntityKeys.all, 'list'] as const,
+  list: (tenantId: string) => [...legalEntityKeys.all, 'list', tenantId] as const,
+  primary: (tenantId: string) => [...legalEntityKeys.all, 'primary', tenantId] as const,
+  detail: (id: string) => [...legalEntityKeys.all, 'detail', id] as const,
+};

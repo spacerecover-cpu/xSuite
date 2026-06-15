@@ -50,15 +50,20 @@ export function numberToWordsEn(value: number): string {
 }
 
 /**
- * Spell a monetary amount in English: `<currency> <whole words> [and NN/100] only`.
- * Cents render as `NN/100` (cheque style) when non-zero.
+ * Spell a monetary amount in English: `<currency> <whole words> [and NN/<factor>] only`.
+ * Minor units render cheque-style over the currency's minor-unit factor (10^decimals)
+ * when non-zero — so OMR (3 decimals → baisa) renders `/1000` and JPY (0 decimals)
+ * has no fractional part (D13). `decimals` defaults to 2 so existing callers are
+ * unchanged; pass the currency's decimal_places for currency-correct minor units.
  */
-export function amountInWordsEn(amount: number, currency = ''): string {
+export function amountInWordsEn(amount: number, currency = '', decimals = 2): string {
   const whole = Math.floor(Math.abs(amount));
-  const cents = Math.round((Math.abs(amount) - whole) * 100);
+  const factor = 10 ** decimals;
+  const minor = Math.round((Math.abs(amount) - whole) * factor);
   const words = numberToWordsEn(whole);
-  const centPart = cents > 0 ? ` and ${String(cents).padStart(2, '0')}/100` : '';
-  return `${currency ? `${currency} ` : ''}${words}${centPart} only`;
+  const minorPart = decimals > 0 && minor > 0
+    ? ` and ${String(minor).padStart(decimals, '0')}/${factor}` : '';
+  return `${currency ? `${currency} ` : ''}${words}${minorPart} only`;
 }
 
 const AR_ONES = [
@@ -103,8 +108,16 @@ function numberToWordsAr(value: number): string {
   return parts.join(' و');
 }
 
-/** Spell a monetary amount in Arabic words: `<words> <currency> فقط`. */
-export function amountInWordsAr(amount: number, currency = ''): string {
-  const words = numberToWordsAr(Math.floor(Math.abs(amount)));
-  return `${words}${currency ? ` ${currency}` : ''} فقط`;
+/**
+ * Spell a monetary amount in Arabic words: `<words> [و<minor words>] <currency> فقط`.
+ * `decimals` defaults to 2 (back-compat); the minor unit is spelled (no longer dropped)
+ * over the currency's 10^decimals factor when non-zero, so OMR/baisa and JPY are both
+ * correct (D13). */
+export function amountInWordsAr(amount: number, currency = '', decimals = 2): string {
+  const whole = Math.floor(Math.abs(amount));
+  const factor = 10 ** decimals;
+  const minor = Math.round((Math.abs(amount) - whole) * factor);
+  const words = numberToWordsAr(whole);
+  const minorPart = decimals > 0 && minor > 0 ? ` و${numberToWordsAr(minor)}` : '';
+  return `${words}${minorPart}${currency ? ` ${currency}` : ''} فقط`;
 }

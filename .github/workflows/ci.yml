@@ -54,6 +54,21 @@ jobs:
       - run: npm ci
       - run: npx eslint src
 
+  country-i18n:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      # Portal-scoped i18n missing-key gate (no-op pass until the portal slice lands).
+      - run: bash scripts/check-i18n-keys.sh
+      # Custom eslint-rule unit tests (eslint-rules/ is in eslint's ignore list, so
+      # these are otherwise orphaned — run them here so rule regressions fail CI).
+      - run: node --test eslint-rules/*.test.js
+
   tenant-table-requirements:
     runs-on: ubuntu-latest
     env:
@@ -85,6 +100,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: bash scripts/check-from-table-names.sh
+
+  country-config-completeness:
+    runs-on: ubuntu-latest
+    # Phase 1 (geo reference-data): this gate flips to ENFORCING (remove the
+    # continue-on-error line below) in the SAME PR/commit that applies the
+    # populate_geo_countries_reference_data seed migration — the strict
+    # check-geo-completeness.sql below requires phone_format + address_format,
+    # which only exist on the live DB once that operator migration lands. Until
+    # the seed is applied, keep continue-on-error so CI reports (not blocks).
+    # OPERATOR: drop the next line when applying the seed migration.
+    continue-on-error: true
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 'Check active-country config completeness (Phase-0 inner: currency/locale/date/tz)'
+        if: ${{ env.SUPABASE_DB_URL != '' }}
+        run: psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f scripts/check-active-country-config.sql
+      - name: 'Check geo completeness (Phase-1 strict: + phone/address, no stubs)'
+        if: ${{ env.SUPABASE_DB_URL != '' }}
+        run: psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f scripts/check-geo-completeness.sql
+      - name: Skip active-country config check (no Supabase credentials)
+        if: ${{ env.SUPABASE_DB_URL == '' }}
+        run: 'echo "SKIP country-config-completeness: SUPABASE_DB_URL unavailable (Dependabot/fork PRs have no access to Actions secrets). Enforced on internal PRs and on push to main."'
 
   token-guard:
     runs-on: ubuntu-latest

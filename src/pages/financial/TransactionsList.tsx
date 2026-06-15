@@ -7,6 +7,7 @@ import { formatDate } from '../../lib/format';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useConfirm } from '../../hooks/useConfirm';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
+import { baseAmount } from '../../lib/financialMath';
 import { FinancialModuleHeader } from '../../components/financial/FinancialModuleHeader';
 import { FinancialStatsCard } from '../../components/financial/FinancialStatsCard';
 import { TransactionFormModal } from '../../components/financial/TransactionFormModal';
@@ -40,6 +41,7 @@ interface TransactionDisplay {
   id: string;
   transaction_date: string;
   amount: number;
+  amount_base?: number | null;
   type: 'income' | 'expense' | 'asset' | 'equity';
   description: string;
   reference_number: string | null;
@@ -100,6 +102,7 @@ export const TransactionsList: React.FC = () => {
         id: row.id ?? '',
         transaction_date: row.transaction_date ?? '',
         amount: row.amount,
+        amount_base: row.amount_base,
         type: (row.transaction_type as TransactionDisplay['type']) ?? 'expense',
         description: row.description ?? '',
         reference_number: null,
@@ -167,8 +170,8 @@ export const TransactionsList: React.FC = () => {
 
   const incomeTransactions = transactions.filter(t => t.type === 'income');
   const expenseTransactions = transactions.filter(t => t.type === 'expense');
-  const totalIncome = incomeTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
-  const totalExpense = expenseTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+  const totalIncome = incomeTransactions.reduce((sum, t) => sum + baseAmount(t as unknown as Record<string, unknown>, 'amount'), 0);
+  const totalExpense = expenseTransactions.reduce((sum, t) => sum + baseAmount(t as unknown as Record<string, unknown>, 'amount'), 0);
   const netCashFlow = totalIncome - totalExpense;
 
   const getTypeColor = (type: string) => {

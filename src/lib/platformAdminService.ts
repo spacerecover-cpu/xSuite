@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient';
 import type { Database } from '../types/database.types';
 import { sanitizeFilterValue } from './postgrestSanitizer';
+import { baseAmount } from './financialMath';
 
 type Tenant = Database['public']['Tables']['tenants']['Row'];
 type TenantSubscription = Database['public']['Tables']['tenant_subscriptions']['Row'];
@@ -250,7 +251,7 @@ export async function calculateHealthScore(tenantId: string): Promise<{
       .is('deleted_at', null),
     supabase
       .from('payments')
-      .select('amount')
+      .select('amount, amount_base')
       .gte('payment_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
     supabase
       .from('support_tickets')
@@ -263,7 +264,7 @@ export async function calculateHealthScore(tenantId: string): Promise<{
   const totalUsers = usersRes.data?.length || 0;
   const activeUsers = activeUsersRes.data?.length || 0;
   const casesLast30d = casesRes.count || 0;
-  const revenue = (paymentsRes.data || []).reduce((sum, p) => sum + (p.amount ?? 0), 0);
+  const revenue = (paymentsRes.data || []).reduce((sum, p) => sum + baseAmount(p, 'amount'), 0);
   const openTickets = ticketsRes.count || 0;
 
   const lastLoginDate = usersRes.data
@@ -313,7 +314,7 @@ export async function recordHealthMetrics(tenantId: string): Promise<void> {
       .is('deleted_at', null),
     supabase
       .from('payments')
-      .select('amount')
+      .select('amount, amount_base')
       .gte('payment_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
     supabase
       .from('support_tickets')
@@ -323,7 +324,7 @@ export async function recordHealthMetrics(tenantId: string): Promise<void> {
       .is('deleted_at', null),
   ]);
 
-  const revenue = (revenueRes.data || []).reduce((sum, p) => sum + (p.amount ?? 0), 0);
+  const revenue = (revenueRes.data || []).reduce((sum, p) => sum + baseAmount(p, 'amount'), 0);
 
   await supabase.from('tenant_health_metrics').insert({
     tenant_id: tenantId,

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { usePortalAuth } from '../../contexts/PortalAuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -7,6 +8,7 @@ import { LogIn, AlertCircle } from 'lucide-react';
 import { getPortalSettings } from '../../lib/portalUrlService';
 
 export const PortalLogin: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { login, error } = usePortalAuth();
   const [email, setEmail] = useState('');
@@ -17,8 +19,8 @@ export const PortalLogin: React.FC = () => {
   const [privacyUrl, setPrivacyUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    document.title = 'Sign In — Customer Portal';
-  }, []);
+    document.title = t('portal.login.tabTitle');
+  }, [t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,8 +60,8 @@ export const PortalLogin: React.FC = () => {
           <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mx-auto mb-4">
             <LogIn className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">Customer Portal</h1>
-          <p className="text-slate-600">Sign in to access your account</p>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">{t('portal.login.heading')}</h1>
+          <p className="text-slate-600">{t('portal.login.subheading')}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -75,23 +77,23 @@ export const PortalLogin: React.FC = () => {
           )}
 
           <Input
-            label="Email Address"
+            label={t('portal.login.emailLabel')}
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
             autoComplete="email"
-            placeholder="your.email@example.com"
+            placeholder={t('portal.login.emailPlaceholder')}
           />
 
           <Input
-            label="Password"
+            label={t('portal.login.passwordLabel')}
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             autoComplete="current-password"
-            placeholder="Enter your password"
+            placeholder={t('portal.login.passwordPlaceholder')}
           />
 
           <div className="text-right -mt-2">
@@ -100,11 +102,11 @@ export const PortalLogin: React.FC = () => {
                 href={forgotPasswordHref}
                 className="text-sm text-primary hover:text-primary/80 hover:underline"
               >
-                Forgot password?
+                {t('portal.login.forgotPassword')}
               </a>
             ) : (
               <span className="text-sm text-slate-400" aria-disabled="true">
-                Forgot password? Contact support.
+                {t('portal.login.forgotPasswordContact')}
               </span>
             )}
           </div>
@@ -114,28 +116,28 @@ export const PortalLogin: React.FC = () => {
             className="w-full bg-primary hover:bg-primary/90"
             disabled={isSubmitting}
           >
-            {isSubmitting ? 'Signing in...' : 'Sign In'}
+            {isSubmitting ? t('portal.login.signingIn') : t('portal.login.signIn')}
           </Button>
         </form>
 
         <div className="mt-6 text-center">
           <p className="text-sm text-slate-500">
-            Need help accessing your account?
+            {t('portal.login.needHelp')}
           </p>
           <p className="text-sm text-slate-500 mt-1">
             {supportEmail ? (
               <>
-                Contact{' '}
+                {t('portal.common.contact')}{' '}
                 <a
                   href={`mailto:${supportEmail}`}
                   className="text-primary hover:underline"
                 >
                   {supportEmail}
                 </a>
-                {' '}for assistance.
+                {' '}{t('portal.login.contactSupportWithEmail')}
               </>
             ) : (
-              <>Contact our support team for assistance.</>
+              <>{t('portal.login.contactSupport')}</>
             )}
           </p>
         </div>
@@ -149,7 +151,7 @@ export const PortalLogin: React.FC = () => {
                 rel="noopener noreferrer"
                 className="hover:text-primary hover:underline"
               >
-                Terms of Service
+                {t('portal.login.termsOfService')}
               </a>
             )}
             {termsUrl && privacyUrl && <span aria-hidden="true">·</span>}
@@ -160,7 +162,7 @@ export const PortalLogin: React.FC = () => {
                 rel="noopener noreferrer"
                 className="hover:text-primary hover:underline"
               >
-                Privacy Policy
+                {t('portal.login.privacyPolicy')}
               </a>
             )}
           </div>

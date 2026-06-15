@@ -1,6 +1,7 @@
 import { supabase, getTenantId } from './supabaseClient';
 import type { Database } from '../types/database.types';
 import { sanitizeFilterValue } from './postgrestSanitizer';
+import { baseAmount } from './financialMath';
 
 function requireTenantId(): string {
   const tid = getTenantId();
@@ -719,7 +720,7 @@ export async function getStockStats(): Promise<StockStats> {
     supabase.from('stock_items').select('*').is('deleted_at', null).eq('is_active', true),
     supabase
       .from('stock_sales')
-      .select('total_amount')
+      .select('total_amount, total_amount_base')
       .is('deleted_at', null)
       .gte('sale_date', new Date().toISOString().split('T')[0]),
   ]);
@@ -740,7 +741,7 @@ export async function getStockStats(): Promise<StockStats> {
   );
   const lowStockCount = items.filter((i) => (i.current_quantity ?? 0) <= (i.minimum_quantity ?? 0) && (i.current_quantity ?? 0) > 0).length;
   const outOfStockCount = items.filter((i) => (i.current_quantity ?? 0) === 0).length;
-  const revenueToday = salesToday.reduce((sum, s) => sum + (s.total_amount ?? 0), 0);
+  const revenueToday = salesToday.reduce((sum, s) => sum + baseAmount(s, 'total_amount'), 0);
 
   return {
     totalItems: items.length,
@@ -783,7 +784,7 @@ export async function getSalesReport(startDate: string, endDate: string) {
   if (error) throw error;
 
   const sales = data ?? [];
-  const totalRevenue = sales.reduce((sum, s) => sum + (s.total_amount ?? 0), 0);
+  const totalRevenue = sales.reduce((sum, s) => sum + baseAmount(s, 'total_amount'), 0);
   const totalCost = sales.reduce((sum, s) => {
     const items = (s as unknown as {
       stock_sale_items?: Array<{ quantity: number; stock_items?: { cost_price: number | null } | null }>;
@@ -922,7 +923,7 @@ export async function getTodaysSales(): Promise<TodaysSalesSummary> {
     .order('sale_date', { ascending: false });
   if (error) throw error;
   const sales = (data ?? []) as unknown as StockSaleWithDetails[];
-  const revenue = sales.reduce((sum, s) => sum + (s.total_amount ?? 0), 0);
+  const revenue = sales.reduce((sum, s) => sum + baseAmount(s as unknown as Record<string, unknown>, 'total_amount'), 0);
   return { count: sales.length, revenue, sales };
 }
 

@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import type { TenantConfig, CurrencyConfig, TaxConfig, DateTimeConfig, LocaleConfig } from '../types/tenantConfig';
-import { DEFAULT_TENANT_CONFIG } from '../types/tenantConfig';
+import { DEFAULT_TENANT_CONFIG, isResolvedConfig } from '../types/tenantConfig';
 import { getTenantConfig, invalidateTenantConfigCache } from '../lib/tenantConfigService';
 import { useAuth } from './AuthContext';
 import { getPortalTenantIdFromSession } from './PortalAuthContext';
 import { logger } from '../lib/logger';
 import { isFeatureEnabled } from '../lib/features/registry';
+import { CountryConfigError } from '../lib/country/resolveCountryConfig';
 
 interface TenantConfigContextType {
   config: TenantConfig;
@@ -48,6 +49,7 @@ export function TenantConfigProvider({ children }: { children: React.ReactNode }
   const tenantId = profile?.tenant_id ?? portalTenantId ?? undefined;
   const [config, setConfig] = useState<TenantConfig>(DEFAULT_TENANT_CONFIG);
   const [isLoading, setIsLoading] = useState(true);
+  const [configError, setConfigError] = useState<string | null>(null);
 
   const loadConfig = useCallback(async () => {
     if (!tenantId) {
@@ -58,9 +60,22 @@ export function TenantConfigProvider({ children }: { children: React.ReactNode }
 
     try {
       setIsLoading(true);
+      setConfigError(null);
       const tenantConfig = await getTenantConfig(tenantId);
+      if (!isResolvedConfig(tenantConfig)) {
+        // Required jurisdiction keys never resolved → block, don't render US (D2/D3).
+        setConfigError('This tenant is not configured for its country.');
+        setConfig(DEFAULT_TENANT_CONFIG);
+        return;
+      }
       setConfig(tenantConfig);
     } catch (err) {
+      if (err instanceof CountryConfigError) {
+        logger.error('Tenant country config unresolved (fail-loud):', err);
+        setConfigError('This tenant is not configured for its country.');
+        setConfig(DEFAULT_TENANT_CONFIG);
+        return;
+      }
       logger.error('Failed to load tenant config:', err);
       setConfig(DEFAULT_TENANT_CONFIG);
     } finally {
@@ -84,6 +99,17 @@ export function TenantConfigProvider({ children }: { children: React.ReactNode }
     isLoading,
     refreshConfig,
   }), [config, isLoading, refreshConfig]);
+
+  if (configError && tenantId) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface p-6 text-center">
+        <div className="max-w-md">
+          <h1 className="text-lg font-semibold text-danger">Tenant not configured</h1>
+          <p className="mt-2 text-sm text-surface-muted">{configError}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <TenantConfigContext.Provider value={value}>

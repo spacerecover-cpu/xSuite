@@ -11,6 +11,7 @@ import {
   getCustomerSerialNumbers,
 } from '../../lib/stockService';
 import { formatDate } from '../../lib/format';
+import { baseAmount } from '../../lib/financialMath';
 import { useCurrency } from '../../hooks/useCurrency';
 
 interface CustomerPurchasesTabProps {
@@ -125,7 +126,7 @@ export const CustomerPurchasesTab: React.FC<CustomerPurchasesTabProps> = ({ cust
                   <tr className="border-t border-slate-200">
                     <td colSpan={3} className="pt-3 text-sm font-medium text-slate-500">Total Purchases</td>
                     <td className="pt-3 text-right font-bold text-slate-900">
-                      {formatCurrency(sales.reduce((sum, s) => sum + (s.total_amount ?? 0), 0))}
+                      {formatCurrency(sales.reduce((sum, s) => sum + baseAmount(s as unknown as Record<string, unknown>, 'total_amount'), 0))}
                     </td>
                     <td colSpan={2} />
                   </tr>

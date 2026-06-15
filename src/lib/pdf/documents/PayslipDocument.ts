@@ -26,7 +26,9 @@ export function buildPayslipDocument(
   const earnings = payslipData.items?.filter((item) => item.component_type === 'earning') || [];
   const deductions = payslipData.items?.filter((item) => item.component_type === 'deduction') || [];
 
+  // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single payroll_record = one employee/period in one currency; payroll_record_items has no amount_base shadow
   const totalEarnings = earnings.reduce((sum, item) => sum + Number(item.amount), 0);
+  // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single payroll_record = one employee/period in one currency; payroll_record_items has no amount_base shadow
   const totalDeductions = deductions.reduce((sum, item) => sum + Number(item.amount), 0);
 
   const thinTableLayout = {

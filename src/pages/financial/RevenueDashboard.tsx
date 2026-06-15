@@ -374,6 +374,7 @@ export const RevenueDashboard: React.FC = () => {
                   </tr>
                 ) : (
                   customerRevenue.map((customer) => {
+                    // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- CustomerRevenueRow.amount is already base-currency (accumulated via baseAmount in generateRevenueByCustomerReport); summing it is a base rollup, not raw native.
                     const totalCustomerRevenue = customerRevenue.reduce<number>((sum, c) => sum + c.amount, 0);
                     const percentage = totalCustomerRevenue > 0 ? (customer.amount / totalCustomerRevenue) * 100 : 0;
                     return (

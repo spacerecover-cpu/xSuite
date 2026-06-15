@@ -17,6 +17,7 @@ import { useCurrency } from '../../hooks/useCurrency';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
 import { createPayment, getPaymentStats, voidPayment, fetchPaymentById } from '../../lib/paymentsService';
+import { baseAmount } from '../../lib/financialMath';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { logger } from '../../lib/logger';
 import {
@@ -89,6 +90,7 @@ export const PaymentsList: React.FC = () => {
           payment_number,
           payment_date,
           amount,
+          amount_base,
           reference,
           status,
           notes,
@@ -280,7 +282,7 @@ export const PaymentsList: React.FC = () => {
     }
   };
 
-  const totalPayments = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+  const totalPayments = payments.reduce((sum, payment) => sum + baseAmount(payment, 'amount'), 0);
   const completedPayments = payments.filter(p => p.status === 'completed');
   const todayPayments = payments.filter(p => p.payment_date && new Date(p.payment_date).toDateString() === new Date().toDateString());
   const pendingPayments = payments.filter(p => p.status === 'pending');

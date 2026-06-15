@@ -13,6 +13,9 @@ interface PortalCustomer {
   email: string | null;
   mobile_number: string | null;
   profile_photo_url: string | null;
+  // Q3 per-recipient comms language (returned by authenticate_portal_customer).
+  // Optional for back-compat with sessions stored before this field existed.
+  preferred_language?: string | null;
 }
 
 interface PortalSession {
@@ -53,7 +56,10 @@ function isValidPortalCustomer(data: unknown): data is PortalCustomer {
     typeof obj.customer_name === 'string' &&
     (obj.email === null || typeof obj.email === 'string') &&
     (obj.mobile_number === null || typeof obj.mobile_number === 'string') &&
-    (obj.profile_photo_url === null || typeof obj.profile_photo_url === 'string')
+    (obj.profile_photo_url === null || typeof obj.profile_photo_url === 'string') &&
+    (obj.preferred_language === undefined ||
+      obj.preferred_language === null ||
+      typeof obj.preferred_language === 'string')
   );
 }
 
