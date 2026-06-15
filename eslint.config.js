@@ -147,5 +147,17 @@
       ],
       plugins: { 'xsuite': xsuitePlugin },
       rules: { 'xsuite/no-raw-style-colors': 'off' },
+    },
+    {
+      // i18n enforcement gate (A0/A3, Country Engine Phase 2): the portal is the
+      // externally-visible non-English surface and is now fully extracted, so a
+      // NEW untranslated literal there must FAIL CI (not just warn). The rest of
+      // the app stays 'warn' until its slices are extracted (deferred breadth).
+      files: [
+        'src/pages/portal/**/*.{ts,tsx}',
+        'src/components/portal/**/*.{ts,tsx}',
+      ],
+      plugins: { 'xsuite': xsuitePlugin },
+      rules: { 'xsuite/no-untranslated-jsx-text': 'error' },
     }
   );
