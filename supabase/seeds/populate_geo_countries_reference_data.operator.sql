@@ -48,7 +48,7 @@ DO $$
 DECLARE bad int;
 BEGIN
   SELECT count(*) INTO bad FROM public.geo_countries
-  WHERE is_active = true AND deleted_at IS NULL
+  WHERE is_active = true
     AND (currency_code IS NULL OR char_length(currency_code) <> 3
          OR locale_code IS NULL OR date_format IS NULL OR timezone IS NULL
          OR phone_format IS NULL OR address_format = '{}'::jsonb);
