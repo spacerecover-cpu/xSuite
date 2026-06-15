@@ -180,8 +180,8 @@ export function toEngineData(
   // spell in Arabic, bilingual shows both.
   if (lines.amountInWords === true) {
     const mode = config.language.mode;
-    const enWords = amountInWordsEn(totalAmount, currencySymbol);
-    const arWords = amountInWordsAr(totalAmount, currencySymbol);
+    const enWords = amountInWordsEn(totalAmount, currencySymbol, decimalPlaces);
+    const arWords = amountInWordsAr(totalAmount, currencySymbol, decimalPlaces);
     const value = mode === 'ar' ? arWords : mode.startsWith('bilingual') ? `${enWords}  ·  ${arWords}` : enWords;
     totals.push({ label: { en: 'Amount in Words:', ar: 'المبلغ بالحروف:' }, value });
   }

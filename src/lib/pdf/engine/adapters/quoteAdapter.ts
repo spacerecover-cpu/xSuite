@@ -161,8 +161,8 @@ export function toEngineData(
   // Amount in words (opt-in; off by default). Language-aware.
   if (lines.amountInWords === true) {
     const mode = config.language.mode;
-    const enWords = amountInWordsEn(totalAmount, currencySymbol);
-    const arWords = amountInWordsAr(totalAmount, currencySymbol);
+    const enWords = amountInWordsEn(totalAmount, currencySymbol, decimalPlaces);
+    const arWords = amountInWordsAr(totalAmount, currencySymbol, decimalPlaces);
     totals.push({
       label: { en: 'Amount in Words:', ar: 'المبلغ بالحروف:' },
       value: mode === 'ar' ? arWords : mode.startsWith('bilingual') ? `${enWords}  ·  ${arWords}` : enWords,
