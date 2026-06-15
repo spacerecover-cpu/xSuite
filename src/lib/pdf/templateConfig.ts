@@ -984,3 +984,17 @@ export function resolveTemplateConfig(
   resolved = applyOverride(resolved, instance);
   return resolved;
 }
+
+/** Resolve with a derived COUNTRY layer beneath theme (§8b): the cascade is
+ *  built-in -> country -> theme -> doc-type -> instance. `country` undefined =
+ *  identity, so all existing resolveTemplateConfig call sites are unaffected. */
+export function resolveTemplateConfigWithCountry(
+  builtIn: DocumentTemplateConfig,
+  country?: TemplateConfigOverride,
+  theme?: TemplateConfigOverride,
+  docType?: TemplateConfigOverride,
+  instance?: TemplateConfigOverride,
+): DocumentTemplateConfig {
+  const withCountry = applyOverride(builtIn, country);
+  return resolveTemplateConfig(withCountry, theme, docType, instance);
+}

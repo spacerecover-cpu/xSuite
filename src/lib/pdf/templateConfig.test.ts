@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   BUILT_IN_TEMPLATE_CONFIGS,
   resolveTemplateConfig,
+  resolveTemplateConfigWithCountry,
   type DocumentTemplateConfig,
   type TemplateConfigOverride,
   type TemplateDocumentType,
@@ -323,6 +324,25 @@ describe('signatureImages cascade', () => {
       { signatureImages: { signature: { show: true } } },
     );
     expect(r.signatureImages).toEqual({ stamp: { show: true, width: 90 }, signature: { show: true } });
+  });
+});
+
+describe('country layer in the cascade (§8b)', () => {
+  it('applies the country override beneath theme/doc-type (most-specific still wins)', () => {
+    const cfg = resolveTemplateConfigWithCountry(
+      BUILT_IN_TEMPLATE_CONFIGS.invoice,
+      { taxBar: { enabled: true }, labels: { taxLabel: { en: 'Sales Tax' } } }, // country
+      undefined, // theme
+      { labels: { taxLabel: { en: 'VAT' } } }, // docType wins over country
+      undefined, // instance
+    );
+    expect(cfg.taxBar?.enabled).toBe(true); // from country
+    expect(cfg.labels.taxLabel).toEqual({ en: 'VAT' }); // doc-type wins over country
+  });
+  it('country undefined is identity (existing behaviour preserved)', () => {
+    const a = resolveTemplateConfigWithCountry(BUILT_IN_TEMPLATE_CONFIGS.invoice, undefined);
+    const b = resolveTemplateConfig(BUILT_IN_TEMPLATE_CONFIGS.invoice);
+    expect(a).toEqual(b);
   });
 });
 
