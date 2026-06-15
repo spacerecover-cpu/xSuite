@@ -9,7 +9,9 @@ export const useCurrency = () => {
     currencySymbol: currencyConfig.symbol,
     currencyPosition: currencyConfig.position,
     decimalPlaces: currencyConfig.decimalPlaces,
-    currencyCode: currencyConfig.code,
+    // D2: code may be the unresolved REQUIRED_SENTINEL symbol; coerce to '' for
+    // display so we never fabricate a US literal here (fail-loud, not fail-US).
+    currencyCode: typeof currencyConfig.code === 'string' ? currencyConfig.code : '',
   };
 
   const formatCurrency = (amount: number): string => {

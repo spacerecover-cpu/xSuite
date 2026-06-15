@@ -230,7 +230,7 @@ export const BankingPage: React.FC = () => {
               Manage accounts, track payments, and reconcile transactions
               {locale && (
                 <span className="ml-2 text-sm text-slate-500">
-                  • Currency: {getCurrencyCode()} ({getCurrencySymbol()})
+                  • Currency: {((c) => (typeof c === 'string' ? c : ''))(getCurrencyCode())} ({getCurrencySymbol()})
                 </span>
               )}
             </p>

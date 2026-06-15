@@ -147,7 +147,7 @@ export const AccountingLocales: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Accounting Locales</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Tenant country: {config.countryName} ({config.currency.code}, {config.tax.label})
+            Tenant country: {config.countryName} ({typeof config.currency.code === 'string' ? config.currency.code : 'Not configured'}, {config.tax.label})
           </p>
           {defaultLocale && (
             <div className="mt-2">

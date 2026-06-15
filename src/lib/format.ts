@@ -40,16 +40,18 @@ export const fetchCurrencyFormat = async (): Promise<CurrencyFormat> => {
         currencySymbol: def.symbol,
         currencyPosition: def.position,
         decimalPlaces: def.decimalPlaces,
-        currencyCode: def.code,
+        // D2: def.code is the unresolved REQUIRED_SENTINEL; emit '' not a US literal.
+        currencyCode: typeof def.code === 'string' ? def.code : '',
       };
     }
 
     cachedCurrencyFormat = {
-      currencySymbol: data.currency_code || DEFAULT_TENANT_CONFIG.currency.code,
+      // D2: fall back to '' (fail-loud) rather than the unresolved sentinel symbol.
+      currencySymbol: data.currency_code || '',
       currencyPosition: 'before',
       decimalPlaces: (data as { decimal_places?: number }).decimal_places
         ?? DEFAULT_TENANT_CONFIG.currency.decimalPlaces,
-      currencyCode: data.currency_code || DEFAULT_TENANT_CONFIG.currency.code,
+      currencyCode: data.currency_code || '',
     };
     return cachedCurrencyFormat;
   } catch (error) {
@@ -59,7 +61,8 @@ export const fetchCurrencyFormat = async (): Promise<CurrencyFormat> => {
       currencySymbol: def.symbol,
       currencyPosition: def.position,
       decimalPlaces: def.decimalPlaces,
-      currencyCode: def.code,
+      // D2: def.code is the unresolved REQUIRED_SENTINEL; emit '' not a US literal.
+      currencyCode: typeof def.code === 'string' ? def.code : '',
     };
   }
 };
