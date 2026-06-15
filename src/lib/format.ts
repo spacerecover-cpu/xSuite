@@ -18,6 +18,11 @@ export interface CurrencyFormat {
   currencyPosition: 'before' | 'after';
   decimalPlaces: number;
   currencyCode: string;
+  // D18: tenant grouping/decimal separators. Optional + additive so existing
+  // callers are unchanged; when absent the formatter defaults to ',' / '.' rather
+  // than forcing en-US grouping via toLocaleString.
+  thousandsSeparator?: string;
+  decimalSeparator?: string;
 }
 
 let cachedCurrencyFormat: CurrencyFormat | null = null;
@@ -75,10 +80,14 @@ export const formatCurrencyWithSettings = (
   amount: number,
   format: CurrencyFormat
 ): string => {
+  const thousandsSeparator = format.thousandsSeparator ?? ',';
+  const decimalSeparator = format.decimalSeparator ?? '.';
   const formattedNumber = amount.toFixed(format.decimalPlaces);
   const [integerPart, decimalPart] = formattedNumber.split('.');
-  const formattedInteger = parseInt(integerPart).toLocaleString('en-US');
-  const fullNumber = decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger;
+  // D18: group with the tenant's separator (same regex formatCurrencyWithConfig
+  // uses) instead of forcing Western en-US grouping via toLocaleString.
+  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, thousandsSeparator);
+  const fullNumber = decimalPart ? `${formattedInteger}${decimalSeparator}${decimalPart}` : formattedInteger;
 
   if (format.currencyPosition === 'before') {
     return `${format.currencySymbol} ${fullNumber}`;
