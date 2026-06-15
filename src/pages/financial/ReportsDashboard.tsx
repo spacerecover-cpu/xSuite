@@ -7,6 +7,8 @@ import { Skeleton } from '../../components/ui/Skeleton';
 import { Modal } from '../../components/ui/Modal';
 import { useCurrency } from '../../hooks/useCurrency';
 import { getFinancialYearDates } from '../../lib/financialService';
+import { baseAmount } from '../../lib/financialMath';
+import { sumBase } from './reportsDashboardRollup';
 import {
   generateProfitLossReport,
   generateAgedReceivablesReport,
@@ -227,12 +229,12 @@ export const ReportsDashboard: React.FC = () => {
       const [invoicesResult, expensesResult] = await Promise.all([
         supabase
           .from('invoices')
-          .select('total_amount, amount_paid, status, invoice_date')
+          .select('total_amount, total_amount_base, amount_paid, amount_paid_base, status, invoice_date')
           .gte('invoice_date', start)
           .lte('invoice_date', end),
         supabase
           .from('expenses')
-          .select('amount, status, expense_date')
+          .select('amount, amount_base, status, expense_date')
           .gte('expense_date', start)
           .lte('expense_date', end)
           .in('status', ['approved', 'paid']),
@@ -241,8 +243,8 @@ export const ReportsDashboard: React.FC = () => {
       const invoices = invoicesResult.data || [];
       const expenses = expensesResult.data || [];
 
-      const totalRevenue = invoices.reduce((sum, inv) => sum + (inv.amount_paid || 0), 0);
-      const totalExpenses = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+      const totalRevenue = sumBase(invoices, 'amount_paid');
+      const totalExpenses = sumBase(expenses, 'amount');
       const netProfit = totalRevenue - totalExpenses;
       const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
@@ -263,7 +265,7 @@ export const ReportsDashboard: React.FC = () => {
       const { start, end } = selectedDateRange;
       const { data, error } = await supabase
         .from('invoices')
-        .select('status, total_amount')
+        .select('status, total_amount, total_amount_base')
         .gte('invoice_date', start)
         .lte('invoice_date', end);
 
@@ -276,7 +278,7 @@ export const ReportsDashboard: React.FC = () => {
           statusCounts[status] = { count: 0, amount: 0 };
         }
         statusCounts[status].count += 1;
-        statusCounts[status].amount += invoice.total_amount || 0;
+        statusCounts[status].amount += baseAmount(invoice, 'total_amount');
       });
 
       return statusCounts;
@@ -315,7 +317,7 @@ export const ReportsDashboard: React.FC = () => {
       const { start, end } = selectedDateRange;
       const { data, error } = await supabase
         .from('invoices')
-        .select('customer_id, amount_paid, customers_enhanced(customer_name)')
+        .select('customer_id, amount_paid, amount_paid_base, customers_enhanced(customer_name)')
         .gte('invoice_date', start)
         .lte('invoice_date', end);
 
@@ -329,7 +331,7 @@ export const ReportsDashboard: React.FC = () => {
         if (!customerRevenue[customerId]) {
           customerRevenue[customerId] = { name: customerName, amount: 0 };
         }
-        customerRevenue[customerId].amount += invoice.amount_paid || 0;
+        customerRevenue[customerId].amount += baseAmount(invoice, 'amount_paid');
       });
 
       return Object.values(customerRevenue)
