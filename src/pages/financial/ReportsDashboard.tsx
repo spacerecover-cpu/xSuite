@@ -8,7 +8,7 @@ import { Modal } from '../../components/ui/Modal';
 import { useCurrency } from '../../hooks/useCurrency';
 import { getFinancialYearDates } from '../../lib/financialService';
 import { baseAmount } from '../../lib/financialMath';
-import { sumBase } from './reportsDashboardRollup';
+import { sumBase, groupSumBase } from './reportsDashboardRollup';
 import {
   generateProfitLossReport,
   generateAgedReceivablesReport,
@@ -291,21 +291,18 @@ export const ReportsDashboard: React.FC = () => {
       const { start, end } = selectedDateRange;
       const { data, error } = await supabase
         .from('expenses')
-        .select('amount, category:master_expense_categories(name)')
+        .select('amount, amount_base, category:master_expense_categories(name)')
         .gte('expense_date', start)
         .lte('expense_date', end)
         .in('status', ['approved', 'paid']);
 
       if (error) throw error;
 
-      const categoryCounts: Record<string, number> = {};
-      (data || []).forEach((expense: { amount?: number; category?: { name?: string } | null }) => {
-        const categoryName = expense.category?.name || 'Uncategorized';
-        if (!categoryCounts[categoryName]) {
-          categoryCounts[categoryName] = 0;
-        }
-        categoryCounts[categoryName] += expense.amount || 0;
-      });
+      const categoryCounts = groupSumBase(
+        (data || []) as Array<{ amount?: number; amount_base?: number; category?: { name?: string } | null }>,
+        'amount',
+        (e) => e.category?.name || 'Uncategorized',
+      );
 
       return categoryCounts;
     },
