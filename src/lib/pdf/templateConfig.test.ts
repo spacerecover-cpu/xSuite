@@ -325,3 +325,19 @@ describe('signatureImages cascade', () => {
     expect(r.signatureImages).toEqual({ stamp: { show: true, width: 90 }, signature: { show: true } });
   });
 });
+
+describe('locale group (date format + numbering) on the config (§8d)', () => {
+  it('is absent on built-in defaults (neutral/legacy)', () => {
+    expect(BUILT_IN_TEMPLATE_CONFIGS.invoice.locale).toBeUndefined();
+  });
+  it('an override layer can set the resolved date format', () => {
+    const cfg = resolveTemplateConfig(
+      BUILT_IN_TEMPLATE_CONFIGS.invoice,
+      undefined,
+      undefined,
+      { locale: { dateFormat: 'DD/MM/YYYY', decimalPlaces: 3 } },
+    );
+    expect(cfg.locale?.dateFormat).toBe('DD/MM/YYYY');
+    expect(cfg.locale?.decimalPlaces).toBe(3);
+  });
+});
