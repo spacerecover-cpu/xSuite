@@ -202,3 +202,113 @@ export async function removeOverride(overrideId: string): Promise<void> {
     throw error;
   }
 }
+
+// ── R10: read-time resolution cascade (§3i/§5.6, Country Engine Phase 2) ──────
+// tenant override (notification_templates) → country default → global default
+// (master_notification_templates) → coded English fallback. Statutory/forensic
+// events force the verified English baseline.
+
+export interface NotificationTemplateResult {
+  subject_template: string | null;
+  body_template: string;
+  link_template: string | null;
+}
+
+export interface ResolveNotificationTemplateInput {
+  eventType: string;
+  channel: string;
+  locale: string;
+  tenantId?: string | null;
+  countryId?: string | null;
+  /** Statutory/forensic events (data-destruction cert, checkout receipt, NDA)
+   *  must use the VERIFIED English baseline, not an unverified localized template. */
+  isStatutory?: boolean;
+}
+
+const RESOLVE_SELECT = 'subject_template, body_template, link_template';
+
+/** Coded English fallback so a notification is never blank when no DB row resolves. */
+const CODED_FALLBACKS: Record<string, NotificationTemplateResult> = {
+  quote_ready: { subject_template: 'Your quote is ready', body_template: 'Your quote is ready to review.', link_template: null },
+  payment_received: { subject_template: 'Payment received', body_template: 'We have received your payment. Thank you.', link_template: null },
+};
+
+function codedFallback(eventType: string): NotificationTemplateResult {
+  return (
+    CODED_FALLBACKS[eventType] ?? {
+      subject_template: null,
+      body_template: `Notification: ${eventType}`,
+      link_template: null,
+    }
+  );
+}
+
+function asResult(data: unknown): NotificationTemplateResult | null {
+  if (!data || typeof data !== 'object') return null;
+  const d = data as Record<string, unknown>;
+  if (typeof d.body_template !== 'string') return null;
+  return {
+    subject_template: (d.subject_template as string | null) ?? null,
+    body_template: d.body_template,
+    link_template: (d.link_template as string | null) ?? null,
+  };
+}
+
+async function lookupTenantTemplate(tenantId: string, eventType: string, channel: string, locale: string) {
+  const { data } = await supabase
+    .from('notification_templates')
+    .select(RESOLVE_SELECT)
+    .eq('tenant_id', tenantId)
+    .eq('event_type', eventType)
+    .eq('channel', channel)
+    .eq('locale', locale)
+    .is('deleted_at', null)
+    .maybeSingle();
+  return asResult(data);
+}
+
+async function lookupMasterTemplate(countryId: string | null, eventType: string, channel: string, locale: string) {
+  let q = supabase
+    .from('master_notification_templates')
+    .select(RESOLVE_SELECT)
+    .eq('event_type', eventType)
+    .eq('channel', channel)
+    .eq('locale', locale)
+    .is('deleted_at', null);
+  q = countryId == null ? q.is('country_id', null) : q.eq('country_id', countryId);
+  const { data } = await q.maybeSingle();
+  return asResult(data);
+}
+
+/** Resolve the effective notification template via the §3i/§5.6 cascade. Statutory
+ *  events use the English baseline; a non-statutory requested-locale miss retries
+ *  the whole cascade in English before the coded fallback. */
+export async function resolveNotificationTemplate(
+  input: ResolveNotificationTemplateInput,
+): Promise<NotificationTemplateResult> {
+  const { eventType, channel, tenantId, countryId } = input;
+
+  const runCascade = async (locale: string): Promise<NotificationTemplateResult | null> => {
+    if (tenantId) {
+      const t = await lookupTenantTemplate(tenantId, eventType, channel, locale);
+      if (t) return t;
+    }
+    if (countryId) {
+      const c = await lookupMasterTemplate(countryId, eventType, channel, locale);
+      if (c) return c;
+    }
+    return lookupMasterTemplate(null, eventType, channel, locale);
+  };
+
+  const primaryLocale = input.isStatutory ? 'en' : input.locale;
+
+  const primary = await runCascade(primaryLocale);
+  if (primary) return primary;
+
+  if (primaryLocale !== 'en') {
+    const english = await runCascade('en');
+    if (english) return english;
+  }
+
+  return codedFallback(eventType);
+}
