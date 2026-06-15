@@ -6,6 +6,7 @@ import { Input } from '../ui/Input';
 import { supabase, resolveTenantId } from '../../lib/supabaseClient';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
+import { composeSupplierAddress } from './supplierAddress';
 
 interface SupplierData {
   id?: string;
@@ -139,15 +140,16 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Only persist columns that exist on suppliers; UI-only fields (state,
-      // zip_code, country, description, primary_contact_*, preferred_shipping_method,
-      // is_approved) are dropped here.
+      // state/zip/country are folded into the address text so they are no longer
+      // dropped (D12). Structured-address migration is Phase 1; this is the
+      // zero-schema data-capture fix. (city/description/primary_contact_*/
+      // preferred_shipping_method/is_approved remain UI-only for now.)
       const supplierUpdate = {
         name: formData.name,
         supplier_number: formData.supplier_number,
         email: formData.email || null,
         phone: formData.phone || null,
-        address: formData.address || null,
+        address: composeSupplierAddress(formData),
         website: formData.website || null,
         tax_number: formData.tax_id || null,
         category_id: formData.category_id || null,
