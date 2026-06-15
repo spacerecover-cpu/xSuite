@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { z } from 'zod';
 import { REQUIRED_SENTINEL } from '../../types/tenantConfig';
-import { CountryConfigError } from './resolveCountryConfig';
+import { CountryConfigError, resolveConfig, type ConfigKeyDef } from './resolveCountryConfig';
 import {
   COUNTRY_CONFIG_REGISTRY,
   REGISTRY_BY_KEY,
@@ -53,5 +54,41 @@ describe('resolveCountryConfigKey bound to the real registry', () => {
   it('weekend_days has a real coded default of [6,0] (Sat/Sun) and is NOT required', () => {
     expect(resolveCountryConfigKey<number[]>({}, 'datetime.weekend_days')).toEqual([6, 0]);
     expect(REGISTRY_BY_KEY['datetime.weekend_days'].required).toBeFalsy();
+  });
+});
+
+describe('§4.7 worked example — a NEW country key ships with ZERO schema change', () => {
+  it('a registry entry alone makes a new per-country key resolvable through the cascade', () => {
+    // Simulate the ONLY change a new key requires: one registry entry. In prod
+    // this is a literal array push to COUNTRY_CONFIG_REGISTRY; here we build a
+    // throwaway registry to prove no schema/types/trigger change is involved.
+    const newKey: ConfigKeyDef = {
+      key: 'document.national_id_label',
+      domain: 'document',
+      label: 'National ID label',
+      description: 'Civil Number (OM) / Emirates ID (AE) / National ID (default).',
+      schema: z.string(),
+      codedDefault: 'National ID',
+    } as ConfigKeyDef;
+
+    const reg = { 'document.national_id_label': newKey };
+
+    // Coded default when no country sets it:
+    expect(resolveConfig<string>(reg, {}, 'document.national_id_label')).toBe('National ID');
+
+    // Per-country value (what an admin would write into geo_countries.country_config,
+    // which lands in the resolved snapshot → the country layer) — NO migration:
+    expect(
+      resolveConfig<string>(reg, { country: { 'document.national_id_label': 'Civil Number' } }, 'document.national_id_label'),
+    ).toBe('Civil Number');
+
+    // A tenant override (UAE entity) still wins at the tenant altitude:
+    expect(
+      resolveConfig<string>(
+        reg,
+        { country: { 'document.national_id_label': 'Civil Number' }, tenant: { 'document.national_id_label': 'Emirates ID' } },
+        'document.national_id_label',
+      ),
+    ).toBe('Emirates ID');
   });
 });
