@@ -10,6 +10,9 @@ export default defineConfig({
   test: {
     name: 'scripts',
     environment: 'node',
-    include: ['scripts/**/*.test.ts'],
+    // Pure, dependency-free TS that lives outside src/: the country-engine seed
+    // generator and the provision-tenant edge-function guards (which have no Deno
+    // globals in the pure module, so vitest imports them directly).
+    include: ['scripts/**/*.test.ts', 'supabase/functions/**/*.test.ts'],
   },
 });
