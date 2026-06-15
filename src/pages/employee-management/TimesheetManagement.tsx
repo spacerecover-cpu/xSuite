@@ -7,6 +7,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { timesheetService, TimesheetWithEmployee, TimesheetFilters } from '../../lib/timesheetService';
 import { timesheetKeys } from '../../lib/queryKeys';
 import { Modal } from '../../components/ui/Modal';
+import { useDateTimeConfig } from '../../contexts/TenantConfigContext';
+import { resolveWeekStartsOn } from './workWeek';
 
 type TabId = 'entries' | 'summary';
 type StatusFilter = 'all' | 'draft' | 'submitted' | 'approved' | 'rejected';
@@ -332,6 +334,8 @@ export function TimesheetManagement() {
   const toast = useToast();
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
+  const { weekStartsOn } = useDateTimeConfig();
+  const wso = resolveWeekStartsOn(weekStartsOn);
   const isAdmin = profile?.role === 'admin' || profile?.role === 'hr';
 
   const [activeTab, setActiveTab] = useState<TabId>('entries');
@@ -407,8 +411,8 @@ export function TimesheetManagement() {
     },
   });
 
-  const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-  const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+  const weekStart = startOfWeek(now, { weekStartsOn: wso });
+  const weekEnd = endOfWeek(now, { weekStartsOn: wso });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
   const weekMap = useMemo(() => {
