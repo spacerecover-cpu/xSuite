@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import i18n from '../lib/i18n';
-import { isRTLLanguage, normalizeLang } from '../lib/locale';
+import { isRTLLanguage, normalizeLang, hydrateLanguages } from '../lib/locale';
+import { fetchActiveLanguages } from '../lib/languageService';
 import { useTenantConfig } from './TenantConfigContext';
 import { updateTenantUiLanguage } from '../lib/tenantConfigService';
 import { logger } from '../lib/logger';
@@ -48,6 +49,13 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     applyLocaleToDOM(effectiveLang);
     persistLocaleHint(effectiveLang);
   }, [effectiveLang]);
+
+  // Widen the supported-language + RTL sets from geo_languages once on mount.
+  // No-op until the table carries more than the {en,ar} bootstrap; a failed read
+  // returns [] so the bootstrap is preserved.
+  useEffect(() => {
+    fetchActiveLanguages().then(hydrateLanguages);
+  }, []);
 
   // Optimistically flip the UI now (DOM + i18n via the effect above), then persist
   // the choice on the tenant and refresh config so it survives reloads and applies
