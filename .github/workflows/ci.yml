@@ -103,14 +103,10 @@ jobs:
 
   country-config-completeness:
     runs-on: ubuntu-latest
-    # Phase 1 (geo reference-data): this gate flips to ENFORCING (remove the
-    # continue-on-error line below) in the SAME PR/commit that applies the
-    # populate_geo_countries_reference_data seed migration — the strict
-    # check-geo-completeness.sql below requires phone_format + address_format,
-    # which only exist on the live DB once that operator migration lands. Until
-    # the seed is applied, keep continue-on-error so CI reports (not blocks).
-    # OPERATOR: drop the next line when applying the seed migration.
-    continue-on-error: true
+    # ENFORCING (Phase-1 geo seed applied — migration 20260615175550). The active
+    # geo_country set is fully configured (0 stubs, strict: incl. phone/address),
+    # so this gate now BLOCKS: any active country missing currency/locale/date/tz/
+    # phone/address fails CI.
     env:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
     steps:

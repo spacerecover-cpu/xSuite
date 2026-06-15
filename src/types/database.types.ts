@@ -6427,6 +6427,7 @@ export type Database = {
           currency_position: string
           currency_symbol: string
           data_protection_regime: string | null
+          data_source: string | null
           date_format: string
           decimal_places: number
           decimal_separator: string
@@ -6447,6 +6448,8 @@ export type Database = {
           region_id: string | null
           requires_local_residency: boolean
           sort_order: number | null
+          source_locked: boolean
+          source_version: string | null
           statutory_workweek: number | null
           tax_invoice_required: boolean
           tax_label: string
@@ -6474,6 +6477,7 @@ export type Database = {
           currency_position?: string
           currency_symbol?: string
           data_protection_regime?: string | null
+          data_source?: string | null
           date_format?: string
           decimal_places?: number
           decimal_separator?: string
@@ -6494,6 +6498,8 @@ export type Database = {
           region_id?: string | null
           requires_local_residency?: boolean
           sort_order?: number | null
+          source_locked?: boolean
+          source_version?: string | null
           statutory_workweek?: number | null
           tax_invoice_required?: boolean
           tax_label?: string
@@ -6521,6 +6527,7 @@ export type Database = {
           currency_position?: string
           currency_symbol?: string
           data_protection_regime?: string | null
+          data_source?: string | null
           date_format?: string
           decimal_places?: number
           decimal_separator?: string
@@ -6541,6 +6548,8 @@ export type Database = {
           region_id?: string | null
           requires_local_residency?: boolean
           sort_order?: number | null
+          source_locked?: boolean
+          source_version?: string | null
           statutory_workweek?: number | null
           tax_invoice_required?: boolean
           tax_label?: string
