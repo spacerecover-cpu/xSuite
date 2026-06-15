@@ -221,6 +221,21 @@ export const createVATRecordFromInvoice = async (
   });
 };
 
+/** D1 — record INPUT (purchase) VAT so vat_returns.input_vat is non-zero and the
+ *  net VAT filed with the authority is correct. Source: expenses / purchase orders
+ *  carrying a tax_amount. Mirrors createVATRecordFromInvoice but record_type='purchase'. */
+export const createVATRecordFromPurchase = async (
+  purchaseId: string,
+  purchaseData: { tax_amount: number; tax_rate: number },
+) => {
+  return createVATRecord({
+    record_type: 'purchase',
+    record_id: purchaseId,
+    vat_amount: purchaseData.tax_amount,
+    vat_rate: purchaseData.tax_rate,
+  });
+};
+
 export const getVATStats = async (filters?: {
   dateFrom?: string;
   dateTo?: string;
@@ -291,6 +306,7 @@ export const vatService = {
   deleteVATReturn,
   createVATRecord,
   createVATRecordFromInvoice,
+  createVATRecordFromPurchase,
   getVATStats,
   getVATRecordsByReturn,
   getQuarterlyVATSummary,
