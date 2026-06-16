@@ -146,18 +146,15 @@ Deno.serve(async (req: Request) => {
     // Self-service signups (no Authorization header) must have an OTP-verified
     // email before we create anything. Admin-provisioned (authed) flows bypass,
     // as before. We re-verify against signup_otps so a client that skipped the
-    // wizard OTP gate can't provision. (Single-use enforcement via a consumed_at
-    // column is a deferred migration — see PR blockers; today we re-check the
-    // verified+unexpired row.)
+    // wizard OTP gate can't provision, then atomically consume the row so a
+    // verified code is SINGLE-USE (consumed_at, migration 20260615200307).
     if (!authHeader) {
-      // TODO(consumed_at): once the signup_otps_consumed_at migration lands,
-      // also `.is('consumed_at', null)` here and stamp `consumed_at = now()` on
-      // the matched row below to make the verified code SINGLE-USE.
       const { data: otpRow } = await supabase
         .from('signup_otps')
         .select('id, verified, expires_at')
         .eq('email', adminEmail.toLowerCase())
         .eq('verified', true)
+        .is('consumed_at', null)
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
         .limit(1)
@@ -166,6 +163,23 @@ Deno.serve(async (req: Request) => {
       if (!otpRow) {
         return new Response(
           JSON.stringify({ error: 'Email not verified. Please verify your email with the code we sent before continuing.' }),
+          { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Single-use: claim the row atomically — the `consumed_at IS NULL` guard on
+      // the UPDATE means two concurrent provisions can't both pass this gate.
+      const { data: claimed } = await supabase
+        .from('signup_otps')
+        .update({ consumed_at: new Date().toISOString() })
+        .eq('id', otpRow.id)
+        .is('consumed_at', null)
+        .select('id')
+        .maybeSingle();
+
+      if (!claimed) {
+        return new Response(
+          JSON.stringify({ error: 'This verification code has already been used. Please request a new code.' }),
           { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }

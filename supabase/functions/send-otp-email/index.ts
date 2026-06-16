@@ -59,7 +59,7 @@ function getOtpEmailHtml(otp: string, companyName: string): string {
       <div style="background:#f8fafc;border:2px dashed #cbd5e1;border-radius:8px;padding:24px;text-align:center;margin:0 0 28px 0;">
         <span style="font-size:36px;font-weight:700;letter-spacing:8px;color:#0f172a;font-family:'Courier New',monospace;">${otp}</span>
       </div>
-      <p style="color:#94a3b8;font-size:12px;line-height:1.5;margin:0 0 4px 0;">This code expires in <strong>10 minutes</strong>.</p>
+      <p style="color:#94a3b8;font-size:12px;line-height:1.5;margin:0 0 4px 0;">This code expires in <strong>30 minutes</strong>.</p>
       <p style="color:#94a3b8;font-size:12px;line-height:1.5;margin:0;">If you didn't request this, you can safely ignore this email.</p>
     </div>
     <div style="background:#f8fafc;padding:20px 40px;border-top:1px solid #e2e8f0;text-align:center;">
@@ -125,7 +125,7 @@ Deno.serve(async (req: Request) => {
         .insert({
           email: email.toLowerCase(),
           otp_code: otp,
-          expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         });
 
       if (insertError) {
@@ -151,7 +151,7 @@ Deno.serve(async (req: Request) => {
 
       try {
         const htmlBody = getOtpEmailHtml(otp, company_name || '');
-        const plainText = `Your xSuite verification code is: ${otp}. This code expires in 10 minutes.`;
+        const plainText = `Your xSuite verification code is: ${otp}. This code expires in 30 minutes.`;
 
         await smtpClient.send({
           from: `xSuite <${gmailUser}>`,

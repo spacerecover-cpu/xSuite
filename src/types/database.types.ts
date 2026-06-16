@@ -13243,6 +13243,7 @@ export type Database = {
       signup_otps: {
         Row: {
           attempts: number | null
+          consumed_at: string | null
           created_at: string | null
           email: string
           expires_at: string
@@ -13252,6 +13253,7 @@ export type Database = {
         }
         Insert: {
           attempts?: number | null
+          consumed_at?: string | null
           created_at?: string | null
           email: string
           expires_at?: string
@@ -13261,6 +13263,7 @@ export type Database = {
         }
         Update: {
           attempts?: number | null
+          consumed_at?: string | null
           created_at?: string | null
           email?: string
           expires_at?: string
