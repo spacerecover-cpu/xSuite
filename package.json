@@ -16,7 +16,8 @@
     "check:schema-drift": "bash scripts/check-schema-drift.sh",
     "db:types": "supabase gen types typescript --project-id ssmbegiyjivrcwgcqutu > src/types/database.types.ts",
     "geo:test": "vitest run --config vitest.config.scripts.ts",
-    "geo:build-seed": "GENERATE=1 vitest run --config vitest.config.scripts.ts scripts/country-engine/generate-seed.test.ts"
+    "geo:build-seed": "GENERATE=1 vitest run --config vitest.config.scripts.ts scripts/country-engine/generate-seed.test.ts",
+    "check:registry-trigger-parity": "vitest run --config vitest.config.scripts.ts scripts/country-engine/registry-trigger-parity.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

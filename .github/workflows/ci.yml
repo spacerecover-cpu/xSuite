@@ -121,6 +121,25 @@ jobs:
         if: ${{ env.SUPABASE_DB_URL == '' }}
         run: 'echo "SKIP country-config-completeness: SUPABASE_DB_URL unavailable (Dependabot/fork PRs have no access to Actions secrets). Enforced on internal PRs and on push to main."'
 
+  registry-trigger-parity:
+    runs-on: ubuntu-latest
+    # Runs UNCONDITIONALLY (unlike the other DB gates): the pure parse/diff specs
+    # need no DB and protect the gate logic on every PR (incl. Dependabot/forks);
+    # the live-DB spec self-skips (describe.skipIf) when SUPABASE_DB_URL is absent.
+    # So live registry<->trigger statutory-key parity is enforced on internal PRs
+    # and push to main, while the pure logic is covered everywhere. Closes the
+    # §2.3/D11 drift between STATUTORY_KEYS and validate_country_config_overrides().
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run check:registry-trigger-parity
+
   token-guard:
     runs-on: ubuntu-latest
     steps:
