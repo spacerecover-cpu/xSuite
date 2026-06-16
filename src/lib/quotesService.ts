@@ -8,6 +8,7 @@ import { logger } from './logger';
 import { calculateQuoteTotals, calculateQuoteTotalsBase, roundMoney } from './financialMath';
 import { resolveRateContext, getBaseCurrency, getCurrencyDecimals } from './currencyService';
 import { toDateInputValue } from './format';
+import { getTenantConfig } from './tenantConfigService';
 
 type QuoteInsert = Database['public']['Tables']['quotes']['Insert'];
 type QuoteUpdate = Database['public']['Tables']['quotes']['Update'];
@@ -808,16 +809,12 @@ export const getQuotesByCaseId = async (caseId: string) => {
 
   if (error) throw error;
 
-  const { data: defaultLocale } = await supabase
-    .from('accounting_locales')
-    .select('currency_symbol, currency_position, decimal_places')
-    .eq('is_default', true)
-    .eq('is_active', true)
-    .maybeSingle();
-
-  const defaultCurrencySymbol = defaultLocale?.currency_symbol || 'USD';
-  const defaultCurrencyPosition = defaultLocale?.currency_position || 'before';
-  const defaultDecimalPlaces = defaultLocale?.decimal_places || 2;
+  // Currency from the Country Engine (single source of truth), not the legacy
+  // accounting_locales table. Derived from the rows' tenant_id; never defaults to USD.
+  const cur = data && data.length > 0 ? (await getTenantConfig(data[0].tenant_id)).currency : null;
+  const defaultCurrencySymbol = cur ? (cur.symbol || (typeof cur.code === 'string' ? cur.code : '')) : '';
+  const defaultCurrencyPosition = cur?.position ?? 'before';
+  const defaultDecimalPlaces = cur?.decimalPlaces ?? 2;
 
   return (data ?? []).map((quote) => ({
     ...quote,
