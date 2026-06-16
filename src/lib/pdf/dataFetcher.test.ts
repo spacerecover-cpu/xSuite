@@ -1,11 +1,25 @@
 import { describe, it, expect, vi } from 'vitest';
+import type { CurrencyConfig } from '../../types/tenantConfig';
 
 // dataFetcher imports the Supabase client at module load; stub it so the pure
 // transform functions can be tested in isolation (they never touch the network).
 vi.mock('../supabaseClient', () => ({ supabase: {} }));
 vi.mock('../companySettingsService', () => ({ getOrCreateCompanySettings: vi.fn() }));
 
-import { toQuoteData, toInvoiceData, toCaseData, toPaymentReceiptData, toPayslipData, toQuoteItems, toInvoiceItems } from './dataFetcher';
+import { toQuoteData, toInvoiceData, toCaseData, toPaymentReceiptData, toPayslipData, toQuoteItems, toInvoiceItems, currencyToBlock } from './dataFetcher';
+
+// A real non-USD resolved currency (Oman). Phase 1's whole point: the document
+// currency block is sourced from the resolved Country Engine CurrencyConfig, so a
+// non-USD tenant NEVER renders 'USD'.
+const OMR: CurrencyConfig = {
+  code: 'OMR',
+  symbol: 'ر.ع.',
+  name: 'Omani Rial',
+  decimalPlaces: 3,
+  decimalSeparator: '.',
+  thousandsSeparator: ',',
+  position: 'before',
+};
 
 const QUOTE_ROW = {
   id: 'q1',
@@ -46,9 +60,31 @@ const INVOICE_ROW = {
   },
 };
 
+describe('currencyToBlock — resolved CurrencyConfig → document currency block (kills the USD leak)', () => {
+  it('maps symbol/position/decimalPlaces from the resolved config', () => {
+    expect(currencyToBlock(OMR)).toEqual({
+      currency_symbol: 'ر.ع.',
+      currency_position: 'before',
+      decimal_places: 3,
+    });
+  });
+
+  it('honors an after-position config', () => {
+    expect(currencyToBlock({ ...OMR, position: 'after' }).currency_position).toBe('after');
+  });
+
+  it('falls back to the ISO code (NEVER USD/$) when the symbol is empty', () => {
+    const block = currencyToBlock({ ...OMR, symbol: '' });
+    expect(block.currency_symbol).toBe('OMR');
+    expect(block.currency_symbol).not.toBe('USD');
+    expect(block.currency_symbol).not.toBe('$');
+  });
+});
+
 describe('toQuoteData — customer/company contract (regression: customer info shows N/A)', () => {
   it('populates customer from a separately-fetched customer row', () => {
     const result = toQuoteData(QUOTE_ROW, {
+      currency: OMR,
       customer: { id: 'cust1', customer_name: 'Midhilesh Krishnan', email: 'm@x.com', mobile_number: '+968 92495122', phone: null },
     });
     expect(result.customer?.customer_name).toBe('Midhilesh Krishnan');
@@ -57,39 +93,39 @@ describe('toQuoteData — customer/company contract (regression: customer info s
   });
 
   it('falls back from phone_number to the DB `phone` column', () => {
-    const result = toQuoteData(QUOTE_ROW, { customer: { id: 'c', customer_name: 'No Mobile', phone: '12345' } });
+    const result = toQuoteData(QUOTE_ROW, { currency: OMR, customer: { id: 'c', customer_name: 'No Mobile', phone: '12345' } });
     expect(result.customer?.phone_number).toBe('12345');
   });
 
   it('maps company and falls back company_name to name', () => {
-    const result = toQuoteData(QUOTE_ROW, { company: { id: 'co', name: 'Acme LLC' } });
+    const result = toQuoteData(QUOTE_ROW, { currency: OMR, company: { id: 'co', name: 'Acme LLC' } });
     expect(result.company?.company_name).toBe('Acme LLC');
   });
 
   it('maps the case reference and creator profile', () => {
-    const result = toQuoteData(QUOTE_ROW, { createdByProfile: { id: 'u', full_name: 'Tech One' } });
+    const result = toQuoteData(QUOTE_ROW, { currency: OMR, createdByProfile: { id: 'u', full_name: 'Tech One' } });
     expect(result.cases?.case_no).toBe('CASE-1');
     expect(result.created_by_profile?.full_name).toBe('Tech One');
   });
 
   it('reduces the associated company to { id, company_name }', () => {
     const result = toQuoteData(QUOTE_ROW, {
+      currency: OMR,
       customerAssociatedCompany: { id: 'ac', company_name: 'Parent Co', email: 'x@x.com' },
     });
     expect(result.customer_associated_company).toEqual({ id: 'ac', company_name: 'Parent Co' });
   });
 
-  it('coerces an unknown currency_position to a valid literal', () => {
-    const result = toQuoteData(QUOTE_ROW, {
-      locale: { currency_symbol: 'OMR', currency_position: 'weird', decimal_places: 3 },
-    });
+  it('sources the currency block from the resolved CurrencyConfig (the OMR tenant shows ر.ع., NEVER USD)', () => {
+    const result = toQuoteData(QUOTE_ROW, { currency: OMR });
+    expect(result.accounting_locales?.currency_symbol).toBe('ر.ع.');
+    expect(result.accounting_locales?.currency_symbol).not.toBe('USD');
     expect(result.accounting_locales?.currency_position).toBe('before');
-    expect(result.accounting_locales?.currency_symbol).toBe('OMR');
     expect(result.accounting_locales?.decimal_places).toBe(3);
   });
 
   it('leaves customer undefined when none is provided (no silent leak)', () => {
-    const result = toQuoteData(QUOTE_ROW, {});
+    const result = toQuoteData(QUOTE_ROW, { currency: OMR });
     expect(result.customer).toBeUndefined();
   });
 });
@@ -97,6 +133,7 @@ describe('toQuoteData — customer/company contract (regression: customer info s
 describe('toInvoiceData — customer/company/bank contract', () => {
   it('populates customer and company from separately-fetched rows', () => {
     const result = toInvoiceData(INVOICE_ROW, {
+      currency: OMR,
       customer: { id: 'c', customer_name: 'Jane Doe', email: 'j@x.com', phone: '555' },
       company: { id: 'co', company_name: 'Globex' },
     });
@@ -106,19 +143,25 @@ describe('toInvoiceData — customer/company/bank contract', () => {
   });
 
   it('maps the embedded bank account (account_name alias) from the invoice row', () => {
-    const result = toInvoiceData(INVOICE_ROW, {});
+    const result = toInvoiceData(INVOICE_ROW, { currency: OMR });
     expect(result.bank_accounts?.account_name).toBe('Main Account');
     expect(result.bank_accounts?.bank_name).toBe('BankX');
     expect(result.bank_accounts?.iban).toBe('IB99');
   });
 
   it('maps the case reference from the invoice row', () => {
-    const result = toInvoiceData(INVOICE_ROW, {});
+    const result = toInvoiceData(INVOICE_ROW, { currency: OMR });
     expect(result.cases?.case_no).toBe('CASE-9');
   });
 
+  it('sources the currency block from the resolved CurrencyConfig (never USD)', () => {
+    const result = toInvoiceData(INVOICE_ROW, { currency: OMR });
+    expect(result.accounting_locales?.currency_symbol).toBe('ر.ع.');
+    expect(result.accounting_locales?.currency_symbol).not.toBe('USD');
+  });
+
   it('leaves customer undefined when none is provided', () => {
-    const result = toInvoiceData(INVOICE_ROW, {});
+    const result = toInvoiceData(INVOICE_ROW, { currency: OMR });
     expect(result.customer).toBeUndefined();
   });
 
@@ -195,18 +238,25 @@ const PAYMENT_ROW = {
 
 describe('toPaymentReceiptData — renamed columns the old cast dropped', () => {
   it('maps payment_number→receipt_number (was always "Draft")', () => {
-    const result = toPaymentReceiptData(PAYMENT_ROW, {});
+    const result = toPaymentReceiptData(PAYMENT_ROW, { currency: OMR });
     expect(result.receipt_number).toBe('RCPT-007');
   });
 
   it('maps reference→reference_number (never rendered before) and keeps payment_method undefined', () => {
-    const result = toPaymentReceiptData(PAYMENT_ROW, {});
+    const result = toPaymentReceiptData(PAYMENT_ROW, { currency: OMR });
     expect(result.reference_number).toBe('CHQ-12345');
     expect(result.payment_method).toBeUndefined();
   });
 
+  it('sources the currency block from the resolved CurrencyConfig (never USD)', () => {
+    const result = toPaymentReceiptData(PAYMENT_ROW, { currency: OMR });
+    expect(result.accounting_locales?.currency_symbol).toBe('ر.ع.');
+    expect(result.accounting_locales?.currency_symbol).not.toBe('USD');
+  });
+
   it('maps the invoice ref, customer, and bank account from extras', () => {
     const result = toPaymentReceiptData(PAYMENT_ROW, {
+      currency: OMR,
       invoice: { id: 'inv1', invoice_number: 'INV-1', total_amount: 500, invoice_type: 'tax_invoice' },
       customer: { id: 'c', customer_name: 'Buyer', phone: '555' },
       bankAccounts: { id: 'b', account_name: 'Main', bank_name: 'BankX', account_number: '1' },
@@ -229,7 +279,7 @@ const PAYROLL_ROW = {
 
 describe('toPayslipData — column mapping + relation contract', () => {
   it('maps total_earnings→gross_salary and passes net_salary/working_days/overtime_hours through', () => {
-    const result = toPayslipData(PAYROLL_ROW, {});
+    const result = toPayslipData(PAYROLL_ROW, { currency: OMR });
     expect(result.gross_salary).toBe(5000);
     expect(result.net_salary).toBe(4000);
     expect(result.working_days).toBe(22);
@@ -237,14 +287,21 @@ describe('toPayslipData — column mapping + relation contract', () => {
   });
 
   it('keeps non-existent columns undefined (payment_date/days_worked/regular_hours)', () => {
-    const result = toPayslipData(PAYROLL_ROW, {});
+    const result = toPayslipData(PAYROLL_ROW, { currency: OMR });
     expect(result.payment_date).toBeUndefined();
     expect(result.days_worked).toBeUndefined();
     expect(result.regular_hours).toBeUndefined();
   });
 
+  it('sources the currency block from the resolved CurrencyConfig (never USD)', () => {
+    const result = toPayslipData(PAYROLL_ROW, { currency: OMR });
+    expect(result.accounting_locales?.currency_symbol).toBe('ر.ع.');
+    expect(result.accounting_locales?.currency_symbol).not.toBe('USD');
+  });
+
   it('builds the employee and payroll_period blocks from relations', () => {
     const result = toPayslipData(PAYROLL_ROW, {
+      currency: OMR,
       employee: { first_name: 'Sam', last_name: 'Lee', employee_number: 'E-1' },
       period: { period_name: 'Jan 2026', start_date: '2026-01-01', end_date: '2026-01-31' },
     });

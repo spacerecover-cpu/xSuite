@@ -22,6 +22,8 @@ import type {
   ChainOfCustodyEntryData,
 } from './types';
 import type { Database } from '../../types/database.types';
+import type { CurrencyConfig } from '../../types/tenantConfig';
+import { getTenantConfig } from '../tenantConfigService';
 
 type QuotesRow = Database['public']['Tables']['quotes']['Row'];
 type InvoicesRow = Database['public']['Tables']['invoices']['Row'];
@@ -145,13 +147,19 @@ function toBankAccount(src: unknown): NonNullable<InvoiceData['bank_accounts']> 
   };
 }
 
-function toLocale(src: unknown): NonNullable<QuoteData['accounting_locales']> {
-  const r = pickRecord(src);
-  const position = r && r.currency_position === 'after' ? 'after' : 'before';
+/**
+ * The document currency block, sourced from the resolved Country Engine
+ * CurrencyConfig (NOT the legacy accounting_locales table). Falls back to the ISO
+ * code when a tenant has no display symbol — never to a US '$'/'USD' default. This
+ * is the single place currency formatting enters the PDF/document layer; Phase 2
+ * will extend it to honor a tenant display_mode (symbol vs ISO code).
+ */
+export function currencyToBlock(c: CurrencyConfig): NonNullable<QuoteData['accounting_locales']> {
+  const code = typeof c.code === 'string' ? c.code : '';
   return {
-    currency_symbol: (r && optStr(r.currency_symbol)) || 'USD',
-    currency_position: position,
-    decimal_places: r && typeof r.decimal_places === 'number' ? r.decimal_places : 2,
+    currency_symbol: c.symbol || code,
+    currency_position: c.position,
+    decimal_places: c.decimalPlaces,
   };
 }
 
@@ -418,12 +426,12 @@ async function fetchCompanySettings(): Promise<CompanySettingsData> {
 export function toQuoteData(
   quoteRow: Partial<QuotesRow> & { cases?: unknown },
   extras: {
+    currency: CurrencyConfig;
     customer?: unknown;
     company?: unknown;
     createdByProfile?: unknown;
     customerAssociatedCompany?: unknown;
     items?: QuoteItemData[] | null;
-    locale?: unknown;
   },
 ): QuoteData {
   // Built field-by-field from the typed row (no `as unknown as`): a renamed or
@@ -453,7 +461,7 @@ export function toQuoteData(
     created_by_profile: toCreatedByProfile(extras.createdByProfile),
     customer_associated_company: toAssociatedCompany(extras.customerAssociatedCompany),
     quote_items: extras.items ?? [],
-    accounting_locales: toLocale(extras.locale),
+    accounting_locales: currencyToBlock(extras.currency),
   } satisfies QuoteData;
 }
 
@@ -533,20 +541,17 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
     console.error('Error fetching quote items:', itemsError);
   }
 
-  const { data: defaultLocale } = await supabase
-    .from('accounting_locales')
-    .select('currency_symbol, currency_position, decimal_places')
-    .eq('is_default', true)
-    .eq('is_active', true)
-    .maybeSingle();
+  // Currency is resolved through the Country Engine (single source of truth), not
+  // the legacy accounting_locales table. quotes.tenant_id scopes the resolution.
+  const cfg = await getTenantConfig(quoteRow.tenant_id);
 
   return toQuoteData(quoteRow, {
+    currency: cfg.currency,
     customer: customerRes.data,
     company: companyRes.data,
     createdByProfile: createdByRes.data,
     customerAssociatedCompany,
     items: toQuoteItems(items),
-    locale: defaultLocale,
   });
 }
 
@@ -557,11 +562,11 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
 export function toInvoiceData(
   invoiceRow: Partial<InvoicesRow> & { cases?: unknown; bank_accounts?: unknown },
   extras: {
+    currency: CurrencyConfig;
     customer?: unknown;
     company?: unknown;
     customerAssociatedCompany?: unknown;
     items?: InvoiceItemData[] | null;
-    locale?: unknown;
   },
 ): InvoiceData {
   // Built field-by-field from the typed row (no `as unknown as`): column drift is
@@ -592,7 +597,7 @@ export function toInvoiceData(
     bank_accounts: toBankAccount(invoiceRow.bank_accounts),
     customer_associated_company: toAssociatedCompany(extras.customerAssociatedCompany),
     invoice_line_items: extras.items ?? [],
-    accounting_locales: toLocale(extras.locale),
+    accounting_locales: currencyToBlock(extras.currency),
   } satisfies InvoiceData;
 }
 
@@ -626,7 +631,9 @@ export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditN
   }
 
   // Related records fetched separately (mirrors fetchInvoiceDetails — no embed/alias drift).
-  const [settings, invoiceRes, customerRes, companyRes, caseRes, itemsRes, localeRes] = await Promise.all([
+  // Currency from the Country Engine (single source), not accounting_locales.
+  const cfg = await getTenantConfig(cnRow.tenant_id);
+  const [settings, invoiceRes, customerRes, companyRes, caseRes, itemsRes] = await Promise.all([
     fetchCompanySettings(),
     cnRow.invoice_id
       ? supabase.from('invoices').select('invoice_number').eq('id', cnRow.invoice_id).maybeSingle()
@@ -646,19 +653,13 @@ export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditN
       .eq('credit_note_id', creditNoteId)
       .is('deleted_at', null)
       .order('sort_order', { ascending: true }),
-    supabase
-      .from('accounting_locales')
-      .select('currency_symbol, currency_position, decimal_places')
-      .eq('is_default', true)
-      .eq('is_active', true)
-      .maybeSingle(),
   ]);
 
   const invoice = invoiceRes.data as { invoice_number?: string | null } | null;
   const customer = customerRes.data as { customer_name?: string | null } | null;
   const company = companyRes.data as { company_name?: string | null; name?: string | null } | null;
   const caseRow = caseRes.data as { case_no?: string | null } | null;
-  const locale = localeRes.data as { currency_symbol?: string; currency_position?: string; decimal_places?: number } | null;
+  const block = currencyToBlock(cfg.currency);
   const items = (itemsRes.data ?? []) as Array<{ description?: string | null; quantity?: number | null; unit_price?: number | null; total?: number | null }>;
 
   return {
@@ -678,9 +679,9 @@ export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditN
       customer_name: customer?.customer_name ?? null,
       company_name: company?.company_name ?? company?.name ?? null,
       case_no: caseRow?.case_no ?? null,
-      currency_symbol: locale?.currency_symbol || 'USD',
-      currency_position: locale?.currency_position === 'before' ? 'before' : 'after',
-      decimal_places: typeof locale?.decimal_places === 'number' ? locale.decimal_places : 2,
+      currency_symbol: block.currency_symbol,
+      currency_position: block.currency_position,
+      decimal_places: block.decimal_places,
       items: items.map((it) => ({
         description: it.description ?? '',
         quantity: typeof it.quantity === 'number' ? it.quantity : 0,
@@ -783,19 +784,15 @@ async function fetchInvoiceDetails(invoiceId: string): Promise<InvoiceData> {
     console.error('Error fetching invoice items:', itemsError);
   }
 
-  const { data: defaultLocale } = await supabase
-    .from('accounting_locales')
-    .select('currency_symbol, currency_position, decimal_places')
-    .eq('is_default', true)
-    .eq('is_active', true)
-    .maybeSingle();
+  // Currency from the Country Engine (single source), not accounting_locales.
+  const cfg = await getTenantConfig(invoiceRow.tenant_id);
 
   return toInvoiceData(invoiceRow, {
+    currency: cfg.currency,
     customer: customerRes.data,
     company: companyRes.data,
     customerAssociatedCompany,
     items: toInvoiceItems(items),
-    locale: defaultLocale,
   });
 }
 
@@ -811,11 +808,11 @@ async function fetchInvoiceDetails(invoiceId: string): Promise<InvoiceData> {
 export function toPaymentReceiptData(
   paymentRow: Partial<PaymentsRow>,
   extras: {
+    currency: CurrencyConfig;
     invoice?: unknown;
     customer?: unknown;
     bankAccounts?: unknown;
     cases?: unknown;
-    locale?: unknown;
   },
 ): PaymentReceiptData {
   const invoiceRef = pickRecord(extras.invoice);
@@ -839,7 +836,7 @@ export function toPaymentReceiptData(
     customer: toCustomerBlock(extras.customer),
     bank_accounts: toBankAccount(extras.bankAccounts),
     cases: toCaseRef(extras.cases),
-    accounting_locales: toLocale(extras.locale),
+    accounting_locales: currencyToBlock(extras.currency),
   } satisfies PaymentReceiptData;
 }
 
@@ -906,19 +903,15 @@ async function fetchPaymentDetails(paymentId: string): Promise<PaymentReceiptDat
     caseInfo = invoiceData?.cases ?? null;
   }
 
-  const { data: defaultLocale } = await supabase
-    .from('accounting_locales')
-    .select('currency_symbol, currency_position, decimal_places')
-    .eq('is_default', true)
-    .eq('is_active', true)
-    .maybeSingle();
+  // Currency from the Country Engine (single source), not accounting_locales.
+  const cfg = await getTenantConfig(paymentData.tenant_id);
 
   return toPaymentReceiptData(paymentData, {
+    currency: cfg.currency,
     invoice: paymentData.invoices,
     customer: customerRow,
     bankAccounts: paymentData.bank_accounts,
     cases: caseInfo,
-    locale: defaultLocale,
   });
 }
 
@@ -933,10 +926,10 @@ async function fetchPaymentDetails(paymentId: string): Promise<PaymentReceiptDat
 export function toPayslipData(
   recordRow: Partial<PayrollRecordsRow>,
   extras: {
+    currency: CurrencyConfig;
     employee?: unknown;
     period?: unknown;
     items?: PayslipData['items'];
-    locale?: unknown;
   },
 ): PayslipData {
   const employeeRow = pickRecord(extras.employee);
@@ -962,7 +955,7 @@ export function toPayslipData(
     gross_salary: recordRow.total_earnings ?? undefined,
     net_salary: recordRow.net_salary ?? 0,
     items: extras.items ?? [],
-    accounting_locales: toLocale(extras.locale),
+    accounting_locales: currencyToBlock(extras.currency),
   } satisfies PayslipData;
 }
 
@@ -1012,12 +1005,8 @@ async function fetchPayslipDetails(recordId: string): Promise<PayslipData> {
     .eq('record_id', recordId)
     .order('sort_order', { ascending: true });
 
-  const { data: defaultLocale } = await supabase
-    .from('accounting_locales')
-    .select('currency_symbol, currency_position, decimal_places')
-    .eq('is_default', true)
-    .eq('is_active', true)
-    .maybeSingle();
+  // Currency from the Country Engine (single source), not accounting_locales.
+  const cfg = await getTenantConfig(recordData.tenant_id);
 
   const mappedItems = (items || []).map(item => ({
     component_code: item.component_id ?? '',
@@ -1027,10 +1016,10 @@ async function fetchPayslipDetails(recordId: string): Promise<PayslipData> {
   }));
 
   return toPayslipData(recordData, {
+    currency: cfg.currency,
     employee: recordData.employee,
     period: recordData.payroll_period,
     items: mappedItems,
-    locale: defaultLocale,
   });
 }
 
