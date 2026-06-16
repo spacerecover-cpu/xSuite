@@ -1,19 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { format as dateFnsFormat, parseISO } from 'date-fns';
 import { ar as arDateLocale } from 'date-fns/locale/ar';
-
-// Mock supabaseClient so format.ts can be imported without env vars
-vi.mock('./supabaseClient', () => ({
-  supabase: {
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-        }),
-      }),
-    }),
-  },
-}));
 
 import {
   formatCurrency,
@@ -22,7 +9,6 @@ import {
   formatDate,
   formatDateTime,
   formatCurrencyWithConfig,
-  formatCurrencyWithSettings,
   renderCurrencyToken,
   toDateInputValue,
 } from './format';
@@ -165,23 +151,6 @@ describe('ar path is locale-aware (Gregorian, Western numerals)', () => {
   });
 });
 
-describe('formatCurrencyWithSettings grouping (D18)', () => {
-  it('uses the supplied separators, not forced en-US comma grouping', () => {
-    const out = formatCurrencyWithSettings(1234567.5, {
-      currencySymbol: 'OMR', currencyPosition: 'after', decimalPlaces: 3,
-      currencyCode: 'OMR', thousandsSeparator: ' ', decimalSeparator: '.',
-    });
-    expect(out).toBe('1 234 567.500 OMR');
-  });
-  it('defaults to comma/dot grouping when separators are omitted (back-compat)', () => {
-    const out = formatCurrencyWithSettings(1234567.5, {
-      currencySymbol: '$', currencyPosition: 'before', decimalPlaces: 2,
-      currencyCode: 'USD',
-    });
-    expect(out).toBe('$ 1,234,567.50');
-  });
-});
-
 // --- Phase 2: currency display_mode + negative_format ---
 
 const cfg = (over: Partial<CurrencyConfig> = {}): CurrencyConfig => ({
@@ -256,6 +225,21 @@ describe('formatCurrencyWithConfig — display_mode + negative_format', () => {
 
   it("default negative_format 'minus' is byte-identical to pre-Phase-2 (sign inside the number)", () => {
     expect(formatCurrencyWithConfig(-1234.5, cfg())).toBe('$-1,234.50');
+  });
+});
+
+// D18 grouping coverage, migrated from the retired formatCurrencyWithSettings.
+// formatCurrencyWithConfig is now the single tenant-separator-aware formatter.
+describe('formatCurrencyWithConfig — tenant grouping separators (D18)', () => {
+  it('honors a custom thousands separator (space), not forced en-US comma grouping', () => {
+    const out = formatCurrencyWithConfig(
+      1234567.5,
+      omr({ thousandsSeparator: ' ', decimalSeparator: '.', position: 'after', displayMode: 'iso_code' }),
+    );
+    expect(out).toBe('1 234 567.500 OMR');
+  });
+  it('defaults to comma/dot grouping for a standard before-position config', () => {
+    expect(formatCurrencyWithConfig(1234567.5, cfg())).toBe('$1,234,567.50');
   });
 });
 
