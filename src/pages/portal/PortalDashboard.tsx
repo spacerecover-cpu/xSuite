@@ -9,11 +9,13 @@ import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { FileText, DollarSign, MessageSquare, Clock } from 'lucide-react';
 import { formatDate } from '../../lib/format';
+import { useCurrency } from '../../hooks/useCurrency';
 import { fetchPortalVisibility, getVisibleCaseIds, getCaseIdsWithFlag } from '../../lib/portalVisibility';
 
 export const PortalDashboard: React.FC = () => {
   const { t } = useTranslation();
   const { customer } = usePortalAuth();
+  const { formatCurrency } = useCurrency();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -228,7 +230,7 @@ export const PortalDashboard: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-slate-900">
-                        {Number(quote.total_amount).toLocaleString()}
+                        {formatCurrency(Number(quote.total_amount) || 0)}
                       </p>
                       {quote.valid_until && (
                         <p className="text-xs text-slate-500">

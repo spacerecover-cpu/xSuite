@@ -6,7 +6,8 @@ import { Button } from '../../ui/Button';
 import { Badge } from '../../ui/Badge';
 import { Card } from '../../ui/Card';
 import { getCaseExpenses, getCasePayments, type CaseExpense, type CasePayment, type CaseFinancialSummary } from '@/lib/caseFinanceService';
-import { formatDate } from '@/lib/format';
+import { formatDate, formatCurrencyWithConfig } from '@/lib/format';
+import { useCurrencyConfig } from '@/contexts/TenantConfigContext';
 import { toQuoteEditInitialData } from '@/lib/quotesService';
 import { toInvoiceEditInitialData } from '@/lib/invoiceService';
 import { useNavigate } from 'react-router-dom';
@@ -61,7 +62,6 @@ interface CaseFinancesTabProps {
   invoices: CaseInvoiceRow[];
   caseFinancialSummary: CaseFinancialSummary | null | undefined;
   formatCurrency: (amount: number) => string;
-  formatCurrencyAmount: (amount: number, symbol: string, position: string, decimals: number) => string;
   onSetShowQuoteModal: (v: boolean) => void;
   onSetShowInvoiceModal: (v: boolean) => void;
   onSetEditingQuote: (q: unknown) => void;
@@ -82,7 +82,6 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
   invoices,
   caseFinancialSummary,
   formatCurrency,
-  formatCurrencyAmount,
   onSetShowQuoteModal,
   onSetShowInvoiceModal,
   onSetEditingQuote,
@@ -97,6 +96,7 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
   invoiceService,
 }) => {
   const navigate = useNavigate();
+  const currencyConfig = useCurrencyConfig();
 
   const { data: expenses = [] } = useQuery<CaseExpense[]>({
     queryKey: ['case_expenses', caseId],
@@ -202,12 +202,7 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
                           </div>
                           <p className="text-sm text-slate-600 mb-1">{quote.title}</p>
                           <p className="text-sm font-medium text-slate-900">
-                            Total: {formatCurrencyAmount(
-                              quote.total_amount || 0,
-                              quote.currency_symbol || 'USD',
-                              quote.currency_position || 'after',
-                              quote.decimal_places || 2
-                            )}
+                            Total: {formatCurrencyWithConfig(quote.total_amount ?? 0, currencyConfig)}
                           </p>
                           <p className="text-xs text-slate-400 mt-1">
                             Created {formatDate(quote.created_at)}
@@ -323,29 +318,14 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
                             )}
                           </div>
                           <p className="text-sm font-medium text-slate-900 mb-1">
-                            Total: {formatCurrencyAmount(
-                              invoice.total_amount || 0,
-                              invoice.currency_symbol || 'USD',
-                              invoice.currency_position || 'after',
-                              invoice.decimal_places || 2
-                            )}
+                            Total: {formatCurrencyWithConfig(invoice.total_amount ?? 0, currencyConfig)}
                           </p>
                           {(invoice.amount_paid ?? 0) > 0 && (
                             <p className="text-sm text-success">
-                              Paid: {formatCurrencyAmount(
-                                invoice.amount_paid ?? 0,
-                                invoice.currency_symbol || 'USD',
-                                invoice.currency_position || 'after',
-                                invoice.decimal_places || 2
-                              )}
+                              Paid: {formatCurrencyWithConfig(invoice.amount_paid ?? 0, currencyConfig)}
                               {(invoice.balance_due ?? 0) > 0 && (
                                 <span className="text-warning ml-2">
-                                  • Balance: {formatCurrencyAmount(
-                                    invoice.balance_due ?? 0,
-                                    invoice.currency_symbol || 'USD',
-                                    invoice.currency_position || 'after',
-                                    invoice.decimal_places || 2
-                                  )}
+                                  • Balance: {formatCurrencyWithConfig(invoice.balance_due ?? 0, currencyConfig)}
                                 </span>
                               )}
                             </p>
@@ -494,7 +474,7 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-bold text-warning">{expense.amount?.toFixed(2)}</p>
+                    <p className="text-sm font-bold text-warning">{formatCurrencyWithConfig(expense.amount ?? 0, currencyConfig)}</p>
                     <Badge
                       variant="custom"
                       color={expense.status === 'paid' ? '#10b981' : expense.status === 'approved' ? '#3b82f6' : '#64748b'}

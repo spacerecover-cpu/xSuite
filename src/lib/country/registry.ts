@@ -78,6 +78,42 @@ export const COUNTRY_CONFIG_REGISTRY: ConfigKeyDef[] = [
     schema: z.enum(['minus', 'parentheses']),
     codedDefault: 'minus',
   },
+  {
+    // Tenant PREFERENCE: symbol placement. NEW in Phase 3 — moves this cosmetic
+    // field from an unvalidated snapshot read into the validated registry cascade.
+    key: 'currency.position',
+    domain: 'currency',
+    label: 'Currency symbol position',
+    description: 'Whether the currency token renders before or after the amount. Tenant preference.',
+    schema: z.enum(['before', 'after']),
+    codedDefault: 'before',
+  },
+  {
+    // Tenant PREFERENCE: display decimals. DISTINCT from the statutory
+    // number_format.amount_in_words_minor_units (OMR=3/JPY=0) below.
+    key: 'currency.decimal_places',
+    domain: 'currency',
+    label: 'Decimal places',
+    description: 'Display decimal places for amounts. Tenant preference (distinct from amount-in-words minor units).',
+    schema: z.number().int().min(0).max(4),
+    codedDefault: 2,
+  },
+  {
+    key: 'currency.decimal_separator',
+    domain: 'currency',
+    label: 'Decimal separator',
+    description: 'Character separating the integer and fraction parts. Tenant preference.',
+    schema: z.string().min(1).max(1),
+    codedDefault: '.',
+  },
+  {
+    key: 'currency.thousands_separator',
+    domain: 'currency',
+    label: 'Thousands separator',
+    description: 'Character grouping thousands (empty = no grouping). Tenant preference.',
+    schema: z.string().max(1),
+    codedDefault: ',',
+  },
   // ── tax (statutory; D9/D10/D11) ──
   {
     key: 'tax.label',
@@ -131,6 +167,31 @@ export const COUNTRY_CONFIG_REGISTRY: ConfigKeyDef[] = [
     schema: z.array(z.number().int().min(0).max(6)),
     codedDefault: [6, 0], // Sat/Sun — a real, neutral default (NOT a sentinel)
   },
+  {
+    key: 'datetime.time_format',
+    domain: 'datetime',
+    label: 'Time format',
+    description: '12-hour or 24-hour clock. Tenant preference.',
+    schema: z.enum(['12h', '24h']),
+    codedDefault: '24h',
+  },
+  {
+    // First day of week. DISTINCT from datetime.weekend_days (which days ARE weekend).
+    key: 'datetime.week_starts_on',
+    domain: 'datetime',
+    label: 'Week starts on',
+    description: 'First day of the week (0=Sun..6=Sat). Tenant preference (distinct from weekend_days).',
+    schema: z.number().int().min(0).max(6),
+    codedDefault: 0,
+  },
+  {
+    key: 'datetime.fiscal_year_start',
+    domain: 'datetime',
+    label: 'Fiscal year start',
+    description: 'Fiscal year start as MM-DD. Tenant preference.',
+    schema: z.string().regex(/^\d{2}-\d{2}$/),
+    codedDefault: '01-01',
+  },
   // ── number_format (statutory minor-unit correctness; D13) ──
   {
     key: 'number_format.amount_in_words_minor_units',
@@ -166,4 +227,14 @@ export const STATUTORY_KEYS: string[] = COUNTRY_CONFIG_REGISTRY.filter(
 /** App-facing binding to the real registry (mirrors isFeatureEnabled at registry.ts:116). */
 export function resolveCountryConfigKey<T>(layers: ConfigLayers, key: string): T {
   return resolveConfig<T>(REGISTRY_BY_KEY, layers, key);
+}
+
+/** A config key is LOCKED (read-only in the Localization Center, never writable as a
+ *  tenant override) iff it is a required jurisdiction key OR country-locked (statutory,
+ *  maxOverrideLayer:'country'). Unknown keys are locked fail-safe. The write path and UI
+ *  both gate on this so a tenant can never shadow jurisdiction truth (D11). */
+export function isConfigKeyLocked(key: string): boolean {
+  const def = REGISTRY_BY_KEY[key];
+  if (!def) return true;
+  return def.required === true || def.maxOverrideLayer === 'country';
 }

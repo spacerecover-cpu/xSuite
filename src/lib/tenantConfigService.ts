@@ -3,7 +3,8 @@ import type { TenantConfig, TaxSystem, Theme } from '../types/tenantConfig';
 import { DEFAULT_TENANT_CONFIG, DEFAULT_THEME, THEMES, REQUIRED_SENTINEL } from '../types/tenantConfig';
 import { logger } from './logger';
 import { SUPPORTED_LANGS } from './locale';
-import { resolveCountryConfigKey } from './country/registry';
+import { resolveCountryConfigKey, REGISTRY_BY_KEY, isConfigKeyLocked } from './country/registry';
+import type { Json } from '../types/database.types';
 import { buildConfigLayers } from './country/buildConfigLayers';
 import type { ConfigLayers } from './country/resolveCountryConfig';
 
@@ -19,7 +20,9 @@ async function fetchTenantConfig(tenantId: string): Promise<TenantConfig> {
     .maybeSingle();
 
   // These reads are keyed only on tenantId and are independent, so run concurrently.
-  const [tenantResult, localeResult, flagsResult] = await Promise.all([
+  // Phase 3: the accounting_locales default-row read was removed — country_config_overrides
+  // is now the sole tenant-override source (the resolver fold was cut in buildConfigLayers).
+  const [tenantResult, flagsResult] = await Promise.all([
     supabase
       .from('tenants')
       .select(`
@@ -38,13 +41,6 @@ async function fetchTenantConfig(tenantId: string): Promise<TenantConfig> {
       `)
       .eq('id', tenantId)
       .maybeSingle(),
-    supabase
-      .from('accounting_locales')
-      .select('currency_code, currency_symbol, decimal_places, currency_position, decimal_separator, thousands_separator, date_format, locale_code')
-      .eq('tenant_id', tenantId)
-      .eq('is_default', true)
-      .is('deleted_at', null)
-      .maybeSingle(),
     flagsPromise,
   ]);
 
@@ -54,21 +50,16 @@ async function fetchTenantConfig(tenantId: string): Promise<TenantConfig> {
     return { ...DEFAULT_TENANT_CONFIG, tenantId };
   }
 
-  const { data: defaultLocale } = localeResult;
-
   const rawFlags = flagsResult?.data?.feature_flags;
   const featureFlags: Record<string, boolean> =
     rawFlags && typeof rawFlags === 'object' && !Array.isArray(rawFlags)
       ? (rawFlags as Record<string, boolean>)
       : {};
 
-  const layers = buildConfigLayers(
-    {
-      resolved_country_config: (data as Record<string, unknown>).resolved_country_config,
-      country_config_overrides: (data as Record<string, unknown>).country_config_overrides,
-    },
-    defaultLocale as Record<string, unknown> | null,
-  );
+  const layers = buildConfigLayers({
+    resolved_country_config: (data as Record<string, unknown>).resolved_country_config,
+    country_config_overrides: (data as Record<string, unknown>).country_config_overrides,
+  });
   // Engine path: resolve every required field through the cascade. A missing
   // required key throws CountryConfigError, which propagates to the provider's
   // blocking "not configured" state (§4.5) — never a silent US fallback.
@@ -100,10 +91,10 @@ export function resolveTenantConfigFromLayers(
       code: get<string>('currency.code'), // required → throws if unresolved
       symbol: (snap['currency.symbol'] as string) || '',
       name: (snap['currency.name'] as string) || (get<string>('currency.code')),
-      decimalPlaces: (snap['currency.decimal_places'] as number) ?? 2,
-      decimalSeparator: (snap['currency.decimal_separator'] as string) || '.',
-      thousandsSeparator: (snap['currency.thousands_separator'] as string) ?? ',',
-      position: ((snap['currency.position'] as string) || 'before') as 'before' | 'after',
+      decimalPlaces: get<number>('currency.decimal_places'),
+      decimalSeparator: get<string>('currency.decimal_separator'),
+      thousandsSeparator: get<string>('currency.thousands_separator'),
+      position: get<'before' | 'after'>('currency.position'),
       // Tenant display preferences (registry codedDefault 'symbol'/'minus' unless
       // the tenant overrode via country_config_overrides). Non-statutory.
       displayMode: get<'symbol' | 'iso_code' | 'symbol_code'>('currency.display_mode'),
@@ -120,10 +111,10 @@ export function resolveTenantConfigFromLayers(
     },
     dateTime: {
       dateFormat: get<string>('datetime.date_format'),
-      timeFormat: ((snap['datetime.time_format'] as string) || '24h') as '12h' | '24h',
+      timeFormat: get<'12h' | '24h'>('datetime.time_format'),
       timezone: get<string>('datetime.timezone'),
-      weekStartsOn: ((snap['datetime.week_starts_on'] as number) ?? 0) as 0 | 1 | 2 | 3 | 4 | 5 | 6,
-      fiscalYearStart: (snap['datetime.fiscal_year_start'] as string) || '01-01',
+      weekStartsOn: get<0 | 1 | 2 | 3 | 4 | 5 | 6>('datetime.week_starts_on'),
+      fiscalYearStart: get<string>('datetime.fiscal_year_start'),
     },
     locale: {
       localeCode: get<string>('locale.code'),
@@ -206,6 +197,53 @@ export async function getTenantConfig(tenantId: string): Promise<TenantConfig> {
   const config = await fetchTenantConfig(tenantId);
   configCache.set(tenantId, { config, timestamp: Date.now() });
   return config;
+}
+
+/**
+ * Persist tenant config overrides into tenants.country_config_overrides via the
+ * merge RPC (Localization Center write path). Validates EACH key client-side
+ * against the registry's own Zod schema and rejects locked (statutory/required)
+ * or unknown keys before the round-trip. The server enforces the lock surface
+ * authoritatively too — the set RPC rejects required jurisdiction keys and the
+ * validate_country_config_overrides() trigger rejects country-locked statutory
+ * keys — so a direct rpc() call cannot bypass it. Invalidates the 5-min config
+ * cache so the next read (and refreshConfig) sees the new values.
+ */
+export async function setTenantConfigOverrides(
+  tenantId: string,
+  overrides: Record<string, Json>,
+): Promise<void> {
+  for (const [key, value] of Object.entries(overrides)) {
+    const def = REGISTRY_BY_KEY[key];
+    if (!def) throw new Error(`Unknown config key: ${key}`);
+    if (isConfigKeyLocked(key)) throw new Error(`Config key is locked (statutory/required): ${key}`);
+    const parsed = def.schema.safeParse(value);
+    if (!parsed.success) throw new Error(`Invalid value for ${key}: ${parsed.error.message}`);
+  }
+  const { error } = await supabase.rpc('set_tenant_country_config_overrides', {
+    p_tenant_id: tenantId,
+    p_overrides: overrides,
+  });
+  if (error) {
+    logger.error('Failed to set tenant config overrides:', error);
+    throw error;
+  }
+  invalidateTenantConfigCache(tenantId);
+}
+
+/** Clear specific tenant config override keys (reset to country default) via the
+ *  reset RPC, which refuses to clear a required key that is not otherwise
+ *  resolvable (anti-brick). Invalidates the config cache. */
+export async function resetTenantConfigOverrides(tenantId: string, keys: string[]): Promise<void> {
+  const { error } = await supabase.rpc('reset_tenant_country_config_overrides', {
+    p_tenant_id: tenantId,
+    p_keys: keys,
+  });
+  if (error) {
+    logger.error('Failed to reset tenant config overrides:', error);
+    throw error;
+  }
+  invalidateTenantConfigCache(tenantId);
 }
 
 export async function updateTenantUiLanguage(tenantId: string, language: string): Promise<void> {

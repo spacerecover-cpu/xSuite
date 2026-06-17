@@ -10,6 +10,8 @@ import { FinancialModuleHeader } from '../../components/financial/FinancialModul
 import { FinancialStatsCard } from '../../components/financial/FinancialStatsCard';
 import { QuoteFormModal } from '../../components/cases/QuoteFormModal';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
+import { roundMoney } from '../../lib/financialMath';
 import { supabase } from '../../lib/supabaseClient';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { ExportButton } from '../../components/shared/ExportButton';
@@ -64,6 +66,7 @@ export const QuotesListPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
+  const currencyConfig = useCurrencyConfig();
   const { profile } = useAuth();
   const selection = useBulkSelection();
   const canBulkArchive = profile?.role === 'owner' || profile?.role === 'admin';
@@ -762,7 +765,7 @@ export const QuotesListPage: React.FC = () => {
                 description: item.description,
                 quantity: item.quantity,
                 unit_price: item.unit_price,
-                total: Math.round(item.quantity * item.unit_price * 100) / 100,
+                total: roundMoney(item.quantity * item.unit_price, currencyConfig.decimalPlaces),
                 sort_order: index,
               }));
 
@@ -817,7 +820,7 @@ export const QuotesListPage: React.FC = () => {
                 description: item.description,
                 quantity: item.quantity,
                 unit_price: item.unit_price,
-                total: Math.round(item.quantity * item.unit_price * 100) / 100,
+                total: roundMoney(item.quantity * item.unit_price, currencyConfig.decimalPlaces),
                 sort_order: index,
               }));
 
