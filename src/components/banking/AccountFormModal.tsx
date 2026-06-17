@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { supabase } from '../../lib/supabaseClient';
 import { BankAccount } from '../../lib/bankingService';
+import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
 import { Building, Wallet, Smartphone, AlertCircle } from 'lucide-react';
 import { logger } from '../../lib/logger';
 
@@ -23,6 +24,7 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string>('');
+  const currencyConfig = useCurrencyConfig();
   const employeeSelectId = useId();
   const currencySelectId = useId();
 
@@ -57,21 +59,8 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
     },
   });
 
-  const { data: defaultLocale } = useQuery({
-    queryKey: ['default_accounting_locale'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('accounting_locales')
-        .select('currency_code')
-        .eq('is_default', true)
-        .eq('is_active', true)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const defaultCurrency = currencies.find(c => c.code === defaultLocale?.currency_code);
+  const defaultCurrencyCode = typeof currencyConfig.code === 'string' ? currencyConfig.code : '';
+  const defaultCurrency = currencies.find(c => c.code === defaultCurrencyCode);
 
   useEffect(() => {
     if (initialData) {
