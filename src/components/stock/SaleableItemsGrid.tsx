@@ -1,6 +1,7 @@
 import React from 'react';
 import { HardDrive, Check } from 'lucide-react';
 import type { StockItemWithCategory } from '../../lib/stockService';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface SaleableItemsGridProps {
   items: StockItemWithCategory[];
@@ -13,10 +14,9 @@ export const SaleableItemsGrid: React.FC<SaleableItemsGridProps> = ({
   onSelect,
   selectedIds,
 }) => {
-  const formatPrice = (price: number | null): string => {
-    if (price === null || price === undefined) return '—';
-    return price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+  const { formatCurrency } = useCurrency();
+  const formatPrice = (price: number | null): string =>
+    price === null || price === undefined ? '—' : formatCurrency(price);
 
   if (items.length === 0) {
     return (

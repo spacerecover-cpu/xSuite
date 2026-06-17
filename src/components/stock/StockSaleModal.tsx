@@ -21,6 +21,7 @@ import { stockKeys } from '../../lib/queryKeys';
 import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { useToast } from '../../hooks/useToast';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface SerialLinePickerProps {
   itemId: string;
@@ -80,6 +81,7 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
   onSuccess,
 }) => {
   const toast = useToast();
+  const { formatCurrency } = useCurrency();
   const paymentMethodFieldId = useId();
   const notesFieldId = useId();
 
@@ -309,8 +311,7 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
     }
   };
 
-  const formatAmount = (n: number) =>
-    n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatAmount = (n: number) => formatCurrency(n);
 
   return (
     <Modal

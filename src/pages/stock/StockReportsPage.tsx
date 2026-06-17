@@ -22,6 +22,7 @@ import {
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
 import { chartAxis, chartCategorical, chartTooltipBorder } from '../../lib/chartTheme';
 import {
   getStockValuation,
@@ -98,6 +99,7 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, sub, positive, negati
 
 export const StockReportsPage: React.FC = () => {
   const { formatCurrency } = useCurrency();
+  const { decimalPlaces } = useCurrencyConfig();
   const today = new Date();
   const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
@@ -144,8 +146,8 @@ export const StockReportsPage: React.FC = () => {
         String(v.item.current_quantity),
         String(v.item.cost_price ?? 0),
         String(v.item.selling_price ?? 0),
-        v.costValue.toFixed(3),
-        v.sellValue.toFixed(3),
+        v.costValue.toFixed(decimalPlaces),
+        v.sellValue.toFixed(decimalPlaces),
         v.margin.toFixed(1) + '%',
       ]),
     ];

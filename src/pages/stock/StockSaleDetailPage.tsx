@@ -16,6 +16,7 @@ import { getStockSale, cancelStockSale } from '../../lib/stockService';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { useToast } from '../../hooks/useToast';
+import { useCurrency } from '../../hooks/useCurrency';
 
 type SaleStatusVariant = 'warning' | 'success' | 'info' | 'secondary' | 'danger';
 
@@ -36,12 +37,10 @@ const formatDate = (value: string | null): string => {
   });
 };
 
-const formatCurrency = (value: number | null | undefined): string => {
-  if (value === null || value === undefined) return '—';
-  return value.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-};
-
 export const StockSaleDetailPage: React.FC = () => {
+  const { formatCurrency: formatCurrencyConfig } = useCurrency();
+  const formatCurrency = (value: number | null | undefined): string =>
+    value === null || value === undefined ? '—' : formatCurrencyConfig(value);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();

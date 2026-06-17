@@ -1,6 +1,7 @@
 import { Eye, Pencil, Trash2, PackagePlus, PackageMinus } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { StockItemWithCategory } from '../../lib/stockService';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface StockItemsTableProps {
   items: StockItemWithCategory[];
@@ -58,14 +59,6 @@ function ItemTypeBadge({ itemType }: { itemType: string | null }) {
   return <Badge variant="default" size="sm">{itemType}</Badge>;
 }
 
-function formatPrice(value: number | null): string {
-  if (value == null) return '—';
-  return value.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 3,
-  });
-}
-
 export function StockItemsTable({
   items,
   onEdit,
@@ -75,6 +68,10 @@ export function StockItemsTable({
   onRecordUsage,
   isLoading,
 }: StockItemsTableProps) {
+  const { formatCurrency } = useCurrency();
+  const formatPrice = (value: number | null): string =>
+    value == null ? '—' : formatCurrency(value);
+
   if (isLoading) {
     return (
       <div className="overflow-x-auto rounded-lg border border-slate-200">
