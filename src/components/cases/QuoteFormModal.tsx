@@ -343,7 +343,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
     void recordTemplateUsage(template.id);
   };
 
-  const docCurrency = quoteData.currency || baseCurrency || 'USD';
+  const docCurrency = quoteData.currency || baseCurrency || currencyFormat.currencyCode;
   const fmtDoc = (v: number) => formatCurrency(v, docCurrency);
 
   const subtotal = lineItems.reduce((sum, item) => {
@@ -916,8 +916,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                         </div>
                         <div className="text-right ml-4">
                           <div className="font-bold text-lg text-success">
-                            {currencyFormat.currencySymbol}
-                            {item.default_price.toFixed(2)}
+                            {fmtDoc(item.default_price)}
                           </div>
                         </div>
                       </div>

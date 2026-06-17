@@ -447,7 +447,7 @@ export const TransactionsList: React.FC = () => {
                         }`}
                       >
                         {transaction.type === 'income' ? '+' : '-'}
-                        {formatCurrency(transaction.amount)}
+                        {formatCurrency(baseAmount(transaction as unknown as Record<string, unknown>, 'amount'))}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
