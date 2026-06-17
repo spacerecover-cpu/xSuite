@@ -77,20 +77,6 @@ export const CaseDetail: React.FC = () => {
 
   const { formatCurrency } = useCurrency();
 
-  const formatCurrencyAmount = (
-    amount: number,
-    currencySymbol: string,
-    currencyPosition: string,
-    decimalPlaces: number
-  ) => {
-    const formattedAmount = amount.toFixed(decimalPlaces);
-    if (currencyPosition === 'before') {
-      return `${currencySymbol} ${formattedAmount}`;
-    } else {
-      return `${formattedAmount} ${currencySymbol}`;
-    }
-  };
-
   const {
     caseData, isLoading, caseError,
     caseStatuses, devices, cloneDrives, attachments,
@@ -692,7 +678,6 @@ export const CaseDetail: React.FC = () => {
               invoices={invoices || []}
               caseFinancialSummary={caseFinancialSummary}
               formatCurrency={formatCurrency}
-              formatCurrencyAmount={formatCurrencyAmount}
               onSetShowQuoteModal={modals.setShowQuoteModal}
               onSetShowInvoiceModal={modals.setShowInvoiceModal}
               onSetEditingQuote={modals.setEditingQuote}
