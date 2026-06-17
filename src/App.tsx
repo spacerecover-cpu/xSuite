@@ -246,7 +246,7 @@ const router = createBrowserRouter(
             <Route path="table-columns" lazy={page(() => import('./pages/settings/TableColumnsSettings'), 'TableColumnsSettings')} />
             <Route path="features" lazy={page(() => import('./pages/settings/FeaturesSettings'), 'FeaturesSettings')} />
             <Route path="system-numbers" lazy={page(() => import('./pages/settings/SystemNumbers'), 'SystemNumbers')} />
-            <Route path="localization" lazy={page(() => import('./pages/settings/AccountingLocales'), 'AccountingLocales')} />
+            <Route path="localization" lazy={page(() => import('./pages/settings/AccountingLocales'), 'LocalizationCenter')} />
             <Route path="currencies" lazy={page(() => import('./pages/settings/CurrencySettings'), 'CurrencySettings')} />
             <Route path="client-portal" lazy={page(() => import('./pages/settings/ClientPortalSettings'), 'ClientPortalSettings')} />
             <Route path="billing" lazy={page(() => import('./pages/settings/BillingPage'), 'default')} />

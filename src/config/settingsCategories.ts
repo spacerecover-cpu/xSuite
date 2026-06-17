@@ -225,13 +225,13 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   },
   {
     id: 'localization',
-    title: 'Localization',
+    title: 'Localization Center',
     icon: Globe,
     backgroundColor: '#14b8a6',
     borderColor: '#14b8a6',
     tables: [],
-    actionLabel: 'Go to Page',
-    description: 'Language, timezone, currency, and regional settings',
+    actionLabel: 'Configure',
+    description: 'Currency display, date & time, timezone, and document language',
   },
   {
     id: 'currencies',

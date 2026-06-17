@@ -1,10 +1,7 @@
 import { format as dateFnsFormat, parseISO } from 'date-fns';
 import { ar as arDateLocale } from 'date-fns/locale/ar';
-import { supabase } from './supabaseClient';
-import { logger } from './logger';
 import { normalizeLang } from './locale';
 import type { CurrencyConfig } from '../types/tenantConfig';
-import { DEFAULT_TENANT_CONFIG } from '../types/tenantConfig';
 
 // Phase 4a: locale-aware formatting. All locale params are OPTIONAL (additive) and
 // every locale-dependent branch is gated on normalizeLang(localeCode) === 'ar', so
@@ -13,88 +10,14 @@ import { DEFAULT_TENANT_CONFIG } from '../types/tenantConfig';
 // natively emits Arabic-Indic digits, so the 'ar' branch forces numberingSystem 'latn'.
 const DEFAULT_LOCALE = 'en-US';
 
+// Backward-compat display shape consumed by useCurrency(); the tenant-aware
+// formatting itself now flows through formatCurrencyWithConfig.
 export interface CurrencyFormat {
   currencySymbol: string;
   currencyPosition: 'before' | 'after';
   decimalPlaces: number;
   currencyCode: string;
-  // D18: tenant grouping/decimal separators. Optional + additive so existing
-  // callers are unchanged; when absent the formatter defaults to ',' / '.' rather
-  // than forcing en-US grouping via toLocaleString.
-  thousandsSeparator?: string;
-  decimalSeparator?: string;
 }
-
-let cachedCurrencyFormat: CurrencyFormat | null = null;
-
-export const fetchCurrencyFormat = async (): Promise<CurrencyFormat> => {
-  if (cachedCurrencyFormat) {
-    return cachedCurrencyFormat;
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('accounting_locales')
-      .select('currency_code, date_format, number_format, is_default, decimal_places')
-      .eq('is_default', true)
-      .maybeSingle();
-
-    if (error || !data) {
-      const def = DEFAULT_TENANT_CONFIG.currency;
-      return {
-        currencySymbol: def.symbol,
-        currencyPosition: def.position,
-        decimalPlaces: def.decimalPlaces,
-        // D2: def.code is the unresolved REQUIRED_SENTINEL; emit '' not a US literal.
-        currencyCode: typeof def.code === 'string' ? def.code : '',
-      };
-    }
-
-    cachedCurrencyFormat = {
-      // D2: fall back to '' (fail-loud) rather than the unresolved sentinel symbol.
-      currencySymbol: data.currency_code || '',
-      currencyPosition: 'before',
-      decimalPlaces: (data as { decimal_places?: number }).decimal_places
-        ?? DEFAULT_TENANT_CONFIG.currency.decimalPlaces,
-      currencyCode: data.currency_code || '',
-    };
-    return cachedCurrencyFormat;
-  } catch (error) {
-    logger.error('Error fetching currency format:', error);
-    const def = DEFAULT_TENANT_CONFIG.currency;
-    return {
-      currencySymbol: def.symbol,
-      currencyPosition: def.position,
-      decimalPlaces: def.decimalPlaces,
-      // D2: def.code is the unresolved REQUIRED_SENTINEL; emit '' not a US literal.
-      currencyCode: typeof def.code === 'string' ? def.code : '',
-    };
-  }
-};
-
-export const clearCurrencyFormatCache = () => {
-  cachedCurrencyFormat = null;
-};
-
-export const formatCurrencyWithSettings = (
-  amount: number,
-  format: CurrencyFormat
-): string => {
-  const thousandsSeparator = format.thousandsSeparator ?? ',';
-  const decimalSeparator = format.decimalSeparator ?? '.';
-  const formattedNumber = amount.toFixed(format.decimalPlaces);
-  const [integerPart, decimalPart] = formattedNumber.split('.');
-  // D18: group with the tenant's separator (same regex formatCurrencyWithConfig
-  // uses) instead of forcing Western en-US grouping via toLocaleString.
-  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, thousandsSeparator);
-  const fullNumber = decimalPart ? `${formattedInteger}${decimalSeparator}${decimalPart}` : formattedInteger;
-
-  if (format.currencyPosition === 'before') {
-    return `${format.currencySymbol} ${fullNumber}`;
-  } else {
-    return `${fullNumber} ${format.currencySymbol}`;
-  }
-};
 
 /**
  * The currency TOKEN the tenant chose to see: the display symbol ('ر.ع.'), the ISO
