@@ -8,6 +8,8 @@ import PurchaseOrderFormModal from '../../components/suppliers/PurchaseOrderForm
 import { ReceiveStockModal } from '../../components/suppliers/ReceiveStockModal';
 import { supabase } from '../../lib/supabaseClient';
 import { useToast } from '../../hooks/useToast';
+import { useCurrency } from '../../hooks/useCurrency';
+import { useTaxConfig } from '../../contexts/TenantConfigContext';
 import { format } from 'date-fns';
 import { logger } from '../../lib/logger';
 
@@ -15,6 +17,8 @@ export default function PurchaseOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const toast = useToast();
+  const { formatCurrency } = useCurrency();
+  const tax = useTaxConfig();
   // Using `any` here preserves the original looseness while we focus on the
   // banned-table and useParams/maybeSingle fixes in scope. Tighter typing for
   // this page is tracked separately.
@@ -220,10 +224,10 @@ export default function PurchaseOrderDetailPage() {
                         <td className="px-4 py-3 text-sm text-gray-900">{item.description}</td>
                         <td className="px-4 py-3 text-sm text-gray-600 text-right">{item.quantity}</td>
                         <td className="px-4 py-3 text-sm text-gray-600 text-right">
-                          ${item.unit_price?.toFixed(2) || '0.00'}
+                          {formatCurrency(item.unit_price ?? 0)}
                         </td>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
-                          ${item.total?.toFixed(2) || '0.00'}
+                          {formatCurrency(item.total ?? 0)}
                         </td>
                       </tr>
                     ))}
@@ -234,15 +238,15 @@ export default function PurchaseOrderDetailPage() {
                         Subtotal:
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
-                        ${order.subtotal?.toFixed(2) || '0.00'}
+                        {formatCurrency(order.subtotal ?? 0)}
                       </td>
                     </tr>
                     <tr>
                       <td colSpan={3} className="px-4 py-3 text-right text-sm font-medium text-gray-700">
-                        Tax:
+                        {tax.label}:
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
-                        ${order.tax_amount?.toFixed(2) || '0.00'}
+                        {formatCurrency(order.tax_amount ?? 0)}
                       </td>
                     </tr>
                     <tr className="border-t-2 border-gray-300">
@@ -250,7 +254,7 @@ export default function PurchaseOrderDetailPage() {
                         Total:
                       </td>
                       <td className="px-4 py-3 text-right text-lg font-bold text-primary">
-                        ${order.total_amount?.toFixed(2) || '0.00'}
+                        {formatCurrency(order.total_amount ?? 0)}
                       </td>
                     </tr>
                   </tfoot>
