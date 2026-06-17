@@ -8,7 +8,6 @@ import { formatDate } from '../../lib/format';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useTaxConfig } from '../../contexts/TenantConfigContext';
-import { fetchDefaultLocale } from '../../lib/financialService';
 import { Input } from '../../components/ui/Input';
 import { VATReturnModal } from '../../components/financial/VATReturnModal';
 import {
@@ -195,13 +194,6 @@ export const VATAuditPage: React.FC = () => {
       if (error) throw error;
       return (data || []) as AuditLog[];
     },
-  });
-
-  // locale fetch retained for future use (date format, decimals). Tax rate/name now
-  // come from useTaxConfig(). The query intentionally keeps the cache warm.
-  useQuery({
-    queryKey: ['default_locale'],
-    queryFn: fetchDefaultLocale,
   });
 
   const salesRecords = vatRecords.filter(r => r.record_type === 'sale');

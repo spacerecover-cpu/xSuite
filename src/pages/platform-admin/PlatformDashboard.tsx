@@ -51,7 +51,17 @@ export const PlatformDashboard: React.FC = () => {
     );
   }
 
+  // NOTE (currency P4 / deferred): MRR/ARR here aggregate billing ACROSS all
+  // tenants, so no single tenant's currency applies — and this platform-admin
+  // surface lives OUTSIDE TenantConfigProvider, so useCurrency()/tenant config
+  // is unavailable AND semantically wrong. The platform has no first-class
+  // "platform base currency" yet (subscription_plans carries no currency column),
+  // so the correct fix is to introduce one and format against it. Until then the
+  // 'en-US'/'USD' literal is an intentional, documented placeholder for the
+  // platform's implicit single-denomination billing figures — not a leaked
+  // tenant fallback. Tracked for a dedicated platform-currency pass.
   const formatCurrency = (amount: number) => {
+    // eslint-disable-next-line xsuite/no-hardcoded-locale-format -- cross-tenant platform surface, no platform base currency yet (see note above)
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
