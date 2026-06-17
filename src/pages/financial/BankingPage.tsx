@@ -5,7 +5,8 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
-import { useAccountingLocale } from '../../hooks/useAccountingLocale';
+import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
+import { formatCurrencyWithConfig, renderCurrencyToken } from '../../lib/format';
 import { useToast } from '../../hooks/useToast';
 import { AccountFormModal } from '../../components/banking/AccountFormModal';
 import { RecordReceiptModal } from '../../components/banking/RecordReceiptModal';
@@ -31,7 +32,8 @@ import {
 } from 'lucide-react';
 
 export const BankingPage: React.FC = () => {
-  const { formatCurrencyValue, locale, getCurrencySymbol, getCurrencyCode } = useAccountingLocale();
+  const currencyConfig = useCurrencyConfig();
+  const formatCurrencyValue = (amount: number) => formatCurrencyWithConfig(amount, currencyConfig);
   const queryClient = useQueryClient();
   const toast = useToast();
 
@@ -228,11 +230,9 @@ export const BankingPage: React.FC = () => {
             <h1 className="text-xl font-bold text-slate-900 mb-2">Banking & Cash Management</h1>
             <p className="text-slate-600 text-base">
               Manage accounts, track payments, and reconcile transactions
-              {locale && (
-                <span className="ml-2 text-sm text-slate-500">
-                  • Currency: {((c) => (typeof c === 'string' ? c : ''))(getCurrencyCode())} ({getCurrencySymbol()})
-                </span>
-              )}
+              <span className="ml-2 text-sm text-slate-500">
+                • Currency: {renderCurrencyToken(currencyConfig)}
+              </span>
             </p>
             <div className="flex gap-4 mt-3">
               <div className="flex items-center gap-2 text-sm">

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { uploadLogo, uploadQRCode, deleteLogo, deleteQRCode, uploadStamp, uploadSignature } from '../../lib/fileStorageService';
-import { SUPPORTED_LANGUAGES, type LanguageCode } from '../../lib/documentTranslations';
+import type { LanguageCode } from '../../lib/documentTranslations';
 import type { Database } from '../../types/database.types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -29,7 +29,6 @@ import {
   Minimize2,
   HardDrive,
   AlertCircle,
-  Languages,
 } from 'lucide-react';
 
 type JsonObject = Record<string, unknown>;
@@ -206,13 +205,6 @@ export const GeneralSettings: React.FC = () => {
           min_retention_days: 1,
           max_retention_days: 3650,
         },
-        localization: {
-          document_language_settings: {
-            mode: 'english_only',
-            secondary_language: null,
-            language_name: null,
-          },
-        },
       };
 
       if (settings) {
@@ -220,7 +212,6 @@ export const GeneralSettings: React.FC = () => {
           ...defaults,
           ...settings,
           clone_defaults: settings.clone_defaults || defaults.clone_defaults,
-          localization: settings.localization || defaults.localization,
         };
         setFormData(settingsWithDefaults);
       } else if (tenantFallback) {
@@ -285,7 +276,6 @@ export const GeneralSettings: React.FC = () => {
         'online_presence',
         'legal_compliance',
         'branding',
-        'document_language',
         'clone_defaults',
       ])
     );
@@ -435,7 +425,12 @@ export const GeneralSettings: React.FC = () => {
     }
 
     setIsSaving(true);
-    updateMutation.mutate(formData);
+    // Document language now lives in the Localization Center (its Document tab is the
+    // sole writer of company_settings.localization). Exclude it here so saving General
+    // Settings never round-trips or clobbers a value edited there.
+    const { localization: _omitLocalization, ...payload } = formData;
+    void _omitLocalization;
+    updateMutation.mutate(payload);
   };
 
   const handleLogoUpload = async (
@@ -1318,150 +1313,28 @@ export const GeneralSettings: React.FC = () => {
             />
         </CollapsibleSection>
 
-        <CollapsibleSection
-          title="Document Language Settings"
-          icon={Languages}
-          color="rgb(var(--color-cat-1))"
-          fieldCount={1}
-          isOpen={openSections.has('document_language')}
-          onToggle={() => toggleSection('document_language')}
-        >
-          <div className="space-y-4">
-            <div className="bg-info-muted border-l-4 border-info rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <Languages className="w-5 h-5 text-info flex-shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="text-sm font-semibold text-info mb-1">
-                    Multi-Language Support for Documents
-                  </h4>
-                  <p className="text-sm text-info">
-                    Configure language settings for printed documents including receipts, quotes, and invoices.
-                    When bilingual mode is enabled, document headings and labels will appear in both English
-                    and your selected secondary language. Content and descriptions remain in English.
-                  </p>
-                </div>
-              </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+              <Globe className="h-5 w-5 text-primary" aria-hidden="true" />
             </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Document Language Mode
-              </label>
-              <select
-                value={
-                  formData.localization?.document_language_settings?.secondary_language || 'none'
-                }
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value === 'none') {
-                    const next: DocumentLanguageSettings = {
-                      mode: 'english_only',
-                      secondary_language: null,
-                      language_name: null,
-                    };
-                    updateField('localization', 'document_language_settings', next);
-                  } else {
-                    const selectedLang = SUPPORTED_LANGUAGES.find(
-                      (lang) => lang.code === value
-                    );
-                    const next: DocumentLanguageSettings = {
-                      mode: 'bilingual',
-                      secondary_language: value as LanguageCode,
-                      language_name: selectedLang?.name || null,
-                    };
-                    updateField('localization', 'document_language_settings', next);
-                  }
-                }}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-              >
-                {SUPPORTED_LANGUAGES.map((lang) => (
-                  <option key={lang.code || 'none'} value={lang.code || 'none'}>
-                    {lang.displayName}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-slate-500 mt-1">
-                Select the language combination for your documents
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-slate-900">Document language moved</h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Document language — along with currency display, date formats, and timezone — now lives in the
+                Localization Center.
               </p>
+              <button
+                type="button"
+                onClick={() => navigate('/settings/localization')}
+                className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+              >
+                Open Localization Center
+                <ChevronLeft className="h-4 w-4 rotate-180" aria-hidden="true" />
+              </button>
             </div>
-
-            {formData.localization?.document_language_settings?.mode === 'bilingual' && (
-              <div className="bg-info-muted border border-info/30 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-info mb-2">Preview Example</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between border-b border-info/30 pb-2">
-                    <span className="font-medium text-info">
-                      QUOTATION | {
-                        formData.localization.document_language_settings.secondary_language === 'ar'
-                          ? 'عرض سعر'
-                          : formData.localization.document_language_settings.secondary_language === 'pl'
-                          ? 'Oferta'
-                          : formData.localization.document_language_settings.secondary_language === 'ru'
-                          ? 'Коммерческое Предложение'
-                          : formData.localization.document_language_settings.secondary_language === 'fr'
-                          ? 'Devis'
-                          : formData.localization.document_language_settings.secondary_language === 'de'
-                          ? 'Angebot'
-                          : formData.localization.document_language_settings.secondary_language === 'it'
-                          ? 'Preventivo'
-                          : formData.localization.document_language_settings.secondary_language === 'es'
-                          ? 'Cotización'
-                          : formData.localization.document_language_settings.secondary_language === 'tr'
-                          ? 'Teklif'
-                          : formData.localization.document_language_settings.secondary_language === 'ko'
-                          ? '견적서'
-                          : formData.localization.document_language_settings.secondary_language === 'pt'
-                          ? 'Orçamento'
-                          : formData.localization.document_language_settings.secondary_language === 'uk'
-                          ? 'Комерційна Пропозиція'
-                          : formData.localization.document_language_settings.secondary_language === 'cs'
-                          ? 'Nabídka'
-                          : formData.localization.document_language_settings.secondary_language === 'th'
-                          ? 'ใบเสนอราคา'
-                          : 'Translation'
-                      }
-                    </span>
-                  </div>
-                  <div className="text-info">
-                    <span className="font-medium">Customer Information</span> | {
-                      formData.localization.document_language_settings.secondary_language === 'ar'
-                        ? 'معلومات العميل'
-                        : formData.localization.document_language_settings.secondary_language === 'pl'
-                        ? 'Informacje o Kliencie'
-                        : formData.localization.document_language_settings.secondary_language === 'ru'
-                        ? 'Информация о Клиенте'
-                        : formData.localization.document_language_settings.secondary_language === 'fr'
-                        ? 'Informations Client'
-                        : formData.localization.document_language_settings.secondary_language === 'de'
-                        ? 'Kundeninformationen'
-                        : formData.localization.document_language_settings.secondary_language === 'it'
-                        ? 'Informazioni Cliente'
-                        : formData.localization.document_language_settings.secondary_language === 'es'
-                        ? 'Información del Cliente'
-                        : formData.localization.document_language_settings.secondary_language === 'tr'
-                        ? 'Müşteri Bilgileri'
-                        : formData.localization.document_language_settings.secondary_language === 'ko'
-                        ? '고객 정보'
-                        : formData.localization.document_language_settings.secondary_language === 'pt'
-                        ? 'Informações do Cliente'
-                        : formData.localization.document_language_settings.secondary_language === 'uk'
-                        ? 'Інформація про Клієнта'
-                        : formData.localization.document_language_settings.secondary_language === 'cs'
-                        ? 'Informace o Zákazníkovi'
-                        : formData.localization.document_language_settings.secondary_language === 'th'
-                        ? 'ข้อมูลลูกค้า'
-                        : 'Translation'
-                    }
-                  </div>
-                  <p className="text-xs text-info mt-3 italic">
-                    Only headings, labels, and field names will be displayed in both languages.
-                    All content, descriptions, and customer data will remain in English.
-                  </p>
-                </div>
-              </div>
-            )}
           </div>
-        </CollapsibleSection>
+        </div>
 
         <CollapsibleSection
           title="Clone Drive Defaults"

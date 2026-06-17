@@ -6,7 +6,7 @@ import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { RichTextEditor } from '../ui/RichTextEditor';
 import { DollarSign, Eye, EyeOff, AlertTriangle } from 'lucide-react';
-import { useAccountingLocale } from '../../hooks/useAccountingLocale';
+import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
 import { logger } from '../../lib/logger';
 import { useToast } from '../../hooks/useToast';
 import { VariableInsertMenu } from './VariableInsertMenu';
@@ -85,8 +85,8 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
   const descriptionId = useId();
   const defaultPriceId = useId();
   const templateContentId = useId();
-  const { locale, getCurrencySymbol } = useAccountingLocale();
-  const decimalPlaces = locale?.decimal_places ?? DEFAULT_DECIMAL_PLACES;
+  const currencyConfig = useCurrencyConfig();
+  const decimalPlaces = currencyConfig.decimalPlaces ?? DEFAULT_DECIMAL_PLACES;
   const [formData, setFormData] = useState<LineItemTemplateFormState>({
     name: '',
     description: '',
@@ -166,7 +166,7 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
       return;
     }
 
-    if (isLineItemType && locale) {
+    if (isLineItemType) {
       const factor = Math.pow(10, decimalPlaces);
       const roundedPrice = Math.round(formData.default_price * factor) / factor;
 
@@ -244,29 +244,29 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
                   Default Price <span className="text-danger ml-1">*</span>
                 </label>
                 <div className="relative">
-                  {locale?.currency_position === 'before' && (
+                  {currencyConfig.position === 'before' && (
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-slate-500 sm:text-sm">{getCurrencySymbol()}</span>
+                      <span className="text-slate-500 sm:text-sm">{currencyConfig.symbol}</span>
                     </div>
                   )}
                   <input
                     id={defaultPriceId}
                     type="number"
-                    step={locale ? Math.pow(10, -decimalPlaces).toFixed(decimalPlaces) : "0.01"}
+                    step={Math.pow(10, -decimalPlaces).toFixed(decimalPlaces)}
                     min="0"
                     value={formData.default_price}
                     onChange={(e) =>
                       setFormData({ ...formData, default_price: parseFloat(e.target.value) || 0 })
                     }
                     required
-                    placeholder={locale ? `0.${'0'.repeat(decimalPlaces)}` : "0.00"}
+                    placeholder={`0.${'0'.repeat(decimalPlaces)}`}
                     className={`w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${
-                      locale?.currency_position === 'before' ? 'pl-12' : locale?.currency_position === 'after' ? 'pr-16' : ''
+                      currencyConfig.position === 'before' ? 'pl-12' : currencyConfig.position === 'after' ? 'pr-16' : ''
                     }`}
                   />
-                  {locale?.currency_position === 'after' && (
+                  {currencyConfig.position === 'after' && (
                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                      <span className="text-slate-500 sm:text-sm">{getCurrencySymbol()}</span>
+                      <span className="text-slate-500 sm:text-sm">{currencyConfig.symbol}</span>
                     </div>
                   )}
                 </div>

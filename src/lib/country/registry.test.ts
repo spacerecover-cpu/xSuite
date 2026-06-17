@@ -7,6 +7,7 @@ import {
   REGISTRY_BY_KEY,
   STATUTORY_KEYS,
   resolveCountryConfigKey,
+  isConfigKeyLocked,
 } from './registry';
 
 describe('COUNTRY_CONFIG_REGISTRY integrity', () => {
@@ -88,6 +89,54 @@ describe('currency display preferences (Phase 2: tenant-overridable, NON-statuto
     expect(REGISTRY_BY_KEY['currency.negative_format'].maxOverrideLayer).toBeUndefined();
     expect(REGISTRY_BY_KEY['currency.display_mode'].required).toBeFalsy();
     expect(REGISTRY_BY_KEY['currency.negative_format'].required).toBeFalsy();
+  });
+});
+
+describe('Phase 3 cosmetic keys (tenant-overridable, NON-statutory)', () => {
+  const KEYS: Array<[string, unknown]> = [
+    ['currency.position', 'before'],
+    ['currency.decimal_places', 2],
+    ['currency.decimal_separator', '.'],
+    ['currency.thousands_separator', ','],
+    ['datetime.time_format', '24h'],
+    ['datetime.week_starts_on', 0],
+    ['datetime.fiscal_year_start', '01-01'],
+  ];
+
+  it('each resolves to its coded default when no layer sets it', () => {
+    for (const [key, def] of KEYS) {
+      expect(resolveCountryConfigKey({}, key)).toEqual(def);
+    }
+  });
+
+  it('each is tenant-overridable and none is statutory', () => {
+    for (const [key] of KEYS) {
+      expect(REGISTRY_BY_KEY[key], `missing ${key}`).toBeTruthy();
+      expect(REGISTRY_BY_KEY[key].maxOverrideLayer).toBeUndefined();
+      expect(REGISTRY_BY_KEY[key].required).toBeFalsy();
+      expect(STATUTORY_KEYS).not.toContain(key);
+    }
+  });
+
+  it('validates values via the registry Zod schema', () => {
+    expect(resolveCountryConfigKey({ tenant: { 'currency.position': 'after' } }, 'currency.position')).toBe('after');
+    expect(() => resolveCountryConfigKey({ tenant: { 'currency.position': 'left' } }, 'currency.position')).toThrow(CountryConfigError);
+    expect(() => resolveCountryConfigKey({ tenant: { 'currency.decimal_places': 9 } }, 'currency.decimal_places')).toThrow(CountryConfigError);
+    expect(() => resolveCountryConfigKey({ tenant: { 'datetime.fiscal_year_start': '1-1' } }, 'datetime.fiscal_year_start')).toThrow(CountryConfigError);
+  });
+});
+
+describe('isConfigKeyLocked — editable vs statutory derivation', () => {
+  it('locks required keys and country-locked keys, leaves preferences editable', () => {
+    expect(isConfigKeyLocked('currency.code')).toBe(true);
+    expect(isConfigKeyLocked('tax.zatca_qr.enabled')).toBe(true);
+    expect(isConfigKeyLocked('currency.display_mode')).toBe(false);
+    expect(isConfigKeyLocked('currency.position')).toBe(false);
+    expect(isConfigKeyLocked('datetime.date_format')).toBe(false);
+  });
+
+  it('treats an unknown key as locked (fail-safe)', () => {
+    expect(isConfigKeyLocked('nope.nope')).toBe(true);
   });
 });
 
