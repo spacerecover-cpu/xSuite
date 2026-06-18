@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Button } from '../../components/ui/Button';
+import { Pager } from '../../components/ui/Pager';
 import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
@@ -39,6 +40,8 @@ import {
   BarChart3,
 } from 'lucide-react';
 
+const PAGE_SIZE = 50;
+
 export const PaymentsList: React.FC = () => {
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
@@ -49,6 +52,7 @@ export const PaymentsList: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
+  const [page, setPage] = useState(0);
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
   const [_selectedPayment, _setSelectedPayment] = useState<any>(null);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -67,6 +71,11 @@ export const PaymentsList: React.FC = () => {
     }
   }, [searchParams, setSearchParams]);
 
+  // Reset to the first page whenever the active filters/search change.
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, statusFilter, dateFilter, paymentMethodFilter]);
+
   const { data: paymentMethods = [] } = useQuery({
     queryKey: ['payment_methods_active'],
     queryFn: async () => {
@@ -80,8 +89,8 @@ export const PaymentsList: React.FC = () => {
     },
   });
 
-  const { data: payments = [], isLoading } = useQuery({
-    queryKey: ['payments', searchTerm, statusFilter, dateFilter, paymentMethodFilter],
+  const { data: paymentsPage, isLoading } = useQuery({
+    queryKey: ['payments', searchTerm, statusFilter, dateFilter, paymentMethodFilter, page],
     queryFn: async () => {
       let query = supabase
         .from('payments')
@@ -102,12 +111,9 @@ export const PaymentsList: React.FC = () => {
             amount,
             invoice:invoices(invoice_number, case_id)
           )
-        `)
+        `, { count: 'exact' })
         .order('payment_date', { ascending: false })
-        // Bounded fetch: render the 500 most recent matches instead of the
-        // whole payments table. Server-side pagination is the structural
-        // follow-up (see InvoicesListPage for the pattern).
-        .limit(500);
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (searchTerm) {
         const s = sanitizeFilterValue(searchTerm);
@@ -146,11 +152,14 @@ export const PaymentsList: React.FC = () => {
         query = query.gte('payment_date', startDate.toISOString().split('T')[0]);
       }
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
       if (error) throw error;
-      return data || [];
+      return { rows: data || [], total: count || 0 };
     },
+    placeholderData: keepPreviousData,
   });
+  const payments = paymentsPage?.rows ?? [];
+  const totalPaymentsCount = paymentsPage?.total ?? 0;
 
   const { data: stats } = useQuery({
     queryKey: ['payment_stats'],
@@ -226,9 +235,44 @@ export const PaymentsList: React.FC = () => {
     setShowReceiptModal(true);
   };
 
-  const handleExportToCSV = () => {
+  const handleExportToCSV = async () => {
+    // Export ALL rows matching the active filters (not just the current page).
+    let query = supabase
+      .from('payments')
+      .select(`
+        payment_number, payment_date, amount, reference, status,
+        customer:customers_enhanced(customer_name),
+        payment_method:master_payment_methods(name)
+      `)
+      .order('payment_date', { ascending: false });
+
+    if (searchTerm) {
+      const s = sanitizeFilterValue(searchTerm);
+      query = query.or(`payment_number.ilike.%${s}%,reference.ilike.%${s}%`);
+    }
+    if (statusFilter !== 'all') query = query.eq('status', statusFilter);
+    if (paymentMethodFilter !== 'all') query = query.eq('payment_method_id', paymentMethodFilter);
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      let startDate: Date;
+      switch (dateFilter) {
+        case 'today': startDate = new Date(now.setHours(0, 0, 0, 0)); break;
+        case 'week': startDate = new Date(now.setDate(now.getDate() - 7)); break;
+        case 'month': startDate = new Date(now.setMonth(now.getMonth() - 1)); break;
+        case 'year': startDate = new Date(now.setFullYear(now.getFullYear() - 1)); break;
+        default: startDate = new Date(0);
+      }
+      query = query.gte('payment_date', startDate.toISOString().split('T')[0]);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      toast.error('Failed to export payments');
+      return;
+    }
+
     const headers = ['Payment #', 'Date', 'Customer', 'Amount', 'Method', 'Reference', 'Status'];
-    const rows = payments.map(p => [
+    const rows = (data ?? []).map((p: any) => [
       p.payment_number,
       p.payment_date ? formatDate(p.payment_date) : '',
       p.customer?.customer_name || 'N/A',
@@ -282,11 +326,6 @@ export const PaymentsList: React.FC = () => {
     }
   };
 
-  const totalPayments = payments.reduce((sum, payment) => sum + baseAmount(payment, 'amount'), 0);
-  const completedPayments = payments.filter(p => p.status === 'completed');
-  const todayPayments = payments.filter(p => p.payment_date && new Date(p.payment_date).toDateString() === new Date().toDateString());
-  const pendingPayments = payments.filter(p => p.status === 'pending');
-
   if (isLoading) {
     return (
       <div className="p-8 max-w-[1800px] mx-auto space-y-6">
@@ -313,12 +352,6 @@ export const PaymentsList: React.FC = () => {
         title="Payments"
         description="Track and manage customer payments"
         iconBgColor="#10b981"
-        statistics={[
-          { label: 'Total Payments', value: payments.length, color: '#3b82f6' },
-          { label: 'Completed', value: completedPayments.length, color: '#10b981' },
-          { label: 'Today', value: todayPayments.length, color: '#f59e0b' },
-          { label: 'Pending', value: pendingPayments.length, color: '#ef4444' },
-        ]}
         primaryAction={{
           label: 'Record Payment',
           onClick: () => setShowRecordPaymentModal(true),
@@ -329,7 +362,7 @@ export const PaymentsList: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <FinancialStatsCard
           label="Total Received"
-          value={formatCurrency(stats?.totalAmount || totalPayments)}
+          value={formatCurrency(stats?.totalAmount || 0)}
           icon={<DollarSign className="w-5 h-5 text-white" />}
           color="green"
         />
@@ -341,13 +374,13 @@ export const PaymentsList: React.FC = () => {
         />
         <FinancialStatsCard
           label="Completed"
-          value={stats?.completed || completedPayments.length}
+          value={stats?.completed ?? 0}
           icon={<CheckCircle className="w-5 h-5 text-white" />}
           color="green"
         />
         <FinancialStatsCard
           label="Total Count"
-          value={stats?.total || payments.length}
+          value={stats?.total ?? 0}
           icon={<Receipt className="w-5 h-5 text-white" />}
           color="slate"
         />
@@ -422,7 +455,7 @@ export const PaymentsList: React.FC = () => {
                   variant="secondary"
                   onClick={handleExportToCSV}
                   className="flex items-center gap-2"
-                  disabled={payments.length === 0}
+                  disabled={totalPaymentsCount === 0}
                 >
                   <Download className="w-4 h-4" />
                   Export CSV
@@ -451,20 +484,20 @@ export const PaymentsList: React.FC = () => {
             <div className="bg-white rounded-lg p-4 border border-info/20">
               <p className="text-xs text-slate-500 mb-1">Average Payment</p>
               <p className="text-2xl font-bold text-primary">
-                {formatCurrency(payments.length > 0 ? totalPayments / payments.length : 0)}
+                {formatCurrency(stats && stats.total > 0 ? stats.totalAmount / stats.total : 0)}
               </p>
             </div>
             <div className="bg-white rounded-lg p-4 border border-success/20">
               <p className="text-xs text-slate-500 mb-1">Success Rate</p>
               <p className="text-2xl font-bold text-success">
-                {payments.length > 0
-                  ? ((completedPayments.length / payments.length) * 100).toFixed(1)
+                {stats && stats.total > 0
+                  ? ((stats.completed / stats.total) * 100).toFixed(1)
                   : 0}%
               </p>
             </div>
             <div className="bg-white rounded-lg p-4 border border-accent/20">
               <p className="text-xs text-slate-500 mb-1">Total Transactions</p>
-              <p className="text-2xl font-bold text-accent-foreground">{payments.length}</p>
+              <p className="text-2xl font-bold text-accent-foreground">{stats?.total ?? 0}</p>
             </div>
           </div>
         </div>
@@ -623,6 +656,13 @@ export const PaymentsList: React.FC = () => {
               </tbody>
             </table>
           </div>
+          <Pager
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={totalPaymentsCount}
+            onPageChange={setPage}
+            itemNoun="payments"
+          />
         </div>
       )}
 

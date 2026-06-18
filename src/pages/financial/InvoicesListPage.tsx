@@ -15,6 +15,7 @@ type InvoiceWithLegacyLinks = InvoiceWithDetails & {
   proforma_invoice_id?: string | null;
 };
 import { Button } from '../../components/ui/Button';
+import { Pager } from '../../components/ui/Pager';
 import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
@@ -754,31 +755,13 @@ export const InvoicesListPage: React.FC<unknown> = () => {
               </tbody>
             </table>
           </div>
-          <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-slate-200 text-sm text-slate-600">
-            <span>
-              {totalInvoices === 0
-                ? '0 invoices'
-                : `${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, totalInvoices)} of ${totalInvoices}`}
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={page === 0}
-                onClick={() => setPage((p) => Math.max(p - 1, 0))}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={(page + 1) * PAGE_SIZE >= totalInvoices}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
+          <Pager
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={totalInvoices}
+            onPageChange={setPage}
+            itemNoun="invoices"
+          />
         </div>
       )}
 
