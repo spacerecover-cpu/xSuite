@@ -177,7 +177,7 @@ const pickInvoicePersistFields = (input: Partial<Invoice>): InvoiceUpdate => {
   return out;
 };
 
-export const fetchInvoices = async (filters?: {
+export const fetchInvoicesPage = async (filters?: {
   status?: string;
   invoiceType?: string;
   search?: string;
@@ -186,7 +186,7 @@ export const fetchInvoices = async (filters?: {
   companyId?: string;
   page?: number;
   pageSize?: number;
-}): Promise<InvoiceWithDetails[]> => {
+}): Promise<{ rows: InvoiceWithDetails[]; total: number }> => {
   let query = supabase
     .from('invoices')
     .select(`
@@ -209,7 +209,7 @@ export const fetchInvoices = async (filters?: {
         email,
         phone
       )
-    `)
+    `, { count: 'exact' })
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
@@ -242,10 +242,24 @@ export const fetchInvoices = async (filters?: {
   const page = filters?.page || 0;
   query = query.range(page * pageSize, (page + 1) * pageSize - 1);
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
 
   if (error) throw error;
-  return (data ?? []) as unknown as InvoiceWithDetails[];
+  return { rows: (data ?? []) as unknown as InvoiceWithDetails[], total: count ?? 0 };
+};
+
+export const fetchInvoices = async (filters?: {
+  status?: string;
+  invoiceType?: string;
+  search?: string;
+  caseId?: string;
+  customerId?: string;
+  companyId?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<InvoiceWithDetails[]> => {
+  const { rows } = await fetchInvoicesPage(filters);
+  return rows;
 };
 
 export const fetchInvoiceById = async (id: string): Promise<InvoiceWithDetails | null> => {

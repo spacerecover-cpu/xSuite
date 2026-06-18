@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchInvoices, getInvoiceStats, createInvoice, updateInvoice, toInvoiceEditInitialData } from '../../lib/invoiceService';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { fetchInvoicesPage, getInvoiceStats, createInvoice, updateInvoice, toInvoiceEditInitialData } from '../../lib/invoiceService';
 import type { Invoice, InvoiceItem, InvoiceWithDetails } from '../../lib/invoiceService';
 import { getInvoiceEditability, canRecordPayment as invoiceCanRecordPayment } from '../../lib/invoicePermissions';
 import type { PaymentReceipt } from '../../lib/bankingService';
@@ -52,6 +52,8 @@ import {
 } from 'lucide-react';
 import { formatDate } from '../../lib/format';
 
+const PAGE_SIZE = 50;
+
 export const InvoicesListPage: React.FC<unknown> = () => {
   const navigate = useNavigate();
   const toast = useToast();
@@ -99,17 +101,29 @@ export const InvoicesListPage: React.FC<unknown> = () => {
     refetchOnWindowFocus: false,
   });
 
-  const { data: invoices = [], isLoading } = useQuery({
-    queryKey: ['invoices', statusFilter, typeFilter, debouncedSearch],
+  const [page, setPage] = useState(0);
+
+  // Reset to the first page whenever the active filters/search change.
+  useEffect(() => {
+    setPage(0);
+  }, [statusFilter, typeFilter, debouncedSearch]);
+
+  const { data: invoicesPage, isLoading } = useQuery({
+    queryKey: ['invoices', statusFilter, typeFilter, debouncedSearch, page],
     queryFn: () =>
-      fetchInvoices({
+      fetchInvoicesPage({
         status: statusFilter !== 'all' ? statusFilter : undefined,
         invoiceType: typeFilter !== 'all' ? typeFilter : undefined,
         search: debouncedSearch || undefined,
+        page,
+        pageSize: PAGE_SIZE,
       }),
     staleTime: 30000,
     refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   });
+  const invoices = invoicesPage?.rows ?? [];
+  const totalInvoices = invoicesPage?.total ?? 0;
 
   const getTypeColor = (type: string) => {
     return type === 'proforma' ? 'rgb(var(--color-accent))' : '#0ea5e9';
@@ -739,6 +753,31 @@ export const InvoicesListPage: React.FC<unknown> = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-slate-200 text-sm text-slate-600">
+            <span>
+              {totalInvoices === 0
+                ? '0 invoices'
+                : `${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, totalInvoices)} of ${totalInvoices}`}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={page === 0}
+                onClick={() => setPage((p) => Math.max(p - 1, 0))}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={(page + 1) * PAGE_SIZE >= totalInvoices}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+              </Button>
+            </div>
           </div>
         </div>
       )}
