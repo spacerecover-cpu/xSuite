@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchQuotes, getQuoteStats, toQuoteEditInitialData } from '../../lib/quotesService';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { fetchQuotesPage, getQuoteStats, toQuoteEditInitialData } from '../../lib/quotesService';
 import type { QuoteWithDetails } from '../../lib/quotesService';
 import { Button } from '../../components/ui/Button';
+import { Pager } from '../../components/ui/Pager';
 import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { FinancialModuleHeader } from '../../components/financial/FinancialModuleHeader';
@@ -59,6 +60,8 @@ const toOptionalString = (value: unknown): string | null => {
   return null;
 };
 
+const PAGE_SIZE = 50;
+
 export const QuotesListPage: React.FC = () => {
   const navigate = useNavigate();
   const toast = useToast();
@@ -79,6 +82,7 @@ export const QuotesListPage: React.FC = () => {
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [editingQuote, setEditingQuote] = useState<QuoteWithDetails | null>(null);
   const [sendingQuoteId, setSendingQuoteId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
 
   // Command-palette deep-link: /quotes?new=1 opens the create modal.
   useEffect(() => {
@@ -98,6 +102,10 @@ export const QuotesListPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  useEffect(() => {
+    setPage(0);
+  }, [statusFilter, debouncedSearch]);
+
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['quote_stats'],
     queryFn: getQuoteStats,
@@ -106,17 +114,22 @@ export const QuotesListPage: React.FC = () => {
     retry: 2,
   });
 
-  const { data: quotes = [], isLoading, error: quotesError } = useQuery({
-    queryKey: ['quotes', statusFilter, debouncedSearch],
+  const { data: quotesPage, isLoading, error: quotesError } = useQuery({
+    queryKey: ['quotes', statusFilter, debouncedSearch, page],
     queryFn: () =>
-      fetchQuotes({
+      fetchQuotesPage({
         status: statusFilter !== 'all' ? statusFilter : undefined,
         search: debouncedSearch || undefined,
+        page,
+        pageSize: PAGE_SIZE,
       }),
     staleTime: 30000,
     refetchOnWindowFocus: false,
     retry: 2,
+    placeholderData: keepPreviousData,
   });
+  const quotes = quotesPage?.rows ?? [];
+  const totalQuotes = quotesPage?.total ?? 0;
 
   const getClientName = (quote: QuoteWithDetails) => {
     if (quote?.customers?.customer_name) {
@@ -130,12 +143,6 @@ export const QuotesListPage: React.FC = () => {
     }
     return 'N/A';
   };
-
-  const { sentQuotes, acceptedQuotes, expiredQuotes } = useMemo(() => ({
-    sentQuotes: quotes.filter((q) => q.status === 'sent'),
-    acceptedQuotes: quotes.filter((q) => q.status === 'accepted'),
-    expiredQuotes: quotes.filter((q) => q.status === 'expired'),
-  }), [quotes]);
 
   // Quote.id is `string | undefined` in the service-layer type; filter
   // to defined ids so the selection APIs (which expect strings) type-check.
@@ -289,13 +296,6 @@ export const QuotesListPage: React.FC = () => {
             icon={<FileText className="w-7 h-7 text-white" />}
             title="Quotes"
             description="Manage customer quotations and proposals"
-            iconBgColor="#3b82f6"
-            statistics={[
-              { label: 'Total Quotes', value: quotes.length, color: '#3b82f6' },
-              { label: 'Paid', value: acceptedQuotes.length, color: '#10b981' },
-              { label: 'Sent', value: sentQuotes.length, color: '#f59e0b' },
-              { label: 'Overdue', value: expiredQuotes.length, color: '#ef4444' },
-            ]}
             primaryAction={{
               label: 'Create Quote',
               onClick: () => setShowQuoteModal(true),
@@ -334,7 +334,7 @@ export const QuotesListPage: React.FC = () => {
         />
         <FinancialStatsCard
           label="Total Count"
-          value={quotes.length}
+          value={stats?.total ?? 0}
           icon={<FileText className="w-5 h-5 text-white" />}
           color="slate"
         />
@@ -713,6 +713,7 @@ export const QuotesListPage: React.FC = () => {
               </tbody>
             </table>
           </div>
+          <Pager page={page} pageSize={PAGE_SIZE} total={totalQuotes} onPageChange={setPage} itemNoun="quotes" />
         </div>
       )}
 

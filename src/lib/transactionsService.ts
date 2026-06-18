@@ -35,7 +35,7 @@ export interface TransactionWithDetails extends Transaction {
 
 const DEFAULT_PAGE_SIZE = 100;
 
-export const fetchTransactions = async (filters?: {
+export const fetchTransactionsPage = async (filters?: {
   type?: string;
   status?: string;
   categoryId?: string;
@@ -45,14 +45,14 @@ export const fetchTransactions = async (filters?: {
   search?: string;
   page?: number;
   pageSize?: number;
-}) => {
+}): Promise<{ rows: TransactionWithDetails[]; total: number }> => {
   let query = supabase
     .from('financial_transactions')
     .select(`
       *,
       category:master_transaction_categories(id, name),
       bank_account:bank_accounts(id, name, bank_name)
-    `)
+    `, { count: 'exact' })
     .is('deleted_at', null)
     .order('transaction_date', { ascending: false })
     .order('created_at', { ascending: false });
@@ -86,9 +86,23 @@ export const fetchTransactions = async (filters?: {
   const page = filters?.page || 0;
   query = query.range(page * pageSize, (page + 1) * pageSize - 1);
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
   if (error) throw error;
-  return data as TransactionWithDetails[];
+  return { rows: (data ?? []) as TransactionWithDetails[], total: count ?? 0 };
+};
+
+export const fetchTransactions = async (filters?: {
+  type?: string;
+  status?: string;
+  categoryId?: string;
+  bankAccountId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<TransactionWithDetails[]> => {
+  return (await fetchTransactionsPage(filters)).rows;
 };
 
 export const fetchTransactionById = async (id: string) => {

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Button } from '../../components/ui/Button';
+import { Pager } from '../../components/ui/Pager';
 import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { Modal } from '../../components/ui/Modal';
@@ -72,6 +73,8 @@ type ExpenseRow = Pick<
   case: { case_no: string | null; title: string | null } | null;
 };
 
+const PAGE_SIZE = 50;
+
 export const ExpensesList: React.FC = () => {
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -84,6 +87,7 @@ export const ExpensesList: React.FC = () => {
   const [isArchiving, setIsArchiving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [page, setPage] = useState(0);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState<any>(null);
   const [, setSelectedExpense] = useState<ExpenseRow | null>(null);
@@ -103,10 +107,14 @@ export const ExpensesList: React.FC = () => {
     }
   }, [searchParams, setSearchParams]);
 
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, statusFilter]);
+
   const isAccountsRole = profile?.role === 'admin' || profile?.role === 'accounts';
 
-  const { data: expenses = [], isLoading, error, refetch } = useQuery<ExpenseRow[]>({
-    queryKey: ['expenses', searchTerm, statusFilter],
+  const { data: expensesPage, isLoading, error, refetch } = useQuery({
+    queryKey: ['expenses', searchTerm, statusFilter, page],
     queryFn: async () => {
       try {
         let query = supabase
@@ -127,7 +135,7 @@ export const ExpensesList: React.FC = () => {
             notes,
             category:master_expense_categories(id, name),
             case:cases(case_no, title)
-          `)
+          `, { count: 'exact' })
           .order('expense_date', { ascending: false });
 
         if (searchTerm) {
@@ -139,15 +147,18 @@ export const ExpensesList: React.FC = () => {
           query = query.eq('status', statusFilter);
         }
 
-        const { data, error } = await query;
+        const { data, error, count } = await query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
         if (error) throw error;
-        return (data ?? []) as unknown as ExpenseRow[];
+        return { rows: (data ?? []) as unknown as ExpenseRow[], total: count ?? 0 };
       } catch (err) {
         logger.error('Error loading expenses:', err);
-        return [];
+        return { rows: [] as ExpenseRow[], total: 0 };
       }
     },
+    placeholderData: keepPreviousData,
   });
+  const expenses = expensesPage?.rows ?? [];
+  const totalExpensesCount = expensesPage?.total ?? 0;
 
   const { data: stats } = useQuery({
     queryKey: ['expense_stats'],
@@ -244,12 +255,6 @@ export const ExpensesList: React.FC = () => {
         return null;
     }
   };
-
-  const totalExpenses = expenses
-    .filter((e) => e.status === 'approved' || e.status === 'paid')
-    .reduce((sum, exp) => sum + baseAmount(exp, 'amount'), 0);
-  const pendingExpenses = expenses.filter((e) => e.status === 'pending');
-  const approvedExpenses = expenses.filter((e) => e.status === 'approved' || e.status === 'paid');
 
   const visibleIds = expenses.map((e) => e.id);
 
@@ -363,12 +368,6 @@ export const ExpensesList: React.FC = () => {
         icon={<Wallet className="w-7 h-7 text-white" />}
         title="Expenses"
         description="Track and manage business expenses"
-        iconBgColor="#f97316"
-        statistics={[
-          { label: 'Total Expenses', value: expenses.length, color: '#f97316' },
-          { label: 'Pending', value: pendingExpenses.length, color: '#f59e0b' },
-          { label: 'Approved', value: approvedExpenses.length, color: '#10b981' },
-        ]}
         primaryAction={{
           label: 'Submit Expense',
           onClick: () => {
@@ -382,7 +381,7 @@ export const ExpensesList: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <FinancialStatsCard
           label="Total Approved"
-          value={formatCurrency(stats?.totalAmount || totalExpenses)}
+          value={formatCurrency(stats?.totalAmount ?? 0)}
           icon={<Wallet className="w-5 h-5 text-white" />}
           color="orange"
         />
@@ -400,7 +399,7 @@ export const ExpensesList: React.FC = () => {
         />
         <FinancialStatsCard
           label="Pending Count"
-          value={stats?.pending || pendingExpenses.length}
+          value={stats?.pending ?? 0}
           icon={<AlertCircle className="w-5 h-5 text-white" />}
           color="amber"
         />
@@ -645,6 +644,7 @@ export const ExpensesList: React.FC = () => {
               </tbody>
             </table>
           </div>
+          <Pager page={page} pageSize={PAGE_SIZE} total={totalExpensesCount} onPageChange={setPage} itemNoun="expenses" />
         </div>
       )}
 

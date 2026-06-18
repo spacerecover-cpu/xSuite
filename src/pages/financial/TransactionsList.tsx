@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Button } from '../../components/ui/Button';
+import { Pager } from '../../components/ui/Pager';
 import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { formatDate } from '../../lib/format';
@@ -13,7 +14,7 @@ import { FinancialStatsCard } from '../../components/financial/FinancialStatsCar
 import { TransactionFormModal } from '../../components/financial/TransactionFormModal';
 import {
   createTransaction,
-  fetchTransactions,
+  fetchTransactionsPage,
   reconcileTransaction,
   voidTransaction,
   getTransactionStats,
@@ -53,6 +54,8 @@ interface TransactionDisplay {
   related_expense?: { expense_number: string };
 }
 
+const PAGE_SIZE = 50;
+
 export const TransactionsList: React.FC = () => {
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
@@ -62,6 +65,7 @@ export const TransactionsList: React.FC = () => {
   const [dateRange, setDateRange] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [page, setPage] = useState(0);
 
   const getDateFromFilter = () => {
     if (dateRange === 'all') return undefined;
@@ -89,16 +93,22 @@ export const TransactionsList: React.FC = () => {
     return startDate.toISOString().split('T')[0];
   };
 
-  const { data: transactions = [], isLoading } = useQuery({
-    queryKey: ['financial_transactions', searchTerm, typeFilter, dateRange],
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, typeFilter, dateRange]);
+
+  const { data: transactionsPage, isLoading } = useQuery({
+    queryKey: ['financial_transactions', searchTerm, typeFilter, dateRange, page],
     queryFn: async () => {
-      const data = await fetchTransactions({
+      const { rows, total } = await fetchTransactionsPage({
         type: typeFilter !== 'all' ? typeFilter : undefined,
         search: searchTerm || undefined,
         dateFrom: getDateFromFilter(),
+        page,
+        pageSize: PAGE_SIZE,
       });
       // Adapt live schema (transaction_type, no status/reference_number) to display shape.
-      return (data || []).map((row): TransactionDisplay => ({
+      const mapped = (rows || []).map((row): TransactionDisplay => ({
         id: row.id ?? '',
         transaction_date: row.transaction_date ?? '',
         amount: row.amount,
@@ -110,8 +120,12 @@ export const TransactionsList: React.FC = () => {
         category: row.category ? { name: row.category.name } : undefined,
         bank_account: row.bank_account ? { account_name: row.bank_account.name } : undefined,
       }));
+      return { rows: mapped, total };
     },
+    placeholderData: keepPreviousData,
   });
+  const transactions = transactionsPage?.rows ?? [];
+  const totalTransactions = transactionsPage?.total ?? 0;
 
   const { data: stats } = useQuery({
     queryKey: ['transaction_stats'],
@@ -168,12 +182,6 @@ export const TransactionsList: React.FC = () => {
     }
   };
 
-  const incomeTransactions = transactions.filter(t => t.type === 'income');
-  const expenseTransactions = transactions.filter(t => t.type === 'expense');
-  const totalIncome = incomeTransactions.reduce((sum, t) => sum + baseAmount(t as unknown as Record<string, unknown>, 'amount'), 0);
-  const totalExpense = expenseTransactions.reduce((sum, t) => sum + baseAmount(t as unknown as Record<string, unknown>, 'amount'), 0);
-  const netCashFlow = totalIncome - totalExpense;
-
   const getTypeColor = (type: string) => {
     switch (type) {
       case 'income':
@@ -214,12 +222,6 @@ export const TransactionsList: React.FC = () => {
         icon={<ArrowLeftRight className="w-7 h-7 text-white" />}
         title="Transactions"
         description="Track all financial movements"
-        iconBgColor="#3b82f6"
-        statistics={[
-          { label: 'Total Transactions', value: transactions.length, color: '#3b82f6' },
-          { label: 'Income', value: incomeTransactions.length, color: '#10b981' },
-          { label: 'Expenses', value: expenseTransactions.length, color: '#ef4444' },
-        ]}
         primaryAction={{
           label: 'New Transaction',
           onClick: () => setShowTransactionModal(true),
@@ -230,21 +232,21 @@ export const TransactionsList: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <FinancialStatsCard
           label="Total Income"
-          value={formatCurrency(stats?.totalIncome || totalIncome)}
+          value={formatCurrency(stats?.totalIncome ?? 0)}
           icon={<TrendingUp className="w-5 h-5 text-white" />}
           color="green"
         />
         <FinancialStatsCard
           label="Total Expenses"
-          value={formatCurrency(stats?.totalExpenses || totalExpense)}
+          value={formatCurrency(stats?.totalExpenses ?? 0)}
           icon={<TrendingDown className="w-5 h-5 text-white" />}
           color="red"
         />
         <FinancialStatsCard
           label="Net Cash Flow"
-          value={formatCurrency(stats?.netCashFlow || netCashFlow)}
+          value={formatCurrency(stats?.netCashFlow ?? 0)}
           icon={<DollarSign className="w-5 h-5 text-white" />}
-          color={(stats?.netCashFlow || netCashFlow) >= 0 ? 'green' : 'red'}
+          color={(stats?.netCashFlow ?? 0) >= 0 ? 'green' : 'red'}
         />
         <FinancialStatsCard
           label="Reconciled"
@@ -494,6 +496,7 @@ export const TransactionsList: React.FC = () => {
               </tbody>
             </table>
           </div>
+          <Pager page={page} pageSize={PAGE_SIZE} total={totalTransactions} onPageChange={setPage} itemNoun="transactions" />
         </div>
       )}
 

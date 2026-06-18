@@ -153,7 +153,7 @@ const pickQuotePersistFields = (input: Partial<Quote>): QuoteUpdate => {
   return out;
 };
 
-export const fetchQuotes = async (filters?: {
+export const fetchQuotesPage = async (filters?: {
   status?: string;
   search?: string;
   customerId?: string;
@@ -161,7 +161,7 @@ export const fetchQuotes = async (filters?: {
   caseId?: string;
   page?: number;
   pageSize?: number;
-}): Promise<QuoteWithDetails[]> => {
+}): Promise<{ rows: QuoteWithDetails[]; total: number }> => {
   try {
     let query = supabase
       .from('quotes')
@@ -185,7 +185,7 @@ export const fetchQuotes = async (filters?: {
           email,
           phone
         )
-      `)
+      `, { count: 'exact' })
       .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
@@ -214,18 +214,30 @@ export const fetchQuotes = async (filters?: {
     const page = filters?.page || 0;
     query = query.range(page * pageSize, (page + 1) * pageSize - 1);
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
 
     if (error) {
       logger.error('Error fetching quotes:', error);
       throw new Error(`Failed to fetch quotes: ${error.message}`);
     }
 
-    return (data ?? []) as unknown as QuoteWithDetails[];
+    return { rows: (data ?? []) as unknown as QuoteWithDetails[], total: count ?? 0 };
   } catch (error: unknown) {
     logger.error('Fetch quotes failed:', error);
     throw error;
   }
+};
+
+export const fetchQuotes = async (filters?: {
+  status?: string;
+  search?: string;
+  customerId?: string;
+  companyId?: string;
+  caseId?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<QuoteWithDetails[]> => {
+  return (await fetchQuotesPage(filters)).rows;
 };
 
 export const fetchQuoteById = async (id: string): Promise<QuoteWithDetails | null> => {

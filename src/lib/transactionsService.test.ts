@@ -47,7 +47,7 @@ describe('getCashFlowSummary (cross-document monthly totals must be base currenc
     expect(summary[0].expense).toBe(12);
     expect(summary[0].netFlow).toBe(76);
     // fetchTransactions selects '*', so amount_base reaches the rows for baseAmount.
-    expect(query.select).toHaveBeenCalledWith(expect.stringContaining('*'));
+    expect(query.select).toHaveBeenCalledWith(expect.stringContaining('*'), { count: 'exact' });
   });
 
   it('falls back to the raw amount for pre-base transition rows (no amount_base)', async () => {
