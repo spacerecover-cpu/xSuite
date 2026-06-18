@@ -4,6 +4,7 @@ import type { StockSaleWithDetails } from '../../lib/stockService';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Skeleton } from '../ui/Skeleton';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface StockSalesTableProps {
   sales: StockSaleWithDetails[];
@@ -30,16 +31,15 @@ const formatDate = (value: string | null): string => {
   });
 };
 
-const formatAmount = (value: number | null): string => {
-  if (value === null || value === undefined) return '—';
-  return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
-
 export const StockSalesTable: React.FC<StockSalesTableProps> = ({
   sales,
   onViewDetail,
   isLoading,
 }) => {
+  const { formatCurrency } = useCurrency();
+  const formatAmount = (value: number | null): string =>
+    value === null || value === undefined ? '—' : formatCurrency(value);
+
   if (isLoading) {
     return (
       <div className="space-y-2 py-4">

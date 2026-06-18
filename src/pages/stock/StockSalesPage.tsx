@@ -21,9 +21,7 @@ import { PageHeader } from '../../components/shared/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { StockSalesTable } from '../../components/stock/StockSalesTable';
 import { StockSaleModal } from '../../components/stock/StockSaleModal';
-
-const formatCurrency = (value: number): string =>
-  value.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+import { useCurrency } from '../../hooks/useCurrency';
 
 const getTodayIso = (): string => new Date().toISOString().split('T')[0];
 
@@ -33,6 +31,7 @@ const getMonthStartIso = (): string => {
 };
 
 export const StockSalesPage: React.FC = () => {
+  const { formatCurrency } = useCurrency();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 

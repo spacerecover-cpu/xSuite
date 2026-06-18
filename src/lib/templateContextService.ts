@@ -1,7 +1,8 @@
-import { supabase } from './supabaseClient';
+import { supabase, resolveTenantId } from './supabaseClient';
 import { logger } from './logger';
 import { getOrCreateCompanySettings } from './companySettingsService';
-import { fetchCurrencyFormat, formatCurrencyWithSettings, formatDate } from './format';
+import { formatCurrencyWithConfig, formatDate } from './format';
+import { getTenantConfig } from './tenantConfigService';
 import type { TemplateContext } from './templateEngine';
 
 // Builds the nested context the template engine renders against, shaped to the
@@ -63,17 +64,26 @@ const daysBetween = (from: string | null, to: string | null): string => {
 export async function buildTemplateContext(refs: ContextRefs): Promise<TemplateContext> {
   const ctx: TemplateContext = {};
 
-  const [companySettings, currencyFormat] = await Promise.all([
+  const [companySettings, currencyConfig] = await Promise.all([
     getOrCreateCompanySettings().catch((error) => {
       logger.warn('Template context: company settings unavailable:', error);
       return null;
     }),
-    fetchCurrencyFormat().catch(() => null),
+    // Single-source the tenant's currency via the Country Engine config instead of
+    // the legacy accounting_locales reader (CL-002). resolveTenantId() preserves the
+    // implicit "current tenant" scoping the RLS-filtered read used to provide.
+    resolveTenantId()
+      .then((tenantId) => getTenantConfig(tenantId))
+      .then((config) => config.currency)
+      .catch((error) => {
+        logger.warn('Template context: tenant currency config unavailable:', error);
+        return null;
+      }),
   ]);
 
   const money = (amount: number | null | undefined): string => {
     if (amount === null || amount === undefined) return '';
-    return currencyFormat ? formatCurrencyWithSettings(amount, currencyFormat) : String(amount);
+    return currencyConfig ? formatCurrencyWithConfig(amount, currencyConfig) : String(amount);
   };
 
   if (companySettings) {
@@ -87,7 +97,7 @@ export async function buildTemplateContext(refs: ContextRefs): Promise<TemplateC
       phone: companySettings.contact_info?.phone_primary ?? '',
       address,
       website: companySettings.online_presence?.website ?? '',
-      currency: currencyFormat?.currencyCode ?? '',
+      currency: currencyConfig && typeof currencyConfig.code === 'string' ? currencyConfig.code : '',
     };
   }
 

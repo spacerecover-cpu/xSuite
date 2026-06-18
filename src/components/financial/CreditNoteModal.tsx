@@ -83,7 +83,7 @@ export const CreditNoteModal: React.FC<CreditNoteModalProps> = ({ isOpen, onClos
           customer_id: invoice.customer_id ?? null,
           company_id: invoice.company_id ?? null,
           credit_type: 'adjustment',
-          currency: invoice.currency ?? 'USD',
+          currency: invoice.currency ?? currencyFormat.currencyCode,
           total_amount: roundMoney(amount),
           tax_amount: taxAmount,
           reason_code: reasonCode,
