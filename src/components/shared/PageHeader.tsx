@@ -4,82 +4,41 @@ import { LucideIcon } from 'lucide-react';
 interface PageHeaderProps {
   title: string;
   description?: string;
-  icon?: LucideIcon;
+  /** A Lucide icon component (e.g. `Package`) or an already-rendered node. */
+  icon?: LucideIcon | React.ReactNode;
   actions?: React.ReactNode;
-  stats?: Array<{
-    label: string;
-    value: string | number;
-    color?: string;
-  }>;
 }
 
-// Maps caller-supplied color keys to literal, JIT-safe token classes.
-// Brand/status keys route through semantic tokens; "teal" has no status
-// meaning so it uses the cat-* identity palette. Raw Tailwind brand colors
-// (text-blue-600 etc.) are banned by DESIGN.md / no-raw-tailwind-colors.
-const STAT_COLOR_CLASSES: Record<string, string> = {
-  primary: 'text-primary',
-  secondary: 'text-secondary',
-  accent: 'text-accent-foreground',
-  blue: 'text-info',
-  green: 'text-success',
-  emerald: 'text-success',
-  teal: 'text-cat-2',
-  red: 'text-danger',
-  orange: 'text-warning',
-  amber: 'text-warning',
-  slate: 'text-slate-900',
-};
+/**
+ * Compact, standardized page header: a single toolbar row with a tokenized icon
+ * chip + title + optional subtitle on the start edge and actions on the end.
+ * Tightened for information density — keep page chrome short so content (tables)
+ * sits high in the viewport.
+ */
+export const PageHeader: React.FC<PageHeaderProps> = ({ title, description, icon, actions }) => {
+  let iconNode: React.ReactNode = null;
+  if (icon) {
+    iconNode = React.isValidElement(icon)
+      ? icon
+      : React.createElement(icon as LucideIcon, { className: 'w-5 h-5' });
+  }
 
-const DEFAULT_STAT_COLOR_CLASS = 'text-slate-900';
-
-export const PageHeader: React.FC<PageHeaderProps> = ({
-  title,
-  description,
-  icon: Icon,
-  actions,
-  stats,
-}) => {
   return (
-    <div className="mb-8">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          {Icon && (
-            <div className="p-3 bg-gradient-to-br from-primary to-primary rounded-xl shadow-lg shadow-primary/30">
-              <Icon className="w-6 h-6 text-white" />
-            </div>
-          )}
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">{title}</h1>
-            {description && (
-              <p className="text-slate-600 mt-1">{description}</p>
-            )}
+    <div className="mb-4 flex items-center justify-between gap-4">
+      <div className="flex items-center gap-3 min-w-0">
+        {iconNode && (
+          <div className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-sm">
+            {iconNode}
           </div>
+        )}
+        <div className="min-w-0">
+          <h1 className="text-lg font-semibold text-slate-900 leading-tight truncate">{title}</h1>
+          {description && (
+            <p className="text-sm text-slate-500 leading-tight truncate">{description}</p>
+          )}
         </div>
-        {actions && <div className="flex items-center gap-3">{actions}</div>}
       </div>
-
-      {stats && stats.length > 0 && (
-        <div className="flex gap-4 mt-6">
-          {stats.map((stat, index) => (
-            <div
-              key={index}
-              className="flex-1 bg-white rounded-lg border border-slate-200 p-4"
-            >
-              <p className="text-sm text-slate-600 mb-1">{stat.label}</p>
-              <p
-                className={`text-2xl font-bold ${
-                  stat.color
-                    ? STAT_COLOR_CLASSES[stat.color] ?? DEFAULT_STAT_COLOR_CLASS
-                    : DEFAULT_STAT_COLOR_CLASS
-                }`}
-              >
-                {stat.value}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
+      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchInvoices, getInvoiceStats, createInvoice, updateInvoice, toInvoiceEditInitialData } from '../../lib/invoiceService';
@@ -18,8 +18,8 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
-import { FinancialModuleHeader } from '../../components/financial/FinancialModuleHeader';
-import { FinancialStatsCard } from '../../components/financial/FinancialStatsCard';
+import { PageHeader } from '../../components/shared/PageHeader';
+import { StatCard } from '../../components/shared/StatCard';
 import { InvoiceFormModal } from '../../components/cases/InvoiceFormModal';
 import { RecordReceiptModal } from '../../components/banking/RecordReceiptModal';
 import { useCurrency } from '../../hooks/useCurrency';
@@ -37,8 +37,6 @@ import {
   Plus,
   Search,
   Filter,
-  Clock,
-  CheckCircle,
   User,
   Building2,
   Eye,
@@ -129,15 +127,6 @@ export const InvoicesListPage: React.FC<unknown> = () => {
     }
     return 'N/A';
   };
-
-  const { sentInvoices, paidInvoices, overdueInvoices } = useMemo(
-    () => ({
-      sentInvoices: invoices.filter((i) => i.status === 'sent'),
-      paidInvoices: invoices.filter((i) => i.status === 'paid'),
-      overdueInvoices: invoices.filter((i) => i.status === 'overdue'),
-    }),
-    [invoices]
-  );
 
   // Invoice.id is technically string | undefined in the service-layer
   // interface (it carries through unsaved drafts), so filter to defined
@@ -256,17 +245,17 @@ export const InvoicesListPage: React.FC<unknown> = () => {
 
   if (isLoading) {
     return (
-      <div className="p-8 max-w-[1800px] mx-auto space-y-6">
-        <Skeleton className="h-28 w-full rounded-2xl" />
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="px-6 py-5 max-w-[1800px] mx-auto space-y-4">
+        <Skeleton className="h-14 w-full rounded-2xl" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+            <Skeleton key={i} className="h-20 w-full rounded-xl" />
           ))}
         </div>
-        <Skeleton className="h-20 w-full rounded-2xl" />
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full rounded-lg" />
+        <Skeleton className="h-16 w-full rounded-2xl" />
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 px-4 py-3 space-y-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full rounded-lg" />
           ))}
         </div>
       </div>
@@ -274,54 +263,83 @@ export const InvoicesListPage: React.FC<unknown> = () => {
   }
 
   return (
-    <div className="p-8 max-w-[1800px] mx-auto">
-      <FinancialModuleHeader
-        icon={<FileText className="w-7 h-7 text-white" />}
+    <div className="px-6 py-5 max-w-[1800px] mx-auto">
+      <PageHeader
+        icon={FileText}
         title="Invoices"
         description="Manage customer invoices and billing"
-        iconBgColor="#10b981"
-        statistics={[
-          { label: 'Total Invoices', value: invoices.length, color: '#10b981' },
-          { label: 'Paid', value: paidInvoices.length, color: '#10b981' },
-          { label: 'Sent', value: sentInvoices.length, color: '#f59e0b' },
-          { label: 'Overdue', value: overdueInvoices.length, color: '#ef4444' },
-        ]}
-        primaryAction={{
-          label: 'Create Invoice',
-          onClick: () => setShowInvoiceModal(true),
-          icon: <Plus className="w-4 h-4" />,
-        }}
+        actions={
+          <>
+            <ExportButton
+              filename="invoices"
+              columns={[
+                { key: 'invoice_number', label: 'Invoice #' },
+                { key: 'invoice_date', label: 'Date' },
+                { key: 'due_date', label: 'Due' },
+                { key: 'invoice_type', label: 'Type' },
+                {
+                  key: (r) => (r.customers_enhanced as { customer_name?: string } | null)?.customer_name,
+                  label: 'Customer',
+                },
+                { key: 'subtotal', label: 'Subtotal' },
+                { key: 'tax_amount', label: 'Tax' },
+                { key: 'total_amount', label: 'Total' },
+                { key: 'amount_paid', label: 'Paid' },
+                { key: 'balance_due', label: 'Balance' },
+                { key: 'status', label: 'Status' },
+              ]}
+              getRows={async () => {
+                let q = supabase
+                  .from('invoices')
+                  .select('invoice_number, invoice_date, due_date, invoice_type, subtotal, tax_amount, total_amount, amount_paid, balance_due, status, customers_enhanced:customer_id(customer_name)')
+                  .is('deleted_at', null);
+                if (debouncedSearch) {
+                  q = q.ilike('invoice_number', `%${debouncedSearch}%`);
+                }
+                if (statusFilter !== 'all') q = q.eq('status', statusFilter);
+                if (typeFilter !== 'all') q = q.eq('invoice_type', typeFilter);
+                const { data, error } = await q.order('invoice_date', { ascending: false, nullsFirst: false });
+                if (error) throw error;
+                return data ?? [];
+              }}
+            />
+            <Button size="sm" onClick={() => setShowInvoiceModal(true)}>
+              <Plus className="w-4 h-4 mr-1.5" />
+              Create Invoice
+            </Button>
+          </>
+        }
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <FinancialStatsCard
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4" role="region" aria-label="Invoice summary">
+        <StatCard
+          tone="info"
           label="Total Invoiced"
           value={formatCurrency(stats?.totalValue || 0)}
-          icon={<FileText className="w-5 h-5 text-white" />}
-          color="blue"
+          sub={`${stats?.total ?? 0} invoices`}
         />
-        <FinancialStatsCard
+        <StatCard
+          tone="success"
           label="Paid"
           value={formatCurrency(stats?.totalPaid || 0)}
-          icon={<CheckCircle className="w-5 h-5 text-white" />}
-          color="green"
+          sub={`${stats?.paid ?? 0} paid`}
         />
-        <FinancialStatsCard
+        <StatCard
+          tone="warning"
           label="Outstanding"
           value={formatCurrency(stats?.totalOutstanding || 0)}
-          icon={<Clock className="w-5 h-5 text-white" />}
-          color="orange"
+          sub={`${Math.max((stats?.total ?? 0) - (stats?.paid ?? 0), 0)} unpaid`}
         />
-        <FinancialStatsCard
+        <StatCard
+          tone="danger"
           label="Overdue"
-          value={overdueInvoices.length}
-          icon={<AlertCircle className="w-5 h-5 text-white" />}
-          color="red"
+          value={stats?.overdue ?? 0}
+          sub="overdue invoices"
         />
       </div>
 
-      <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
-        <div className="p-6">
+      <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-4">
+        <div className="px-4 py-3">
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
             <div className="w-full lg:w-80 relative flex-shrink-0">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
@@ -423,39 +441,6 @@ export const InvoicesListPage: React.FC<unknown> = () => {
               )}
             </Button>
 
-            <ExportButton
-              filename="invoices"
-              columns={[
-                { key: 'invoice_number', label: 'Invoice #' },
-                { key: 'invoice_date', label: 'Date' },
-                { key: 'due_date', label: 'Due' },
-                { key: 'invoice_type', label: 'Type' },
-                {
-                  key: (r) => (r.customers_enhanced as { customer_name?: string } | null)?.customer_name,
-                  label: 'Customer',
-                },
-                { key: 'subtotal', label: 'Subtotal' },
-                { key: 'tax_amount', label: 'Tax' },
-                { key: 'total_amount', label: 'Total' },
-                { key: 'amount_paid', label: 'Paid' },
-                { key: 'balance_due', label: 'Balance' },
-                { key: 'status', label: 'Status' },
-              ]}
-              getRows={async () => {
-                let q = supabase
-                  .from('invoices')
-                  .select('invoice_number, invoice_date, due_date, invoice_type, subtotal, tax_amount, total_amount, amount_paid, balance_due, status, customers_enhanced:customer_id(customer_name)')
-                  .is('deleted_at', null);
-                if (debouncedSearch) {
-                  q = q.ilike('invoice_number', `%${debouncedSearch}%`);
-                }
-                if (statusFilter !== 'all') q = q.eq('status', statusFilter);
-                if (typeFilter !== 'all') q = q.eq('invoice_type', typeFilter);
-                const { data, error } = await q.order('invoice_date', { ascending: false, nullsFirst: false });
-                if (error) throw error;
-                return data ?? [];
-              }}
-            />
           </div>
 
           {showFilters && (
@@ -512,7 +497,7 @@ export const InvoicesListPage: React.FC<unknown> = () => {
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-4 py-4 w-10">
+                  <th className="px-4 py-2.5 w-10">
                     <input
                       type="checkbox"
                       checked={selection.allSelected(visibleIds)}
@@ -527,31 +512,31 @@ export const InvoicesListPage: React.FC<unknown> = () => {
                       aria-label="Select all on this page"
                     />
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                     Invoice #
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                     Type
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                     Case
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                     Customer
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                     Date
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                     Due Date
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                     Amount
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -570,7 +555,7 @@ export const InvoicesListPage: React.FC<unknown> = () => {
                     }`}
                   >
                     <td
-                      className="px-4 py-4 w-10"
+                      className="px-4 py-2.5 w-10"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <input
@@ -582,12 +567,12 @@ export const InvoicesListPage: React.FC<unknown> = () => {
                         aria-label={`Select invoice ${invoice.invoice_number}`}
                       />
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-2.5 whitespace-nowrap">
                       <span className="font-semibold text-primary">
                         {invoice.invoice_number}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-2.5 whitespace-nowrap">
                       <Badge
                         variant="custom"
                         color={getTypeColor(invoice.invoice_type)}
@@ -596,7 +581,7 @@ export const InvoicesListPage: React.FC<unknown> = () => {
                         {invoice.invoice_type === 'proforma' ? 'Proforma' : 'Tax Invoice'}
                       </Badge>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-2.5 whitespace-nowrap">
                       {invoice.cases ? (
                         <div>
                           <p className="text-sm font-medium text-slate-900">
@@ -610,7 +595,7 @@ export const InvoicesListPage: React.FC<unknown> = () => {
                         'N/A'
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-2.5 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         {invoice.customers_enhanced ? (
                           <User className="w-4 h-4 text-slate-400" />
@@ -624,7 +609,7 @@ export const InvoicesListPage: React.FC<unknown> = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-2.5 whitespace-nowrap">
                       <p className="text-sm text-slate-600">
                         {formatDate(invoice.invoice_date || '')}
                       </p>
@@ -634,10 +619,10 @@ export const InvoicesListPage: React.FC<unknown> = () => {
                         </p>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                    <td className="px-4 py-2.5 whitespace-nowrap text-sm text-slate-600">
                       {invoice.due_date ? formatDate(invoice.due_date) : 'N/A'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-2.5 whitespace-nowrap">
                       <div>
                         <p className="text-sm font-medium text-slate-900">
                           {formatCurrency(invoice.total_amount || 0)}
@@ -649,7 +634,7 @@ export const InvoicesListPage: React.FC<unknown> = () => {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-2.5 whitespace-nowrap">
                       <div className="flex flex-col gap-1">
                         <Badge variant={statusToBadgeVariant(invoice.status)} size="sm">
                           {invoice.status}
@@ -687,7 +672,7 @@ export const InvoicesListPage: React.FC<unknown> = () => {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-2.5 whitespace-nowrap">
                       <div
                         className="flex items-center justify-end gap-2"
                         onClick={(e) => e.stopPropagation()}
