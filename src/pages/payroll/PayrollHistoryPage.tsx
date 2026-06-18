@@ -7,10 +7,11 @@ import { payrollKeys } from '../../lib/queryKeys';
 import { Button } from '../../components/ui/Button';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { PageHeader } from '../../components/shared/PageHeader';
-import { formatCurrency } from '../../lib/format';
+import { useCurrency } from '../../hooks/useCurrency';
 import { format } from 'date-fns';
 
 export default function PayrollHistoryPage() {
+  const { formatCurrency } = useCurrency();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
