@@ -10,6 +10,7 @@
   import noRawStyleColors from './eslint-rules/no-raw-style-colors.js';
   import noUnfilteredItemEmbed from './eslint-rules/no-unfiltered-item-embed.js';
   import noRawCurrencyAggregation from './eslint-rules/no-raw-currency-aggregation.js';
+  import noHardcodedLocaleFormat from './eslint-rules/no-hardcoded-locale-format.js';
 
   // Hoisted so the main config and the fixed-surface override below share one
   // identical xsuite plugin object (flat config resolves plugin rules per block).
@@ -21,6 +22,7 @@
       'no-raw-style-colors': noRawStyleColors,
       'no-unfiltered-item-embed': noUnfilteredItemEmbed,
       'no-raw-currency-aggregation': noRawCurrencyAggregation,
+      'no-hardcoded-locale-format': noHardcodedLocaleFormat,
     },
   };
 
@@ -88,6 +90,12 @@
         // through baseAmount/sumBankBalanceBase, and genuine single-currency rollups
         // carry a reasoned inline disable. New raw aggregations fail CI.
         'xsuite/no-raw-currency-aggregation': 'error',
+        // Worldwide currency/locale guardrail (P4): hardcoded 'en-US'/'en-GB'
+        // number/date formatting bypasses the tenant's Country-Engine locale.
+        // 'warn' (not 'error') because ~15 pre-existing sites are being burned
+        // down across other P4 slices — like no-untranslated-jsx-text, this
+        // surfaces NEW violations in review without failing CI on existing debt.
+        'xsuite/no-hardcoded-locale-format': 'warn',
         '@typescript-eslint/no-unused-vars': ['error', {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',

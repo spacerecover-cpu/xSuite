@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 import { logger } from '../logger';
+import type { CurrencyConfig } from '../../types/tenantConfig';
 import type { CompanySettingsData, TranslationContext } from './types';
 
 export function formatDate(date: string | Date | null | undefined, formatStr: string = 'dd/MM/yyyy'): string {
@@ -18,20 +19,43 @@ export function formatDateTime(date: string | Date | null | undefined): string {
 
 export function formatCurrency(
   amount: number | null | undefined,
-  currencyCode: string = 'USD',
-  locale: string = 'en-US'
+  // Pass the tenant's resolved CurrencyConfig: it carries symbol/code/position,
+  // separators, decimalPlaces, displayMode and negativeFormat. Honors
+  // config.decimalPlaces (OMR 3 / JPY 0), the tenant separators and currency
+  // position — NOT a hardcoded 2dp / en-US. The logic mirrors
+  // formatCurrencyWithConfig (lib/format) but is inlined so this PDF leaf stays
+  // free of the supabaseClient import chain that lib/format pulls in.
+  config: CurrencyConfig
 ): string {
   if (amount === null || amount === undefined) return '-';
-  try {
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: currencyCode,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `${currencyCode} ${amount.toFixed(2)}`;
-  }
+
+  const code = typeof config.code === 'string' ? config.code : '';
+  const symbol = config.symbol || code;
+  const token =
+    config.displayMode === 'iso_code'
+      ? code || symbol
+      : config.displayMode === 'symbol_code'
+        ? code && config.symbol && config.symbol !== code
+          ? `${config.symbol} ${code}`
+          : code || symbol
+        : symbol;
+
+  const useParens = config.negativeFormat === 'parentheses' && amount < 0;
+  const magnitude = useParens ? Math.abs(amount) : amount;
+
+  const parts = magnitude.toFixed(config.decimalPlaces).split('.');
+  const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, config.thousandsSeparator);
+  const decimalPart = parts[1];
+  const formattedNumber =
+    config.decimalPlaces > 0
+      ? `${integerPart}${config.decimalSeparator}${decimalPart}`
+      : integerPart;
+
+  const body =
+    config.position === 'before'
+      ? `${token}${formattedNumber}`
+      : `${formattedNumber} ${token}`;
+  return useParens ? `(${body})` : body;
 }
 
 export function formatCapacity(capacity: string | null | undefined): string {

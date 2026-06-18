@@ -1,5 +1,4 @@
 import { supabase, resolveTenantId } from './supabaseClient';
-import { AccountingLocale } from '../types/accountingLocale';
 import { logger } from './logger';
 import { baseAmount } from './financialMath';
 import type { Database } from '../types/database.types';
@@ -76,26 +75,6 @@ export interface TransactionType {
   type: 'income' | 'expense' | 'asset' | 'equity';
   description?: string;
 }
-
-export const fetchDefaultLocale = async (): Promise<AccountingLocale | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('accounting_locales')
-      .select('*')
-      .eq('is_default', true)
-      .maybeSingle();
-
-    if (error) {
-      logger.error('Error fetching default locale:', error);
-      return null;
-    }
-
-    return data;
-  } catch (error) {
-    logger.error('Error fetching default locale:', error);
-    return null;
-  }
-};
 
 export const calculateVAT = (amount: number, taxRate: number): number => {
   return Math.round(amount * taxRate * 100) / 100;
@@ -203,22 +182,6 @@ export const getNextTransactionNumber = async (prefix: string): Promise<string> 
       throw error;
     }
     throw new Error(`Failed to generate ${prefix} number: ${msg}`);
-  }
-};
-
-export const formatCurrencyWithLocale = (
-  amount: number,
-  locale: AccountingLocale
-): string => {
-  const formattedNumber = amount.toFixed(locale.decimal_places ?? 2);
-  const [integerPart, decimalPart] = formattedNumber.split('.');
-  const formattedInteger = parseInt(integerPart).toLocaleString('en-US');
-  const fullNumber = decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger;
-
-  if (locale.currency_position === 'before') {
-    return `${locale.currency_symbol} ${fullNumber}`;
-  } else {
-    return `${fullNumber} ${locale.currency_symbol}`;
   }
 };
 
