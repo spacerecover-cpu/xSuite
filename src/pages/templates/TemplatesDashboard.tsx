@@ -14,14 +14,21 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
-import { seedTemplates } from '../../lib/seedService';
+import { seedTemplates, checkIfSeededTemplates } from '../../lib/seedService';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
 import { Badge } from '../../components/ui/Badge';
+import { Modal } from '../../components/ui/Modal';
+import { LineItemTemplateFormModal } from '../../components/templates/LineItemTemplateFormModal';
 import { SeedingResultsDisplay } from '../../components/settings/SeedingResultsDisplay';
+import { useAuth } from '../../contexts/AuthContext';
 import { logger } from '../../lib/logger';
+import type { Database } from '../../types/database.types';
+
+type DocumentTemplateInsert = Database['public']['Tables']['document_templates']['Insert'];
 
 interface TemplateCategory {
   id: string;
@@ -42,6 +49,7 @@ interface TemplateType {
 
 export const TemplatesDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [categories, setCategories] = useState<TemplateCategory[]>([]);
   const [templateTypes, setTemplateTypes] = useState<TemplateType[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -51,6 +59,10 @@ export const TemplatesDashboard: React.FC = () => {
   const [seedingResults, setSeedingResults] = useState<any>(null);
   const [showSeedingResults, setShowSeedingResults] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [isSeeded, setIsSeeded] = useState(false);
+  const [showTypePicker, setShowTypePicker] = useState(false);
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [createTypeId, setCreateTypeId] = useState('');
 
   useEffect(() => {
     loadData();
@@ -106,6 +118,7 @@ export const TemplatesDashboard: React.FC = () => {
 
       setCategories(enrichedCategories);
       setTemplateTypes(enrichedTypes);
+      setIsSeeded(await checkIfSeededTemplates());
     } catch (error) {
       logger.error('Error loading templates:', error);
     } finally {
@@ -130,6 +143,30 @@ export const TemplatesDashboard: React.FC = () => {
     }
   };
 
+  const openCreateFlow = () => {
+    setCreateTypeId(templateTypes[0]?.id ?? '');
+    setShowTypePicker(true);
+  };
+
+  const handleContinueToForm = () => {
+    if (!createTypeId) return;
+    setShowTypePicker(false);
+    setShowFormModal(true);
+  };
+
+  const handleSaveTemplate = async (templateData: Record<string, unknown>) => {
+    if (!profile?.tenant_id) throw new Error('No active tenant');
+    const insertPayload = {
+      ...(templateData as Omit<DocumentTemplateInsert, 'tenant_id'>),
+      tenant_id: profile.tenant_id,
+    } as DocumentTemplateInsert;
+    const { error } = await supabase.from('document_templates').insert(insertPayload);
+    if (error) throw error;
+    await loadData();
+    setShowFormModal(false);
+    setCreateTypeId('');
+  };
+
   const getIconComponent = (iconName: string) => {
     const icons: Record<string, any> = {
       FileText,
@@ -148,6 +185,8 @@ export const TemplatesDashboard: React.FC = () => {
   });
 
   const totalTemplates = templateTypes.reduce((sum, type) => sum + type.template_count, 0);
+
+  const createType = templateTypes.find((type) => type.id === createTypeId) ?? null;
 
   if (isLoading) {
     return (
@@ -180,15 +219,17 @@ export const TemplatesDashboard: React.FC = () => {
           <p className="mt-1 text-slate-600">Manage document and communication templates</p>
         </div>
         <div className="flex gap-3">
-          <Button
-            variant="secondary"
-            onClick={handleSeedTemplates}
-            disabled={isSeeding}
-          >
-            <Sparkles className="w-4 h-4 mr-2" />
-            {isSeeding ? 'Seeding...' : 'Seed Sample Templates'}
-          </Button>
-          <Button onClick={() => navigate('/templates/new')}>
+          {!isSeeded && (
+            <Button
+              variant="secondary"
+              onClick={handleSeedTemplates}
+              disabled={isSeeding}
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              {isSeeding ? 'Seeding...' : 'Seed Sample Templates'}
+            </Button>
+          )}
+          <Button onClick={openCreateFlow}>
             <Plus className="w-4 h-4 mr-2" />
             New Template
           </Button>
@@ -401,7 +442,7 @@ export const TemplatesDashboard: React.FC = () => {
                   ? 'Try adjusting your search terms'
                   : 'Get started by creating your first template'}
               </p>
-              <Button onClick={() => navigate('/templates/new')}>
+              <Button onClick={openCreateFlow}>
                 <Plus className="w-4 h-4 mr-2" />
                 Create Template
               </Button>
@@ -409,6 +450,57 @@ export const TemplatesDashboard: React.FC = () => {
           )}
         </div>
       </div>
+
+      {showTypePicker && (
+        <Modal
+          isOpen={showTypePicker}
+          onClose={() => setShowTypePicker(false)}
+          title="New Template"
+          size="sm"
+        >
+          <div className="space-y-4">
+            {templateTypes.length === 0 ? (
+              <p className="text-sm text-slate-600">
+                No template types are available yet. Seed sample templates to get started.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-slate-600">
+                  Choose the type of template you want to create. The editor adapts to the type you pick.
+                </p>
+                <Select
+                  label="Template Type"
+                  value={createTypeId}
+                  onChange={(e) => setCreateTypeId(e.target.value)}
+                  options={templateTypes.map((type) => ({ value: type.id, label: type.name }))}
+                />
+              </>
+            )}
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="secondary" onClick={() => setShowTypePicker(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleContinueToForm} disabled={!createTypeId}>
+                Continue
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {showFormModal && createType && (
+        <LineItemTemplateFormModal
+          isOpen={showFormModal}
+          onClose={() => {
+            setShowFormModal(false);
+            setCreateTypeId('');
+          }}
+          onSave={handleSaveTemplate}
+          templateTypeId={createType.id}
+          isLineItemType={false}
+          typeCode={createType.code}
+        />
+      )}
     </div>
   );
 };
