@@ -53,6 +53,39 @@ export async function createCustomer(input: CreateCustomerInput): Promise<Custom
   return newCustomer;
 }
 
+/**
+ * Lightweight global customer KPIs via count-only queries (no row payload),
+ * so the list page's stat cards stay correct regardless of dataset size.
+ * RLS scopes every count to the current tenant.
+ */
+export async function getCustomerStats(): Promise<{
+  total: number;
+  portalEnabled: number;
+  active: number;
+  recent30d: number;
+}> {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const recentIso = thirtyDaysAgo.toISOString();
+
+  const base = () =>
+    supabase.from('customers_enhanced').select('*', { count: 'exact', head: true }).is('deleted_at', null);
+
+  const [totalRes, portalRes, activeRes, recentRes] = await Promise.all([
+    base(),
+    base().eq('portal_enabled', true),
+    base().eq('is_active', true),
+    base().gte('created_at', recentIso),
+  ]);
+
+  return {
+    total: totalRes.count ?? 0,
+    portalEnabled: portalRes.count ?? 0,
+    active: activeRes.count ?? 0,
+    recent30d: recentRes.count ?? 0,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Customer ↔ company relationship management (platform review 2026-06-10, #1).
 // Relationships are managed, never swapped: add / end (soft delete + reason) /
