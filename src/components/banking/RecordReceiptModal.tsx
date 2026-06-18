@@ -7,7 +7,8 @@ import { SearchableSelect } from '../ui/SearchableSelect';
 import { supabase } from '../../lib/supabaseClient';
 import { bankingService } from '../../lib/bankingService';
 import { baseAmount } from '../../lib/financialMath';
-import { useAccountingLocale } from '../../hooks/useAccountingLocale';
+import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
+import { formatCurrencyWithConfig } from '../../lib/format';
 import {
   AlertCircle,
   Check,
@@ -85,7 +86,8 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
   singleInvoiceMode = false,
   invoiceId,
 }) => {
-  const { formatCurrencyValue } = useAccountingLocale();
+  const currencyConfig = useCurrencyConfig();
+  const formatCurrencyValue = (amount: number) => formatCurrencyWithConfig(amount, currencyConfig);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string>('');
   const [allocations, setAllocations] = useState<Map<string, number>>(new Map());

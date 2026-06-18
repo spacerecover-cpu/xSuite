@@ -4,7 +4,8 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { bankingService } from '../../lib/bankingService';
-import { useAccountingLocale } from '../../hooks/useAccountingLocale';
+import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
+import { formatCurrencyWithConfig } from '../../lib/format';
 import { AlertCircle, ArrowRight } from 'lucide-react';
 
 interface TransferFundsModalProps {
@@ -18,7 +19,8 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
   onClose,
   onSave,
 }) => {
-  const { formatCurrencyValue } = useAccountingLocale();
+  const currencyConfig = useCurrencyConfig();
+  const formatCurrencyValue = (amount: number) => formatCurrencyWithConfig(amount, currencyConfig);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string>('');
   const [warning, setWarning] = useState<string>('');

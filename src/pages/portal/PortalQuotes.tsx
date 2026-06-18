@@ -10,6 +10,7 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { DollarSign, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
 import { formatDate } from '../../lib/format';
+import { useCurrency } from '../../hooks/useCurrency';
 import { fetchPortalVisibility, getCaseIdsWithFlag } from '../../lib/portalVisibility';
 
 interface Quote {
@@ -43,6 +44,7 @@ interface QuoteItem {
 export const PortalQuotes: React.FC = () => {
   const { t } = useTranslation();
   const { customer } = usePortalAuth();
+  const { formatCurrency } = useCurrency();
   const queryClient = useQueryClient();
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -250,7 +252,7 @@ export const PortalQuotes: React.FC = () => {
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold text-slate-900">
-                      {Number(quote.total_amount).toLocaleString()}
+                      {formatCurrency(Number(quote.total_amount) || 0)}
                     </p>
                     {quote.valid_until && (
                       <p className="text-xs text-slate-500 mt-1">
@@ -304,7 +306,7 @@ export const PortalQuotes: React.FC = () => {
                   </div>
                   <div className="text-right">
                     <p className="text-xl font-bold text-slate-900">
-                      {Number(quote.total_amount).toLocaleString()}
+                      {formatCurrency(Number(quote.total_amount) || 0)}
                     </p>
                   </div>
                 </div>
@@ -375,10 +377,10 @@ export const PortalQuotes: React.FC = () => {
                           </td>
                           <td className="p-3 text-center text-slate-700">{item.quantity ?? 1}</td>
                           <td className="p-3 text-right text-slate-700">
-                            {Number(item.unit_price).toLocaleString()}
+                            {formatCurrency(Number(item.unit_price) || 0)}
                           </td>
                           <td className="p-3 text-right font-medium text-slate-900">
-                            {Number(item.total_price).toLocaleString()}
+                            {formatCurrency(Number(item.total_price) || 0)}
                           </td>
                         </tr>
                       ))}
@@ -389,7 +391,7 @@ export const PortalQuotes: React.FC = () => {
                           {t('portal.quotes.subtotal')}
                         </td>
                         <td className="p-3 text-right text-slate-900">
-                          {Number(selectedQuote.subtotal).toLocaleString()}
+                          {formatCurrency(Number(selectedQuote.subtotal) || 0)}
                         </td>
                       </tr>
                       {Number(selectedQuote.discount_amount) > 0 && (
@@ -398,7 +400,7 @@ export const PortalQuotes: React.FC = () => {
                             {t('portal.quotes.discount')}
                           </td>
                           <td className="p-3 text-right text-slate-900">
-                            -{Number(selectedQuote.discount_amount).toLocaleString()}
+                            -{formatCurrency(Number(selectedQuote.discount_amount) || 0)}
                           </td>
                         </tr>
                       )}
@@ -408,7 +410,7 @@ export const PortalQuotes: React.FC = () => {
                             {t('portal.quotes.tax')}
                           </td>
                           <td className="p-3 text-right text-slate-900">
-                            {Number(selectedQuote.tax_amount).toLocaleString()}
+                            {formatCurrency(Number(selectedQuote.tax_amount) || 0)}
                           </td>
                         </tr>
                       )}
@@ -417,7 +419,7 @@ export const PortalQuotes: React.FC = () => {
                           {t('portal.quotes.totalAmount')}
                         </td>
                         <td className="p-3 text-right font-bold text-slate-900 text-lg">
-                          {Number(selectedQuote.total_amount).toLocaleString()}
+                          {formatCurrency(Number(selectedQuote.total_amount) || 0)}
                         </td>
                       </tr>
                     </tfoot>

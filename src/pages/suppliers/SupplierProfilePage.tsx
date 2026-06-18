@@ -15,6 +15,7 @@ import ContactFormModal from '../../components/suppliers/ContactFormModal';
 import DocumentUploadModal from '../../components/suppliers/DocumentUploadModal';
 import { supabase } from '../../lib/supabaseClient';
 import { useToast } from '../../hooks/useToast';
+import { useCurrency } from '../../hooks/useCurrency';
 import { format } from 'date-fns';
 import { logger } from '../../lib/logger';
 import type { Database } from '../../types/database.types';
@@ -385,6 +386,7 @@ export default function SupplierProfilePage() {
 }
 
 function OverviewTab({ supplier }: { supplier: SupplierWithRelations }) {
+  const { formatCurrency } = useCurrency();
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2 space-y-6">
@@ -492,11 +494,11 @@ function OverviewTab({ supplier }: { supplier: SupplierWithRelations }) {
             <div className="space-y-3">
               <div>
                 <label className="text-sm text-gray-500">Credit Limit</label>
-                <p className="font-medium">{supplier.credit_limit != null ? supplier.credit_limit.toLocaleString() : '-'}</p>
+                <p className="font-medium">{supplier.credit_limit != null ? formatCurrency(supplier.credit_limit) : '-'}</p>
               </div>
               <div>
                 <label className="text-sm text-gray-500">Outstanding Balance</label>
-                <p className="font-medium">{supplier.outstanding_balance != null ? supplier.outstanding_balance.toLocaleString() : '-'}</p>
+                <p className="font-medium">{supplier.outstanding_balance != null ? formatCurrency(supplier.outstanding_balance) : '-'}</p>
               </div>
               <div>
                 <label className="text-sm text-gray-500">Bank</label>
@@ -700,6 +702,7 @@ function DocumentsTab({
 }
 
 function PerformanceTab({ supplier, performance }: { supplier: SupplierWithRelations; performance: SupplierPerformanceMetricRow[] }) {
+  const { formatCurrency } = useCurrency();
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -727,7 +730,7 @@ function PerformanceTab({ supplier, performance }: { supplier: SupplierWithRelat
               <DollarSign className="w-4 h-4" />
               <span className="text-sm">Credit Limit</span>
             </div>
-            <div className="text-2xl font-bold text-gray-900">{supplier.credit_limit != null ? supplier.credit_limit.toLocaleString() : '-'}</div>
+            <div className="text-2xl font-bold text-gray-900">{supplier.credit_limit != null ? formatCurrency(supplier.credit_limit) : '-'}</div>
           </div>
         </Card>
         <Card>
@@ -736,7 +739,7 @@ function PerformanceTab({ supplier, performance }: { supplier: SupplierWithRelat
               <CheckCircle className="w-4 h-4" />
               <span className="text-sm">Outstanding</span>
             </div>
-            <div className="text-2xl font-bold text-gray-900">{supplier.outstanding_balance != null ? supplier.outstanding_balance.toLocaleString() : '-'}</div>
+            <div className="text-2xl font-bold text-gray-900">{supplier.outstanding_balance != null ? formatCurrency(supplier.outstanding_balance) : '-'}</div>
           </div>
         </Card>
       </div>
@@ -785,6 +788,7 @@ function PerformanceTab({ supplier, performance }: { supplier: SupplierWithRelat
 
 function OrdersTab({ orders, supplierId }: { orders: PurchaseOrderWithStatus[]; supplierId: string }) {
   const navigate = useNavigate();
+  const { formatCurrency } = useCurrency();
 
   const columns: Column<PurchaseOrderWithStatus>[] = [
     {
@@ -812,7 +816,7 @@ function OrdersTab({ orders, supplierId }: { orders: PurchaseOrderWithStatus[]; 
     {
       key: 'total_amount',
       header: 'Amount',
-      render: (order) => order.total_amount != null ? order.total_amount.toLocaleString() : '0.00',
+      render: (order) => formatCurrency(order.total_amount ?? 0),
     },
     {
       key: 'status',

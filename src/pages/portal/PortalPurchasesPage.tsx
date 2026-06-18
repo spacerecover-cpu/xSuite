@@ -8,10 +8,7 @@ import { Badge } from '../../components/ui/Badge';
 import { ShoppingBag, Package, Calendar, DollarSign } from 'lucide-react';
 import { formatDate } from '../../lib/format';
 import { baseAmount } from '../../lib/financialMath';
-
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-}
+import { useCurrency } from '../../hooks/useCurrency';
 
 type StockItemEmbed = {
   id: string;
@@ -23,6 +20,7 @@ type StockItemEmbed = {
 export const PortalPurchasesPage: React.FC = () => {
   const { t } = useTranslation();
   const { customer } = usePortalAuth();
+  const { formatCurrency } = useCurrency();
 
   useEffect(() => {
     document.title = t('portal.purchases.tabTitle');

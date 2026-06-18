@@ -578,7 +578,7 @@ export const ExpensesList: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <span className="text-sm font-bold text-slate-900">
-                        {formatCurrency(expense.amount)}
+                        {formatCurrency(baseAmount(expense, 'amount'))}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

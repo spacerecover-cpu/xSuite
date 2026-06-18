@@ -421,7 +421,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
     void recordTemplateUsage(template.id);
   };
 
-  const docCurrency = invoiceData.currency || baseCurrency || 'USD';
+  const docCurrency = invoiceData.currency || baseCurrency || currencyFormat.currencyCode;
   const fmtDoc = (v: number) => formatCurrency(v, docCurrency);
 
   const subtotal = lineItems.reduce((sum, item) => {

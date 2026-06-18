@@ -5,10 +5,12 @@ import { payrollService } from '../../lib/payrollService';
 import { payrollKeys } from '../../lib/queryKeys';
 import { Button } from '../../components/ui/Button';
 import { StatsCard } from '../../components/ui/StatsCard';
-import { formatCurrency } from '../../lib/format';
+import { useCurrency } from '../../hooks/useCurrency';
 import { format } from 'date-fns';
 
 export const PayrollDashboard = () => {
+  const { formatCurrency } = useCurrency();
+
   const { data: stats, isLoading } = useQuery({
     queryKey: payrollKeys.dashboardStats(),
     queryFn: () => payrollService.getDashboardStats(),

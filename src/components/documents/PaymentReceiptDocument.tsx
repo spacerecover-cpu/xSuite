@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckCircle, Receipt } from 'lucide-react';
-import { formatDate, cleanBankFieldValue } from '../../lib/format';
+import { formatDate, cleanBankFieldValue, formatCurrencyWithConfig } from '../../lib/format';
+import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
 
 interface CompanySettings {
   basic_info?: {
@@ -59,16 +60,16 @@ interface PaymentReceiptDocumentProps {
 export const PaymentReceiptDocument: React.FC<PaymentReceiptDocumentProps> = ({
   payment,
   companySettings,
-  currencyFormat,
+  currencyFormat: _currencyFormat,
   t: _t,
   elementId = 'receipt-print-frame',
 }) => {
-  if (!payment) return null;
+  const currencyConfig = useCurrencyConfig();
 
-  const formatCurrency = (amount: number | null | undefined): string => {
-    if (amount === null || amount === undefined) return `${currencyFormat.currencySymbol}0.00`;
-    return `${currencyFormat.currencySymbol}${amount.toFixed(currencyFormat.decimalPlaces)}`;
-  };
+  const formatCurrency = (amount: number | null | undefined): string =>
+    formatCurrencyWithConfig(amount ?? 0, currencyConfig);
+
+  if (!payment) return null;
 
   const customerName = payment.customer?.customer_name || payment.customers?.customer_name || payment.customer_associated_company?.company_name || payment.companies?.company_name || 'N/A';
   const customerEmail = payment.customer?.email || payment.customers?.email || '';

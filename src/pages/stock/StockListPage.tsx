@@ -45,6 +45,7 @@ import { BulkPriceUpdateModal } from '../../components/stock/BulkPriceUpdateModa
 import { PrintLabelsModal } from '../../components/stock/PrintLabelsModal';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useToast } from '../../hooks/useToast';
+import { useCurrency } from '../../hooks/useCurrency';
 
 type TabId = 'all' | 'saleable' | 'internal' | 'low_stock';
 
@@ -55,10 +56,8 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'low_stock', label: 'Low Stock' },
 ];
 
-const formatCurrency = (value: number): string =>
-  value.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-
 export const StockListPage: React.FC = () => {
+  const { formatCurrency } = useCurrency();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
