@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { Pager } from '../../components/ui/Pager';
 import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { ResourceCloneDriveModal } from '../../components/resources/ResourceCloneDriveModal';
 import { HardDrive, Search, Filter, Plus, Database, AlertCircle, CheckCircle, CreditCard as Edit2, MapPin, Calendar, ArrowUpDown, FileText, X } from 'lucide-react';
+
+const PAGE_SIZE = 50;
 
 export const CloneDrivesList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -19,6 +22,14 @@ export const CloneDrivesList: React.FC = () => {
   const [sortField, setSortField] = useState<string>('clone_id');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+
+  // Client-side pagination: the list is filtered/sorted in memory (and rows
+  // expand), so we bound the DOM by slicing the sorted set. Reset to page 0 when
+  // the filtered/sorted set changes so the view never lands on an empty page.
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, statusFilter, driveTypeFilter, sortField, sortDirection]);
 
   const { data: resourceCloneDrives = [], isLoading } = useQuery({
     queryKey: ['resource_clone_drives'],
@@ -153,6 +164,8 @@ export const CloneDrivesList: React.FC = () => {
 
     return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
   });
+
+  const pagedDrives = sortedDrives.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const stats = {
     total: resourceCloneDrives.length,
@@ -585,7 +598,7 @@ export const CloneDrivesList: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {sortedDrives.map((drive) => (
+                {pagedDrives.map((drive) => (
                   <React.Fragment key={drive.id}>
                     <tr
                       className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer"
@@ -830,6 +843,13 @@ export const CloneDrivesList: React.FC = () => {
               </tbody>
             </table>
           </div>
+          <Pager
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={sortedDrives.length}
+            onPageChange={setPage}
+            itemNoun="clone drives"
+          />
         </Card>
       )}
 
