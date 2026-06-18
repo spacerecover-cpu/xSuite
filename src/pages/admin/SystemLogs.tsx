@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { Pager } from '../../components/ui/Pager';
 import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import type { BadgeVariant } from '../../lib/ui/variants';
@@ -20,30 +23,40 @@ interface SystemLog {
   created_at: string;
 }
 
+const PAGE_SIZE = 50;
+
 export const SystemLogs: React.FC = () => {
-  const [logs, setLogs] = useState<SystemLog[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [levelFilter, setLevelFilter] = useState<string>('all');
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
-    fetchLogs();
-  }, [levelFilter]);
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-  const fetchLogs = async () => {
-    setLoading(true);
-    try {
+  useEffect(() => {
+    setPage(0);
+  }, [levelFilter, debouncedSearch]);
+
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ['system_logs', levelFilter, debouncedSearch, page],
+    queryFn: async () => {
       let query = supabase
         .from('system_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false });
 
       if (levelFilter !== 'all') {
         query = query.eq('level', levelFilter);
       }
+      if (debouncedSearch) {
+        const s = sanitizeFilterValue(debouncedSearch);
+        query = query.or(`message.ilike.%${s}%,category.ilike.%${s}%`);
+      }
 
-      const { data, error } = await query;
+      const { data, error, count } = await query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
       if (error) throw error;
       const normalized: SystemLog[] = (data || []).map((row) => ({
         id: row.id,
@@ -61,21 +74,13 @@ export const SystemLogs: React.FC = () => {
             : String(row.ip_address),
         created_at: row.created_at,
       }));
-      setLogs(normalized);
-    } catch (error) {
-      logger.error('Error fetching logs:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredLogs = logs.filter((log) => {
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      log.message.toLowerCase().includes(searchLower) ||
-      (log.category?.toLowerCase().includes(searchLower) ?? false)
-    );
+      return { rows: normalized, total: count ?? 0 };
+    },
+    placeholderData: keepPreviousData,
   });
+
+  const logs = data?.rows ?? [];
+  const total = data?.total ?? 0;
 
   const getLevelIcon = (level: string) => {
     switch (level) {
@@ -114,16 +119,32 @@ export const SystemLogs: React.FC = () => {
   const getLevelBadgeVariant = (level: string): BadgeVariant =>
     LEVEL_BADGE_VARIANT[level] ?? 'secondary';
 
-  const exportLogs = () => {
+  const exportLogs = async () => {
+    let query = supabase
+      .from('system_logs')
+      .select('created_at, level, category, message, ip_address')
+      .order('created_at', { ascending: false });
+    if (levelFilter !== 'all') {
+      query = query.eq('level', levelFilter);
+    }
+    if (debouncedSearch) {
+      const s = sanitizeFilterValue(debouncedSearch);
+      query = query.or(`message.ilike.%${s}%,category.ilike.%${s}%`);
+    }
+    const { data, error } = await query;
+    if (error) {
+      logger.error('Error exporting logs:', error);
+      return;
+    }
     const csv = [
       ['Timestamp', 'Level', 'Category', 'Message', 'IP Address'].join(','),
-      ...filteredLogs.map((log) =>
+      ...(data || []).map((log) =>
         [
           format(new Date(log.created_at), 'yyyy-MM-dd HH:mm:ss'),
           log.level,
           log.category ?? '',
-          `"${log.message.replace(/"/g, '""')}"`,
-          log.ip_address || '',
+          `"${String(log.message ?? '').replace(/"/g, '""')}"`,
+          log.ip_address == null ? '' : String(log.ip_address),
         ].join(',')
       ),
     ].join('\n');
@@ -197,7 +218,7 @@ export const SystemLogs: React.FC = () => {
 
       <div className="bg-white rounded-lg shadow-sm border border-slate-200">
         <div className="divide-y divide-slate-200">
-          {filteredLogs.map((log) => (
+          {logs.map((log) => (
             <div key={log.id} className="p-4 hover:bg-slate-50 transition-colors">
               <div className="flex items-start gap-3">
                 <div className={`mt-1 p-2 rounded-lg ${getLevelChipClass(log.level)}`}>
@@ -237,10 +258,14 @@ export const SystemLogs: React.FC = () => {
           </div>
         )}
 
-        {!loading && filteredLogs.length === 0 && (
+        {!loading && logs.length === 0 && (
           <div className="text-center py-12">
             <p className="text-slate-500">No logs found</p>
           </div>
+        )}
+
+        {total > 0 && (
+          <Pager page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} itemNoun="logs" />
         )}
       </div>
     </div>

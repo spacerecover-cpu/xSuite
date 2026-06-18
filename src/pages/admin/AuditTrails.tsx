@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { Pager } from '../../components/ui/Pager';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Badge } from '../../components/ui/Badge';
 import { Search, Eye, Edit, Trash2, Plus } from 'lucide-react';
 import { format } from 'date-fns';
-import { logger } from '../../lib/logger';
 
 type BadgeTone = 'success' | 'info' | 'danger' | 'secondary';
 
@@ -34,36 +36,57 @@ interface AuditTrail {
   user_name?: string;
 }
 
+const PAGE_SIZE = 50;
+
 export const AuditTrails: React.FC = () => {
-  const [trails, setTrails] = useState<AuditTrail[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [actionFilter, setActionFilter] = useState<string>('all');
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
-    fetchTrails();
-  }, [actionFilter]);
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-  const fetchTrails = async () => {
-    setLoading(true);
-    try {
+  useEffect(() => {
+    setPage(0);
+  }, [actionFilter, debouncedSearch]);
+
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ['audit_trails', actionFilter, debouncedSearch, page],
+    queryFn: async () => {
       let query = supabase
         .from('audit_trails')
         .select(`
           *,
           profiles:performed_by (full_name)
-        `)
-        .order('performed_at', { ascending: false })
-        .limit(100);
+        `, { count: 'exact' })
+        .order('performed_at', { ascending: false });
 
       if (actionFilter !== 'all') {
         query = query.eq('action', actionFilter);
       }
+      if (debouncedSearch) {
+        const s = sanitizeFilterValue(debouncedSearch);
+        const orParts = [`record_type.ilike.%${s}%`, `action.ilike.%${s}%`];
+        // user_name is the joined profiles.full_name; resolve matching actor ids
+        // so "search by who" still works server-side across the full dataset.
+        const { data: matchedProfiles } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('full_name', `%${s}%`);
+        const ids = (matchedProfiles ?? []).map((p) => p.id);
+        if (ids.length > 0) {
+          orParts.push(`performed_by.in.(${ids.join(',')})`);
+        }
+        query = query.or(orParts.join(','));
+      }
 
-      const { data, error } = await query;
+      const { data, error, count } = await query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
       if (error) throw error;
 
-      const formattedData = (data || []).map((trail) => {
+      const formattedData: AuditTrail[] = (data || []).map((trail) => {
         const t = trail as unknown as AuditTrail & { profiles?: { full_name?: string } | null; ip_address: unknown };
         return {
           ...t,
@@ -71,23 +94,13 @@ export const AuditTrails: React.FC = () => {
           user_name: t.profiles?.full_name || 'Unknown User',
         };
       });
-
-      setTrails(formattedData);
-    } catch (error) {
-      logger.error('Error fetching audit trails:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredTrails = trails.filter((trail) => {
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      trail.user_name?.toLowerCase().includes(searchLower) ||
-      trail.record_type.toLowerCase().includes(searchLower) ||
-      trail.action.toLowerCase().includes(searchLower)
-    );
+      return { rows: formattedData, total: count ?? 0 };
+    },
+    placeholderData: keepPreviousData,
   });
+
+  const trails = data?.rows ?? [];
+  const total = data?.total ?? 0;
 
   const getActionIcon = (action: string) => {
     switch (action) {
@@ -161,7 +174,7 @@ export const AuditTrails: React.FC = () => {
 
       <div className="bg-white rounded-lg shadow-sm border border-slate-200">
         <div className="divide-y divide-slate-200">
-          {filteredTrails.map((trail) => {
+          {trails.map((trail) => {
             const tone = ACTION_TONE[trail.action] ?? ACTION_TONE.view;
             return (
             <div key={trail.id} className="p-4 hover:bg-slate-50 transition-colors">
@@ -205,10 +218,14 @@ export const AuditTrails: React.FC = () => {
           </div>
         )}
 
-        {!loading && filteredTrails.length === 0 && (
+        {!loading && trails.length === 0 && (
           <div className="text-center py-12">
             <p className="text-slate-500">No audit trails found</p>
           </div>
+        )}
+
+        {total > 0 && (
+          <Pager page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} itemNoun="entries" />
         )}
       </div>
     </div>
