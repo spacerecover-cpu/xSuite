@@ -11,6 +11,7 @@ import { Input } from '../../components/ui/Input';
 import PurchaseOrderFormModal from '../../components/suppliers/PurchaseOrderFormModal';
 import { supabase } from '../../lib/supabaseClient';
 import { useToast } from '../../hooks/useToast';
+import { useCurrency } from '../../hooks/useCurrency';
 import { format } from 'date-fns';
 import { logger } from '../../lib/logger';
 import { baseAmount } from '../../lib/financialMath';
@@ -38,6 +39,7 @@ export default function PurchaseOrdersListPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
+  const { formatCurrency } = useCurrency();
   const [orders, setOrders] = useState<PurchaseOrderWithJoins[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -190,10 +192,7 @@ export default function PurchaseOrdersListPage() {
       header: 'Total Amount',
       render: (order) => (
         <span className="font-semibold">
-          ${(order.total_amount ?? 0).toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}
+          {formatCurrency(order.total_amount ?? 0)}
         </span>
       ),
     },
@@ -246,7 +245,7 @@ export default function PurchaseOrdersListPage() {
         />
         <StatsCard
           title="Total Value"
-          value={`$${stats.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          value={formatCurrency(stats.totalValue)}
           icon={DollarSign}
           color="blue"
         />
