@@ -193,6 +193,48 @@ export async function getStockItems(filters?: StockFilters): Promise<StockItemWi
   return items;
 }
 
+export async function getStockItemsPage(
+  filters?: StockFilters,
+  page = 0,
+  pageSize = 50,
+): Promise<{ rows: StockItemWithCategory[]; total: number }> {
+  // low_stock compares two columns (current_quantity <= minimum_quantity), which
+  // PostgREST can't express in a filter; fetch the matching set and paginate it
+  // in memory (low-stock is a bounded worklist, not the full catalog).
+  if (filters?.lowStock) {
+    const all = await getStockItems(filters);
+    return {
+      rows: all.slice(page * pageSize, (page + 1) * pageSize),
+      total: all.length,
+    };
+  }
+
+  let query = supabase
+    .from('stock_items')
+    .select('*, stock_categories(*)', { count: 'exact' })
+    .is('deleted_at', null)
+    .order('name', { ascending: true });
+
+  if (filters?.type && filters.type !== 'both') {
+    const t = sanitizeFilterValue(filters.type);
+    query = query.or(`item_type.eq.${t},item_type.eq.both`);
+  }
+  if (filters?.category_id) {
+    query = query.eq('category_id', filters.category_id);
+  }
+  if (filters?.is_active !== undefined) {
+    query = query.eq('is_active', filters.is_active);
+  }
+  if (filters?.search) {
+    const s = sanitizeFilterValue(filters.search);
+    query = query.or(`name.ilike.%${s}%,brand.ilike.%${s}%,sku.ilike.%${s}%`);
+  }
+
+  const { data, error, count } = await query.range(page * pageSize, (page + 1) * pageSize - 1);
+  if (error) throw error;
+  return { rows: (data ?? []) as StockItemWithCategory[], total: count ?? 0 };
+}
+
 export async function getStockItem(id: string): Promise<StockItemWithCategory | null> {
   const { data, error } = await supabase
     .from('stock_items')

@@ -113,6 +113,57 @@ export async function getInventoryItems(filters?: {
   return await enrichItemsWithStockCount(items);
 }
 
+export async function getInventoryItemsPage(filters?: {
+  category_id?: string;
+  status_id?: string;
+  condition_id?: string;
+  location_id?: string;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}) {
+  const pageSize = filters?.pageSize ?? 50;
+  const page = filters?.page ?? 0;
+
+  let query = supabase
+    .from('inventory_items')
+    .select(`
+      *,
+      category:master_inventory_categories(id, name, color_code),
+      status_type:master_inventory_status_types(id, name, color_code, is_available_status),
+      condition_type:master_inventory_condition_types(id, rating, name, color_code),
+      brand:catalog_device_brands(id, name),
+      capacity:catalog_device_capacities(id, name, gb_value),
+      storage_location:inventory_locations(id, name),
+      interface:catalog_interfaces(id, name)
+    `, { count: 'exact' })
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false });
+
+  if (filters?.category_id) query = query.eq('category_id', filters.category_id);
+  if (filters?.status_id) query = query.eq('status_id', filters.status_id);
+  if (filters?.condition_id) query = query.eq('condition_id', filters.condition_id);
+  if (filters?.location_id) query = query.eq('location_id', filters.location_id);
+  if (filters?.search) {
+    const s = sanitizeFilterValue(filters.search);
+    query = query.or(
+      `name.ilike.%${s}%,` +
+      `item_number.ilike.%${s}%,` +
+      `serial_number.ilike.%${s}%,` +
+      `model.ilike.%${s}%`
+    );
+  }
+
+  const { data, error, count } = await query.range(page * pageSize, (page + 1) * pageSize - 1);
+  if (error) {
+    logger.error('Error fetching inventory items:', error);
+    throw error;
+  }
+
+  const rows = await enrichItemsWithStockCount(data ?? []);
+  return { rows, total: count ?? 0 };
+}
+
 type EnrichableItem = { model: string | null; [key: string]: unknown };
 type StockCountRow = {
   model: string | null;

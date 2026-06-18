@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Package, Zap, Edit2, Trash2, RefreshCw, Filter, ChevronLeft, ChevronRight, Upload } from 'lucide-react';
+import { Plus, Search, Package, Zap, Edit2, Trash2, RefreshCw, Filter, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../hooks/useToast';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { Pager } from '../../components/ui/Pager';
 import AddInventoryModal from '../../components/inventory/AddInventoryModal';
 import InventoryDetailModal from '../../components/inventory/InventoryDetailModal';
 import DeleteInventoryConfirmationModal from '../../components/inventory/DeleteInventoryConfirmationModal';
 import { InventoryInsightsHeader } from '../../components/inventory/InventoryInsightsHeader';
 import { BulkInventoryImportModal } from '../../components/importExport/BulkInventoryImportModal';
 import {
-  getInventoryItems,
+  getInventoryItemsPage,
   getInventoryCategories,
   getInventoryStatusTypes,
   getInventoryStatistics,
@@ -24,6 +25,8 @@ import {
 } from '../../lib/inventoryService';
 import { format } from 'date-fns';
 import { logger } from '../../lib/logger';
+
+const PAGE_SIZE = 50;
 
 export default function InventoryListPage() {
   const navigate = useNavigate();
@@ -49,6 +52,7 @@ export default function InventoryListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -60,17 +64,22 @@ export default function InventoryListPage() {
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
-  const ITEMS_PER_PAGE = 7;
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     loadData();
-  }, [selectedCategory, selectedStatus, searchTerm, currentPage]);
+  }, [selectedCategory, selectedStatus, debouncedSearch, page]);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, selectedCategory, selectedStatus]);
+    setPage(0);
+  }, [debouncedSearch, selectedCategory, selectedStatus]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -106,10 +115,12 @@ export default function InventoryListPage() {
 
       const [itemsData, categoriesData, statusTypesData, statsData, insightsData] =
         await Promise.all([
-          getInventoryItems({
+          getInventoryItemsPage({
             category_id: selectedCategory || undefined,
             status_id: selectedStatus || undefined,
-            search: searchTerm || undefined,
+            search: debouncedSearch || undefined,
+            page,
+            pageSize: PAGE_SIZE,
           }),
           getInventoryCategories(),
           getInventoryStatusTypes(),
@@ -117,7 +128,8 @@ export default function InventoryListPage() {
           getInventoryInsights(),
         ]);
 
-      setItems(itemsData || []);
+      setItems(itemsData?.rows || []);
+      setTotal(itemsData?.total || 0);
       setCategories(categoriesData || []);
       setStatusTypes(statusTypesData || []);
       setStatistics(statsData || {
@@ -262,11 +274,6 @@ export default function InventoryListPage() {
     if (!item) return 'Unknown Item';
     return `${item.brand?.name || ''} ${item.model || ''}`.trim() || 'Inventory Item';
   };
-
-  const totalPages = Math.ceil(items.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE + 1;
-  const endIndex = Math.min(currentPage * ITEMS_PER_PAGE, items.length);
-  const paginatedItems = items.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
     <div className="p-6 max-w-[1800px] mx-auto">
@@ -508,7 +515,7 @@ export default function InventoryListPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {paginatedItems.map((item) => (
+                  {items.map((item) => (
                     <tr
                       key={item.id}
                       onClick={(e) => handleRowClick(item, e)}
@@ -679,44 +686,8 @@ export default function InventoryListPage() {
             </div>
           </div>
 
-          {totalPages > 1 && (
-            <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mt-4 p-2.5">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-slate-600">
-                  Showing <span className="font-medium text-slate-900">{startIndex}</span> to{' '}
-                  <span className="font-medium text-slate-900">{endIndex}</span> of{' '}
-                  <span className="font-medium text-slate-900">{items.length}</span> items
-                </div>
-                <div className="flex items-center gap-4">
-                  <p className="text-sm text-slate-600">
-                    Page <span className="font-medium text-slate-900">{currentPage}</span> of{' '}
-                    <span className="font-medium text-slate-900">{totalPages}</span>
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1 || isRefreshing}
-                      className="flex items-center gap-1"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                      Previous
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages || isRefreshing}
-                      className="flex items-center gap-1"
-                    >
-                      Next
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
+          {total > 0 && (
+            <Pager page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} itemNoun="inventory items" />
           )}
         </>
       )}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   Package,
   Plus,
@@ -24,7 +24,7 @@ import {
 import { EmptyState } from '../../components/shared/EmptyState';
 import { stockKeys } from '../../lib/queryKeys';
 import {
-  getStockItems,
+  getStockItemsPage,
   getStockStats,
   deleteStockItem,
   type StockItemWithCategory,
@@ -32,6 +32,7 @@ import {
 } from '../../lib/stockService';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Button } from '../../components/ui/Button';
+import { Pager } from '../../components/ui/Pager';
 import { Modal } from '../../components/ui/Modal';
 import { StockItemsTable } from '../../components/stock/StockItemsTable';
 import { StockItemFormModal } from '../../components/stock/StockItemFormModal';
@@ -56,6 +57,8 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'low_stock', label: 'Low Stock' },
 ];
 
+const PAGE_SIZE = 50;
+
 export const StockListPage: React.FC = () => {
   const { formatCurrency } = useCurrency();
   const navigate = useNavigate();
@@ -67,6 +70,7 @@ export const StockListPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [alertDismissed, setAlertDismissed] = useState(false);
 
@@ -98,6 +102,10 @@ export const StockListPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [search]);
 
+  useEffect(() => {
+    setPage(0);
+  }, [activeTab, debouncedSearch, categoryId]);
+
   const filters = useMemo((): StockFilters => {
     const base: StockFilters = {
       search: debouncedSearch || undefined,
@@ -109,11 +117,14 @@ export const StockListPage: React.FC = () => {
     return base;
   }, [activeTab, debouncedSearch, categoryId]);
 
-  const { data: items = [], isLoading: itemsLoading } = useQuery({
-    queryKey: [...stockKeys.items(), filters],
-    queryFn: () => getStockItems(filters),
+  const { data: itemsPage, isLoading: itemsLoading } = useQuery({
+    queryKey: [...stockKeys.items(), filters, page],
+    queryFn: () => getStockItemsPage(filters, page, PAGE_SIZE),
     staleTime: 30000,
+    placeholderData: keepPreviousData,
   });
+  const items = itemsPage?.rows ?? [];
+  const total = itemsPage?.total ?? 0;
 
   const { data: stats } = useQuery({
     queryKey: stockKeys.stats(),
@@ -422,8 +433,8 @@ export const StockListPage: React.FC = () => {
           )}
 
           <div className="flex items-center gap-2 text-sm text-slate-500 ml-auto shrink-0">
-            <span className="font-medium text-slate-700 tabular-nums">{items.length}</span>
-            <span>item{items.length !== 1 ? 's' : ''}</span>
+            <span className="font-medium text-slate-700 tabular-nums">{total}</span>
+            <span>item{total !== 1 ? 's' : ''}</span>
           </div>
         </div>
 
@@ -603,6 +614,9 @@ export const StockListPage: React.FC = () => {
             />
           )}
         </div>
+        {total > 0 && (
+          <Pager page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} itemNoun="stock items" />
+        )}
       </div>
 
       <StockItemFormModal

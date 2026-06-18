@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import SuppliersListPage from './SuppliersListPage';
 
 // --- Mocks ------------------------------------------------------------------
 //
-// calculateStats() sums purchase_orders across documents into the Total Spend
-// (YTD) card. That cross-document sum must use the base-currency shadow
-// (total_amount_base), never the raw native total_amount — otherwise a
-// multi-currency tenant adds e.g. OMR to EUR under one symbol.
+// The Total Spend (YTD) stat sums purchase_orders across documents. That
+// cross-document sum must use the base-currency shadow (total_amount_base),
+// never the raw native total_amount — otherwise a multi-currency tenant adds
+// e.g. OMR to EUR under one symbol.
 
 const { poSelectSpy } = vi.hoisted(() => ({ poSelectSpy: vi.fn() }));
 
@@ -23,20 +24,17 @@ vi.mock('../../hooks/useCurrency', () => ({
 }));
 
 vi.mock('../../lib/supabaseClient', () => {
-  // suppliers + master_supplier_categories resolve to []; purchase_orders feeds
-  // the mixed-currency rows. select() is captured per-table so we can assert the
-  // purchase_orders query widened to include total_amount_base.
-  const suppliersChain = () => {
+  // suppliers list + count queries and categories resolve empty; purchase_orders
+  // feeds the mixed-currency rows. A universal thenable chain answers every
+  // builder method (select/is/or/eq/order/range…) so the paged list query and
+  // the head:count stats queries both resolve. purchase_orders.select() is
+  // captured so we can assert the query widened to include total_amount_base.
+  const thenableChain = (result: unknown) => {
     const chain: Record<string, unknown> = {};
-    chain.select = vi.fn(() => chain);
-    chain.order = vi.fn(() => Promise.resolve({ data: [], error: null }));
-    return chain;
-  };
-  const categoriesChain = () => {
-    const chain: Record<string, unknown> = {};
-    chain.select = vi.fn(() => chain);
-    chain.eq = vi.fn(() => chain);
-    chain.order = vi.fn(() => Promise.resolve({ data: [], error: null }));
+    for (const m of ['select', 'is', 'or', 'eq', 'order', 'range', 'gte', 'lte', 'ilike', 'in']) {
+      chain[m] = vi.fn(() => chain);
+    }
+    chain.then = (resolve: (v: unknown) => void) => resolve(result);
     return chain;
   };
   const purchaseOrdersChain = () => ({
@@ -55,18 +53,21 @@ vi.mock('../../lib/supabaseClient', () => {
     supabase: {
       from: vi.fn((table: string) => {
         if (table === 'purchase_orders') return purchaseOrdersChain();
-        if (table === 'master_supplier_categories') return categoriesChain();
-        return suppliersChain();
+        if (table === 'master_supplier_categories') return thenableChain({ data: [], error: null });
+        return thenableChain({ data: [], count: 0, error: null });
       }),
     },
   };
 });
 
 function renderPage() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter>
-      <SuppliersListPage />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <SuppliersListPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
