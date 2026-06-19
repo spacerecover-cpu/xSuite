@@ -5,7 +5,7 @@ import { Calendar, Users, DollarSign, Check } from 'lucide-react';
 import { payrollService } from '../../lib/payrollService';
 import { payrollKeys } from '../../lib/queryKeys';
 import { Button } from '../../components/ui/Button';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { useToast } from '../../hooks/useToast';
 import { format, addDays, startOfMonth, endOfMonth } from 'date-fns';
 
@@ -68,11 +68,7 @@ export default function ProcessPayrollPage() {
 
   return (
     <div className="p-8 max-w-[1200px] mx-auto">
-      <PageHeader
-        title="Process Payroll"
-        description="Create and process payroll for employees"
-        icon={DollarSign}
-      />
+      <PageHeaderSlot title="Process Payroll" />
 
       <div className="mb-8 flex items-center">
         {[1, 2, 3].map((s) => (

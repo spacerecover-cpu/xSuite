@@ -6,7 +6,7 @@ import { payrollService } from '../../lib/payrollService';
 import { payrollKeys } from '../../lib/queryKeys';
 import { Button } from '../../components/ui/Button';
 import { Skeleton } from '../../components/ui/Skeleton';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { useCurrency } from '../../hooks/useCurrency';
 import { format } from 'date-fns';
 
@@ -28,10 +28,16 @@ export default function PayrollHistoryPage() {
 
   return (
     <div className="p-8 max-w-[1800px] mx-auto">
-      <PageHeader
+      <PageHeaderSlot
         title="Payroll History"
-        description="View and manage all payroll periods"
-        icon={Calendar}
+        actions={
+          <Link to="/payroll/process">
+            <Button>
+              <Calendar className="w-4 h-4 mr-2" />
+              Process New Payroll
+            </Button>
+          </Link>
+        }
       />
 
       <div className="mb-6 flex flex-wrap gap-4">
@@ -62,15 +68,6 @@ export default function PayrollHistoryPage() {
             <option value="paid">Paid</option>
             <option value="cancelled">Cancelled</option>
           </select>
-        </div>
-
-        <div className="ml-auto">
-          <Link to="/payroll/process">
-            <Button>
-              <Calendar className="w-4 h-4 mr-2" />
-              Process New Payroll
-            </Button>
-          </Link>
         </div>
       </div>
 

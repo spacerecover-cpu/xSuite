@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Save, RotateCcw, Settings } from 'lucide-react';
+import { Save, RotateCcw } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { payrollService } from '../../lib/payrollService';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
 import { supabase } from '../../lib/supabaseClient';
@@ -137,10 +137,29 @@ export const PayrollSettingsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHeaderSlot
         title="Payroll Settings"
-        description="Configure payroll calculation parameters and defaults"
-        icon={Settings}
+        actions={
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleReset}
+              disabled={resetSettingsMutation.isPending}
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Reset to Defaults
+            </Button>
+            <Button
+              type="button"
+              onClick={() => updateSettingsMutation.mutate(formData)}
+              disabled={updateSettingsMutation.isPending}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {updateSettingsMutation.isPending ? 'Saving...' : 'Save Settings'}
+            </Button>
+          </>
+        }
       />
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -334,21 +353,6 @@ export const PayrollSettingsPage: React.FC = () => {
           </div>
         </Card>
 
-        <div className="flex justify-between items-center pt-6">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleReset}
-            disabled={resetSettingsMutation.isPending}
-          >
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Reset to Defaults
-          </Button>
-          <Button type="submit" disabled={updateSettingsMutation.isPending}>
-            <Save className="h-4 w-4 mr-2" />
-            {updateSettingsMutation.isPending ? 'Saving...' : 'Save Settings'}
-          </Button>
-        </div>
       </form>
     </div>
   );

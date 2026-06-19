@@ -4,7 +4,7 @@ import { Plus, CreditCard as Edit2, Trash2, ToggleLeft, ToggleRight } from 'luci
 import { payrollService } from '../../lib/payrollService';
 import { payrollKeys } from '../../lib/queryKeys';
 import { Button } from '../../components/ui/Button';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Badge } from '../../components/ui/Badge';
 import { useToast } from '../../hooks/useToast';
 import { SalaryComponentFormModal } from '../../components/payroll/SalaryComponentFormModal';
@@ -94,17 +94,15 @@ export default function SalaryComponentsPage() {
 
   return (
     <div className="p-8 max-w-[1400px] mx-auto">
-      <PageHeader
+      <PageHeaderSlot
         title="Salary Components"
-        description="Manage earnings and deductions that make up employee salaries"
+        actions={
+          <Button onClick={handleAdd}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Component
+          </Button>
+        }
       />
-
-      <div className="mb-6 flex justify-end">
-        <Button onClick={handleAdd}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Component
-        </Button>
-      </div>
 
       <div className="space-y-8">
         <div>

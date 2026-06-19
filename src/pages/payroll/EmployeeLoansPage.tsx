@@ -8,7 +8,7 @@ import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { StatsCard } from '../../components/ui/StatsCard';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { LoanFormModal } from '../../components/payroll/LoanFormModal';
 import { LoanDetailModal } from '../../components/payroll/LoanDetailModal';
 import { useCurrency } from '../../hooks/useCurrency';
@@ -106,9 +106,8 @@ export const EmployeeLoansPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHeaderSlot
         title="Employee Loans"
-        description="Manage employee loans, advances, and repayment schedules"
         actions={
           <Button onClick={() => setShowLoanForm(true)}>
             <Plus className="h-4 w-4 mr-2" />
