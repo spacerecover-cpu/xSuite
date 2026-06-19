@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { PendingApprovalScreen } from './PendingApprovalScreen';
 import { MFAChallenge } from './auth/MFAChallenge';
+import { PasswordChangeModal } from './users/PasswordChangeModal';
 
 interface ProtectedRouteProps {
   /** Omit to use the guard as a pathless layout route — children render via <Outlet/>. */
@@ -44,7 +45,7 @@ const AuthLoadingSkeleton = () => (
 );
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
-  const { user, profile, loading, profileStatus, mfaPending, completeMFAChallenge, signOut } = useAuth();
+  const { user, profile, loading, profileStatus, mfaPending, passwordResetRequired, completeMFAChallenge, signOut } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -108,6 +109,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
   // settles (redirect on signed-out, or profile resolves).
   if (!profile) {
     return <AuthLoadingSkeleton />;
+  }
+
+  // Forced password rotation: enforce on every route, not just /login, so a
+  // deep link or browser refresh can't walk past an admin-mandated reset (H5).
+  if (passwordResetRequired) {
+    return <PasswordChangeModal isOpen userName={profile.full_name} />;
   }
 
   const isPlatformAdmin = !profile.tenant_id && (profile.role === 'owner' || profile.role === 'admin');

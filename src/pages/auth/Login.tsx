@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { PasswordChangeModal } from '../../components/users/PasswordChangeModal';
 import { MFAChallenge } from '../../components/auth/MFAChallenge';
 import { AuthLayout } from '../../components/auth/shared/AuthLayout';
+import { safeInternalRedirect } from '../../lib/utils';
 import { BrandShowcase } from './login/BrandShowcase';
 import { LoginForm } from './login/LoginForm';
 
@@ -45,7 +46,7 @@ export const Login: React.FC = () => {
     if (profile && !passwordResetRequired && !mfaPending && !hasRedirected.current && profileStatus === 'approved') {
       hasRedirected.current = true;
       const isPlatformAdmin = !profile.tenant_id && (profile.role === 'owner' || profile.role === 'admin');
-      const from = (location.state as { from?: { pathname?: string } })?.from?.pathname;
+      const from = safeInternalRedirect((location.state as { from?: { pathname?: string } })?.from?.pathname);
       const defaultPath = isPlatformAdmin ? '/platform-admin' : '/';
       navigate(from || defaultPath, { replace: true });
     }

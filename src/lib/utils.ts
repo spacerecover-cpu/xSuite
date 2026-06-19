@@ -20,4 +20,18 @@ export function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+/**
+ * Validate a post-login `from` redirect target. Returns the path only when it
+ * is a safe root-relative app path; otherwise null (caller falls back to a
+ * default). Rejects protocol-relative (`//host`) and backslash variants that
+ * browsers normalize into off-site navigations, and anything not starting with
+ * a single `/` (absolute URLs, `javascript:` schemes).
+ */
+export function safeInternalRedirect(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (!path.startsWith('/')) return null;
+  if (path.startsWith('//') || path.startsWith('/\\')) return null;
+  return path;
+}
+
 export type { ClassValue };

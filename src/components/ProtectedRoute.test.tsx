@@ -8,6 +8,9 @@ vi.mock('../contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 // MFAChallenge → mfaService → supabaseClient, whose module-load env check would
 // throw in the test container (no .env). It's never called while just rendering.
 vi.mock('../lib/supabaseClient', () => ({ supabase: {} }));
+// PasswordChangeModal pulls in userManagementService → supabaseClient; only used
+// on submit, not on render.
+vi.mock('../lib/userManagementService', () => ({ userManagementService: { changePassword: vi.fn() } }));
 
 const DEFAULTS = {
   user: { id: 'u1' },
@@ -83,6 +86,15 @@ describe('ProtectedRoute', () => {
     setAuth({ profile: APPROVED_PROFILE, profileStatus: 'approved', mfaPending: true });
     renderRoute();
     expect(screen.getByText('Two-Factor Authentication')).toBeInTheDocument();
+    expect(screen.queryByText('protected content')).not.toBeInTheDocument();
+  });
+
+  it('forces the password-change modal (not protected content) when passwordResetRequired, on any route (H5)', () => {
+    // Forced rotation was only enforced on /login, so a deep link / refresh
+    // walked straight into the app. Gate it in ProtectedRoute too.
+    setAuth({ profile: APPROVED_PROFILE, profileStatus: 'approved', passwordResetRequired: true });
+    renderRoute();
+    expect(screen.getByText('Change Your Password')).toBeInTheDocument();
     expect(screen.queryByText('protected content')).not.toBeInTheDocument();
   });
 });
