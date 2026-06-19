@@ -23,6 +23,9 @@ interface ConfigurableDataTableProps<T> {
   /** Persist user column widths (called once per resize gesture, on release). */
   onWidthsChange?: (widths: Record<string, number>) => void;
   rowAriaLabel?: (row: T) => string;
+  /** Extra classes per row (e.g. status-based row tinting); applied to the
+   *  desktop <tr> and the mobile card alike. */
+  rowClassName?: (row: T) => string | undefined;
 }
 
 const SELECTION_W = 48;
@@ -44,6 +47,7 @@ export function ConfigurableDataTable<T>({
   selection,
   onWidthsChange,
   rowAriaLabel,
+  rowClassName,
 }: ConfigurableDataTableProps<T>) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = useState<number>(1200);
@@ -216,6 +220,7 @@ export function ConfigurableDataTable<T>({
                     className={cn(
                       'transition-colors hover:bg-slate-50',
                       onRowClick && 'cursor-pointer',
+                      rowClassName?.(row),
                       isSelected && 'bg-info-muted/30',
                     )}
                   >
@@ -294,7 +299,7 @@ export function ConfigurableDataTable<T>({
               onKeyDown={onRowClick ? (e) => handleRowKeyDown(e, row) : undefined}
               role={onRowClick ? 'button' : undefined}
               tabIndex={onRowClick ? 0 : undefined}
-              className={cn('p-4', onRowClick && 'cursor-pointer hover:bg-slate-50', isSelected && 'bg-info-muted/30')}
+              className={cn('p-4', onRowClick && 'cursor-pointer hover:bg-slate-50', rowClassName?.(row), isSelected && 'bg-info-muted/30')}
             >
               {selection ? (
                 <label

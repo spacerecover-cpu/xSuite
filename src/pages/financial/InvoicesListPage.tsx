@@ -98,11 +98,6 @@ export const InvoicesListPage: React.FC<unknown> = () => {
     return 'N/A';
   };
 
-  // Invoice.id is technically string | undefined in the service-layer
-  // interface (it carries through unsaved drafts), so filter to defined
-  // strings before handing the list to the selection state.
-  const visibleIds = invoices.map((i) => i.id).filter((id): id is string => Boolean(id));
-
   // Edit opens the form modal after re-fetching the row + its live line items,
   // exactly as the inline row handler did before the table was extracted.
   const handleEditInvoice = async (invoice: InvoiceWithDetails) => {
@@ -346,7 +341,6 @@ export const InvoicesListPage: React.FC<unknown> = () => {
         <InvoicesTable
           rows={invoices}
           selection={selection}
-          visibleIds={visibleIds}
           navigate={navigate}
           formatCurrency={formatCurrency}
           getTypeColor={getTypeColor}

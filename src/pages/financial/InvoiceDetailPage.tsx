@@ -234,7 +234,13 @@ export const InvoiceDetailPage: React.FC = () => {
   const outsideContent = (
     <>
       <style>{`
-        @media (min-width: 1280px) {
+        /* True-to-print A4 preview only once the 2/3 document column can
+           actually hold 210mm (~794px). With the 288px sidebar + page gutters
+           that needs a ~1800px viewport; below it the fluid rule beneath takes
+           over so the page never clips its right edge on a 13" laptop. The PDF
+           is generated programmatically (pdfmake), so this on-screen sizing
+           never affects the downloaded document. */
+        @media (min-width: 1800px) {
           #invoice-print-content {
             position: relative;
             width: 210mm;
@@ -259,7 +265,7 @@ export const InvoiceDetailPage: React.FC = () => {
           }
         }
 
-        @media (max-width: 1279px) {
+        @media (max-width: 1799px) {
           #invoice-print-content {
             position: relative;
             width: 100%;
