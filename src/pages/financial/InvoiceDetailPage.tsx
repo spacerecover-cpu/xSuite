@@ -6,7 +6,7 @@ import type { Invoice, InvoiceItem, InvoiceWithDetails } from '../../lib/invoice
 import { getInvoiceEditability, canRecordPayment as invoiceCanRecordPayment, canIssueInvoice as invoiceCanIssue, canCreditInvoice as invoiceCanCredit, getPaymentSummary } from '../../lib/invoicePermissions';
 import { PaymentSummaryBar } from '../../components/financial/PaymentSummaryBar';
 import { PaymentHistoryTable } from '../../components/financial/PaymentHistoryTable';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { DetailPageHeader } from '../../components/shared/DetailPageHeader';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -503,16 +503,126 @@ export const InvoiceDetailPage: React.FC = () => {
         }
       `}</style>
 
-      <div className="p-4 md:p-8 max-w-[1800px] mx-auto">
-        <button
-          onClick={() => navigate('/invoices')}
-          className="flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-6 transition-all hover:gap-3 font-medium"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span>Back to Invoices</span>
-        </button>
+      <div className="px-6 py-5 max-w-[1800px] mx-auto">
+        <DetailPageHeader
+          breadcrumbs={[
+            { label: 'Invoices', to: '/invoices' },
+            { label: `Invoice ${invoice.invoice_number || 'Draft'}` },
+          ]}
+          badges={
+            <>
+              <div className="flex items-center gap-2">
+                <StatusIcon className="w-5 h-5" />
+                <Badge variant="custom" color={statusConfig[invoice.status as keyof typeof statusConfig]?.color || 'secondary'}>
+                  {statusConfig[invoice.status as keyof typeof statusConfig]?.label || invoice.status}
+                </Badge>
+              </div>
+              <Badge variant="custom" color={typeConfig[invoice.invoice_type as keyof typeof typeConfig]?.color || '#64748b'}>
+                {typeConfig[invoice.invoice_type as keyof typeof typeConfig]?.label || invoice.invoice_type}
+              </Badge>
+            </>
+          }
+          actions={
+            <>
+              <PDFDownloadButton
+                onClick={handleDownloadPDF}
+                isGenerating={isGenerating}
+                disabled={isLoadingSettings || isLoadingTranslations || !translationsReady || !settingsReady || translationsError || settingsError}
+              />
+              {canEdit && (
+                <Button onClick={handleOpenEdit} variant="secondary">
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit Invoice
+                </Button>
+              )}
+              {canIssue && (
+                <Button onClick={handleIssueInvoice}>
+                  <Send className="w-4 h-4 mr-2" />
+                  Issue Invoice
+                </Button>
+              )}
+              {canRecordPayment && (
+                <Button onClick={() => setShowPaymentModal(true)} variant="secondary">
+                  <DollarSign className="w-4 h-4 mr-2" />
+                  Record Payment
+                </Button>
+              )}
+              {canCredit && (
+                <Button onClick={() => setShowCreditNoteModal(true)} variant="secondary">
+                  <FileMinus className="w-4 h-4 mr-2" />
+                  Create Credit Note
+                </Button>
+              )}
+              {canConvert && (
+                <Button onClick={handleConvertToTax} variant="secondary">
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Convert to Tax Invoice
+                </Button>
+              )}
+              {hasConversionHistory && (
+                <Button onClick={handleViewConversionHistory} variant="secondary">
+                  <ArrowRight className="w-4 h-4 mr-2" />
+                  View Conversion History
+                </Button>
+              )}
+            </>
+          }
+          meta={
+            <AuditInfo
+              variant="inline"
+              createdAt={invoice.created_at}
+              createdByName={nameOf(invoice.created_by)}
+              updatedAt={invoice.updated_at}
+              updatedByName={nameOf(invoice.updated_by)}
+            />
+          }
+        />
 
-        <PageHeader title={`Invoice ${invoice.invoice_number || 'Draft'}`} />
+        {/* Alerts: errors, loading, and conversion-state notices */}
+        <div className="px-6 space-y-2">
+          {(translationsError || settingsError || resourceError) && (
+            <div className="bg-danger-muted border border-danger/30 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h4 className="text-sm font-semibold text-danger mb-1">Cannot Generate PDF</h4>
+                  <p className="text-sm text-danger">
+                    {translationsError && translationsErrorMessage}
+                    {settingsError && resourceError}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          {(isLoadingTranslations || isLoadingSettings) && !translationsError && !settingsError && (
+            <div className="bg-info-muted border border-info/30 rounded-lg p-3">
+              <div className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                <span className="text-sm text-info">
+                  Loading resources...
+                </span>
+              </div>
+            </div>
+          )}
+          {isConverted && (
+            <div className="p-3 bg-info-muted border border-info/30 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium text-info">Read-Only (Converted)</span>
+              </div>
+              {/* v1.0.0: no `converted_to_invoice_id` column. Link via conversion history (B8). */}
+            </div>
+          )}
+          {wasConvertedFromProforma && (
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <ArrowRight className="w-4 h-4 text-slate-600" />
+                <span className="text-sm font-medium text-slate-700">Created from Proforma</span>
+              </div>
+              {/* v1.0.0: no `proforma_invoice_id` column. The proforma quote_id is in `converted_from_quote_id` (B8 to wire navigation). */}
+            </div>
+          )}
+        </div>
 
         <div className="flex flex-col xl:grid xl:grid-cols-3 gap-6 mb-6">
           <div className="xl:col-span-2 w-full">
@@ -527,152 +637,9 @@ export const InvoiceDetailPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="xl:col-span-1 space-y-6">
-            {/* Status & Type Card */}
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4">Status</h3>
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <StatusIcon className="w-5 h-5" />
-                  <Badge variant="custom" color={statusConfig[invoice.status as keyof typeof statusConfig]?.color || 'secondary'}>
-                    {statusConfig[invoice.status as keyof typeof statusConfig]?.label || invoice.status}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-3">
-                  <FileText className="w-5 h-5" />
-                  <Badge variant="custom" color={typeConfig[invoice.invoice_type as keyof typeof typeConfig]?.color || '#64748b'}>
-                    {typeConfig[invoice.invoice_type as keyof typeof typeConfig]?.label || invoice.invoice_type}
-                  </Badge>
-                </div>
-
-                {isConverted && (
-                  <div className="mt-4 p-3 bg-info-muted border border-info/30 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Lock className="w-4 h-4 text-primary" />
-                      <span className="text-sm font-medium text-info">Read-Only (Converted)</span>
-                    </div>
-                    {/* v1.0.0: no `converted_to_invoice_id` column. Link via conversion history (B8). */}
-                  </div>
-                )}
-
-                {wasConvertedFromProforma && (
-                  <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <ArrowRight className="w-4 h-4 text-slate-600" />
-                      <span className="text-sm font-medium text-slate-700">Created from Proforma</span>
-                    </div>
-                    {/* v1.0.0: no `proforma_invoice_id` column. The proforma quote_id is in `converted_from_quote_id` (B8 to wire navigation). */}
-                  </div>
-                )}
-              </div>
-            </Card>
-
-            {/* Actions Card */}
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4">Actions</h3>
-
-              {/* Error Messages */}
-              {(translationsError || settingsError || resourceError) && (
-                <div className="bg-danger-muted border border-danger/30 rounded-lg p-3 mb-4">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <h4 className="text-sm font-semibold text-danger mb-1">Cannot Generate PDF</h4>
-                      <p className="text-sm text-danger">
-                        {translationsError && translationsErrorMessage}
-                        {settingsError && resourceError}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Loading Status */}
-              {(isLoadingTranslations || isLoadingSettings) && !translationsError && !settingsError && (
-                <div className="bg-info-muted border border-info/30 rounded-lg p-3 mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                    <span className="text-sm text-info">
-                      Loading resources...
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-3">
-                <PDFDownloadButton
-                  onClick={handleDownloadPDF}
-                  isGenerating={isGenerating}
-                  disabled={isLoadingSettings || isLoadingTranslations || !translationsReady || !settingsReady || translationsError || settingsError}
-                  className="w-full"
-                />
-
-                {canEdit && (
-                  <Button
-                    onClick={handleOpenEdit}
-                    variant="secondary"
-                    className="w-full"
-                  >
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit Invoice
-                  </Button>
-                )}
-
-                {canIssue && (
-                  <Button onClick={handleIssueInvoice} className="w-full">
-                    <Send className="w-4 h-4 mr-2" />
-                    Issue Invoice
-                  </Button>
-                )}
-
-                {canRecordPayment && (
-                  <Button
-                    onClick={() => setShowPaymentModal(true)}
-                    variant="secondary"
-                    className="w-full"
-                  >
-                    <DollarSign className="w-4 h-4 mr-2" />
-                    Record Payment
-                  </Button>
-                )}
-
-                {canCredit && (
-                  <Button
-                    onClick={() => setShowCreditNoteModal(true)}
-                    variant="secondary"
-                    className="w-full"
-                  >
-                    <FileMinus className="w-4 h-4 mr-2" />
-                    Create Credit Note
-                  </Button>
-                )}
-
-                {canConvert && (
-                  <Button
-                    onClick={handleConvertToTax}
-                    variant="secondary"
-                    className="w-full"
-                  >
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Convert to Tax Invoice
-                  </Button>
-                )}
-
-                {hasConversionHistory && (
-                  <Button
-                    onClick={handleViewConversionHistory}
-                    variant="secondary"
-                    className="w-full"
-                  >
-                    <ArrowRight className="w-4 h-4 mr-2" />
-                    View Conversion History
-                  </Button>
-                )}
-              </div>
-            </Card>
-
+          <div className="xl:col-span-1 space-y-4">
             {/* Invoice Details */}
-            <Card className="p-6">
+            <Card className="p-4">
               <h3 className="text-lg font-semibold text-slate-900 mb-4">Invoice Details</h3>
               <div className="space-y-3 text-sm">
                 <div>
@@ -687,13 +654,6 @@ export const InvoiceDetailPage: React.FC = () => {
                     {new Date(invoice.due_date).toLocaleDateString()}
                   </span>
                 </div>
-                <AuditInfo
-                  variant="stacked"
-                  createdAt={invoice.created_at}
-                  createdByName={nameOf(invoice.created_by)}
-                  updatedAt={invoice.updated_at}
-                  updatedByName={nameOf(invoice.updated_by)}
-                />
                 <div className="pt-2 border-t">
                   <span className="text-slate-600">Total:</span>
                   <span className="ml-2 text-slate-900 font-bold">
@@ -722,7 +682,7 @@ export const InvoiceDetailPage: React.FC = () => {
               </div>
             </Card>
 
-            <Card className="p-6">
+            <Card className="p-4">
               <div className="flex items-center gap-2 mb-4">
                 <Receipt className="w-4 h-4 text-slate-600" />
                 <h3 className="text-lg font-semibold text-slate-900">Payment History</h3>
@@ -738,7 +698,7 @@ export const InvoiceDetailPage: React.FC = () => {
             </Card>
 
             {creditNotes.length > 0 && (
-              <Card className="p-6">
+              <Card className="p-4">
                 <div className="flex items-center gap-2 mb-4">
                   <FileMinus className="w-4 h-4 text-slate-600" />
                   <h3 className="text-lg font-semibold text-slate-900">Credit Notes</h3>
