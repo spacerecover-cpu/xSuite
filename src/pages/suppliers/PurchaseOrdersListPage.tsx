@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Package, DollarSign, Clock, CheckCircle } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Button } from '../../components/ui/Button';
 import { DataTable, type Column } from '../../components/shared/DataTable';
 import { ExportButton } from '../../components/shared/ExportButton';
 import { Badge } from '../../components/ui/Badge';
-import { StatsCard } from '../../components/ui/StatsCard';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
+import { KpiRow } from '../../components/templates/KpiRow';
 import { Input } from '../../components/ui/Input';
-import { Pager } from '../../components/ui/Pager';
 import PurchaseOrderFormModal from '../../components/suppliers/PurchaseOrderFormModal';
 import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
@@ -249,131 +248,106 @@ export default function PurchaseOrdersListPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <PageHeaderSlot
-        title="Purchase Orders"
-        actions={
-          <Button onClick={() => setShowAddModal(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Create Purchase Order
-          </Button>
-        }
-      />
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatsCard
-          title="Total Orders"
-          value={(stats?.total ?? 0).toString()}
-          icon={Package}
+    <ListPageTemplate
+      title="Purchase Orders"
+      headerActions={
+        <Button onClick={() => setShowAddModal(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Create Purchase Order
+        </Button>
+      }
+      kpis={
+        <KpiRow
+          stats={[
+            { label: 'Total Orders', value: (stats?.total ?? 0).toString() },
+            { label: 'Pending Orders', value: (stats?.pending ?? 0).toString(), tone: 'warning' },
+            { label: 'Approved/Received', value: (stats?.approved ?? 0).toString(), tone: 'success' },
+            { label: 'Total Value', value: formatCurrency(stats?.totalValue ?? 0), tone: 'info' },
+          ]}
         />
-        <StatsCard
-          title="Pending Orders"
-          value={(stats?.pending ?? 0).toString()}
-          icon={Clock}
-          color="orange"
-        />
-        <StatsCard
-          title="Approved/Received"
-          value={(stats?.approved ?? 0).toString()}
-          icon={CheckCircle}
-          color="green"
-        />
-        <StatsCard
-          title="Total Value"
-          value={formatCurrency(stats?.totalValue ?? 0)}
-          icon={DollarSign}
-          color="blue"
-        />
-      </div>
-
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <Input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by PO number, supplier..."
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
-              >
-                <option value="all">All Statuses</option>
-                {statuses.map((status) => (
-                  <option key={status.id} value={status.id}>
-                    {status.name}
-                  </option>
-                ))}
-              </select>
-
-              <ExportButton
-                filename="purchase-orders"
-                columns={[
-                  { key: 'po_number', label: 'PO #' },
-                  { key: 'order_date', label: 'Order Date' },
-                  { key: 'expected_delivery_date', label: 'Expected' },
-                  { key: 'received_at', label: 'Received' },
-                  {
-                    key: (r) => (r.suppliers as { name?: string } | null)?.name,
-                    label: 'Supplier',
-                  },
-                  { key: 'currency', label: 'Currency' },
-                  { key: 'subtotal', label: 'Subtotal' },
-                  { key: 'tax_amount', label: 'Tax' },
-                  { key: 'shipping_cost', label: 'Shipping' },
-                  { key: 'total_amount', label: 'Total' },
-                  {
-                    key: (r) => (r.master_purchase_order_statuses as { name?: string } | null)?.name,
-                    label: 'Status',
-                  },
-                ]}
-                getRows={async () => {
-                  let q = supabase
-                    .from('purchase_orders')
-                    .select('po_number, order_date, expected_delivery_date, received_at, currency, subtotal, tax_amount, shipping_cost, total_amount, suppliers:supplier_id(name), master_purchase_order_statuses:status_id(name)')
-                    .is('deleted_at', null);
-                  if (searchQuery) {
-                    q = q.ilike('po_number', `%${searchQuery}%`);
-                  }
-                  if (statusFilter !== 'all') q = q.eq('status_id', statusFilter);
-                  const { data, error } = await q.order('order_date', { ascending: false, nullsFirst: false });
-                  if (error) throw error;
-                  return data ?? [];
-                }}
+      }
+      toolbar={
+        <div className="mb-4 flex flex-col md:flex-row gap-4">
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by PO number, supplier..."
+                className="pl-10"
               />
             </div>
           </div>
+
+          <div className="flex gap-2">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+            >
+              <option value="all">All Statuses</option>
+              {statuses.map((status) => (
+                <option key={status.id} value={status.id}>
+                  {status.name}
+                </option>
+              ))}
+            </select>
+
+            <ExportButton
+              filename="purchase-orders"
+              columns={[
+                { key: 'po_number', label: 'PO #' },
+                { key: 'order_date', label: 'Order Date' },
+                { key: 'expected_delivery_date', label: 'Expected' },
+                { key: 'received_at', label: 'Received' },
+                {
+                  key: (r) => (r.suppliers as { name?: string } | null)?.name,
+                  label: 'Supplier',
+                },
+                { key: 'currency', label: 'Currency' },
+                { key: 'subtotal', label: 'Subtotal' },
+                { key: 'tax_amount', label: 'Tax' },
+                { key: 'shipping_cost', label: 'Shipping' },
+                { key: 'total_amount', label: 'Total' },
+                {
+                  key: (r) => (r.master_purchase_order_statuses as { name?: string } | null)?.name,
+                  label: 'Status',
+                },
+              ]}
+              getRows={async () => {
+                let q = supabase
+                  .from('purchase_orders')
+                  .select('po_number, order_date, expected_delivery_date, received_at, currency, subtotal, tax_amount, shipping_cost, total_amount, suppliers:supplier_id(name), master_purchase_order_statuses:status_id(name)')
+                  .is('deleted_at', null);
+                if (searchQuery) {
+                  q = q.ilike('po_number', `%${searchQuery}%`);
+                }
+                if (statusFilter !== 'all') q = q.eq('status_id', statusFilter);
+                const { data, error } = await q.order('order_date', { ascending: false, nullsFirst: false });
+                if (error) throw error;
+                return data ?? [];
+              }}
+            />
+          </div>
         </div>
-
-        {loading ? (
-          <div className="p-12 text-center text-gray-500">Loading purchase orders…</div>
-        ) : (
-          <>
-            <DataTable<PurchaseOrderWithJoins>
-              columns={columns}
-              data={orders}
-              emptyMessage="No purchase orders found"
-            />
-            <Pager
-              page={page}
-              pageSize={PAGE_SIZE}
-              total={totalOrders}
-              onPageChange={setPage}
-              itemNoun="purchase orders"
-            />
-          </>
-        )}
-      </div>
-
+      }
+      loading={loading}
+      table={
+        <DataTable<PurchaseOrderWithJoins>
+          columns={columns}
+          data={orders}
+          emptyMessage="No purchase orders found"
+        />
+      }
+      pager={{
+        page,
+        pageSize: PAGE_SIZE,
+        total: totalOrders,
+        onPageChange: setPage,
+        itemNoun: 'purchase orders',
+      }}
+    >
       {showAddModal && (
         <PurchaseOrderFormModal
           isOpen={showAddModal}
@@ -395,6 +369,6 @@ export default function PurchaseOrdersListPage() {
           }
         />
       )}
-    </div>
+    </ListPageTemplate>
   );
 }

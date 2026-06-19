@@ -4,11 +4,10 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import { fetchQuotesPage, getQuoteStats, toQuoteEditInitialData } from '../../lib/quotesService';
 import type { QuoteWithDetails } from '../../lib/quotesService';
 import { Button } from '../../components/ui/Button';
-import { Pager } from '../../components/ui/Pager';
 import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
-import { FinancialModuleHeader } from '../../components/financial/FinancialModuleHeader';
-import { FinancialStatsCard } from '../../components/financial/FinancialStatsCard';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
+import { KpiRow } from '../../components/templates/KpiRow';
 import { QuoteFormModal } from '../../components/cases/QuoteFormModal';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
@@ -22,15 +21,12 @@ import { downloadCSV } from '../../lib/csvExport';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
-import { Skeleton } from '../../components/ui/Skeleton';
 import type { Database } from '../../types/database.types';
 import {
   FileText,
   Plus,
   Search,
   Filter,
-  Clock,
-  CheckCircle,
   User,
   Building2,
   Eye,
@@ -253,24 +249,6 @@ export const QuotesListPage: React.FC = () => {
     }
   };
 
-  if (isLoading || statsLoading) {
-    return (
-      <div className="p-8 max-w-[1800px] mx-auto">
-        <Skeleton className="h-24 w-full rounded-2xl mb-6" />
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 w-full rounded-2xl" />
-          ))}
-        </div>
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full rounded-lg" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   if (quotesError) {
     return (
       <div className="p-8 max-w-[1800px] mx-auto">
@@ -288,60 +266,33 @@ export const QuotesListPage: React.FC = () => {
     );
   }
 
-  return (
-    <div className="p-8 max-w-[1800px] mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex-1">
-          <FinancialModuleHeader
-            icon={<FileText className="w-7 h-7 text-white" />}
-            title="Quotes"
-            description="Manage customer quotations and proposals"
-            primaryAction={{
-              label: 'Create Quote',
-              onClick: () => setShowQuoteModal(true),
-              icon: <Plus className="w-4 h-4" />,
-            }}
-          />
-        </div>
-        <Button
-          variant="secondary"
-          onClick={() => navigate('/quotes/recycle-bin')}
-          className="ml-4"
-        >
-          <Trash2 className="w-4 h-4 mr-2" />
-          Recycle Bin
-        </Button>
-      </div>
+  const headerActions = (
+    <>
+      <Button onClick={() => setShowQuoteModal(true)}>
+        <Plus className="w-4 h-4 mr-2" />
+        Create Quote
+      </Button>
+      <Button variant="secondary" onClick={() => navigate('/quotes/recycle-bin')}>
+        <Trash2 className="w-4 h-4 mr-2" />
+        Recycle Bin
+      </Button>
+    </>
+  );
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <FinancialStatsCard
-          label="Total Invoiced"
-          value={formatCurrency(stats?.totalValue || 0)}
-          icon={<FileText className="w-5 h-5 text-white" />}
-          color="blue"
-        />
-        <FinancialStatsCard
-          label="Paid"
-          value={formatCurrency(stats?.acceptedValue || 0)}
-          icon={<CheckCircle className="w-5 h-5 text-white" />}
-          color="green"
-        />
-        <FinancialStatsCard
-          label="Outstanding"
-          value={formatCurrency(stats?.sentValue || 0)}
-          icon={<Clock className="w-5 h-5 text-white" />}
-          color="orange"
-        />
-        <FinancialStatsCard
-          label="Total Count"
-          value={stats?.total ?? 0}
-          icon={<FileText className="w-5 h-5 text-white" />}
-          color="slate"
-        />
-      </div>
+  const kpis = (
+    <KpiRow
+      stats={[
+        { label: 'Total Invoiced', value: formatCurrency(stats?.totalValue || 0), tone: 'info' },
+        { label: 'Paid', value: formatCurrency(stats?.acceptedValue || 0), tone: 'success' },
+        { label: 'Outstanding', value: formatCurrency(stats?.sentValue || 0), tone: 'warning' },
+        { label: 'Total Count', value: stats?.total ?? 0, tone: 'neutral' },
+      ]}
+    />
+  );
 
-      <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
-        <div className="p-6">
+  const toolbar = (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
+      <div className="p-6">
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
             <div className="w-full lg:w-80 relative flex-shrink-0">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
@@ -494,24 +445,27 @@ export const QuotesListPage: React.FC = () => {
           )}
         </div>
       </div>
+  );
 
-      {quotes.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
-          <EmptyState
-            icon={FileText}
-            title="No quotes found"
-            description={
-              searchTerm || statusFilter !== 'all'
-                ? 'No quotes found matching your criteria.'
-                : 'No quotes yet. Create your first quote to get started.'
-            }
-            action={{ label: 'Create Quote', onClick: () => setShowQuoteModal(true) }}
-          />
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
+  const empty = (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
+      <EmptyState
+        icon={FileText}
+        title="No quotes found"
+        description={
+          searchTerm || statusFilter !== 'all'
+            ? 'No quotes found matching your criteria.'
+            : 'No quotes yet. Create your first quote to get started.'
+        }
+        action={{ label: 'Create Quote', onClick: () => setShowQuoteModal(true) }}
+      />
+    </div>
+  );
+
+  const table = (
+    <>
+      <div className="overflow-x-auto">
+        <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   <th className="px-4 py-4 w-10">
@@ -713,10 +667,56 @@ export const QuotesListPage: React.FC = () => {
               </tbody>
             </table>
           </div>
-          <Pager page={page} pageSize={PAGE_SIZE} total={totalQuotes} onPageChange={setPage} itemNoun="quotes" />
-        </div>
-      )}
+    </>
+  );
 
+  return (
+    <ListPageTemplate
+      title="Quotes"
+      headerActions={headerActions}
+      kpis={kpis}
+      toolbar={toolbar}
+      table={table}
+      pager={{ page, pageSize: PAGE_SIZE, total: totalQuotes, onPageChange: setPage, itemNoun: 'quotes' }}
+      loading={isLoading || statsLoading}
+      isEmpty={quotes.length === 0}
+      empty={empty}
+      footer={
+        <BulkActionsBar
+          count={selection.selectedCount}
+          onClear={selection.clear}
+          itemNoun="quote"
+        >
+          <BulkActionButton
+            variant="ghost"
+            icon={<Download className="w-4 h-4" />}
+            label="Export"
+            onClick={handleBulkExport}
+            disabled={sendProgress !== null}
+          />
+          <BulkActionButton
+            variant="primary"
+            icon={<Send className="w-4 h-4" />}
+            label={
+              sendProgress
+                ? `Sending ${sendProgress.done}/${sendProgress.total}…`
+                : 'Send'
+            }
+            onClick={handleBulkSend}
+            disabled={sendProgress !== null || isArchiving}
+          />
+          {canBulkArchive && (
+            <BulkActionButton
+              variant="danger"
+              icon={<Archive className="w-4 h-4" />}
+              label={isArchiving ? 'Archiving…' : 'Archive'}
+              onClick={handleBulkArchive}
+              disabled={isArchiving || sendProgress !== null}
+            />
+          )}
+        </BulkActionsBar>
+      }
+    >
       {showQuoteModal && (
         <QuoteFormModal
           isOpen={showQuoteModal}
@@ -842,41 +842,7 @@ export const QuotesListPage: React.FC = () => {
           clientReference={editingQuote?.client_reference}
         />
       )}
-
-      <BulkActionsBar
-        count={selection.selectedCount}
-        onClear={selection.clear}
-        itemNoun="quote"
-      >
-        <BulkActionButton
-          variant="ghost"
-          icon={<Download className="w-4 h-4" />}
-          label="Export"
-          onClick={handleBulkExport}
-          disabled={sendProgress !== null}
-        />
-        <BulkActionButton
-          variant="primary"
-          icon={<Send className="w-4 h-4" />}
-          label={
-            sendProgress
-              ? `Sending ${sendProgress.done}/${sendProgress.total}…`
-              : 'Send'
-          }
-          onClick={handleBulkSend}
-          disabled={sendProgress !== null || isArchiving}
-        />
-        {canBulkArchive && (
-          <BulkActionButton
-            variant="danger"
-            icon={<Archive className="w-4 h-4" />}
-            label={isArchiving ? 'Archiving…' : 'Archive'}
-            onClick={handleBulkArchive}
-            disabled={isArchiving || sendProgress !== null}
-          />
-        )}
-      </BulkActionsBar>
-    </div>
+    </ListPageTemplate>
   );
 };
 
