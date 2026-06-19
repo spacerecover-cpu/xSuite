@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchInvoiceById, convertProformaToTaxInvoice, getConversionHistory, updateInvoice, toInvoiceEditInitialData, getPaymentHistory, issueInvoice } from '../../lib/invoiceService';
 import type { Invoice, InvoiceItem, InvoiceWithDetails } from '../../lib/invoiceService';
 import { getInvoiceEditability, canRecordPayment as invoiceCanRecordPayment, canIssueInvoice as invoiceCanIssue, canCreditInvoice as invoiceCanCredit, getPaymentSummary } from '../../lib/invoicePermissions';
 import { PaymentSummaryBar } from '../../components/financial/PaymentSummaryBar';
 import { PaymentHistoryTable } from '../../components/financial/PaymentHistoryTable';
-import { DetailPageHeader } from '../../components/shared/DetailPageHeader';
-import { Card } from '../../components/ui/Card';
+import { DetailPageTemplate } from '../../components/templates/DetailPageTemplate';
+import { DetailSidebarCard } from '../../components/templates/DetailSidebarCard';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
@@ -18,7 +18,7 @@ import { usePDFDownload } from '../../hooks/usePDFDownload';
 import { useProfileNames } from '../../hooks/useProfileNames';
 import { AuditInfo } from '../../components/ui/AuditInfo';
 import { useToast } from '../../hooks/useToast';
-import { FileText, ArrowLeft, CreditCard as Edit, DollarSign, AlertCircle, RefreshCw, CheckCircle, ArrowRight, Lock, Receipt, Send, FileMinus, Download } from 'lucide-react';
+import { FileText, CreditCard as Edit, DollarSign, AlertCircle, RefreshCw, CheckCircle, ArrowRight, Lock, Receipt, Send, FileMinus, Download } from 'lucide-react';
 import { RecordReceiptModal } from '../../components/banking/RecordReceiptModal';
 import { InvoiceFormModal } from '../../components/cases/InvoiceFormModal';
 import { CreditNoteModal } from '../../components/financial/CreditNoteModal';
@@ -45,7 +45,6 @@ const typeConfig = {
 
 export const InvoiceDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const toast = useToast();
   const { formatCurrency, currencyFormat } = useCurrency();
@@ -216,45 +215,23 @@ export const InvoiceDetailPage: React.FC = () => {
     setShowEditModal(true);
   };
 
-  if (isLoading) {
-    return (
-      <div className="px-6 py-5 max-w-[1800px] mx-auto">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-slate-200 rounded w-1/4"></div>
-          <div className="h-64 bg-slate-200 rounded"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!invoice) {
-    return (
-      <div className="px-6 py-5 max-w-[1800px] mx-auto">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-slate-900 mb-4">Invoice Not Found</h2>
-          <Button onClick={() => navigate('/invoices')}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Invoices
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  const StatusIcon = statusConfig[invoice.status as keyof typeof statusConfig]?.icon || FileText;
+  const StatusIcon = statusConfig[invoice?.status as keyof typeof statusConfig]?.icon || FileText;
   // v1.0.0: invoices has no `converted_to_invoice_id`/`proforma_invoice_id`/`converted_at` columns.
   // Conversion state is inferred from status and `converted_from_quote_id` (proforma→tax via RPC).
-  const isConverted = invoice.invoice_type === 'proforma' && invoice.status === 'converted';
-  const editability = getInvoiceEditability(invoice);
-  const canEdit = editability.mode !== 'none';
-  const canRecordPayment = invoiceCanRecordPayment(invoice);
-  const canCredit = invoiceCanCredit(invoice);
-  const canIssue = invoiceCanIssue(invoice);
-  const canConvert = invoice.invoice_type === 'proforma' && invoice.status !== 'converted';
-  const hasConversionHistory = invoice.invoice_type === 'tax_invoice' && !!invoice.converted_from_quote_id;
-  const wasConvertedFromProforma = invoice.invoice_type === 'tax_invoice' && !!invoice.converted_from_quote_id;
+  const isConverted = invoice?.invoice_type === 'proforma' && invoice?.status === 'converted';
+  const editability = invoice ? getInvoiceEditability(invoice) : null;
+  const canEdit = editability !== null && editability.mode !== 'none';
+  const canRecordPayment = invoice ? invoiceCanRecordPayment(invoice) : false;
+  const canCredit = invoice ? invoiceCanCredit(invoice) : false;
+  const canIssue = invoice ? invoiceCanIssue(invoice) : false;
+  const canConvert = invoice?.invoice_type === 'proforma' && invoice?.status !== 'converted';
+  const hasConversionHistory = invoice?.invoice_type === 'tax_invoice' && !!invoice?.converted_from_quote_id;
+  const wasConvertedFromProforma = invoice?.invoice_type === 'tax_invoice' && !!invoice?.converted_from_quote_id;
 
-  return (
+  // Rendered via DetailPageTemplate's `outside` slot — at root, in every state
+  // (including loading/not-found) — so the print CSS + modal portals are never
+  // clipped by the padded container.
+  const outsideContent = (
     <>
       <style>{`
         @media (min-width: 1280px) {
@@ -503,249 +480,6 @@ export const InvoiceDetailPage: React.FC = () => {
         }
       `}</style>
 
-      <div className="px-6 py-5 max-w-[1800px] mx-auto">
-        <DetailPageHeader
-          breadcrumbs={[
-            { label: 'Invoices', to: '/invoices' },
-            { label: `Invoice ${invoice.invoice_number || 'Draft'}` },
-          ]}
-          badges={
-            <>
-              <div className="flex items-center gap-2">
-                <StatusIcon className="w-5 h-5" />
-                <Badge variant="custom" color={statusConfig[invoice.status as keyof typeof statusConfig]?.color || 'secondary'}>
-                  {statusConfig[invoice.status as keyof typeof statusConfig]?.label || invoice.status}
-                </Badge>
-              </div>
-              <Badge variant="custom" color={typeConfig[invoice.invoice_type as keyof typeof typeConfig]?.color || '#64748b'}>
-                {typeConfig[invoice.invoice_type as keyof typeof typeConfig]?.label || invoice.invoice_type}
-              </Badge>
-            </>
-          }
-          actions={
-            <>
-              <PDFDownloadButton
-                onClick={handleDownloadPDF}
-                isGenerating={isGenerating}
-                disabled={isLoadingSettings || isLoadingTranslations || !translationsReady || !settingsReady || translationsError || settingsError}
-              />
-              {canEdit && (
-                <Button onClick={handleOpenEdit} variant="secondary">
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit Invoice
-                </Button>
-              )}
-              {canIssue && (
-                <Button onClick={handleIssueInvoice}>
-                  <Send className="w-4 h-4 mr-2" />
-                  Issue Invoice
-                </Button>
-              )}
-              {canRecordPayment && (
-                <Button onClick={() => setShowPaymentModal(true)} variant="secondary">
-                  <DollarSign className="w-4 h-4 mr-2" />
-                  Record Payment
-                </Button>
-              )}
-              {canCredit && (
-                <Button onClick={() => setShowCreditNoteModal(true)} variant="secondary">
-                  <FileMinus className="w-4 h-4 mr-2" />
-                  Create Credit Note
-                </Button>
-              )}
-              {canConvert && (
-                <Button onClick={handleConvertToTax} variant="secondary">
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Convert to Tax Invoice
-                </Button>
-              )}
-              {hasConversionHistory && (
-                <Button onClick={handleViewConversionHistory} variant="secondary">
-                  <ArrowRight className="w-4 h-4 mr-2" />
-                  View Conversion History
-                </Button>
-              )}
-            </>
-          }
-          meta={
-            <AuditInfo
-              variant="inline"
-              createdAt={invoice.created_at}
-              createdByName={nameOf(invoice.created_by)}
-              updatedAt={invoice.updated_at}
-              updatedByName={nameOf(invoice.updated_by)}
-            />
-          }
-        />
-
-        {/* Alerts: errors, loading, and conversion-state notices */}
-        <div className="space-y-2 empty:hidden mb-4">
-          {(translationsError || settingsError || resourceError) && (
-            <div className="bg-danger-muted border border-danger/30 rounded-lg p-3">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <h4 className="text-sm font-semibold text-danger mb-1">Cannot Generate PDF</h4>
-                  <p className="text-sm text-danger">
-                    {translationsError && translationsErrorMessage}
-                    {settingsError && resourceError}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-          {(isLoadingTranslations || isLoadingSettings) && !translationsError && !settingsError && (
-            <div className="bg-info-muted border border-info/30 rounded-lg p-3">
-              <div className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                <span className="text-sm text-info">
-                  Loading resources...
-                </span>
-              </div>
-            </div>
-          )}
-          {isConverted && (
-            <div className="p-3 bg-info-muted border border-info/30 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Lock className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium text-info">Read-Only (Converted)</span>
-              </div>
-              {/* v1.0.0: no `converted_to_invoice_id` column. Link via conversion history (B8). */}
-            </div>
-          )}
-          {wasConvertedFromProforma && (
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-              <div className="flex items-center gap-2">
-                <ArrowRight className="w-4 h-4 text-slate-600" />
-                <span className="text-sm font-medium text-slate-700">Created from Proforma</span>
-              </div>
-              {/* v1.0.0: no `proforma_invoice_id` column. The proforma quote_id is in `converted_from_quote_id` (B8 to wire navigation). */}
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-col xl:grid xl:grid-cols-3 gap-6 mb-6">
-          <div className="xl:col-span-2 w-full">
-            <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-3 sm:p-6 min-w-0 overflow-x-auto">
-              <InvoiceDocument
-                invoice={invoice as unknown as Record<string, unknown>}
-                companySettings={companySettings}
-                currencyFormat={currencyFormat}
-                t={tForDocument}
-                elementId="invoice-print-content"
-              />
-            </div>
-          </div>
-
-          <div className="xl:col-span-1 space-y-4">
-            {/* Invoice Details */}
-            <Card className="p-4">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4">Invoice Details</h3>
-              <div className="space-y-3 text-sm">
-                <div>
-                  <span className="text-slate-600">Invoice Date:</span>
-                  <span className="ml-2 text-slate-900 font-medium">
-                    {new Date(invoice.invoice_date).toLocaleDateString()}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-600">Due Date:</span>
-                  <span className="ml-2 text-slate-900 font-medium">
-                    {new Date(invoice.due_date).toLocaleDateString()}
-                  </span>
-                </div>
-                <div className="pt-2 border-t">
-                  <span className="text-slate-600">Total:</span>
-                  <span className="ml-2 text-slate-900 font-bold">
-                    {formatCurrency(invoice.total_amount || 0)}
-                  </span>
-                </div>
-                {(invoice.amount_paid ?? 0) > 0 && (
-                  <>
-                    <div>
-                      <span className="text-success">Paid:</span>
-                      <span className="ml-2 text-success font-bold">
-                        {formatCurrency(invoice.amount_paid ?? 0)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-warning">Balance Due:</span>
-                      <span className="ml-2 text-warning font-bold">
-                        {formatCurrency(
-                          invoice.balance_due ??
-                            ((invoice.total_amount ?? 0) - (invoice.amount_paid ?? 0))
-                        )}
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </Card>
-
-            <Card className="p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <Receipt className="w-4 h-4 text-slate-600" />
-                <h3 className="text-lg font-semibold text-slate-900">Payment History</h3>
-              </div>
-              <div className="space-y-3">
-                <PaymentSummaryBar summary={getPaymentSummary(invoice)} formatMoney={formatCurrency} />
-                <PaymentHistoryTable
-                  entries={payments}
-                  formatMoney={formatCurrency}
-                  formatDate={(d) => (d ? new Date(d).toLocaleDateString() : '—')}
-                />
-              </div>
-            </Card>
-
-            {creditNotes.length > 0 && (
-              <Card className="p-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <FileMinus className="w-4 h-4 text-slate-600" />
-                  <h3 className="text-lg font-semibold text-slate-900">Credit Notes</h3>
-                </div>
-                <div className="divide-y divide-border">
-                  {creditNotes.map((cn) => (
-                    <div key={cn.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                      <div className="min-w-0">
-                        <p className="font-medium text-slate-900">{cn.credit_note_number}</p>
-                        <p className="text-xs text-slate-500">
-                          {cn.credit_note_date ? new Date(cn.credit_note_date).toLocaleDateString() : '—'}
-                          {cn.reason_code ? ` · ${cn.reason_code.replace(/_/g, ' ')}` : ''}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {cn.status === 'void' && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Void</span>
-                        )}
-                        <span
-                          className={`font-semibold tabular-nums ${cn.status === 'void' ? 'text-slate-400 line-through' : 'text-slate-900'}`}
-                        >
-                          −{formatCurrency(cn.total_amount || 0)}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleDownloadCreditNote(cn.id)}
-                          disabled={downloadingCnId === cn.id}
-                          className="p-1 text-slate-400 hover:text-primary disabled:opacity-50"
-                          title="Download credit note PDF"
-                          aria-label="Download credit note PDF"
-                        >
-                          {downloadingCnId === cn.id ? (
-                            <span className="block w-4 h-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                          ) : (
-                            <Download className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Record Payment Modal */}
       {showPaymentModal && id && (
         <RecordReceiptModal
@@ -901,6 +635,248 @@ export const InvoiceDetailPage: React.FC = () => {
         </div>
       </Modal>
     </>
+  );
+
+  return (
+    <DetailPageTemplate
+      loading={isLoading}
+      notFound={!isLoading && !invoice}
+      backTo={{ to: '/invoices', label: 'Back to Invoices' }}
+      outside={outsideContent}
+      header={{
+        breadcrumbs: [
+          { label: 'Invoices', to: '/invoices' },
+          { label: `Invoice ${invoice?.invoice_number || 'Draft'}` },
+        ],
+        badges: (
+          <>
+            <div className="flex items-center gap-2">
+              <StatusIcon className="w-5 h-5" />
+              <Badge variant="custom" color={statusConfig[invoice?.status as keyof typeof statusConfig]?.color || 'secondary'}>
+                {statusConfig[invoice?.status as keyof typeof statusConfig]?.label || invoice?.status}
+              </Badge>
+            </div>
+            <Badge variant="custom" color={typeConfig[invoice?.invoice_type as keyof typeof typeConfig]?.color || '#64748b'}>
+              {typeConfig[invoice?.invoice_type as keyof typeof typeConfig]?.label || invoice?.invoice_type}
+            </Badge>
+          </>
+        ),
+        actions: (
+          <>
+            <PDFDownloadButton
+              onClick={handleDownloadPDF}
+              isGenerating={isGenerating}
+              disabled={isLoadingSettings || isLoadingTranslations || !translationsReady || !settingsReady || translationsError || settingsError}
+            />
+            {canEdit && (
+              <Button onClick={handleOpenEdit} variant="secondary">
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Invoice
+              </Button>
+            )}
+            {canIssue && (
+              <Button onClick={handleIssueInvoice}>
+                <Send className="w-4 h-4 mr-2" />
+                Issue Invoice
+              </Button>
+            )}
+            {canRecordPayment && (
+              <Button onClick={() => setShowPaymentModal(true)} variant="secondary">
+                <DollarSign className="w-4 h-4 mr-2" />
+                Record Payment
+              </Button>
+            )}
+            {canCredit && (
+              <Button onClick={() => setShowCreditNoteModal(true)} variant="secondary">
+                <FileMinus className="w-4 h-4 mr-2" />
+                Create Credit Note
+              </Button>
+            )}
+            {canConvert && (
+              <Button onClick={handleConvertToTax} variant="secondary">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Convert to Tax Invoice
+              </Button>
+            )}
+            {hasConversionHistory && (
+              <Button onClick={handleViewConversionHistory} variant="secondary">
+                <ArrowRight className="w-4 h-4 mr-2" />
+                View Conversion History
+              </Button>
+            )}
+          </>
+        ),
+        meta: (
+          <AuditInfo
+            variant="inline"
+            createdAt={invoice?.created_at}
+            createdByName={nameOf(invoice?.created_by)}
+            updatedAt={invoice?.updated_at}
+            updatedByName={nameOf(invoice?.updated_by)}
+          />
+        ),
+      }}
+      alerts={
+        <>
+          {(translationsError || settingsError || resourceError) && (
+            <div className="bg-danger-muted border border-danger/30 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h4 className="text-sm font-semibold text-danger mb-1">Cannot Generate PDF</h4>
+                  <p className="text-sm text-danger">
+                    {translationsError && translationsErrorMessage}
+                    {settingsError && resourceError}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          {(isLoadingTranslations || isLoadingSettings) && !translationsError && !settingsError && (
+            <div className="bg-info-muted border border-info/30 rounded-lg p-3">
+              <div className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                <span className="text-sm text-info">
+                  Loading resources...
+                </span>
+              </div>
+            </div>
+          )}
+          {isConverted && (
+            <div className="p-3 bg-info-muted border border-info/30 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium text-info">Read-Only (Converted)</span>
+              </div>
+              {/* v1.0.0: no `converted_to_invoice_id` column. Link via conversion history (B8). */}
+            </div>
+          )}
+          {wasConvertedFromProforma && (
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <ArrowRight className="w-4 h-4 text-slate-600" />
+                <span className="text-sm font-medium text-slate-700">Created from Proforma</span>
+              </div>
+              {/* v1.0.0: no `proforma_invoice_id` column. The proforma quote_id is in `converted_from_quote_id` (B8 to wire navigation). */}
+            </div>
+          )}
+        </>
+      }
+    >
+      {invoice && (
+        <div className="flex flex-col xl:grid xl:grid-cols-3 gap-6 mb-6">
+          <div className="xl:col-span-2 w-full">
+            <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-3 sm:p-6 min-w-0 overflow-x-auto">
+              <InvoiceDocument
+                invoice={invoice as unknown as Record<string, unknown>}
+                companySettings={companySettings}
+                currencyFormat={currencyFormat}
+                t={tForDocument}
+                elementId="invoice-print-content"
+              />
+            </div>
+          </div>
+
+          <div className="xl:col-span-1 space-y-4">
+            {/* Invoice Details */}
+            <DetailSidebarCard title="Invoice Details">
+              <div className="space-y-3 text-sm">
+                <div>
+                  <span className="text-slate-600">Invoice Date:</span>
+                  <span className="ml-2 text-slate-900 font-medium">
+                    {new Date(invoice.invoice_date).toLocaleDateString()}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-600">Due Date:</span>
+                  <span className="ml-2 text-slate-900 font-medium">
+                    {new Date(invoice.due_date).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="pt-2 border-t">
+                  <span className="text-slate-600">Total:</span>
+                  <span className="ml-2 text-slate-900 font-bold">
+                    {formatCurrency(invoice.total_amount || 0)}
+                  </span>
+                </div>
+                {(invoice.amount_paid ?? 0) > 0 && (
+                  <>
+                    <div>
+                      <span className="text-success">Paid:</span>
+                      <span className="ml-2 text-success font-bold">
+                        {formatCurrency(invoice.amount_paid ?? 0)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-warning">Balance Due:</span>
+                      <span className="ml-2 text-warning font-bold">
+                        {formatCurrency(
+                          invoice.balance_due ??
+                            ((invoice.total_amount ?? 0) - (invoice.amount_paid ?? 0))
+                        )}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </DetailSidebarCard>
+
+            <DetailSidebarCard title="Payment History" icon={Receipt}>
+              <div className="space-y-3">
+                <PaymentSummaryBar summary={getPaymentSummary(invoice)} formatMoney={formatCurrency} />
+                <PaymentHistoryTable
+                  entries={payments}
+                  formatMoney={formatCurrency}
+                  formatDate={(d) => (d ? new Date(d).toLocaleDateString() : '—')}
+                />
+              </div>
+            </DetailSidebarCard>
+
+            {creditNotes.length > 0 && (
+              <DetailSidebarCard title="Credit Notes" icon={FileMinus}>
+                <div className="divide-y divide-border">
+                  {creditNotes.map((cn) => (
+                    <div key={cn.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-900">{cn.credit_note_number}</p>
+                        <p className="text-xs text-slate-500">
+                          {cn.credit_note_date ? new Date(cn.credit_note_date).toLocaleDateString() : '—'}
+                          {cn.reason_code ? ` · ${cn.reason_code.replace(/_/g, ' ')}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {cn.status === 'void' && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Void</span>
+                        )}
+                        <span
+                          className={`font-semibold tabular-nums ${cn.status === 'void' ? 'text-slate-400 line-through' : 'text-slate-900'}`}
+                        >
+                          −{formatCurrency(cn.total_amount || 0)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadCreditNote(cn.id)}
+                          disabled={downloadingCnId === cn.id}
+                          className="p-1 text-slate-400 hover:text-primary disabled:opacity-50"
+                          title="Download credit note PDF"
+                          aria-label="Download credit note PDF"
+                        >
+                          {downloadingCnId === cn.id ? (
+                            <span className="block w-4 h-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          ) : (
+                            <Download className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </DetailSidebarCard>
+            )}
+          </div>
+        </div>
+      )}
+    </DetailPageTemplate>
   );
 };
 
