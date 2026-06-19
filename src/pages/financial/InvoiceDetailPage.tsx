@@ -579,7 +579,7 @@ export const InvoiceDetailPage: React.FC = () => {
         />
 
         {/* Alerts: errors, loading, and conversion-state notices */}
-        <div className="px-6 space-y-2">
+        <div className="space-y-2 empty:hidden mb-4">
           {(translationsError || settingsError || resourceError) && (
             <div className="bg-danger-muted border border-danger/30 rounded-lg p-3">
               <div className="flex items-start gap-2">

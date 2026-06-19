@@ -24,7 +24,9 @@ export interface DetailPageHeaderProps {
  * Shared, compact detail-page header. The breadcrumb's final crumb IS the page
  * title (rendered once as an <h1>), so the title is never duplicated. Ancestor
  * crumbs are router links. `badges`, `actions`, and `meta` are caller-composed
- * slots. Container is px-6 py-5 (the detail-page density standard).
+ * slots. The block is gutter-neutral — the page's padded container (px-6 py-5)
+ * supplies the horizontal gutter so the header aligns with the page content;
+ * this adds only a bottom margin to separate from what follows.
  */
 export const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
   breadcrumbs,
@@ -35,7 +37,7 @@ export const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
   const ancestors = breadcrumbs.slice(0, -1);
   const current = breadcrumbs[breadcrumbs.length - 1];
   return (
-    <div className="px-6 py-5">
+    <div className="mb-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           {ancestors.length > 0 && (
