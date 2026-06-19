@@ -4,14 +4,13 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Button } from '../../components/ui/Button';
-import { Pager } from '../../components/ui/Pager';
 import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { Modal } from '../../components/ui/Modal';
 import { formatDate } from '../../lib/format';
 import { baseAmount } from '../../lib/financialMath';
-import { FinancialModuleHeader } from '../../components/financial/FinancialModuleHeader';
-import { FinancialStatsCard } from '../../components/financial/FinancialStatsCard';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
+import { KpiRow } from '../../components/templates/KpiRow';
 import { ExpenseFormModal } from '../../components/financial/ExpenseFormModal';
 import { useCurrency } from '../../hooks/useCurrency';
 import {
@@ -37,7 +36,6 @@ import {
   Plus,
   Search,
   Wallet,
-  TrendingUp,
   Clock,
   CheckCircle2,
   XCircle,
@@ -325,24 +323,21 @@ export const ExpensesList: React.FC = () => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="p-8 max-w-[1800px] mx-auto space-y-6">
-        <Skeleton className="h-28 w-full rounded-2xl" />
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
-          ))}
-        </div>
-        <Skeleton className="h-20 w-full rounded-2xl" />
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full rounded-lg" />
-          ))}
-        </div>
+  const loadingFallback = (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+        ))}
       </div>
-    );
-  }
+      <Skeleton className="h-20 w-full rounded-2xl" />
+      <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-12 w-full rounded-lg" />
+        ))}
+      </div>
+    </div>
+  );
 
   if (error) {
     return (
@@ -363,132 +358,135 @@ export const ExpensesList: React.FC = () => {
   }
 
   return (
-    <div className="p-8 max-w-[1800px] mx-auto">
-      <FinancialModuleHeader
-        icon={<Wallet className="w-7 h-7 text-white" />}
-        title="Expenses"
-        description="Track and manage business expenses"
-        primaryAction={{
-          label: 'Submit Expense',
-          onClick: () => {
-            setEditingExpense(null);
-            setShowExpenseModal(true);
-          },
-          icon: <Plus className="w-4 h-4" />,
-        }}
-      />
+    <ListPageTemplate
+      title="Expenses"
+      headerActions={
+        <>
+          <ExportButton
+            filename="expenses"
+            columns={[
+              { key: 'expense_number', label: 'Expense #' },
+              { key: 'expense_date', label: 'Date' },
+              { key: 'vendor', label: 'Vendor' },
+              { key: 'description', label: 'Description' },
+              {
+                key: (r) => (r.master_expense_categories as { name?: string } | null)?.name,
+                label: 'Category',
+              },
+              { key: 'amount', label: 'Amount' },
+              { key: 'tax_amount', label: 'Tax' },
+              { key: 'currency', label: 'Currency' },
+              { key: 'status', label: 'Status' },
+              { key: 'is_billable', label: 'Billable', format: (v) => (v ? 'yes' : 'no') },
+            ]}
+            getRows={async () => {
+              let q = supabase
+                .from('expenses')
+                .select('expense_number, expense_date, vendor, description, amount, tax_amount, currency, status, is_billable, master_expense_categories:category_id(name)')
+                .is('deleted_at', null);
+              if (searchTerm) {
+                const s = sanitizeFilterValue(searchTerm);
+                q = q.or(`expense_number.ilike.%${s}%,vendor.ilike.%${s}%,description.ilike.%${s}%`);
+              }
+              if (statusFilter !== 'all') q = q.eq('status', statusFilter);
+              const { data, error } = await q.order('expense_date', { ascending: false, nullsFirst: false });
+              if (error) throw error;
+              return data ?? [];
+            }}
+          />
+          <Button
+            size="sm"
+            onClick={() => {
+              setEditingExpense(null);
+              setShowExpenseModal(true);
+            }}
+          >
+            <Plus className="w-4 h-4 mr-1.5" />
+            Submit Expense
+          </Button>
+        </>
+      }
+      kpis={
+        <KpiRow
+          stats={[
+            {
+              tone: 'warning',
+              label: 'Total Approved',
+              value: formatCurrency(stats?.totalAmount ?? 0),
+            },
+            {
+              tone: 'warning',
+              label: 'Pending Amount',
+              value: formatCurrency(stats?.pendingAmount || 0),
+            },
+            {
+              tone: 'info',
+              label: 'This Month',
+              value: formatCurrency(stats?.thisMonthAmount || 0),
+            },
+            {
+              tone: 'warning',
+              label: 'Pending Count',
+              value: stats?.pending ?? 0,
+            },
+          ]}
+        />
+      }
+      toolbar={
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
+          <div className="p-6">
+            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
+              <div className="w-full lg:w-80 relative flex-shrink-0">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Search expenses..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+              </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <FinancialStatsCard
-          label="Total Approved"
-          value={formatCurrency(stats?.totalAmount ?? 0)}
-          icon={<Wallet className="w-5 h-5 text-white" />}
-          color="orange"
-        />
-        <FinancialStatsCard
-          label="Pending Amount"
-          value={formatCurrency(stats?.pendingAmount || 0)}
-          icon={<Clock className="w-5 h-5 text-white" />}
-          color="amber"
-        />
-        <FinancialStatsCard
-          label="This Month"
-          value={formatCurrency(stats?.thisMonthAmount || 0)}
-          icon={<TrendingUp className="w-5 h-5 text-white" />}
-          color="blue"
-        />
-        <FinancialStatsCard
-          label="Pending Count"
-          value={stats?.pending ?? 0}
-          icon={<AlertCircle className="w-5 h-5 text-white" />}
-          color="amber"
-        />
-      </div>
+              <div className="flex-1 flex flex-wrap items-center gap-2">
+                {['all', 'draft', 'pending', 'approved', 'rejected', 'paid'].map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setStatusFilter(status)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      statusFilter === status
+                        ? status === 'pending'
+                          ? 'bg-warning text-warning-foreground shadow-md'
+                          : status === 'approved'
+                          ? 'bg-success text-success-foreground shadow-md'
+                          : status === 'rejected'
+                          ? 'bg-danger text-danger-foreground shadow-md'
+                          : status === 'paid'
+                          ? 'bg-info text-info-foreground shadow-md'
+                          : 'bg-slate-600 text-white shadow-md'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
+                  </button>
+                ))}
+              </div>
 
-      <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
-        <div className="p-6">
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
-            <div className="w-full lg:w-80 relative flex-shrink-0">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search expenses..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary"
-              />
+              <Button
+                variant="secondary"
+                onClick={() => refetch()}
+                className="flex items-center gap-2 flex-shrink-0"
+              >
+                <Filter className="w-4 h-4" />
+                Refresh
+              </Button>
             </div>
-
-            <div className="flex-1 flex flex-wrap items-center gap-2">
-              {['all', 'draft', 'pending', 'approved', 'rejected', 'paid'].map((status) => (
-                <button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                    statusFilter === status
-                      ? status === 'pending'
-                        ? 'bg-warning text-warning-foreground shadow-md'
-                        : status === 'approved'
-                        ? 'bg-success text-success-foreground shadow-md'
-                        : status === 'rejected'
-                        ? 'bg-danger text-danger-foreground shadow-md'
-                        : status === 'paid'
-                        ? 'bg-info text-info-foreground shadow-md'
-                        : 'bg-slate-600 text-white shadow-md'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
-                </button>
-              ))}
-            </div>
-
-            <Button
-              variant="secondary"
-              onClick={() => refetch()}
-              className="flex items-center gap-2 flex-shrink-0"
-            >
-              <Filter className="w-4 h-4" />
-              Refresh
-            </Button>
-
-            <ExportButton
-              filename="expenses"
-              columns={[
-                { key: 'expense_number', label: 'Expense #' },
-                { key: 'expense_date', label: 'Date' },
-                { key: 'vendor', label: 'Vendor' },
-                { key: 'description', label: 'Description' },
-                {
-                  key: (r) => (r.master_expense_categories as { name?: string } | null)?.name,
-                  label: 'Category',
-                },
-                { key: 'amount', label: 'Amount' },
-                { key: 'tax_amount', label: 'Tax' },
-                { key: 'currency', label: 'Currency' },
-                { key: 'status', label: 'Status' },
-                { key: 'is_billable', label: 'Billable', format: (v) => (v ? 'yes' : 'no') },
-              ]}
-              getRows={async () => {
-                let q = supabase
-                  .from('expenses')
-                  .select('expense_number, expense_date, vendor, description, amount, tax_amount, currency, status, is_billable, master_expense_categories:category_id(name)')
-                  .is('deleted_at', null);
-                if (searchTerm) {
-                  const s = sanitizeFilterValue(searchTerm);
-                  q = q.or(`expense_number.ilike.%${s}%,vendor.ilike.%${s}%,description.ilike.%${s}%`);
-                }
-                if (statusFilter !== 'all') q = q.eq('status', statusFilter);
-                const { data, error } = await q.order('expense_date', { ascending: false, nullsFirst: false });
-                if (error) throw error;
-                return data ?? [];
-              }}
-            />
           </div>
         </div>
-      </div>
-
-      {expenses.length === 0 ? (
+      }
+      loading={isLoading}
+      loadingFallback={loadingFallback}
+      isEmpty={expenses.length === 0}
+      empty={
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
           <EmptyState
             icon={Wallet}
@@ -501,9 +499,10 @@ export const ExpensesList: React.FC = () => {
             action={{ label: 'Submit Expense', onClick: () => { setEditingExpense(null); setShowExpenseModal(true); } }}
           />
         </div>
-      ) : (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
+      }
+      pager={{ page, pageSize: PAGE_SIZE, total: totalExpensesCount, onPageChange: setPage, itemNoun: 'expenses' }}
+      table={
+        <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
@@ -643,11 +642,32 @@ export const ExpensesList: React.FC = () => {
                 ))}
               </tbody>
             </table>
-          </div>
-          <Pager page={page} pageSize={PAGE_SIZE} total={totalExpensesCount} onPageChange={setPage} itemNoun="expenses" />
         </div>
-      )}
-
+      }
+      footer={
+        <BulkActionsBar
+          count={selection.selectedCount}
+          onClear={selection.clear}
+          itemNoun="expense"
+        >
+          <BulkActionButton
+            variant="ghost"
+            icon={<Download className="w-4 h-4" />}
+            label="Export"
+            onClick={handleBulkExport}
+          />
+          {canBulkArchive && (
+            <BulkActionButton
+              variant="danger"
+              icon={<Archive className="w-4 h-4" />}
+              label={isArchiving ? 'Archiving…' : 'Archive'}
+              onClick={handleBulkArchive}
+              disabled={isArchiving}
+            />
+          )}
+        </BulkActionsBar>
+      }
+    >
       <ExpenseFormModal
         isOpen={showExpenseModal}
         onClose={() => {
@@ -751,28 +771,6 @@ export const ExpensesList: React.FC = () => {
           </div>
         </div>
       </Modal>
-
-      <BulkActionsBar
-        count={selection.selectedCount}
-        onClear={selection.clear}
-        itemNoun="expense"
-      >
-        <BulkActionButton
-          variant="ghost"
-          icon={<Download className="w-4 h-4" />}
-          label="Export"
-          onClick={handleBulkExport}
-        />
-        {canBulkArchive && (
-          <BulkActionButton
-            variant="danger"
-            icon={<Archive className="w-4 h-4" />}
-            label={isArchiving ? 'Archiving…' : 'Archive'}
-            onClick={handleBulkArchive}
-            disabled={isArchiving}
-          />
-        )}
-      </BulkActionsBar>
-    </div>
+    </ListPageTemplate>
   );
 };

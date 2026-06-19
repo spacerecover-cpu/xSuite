@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FolderOpen, Plus, CreditCard as Edit2, Trash2, ChevronRight, Tag, Layers } from 'lucide-react';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
@@ -269,10 +269,8 @@ export const StockCategoriesPage: React.FC = () => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <PageHeader
+      <PageHeaderSlot
         title="Stock Categories"
-        description="Organize your stock items into categories and subcategories"
-        icon={FolderOpen}
         actions={
           <Button onClick={openAdd} size="sm">
             <Plus className="w-4 h-4 mr-1.5" />

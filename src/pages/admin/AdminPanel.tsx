@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import { Card } from '../../components/ui/Card';
 import { Skeleton } from '../../components/ui/Skeleton';
-import { StatsCard } from '../../components/ui/StatsCard';
+import { StatCard } from '../../components/shared/StatCard';
 import {
   Users,
   Activity,
@@ -175,23 +175,23 @@ export const AdminPanel: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatsCard
-          title="Total Users"
+        <StatCard
+          label="Total Users"
           value={String(stats.totalUsers)}
           icon={Users}
         />
-        <StatsCard
-          title="Active Sessions"
+        <StatCard
+          label="Active Sessions"
           value={String(stats.activeUsers)}
           icon={Activity}
         />
-        <StatsCard
-          title="System Logs"
+        <StatCard
+          label="System Logs"
           value={String(stats.totalLogs)}
           icon={FileText}
         />
-        <StatsCard
-          title="Recent Errors"
+        <StatCard
+          label="Recent Errors"
           value={String(stats.recentErrors)}
           icon={AlertTriangle}
         />

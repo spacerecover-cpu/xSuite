@@ -7,7 +7,7 @@ import {
   permanentDeleteQuote,
   type QuoteWithDetails,
 } from '../../lib/quotesService';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
@@ -184,9 +184,8 @@ export const QuotesRecycleBin: React.FC = () => {
   return (
     <>
       <div className="p-8">
-        <PageHeader
+        <PageHeaderSlot
           title="Quotes Recycle Bin"
-          description="Restore or permanently delete quotes. Quotes are auto-purged after 30 days."
           actions={
             <Button variant="secondary" onClick={() => navigate('/quotes')}>
               <ArrowLeft className="w-4 h-4 mr-2" />

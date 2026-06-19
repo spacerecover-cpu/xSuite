@@ -4,9 +4,8 @@ import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
-import { Pager } from '../../components/ui/Pager';
-import { Skeleton } from '../../components/ui/Skeleton';
 import { Badge } from '../../components/ui/Badge';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
 import { Search, Eye, Edit, Trash2, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -117,117 +116,98 @@ export const AuditTrails: React.FC = () => {
     }
   };
 
-  return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Audit Trails</h1>
-            <p className="text-slate-600 mt-1">User activity and data changes</p>
-          </div>
-        </div>
-
-        <div className="flex gap-4 items-center">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-            <Input
-              type="text"
-              placeholder="Search audit trails..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <Button
-              variant={actionFilter === 'all' ? 'primary' : 'secondary'}
-              onClick={() => setActionFilter('all')}
-              className="text-sm"
-            >
-              All
-            </Button>
-            <Button
-              variant={actionFilter === 'create' ? 'primary' : 'secondary'}
-              onClick={() => setActionFilter('create')}
-              className="text-sm"
-            >
-              Create
-            </Button>
-            <Button
-              variant={actionFilter === 'update' ? 'primary' : 'secondary'}
-              onClick={() => setActionFilter('update')}
-              className="text-sm"
-            >
-              Update
-            </Button>
-            <Button
-              variant={actionFilter === 'delete' ? 'primary' : 'secondary'}
-              onClick={() => setActionFilter('delete')}
-              className="text-sm"
-            >
-              Delete
-            </Button>
-          </div>
-        </div>
+  const toolbar = (
+    <div className="flex gap-4 items-center mb-6">
+      <div className="flex-1 relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+        <Input
+          type="text"
+          placeholder="Search audit trails..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200">
-        <div className="divide-y divide-slate-200">
-          {trails.map((trail) => {
-            const tone = ACTION_TONE[trail.action] ?? ACTION_TONE.view;
-            return (
-            <div key={trail.id} className="p-4 hover:bg-slate-50 transition-colors">
-              <div className="flex items-start gap-3">
-                <div className={`mt-1 p-2 rounded-lg ${tone.chip}`}>
-                  {getActionIcon(trail.action)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium text-slate-900">{trail.user_name}</span>
-                    <Badge variant={tone.badge}>{trail.action}</Badge>
-                    <span className="text-sm text-slate-600">{trail.record_type}</span>
-                    <span className="text-xs text-slate-400 ml-auto">
-                      {format(new Date(trail.performed_at), 'MMM dd, yyyy HH:mm:ss')}
-                    </span>
-                  </div>
-                  {trail.record_id && (
-                    <p className="text-xs text-slate-500">Record ID: {trail.record_id}</p>
-                  )}
-                  {trail.ip_address && (
-                    <p className="text-xs text-slate-500">IP: {trail.ip_address}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-            );
-          })}
-        </div>
-
-        {loading && (
-          <div className="divide-y divide-slate-200">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="p-4 flex items-start gap-3">
-                <Skeleton className="w-8 h-8 rounded-lg" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-1/2" />
-                  <Skeleton className="h-3 w-1/3" />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {!loading && trails.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-slate-500">No audit trails found</p>
-          </div>
-        )}
-
-        {total > 0 && (
-          <Pager page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} itemNoun="entries" />
-        )}
+      <div className="flex gap-2">
+        <Button
+          variant={actionFilter === 'all' ? 'primary' : 'secondary'}
+          onClick={() => setActionFilter('all')}
+          className="text-sm"
+        >
+          All
+        </Button>
+        <Button
+          variant={actionFilter === 'create' ? 'primary' : 'secondary'}
+          onClick={() => setActionFilter('create')}
+          className="text-sm"
+        >
+          Create
+        </Button>
+        <Button
+          variant={actionFilter === 'update' ? 'primary' : 'secondary'}
+          onClick={() => setActionFilter('update')}
+          className="text-sm"
+        >
+          Update
+        </Button>
+        <Button
+          variant={actionFilter === 'delete' ? 'primary' : 'secondary'}
+          onClick={() => setActionFilter('delete')}
+          className="text-sm"
+        >
+          Delete
+        </Button>
       </div>
     </div>
+  );
+
+  const table = (
+    <div className="divide-y divide-slate-200">
+      {trails.map((trail) => {
+        const tone = ACTION_TONE[trail.action] ?? ACTION_TONE.view;
+        return (
+        <div key={trail.id} className="p-4 hover:bg-slate-50 transition-colors">
+          <div className="flex items-start gap-3">
+            <div className={`mt-1 p-2 rounded-lg ${tone.chip}`}>
+              {getActionIcon(trail.action)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm font-medium text-slate-900">{trail.user_name}</span>
+                <Badge variant={tone.badge}>{trail.action}</Badge>
+                <span className="text-sm text-slate-600">{trail.record_type}</span>
+                <span className="text-xs text-slate-400 ml-auto">
+                  {format(new Date(trail.performed_at), 'MMM dd, yyyy HH:mm:ss')}
+                </span>
+              </div>
+              {trail.record_id && (
+                <p className="text-xs text-slate-500">Record ID: {trail.record_id}</p>
+              )}
+              {trail.ip_address && (
+                <p className="text-xs text-slate-500">IP: {trail.ip_address}</p>
+              )}
+            </div>
+          </div>
+        </div>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <ListPageTemplate
+      title="Audit Trails"
+      toolbar={toolbar}
+      table={table}
+      pager={{ page, pageSize: PAGE_SIZE, total, onPageChange: setPage, itemNoun: 'entries' }}
+      loading={loading}
+      isEmpty={!loading && trails.length === 0}
+      empty={
+        <div className="text-center py-12">
+          <p className="text-slate-500">No audit trails found</p>
+        </div>
+      }
+    />
   );
 };

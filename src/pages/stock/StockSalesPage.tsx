@@ -17,7 +17,7 @@ import {
   type SalesFilters,
 } from '../../lib/stockService';
 import { baseAmount } from '../../lib/financialMath';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Button } from '../../components/ui/Button';
 import { StockSalesTable } from '../../components/stock/StockSalesTable';
 import { StockSaleModal } from '../../components/stock/StockSaleModal';
@@ -119,10 +119,8 @@ export const StockSalesPage: React.FC = () => {
 
   return (
     <div className="p-6 max-w-[1800px] mx-auto space-y-6">
-      <PageHeader
+      <PageHeaderSlot
         title="Device Sales"
-        description="Track and manage all backup device and parts sales"
-        icon={ShoppingCart}
         actions={
           <Button
             variant="primary"

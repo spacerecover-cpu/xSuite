@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -121,10 +121,7 @@ export default function BillingPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <PageHeader
-        title="Billing & Subscription"
-        description="Manage your subscription, view usage, and billing history"
-      />
+      <PageHeaderSlot title="Billing & Subscription" />
 
       {isPastDue && (
         <div className="bg-warning-muted border border-warning/30 rounded-lg p-4 flex items-start gap-3">

@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { FinancialModuleHeader } from '../../components/financial/FinancialModuleHeader';
-import { FinancialStatsCard } from '../../components/financial/FinancialStatsCard';
+import { StatCard } from '../../components/shared/StatCard';
 import { formatDate } from '../../lib/format';
 import { useCurrency } from '../../hooks/useCurrency';
 import {
@@ -13,7 +13,7 @@ import {
   generateRevenueByCaseReport,
 } from '../../lib/financialReportsService';
 import { baseAmount } from '../../lib/financialMath';
-import { TrendingUp, DollarSign, PieChart, BarChart3, Plus, Search, Users, Briefcase } from 'lucide-react';
+import { TrendingUp, BarChart3, Plus, Search, Users, Briefcase } from 'lucide-react';
 
 type RevenueInvoiceRow = {
   id: string;
@@ -172,29 +172,25 @@ export const RevenueDashboard: React.FC = () => {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <FinancialStatsCard
+        <StatCard
           label="Total Revenue"
           value={formatCurrency(totalRevenue)}
-          icon={<DollarSign className="w-5 h-5 text-white" />}
-          color="green"
+          tone="success"
         />
-        <FinancialStatsCard
+        <StatCard
           label="This Month"
           value={formatCurrency(thisMonthRevenue)}
-          icon={<TrendingUp className="w-5 h-5 text-white" />}
-          color="blue"
+          tone="info"
         />
-        <FinancialStatsCard
+        <StatCard
           label="Growth Rate"
           value={`${growthRate.toFixed(2)}%`}
-          icon={<BarChart3 className="w-5 h-5 text-white" />}
-          color="green"
+          tone="success"
         />
-        <FinancialStatsCard
+        <StatCard
           label="Revenue Streams"
           value={revenueData.length}
-          icon={<PieChart className="w-5 h-5 text-white" />}
-          color="slate"
+          tone="neutral"
         />
       </div>
 

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { HeaderSlotProvider } from '../../contexts/HeaderSlotContext';
 import SuppliersListPage from './SuppliersListPage';
 
 // --- Mocks ------------------------------------------------------------------
@@ -65,7 +66,9 @@ function renderPage() {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
-        <SuppliersListPage />
+        <HeaderSlotProvider>
+          <SuppliersListPage />
+        </HeaderSlotProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );

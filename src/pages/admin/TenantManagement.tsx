@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Building2, Users, FileText, DollarSign, AlertCircle, CheckCircle, XCircle, Pause } from 'lucide-react';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -197,11 +197,7 @@ export const TenantManagement = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Tenant Management"
-        description="Manage all SaaS customers and their subscriptions"
-        icon={Building2}
-      />
+      <PageHeaderSlot title="Tenant Management" />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card className="p-6">

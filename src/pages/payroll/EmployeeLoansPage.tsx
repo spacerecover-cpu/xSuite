@@ -7,8 +7,8 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
-import { StatsCard } from '../../components/ui/StatsCard';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { StatCard } from '../../components/shared/StatCard';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { LoanFormModal } from '../../components/payroll/LoanFormModal';
 import { LoanDetailModal } from '../../components/payroll/LoanDetailModal';
 import { useCurrency } from '../../hooks/useCurrency';
@@ -106,9 +106,8 @@ export const EmployeeLoansPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHeaderSlot
         title="Employee Loans"
-        description="Manage employee loans, advances, and repayment schedules"
         actions={
           <Button onClick={() => setShowLoanForm(true)}>
             <Plus className="h-4 w-4 mr-2" />
@@ -118,23 +117,20 @@ export const EmployeeLoansPage: React.FC = () => {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatsCard
-          title="Active Loans"
+        <StatCard
+          label="Active Loans"
           value={String(stats.activeLoans)}
           icon={TrendingUp}
-          trend={undefined}
         />
-        <StatsCard
-          title="Total Outstanding"
+        <StatCard
+          label="Total Outstanding"
           value={formatCurrency(stats.totalOutstanding)}
           icon={DollarSign}
-          trend={undefined}
         />
-        <StatsCard
-          title="Monthly Deductions"
+        <StatCard
+          label="Monthly Deductions"
           value={formatCurrency(stats.monthlyDeductions)}
           icon={Calendar}
-          trend={undefined}
         />
       </div>
 

@@ -4,13 +4,12 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Button } from '../../components/ui/Button';
-import { Pager } from '../../components/ui/Pager';
 import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { formatDate } from '../../lib/format';
-import { FinancialModuleHeader } from '../../components/financial/FinancialModuleHeader';
-import { FinancialStatsCard } from '../../components/financial/FinancialStatsCard';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
+import { KpiRow } from '../../components/templates/KpiRow';
 import { RecordPaymentModal } from '../../components/financial/RecordPaymentModal';
 import { PaymentViewModal } from '../../components/financial/PaymentViewModal';
 import { PaymentReceiptModal } from '../../components/financial/PaymentReceiptModal';
@@ -25,8 +24,6 @@ import {
   Plus,
   Search,
   CreditCard,
-  Calendar,
-  DollarSign,
   User,
   Eye,
   Receipt,
@@ -326,66 +323,42 @@ export const PaymentsList: React.FC = () => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="p-8 max-w-[1800px] mx-auto space-y-6">
-        <Skeleton className="h-28 w-full rounded-2xl" />
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
-          ))}
-        </div>
-        <Skeleton className="h-20 w-full rounded-2xl" />
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full rounded-lg" />
-          ))}
-        </div>
+  const loadingFallback = (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+        ))}
       </div>
-    );
-  }
-
-  return (
-    <div className="p-8 max-w-[1800px] mx-auto">
-      <FinancialModuleHeader
-        icon={<CreditCard className="w-7 h-7 text-white" />}
-        title="Payments"
-        description="Track and manage customer payments"
-        iconBgColor="#10b981"
-        primaryAction={{
-          label: 'Record Payment',
-          onClick: () => setShowRecordPaymentModal(true),
-          icon: <Plus className="w-4 h-4" />,
-        }}
-      />
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <FinancialStatsCard
-          label="Total Received"
-          value={formatCurrency(stats?.totalAmount || 0)}
-          icon={<DollarSign className="w-5 h-5 text-white" />}
-          color="green"
-        />
-        <FinancialStatsCard
-          label="This Month"
-          value={formatCurrency(stats?.thisMonthAmount || 0)}
-          icon={<Calendar className="w-5 h-5 text-white" />}
-          color="blue"
-        />
-        <FinancialStatsCard
-          label="Completed"
-          value={stats?.completed ?? 0}
-          icon={<CheckCircle className="w-5 h-5 text-white" />}
-          color="green"
-        />
-        <FinancialStatsCard
-          label="Total Count"
-          value={stats?.total ?? 0}
-          icon={<Receipt className="w-5 h-5 text-white" />}
-          color="slate"
-        />
+      <Skeleton className="h-20 w-full rounded-2xl" />
+      <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-12 w-full rounded-lg" />
+        ))}
       </div>
+    </div>
+  );
 
+  const headerActions = (
+    <Button onClick={() => setShowRecordPaymentModal(true)} className="flex items-center gap-2">
+      <Plus className="w-4 h-4" />
+      Record Payment
+    </Button>
+  );
+
+  const kpis = (
+    <KpiRow
+      stats={[
+        { label: 'Total Received', value: formatCurrency(stats?.totalAmount || 0), tone: 'success' },
+        { label: 'This Month', value: formatCurrency(stats?.thisMonthAmount || 0), tone: 'info' },
+        { label: 'Completed', value: stats?.completed ?? 0, tone: 'success' },
+        { label: 'Total Count', value: stats?.total ?? 0, tone: 'neutral' },
+      ]}
+    />
+  );
+
+  const toolbar = (
+    <>
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
         <div className="p-6">
           <div className="flex flex-col gap-4">
@@ -502,24 +475,27 @@ export const PaymentsList: React.FC = () => {
           </div>
         </div>
       )}
+    </>
+  );
 
-      {payments.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
-          <EmptyState
-            icon={CreditCard}
-            title="No payments found"
-            description={
-              searchTerm || statusFilter !== 'all' || dateFilter !== 'all'
-                ? 'No payments found matching your criteria.'
-                : 'No payments yet. Record your first payment to get started.'
-            }
-            action={{ label: 'Record Payment', onClick: () => setShowRecordPaymentModal(true) }}
-          />
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
+  const empty = (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
+      <EmptyState
+        icon={CreditCard}
+        title="No payments found"
+        description={
+          searchTerm || statusFilter !== 'all' || dateFilter !== 'all'
+            ? 'No payments found matching your criteria.'
+            : 'No payments yet. Record your first payment to get started.'
+        }
+        action={{ label: 'Record Payment', onClick: () => setShowRecordPaymentModal(true) }}
+      />
+    </div>
+  );
+
+  const table = (
+    <div className="overflow-x-auto">
+      <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Payment #</th>
@@ -655,17 +631,28 @@ export const PaymentsList: React.FC = () => {
                 ))}
               </tbody>
             </table>
-          </div>
-          <Pager
-            page={page}
-            pageSize={PAGE_SIZE}
-            total={totalPaymentsCount}
-            onPageChange={setPage}
-            itemNoun="payments"
-          />
-        </div>
-      )}
+    </div>
+  );
 
+  return (
+    <ListPageTemplate
+      title="Payments"
+      headerActions={headerActions}
+      kpis={kpis}
+      toolbar={toolbar}
+      table={table}
+      pager={{
+        page,
+        pageSize: PAGE_SIZE,
+        total: totalPaymentsCount,
+        onPageChange: setPage,
+        itemNoun: 'payments',
+      }}
+      loading={isLoading}
+      loadingFallback={loadingFallback}
+      isEmpty={payments.length === 0}
+      empty={empty}
+    >
       <RecordPaymentModal
         isOpen={showRecordPaymentModal}
         onClose={() => setShowRecordPaymentModal(false)}
@@ -692,6 +679,6 @@ export const PaymentsList: React.FC = () => {
         }}
         payment={fullPaymentData}
       />
-    </div>
+    </ListPageTemplate>
   );
 };

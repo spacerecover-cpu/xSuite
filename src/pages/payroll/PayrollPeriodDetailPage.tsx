@@ -7,7 +7,7 @@ import { payrollKeys } from '../../lib/queryKeys';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
-import { StatsCard } from '../../components/ui/StatsCard';
+import { StatCard } from '../../components/shared/StatCard';
 import { useToast } from '../../hooks/useToast';
 import { useCurrency } from '../../hooks/useCurrency';
 import { format } from 'date-fns';
@@ -210,23 +210,23 @@ export default function PayrollPeriodDetailPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <StatsCard
-          title="Total Employees"
+        <StatCard
+          label="Total Employees"
           value={period.employee_count?.toString() || '0'}
           icon={Users}
         />
-        <StatsCard
-          title="Gross Earnings"
+        <StatCard
+          label="Gross Earnings"
           value={formatCurrency(period.total_gross || 0)}
           icon={TrendingUp}
         />
-        <StatsCard
-          title="Total Deductions"
+        <StatCard
+          label="Total Deductions"
           value={formatCurrency(period.total_deductions || 0)}
           icon={TrendingDown}
         />
-        <StatsCard
-          title="Net Payroll"
+        <StatCard
+          label="Net Payroll"
           value={formatCurrency(period.total_net || 0)}
           icon={DollarSign}
         />

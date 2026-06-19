@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { HeaderSlotProvider } from '../../contexts/HeaderSlotContext';
 import { EmployeesList } from './EmployeesList';
 
 // The list is server-paginated. The KPIs and the pager total must come from
@@ -48,9 +49,11 @@ function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        <EmployeesList />
-      </MemoryRouter>
+      <HeaderSlotProvider>
+        <MemoryRouter>
+          <EmployeesList />
+        </MemoryRouter>
+      </HeaderSlotProvider>
     </QueryClientProvider>,
   );
 }

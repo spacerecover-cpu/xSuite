@@ -10,7 +10,7 @@ import {
   Package,
   Filter,
 } from 'lucide-react';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
@@ -225,10 +225,8 @@ export const StockAdjustmentsPage: React.FC = () => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <PageHeader
+      <PageHeaderSlot
         title="Stock Adjustments"
-        description="Manage inventory count sessions and reconcile physical stock"
-        icon={ClipboardList}
         actions={
           <Button onClick={() => setIsModalOpen(true)} size="sm">
             <Plus className="w-4 h-4 mr-1.5" />

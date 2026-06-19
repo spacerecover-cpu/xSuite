@@ -443,7 +443,7 @@ export const CasesList: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-[1800px] mx-auto">
+    <div className="p-6 max-w-[1800px] 2xl:max-w-[2400px] mx-auto">
       <div className="mb-6 flex items-start justify-between">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg bg-primary">

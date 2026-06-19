@@ -4,9 +4,8 @@ import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
-import { Pager } from '../../components/ui/Pager';
 import { Badge } from '../../components/ui/Badge';
-import { Skeleton } from '../../components/ui/Skeleton';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
 import type { BadgeVariant } from '../../lib/ui/variants';
 import { Search, Download, AlertCircle, AlertTriangle, Info, Bug } from 'lucide-react';
 import { format } from 'date-fns';
@@ -158,20 +157,16 @@ export const SystemLogs: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">System Logs</h1>
-            <p className="text-slate-600 mt-1">Application logs and events</p>
-          </div>
-          <Button onClick={exportLogs} className="gap-2" variant="secondary">
-            <Download className="w-4 h-4" />
-            Export CSV
-          </Button>
-        </div>
-
-        <div className="flex gap-4 items-center">
+    <ListPageTemplate
+      title="System Logs"
+      headerActions={
+        <Button onClick={exportLogs} className="gap-2" variant="secondary">
+          <Download className="w-4 h-4" />
+          Export CSV
+        </Button>
+      }
+      toolbar={
+        <div className="flex gap-4 items-center mb-6">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <Input
@@ -214,9 +209,16 @@ export const SystemLogs: React.FC = () => {
             </Button>
           </div>
         </div>
-      </div>
-
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200">
+      }
+      loading={loading}
+      isEmpty={!loading && logs.length === 0}
+      empty={
+        <div className="bg-white rounded-xl border border-slate-200 text-center py-12">
+          <p className="text-slate-500">No logs found</p>
+        </div>
+      }
+      pager={{ page, pageSize: PAGE_SIZE, total, onPageChange: setPage, itemNoun: 'logs' }}
+      table={
         <div className="divide-y divide-slate-200">
           {logs.map((log) => (
             <div key={log.id} className="p-4 hover:bg-slate-50 transition-colors">
@@ -243,31 +245,7 @@ export const SystemLogs: React.FC = () => {
             </div>
           ))}
         </div>
-
-        {loading && (
-          <div className="divide-y divide-slate-200">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="p-4 flex items-start gap-3">
-                <Skeleton className="w-8 h-8 rounded-lg" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-1/2" />
-                  <Skeleton className="h-3 w-1/3" />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {!loading && logs.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-slate-500">No logs found</p>
-          </div>
-        )}
-
-        {total > 0 && (
-          <Pager page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} itemNoun="logs" />
-        )}
-      </div>
-    </div>
+      }
+    />
   );
 };

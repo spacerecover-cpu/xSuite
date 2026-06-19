@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { Plus, Search, Filter, Truck, UserCheck, Users, Mail, Phone, MapPin } from 'lucide-react';
+import { Plus, Search, Filter, Truck, Mail, Phone, MapPin } from 'lucide-react';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { ExportButton } from '../../components/shared/ExportButton';
 import { Button } from '../../components/ui/Button';
-import { Pager } from '../../components/ui/Pager';
 import { Badge } from '../../components/ui/Badge';
-import { Skeleton } from '../../components/ui/Skeleton';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
+import { KpiRow } from '../../components/templates/KpiRow';
 import SupplierFormModal from '../../components/suppliers/SupplierFormModal';
 import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
@@ -155,65 +155,8 @@ export default function SuppliersListPage() {
     setShowAddModal(true);
   };
 
-  return (
-    <div className="p-6 max-w-[1800px] mx-auto">
-      <div className="mb-6 flex items-start justify-between">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg bg-primary">
-            <Truck className="w-6 h-6 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-1">Suppliers</h1>
-            <p className="text-slate-600 text-base">
-              Manage your supplier relationships and purchase orders
-            </p>
-          </div>
-        </div>
-        <Button onClick={handleOpenModal} variant="primary">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Supplier
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-gradient-to-br from-info-muted to-info-muted rounded-xl p-4 border border-info/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-info uppercase tracking-wide">Total Suppliers</p>
-              <p className="text-2xl font-bold text-info mt-1">{stats?.total ?? 0}</p>
-            </div>
-            <div className="w-10 h-10 bg-info rounded-lg flex items-center justify-center">
-              <Truck className="w-5 h-5 text-white" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-success-muted to-success-muted rounded-xl p-4 border border-success/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-success uppercase tracking-wide">Active</p>
-              <p className="text-2xl font-bold text-success mt-1">{stats?.active ?? 0}</p>
-            </div>
-            <div className="w-10 h-10 bg-success rounded-lg flex items-center justify-center">
-              <UserCheck className="w-5 h-5 text-white" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-warning-muted to-warning-muted rounded-xl p-4 border border-warning/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-warning uppercase tracking-wide">Total Spend (YTD)</p>
-              <p className="text-2xl font-bold text-warning mt-1">{formatCurrency(stats?.totalSpend ?? 0)}</p>
-            </div>
-            <div className="w-10 h-10 bg-warning rounded-lg flex items-center justify-center">
-              <Users className="w-5 h-5 text-white" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
+  const toolbar = (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
         <div className="p-6">
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
             <div className="w-full lg:w-80 relative flex-shrink-0">
@@ -336,40 +279,24 @@ export default function SuppliersListPage() {
           )}
         </div>
       </div>
+  );
 
-      {loading ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-          <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
-            <Skeleton className="h-4 w-32" />
-          </div>
-          <div className="divide-y divide-slate-100">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4 px-6 py-4">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 flex-1" />
-                <Skeleton className="h-4 w-40" />
-                <Skeleton className="h-4 w-28" />
-                <Skeleton className="h-6 w-20 rounded-full" />
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : suppliers.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
-          <EmptyState
-            icon={Truck}
-            title="No suppliers found"
-            description={
-              searchTerm || statusFilter !== 'all' || categoryFilter !== 'all'
-                ? 'No suppliers found matching your criteria.'
-                : 'No suppliers yet. Add your first supplier to get started.'
-            }
-            action={{ label: 'Add Supplier', onClick: handleOpenModal }}
-          />
-        </div>
-      ) : (
-        <>
-          <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+  const emptyState = (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
+      <EmptyState
+        icon={Truck}
+        title="No suppliers found"
+        description={
+          searchTerm || statusFilter !== 'all' || categoryFilter !== 'all'
+            ? 'No suppliers found matching your criteria.'
+            : 'No suppliers yet. Add your first supplier to get started.'
+        }
+        action={{ label: 'Add Supplier', onClick: handleOpenModal }}
+      />
+    </div>
+  );
+
+  const table = (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
@@ -494,11 +421,34 @@ export default function SuppliersListPage() {
                 </tbody>
               </table>
             </div>
-            <Pager page={page} pageSize={PAGE_SIZE} total={totalSuppliers} onPageChange={setPage} itemNoun="suppliers" />
-          </div>
-        </>
-      )}
+  );
 
+  return (
+    <ListPageTemplate
+      title="Suppliers"
+      headerActions={
+        <Button onClick={handleOpenModal} variant="primary">
+          <Plus className="w-4 h-4 mr-2" />
+          Add Supplier
+        </Button>
+      }
+      kpis={
+        <KpiRow
+          cols="grid-cols-1 md:grid-cols-3"
+          stats={[
+            { label: 'Total Suppliers', value: stats?.total ?? 0, tone: 'info' },
+            { label: 'Active', value: stats?.active ?? 0, tone: 'success' },
+            { label: 'Total Spend (YTD)', value: formatCurrency(stats?.totalSpend ?? 0), tone: 'warning' },
+          ]}
+        />
+      }
+      toolbar={toolbar}
+      table={table}
+      pager={{ page, pageSize: PAGE_SIZE, total: totalSuppliers, onPageChange: setPage, itemNoun: 'suppliers' }}
+      loading={loading}
+      isEmpty={suppliers.length === 0}
+      empty={emptyState}
+    >
       {showAddModal && (
         <SupplierFormModal
           isOpen={showAddModal}
@@ -507,6 +457,6 @@ export default function SuppliersListPage() {
           supplier={null}
         />
       )}
-    </div>
+    </ListPageTemplate>
   );
 }

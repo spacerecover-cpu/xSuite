@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MapPin, Plus, Pencil, Check, X } from 'lucide-react';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -101,10 +101,8 @@ const StockLocationsPage: React.FC = () => {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <PageHeader
+      <PageHeaderSlot
         title="Stock Locations"
-        description="Manage storage locations for your stock items"
-        icon={MapPin}
         actions={
           <Button
             variant="primary"
