@@ -44,6 +44,11 @@ import {
   DollarSign as DollarSignIcon,
   Briefcase,
   Copy,
+  CircleDollarSign,
+  Boxes,
+  Banknote,
+  CalendarClock,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { SidebarSection } from './SidebarSection';
 import { ProtectedSidebarNavItem } from './ProtectedSidebarNavItem';
@@ -125,8 +130,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'docked' }) => {
           </div>
           {!collapsed && (
             <div>
-              <h1 className="text-sm font-semibold tracking-tight leading-tight text-slate-900">DataRecovery</h1>
-              <p className="mt-0.5 text-xxs font-medium uppercase tracking-[0.08em] text-slate-500">Professional Suite</p>
+              <h1 className="text-[15px] font-semibold tracking-tight leading-tight text-slate-900">DataRecovery</h1>
+              <p className="mt-0.5 text-xxs font-medium uppercase tracking-[0.16em] text-slate-400">Professional Suite</p>
             </div>
           )}
         </div>
@@ -166,7 +171,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'docked' }) => {
             defaultCollapsed={expandedSection !== 'financial'}
             onToggle={(c) => handleSectionToggle('financial', c)}
             isCollapsed={collapsed}
-            accentColor="amber"
+            icon={CircleDollarSign}
           >
             <ProtectedSidebarNavItem
               to="/invoices"
@@ -192,7 +197,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'docked' }) => {
             defaultCollapsed={expandedSection !== 'business'}
             onToggle={(c) => handleSectionToggle('business', c)}
             isCollapsed={collapsed}
-            accentColor="emerald"
+            icon={Briefcase}
           >
             <ProtectedSidebarNavItem to="/customers" icon={Users} label="Customers" isCollapsed={collapsed} />
             <ProtectedSidebarNavItem
@@ -215,7 +220,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'docked' }) => {
             defaultCollapsed={expandedSection !== 'resources'}
             onToggle={(c) => handleSectionToggle('resources', c)}
             isCollapsed={collapsed}
-            accentColor="teal"
+            icon={Boxes}
           >
             <ProtectedSidebarNavItem to="/tools" icon={Wrench} label="Inventory" isCollapsed={collapsed} />
             <ProtectedSidebarNavItem
@@ -237,7 +242,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'docked' }) => {
             defaultCollapsed={expandedSection !== 'hr'}
             onToggle={(c) => handleSectionToggle('hr', c)}
             isCollapsed={collapsed}
-            accentColor="sky"
+            icon={Users}
           >
             <ProtectedSidebarNavItem to="/hr" icon={UserCheck} label="HR Dashboard" isCollapsed={collapsed} />
             <ProtectedSidebarNavItem to="/hr/employees" icon={Users} label="Employees" isCollapsed={collapsed} />
@@ -253,7 +258,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'docked' }) => {
             defaultCollapsed={expandedSection !== 'payroll'}
             onToggle={(c) => handleSectionToggle('payroll', c)}
             isCollapsed={collapsed}
-            accentColor="payroll"
+            icon={Banknote}
           >
             <ProtectedSidebarNavItem to="/payroll" icon={DollarSignIcon} label="Payroll Dashboard" isCollapsed={collapsed} />
             <ProtectedSidebarNavItem to="/payroll/process" icon={Calendar} label="Process Payroll" isCollapsed={collapsed} />
@@ -271,7 +276,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'docked' }) => {
             defaultCollapsed={expandedSection !== 'employee'}
             onToggle={(c) => handleSectionToggle('employee', c)}
             isCollapsed={collapsed}
-            accentColor="employee"
+            icon={CalendarClock}
           >
             <ProtectedSidebarNavItem to="/attendance" icon={CalendarCheck} label="Attendance" isCollapsed={collapsed} />
             <ProtectedSidebarNavItem to="/leave" icon={Calendar} label="Leave Management" isCollapsed={collapsed} />
@@ -285,7 +290,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'docked' }) => {
             defaultCollapsed={expandedSection !== 'system'}
             onToggle={(c) => handleSectionToggle('system', c)}
             isCollapsed={collapsed}
-            accentColor="slate"
+            icon={SlidersHorizontal}
           >
             <ProtectedSidebarNavItem to="/settings" icon={Settings} label="Settings" isCollapsed={collapsed} />
             <ProtectedSidebarNavItem to="/settings/documents" icon={FileStack} label="Documents" isCollapsed={collapsed} />
