@@ -58,6 +58,7 @@ interface ChainOfCustodyTabProps {
     model?: string | null;
     serial_number?: string | null;
   }>;
+  deviceId?: string;
 }
 
 const TERMINAL_CASE_STATUSES = new Set(['delivered', 'cancelled']);
@@ -114,6 +115,7 @@ export const ChainOfCustodyTab: React.FC<ChainOfCustodyTabProps> = ({
   caseNumber,
   caseStatus,
   caseDevices = [],
+  deviceId,
 }) => {
   const { profile, user } = useAuth();
   const currentUserId = user?.id ?? null;
@@ -198,8 +200,13 @@ export const ChainOfCustodyTab: React.FC<ChainOfCustodyTabProps> = ({
     'critical_event',
   ];
 
+  const visibleEntries = useMemo(
+    () => (deviceId ? custodyData.filter((e) => e.device_id === deviceId) : custodyData),
+    [custodyData, deviceId]
+  );
+
   const filteredData = useMemo(() => {
-    let filtered = custodyData;
+    let filtered = visibleEntries;
 
     if (selectedCategories.length > 0) {
       filtered = filtered.filter((entry) => selectedCategories.includes(entry.action_category));
@@ -217,7 +224,7 @@ export const ChainOfCustodyTab: React.FC<ChainOfCustodyTabProps> = ({
     }
 
     return filtered;
-  }, [custodyData, selectedCategories, searchTerm]);
+  }, [visibleEntries, selectedCategories, searchTerm]);
 
   const toggleCategory = (category: ActionCategory) => {
     setSelectedCategories((prev) =>
@@ -240,7 +247,7 @@ export const ChainOfCustodyTab: React.FC<ChainOfCustodyTabProps> = ({
   const [showExportMenu, setShowExportMenu] = useState(false);
 
   const handleExport = async (format: 'pdf' | 'csv' | 'json') => {
-    const dataToExport = filteredData.length > 0 ? filteredData : custodyData;
+    const dataToExport = filteredData.length > 0 ? filteredData : visibleEntries;
 
     switch (format) {
       case 'pdf': {

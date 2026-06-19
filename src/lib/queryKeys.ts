@@ -15,6 +15,7 @@ export const customerKeys = {
   lists: () => [...customerKeys.all, 'list'] as const,
   list: (filters: Record<string, unknown>) => [...customerKeys.lists(), filters] as const,
   detail: (id: string) => [...customerKeys.all, 'detail', id] as const,
+  timeline: (id: string) => [...customerKeys.all, 'timeline', id] as const,
 };
 
 export const companyKeys = {

@@ -15,7 +15,7 @@ import { PhotoViewerModal } from '../../components/ui/PhotoViewerModal';
 import {
   User, Mail, Phone, MapPin, Building2,
   Calendar, FileText, DollarSign, MessageSquare, MessageCircle, Eye, Link as LinkIcon,
-  Copy, RefreshCw, Ban, Check, AlertTriangle, ShoppingBag
+  Copy, RefreshCw, Ban, Check, AlertTriangle, ShoppingBag, Activity
 } from 'lucide-react';
 import { formatDate } from '../../lib/format';
 import { useProfileNames } from '../../hooks/useProfileNames';
@@ -28,6 +28,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { CustomerPurchasesTab } from '../../components/customers/CustomerPurchasesTab';
 import { CustomerCasesTab } from '../../components/customers/CustomerCasesTab';
 import { CustomerFinancialTab } from '../../components/customers/CustomerFinancialTab';
+import { CustomerTimelineTab } from '../../components/customers/CustomerTimelineTab';
 import { EmailDocumentModal } from '../../components/cases/EmailDocumentModal';
 import { SendMessageModal } from '../../components/communications/SendMessageModal';
 import { useConfirm } from '../../hooks/useConfirm';
@@ -35,7 +36,7 @@ import { DetailPageTemplate } from '../../components/templates/DetailPageTemplat
 import { DetailPageSkeleton } from '../../components/templates/DetailPageSkeleton';
 import { DetailPageNotFound } from '../../components/templates/DetailPageNotFound';
 
-type TabId = 'overview' | 'cases' | 'financial' | 'communications' | 'purchases';
+type TabId = 'overview' | 'cases' | 'financial' | 'communications' | 'purchases' | 'timeline';
 
 interface Customer {
   id: string;
@@ -993,6 +994,7 @@ export const CustomerProfilePage: React.FC = () => {
               { id: 'financial', label: 'Financial', icon: DollarSign },
               { id: 'communications', label: 'Communications', icon: MessageSquare },
               { id: 'purchases', label: 'Purchases', icon: ShoppingBag },
+              { id: 'timeline', label: 'Timeline', icon: Activity },
             ] as const).map((tab) => (
               <button
                 key={tab.id}
@@ -1148,6 +1150,8 @@ export const CustomerProfilePage: React.FC = () => {
           {activeTab === 'purchases' && id && (
             <CustomerPurchasesTab customerId={id} />
           )}
+
+          {activeTab === 'timeline' && id && <CustomerTimelineTab customerId={id} />}
         </div>
       </div>
     </DetailPageTemplate>

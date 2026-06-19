@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import { resolve } from 'path';
 
 // Two projects:
 // - node: pure logic (.test.ts) — money math, status derivation, cn, variants. No DOM.
@@ -25,6 +26,11 @@ export default defineConfig({
       },
       {
         plugins: [react()],
+        resolve: {
+          alias: {
+            '@': resolve(__dirname, './src'),
+          },
+        },
         test: {
           name: 'dom',
           environment: 'jsdom',

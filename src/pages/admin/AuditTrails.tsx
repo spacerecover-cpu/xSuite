@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
+import { AuditCustodyFeed } from '../../components/cases/AuditCustodyFeed';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -42,6 +43,7 @@ export const AuditTrails: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [actionFilter, setActionFilter] = useState<string>('all');
   const [page, setPage] = useState(0);
+  const [scope, setScope] = useState<'system' | 'custody'>('system');
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -54,6 +56,7 @@ export const AuditTrails: React.FC = () => {
 
   const { data, isLoading: loading } = useQuery({
     queryKey: ['audit_trails', actionFilter, debouncedSearch, page],
+    enabled: scope === 'system',
     queryFn: async () => {
       let query = supabase
         .from('audit_trails')
@@ -118,6 +121,10 @@ export const AuditTrails: React.FC = () => {
 
   const toolbar = (
     <div className="flex gap-4 items-center mb-6">
+      <div className="flex gap-2">
+        <Button variant={scope === 'system' ? 'primary' : 'secondary'} onClick={() => setScope('system')} className="text-sm">System</Button>
+        <Button variant={scope === 'custody' ? 'primary' : 'secondary'} onClick={() => setScope('custody')} className="text-sm">Case Custody</Button>
+      </div>
       <div className="flex-1 relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
         <Input
@@ -199,7 +206,7 @@ export const AuditTrails: React.FC = () => {
     <ListPageTemplate
       title="Audit Trails"
       toolbar={toolbar}
-      table={table}
+      table={scope === 'custody' ? <AuditCustodyFeed page={page} onPageChange={setPage} search={debouncedSearch} /> : table}
       pager={{ page, pageSize: PAGE_SIZE, total, onPageChange: setPage, itemNoun: 'entries' }}
       loading={loading}
       isEmpty={!loading && trails.length === 0}

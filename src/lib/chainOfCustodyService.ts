@@ -1,6 +1,8 @@
 import { supabase } from './supabaseClient';
 import { logger } from './logger';
+import { sanitizeFilterValue } from './postgrestSanitizer';
 import type { Database } from '../types/database.types';
+import type { ActivityEntry } from '../components/shared/ActivityTimeline';
 
 export type ActionCategory =
   | 'creation'
@@ -1159,6 +1161,76 @@ export async function logPortalApproval(params: {
   });
 }
 
+export async function fetchCustomerTimeline(customerId: string): Promise<ActivityEntry[]> {
+  const { data: cases } = await supabase
+    .from('cases').select('id').eq('customer_id', customerId).is('deleted_at', null);
+  const caseIds = (cases ?? []).map((c) => c.id);
+  if (caseIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('case_job_history')
+    .select('id, action, details, old_value, new_value, performed_by, created_at')
+    .in('case_id', caseIds)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  const rows = data ?? [];
+  const actorIds = [...new Set(rows.map((r) => r.performed_by).filter(Boolean))] as string[];
+  const names = new Map<string, string | null>();
+  if (actorIds.length > 0) {
+    const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', actorIds);
+    for (const p of profiles ?? []) names.set(p.id, p.full_name);
+  }
+  return rows.map((r) => ({
+    ...r,
+    actor_name: r.performed_by ? names.get(r.performed_by) ?? 'Unknown user' : 'System',
+  }));
+}
+
 // logDeviceCheckout / logDeviceReturn were removed: checkout custody events are
 // written server-side by log_case_checkout (DEVICE_CHECKED_OUT / CASE_CHECKED_OUT),
 // so no client path can record a physical handoff without the ledger entry.
+
+export interface CustodyFeedRow {
+  id: string;
+  case_id: string;
+  device_id: string | null;
+  action: string;
+  action_category: string;
+  description: string | null;
+  actor_name: string | null;
+  custody_status: string | null;
+  created_at: string;
+  case_no: string | null;
+}
+
+/** Tenant-wide custody ledger feed for the admin audit view. RLS already
+ *  scopes rows to the current tenant (platform admins see all). */
+export async function fetchCustodyFeed(opts: {
+  page: number;
+  pageSize: number;
+  search?: string;
+}): Promise<{ rows: CustodyFeedRow[]; total: number }> {
+  const { page, pageSize, search } = opts;
+  let query = supabase
+    .from('chain_of_custody')
+    .select(
+      'id, case_id, device_id, action, action_category, description, actor_name, custody_status, created_at, cases:case_id(case_no)',
+      { count: 'exact' },
+    )
+    .order('created_at', { ascending: false });
+
+  if (search) {
+    const s = sanitizeFilterValue(search);
+    query = query.or(`action.ilike.%${s}%,description.ilike.%${s}%,actor_name.ilike.%${s}%`);
+  }
+
+  const { data, error, count } = await query.range(page * pageSize, (page + 1) * pageSize - 1);
+  if (error) {
+    logger.error('Error fetching custody feed:', error);
+    throw error;
+  }
+  const rows = (data ?? []).map((r) => {
+    const row = r as unknown as CustodyFeedRow & { cases?: { case_no?: string | null } | null };
+    return { ...row, case_no: row.cases?.case_no ?? null };
+  });
+  return { rows, total: count ?? 0 };
+}
