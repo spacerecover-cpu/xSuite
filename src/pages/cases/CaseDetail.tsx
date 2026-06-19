@@ -2,7 +2,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { getNextCaseNumber } from '../../lib/caseService';
-import { ArrowLeft, MessageCircle, Printer, FileText, Tag, CheckCircle2, Copy, User, HardDrive, FileStack, AlertCircle, Package, Activity, Settings, History, Users, DollarSign, Trash2, Grid2x2 as Grid, Eye, Mail } from 'lucide-react';
+import { MessageCircle, Printer, FileText, Tag, CheckCircle2, Copy, User, HardDrive, FileStack, AlertCircle, Package, Activity, Settings, History, Users, DollarSign, Trash2, Grid2x2 as Grid, Eye, Mail } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -25,6 +25,7 @@ import { MarkAsDeliveredModal } from '../../components/cases/MarkAsDeliveredModa
 import { PreserveLongTermModal } from '../../components/cases/PreserveLongTermModal';
 import type { CreateCloneDriveFormValues } from '../../components/cases/CreateCloneDriveModal';
 import { AuditInfo } from '../../components/ui/AuditInfo';
+import { DetailPageHeader } from '../../components/shared/DetailPageHeader';
 import { ReportTypeSelectionModal } from '../../components/cases/ReportTypeSelectionModal';
 import { StreamlinedReportEditor } from '../../components/cases/StreamlinedReportEditor';
 import ReportViewModal from '../../components/cases/ReportViewModal';
@@ -323,36 +324,16 @@ export const CaseDetail: React.FC = () => {
 
   return (
     <>
-    <div className="p-4 md:p-8 max-w-[1800px] mx-auto">
-      {/* Header - Unified White Container */}
-      <div className="bg-white rounded-lg p-6 mb-6 shadow-sm border border-slate-200">
-        <button
-          onClick={() => navigate('/cases')}
-          className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span className="text-sm font-medium">Back to Cases</span>
-        </button>
-
-        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
-          <div>
-            <div className="flex items-center gap-3 mb-2 flex-wrap">
-              <h1 className="text-2xl md:text-3xl font-bold text-primary">Case #{caseData.case_no}</h1>
-              <Badge variant="custom" color={getStatusColor(caseData.status)} size="lg">
-                {getStatusDisplayName(caseData.status)}
-              </Badge>
-            </div>
-            <AuditInfo
-              className="mt-2"
-              createdAt={caseData.created_at}
-              createdByName={caseData.created_by_profile?.full_name}
-              updatedAt={caseData.updated_at}
-              updatedByName={caseData.updated_by_profile?.full_name}
-            />
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex flex-wrap gap-2">
+    <div className="px-6 py-5 max-w-[1800px] mx-auto">
+      <DetailPageHeader
+        breadcrumbs={[{ label: 'Cases', to: '/cases' }, { label: `Case #${caseData.case_no}` }]}
+        badges={
+          <Badge variant="custom" color={getStatusColor(caseData.status)} size="lg">
+            {getStatusDisplayName(caseData.status)}
+          </Badge>
+        }
+        actions={
+          <>
             <Button
               onClick={handleWhatsApp}
               style={{ backgroundColor: '#25D366' }}
@@ -418,9 +399,21 @@ export const CaseDetail: React.FC = () => {
                 <span className="hidden md:inline">Delete</span>
               </Button>
             )}
-          </div>
-        </div>
+          </>
+        }
+        meta={
+          <AuditInfo
+            className="mt-2"
+            createdAt={caseData.created_at}
+            createdByName={caseData.created_by_profile?.full_name}
+            updatedAt={caseData.updated_at}
+            updatedByName={caseData.updated_by_profile?.full_name}
+          />
+        }
+      />
 
+      {/* Stage banner + Quick Info Cards */}
+      <div className="bg-white rounded-lg p-6 mb-6 shadow-sm border border-slate-200">
         {/* Stage banner: shows current phase + Next Action CTA + allowed transitions */}
         {isEnabled('workflow.stage_banner') && (
           <div className="mb-6">

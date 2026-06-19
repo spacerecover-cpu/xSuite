@@ -13,7 +13,7 @@ import { CustomerAvatar } from '../../components/ui/CustomerAvatar';
 import { ImageUpload } from '../../components/ui/ImageUpload';
 import { PhotoViewerModal } from '../../components/ui/PhotoViewerModal';
 import {
-  ChevronLeft, User, Mail, Phone, MapPin, Building2,
+  User, Mail, Phone, MapPin, Building2,
   Calendar, FileText, DollarSign, MessageSquare, MessageCircle, Eye, Link as LinkIcon,
   Copy, RefreshCw, Ban, Check, AlertTriangle, ShoppingBag
 } from 'lucide-react';
@@ -32,6 +32,7 @@ import { EmailDocumentModal } from '../../components/cases/EmailDocumentModal';
 import { SendMessageModal } from '../../components/communications/SendMessageModal';
 import { useConfirm } from '../../hooks/useConfirm';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { DetailPageHeader } from '../../components/shared/DetailPageHeader';
 
 type TabId = 'overview' | 'cases' | 'financial' | 'communications' | 'purchases';
 
@@ -379,7 +380,7 @@ export const CustomerProfilePage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-8 max-w-[1600px] mx-auto">
+      <div className="px-6 py-5 max-w-[1600px] mx-auto">
         <Skeleton className="h-5 w-40 mb-6" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           <div className="lg:col-span-2 space-y-6">
@@ -412,7 +413,7 @@ export const CustomerProfilePage: React.FC = () => {
 
   if (!customer) {
     return (
-      <div className="p-8">
+      <div className="px-6 py-5">
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
           <User className="w-16 h-16 text-slate-300 mx-auto mb-4" />
           <p className="text-slate-500 text-lg">Customer not found</p>
@@ -454,18 +455,42 @@ export const CustomerProfilePage: React.FC = () => {
   };
 
   return (
-    <div className="p-8 max-w-[1600px] mx-auto">
-      <button
-        onClick={() => navigate('/customers')}
-        className="flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-6 transition-all hover:gap-3 font-medium"
-      >
-        <ChevronLeft className="w-5 h-5" />
-        <span>Back to Customers</span>
-      </button>
+    <div className="px-6 py-5 max-w-[1600px] mx-auto">
+      <DetailPageHeader
+        breadcrumbs={[
+          { label: 'Customers', to: '/customers' },
+          { label: customer.customer_name },
+        ]}
+        badges={
+          <>
+            <Badge variant="custom" color="rgb(var(--color-primary))">
+              {customer.customer_number}
+            </Badge>
+            {customer.portal_enabled && (
+              <Badge variant="success">Portal Active</Badge>
+            )}
+            {!customer.is_active && <Badge variant="default">Inactive</Badge>}
+          </>
+        }
+        actions={
+          <Button variant="secondary" size="sm" onClick={handleOpenEditModal}>
+            Edit Profile
+          </Button>
+        }
+        meta={
+          <AuditInfo
+            createdAt={customer.created_at}
+            createdLabel="Joined"
+            createdByName={nameOf(customer.created_by)}
+            updatedAt={customer.updated_at}
+            updatedByName={nameOf(customer.updated_by)}
+          />
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="lg:col-span-2 space-y-6">
-          <Card className="p-6">
+          <Card className="p-4">
             <div className="flex items-start gap-6">
               <CustomerAvatar
                 firstName={customer.customer_name}
@@ -476,19 +501,6 @@ export const CustomerProfilePage: React.FC = () => {
                 onClick={() => customer.profile_photo_url && setIsPhotoViewerOpen(true)}
               />
               <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-2xl font-bold text-slate-900">
-                    {customer.customer_name}
-                  </h1>
-                  <Badge variant="custom" color="rgb(var(--color-primary))">
-                    {customer.customer_number}
-                  </Badge>
-                  {customer.portal_enabled && (
-                    <Badge variant="success">Portal Active</Badge>
-                  )}
-                  {!customer.is_active && <Badge variant="default">Inactive</Badge>}
-                </div>
-
                 {customer.customer_groups && (
                   <div className="flex items-center gap-2 mb-4">
                     <Badge variant="accent">
@@ -520,13 +532,6 @@ export const CustomerProfilePage: React.FC = () => {
                       <span>{[customer.geo_cities?.name, customer.geo_countries?.name].filter(Boolean).join(', ')}</span>
                     </div>
                   )}
-                  <AuditInfo
-                    createdAt={customer.created_at}
-                    createdLabel="Joined"
-                    createdByName={nameOf(customer.created_by)}
-                    updatedAt={customer.updated_at}
-                    updatedByName={nameOf(customer.updated_by)}
-                  />
                 </div>
 
                 {customer.address && (
@@ -535,15 +540,11 @@ export const CustomerProfilePage: React.FC = () => {
                   </div>
                 )}
               </div>
-
-              <Button variant="secondary" size="sm" onClick={handleOpenEditModal}>
-                Edit Profile
-              </Button>
             </div>
           </Card>
 
           {(companies.length > 0 || canManageCompanies) && (
-            <Card className="p-6">
+            <Card className="p-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-2">
                   <Building2 className="w-4 h-4" />
@@ -608,7 +609,7 @@ export const CustomerProfilePage: React.FC = () => {
           )}
         </div>
 
-        <Card className="p-6 h-fit">
+        <Card className="p-4 h-fit">
           <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider mb-4">
             Customer Portal
           </h3>
