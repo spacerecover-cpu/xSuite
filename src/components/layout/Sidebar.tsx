@@ -6,54 +6,12 @@ import { useTenantFeatures } from '../../contexts/TenantConfigContext';
 import { useSidebarPreferences } from '../../contexts/SidebarPreferencesContext';
 import { useLocale } from '../../contexts/LocaleContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
-import {
-  LayoutDashboard,
-  FolderOpen,
-  Users,
-  Building2,
-  FileText,
-  Receipt,
-  Package,
-  Wrench,
-  Calendar,
-  BookOpen,
-  TrendingUp,
-  CreditCard,
-  Landmark,
-  BarChart3,
-  Settings,
-  UserCog,
-  Shield,
-  FileStack,
-  HardDrive,
-  LogOut,
-  ChevronLeft,
-  ChevronRight,
-  Truck,
-  LifeBuoy,
-  ShoppingCart,
-  Wallet,
-  ArrowLeftRight,
-  FileCheck,
-  UserCheck,
-  ClipboardList,
-  CalendarCheck,
-  Timer as TimerIcon,
-  UserPlus as UserPlusIcon,
-  Layers,
-  DollarSign as DollarSignIcon,
-  Briefcase,
-  Copy,
-  CircleDollarSign,
-  Boxes,
-  Banknote,
-  CalendarClock,
-  SlidersHorizontal,
-} from 'lucide-react';
+import { HardDrive, LogOut, ChevronLeft, ChevronRight, LifeBuoy } from 'lucide-react';
 import { SidebarSection } from './SidebarSection';
 import { ProtectedSidebarNavItem } from './ProtectedSidebarNavItem';
 import { Tooltip } from '../ui/Tooltip';
 import { useSidebarBadges } from '../../hooks/useSidebarBadges';
+import { NAV_SECTIONS } from './navConfig';
 
 interface SidebarProps {
   /** 'docked' = the persistent desktop rail; 'drawer' = inside the mobile off-canvas panel. */
@@ -67,7 +25,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'docked' }) => {
   const { profile, signOut } = useAuth();
   const { hasModuleAccess } = usePermissions();
   const { isEnabled } = useTenantFeatures();
-  const { casesTodayCount, invoicesAttentionCount, pendingQuotesCount, lowStockCount } = useSidebarBadges();
+  const badges = useSidebarBadges();
   const { position, isCollapsed, toggleCollapsed, expandedSection, setExpandedSection } = useSidebarPreferences();
   const { locale } = useLocale();
   const navigate = useNavigate();
@@ -99,10 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'docked' }) => {
     : (collapsed ? ChevronRight : ChevronLeft);
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'owner';
-  const canViewFinance = (hasModuleAccess('invoices') || hasModuleAccess('payments')) && isEnabled('nav.financial');
-  const canViewClients = (hasModuleAccess('customers') || hasModuleAccess('companies')) && isEnabled('nav.business');
-  const canViewLab = (hasModuleAccess('inventory') || hasModuleAccess('stock') || hasModuleAccess('clone-drives')) && isEnabled('nav.resources');
-  const canViewHR = (hasModuleAccess('hr-dashboard') || hasModuleAccess('employees')) && isEnabled('nav.hr');
+  const navGateContext = { isAdmin, hasModuleAccess, isEnabled };
 
   const getRoleAvatarBg = (role?: string) => {
     switch (role) {
@@ -152,152 +107,40 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'docked' }) => {
 
       {/* Navigation */}
       <nav aria-label="Primary" className={`flex-1 min-h-0 overflow-y-auto w-full ${collapsed ? 'px-2' : 'px-3'} py-2`}>
-        <SidebarSection title="Core Operations" isCollapsed={collapsed} alwaysExpanded>
-          <ProtectedSidebarNavItem to="/" icon={LayoutDashboard} label="Dashboard" isCollapsed={collapsed} />
-          <ProtectedSidebarNavItem
-            to="/cases"
-            icon={FolderOpen}
-            label="Cases"
-            badge={casesTodayCount > 0 ? casesTodayCount : undefined}
-            badgeColor="blue"
-            isCollapsed={collapsed}
-          />
-          <ProtectedSidebarNavItem to="/case-reports" icon={FileText} label="Case Reports" isCollapsed={collapsed} />
-        </SidebarSection>
-
-        {canViewFinance && (
-          <SidebarSection
-            title="Financial"
-            defaultCollapsed={expandedSection !== 'financial'}
-            onToggle={(c) => handleSectionToggle('financial', c)}
-            isCollapsed={collapsed}
-            icon={CircleDollarSign}
-          >
-            <ProtectedSidebarNavItem
-              to="/invoices"
-              icon={Receipt}
-              label="Invoices"
-              badge={invoicesAttentionCount > 0 ? invoicesAttentionCount : undefined}
-              badgeColor="blue"
+        {NAV_SECTIONS.map((section) => {
+          if (section.gate && !section.gate(navGateContext)) return null;
+          const items = section.items.map((item) => {
+            const count = item.badgeKey ? badges[item.badgeKey] : 0;
+            return (
+              <ProtectedSidebarNavItem
+                key={item.to}
+                to={item.to}
+                icon={item.icon}
+                label={item.label}
+                moduleKey={item.moduleKey}
+                badge={item.badgeKey && count > 0 ? count : undefined}
+                badgeColor={item.badgeColor}
+                isCollapsed={collapsed}
+              />
+            );
+          });
+          return section.alwaysExpanded ? (
+            <SidebarSection key={section.key} title={section.title} isCollapsed={collapsed} alwaysExpanded>
+              {items}
+            </SidebarSection>
+          ) : (
+            <SidebarSection
+              key={section.key}
+              title={section.title}
+              icon={section.icon}
               isCollapsed={collapsed}
-            />
-            <ProtectedSidebarNavItem to="/payments" icon={CreditCard} label="Payments" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/expenses" icon={Wallet} label="Expenses" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/finance" icon={TrendingUp} label="Revenue" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/transactions" icon={ArrowLeftRight} label="Transactions" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/banking" icon={Landmark} label="Banking" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/vat-audit" icon={FileCheck} label="VAT & Audit" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/reports" icon={BarChart3} label="Financial Reports" isCollapsed={collapsed} />
-          </SidebarSection>
-        )}
-
-        {canViewClients && (
-          <SidebarSection
-            title="Business"
-            defaultCollapsed={expandedSection !== 'business'}
-            onToggle={(c) => handleSectionToggle('business', c)}
-            isCollapsed={collapsed}
-            icon={Briefcase}
-          >
-            <ProtectedSidebarNavItem to="/customers" icon={Users} label="Customers" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem
-              to="/quotes"
-              icon={FileText}
-              label="Quotes"
-              badge={pendingQuotesCount > 0 ? pendingQuotesCount : undefined}
-              badgeColor="green"
-              isCollapsed={collapsed}
-            />
-            <ProtectedSidebarNavItem to="/companies" icon={Building2} label="Companies" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/suppliers" icon={Truck} label="Suppliers" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/purchase-orders" icon={ShoppingCart} label="Purchase Orders" isCollapsed={collapsed} />
-          </SidebarSection>
-        )}
-
-        {canViewLab && (
-          <SidebarSection
-            title="Resources"
-            defaultCollapsed={expandedSection !== 'resources'}
-            onToggle={(c) => handleSectionToggle('resources', c)}
-            isCollapsed={collapsed}
-            icon={Boxes}
-          >
-            <ProtectedSidebarNavItem to="/tools" icon={Wrench} label="Inventory" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem
-              to="/stock"
-              icon={Package}
-              label="Stock"
-              badge={lowStockCount > 0 ? lowStockCount : undefined}
-              badgeColor="orange"
-              isCollapsed={collapsed}
-            />
-            <ProtectedSidebarNavItem to="/clone-drives" icon={Copy} label="Clone Drives" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/procedures" icon={BookOpen} label="KB Center" isCollapsed={collapsed} />
-          </SidebarSection>
-        )}
-
-        {canViewHR && (
-          <SidebarSection
-            title="Human Resources"
-            defaultCollapsed={expandedSection !== 'hr'}
-            onToggle={(c) => handleSectionToggle('hr', c)}
-            isCollapsed={collapsed}
-            icon={Users}
-          >
-            <ProtectedSidebarNavItem to="/hr" icon={UserCheck} label="HR Dashboard" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/hr/employees" icon={Users} label="Employees" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/hr/recruitment" icon={Briefcase} label="Recruitment" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/hr/onboarding" icon={UserPlusIcon} label="Onboarding" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/hr/performance" icon={TrendingUp} label="Performance" isCollapsed={collapsed} />
-          </SidebarSection>
-        )}
-
-        {canViewHR && (
-          <SidebarSection
-            title="Payroll"
-            defaultCollapsed={expandedSection !== 'payroll'}
-            onToggle={(c) => handleSectionToggle('payroll', c)}
-            isCollapsed={collapsed}
-            icon={Banknote}
-          >
-            <ProtectedSidebarNavItem to="/payroll" icon={DollarSignIcon} label="Payroll Dashboard" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/payroll/process" icon={Calendar} label="Process Payroll" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/payroll/components" icon={Layers} label="Salary Components" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/payroll/history" icon={ClipboardList} label="History" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/payroll/adjustments" icon={TrendingUp} label="Adjustments" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/payroll/loans" icon={Wallet} label="Loans" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/payroll/settings" icon={Settings} label="Settings" isCollapsed={collapsed} />
-          </SidebarSection>
-        )}
-
-        {canViewHR && (
-          <SidebarSection
-            title="Employee Management"
-            defaultCollapsed={expandedSection !== 'employee'}
-            onToggle={(c) => handleSectionToggle('employee', c)}
-            isCollapsed={collapsed}
-            icon={CalendarClock}
-          >
-            <ProtectedSidebarNavItem to="/attendance" icon={CalendarCheck} label="Attendance" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/leave" icon={Calendar} label="Leave Management" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/timesheets" icon={TimerIcon} label="Timesheets" isCollapsed={collapsed} />
-          </SidebarSection>
-        )}
-
-        {isAdmin && (
-          <SidebarSection
-            title="System"
-            defaultCollapsed={expandedSection !== 'system'}
-            onToggle={(c) => handleSectionToggle('system', c)}
-            isCollapsed={collapsed}
-            icon={SlidersHorizontal}
-          >
-            <ProtectedSidebarNavItem to="/settings" icon={Settings} label="Settings" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/settings/documents" icon={FileStack} label="Documents" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/users" icon={UserCog} label="User Management" isCollapsed={collapsed} />
-            <ProtectedSidebarNavItem to="/admin" icon={Shield} label="Admin Panel" isCollapsed={collapsed} />
-          </SidebarSection>
-        )}
+              defaultCollapsed={expandedSection !== section.key}
+              onToggle={(c) => handleSectionToggle(section.key, c)}
+            >
+              {items}
+            </SidebarSection>
+          );
+        })}
       </nav>
 
       {/* Footer */}
