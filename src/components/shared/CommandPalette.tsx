@@ -1,35 +1,13 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import {
-  Search,
-  CornerDownLeft,
-  ArrowUp,
-  ArrowDown,
-  Command,
-  Briefcase,
-  Users,
-  FileText,
-  CreditCard,
-  Package,
-  HardDrive,
-  Building2,
-  Truck,
-  UserPlus,
-  Calendar,
-  Settings,
-  Shield,
-  Plus,
-  Receipt,
-  Bell,
-  ListChecks,
-  Wallet,
-  Boxes,
-  ShoppingCart,
-  type LucideIcon,
-} from 'lucide-react';
+import { Search, CornerDownLeft, ArrowUp, ArrowDown, Command, Briefcase, Users, Receipt } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { Dialog } from '../ui/Dialog';
+import { usePermissions } from '../../contexts/PermissionsContext';
+import { useTenantFeatures } from '../../contexts/TenantConfigContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { buildCommands, type CommandItem } from './commandPaletteRegistry';
 
 const LISTBOX_ID = 'command-palette-listbox';
 
@@ -38,76 +16,6 @@ interface CommandPaletteProps {
   onClose: () => void;
 }
 
-type CommandKind = 'page' | 'action' | 'recent';
-
-interface CommandItem {
-  id: string;
-  kind: CommandKind;
-  group: string;
-  label: string;
-  hint?: string;
-  icon: LucideIcon;
-  to: string;
-  keywords?: string;
-}
-
-// Static navigation registry. Mirrors AppLayout's top-level pages.
-// Keep this list short — exhaustive registries become unfocused.
-const STATIC_COMMANDS: CommandItem[] = [
-  // Core Operations
-  { id: 'nav-cases', kind: 'page', group: 'Operations', label: 'Cases', icon: Briefcase, to: '/cases', keywords: 'jobs work tickets' },
-  { id: 'nav-customers', kind: 'page', group: 'Operations', label: 'Customers', icon: Users, to: '/customers', keywords: 'clients contacts' },
-  { id: 'nav-companies', kind: 'page', group: 'Operations', label: 'Companies', icon: Building2, to: '/companies', keywords: 'organizations businesses' },
-
-  // Financial
-  { id: 'nav-quotes', kind: 'page', group: 'Financial', label: 'Quotes', icon: FileText, to: '/quotes', keywords: 'proforma estimates' },
-  { id: 'nav-invoices', kind: 'page', group: 'Financial', label: 'Invoices', icon: Receipt, to: '/invoices', keywords: 'billing' },
-  { id: 'nav-payments', kind: 'page', group: 'Financial', label: 'Payments', icon: CreditCard, to: '/payments', keywords: 'receipts paid' },
-  { id: 'nav-expenses', kind: 'page', group: 'Financial', label: 'Expenses', icon: Wallet, to: '/expenses' },
-  { id: 'nav-banking', kind: 'page', group: 'Financial', label: 'Banking', icon: Wallet, to: '/banking', keywords: 'bank accounts reconciliation' },
-  { id: 'nav-vat-audit', kind: 'page', group: 'Financial', label: 'VAT & Audit', icon: Shield, to: '/vat-audit', keywords: 'tax compliance' },
-  { id: 'nav-finance', kind: 'page', group: 'Financial', label: 'Revenue Dashboard', icon: FileText, to: '/finance', keywords: 'kpi metrics' },
-
-  // Resources
-  { id: 'nav-inventory', kind: 'page', group: 'Resources', label: 'Inventory', icon: Boxes, to: '/inventory', keywords: 'parts donors' },
-  { id: 'nav-stock', kind: 'page', group: 'Resources', label: 'Stock', icon: Package, to: '/stock', keywords: 'devices items pos' },
-  { id: 'nav-stock-sales', kind: 'page', group: 'Resources', label: 'Stock Sales', icon: ShoppingCart, to: '/stock/sales' },
-  { id: 'nav-clone-drives', kind: 'page', group: 'Resources', label: 'Clone Drives', icon: HardDrive, to: '/clone-drives' },
-  { id: 'nav-kb', kind: 'page', group: 'Resources', label: 'KB Center', icon: ListChecks, to: '/procedures', keywords: 'knowledge base articles' },
-
-  // Suppliers
-  { id: 'nav-suppliers', kind: 'page', group: 'Suppliers', label: 'Suppliers', icon: Truck, to: '/suppliers' },
-  { id: 'nav-purchase-orders', kind: 'page', group: 'Suppliers', label: 'Purchase Orders', icon: FileText, to: '/purchase-orders', keywords: 'po' },
-
-  // People
-  { id: 'nav-hr', kind: 'page', group: 'People', label: 'HR Dashboard', icon: Users, to: '/hr' },
-  { id: 'nav-employees', kind: 'page', group: 'People', label: 'Employees', icon: Users, to: '/hr/employees' },
-  { id: 'nav-payroll', kind: 'page', group: 'People', label: 'Payroll', icon: Wallet, to: '/payroll' },
-  { id: 'nav-attendance', kind: 'page', group: 'People', label: 'Attendance', icon: Calendar, to: '/attendance' },
-  { id: 'nav-leave', kind: 'page', group: 'People', label: 'Leave', icon: Calendar, to: '/leave' },
-  { id: 'nav-timesheets', kind: 'page', group: 'People', label: 'Timesheets', icon: Calendar, to: '/timesheets' },
-
-  // System
-  { id: 'nav-users', kind: 'page', group: 'System', label: 'User Management', icon: Users, to: '/users' },
-  { id: 'nav-settings', kind: 'page', group: 'System', label: 'Settings', icon: Settings, to: '/settings' },
-  { id: 'nav-notifications', kind: 'page', group: 'System', label: 'Notifications', icon: Bell, to: '/notifications', keywords: 'history inbox alerts' },
-  { id: 'nav-notif-prefs', kind: 'page', group: 'System', label: 'Notification Preferences', icon: Bell, to: '/settings/notifications' },
-  { id: 'nav-security', kind: 'page', group: 'System', label: 'Security', icon: Shield, to: '/settings/security' },
-  { id: 'nav-appearance', kind: 'page', group: 'System', label: 'Appearance', icon: Settings, to: '/settings/appearance', keywords: 'theme color' },
-  { id: 'nav-admin', kind: 'page', group: 'System', label: 'Admin Panel', icon: Shield, to: '/admin' },
-  { id: 'nav-audit', kind: 'page', group: 'System', label: 'Audit Trails', icon: Shield, to: '/admin/audit' },
-
-  // Quick actions — navigation with an intent. The destination page reads
-  // ?new=1 (where supported) to auto-open the create modal.
-  { id: 'act-new-case', kind: 'action', group: 'Create', label: 'New Case', hint: 'Open case create modal', icon: Plus, to: '/cases?new=1', keywords: 'create job' },
-  { id: 'act-new-customer', kind: 'action', group: 'Create', label: 'New Customer', icon: UserPlus, to: '/customers?new=1', keywords: 'create client' },
-  { id: 'act-new-invoice', kind: 'action', group: 'Create', label: 'New Invoice', icon: Plus, to: '/invoices?new=1', keywords: 'create bill' },
-  { id: 'act-new-quote', kind: 'action', group: 'Create', label: 'New Quote', icon: Plus, to: '/quotes?new=1', keywords: 'create proforma' },
-  { id: 'act-new-payment', kind: 'action', group: 'Create', label: 'Record Payment', icon: Plus, to: '/payments?new=1' },
-  { id: 'act-new-expense', kind: 'action', group: 'Create', label: 'New Expense', icon: Plus, to: '/expenses?new=1' },
-  { id: 'act-new-supplier', kind: 'action', group: 'Create', label: 'New Supplier', icon: Plus, to: '/suppliers?new=1' },
-  { id: 'act-new-po', kind: 'action', group: 'Create', label: 'New Purchase Order', icon: Plus, to: '/purchase-orders?new=1' },
-];
 
 // Substring + initial-letter score. Higher is better. -1 means no match.
 function scoreMatch(query: string, target: string): number {
@@ -147,6 +55,16 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+
+  const { hasModuleAccess } = usePermissions();
+  const { isEnabled } = useTenantFeatures();
+  const { profile } = useAuth();
+  // Gated command registry — mirrors the sidebar's permission/feature gating so
+  // the palette never exposes navigation the user cannot access.
+  const commands = useMemo(() => {
+    const isAdmin = profile?.role === 'admin' || profile?.role === 'owner';
+    return buildCommands({ isAdmin, hasModuleAccess, isEnabled });
+  }, [profile?.role, hasModuleAccess, isEnabled]);
 
   // Reset state every time the palette opens. Otherwise stale active-index
   // can point past the new filtered list and the previous query lingers.
@@ -229,10 +147,10 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   // subset of static commands below; never show 100+ rows for an empty query.
   const visibleItems = useMemo<CommandItem[]>(() => {
     if (!query.trim()) {
-      const pinnedStatic = STATIC_COMMANDS.filter((c) => c.kind === 'action').slice(0, 6);
+      const pinnedStatic = commands.filter((c) => c.kind === 'action').slice(0, 6);
       return [...recents, ...pinnedStatic];
     }
-    const all = [...recents, ...STATIC_COMMANDS];
+    const all = [...recents, ...commands];
     const scored = all
       .map((item) => ({ item, score: scoreItem(query, item) }))
       .filter((r) => r.score >= 0)
@@ -240,7 +158,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       .slice(0, 50)
       .map((r) => r.item);
     return scored;
-  }, [query, recents]);
+  }, [query, recents, commands]);
 
   // Group items in render order while preserving the scored sort.
   const groupedItems = useMemo(() => {
