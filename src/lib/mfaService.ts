@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { logger } from './logger';
 
 export interface MFAFactor {
   id: string;
@@ -79,12 +80,25 @@ export const mfaService = {
   },
 
   async needsMFAVerification(): Promise<boolean> {
+    // This gates whether a session must present its second factor. It must
+    // fail CLOSED: a transient AAL-check error previously returned false and
+    // silently admitted an MFA-enrolled user at aal1 (security control off).
     try {
       const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (error) return false;
+      if (error || !data) throw error ?? new Error('No assurance-level data returned');
+      // nextLevel is the highest AAL the user can reach: 'aal2' means a verified
+      // factor exists, so an aal1 session still owes the challenge.
       return data.currentLevel === 'aal1' && data.nextLevel === 'aal2';
-    } catch {
-      return false;
+    } catch (e) {
+      logger.error('MFA assurance check failed; failing closed via factor list', e);
+      // Can't read AAL — challenge only users who actually have a verified
+      // factor, so a blip never strands a non-MFA user on the challenge screen.
+      try {
+        return await this.isMFAEnabled();
+      } catch {
+        // Can't determine enrollment either: safest is to require the challenge.
+        return true;
+      }
     }
   },
 

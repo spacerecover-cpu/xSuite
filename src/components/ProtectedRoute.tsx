@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { PendingApprovalScreen } from './PendingApprovalScreen';
+import { MFAChallenge } from './auth/MFAChallenge';
 
 interface ProtectedRouteProps {
   /** Omit to use the guard as a pathless layout route — children render via <Outlet/>. */
@@ -43,7 +44,7 @@ const AuthLoadingSkeleton = () => (
 );
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
-  const { user, profile, loading, profileStatus } = useAuth();
+  const { user, profile, loading, profileStatus, mfaPending, completeMFAChallenge, signOut } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -52,6 +53,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // MFA gate: an authenticated-but-not-yet-elevated (aal1) session must present
+  // its second factor before any protected page renders. Without this the
+  // challenge lived only on /login, so a deep link / second tab bypassed it.
+  if (mfaPending) {
+    return <MFAChallenge onVerified={completeMFAChallenge} onCancel={() => void signOut()} />;
   }
 
   if (profileStatus === 'pending_approval') {

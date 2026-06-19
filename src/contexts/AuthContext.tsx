@@ -115,6 +115,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const checkMFAStatus = useCallback(async () => {
+    // Recomputed on every session establishment (boot, sign-in, refresh) — not
+    // only at sign-in — so an MFA-enrolled session can never reach the app at
+    // aal1 via refresh, a second tab, or OAuth. Snapshot the epoch so a result
+    // that lands after sign-out can't re-arm the gate. needsMFAVerification
+    // fails closed (see mfaService).
+    const epoch = authEpoch.current;
+    const needsMFA = await mfaService.needsMFAVerification();
+    if (authEpoch.current !== epoch) return;
+    setMfaPending(needsMFA);
+  }, []);
+
   useEffect(() => {
     let mounted = true;
 
@@ -124,6 +136,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
+        checkMFAStatus();
       } else {
         setLoading(false);
       }
@@ -144,6 +157,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (!(event === 'TOKEN_REFRESHED' && sameUser)) {
             await fetchProfile(session.user.id);
           }
+          // AAL can change on any of these events — notably TOKEN_REFRESHED,
+          // which fires when an MFA verify upgrades the session to aal2 — so
+          // recompute the gate on every session establishment, not just sign-in.
+          await checkMFAStatus();
         } else {
           // Signed out (manual, expiry, or revoked refresh token). Invalidate
           // in-flight fetches and reset status so it isn't left stale at
@@ -152,6 +169,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setProfile(null);
           profileCache.current = null;
           setProfileStatus('loading');
+          setMfaPending(false);
           setLoading(false);
         }
       })();
@@ -161,7 +179,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [fetchProfile]);
+  }, [fetchProfile, checkMFAStatus]);
 
   useEffect(() => {
     if (!user) return;
@@ -201,15 +219,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await fetchProfile(user.id);
     }
   }, [user, fetchProfile]);
-
-  const checkMFAStatus = useCallback(async () => {
-    try {
-      const needsMFA = await mfaService.needsMFAVerification();
-      setMfaPending(needsMFA);
-    } catch {
-      setMfaPending(false);
-    }
-  }, []);
 
   const completeMFAChallenge = useCallback(() => {
     setMfaPending(false);
@@ -256,6 +265,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     profileCache.current = null;
     setProfile(null);
     setProfileStatus('loading');
+    setMfaPending(false);
     localStorage.removeItem('tenant_id');
     try {
       await supabase.auth.signOut();

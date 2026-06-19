@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './AuthContext';
 // Controllable supabase + service mocks so we can drive the auth lifecycle.
 let authStateCb: ((event: string, session: unknown) => void) | null = null;
 let maybeSingleImpl: () => Promise<{ data: unknown; error: unknown }> = async () => ({ data: null, error: null });
+let needsMFAImpl: () => Promise<boolean> = async () => false;
 const signOutMock = vi.fn(async () => {
   authStateCb?.('SIGNED_OUT', null);
 });
@@ -22,7 +23,7 @@ vi.mock('../lib/supabaseClient', () => ({
     from: () => ({ select: () => ({ eq: () => ({ maybeSingle: () => maybeSingleImpl() }) }) }),
   },
 }));
-vi.mock('../lib/mfaService', () => ({ mfaService: { needsMFAVerification: vi.fn(async () => false) } }));
+vi.mock('../lib/mfaService', () => ({ mfaService: { needsMFAVerification: () => needsMFAImpl() } }));
 vi.mock('../lib/logger', () => ({ logger: { error: vi.fn() } }));
 
 const APPROVED = {
@@ -31,10 +32,11 @@ const APPROVED = {
 };
 
 function Harness() {
-  const { profileStatus, loading, profile, signOut } = useAuth();
+  const { profileStatus, loading, profile, mfaPending, signOut } = useAuth();
   return (
     <div>
       <span data-testid="state">{`${profileStatus}|${loading}|${profile ? 'yes' : 'no'}`}</span>
+      <span data-testid="mfa">{String(mfaPending)}</span>
       <button onClick={() => void signOut()}>logout</button>
     </div>
   );
@@ -46,6 +48,7 @@ describe('AuthContext', () => {
   beforeEach(() => {
     authStateCb = null;
     maybeSingleImpl = async () => ({ data: null, error: null });
+    needsMFAImpl = async () => false;
     signOutMock.mockClear();
   });
 
@@ -86,5 +89,24 @@ describe('AuthContext', () => {
     render(<AuthProvider><Harness /></AuthProvider>);
     await waitFor(() => expect(state()).toBe('approved|false|yes'), { timeout: 3000 });
     expect(calls).toBe(3);
+  });
+
+  it('computes the MFA gate on boot, not only at sign-in (C1)', async () => {
+    // Bug: mfaPending was set only inside signIn, so an MFA user reached the
+    // app at aal1 after a browser refresh / second tab / OAuth.
+    maybeSingleImpl = async () => ({ data: APPROVED, error: null });
+    needsMFAImpl = async () => true;
+    render(<AuthProvider><Harness /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('mfa').textContent).toBe('true'));
+  });
+
+  it('clears the MFA gate on sign-out', async () => {
+    maybeSingleImpl = async () => ({ data: APPROVED, error: null });
+    needsMFAImpl = async () => true;
+    render(<AuthProvider><Harness /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('mfa').textContent).toBe('true'));
+
+    fireEvent.click(screen.getByText('logout'));
+    await waitFor(() => expect(screen.getByTestId('mfa').textContent).toBe('false'));
   });
 });

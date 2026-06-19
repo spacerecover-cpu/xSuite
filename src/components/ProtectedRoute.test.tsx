@@ -5,6 +5,9 @@ import { ProtectedRoute } from './ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
 
 vi.mock('../contexts/AuthContext', () => ({ useAuth: vi.fn() }));
+// MFAChallenge → mfaService → supabaseClient, whose module-load env check would
+// throw in the test container (no .env). It's never called while just rendering.
+vi.mock('../lib/supabaseClient', () => ({ supabase: {} }));
 
 const DEFAULTS = {
   user: { id: 'u1' },
@@ -72,5 +75,14 @@ describe('ProtectedRoute', () => {
     setAuth({ profile: APPROVED_PROFILE, profileStatus: 'approved' });
     renderRoute();
     expect(screen.getByText('protected content')).toBeInTheDocument();
+  });
+
+  it('renders the MFA challenge (not protected content) when mfaPending, even via deep link (C2)', () => {
+    // Reported bypass: an MFA-pending session deep-linking to /cases rendered
+    // the page because the challenge only existed on /login.
+    setAuth({ profile: APPROVED_PROFILE, profileStatus: 'approved', mfaPending: true });
+    renderRoute();
+    expect(screen.getByText('Two-Factor Authentication')).toBeInTheDocument();
+    expect(screen.queryByText('protected content')).not.toBeInTheDocument();
   });
 });
