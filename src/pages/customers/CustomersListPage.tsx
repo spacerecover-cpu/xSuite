@@ -23,7 +23,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
 import { Skeleton } from '../../components/ui/Skeleton';
-import { Pager } from '../../components/ui/Pager';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
 
 interface Customer {
   id: string;
@@ -459,32 +459,8 @@ export const CustomersListPage: React.FC = () => {
     }
   };
 
-  return (
-    <div className="p-6 max-w-[1800px] mx-auto">
-      <div className="mb-6 flex items-start justify-between">
-        <div className="flex items-start gap-4">
-          <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg bg-primary"
-            style={{
-              boxShadow: '0 10px 40px -10px rgb(var(--color-primary) / 0.5)',
-            }}
-          >
-            <Users className="w-6 h-6 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-1">Customers</h1>
-            <p className="text-slate-600 text-base">
-              Manage individual customer records and relationships
-            </p>
-          </div>
-        </div>
-        <Button onClick={handleOpenModal}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Customer
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+  const kpis = (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-info-muted rounded-xl p-4 border border-info/20">
           <div className="flex items-center justify-between">
             <div>
@@ -533,8 +509,10 @@ export const CustomersListPage: React.FC = () => {
           </div>
         </div>
       </div>
+  );
 
-      <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
+  const toolbar = (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
         <div className="p-6">
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
             <div className="w-full lg:w-80 relative flex-shrink-0">
@@ -674,34 +652,37 @@ export const CustomersListPage: React.FC = () => {
           )}
         </div>
       </div>
+  );
 
-      {isLoading ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4">
-              <Skeleton className="w-10 h-10 rounded-full flex-shrink-0" />
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-1/3" />
-                <Skeleton className="h-3 w-1/4" />
-              </div>
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-6 w-16 rounded-full" />
-            </div>
-          ))}
+  const loadingFallback = (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-4">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-4">
+          <Skeleton className="w-10 h-10 rounded-full flex-shrink-0" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-1/3" />
+            <Skeleton className="h-3 w-1/4" />
+          </div>
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-6 w-16 rounded-full" />
         </div>
-      ) : customers.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500 text-lg">
-            {searchTerm || filterGroup !== 'all' || filterPortal !== 'all'
-              ? 'No customers found matching your criteria.'
-              : 'No customers yet. Add your first customer to get started.'}
-          </p>
-        </div>
-      ) : (
-        <>
-          <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
+      ))}
+    </div>
+  );
+
+  const empty = (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
+      <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+      <p className="text-slate-500 text-lg">
+        {searchTerm || filterGroup !== 'all' || filterPortal !== 'all'
+          ? 'No customers found matching your criteria.'
+          : 'No customers yet. Add your first customer to get started.'}
+      </p>
+    </div>
+  );
+
+  const table = (
+    <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
@@ -860,11 +841,49 @@ export const CustomersListPage: React.FC = () => {
                 </tbody>
               </table>
             </div>
-            <Pager page={page} pageSize={PAGE_SIZE} total={totalCustomers} onPageChange={setPage} itemNoun="customers" />
-          </div>
-        </>
-      )}
+  );
 
+  return (
+    <ListPageTemplate
+      title="Customers"
+      headerActions={
+        <Button onClick={handleOpenModal}>
+          <Plus className="w-4 h-4 mr-2" />
+          Add Customer
+        </Button>
+      }
+      kpis={kpis}
+      toolbar={toolbar}
+      table={table}
+      pager={{ page, pageSize: PAGE_SIZE, total: totalCustomers, onPageChange: setPage, itemNoun: 'customers' }}
+      loading={isLoading}
+      loadingFallback={loadingFallback}
+      isEmpty={customers.length === 0}
+      empty={empty}
+      footer={
+        <BulkActionsBar
+          count={selection.selectedCount}
+          onClear={selection.clear}
+          itemNoun="customer"
+        >
+          <BulkActionButton
+            variant="ghost"
+            icon={<Download className="w-4 h-4" />}
+            label="Export"
+            onClick={handleBulkExport}
+          />
+          {canBulkArchive && (
+            <BulkActionButton
+              variant="danger"
+              icon={<Archive className="w-4 h-4" />}
+              label={isArchiving ? 'Archiving…' : 'Archive'}
+              onClick={handleBulkArchive}
+              disabled={isArchiving}
+            />
+          )}
+        </BulkActionsBar>
+      }
+    >
       <Modal
         isOpen={isModalOpen}
         onClose={() => {
@@ -1160,28 +1179,6 @@ export const CustomersListPage: React.FC = () => {
           </div>
         </form>
       </Modal>
-
-      <BulkActionsBar
-        count={selection.selectedCount}
-        onClear={selection.clear}
-        itemNoun="customer"
-      >
-        <BulkActionButton
-          variant="ghost"
-          icon={<Download className="w-4 h-4" />}
-          label="Export"
-          onClick={handleBulkExport}
-        />
-        {canBulkArchive && (
-          <BulkActionButton
-            variant="danger"
-            icon={<Archive className="w-4 h-4" />}
-            label={isArchiving ? 'Archiving…' : 'Archive'}
-            onClick={handleBulkArchive}
-            disabled={isArchiving}
-          />
-        )}
-      </BulkActionsBar>
-    </div>
+    </ListPageTemplate>
   );
 };
