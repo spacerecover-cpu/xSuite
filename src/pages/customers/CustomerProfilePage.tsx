@@ -31,8 +31,9 @@ import { CustomerFinancialTab } from '../../components/customers/CustomerFinanci
 import { EmailDocumentModal } from '../../components/cases/EmailDocumentModal';
 import { SendMessageModal } from '../../components/communications/SendMessageModal';
 import { useConfirm } from '../../hooks/useConfirm';
-import { Skeleton } from '../../components/ui/Skeleton';
-import { DetailPageHeader } from '../../components/shared/DetailPageHeader';
+import { DetailPageTemplate } from '../../components/templates/DetailPageTemplate';
+import { DetailPageSkeleton } from '../../components/templates/DetailPageSkeleton';
+import { DetailPageNotFound } from '../../components/templates/DetailPageNotFound';
 
 type TabId = 'overview' | 'cases' | 'financial' | 'communications' | 'purchases';
 
@@ -379,50 +380,11 @@ export const CustomerProfilePage: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="px-6 py-5 max-w-[1600px] mx-auto">
-        <Skeleton className="h-5 w-40 mb-6" />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <div className="lg:col-span-2 space-y-6">
-            <div className="rounded-2xl border border-slate-200 p-6">
-              <div className="flex items-start gap-6">
-                <Skeleton className="w-20 h-20 rounded-full flex-shrink-0" />
-                <div className="flex-1 space-y-3">
-                  <Skeleton className="h-7 w-1/2" />
-                  <Skeleton className="h-4 w-1/3" />
-                  <Skeleton className="h-4 w-2/3" />
-                  <Skeleton className="h-4 w-1/2" />
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="rounded-2xl border border-slate-200 p-6 space-y-4">
-            <Skeleton className="h-4 w-32" />
-            <Skeleton className="h-24 w-full rounded-xl" />
-            <Skeleton className="h-9 w-full rounded-lg" />
-          </div>
-        </div>
-        <div className="rounded-2xl border border-slate-200 p-6 space-y-4">
-          <Skeleton className="h-6 w-48" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-5/6" />
-        </div>
-      </div>
-    );
+    return <DetailPageSkeleton />;
   }
 
   if (!customer) {
-    return (
-      <div className="px-6 py-5">
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <User className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500 text-lg">Customer not found</p>
-          <Button onClick={() => navigate('/customers')} variant="secondary" className="mt-4">
-            Back to Customers
-          </Button>
-        </div>
-      </div>
-    );
+    return <DetailPageNotFound backTo={{ to: '/customers', label: 'Back to Customers' }} />;
   }
 
 
@@ -455,13 +417,13 @@ export const CustomerProfilePage: React.FC = () => {
   };
 
   return (
-    <div className="px-6 py-5 max-w-[1600px] mx-auto">
-      <DetailPageHeader
-        breadcrumbs={[
+    <DetailPageTemplate
+      header={{
+        breadcrumbs: [
           { label: 'Customers', to: '/customers' },
           { label: customer.customer_name },
-        ]}
-        badges={
+        ],
+        badges: (
           <>
             <Badge variant="custom" color="rgb(var(--color-primary))">
               {customer.customer_number}
@@ -471,13 +433,13 @@ export const CustomerProfilePage: React.FC = () => {
             )}
             {!customer.is_active && <Badge variant="default">Inactive</Badge>}
           </>
-        }
-        actions={
+        ),
+        actions: (
           <Button variant="secondary" size="sm" onClick={handleOpenEditModal}>
             Edit Profile
           </Button>
-        }
-        meta={
+        ),
+        meta: (
           <AuditInfo
             createdAt={customer.created_at}
             createdLabel="Joined"
@@ -485,9 +447,298 @@ export const CustomerProfilePage: React.FC = () => {
             updatedAt={customer.updated_at}
             updatedByName={nameOf(customer.updated_by)}
           />
-        }
-      />
+        ),
+      }}
+      outside={
+        <>
+          <Modal
+            isOpen={showGeneratePasswordModal}
+            onClose={() => {
+              setShowGeneratePasswordModal(false);
+              setGeneratedPassword(null);
+            }}
+            title="Portal Password Generated"
+          >
+            <div className="space-y-4">
+              {generatePasswordMutation.isPending ? (
+                <div className="text-center py-8">
+                  <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin mb-4"></div>
+                  <p className="text-slate-600">Generating secure password...</p>
+                </div>
+              ) : generatedPassword ? (
+                <>
+                  <div className="flex items-start gap-3 p-4 bg-success-muted border border-success/20 rounded-lg">
+                    <Check className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-success">
+                      <p className="font-semibold mb-1">Password Generated Successfully</p>
+                      <p>
+                        A new password has been generated. Please copy and share it with the customer securely.
+                        This password will only be shown once.
+                      </p>
+                    </div>
+                  </div>
 
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-2">
+                        Email Address
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 px-4 py-3 bg-slate-50 rounded-lg text-sm font-mono text-slate-900 border border-slate-200">
+                          {customer?.email}
+                        </div>
+                        <button
+                          onClick={() => customer?.email && handleCopyEmail(customer.email)}
+                          className="p-3 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                          title="Copy email"
+                        >
+                          {copiedEmail ? (
+                            <Check className="w-5 h-5 text-success" />
+                          ) : (
+                            <Copy className="w-5 h-5 text-slate-600" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-2">
+                        Generated Password
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 px-4 py-3 bg-warning-muted rounded-lg text-lg font-mono font-bold text-slate-900 border-2 border-warning/40 tracking-wider">
+                          {generatedPassword}
+                        </div>
+                        <button
+                          onClick={() => handleCopyPassword(generatedPassword)}
+                          className="p-3 bg-warning-muted hover:bg-warning/20 rounded-lg transition-colors"
+                          title="Copy password"
+                        >
+                          {copiedPassword ? (
+                            <Check className="w-5 h-5 text-success" />
+                          ) : (
+                            <Copy className="w-5 h-5 text-warning" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-2">
+                        Portal Login URL
+                      </label>
+                      <div className="px-4 py-3 bg-slate-50 rounded-lg text-sm font-mono text-slate-700 border border-slate-200">
+                        {portalLoginUrl}
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button
+                    className="w-full"
+                    onClick={() => {
+                      if (customer?.email && generatedPassword) {
+                        handleCopyCredentials(customer.email, generatedPassword);
+                      }
+                    }}
+                  >
+                    {copiedCredentials ? (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        Copied to Clipboard!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy All Credentials
+                      </>
+                    )}
+                  </Button>
+
+                  <div className="text-xs text-slate-500 text-center pt-3 border-t">
+                    <p>You can now share these credentials with the customer via WhatsApp, email, or SMS.</p>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8">
+                  <AlertTriangle className="w-12 h-12 text-danger mx-auto mb-4" />
+                  <p className="text-slate-600">Failed to generate password. Please try again.</p>
+                </div>
+              )}
+            </div>
+          </Modal>
+
+          <Modal
+            isOpen={isEditModalOpen}
+            onClose={() => setIsEditModalOpen(false)}
+            title="Edit Customer"
+          >
+            <form onSubmit={handleSubmitEdit} className="space-y-4">
+              <div className="max-w-sm">
+                <ImageUpload
+                  label="Profile Photo"
+                  description="Upload a profile photo for this customer"
+                  value={photoPreviewUrl || undefined}
+                  onChange={(file, previewUrl) => {
+                    setPhotoFile(file);
+                    setPhotoPreviewUrl(previewUrl);
+                  }}
+                  maxSizeMB={5}
+                  bucketName="company-assets"
+                  className="compact-upload"
+                  enableCrop={true}
+                  cropAspectRatio={1}
+                  cropShape="round"
+                />
+              </div>
+
+              <Input
+                label="Customer Name"
+                value={editFormData.customer_name}
+                onChange={(e) => setEditFormData({ ...editFormData, customer_name: e.target.value })}
+                required
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Email"
+                  type="email"
+                  value={editFormData.email}
+                  onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                />
+                <PhoneInput
+                  label="Mobile Number"
+                  value={editFormData.mobile_number}
+                  onChange={(val) => setEditFormData({ ...editFormData, mobile_number: val })}
+                  countries={countries as Array<{ id: string; name: string; code: string; phone_code: string | null }>}
+                  selectedCountryId={editFormData.country_id}
+                />
+              </div>
+
+              <PhoneInput
+                label="Phone Number (Alternative)"
+                value={editFormData.phone}
+                onChange={(val) => setEditFormData({ ...editFormData, phone: val })}
+                countries={countries as Array<{ id: string; name: string; code: string; phone_code: string | null }>}
+                selectedCountryId={editFormData.country_id}
+              />
+
+              <SearchableSelect
+                label="Customer Group"
+                value={editFormData.customer_group_id}
+                onChange={(value) => setEditFormData({ ...editFormData, customer_group_id: value })}
+                options={customerGroups.map((g: { id: string; name: string }) => ({ id: g.id, name: g.name }))}
+                placeholder="Select Group"
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <SearchableSelect
+                  label="Country"
+                  value={editFormData.country_id}
+                  onChange={(value) => {
+                    setEditFormData({ ...editFormData, country_id: value, city_id: '' });
+                  }}
+                  options={countries.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))}
+                  placeholder="Select Country"
+                />
+                <SearchableSelect
+                  label="City"
+                  value={editFormData.city_id}
+                  onChange={(value) => setEditFormData({ ...editFormData, city_id: value })}
+                  options={filteredCities.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))}
+                  placeholder="Select City"
+                  disabled={!editFormData.country_id}
+                />
+              </div>
+
+              <Input
+                label="Address"
+                value={editFormData.address}
+                onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
+              />
+
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editFormData.portal_enabled}
+                    onChange={(e) =>
+                      setEditFormData({ ...editFormData, portal_enabled: e.target.checked })
+                    }
+                    className="w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
+                  />
+                  <span className="text-sm font-medium text-slate-700">
+                    Enable Client Portal Access
+                  </span>
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Internal Notes
+                </label>
+                <textarea
+                  value={editFormData.notes}
+                  onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
+                  placeholder="Add any internal notes..."
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end pt-3 border-t">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setIsEditModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateMutation.isPending || uploadingPhoto}>
+                  {uploadingPhoto ? 'Uploading Photo...' : updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
+            </form>
+          </Modal>
+
+          {customer.profile_photo_url && (
+            <PhotoViewerModal
+              isOpen={isPhotoViewerOpen}
+              onClose={() => setIsPhotoViewerOpen(false)}
+              imageUrl={customer.profile_photo_url}
+              altText={`${customer.customer_name} profile photo`}
+            />
+          )}
+
+          {showComposeEmail && id && (
+            <EmailDocumentModal
+              isOpen={showComposeEmail}
+              onClose={() => {
+                setShowComposeEmail(false);
+                queryClient.invalidateQueries({ queryKey: ['customer_communications', id] });
+              }}
+              customerId={id}
+              customerName={customer.customer_name}
+              customerEmail={customer.email ?? undefined}
+              companyName="Data Recovery"
+            />
+          )}
+
+          {composeMessageChannel && id && (
+            <SendMessageModal
+              isOpen={!!composeMessageChannel}
+              onClose={() => setComposeMessageChannel(null)}
+              channel={composeMessageChannel}
+              customerId={id}
+              defaultPhone={customer.mobile_number || customer.phone || ''}
+              contextRefs={{ customerId: id }}
+              onLogged={() =>
+                queryClient.invalidateQueries({ queryKey: ['customer_communications', id] })
+              }
+            />
+          )}
+        </>
+      }
+    >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="lg:col-span-2 space-y-6">
           <Card className="p-4">
@@ -899,292 +1150,6 @@ export const CustomerProfilePage: React.FC = () => {
           )}
         </div>
       </div>
-
-      <Modal
-        isOpen={showGeneratePasswordModal}
-        onClose={() => {
-          setShowGeneratePasswordModal(false);
-          setGeneratedPassword(null);
-        }}
-        title="Portal Password Generated"
-      >
-        <div className="space-y-4">
-          {generatePasswordMutation.isPending ? (
-            <div className="text-center py-8">
-              <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin mb-4"></div>
-              <p className="text-slate-600">Generating secure password...</p>
-            </div>
-          ) : generatedPassword ? (
-            <>
-              <div className="flex items-start gap-3 p-4 bg-success-muted border border-success/20 rounded-lg">
-                <Check className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-success">
-                  <p className="font-semibold mb-1">Password Generated Successfully</p>
-                  <p>
-                    A new password has been generated. Please copy and share it with the customer securely.
-                    This password will only be shown once.
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-2">
-                    Email Address
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 px-4 py-3 bg-slate-50 rounded-lg text-sm font-mono text-slate-900 border border-slate-200">
-                      {customer?.email}
-                    </div>
-                    <button
-                      onClick={() => customer?.email && handleCopyEmail(customer.email)}
-                      className="p-3 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-                      title="Copy email"
-                    >
-                      {copiedEmail ? (
-                        <Check className="w-5 h-5 text-success" />
-                      ) : (
-                        <Copy className="w-5 h-5 text-slate-600" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-2">
-                    Generated Password
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 px-4 py-3 bg-warning-muted rounded-lg text-lg font-mono font-bold text-slate-900 border-2 border-warning/40 tracking-wider">
-                      {generatedPassword}
-                    </div>
-                    <button
-                      onClick={() => handleCopyPassword(generatedPassword)}
-                      className="p-3 bg-warning-muted hover:bg-warning/20 rounded-lg transition-colors"
-                      title="Copy password"
-                    >
-                      {copiedPassword ? (
-                        <Check className="w-5 h-5 text-success" />
-                      ) : (
-                        <Copy className="w-5 h-5 text-warning" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-2">
-                    Portal Login URL
-                  </label>
-                  <div className="px-4 py-3 bg-slate-50 rounded-lg text-sm font-mono text-slate-700 border border-slate-200">
-                    {portalLoginUrl}
-                  </div>
-                </div>
-              </div>
-
-              <Button
-                className="w-full"
-                onClick={() => {
-                  if (customer?.email && generatedPassword) {
-                    handleCopyCredentials(customer.email, generatedPassword);
-                  }
-                }}
-              >
-                {copiedCredentials ? (
-                  <>
-                    <Check className="w-4 h-4 mr-2" />
-                    Copied to Clipboard!
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4 mr-2" />
-                    Copy All Credentials
-                  </>
-                )}
-              </Button>
-
-              <div className="text-xs text-slate-500 text-center pt-3 border-t">
-                <p>You can now share these credentials with the customer via WhatsApp, email, or SMS.</p>
-              </div>
-            </>
-          ) : (
-            <div className="text-center py-8">
-              <AlertTriangle className="w-12 h-12 text-danger mx-auto mb-4" />
-              <p className="text-slate-600">Failed to generate password. Please try again.</p>
-            </div>
-          )}
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        title="Edit Customer"
-      >
-        <form onSubmit={handleSubmitEdit} className="space-y-4">
-          <div className="max-w-sm">
-            <ImageUpload
-              label="Profile Photo"
-              description="Upload a profile photo for this customer"
-              value={photoPreviewUrl || undefined}
-              onChange={(file, previewUrl) => {
-                setPhotoFile(file);
-                setPhotoPreviewUrl(previewUrl);
-              }}
-              maxSizeMB={5}
-              bucketName="company-assets"
-              className="compact-upload"
-              enableCrop={true}
-              cropAspectRatio={1}
-              cropShape="round"
-            />
-          </div>
-
-          <Input
-            label="Customer Name"
-            value={editFormData.customer_name}
-            onChange={(e) => setEditFormData({ ...editFormData, customer_name: e.target.value })}
-            required
-          />
-
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Email"
-              type="email"
-              value={editFormData.email}
-              onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
-            />
-            <PhoneInput
-              label="Mobile Number"
-              value={editFormData.mobile_number}
-              onChange={(val) => setEditFormData({ ...editFormData, mobile_number: val })}
-              countries={countries as Array<{ id: string; name: string; code: string; phone_code: string | null }>}
-              selectedCountryId={editFormData.country_id}
-            />
-          </div>
-
-          <PhoneInput
-            label="Phone Number (Alternative)"
-            value={editFormData.phone}
-            onChange={(val) => setEditFormData({ ...editFormData, phone: val })}
-            countries={countries as Array<{ id: string; name: string; code: string; phone_code: string | null }>}
-            selectedCountryId={editFormData.country_id}
-          />
-
-          <SearchableSelect
-            label="Customer Group"
-            value={editFormData.customer_group_id}
-            onChange={(value) => setEditFormData({ ...editFormData, customer_group_id: value })}
-            options={customerGroups.map((g: { id: string; name: string }) => ({ id: g.id, name: g.name }))}
-            placeholder="Select Group"
-          />
-
-          <div className="grid grid-cols-2 gap-3">
-            <SearchableSelect
-              label="Country"
-              value={editFormData.country_id}
-              onChange={(value) => {
-                setEditFormData({ ...editFormData, country_id: value, city_id: '' });
-              }}
-              options={countries.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))}
-              placeholder="Select Country"
-            />
-            <SearchableSelect
-              label="City"
-              value={editFormData.city_id}
-              onChange={(value) => setEditFormData({ ...editFormData, city_id: value })}
-              options={filteredCities.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))}
-              placeholder="Select City"
-              disabled={!editFormData.country_id}
-            />
-          </div>
-
-          <Input
-            label="Address"
-            value={editFormData.address}
-            onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
-          />
-
-          <div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={editFormData.portal_enabled}
-                onChange={(e) =>
-                  setEditFormData({ ...editFormData, portal_enabled: e.target.checked })
-                }
-                className="w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
-              />
-              <span className="text-sm font-medium text-slate-700">
-                Enable Client Portal Access
-              </span>
-            </label>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
-              Internal Notes
-            </label>
-            <textarea
-              value={editFormData.notes}
-              onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
-              rows={2}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
-              placeholder="Add any internal notes..."
-            />
-          </div>
-
-          <div className="flex gap-3 justify-end pt-3 border-t">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setIsEditModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={updateMutation.isPending || uploadingPhoto}>
-              {uploadingPhoto ? 'Uploading Photo...' : updateMutation.isPending ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      {customer.profile_photo_url && (
-        <PhotoViewerModal
-          isOpen={isPhotoViewerOpen}
-          onClose={() => setIsPhotoViewerOpen(false)}
-          imageUrl={customer.profile_photo_url}
-          altText={`${customer.customer_name} profile photo`}
-        />
-      )}
-
-      {showComposeEmail && id && (
-        <EmailDocumentModal
-          isOpen={showComposeEmail}
-          onClose={() => {
-            setShowComposeEmail(false);
-            queryClient.invalidateQueries({ queryKey: ['customer_communications', id] });
-          }}
-          customerId={id}
-          customerName={customer.customer_name}
-          customerEmail={customer.email ?? undefined}
-          companyName="Data Recovery"
-        />
-      )}
-
-      {composeMessageChannel && id && (
-        <SendMessageModal
-          isOpen={!!composeMessageChannel}
-          onClose={() => setComposeMessageChannel(null)}
-          channel={composeMessageChannel}
-          customerId={id}
-          defaultPhone={customer.mobile_number || customer.phone || ''}
-          contextRefs={{ customerId: id }}
-          onLogged={() =>
-            queryClient.invalidateQueries({ queryKey: ['customer_communications', id] })
-          }
-        />
-      )}
-    </div>
+    </DetailPageTemplate>
   );
 };

@@ -7,7 +7,6 @@ import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
-import { Skeleton } from '../../components/ui/Skeleton';
 import { formatDate } from '../../lib/format';
 import { quotesService } from '../../lib/quotesService';
 import { invoiceService } from '../../lib/invoiceService';
@@ -25,7 +24,9 @@ import { MarkAsDeliveredModal } from '../../components/cases/MarkAsDeliveredModa
 import { PreserveLongTermModal } from '../../components/cases/PreserveLongTermModal';
 import type { CreateCloneDriveFormValues } from '../../components/cases/CreateCloneDriveModal';
 import { AuditInfo } from '../../components/ui/AuditInfo';
-import { DetailPageHeader } from '../../components/shared/DetailPageHeader';
+import { DetailPageTemplate } from '../../components/templates/DetailPageTemplate';
+import { DetailPageSkeleton } from '../../components/templates/DetailPageSkeleton';
+import { DetailPageNotFound } from '../../components/templates/DetailPageNotFound';
 import { ReportTypeSelectionModal } from '../../components/cases/ReportTypeSelectionModal';
 import { StreamlinedReportEditor } from '../../components/cases/StreamlinedReportEditor';
 import ReportViewModal from '../../components/cases/ReportViewModal';
@@ -273,24 +274,7 @@ export const CaseDetail: React.FC = () => {
   }, [tabs, activeTab]);
 
   if (isLoading) {
-    return (
-      <div className="p-6 max-w-[1800px] mx-auto space-y-6">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-12 w-12 rounded-xl" />
-          <div className="space-y-2">
-            <Skeleton className="h-6 w-48" />
-            <Skeleton className="h-4 w-64" />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-xl" />
-          ))}
-        </div>
-        <Skeleton className="h-10 w-full rounded-lg" />
-        <Skeleton className="h-96 w-full rounded-2xl" />
-      </div>
-    );
+    return <DetailPageSkeleton />;
   }
 
   if (caseError) {
@@ -309,30 +293,19 @@ export const CaseDetail: React.FC = () => {
   }
 
   if (!caseData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500 text-lg">Case not found</p>
-          <Button onClick={() => navigate('/cases')} className="mt-4">
-            Back to Cases
-          </Button>
-        </div>
-      </div>
-    );
+    return <DetailPageNotFound backTo={{ to: '/cases', label: 'Back to Cases' }} />;
   }
 
   return (
-    <>
-    <div className="px-6 py-5 max-w-[1800px] mx-auto">
-      <DetailPageHeader
-        breadcrumbs={[{ label: 'Cases', to: '/cases' }, { label: `Case #${caseData.case_no}` }]}
-        badges={
+    <DetailPageTemplate
+      header={{
+        breadcrumbs: [{ label: 'Cases', to: '/cases' }, { label: `Case #${caseData.case_no}` }],
+        badges: (
           <Badge variant="custom" color={getStatusColor(caseData.status)} size="lg">
             {getStatusDisplayName(caseData.status)}
           </Badge>
-        }
-        actions={
+        ),
+        actions: (
           <>
             <Button
               onClick={handleWhatsApp}
@@ -400,8 +373,8 @@ export const CaseDetail: React.FC = () => {
               </Button>
             )}
           </>
-        }
-        meta={
+        ),
+        meta: (
           <AuditInfo
             className="mt-2"
             createdAt={caseData.created_at}
@@ -409,8 +382,576 @@ export const CaseDetail: React.FC = () => {
             updatedAt={caseData.updated_at}
             updatedByName={caseData.updated_by_profile?.full_name}
           />
-        }
-      />
+        ),
+      }}
+      outside={
+        <>
+          {/* WhatsApp handoff (header quick action) */}
+          {whatsAppModalOpen && caseData && (
+            <SendMessageModal
+              isOpen={whatsAppModalOpen}
+              onClose={() => setWhatsAppModalOpen(false)}
+              channel="whatsapp"
+              caseId={id!}
+              customerId={caseData.customer_id ?? undefined}
+              defaultPhone={caseData.contact?.mobile_number || caseData.customer?.mobile_number || caseData.customer?.phone || ''}
+              contextRefs={{ caseId: id! }}
+            />
+          )}
+
+          {/* Checkout Modal */}
+          {modals.showCheckoutModal && (
+            <DeviceCheckoutModal
+              isOpen={modals.showCheckoutModal}
+              onClose={() => modals.setShowCheckoutModal(false)}
+              caseId={id!}
+              caseNumber={caseData.case_no ?? ''}
+              devices={devices as unknown as React.ComponentProps<typeof DeviceCheckoutModal>['devices']}
+              customerName={caseData.customer?.customer_name || ''}
+              customerMobileNumber={caseData.customer?.mobile_number || caseData.customer?.phone || ''}
+              onCheckoutComplete={() => {
+                queryClient.invalidateQueries({ queryKey: ['case', id] });
+                queryClient.invalidateQueries({ queryKey: ['case_history', id] });
+              }}
+              onShowCheckoutPreview={handleOpenCheckoutPreview}
+            />
+          )}
+
+          {/* Duplicate Case Confirmation Modal */}
+          {modals.showDuplicateModal && (
+            <DuplicateCaseConfirmationModal
+              isOpen={modals.showDuplicateModal}
+              onClose={() => modals.setShowDuplicateModal(false)}
+              onConfirm={handleConfirmDuplicate}
+              originalCaseNumber={caseData.case_no ?? ''}
+              customerName={caseData.customer?.customer_name || 'Unknown'}
+              serviceName={caseData.service_type?.name || 'Unknown'}
+              newCaseNumber={nextCaseNumberQuery.data}
+              isGeneratingNumber={nextCaseNumberQuery.isFetching}
+              isLoading={duplicateCaseMutation.isPending}
+            />
+          )}
+
+          {/* Delete Case Confirmation Modal */}
+          {modals.showDeleteModal && (
+            <DeleteCaseConfirmationModal
+              isOpen={modals.showDeleteModal}
+              onClose={() => modals.setShowDeleteModal(false)}
+              onConfirm={handleConfirmDelete}
+              caseNumber={caseData.case_no ?? ''}
+              caseTitle={caseData.title || 'Untitled Case'}
+              isDeleting={deleteCaseMutation.isPending}
+            />
+          )}
+
+          {/* Device Form Modal */}
+          {modals.showDeviceModal && (
+            <DeviceFormModal
+              isOpen={modals.showDeviceModal}
+              onClose={() => {
+                modals.setShowDeviceModal(false);
+                modals.setEditingDevice(null);
+              }}
+              caseId={id!}
+              deviceData={modals.editingDevice}
+              onSuccess={() => {
+                queryClient.invalidateQueries({ queryKey: ['case_devices', id] });
+                modals.setShowDeviceModal(false);
+                modals.setEditingDevice(null);
+              }}
+            />
+          )}
+
+          {/* View Clone Drive Modal */}
+          {modals.viewCloneModal && (
+            <Modal
+              isOpen={!!modals.viewCloneModal}
+              onClose={() => modals.setViewCloneModal(null)}
+              title={`Clone Drive Details - ${caseData.case_no}`}
+              icon={Copy}
+              maxWidth="3xl"
+            >
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">Clone ID</label>
+                    <p className="text-sm text-slate-900 font-semibold">Clone #{caseData.case_no}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">Status</label>
+                    <p className="text-sm text-slate-900 capitalize">{modals.viewCloneModal.status}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">Storage Path</label>
+                    <p className="text-sm text-slate-900 font-mono break-all">{modals.viewCloneModal.storage_path}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">Storage Server</label>
+                    <p className="text-sm text-slate-900">{modals.viewCloneModal.storage_server || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">Image Format</label>
+                    <p className="text-sm text-slate-900 uppercase">{modals.viewCloneModal.image_format || 'DD'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">Image Size</label>
+                    <p className="text-sm text-slate-900">{modals.viewCloneModal.image_size_gb ? `${modals.viewCloneModal.image_size_gb} GB` : 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">Clone Date</label>
+                    <p className="text-sm text-slate-900">{formatDate(modals.viewCloneModal.clone_date)}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">Cloned By</label>
+                    <p className="text-sm text-slate-900">{modals.viewCloneModal.cloned_by_name || 'Unknown'}</p>
+                  </div>
+                  {modals.viewCloneModal.extracted_date && (
+                    <>
+                      <div>
+                        <label className="text-sm font-medium text-slate-600">Extracted Date</label>
+                        <p className="text-sm text-slate-900">{formatDate(modals.viewCloneModal.extracted_date)}</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+                {modals.viewCloneModal.notes && (
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">Notes</label>
+                    <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded">{modals.viewCloneModal.notes}</p>
+                  </div>
+                )}
+                <div className="flex justify-end pt-4 border-t border-slate-200">
+                  <Button variant="secondary" onClick={() => modals.setViewCloneModal(null)}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            </Modal>
+          )}
+
+          {/* Mark As Delivered Modal */}
+          <MarkAsDeliveredModal
+            isOpen={modals.showMarkAsDeliveredModal}
+            onClose={() => {
+              modals.setShowMarkAsDeliveredModal(false);
+              modals.setSelectedClone(null);
+            }}
+            onConfirm={(updateCaseStatus, deliveryNotes, retentionDays) => {
+              if (modals.selectedClone) {
+                markAsDeliveredMutation.mutate({ cloneId: modals.selectedClone.id, updateCaseStatus, deliveryNotes, retentionDays });
+              }
+            }}
+            clone={modals.selectedClone}
+            caseNo={caseData?.case_no ?? undefined}
+            caseStatus={caseData?.status ?? undefined}
+            patientDeviceName={
+              modals.selectedClone && devices.length > 0
+                ? (() => {
+                    const patientDevice = devices.find(d => d.id === modals.selectedClone.patient_device_id);
+                    return patientDevice
+                      ? `${patientDevice.device_type?.name || 'Device'} ${patientDevice.serial_number ? `(${patientDevice.serial_number})` : ''}`
+                      : 'Unknown Device';
+                  })()
+                : undefined
+            }
+            isLoading={markAsDeliveredMutation.isPending}
+          />
+
+          {/* Preserve Long-term Modal */}
+          <PreserveLongTermModal
+            isOpen={modals.showPreserveLongTermModal}
+            onClose={() => {
+              modals.setShowPreserveLongTermModal(false);
+              modals.setSelectedClone(null);
+            }}
+            onConfirm={(preserveReason) => {
+              if (modals.selectedClone) {
+                preserveLongTermMutation.mutate({ cloneId: modals.selectedClone.id, preserveReason });
+              }
+            }}
+            clone={modals.selectedClone}
+            caseNo={caseData?.case_no ?? undefined}
+            patientDeviceName={
+              modals.selectedClone && devices.length > 0
+                ? (() => {
+                    const patientDevice = devices.find(d => d.id === modals.selectedClone.patient_device_id);
+                    return patientDevice
+                      ? `${patientDevice.device_type?.name || 'Device'} ${patientDevice.serial_number ? `(${patientDevice.serial_number})` : ''}`
+                      : 'Unknown Device';
+                  })()
+                : undefined
+            }
+            isLoading={preserveLongTermMutation.isPending}
+          />
+
+          {/* Quote View Modal */}
+          {modals.viewingQuote && (
+            <PDFPreviewModal
+              isOpen={!!modals.viewingQuote}
+              onClose={() => modals.setViewingQuote(null)}
+              documentType="quote"
+              documentId={modals.viewingQuote.id}
+              documentNumber={modals.viewingQuote.quote_number}
+              customerEmail={modals.viewingQuote.customers?.email}
+            />
+          )}
+
+          {/* Invoice View Modal */}
+          {modals.viewingInvoice && (
+            <PDFPreviewModal
+              isOpen={!!modals.viewingInvoice}
+              onClose={() => modals.setViewingInvoice(null)}
+              documentType="invoice"
+              documentId={modals.viewingInvoice.id}
+              documentNumber={modals.viewingInvoice.invoice_number}
+              customerEmail={modals.viewingInvoice.customers_enhanced?.email || modals.viewingInvoice.customers?.email}
+            />
+          )}
+
+          {/* Report Type Selection Modal */}
+          {caseData && (
+            <ReportTypeSelectionModal
+              isOpen={modals.showReportTypeSelector}
+              onClose={() => modals.setShowReportTypeSelector(false)}
+              onSelectType={(type) => {
+                modals.setSelectedReportType(type);
+                modals.setShowReportTypeSelector(false);
+              }}
+              caseNumber={caseData.case_no || caseData.case_number || ''}
+              serviceType={caseData.service_type?.name || 'Data Recovery'}
+            />
+          )}
+
+          {/* Streamlined Report Editor */}
+          {caseData && (modals.selectedReportType || modals.editingReport || modals.reportVersioningId) && (
+            <StreamlinedReportEditor
+              isOpen={!!(modals.selectedReportType || modals.editingReport || modals.reportVersioningId)}
+              onClose={() => {
+                modals.setSelectedReportType(null);
+                modals.setEditingReport(null);
+                modals.setReportVersioningId(null);
+              }}
+              reportType={modals.editingReport?.report_type || modals.selectedReportType}
+              caseId={id!}
+              caseData={{
+                case_no: caseData.case_no || caseData.case_number || '',
+                title: caseData.title || '',
+                service_type: caseData.service_type ?? undefined,
+                customer: caseData.customer
+                  ? {
+                      first_name: caseData.customer.customer_name,
+                    }
+                  : undefined,
+                assigned_engineer: caseData.assigned_engineer ?? undefined,
+                created_at: caseData.created_at,
+              }}
+              deviceData={devices && devices.length > 0 ? {
+                device_type: devices[0].device_type?.name || '',
+                brand: devices[0].brand?.name || '',
+                model: devices[0].model || '',
+                capacity: devices[0].capacity?.name || '',
+                serial_number: devices[0].serial_number || '',
+                symptoms: devices[0].symptoms || '',
+              } : undefined}
+              reportId={modals.editingReport?.id}
+              existingReport={modals.editingReport}
+              onSuccess={() => {
+                queryClient.invalidateQueries({ queryKey: ['case_reports', id] });
+                modals.setSelectedReportType(null);
+                modals.setEditingReport(null);
+                modals.setReportVersioningId(null);
+              }}
+            />
+          )}
+
+          {/* Report View Modal */}
+          <ReportViewModal
+            isOpen={!!modals.viewReportId}
+            onClose={() => modals.setViewReportId(null)}
+            reportId={modals.viewReportId || ''}
+            onNewVersion={() => {
+              modals.setReportVersioningId(modals.viewReportId);
+              modals.setViewReportId(null);
+            }}
+            onApprove={async (reportId) => {
+              await reportsService.approveReport(reportId, profile?.id || '');
+              queryClient.invalidateQueries({ queryKey: ['case_reports', id] });
+            }}
+            onSend={async (reportId) => {
+              await reportsService.sendReportToCustomer(reportId);
+              queryClient.invalidateQueries({ queryKey: ['case_reports', id] });
+            }}
+          />
+
+          {/* PDF Preview Modal */}
+          {modals.showPDFPreviewModal && modals.previewDocumentType && caseData && (
+            <PDFPreviewModal
+              isOpen={modals.showPDFPreviewModal}
+              onClose={() => {
+                modals.setShowPDFPreviewModal(false);
+                modals.setPreviewDocumentType(null);
+              }}
+              documentId={id!}
+              documentNumber={caseData.case_no || caseData.case_number || ''}
+              documentType={modals.previewDocumentType}
+              customerEmail={caseData.customer?.email ?? undefined}
+              onSendEmail={handleSendEmailFromPreview}
+            />
+          )}
+
+          {/* Email Document Modal */}
+          {modals.showEmailModal && modals.emailPdfBlob && modals.previewDocumentType && caseData && (
+            <EmailDocumentModal
+              isOpen={modals.showEmailModal}
+              onClose={() => {
+                modals.setShowEmailModal(false);
+                modals.setEmailPdfBlob(null);
+                modals.setEmailPdfFilename('');
+              }}
+              blob={modals.emailPdfBlob}
+              filename={modals.emailPdfFilename}
+              documentType={modals.previewDocumentType}
+              caseId={id!}
+              caseNumber={caseData.case_no || caseData.case_number || ''}
+              customerName={caseData.customer?.customer_name || 'Customer'}
+              customerEmail={caseData.customer?.email ?? undefined}
+              companyName="Data Recovery"
+            />
+          )}
+
+          {/* Quote Form Modal — create / edit */}
+          {modals.showQuoteModal && (
+            <QuoteFormModal
+              isOpen={modals.showQuoteModal}
+              onClose={() => {
+                modals.setShowQuoteModal(false);
+                modals.setEditingQuote(null);
+              }}
+              caseId={id!}
+              customerId={caseData?.customer_id ?? null}
+              companyId={caseData?.company_id ?? null}
+              initialData={modals.editingQuote ?? undefined}
+              clientReference={caseData?.client_reference ?? undefined}
+              onSave={async (quoteData, items) => {
+                try {
+                  const stateEditingId = (modals.editingQuote as { id?: string } | null)?.id;
+                  const payloadEditingId = typeof quoteData.id === 'string' && quoteData.id ? quoteData.id : undefined;
+                  const editingQuoteId = payloadEditingId ?? stateEditingId;
+                  if (editingQuoteId) {
+                    // Edit path — patch quote + replace line items inline
+                    const updatePayload: Database['public']['Tables']['quotes']['Update'] = {
+                      status: typeof quoteData.status === 'string' ? quoteData.status : 'draft',
+                      valid_until: typeof quoteData.valid_until === 'string' && quoteData.valid_until ? quoteData.valid_until : null,
+                      tax_rate: typeof quoteData.tax_rate === 'number' ? quoteData.tax_rate : 0,
+                      discount_amount: typeof quoteData.discount_amount === 'number' ? quoteData.discount_amount : 0,
+                      discount_type: typeof quoteData.discount_type === 'string' ? quoteData.discount_type : 'fixed',
+                      title: typeof quoteData.title === 'string' ? quoteData.title : null,
+                      client_reference: typeof quoteData.client_reference === 'string' ? quoteData.client_reference : null,
+                      bank_account_id: typeof quoteData.bank_account_id === 'string' ? quoteData.bank_account_id : null,
+                      terms: typeof quoteData.terms_and_conditions === 'string' ? quoteData.terms_and_conditions : null,
+                      notes: typeof quoteData.notes === 'string' ? quoteData.notes : null,
+                      updated_at: new Date().toISOString(),
+                    };
+                    const { error: upErr } = await supabase
+                      .from('quotes')
+                      .update(updatePayload)
+                      .eq('id', editingQuoteId);
+                    if (upErr) throw upErr;
+
+                    await supabase
+                      .from('quote_items')
+                      .update({ deleted_at: new Date().toISOString() })
+                      .eq('quote_id', editingQuoteId);
+
+                    const itemsToInsert = items.map((item, index) => ({
+                      quote_id: editingQuoteId,
+                      description: item.description,
+                      quantity: item.quantity,
+                      unit_price: item.unit_price,
+                      total: Math.round(item.quantity * item.unit_price * 100) / 100,
+                      sort_order: index,
+                    })) as Database['public']['Tables']['quote_items']['Insert'][];
+                    if (itemsToInsert.length > 0) {
+                      const { error: itemsErr } = await supabase
+                        .from('quote_items')
+                        .insert(itemsToInsert);
+                      if (itemsErr) throw itemsErr;
+                    }
+                    toast.success('Quote updated successfully');
+                  } else {
+                    // Create path — use service so number generation + totals are centralised
+                    const newQuote: QuoteShape = {
+                      case_id: id!,
+                      customer_id: caseData?.customer_id ?? null,
+                      company_id: caseData?.company_id ?? null,
+                      status: (typeof quoteData.status === 'string' ? quoteData.status : 'draft') as QuoteShape['status'],
+                      title: typeof quoteData.title === 'string' ? quoteData.title : undefined,
+                      client_reference: typeof quoteData.client_reference === 'string' ? quoteData.client_reference : undefined,
+                      valid_until: typeof quoteData.valid_until === 'string' && quoteData.valid_until ? quoteData.valid_until : undefined,
+                      tax_rate: typeof quoteData.tax_rate === 'number' ? quoteData.tax_rate : 0,
+                      discount_amount: typeof quoteData.discount_amount === 'number' ? quoteData.discount_amount : 0,
+                      discount_type: (typeof quoteData.discount_type === 'string' ? quoteData.discount_type : 'fixed') as QuoteShape['discount_type'],
+                      bank_account_id: typeof quoteData.bank_account_id === 'string' ? quoteData.bank_account_id : null,
+                      terms: typeof quoteData.terms_and_conditions === 'string' ? quoteData.terms_and_conditions : undefined,
+                      notes: typeof quoteData.notes === 'string' ? quoteData.notes : undefined,
+                    };
+                    const quoteItems: QuoteItemShape[] = items.map((item, index) => ({
+                      description: item.description,
+                      quantity: item.quantity,
+                      unit_price: item.unit_price,
+                      sort_order: index,
+                    }));
+                    await createQuoteService(newQuote, quoteItems);
+                    toast.success('Quote created successfully');
+                  }
+                  invalidateCaseFinanceQueries();
+                } catch (error: unknown) {
+                  const msg = error instanceof Error ? error.message : 'Failed to save quote';
+                  toast.error(msg);
+                  throw error;
+                }
+              }}
+            />
+          )}
+
+          {/* Invoice Form Modal — create / edit */}
+          {modals.showInvoiceModal && (
+            <InvoiceFormModal
+              isOpen={modals.showInvoiceModal}
+              onClose={() => {
+                modals.setShowInvoiceModal(false);
+                modals.setEditingInvoice(null);
+              }}
+              caseId={id!}
+              customerId={caseData?.customer_id ?? null}
+              companyId={caseData?.company_id ?? null}
+              initialData={modals.editingInvoice ?? undefined}
+              quotes={(quotes || []).map((q) => ({
+                id: q.id,
+                quote_number: q.quote_number ?? null,
+                title: null,
+                total_amount: q.total_amount ?? null,
+              }))}
+              clientReference={caseData?.client_reference ?? undefined}
+              onSave={async (invoiceData, items) => {
+                try {
+                  const stateEditingId = (modals.editingInvoice as { id?: string } | null)?.id;
+                  const payload = invoiceData as Partial<InvoiceShape> & { id?: string };
+                  const payloadEditingId = typeof payload.id === 'string' && payload.id ? payload.id : undefined;
+                  const editingInvoiceId = payloadEditingId ?? stateEditingId;
+                  const lineItems = items as InvoiceItemShape[];
+                  if (editingInvoiceId) {
+                    await updateInvoiceService(editingInvoiceId, {
+                      case_id: payload.case_id,
+                      customer_id: payload.customer_id,
+                      company_id: payload.company_id,
+                      title: payload.title,
+                      invoice_type: payload.invoice_type,
+                      invoice_date: payload.invoice_date,
+                      due_date: payload.due_date,
+                      status: payload.status,
+                      notes: payload.notes,
+                      internal_notes: payload.internal_notes,
+                      discount_amount: payload.discount_amount,
+                      discount_type: payload.discount_type,
+                      tax_rate: payload.tax_rate,
+                      client_reference: payload.client_reference,
+                      bank_account_id: payload.bank_account_id,
+                      terms_and_conditions: payload.terms_and_conditions,
+                      quote_id: payload.quote_id,
+                    }, lineItems);
+                    toast.success('Invoice updated successfully');
+                  } else {
+                    await createInvoiceService({
+                      title: payload.title,
+                      case_id: id!,
+                      customer_id: payload.customer_id ?? caseData?.customer_id ?? null,
+                      company_id: payload.company_id ?? caseData?.company_id ?? null,
+                      invoice_type: payload.invoice_type ?? 'tax_invoice',
+                      invoice_date: payload.invoice_date ?? new Date().toISOString().split('T')[0],
+                      due_date: payload.due_date ?? new Date().toISOString().split('T')[0],
+                      status: payload.status ?? 'draft',
+                      notes: payload.notes,
+                      discount_amount: payload.discount_amount,
+                      discount_type: payload.discount_type,
+                      tax_rate: payload.tax_rate,
+                      client_reference: payload.client_reference,
+                      bank_account_id: payload.bank_account_id,
+                      terms_and_conditions: payload.terms_and_conditions,
+                      quote_id: payload.quote_id,
+                    }, lineItems);
+                    toast.success('Invoice created successfully');
+                  }
+                  invalidateCaseFinanceQueries();
+                } catch (error: unknown) {
+                  const msg = error instanceof Error ? error.message : 'Failed to save invoice';
+                  toast.error(msg);
+                  throw error;
+                }
+              }}
+            />
+          )}
+
+          {/* Convert Proforma to Tax Invoice Modal */}
+          {modals.showConvertProformaModal && modals.convertingInvoice && (
+            <ConvertProformaToTaxModal
+              isOpen={modals.showConvertProformaModal}
+              onClose={() => {
+                modals.setShowConvertProformaModal(false);
+                modals.setConvertingInvoice(null);
+              }}
+              source={{
+                number: (modals.convertingInvoice as { invoice_number?: string | null }).invoice_number ?? null,
+                customerName: caseData.customer?.customer_name ?? null,
+                totalAmount: (modals.convertingInvoice as { total_amount?: number | null }).total_amount ?? null,
+              }}
+              isConverting={isConvertingProforma}
+              onConvert={async (data) => {
+                const convertingId = (modals.convertingInvoice as { id?: string } | null)?.id;
+                if (!convertingId) return;
+                try {
+                  setIsConvertingProforma(true);
+                  await convertProformaToTaxInvoice(
+                    convertingId,
+                    data.dueDate,
+                    data.notes
+                  );
+                  invalidateCaseFinanceQueries();
+                  toast.success('Converted to Tax Invoice');
+                  modals.setShowConvertProformaModal(false);
+                  modals.setConvertingInvoice(null);
+                } catch (error: unknown) {
+                  const msg = error instanceof Error ? error.message : 'Failed to convert';
+                  toast.error(msg);
+                } finally {
+                  setIsConvertingProforma(false);
+                }
+              }}
+            />
+          )}
+
+          {/* Record Payment Modal */}
+          {modals.showRecordPaymentModal && (
+            <RecordPaymentModal
+              isOpen={modals.showRecordPaymentModal}
+              onClose={() => {
+                modals.setShowRecordPaymentModal(false);
+                modals.setSelectedInvoiceForPayment(null);
+              }}
+              preselectedCaseId={id ?? undefined}
+              preselectedInvoiceId={(modals.selectedInvoiceForPayment as { id?: string } | null)?.id ?? undefined}
+              onSave={async (paymentData, allocations) => {
+                await createPaymentMutation.mutateAsync({
+                  paymentData: paymentData as Omit<PaymentShape, 'id' | 'payment_number' | 'created_at' | 'updated_at'>,
+                  allocations,
+                });
+                invalidateCaseFinanceQueries();
+              }}
+            />
+          )}
+        </>
+      }
+    >
 
       {/* Stage banner + Quick Info Cards */}
       <div className="bg-white rounded-lg p-6 mb-6 shadow-sm border border-slate-200">
@@ -827,571 +1368,7 @@ export const CaseDetail: React.FC = () => {
         </Suspense>
       )}
 
-      {/* WhatsApp handoff (header quick action) */}
-      {whatsAppModalOpen && caseData && (
-        <SendMessageModal
-          isOpen={whatsAppModalOpen}
-          onClose={() => setWhatsAppModalOpen(false)}
-          channel="whatsapp"
-          caseId={id!}
-          customerId={caseData.customer_id ?? undefined}
-          defaultPhone={caseData.contact?.mobile_number || caseData.customer?.mobile_number || caseData.customer?.phone || ''}
-          contextRefs={{ caseId: id! }}
-        />
-      )}
-
-      {/* Checkout Modal */}
-      {modals.showCheckoutModal && (
-        <DeviceCheckoutModal
-          isOpen={modals.showCheckoutModal}
-          onClose={() => modals.setShowCheckoutModal(false)}
-          caseId={id!}
-          caseNumber={caseData.case_no ?? ''}
-          devices={devices as unknown as React.ComponentProps<typeof DeviceCheckoutModal>['devices']}
-          customerName={caseData.customer?.customer_name || ''}
-          customerMobileNumber={caseData.customer?.mobile_number || caseData.customer?.phone || ''}
-          onCheckoutComplete={() => {
-            queryClient.invalidateQueries({ queryKey: ['case', id] });
-            queryClient.invalidateQueries({ queryKey: ['case_history', id] });
-          }}
-          onShowCheckoutPreview={handleOpenCheckoutPreview}
-        />
-      )}
-
-      {/* Duplicate Case Confirmation Modal */}
-      {modals.showDuplicateModal && (
-        <DuplicateCaseConfirmationModal
-          isOpen={modals.showDuplicateModal}
-          onClose={() => modals.setShowDuplicateModal(false)}
-          onConfirm={handleConfirmDuplicate}
-          originalCaseNumber={caseData.case_no ?? ''}
-          customerName={caseData.customer?.customer_name || 'Unknown'}
-          serviceName={caseData.service_type?.name || 'Unknown'}
-          newCaseNumber={nextCaseNumberQuery.data}
-          isGeneratingNumber={nextCaseNumberQuery.isFetching}
-          isLoading={duplicateCaseMutation.isPending}
-        />
-      )}
-
-      {/* Delete Case Confirmation Modal */}
-      {modals.showDeleteModal && (
-        <DeleteCaseConfirmationModal
-          isOpen={modals.showDeleteModal}
-          onClose={() => modals.setShowDeleteModal(false)}
-          onConfirm={handleConfirmDelete}
-          caseNumber={caseData.case_no ?? ''}
-          caseTitle={caseData.title || 'Untitled Case'}
-          isDeleting={deleteCaseMutation.isPending}
-        />
-      )}
-
-      {/* Device Form Modal */}
-      {modals.showDeviceModal && (
-        <DeviceFormModal
-          isOpen={modals.showDeviceModal}
-          onClose={() => {
-            modals.setShowDeviceModal(false);
-            modals.setEditingDevice(null);
-          }}
-          caseId={id!}
-          deviceData={modals.editingDevice}
-          onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ['case_devices', id] });
-            modals.setShowDeviceModal(false);
-            modals.setEditingDevice(null);
-          }}
-        />
-      )}
-
-      {/* View Clone Drive Modal */}
-      {modals.viewCloneModal && (
-        <Modal
-          isOpen={!!modals.viewCloneModal}
-          onClose={() => modals.setViewCloneModal(null)}
-          title={`Clone Drive Details - ${caseData.case_no}`}
-          icon={Copy}
-          maxWidth="3xl"
-        >
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-slate-600">Clone ID</label>
-                <p className="text-sm text-slate-900 font-semibold">Clone #{caseData.case_no}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-600">Status</label>
-                <p className="text-sm text-slate-900 capitalize">{modals.viewCloneModal.status}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-600">Storage Path</label>
-                <p className="text-sm text-slate-900 font-mono break-all">{modals.viewCloneModal.storage_path}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-600">Storage Server</label>
-                <p className="text-sm text-slate-900">{modals.viewCloneModal.storage_server || 'N/A'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-600">Image Format</label>
-                <p className="text-sm text-slate-900 uppercase">{modals.viewCloneModal.image_format || 'DD'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-600">Image Size</label>
-                <p className="text-sm text-slate-900">{modals.viewCloneModal.image_size_gb ? `${modals.viewCloneModal.image_size_gb} GB` : 'N/A'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-600">Clone Date</label>
-                <p className="text-sm text-slate-900">{formatDate(modals.viewCloneModal.clone_date)}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-600">Cloned By</label>
-                <p className="text-sm text-slate-900">{modals.viewCloneModal.cloned_by_name || 'Unknown'}</p>
-              </div>
-              {modals.viewCloneModal.extracted_date && (
-                <>
-                  <div>
-                    <label className="text-sm font-medium text-slate-600">Extracted Date</label>
-                    <p className="text-sm text-slate-900">{formatDate(modals.viewCloneModal.extracted_date)}</p>
-                  </div>
-                </>
-              )}
-            </div>
-            {modals.viewCloneModal.notes && (
-              <div>
-                <label className="text-sm font-medium text-slate-600">Notes</label>
-                <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded">{modals.viewCloneModal.notes}</p>
-              </div>
-            )}
-            <div className="flex justify-end pt-4 border-t border-slate-200">
-              <Button variant="secondary" onClick={() => modals.setViewCloneModal(null)}>
-                Close
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* Mark As Delivered Modal */}
-      <MarkAsDeliveredModal
-        isOpen={modals.showMarkAsDeliveredModal}
-        onClose={() => {
-          modals.setShowMarkAsDeliveredModal(false);
-          modals.setSelectedClone(null);
-        }}
-        onConfirm={(updateCaseStatus, deliveryNotes, retentionDays) => {
-          if (modals.selectedClone) {
-            markAsDeliveredMutation.mutate({ cloneId: modals.selectedClone.id, updateCaseStatus, deliveryNotes, retentionDays });
-          }
-        }}
-        clone={modals.selectedClone}
-        caseNo={caseData?.case_no ?? undefined}
-        caseStatus={caseData?.status ?? undefined}
-        patientDeviceName={
-          modals.selectedClone && devices.length > 0
-            ? (() => {
-                const patientDevice = devices.find(d => d.id === modals.selectedClone.patient_device_id);
-                return patientDevice
-                  ? `${patientDevice.device_type?.name || 'Device'} ${patientDevice.serial_number ? `(${patientDevice.serial_number})` : ''}`
-                  : 'Unknown Device';
-              })()
-            : undefined
-        }
-        isLoading={markAsDeliveredMutation.isPending}
-      />
-
-      {/* Preserve Long-term Modal */}
-      <PreserveLongTermModal
-        isOpen={modals.showPreserveLongTermModal}
-        onClose={() => {
-          modals.setShowPreserveLongTermModal(false);
-          modals.setSelectedClone(null);
-        }}
-        onConfirm={(preserveReason) => {
-          if (modals.selectedClone) {
-            preserveLongTermMutation.mutate({ cloneId: modals.selectedClone.id, preserveReason });
-          }
-        }}
-        clone={modals.selectedClone}
-        caseNo={caseData?.case_no ?? undefined}
-        patientDeviceName={
-          modals.selectedClone && devices.length > 0
-            ? (() => {
-                const patientDevice = devices.find(d => d.id === modals.selectedClone.patient_device_id);
-                return patientDevice
-                  ? `${patientDevice.device_type?.name || 'Device'} ${patientDevice.serial_number ? `(${patientDevice.serial_number})` : ''}`
-                  : 'Unknown Device';
-              })()
-            : undefined
-        }
-        isLoading={preserveLongTermMutation.isPending}
-      />
-
-      {/* Quote View Modal */}
-      {modals.viewingQuote && (
-        <PDFPreviewModal
-          isOpen={!!modals.viewingQuote}
-          onClose={() => modals.setViewingQuote(null)}
-          documentType="quote"
-          documentId={modals.viewingQuote.id}
-          documentNumber={modals.viewingQuote.quote_number}
-          customerEmail={modals.viewingQuote.customers?.email}
-        />
-      )}
-
-      {/* Invoice View Modal */}
-      {modals.viewingInvoice && (
-        <PDFPreviewModal
-          isOpen={!!modals.viewingInvoice}
-          onClose={() => modals.setViewingInvoice(null)}
-          documentType="invoice"
-          documentId={modals.viewingInvoice.id}
-          documentNumber={modals.viewingInvoice.invoice_number}
-          customerEmail={modals.viewingInvoice.customers_enhanced?.email || modals.viewingInvoice.customers?.email}
-        />
-      )}
-
-      {/* Report Type Selection Modal */}
-      {caseData && (
-        <ReportTypeSelectionModal
-          isOpen={modals.showReportTypeSelector}
-          onClose={() => modals.setShowReportTypeSelector(false)}
-          onSelectType={(type) => {
-            modals.setSelectedReportType(type);
-            modals.setShowReportTypeSelector(false);
-          }}
-          caseNumber={caseData.case_no || caseData.case_number || ''}
-          serviceType={caseData.service_type?.name || 'Data Recovery'}
-        />
-      )}
-
-      {/* Streamlined Report Editor */}
-      {caseData && (modals.selectedReportType || modals.editingReport || modals.reportVersioningId) && (
-        <StreamlinedReportEditor
-          isOpen={!!(modals.selectedReportType || modals.editingReport || modals.reportVersioningId)}
-          onClose={() => {
-            modals.setSelectedReportType(null);
-            modals.setEditingReport(null);
-            modals.setReportVersioningId(null);
-          }}
-          reportType={modals.editingReport?.report_type || modals.selectedReportType}
-          caseId={id!}
-          caseData={{
-            case_no: caseData.case_no || caseData.case_number || '',
-            title: caseData.title || '',
-            service_type: caseData.service_type ?? undefined,
-            customer: caseData.customer
-              ? {
-                  first_name: caseData.customer.customer_name,
-                }
-              : undefined,
-            assigned_engineer: caseData.assigned_engineer ?? undefined,
-            created_at: caseData.created_at,
-          }}
-          deviceData={devices && devices.length > 0 ? {
-            device_type: devices[0].device_type?.name || '',
-            brand: devices[0].brand?.name || '',
-            model: devices[0].model || '',
-            capacity: devices[0].capacity?.name || '',
-            serial_number: devices[0].serial_number || '',
-            symptoms: devices[0].symptoms || '',
-          } : undefined}
-          reportId={modals.editingReport?.id}
-          existingReport={modals.editingReport}
-          onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ['case_reports', id] });
-            modals.setSelectedReportType(null);
-            modals.setEditingReport(null);
-            modals.setReportVersioningId(null);
-          }}
-        />
-      )}
-
-      {/* Report View Modal */}
-      <ReportViewModal
-        isOpen={!!modals.viewReportId}
-        onClose={() => modals.setViewReportId(null)}
-        reportId={modals.viewReportId || ''}
-        onNewVersion={() => {
-          modals.setReportVersioningId(modals.viewReportId);
-          modals.setViewReportId(null);
-        }}
-        onApprove={async (reportId) => {
-          await reportsService.approveReport(reportId, profile?.id || '');
-          queryClient.invalidateQueries({ queryKey: ['case_reports', id] });
-        }}
-        onSend={async (reportId) => {
-          await reportsService.sendReportToCustomer(reportId);
-          queryClient.invalidateQueries({ queryKey: ['case_reports', id] });
-        }}
-      />
-
-      {/* PDF Preview Modal */}
-      {modals.showPDFPreviewModal && modals.previewDocumentType && caseData && (
-        <PDFPreviewModal
-          isOpen={modals.showPDFPreviewModal}
-          onClose={() => {
-            modals.setShowPDFPreviewModal(false);
-            modals.setPreviewDocumentType(null);
-          }}
-          documentId={id!}
-          documentNumber={caseData.case_no || caseData.case_number || ''}
-          documentType={modals.previewDocumentType}
-          customerEmail={caseData.customer?.email ?? undefined}
-          onSendEmail={handleSendEmailFromPreview}
-        />
-      )}
-
-      {/* Email Document Modal */}
-      {modals.showEmailModal && modals.emailPdfBlob && modals.previewDocumentType && caseData && (
-        <EmailDocumentModal
-          isOpen={modals.showEmailModal}
-          onClose={() => {
-            modals.setShowEmailModal(false);
-            modals.setEmailPdfBlob(null);
-            modals.setEmailPdfFilename('');
-          }}
-          blob={modals.emailPdfBlob}
-          filename={modals.emailPdfFilename}
-          documentType={modals.previewDocumentType}
-          caseId={id!}
-          caseNumber={caseData.case_no || caseData.case_number || ''}
-          customerName={caseData.customer?.customer_name || 'Customer'}
-          customerEmail={caseData.customer?.email ?? undefined}
-          companyName="Data Recovery"
-        />
-      )}
-
-      {/* Quote Form Modal — create / edit */}
-      {modals.showQuoteModal && (
-        <QuoteFormModal
-          isOpen={modals.showQuoteModal}
-          onClose={() => {
-            modals.setShowQuoteModal(false);
-            modals.setEditingQuote(null);
-          }}
-          caseId={id!}
-          customerId={caseData?.customer_id ?? null}
-          companyId={caseData?.company_id ?? null}
-          initialData={modals.editingQuote ?? undefined}
-          clientReference={caseData?.client_reference ?? undefined}
-          onSave={async (quoteData, items) => {
-            try {
-              const stateEditingId = (modals.editingQuote as { id?: string } | null)?.id;
-              const payloadEditingId = typeof quoteData.id === 'string' && quoteData.id ? quoteData.id : undefined;
-              const editingQuoteId = payloadEditingId ?? stateEditingId;
-              if (editingQuoteId) {
-                // Edit path — patch quote + replace line items inline
-                const updatePayload: Database['public']['Tables']['quotes']['Update'] = {
-                  status: typeof quoteData.status === 'string' ? quoteData.status : 'draft',
-                  valid_until: typeof quoteData.valid_until === 'string' && quoteData.valid_until ? quoteData.valid_until : null,
-                  tax_rate: typeof quoteData.tax_rate === 'number' ? quoteData.tax_rate : 0,
-                  discount_amount: typeof quoteData.discount_amount === 'number' ? quoteData.discount_amount : 0,
-                  discount_type: typeof quoteData.discount_type === 'string' ? quoteData.discount_type : 'fixed',
-                  title: typeof quoteData.title === 'string' ? quoteData.title : null,
-                  client_reference: typeof quoteData.client_reference === 'string' ? quoteData.client_reference : null,
-                  bank_account_id: typeof quoteData.bank_account_id === 'string' ? quoteData.bank_account_id : null,
-                  terms: typeof quoteData.terms_and_conditions === 'string' ? quoteData.terms_and_conditions : null,
-                  notes: typeof quoteData.notes === 'string' ? quoteData.notes : null,
-                  updated_at: new Date().toISOString(),
-                };
-                const { error: upErr } = await supabase
-                  .from('quotes')
-                  .update(updatePayload)
-                  .eq('id', editingQuoteId);
-                if (upErr) throw upErr;
-
-                await supabase
-                  .from('quote_items')
-                  .update({ deleted_at: new Date().toISOString() })
-                  .eq('quote_id', editingQuoteId);
-
-                const itemsToInsert = items.map((item, index) => ({
-                  quote_id: editingQuoteId,
-                  description: item.description,
-                  quantity: item.quantity,
-                  unit_price: item.unit_price,
-                  total: Math.round(item.quantity * item.unit_price * 100) / 100,
-                  sort_order: index,
-                })) as Database['public']['Tables']['quote_items']['Insert'][];
-                if (itemsToInsert.length > 0) {
-                  const { error: itemsErr } = await supabase
-                    .from('quote_items')
-                    .insert(itemsToInsert);
-                  if (itemsErr) throw itemsErr;
-                }
-                toast.success('Quote updated successfully');
-              } else {
-                // Create path — use service so number generation + totals are centralised
-                const newQuote: QuoteShape = {
-                  case_id: id!,
-                  customer_id: caseData?.customer_id ?? null,
-                  company_id: caseData?.company_id ?? null,
-                  status: (typeof quoteData.status === 'string' ? quoteData.status : 'draft') as QuoteShape['status'],
-                  title: typeof quoteData.title === 'string' ? quoteData.title : undefined,
-                  client_reference: typeof quoteData.client_reference === 'string' ? quoteData.client_reference : undefined,
-                  valid_until: typeof quoteData.valid_until === 'string' && quoteData.valid_until ? quoteData.valid_until : undefined,
-                  tax_rate: typeof quoteData.tax_rate === 'number' ? quoteData.tax_rate : 0,
-                  discount_amount: typeof quoteData.discount_amount === 'number' ? quoteData.discount_amount : 0,
-                  discount_type: (typeof quoteData.discount_type === 'string' ? quoteData.discount_type : 'fixed') as QuoteShape['discount_type'],
-                  bank_account_id: typeof quoteData.bank_account_id === 'string' ? quoteData.bank_account_id : null,
-                  terms: typeof quoteData.terms_and_conditions === 'string' ? quoteData.terms_and_conditions : undefined,
-                  notes: typeof quoteData.notes === 'string' ? quoteData.notes : undefined,
-                };
-                const quoteItems: QuoteItemShape[] = items.map((item, index) => ({
-                  description: item.description,
-                  quantity: item.quantity,
-                  unit_price: item.unit_price,
-                  sort_order: index,
-                }));
-                await createQuoteService(newQuote, quoteItems);
-                toast.success('Quote created successfully');
-              }
-              invalidateCaseFinanceQueries();
-            } catch (error: unknown) {
-              const msg = error instanceof Error ? error.message : 'Failed to save quote';
-              toast.error(msg);
-              throw error;
-            }
-          }}
-        />
-      )}
-
-      {/* Invoice Form Modal — create / edit */}
-      {modals.showInvoiceModal && (
-        <InvoiceFormModal
-          isOpen={modals.showInvoiceModal}
-          onClose={() => {
-            modals.setShowInvoiceModal(false);
-            modals.setEditingInvoice(null);
-          }}
-          caseId={id!}
-          customerId={caseData?.customer_id ?? null}
-          companyId={caseData?.company_id ?? null}
-          initialData={modals.editingInvoice ?? undefined}
-          quotes={(quotes || []).map((q) => ({
-            id: q.id,
-            quote_number: q.quote_number ?? null,
-            title: null,
-            total_amount: q.total_amount ?? null,
-          }))}
-          clientReference={caseData?.client_reference ?? undefined}
-          onSave={async (invoiceData, items) => {
-            try {
-              const stateEditingId = (modals.editingInvoice as { id?: string } | null)?.id;
-              const payload = invoiceData as Partial<InvoiceShape> & { id?: string };
-              const payloadEditingId = typeof payload.id === 'string' && payload.id ? payload.id : undefined;
-              const editingInvoiceId = payloadEditingId ?? stateEditingId;
-              const lineItems = items as InvoiceItemShape[];
-              if (editingInvoiceId) {
-                await updateInvoiceService(editingInvoiceId, {
-                  case_id: payload.case_id,
-                  customer_id: payload.customer_id,
-                  company_id: payload.company_id,
-                  title: payload.title,
-                  invoice_type: payload.invoice_type,
-                  invoice_date: payload.invoice_date,
-                  due_date: payload.due_date,
-                  status: payload.status,
-                  notes: payload.notes,
-                  internal_notes: payload.internal_notes,
-                  discount_amount: payload.discount_amount,
-                  discount_type: payload.discount_type,
-                  tax_rate: payload.tax_rate,
-                  client_reference: payload.client_reference,
-                  bank_account_id: payload.bank_account_id,
-                  terms_and_conditions: payload.terms_and_conditions,
-                  quote_id: payload.quote_id,
-                }, lineItems);
-                toast.success('Invoice updated successfully');
-              } else {
-                await createInvoiceService({
-                  title: payload.title,
-                  case_id: id!,
-                  customer_id: payload.customer_id ?? caseData?.customer_id ?? null,
-                  company_id: payload.company_id ?? caseData?.company_id ?? null,
-                  invoice_type: payload.invoice_type ?? 'tax_invoice',
-                  invoice_date: payload.invoice_date ?? new Date().toISOString().split('T')[0],
-                  due_date: payload.due_date ?? new Date().toISOString().split('T')[0],
-                  status: payload.status ?? 'draft',
-                  notes: payload.notes,
-                  discount_amount: payload.discount_amount,
-                  discount_type: payload.discount_type,
-                  tax_rate: payload.tax_rate,
-                  client_reference: payload.client_reference,
-                  bank_account_id: payload.bank_account_id,
-                  terms_and_conditions: payload.terms_and_conditions,
-                  quote_id: payload.quote_id,
-                }, lineItems);
-                toast.success('Invoice created successfully');
-              }
-              invalidateCaseFinanceQueries();
-            } catch (error: unknown) {
-              const msg = error instanceof Error ? error.message : 'Failed to save invoice';
-              toast.error(msg);
-              throw error;
-            }
-          }}
-        />
-      )}
-
-      {/* Convert Proforma to Tax Invoice Modal */}
-      {modals.showConvertProformaModal && modals.convertingInvoice && (
-        <ConvertProformaToTaxModal
-          isOpen={modals.showConvertProformaModal}
-          onClose={() => {
-            modals.setShowConvertProformaModal(false);
-            modals.setConvertingInvoice(null);
-          }}
-          source={{
-            number: (modals.convertingInvoice as { invoice_number?: string | null }).invoice_number ?? null,
-            customerName: caseData.customer?.customer_name ?? null,
-            totalAmount: (modals.convertingInvoice as { total_amount?: number | null }).total_amount ?? null,
-          }}
-          isConverting={isConvertingProforma}
-          onConvert={async (data) => {
-            const convertingId = (modals.convertingInvoice as { id?: string } | null)?.id;
-            if (!convertingId) return;
-            try {
-              setIsConvertingProforma(true);
-              await convertProformaToTaxInvoice(
-                convertingId,
-                data.dueDate,
-                data.notes
-              );
-              invalidateCaseFinanceQueries();
-              toast.success('Converted to Tax Invoice');
-              modals.setShowConvertProformaModal(false);
-              modals.setConvertingInvoice(null);
-            } catch (error: unknown) {
-              const msg = error instanceof Error ? error.message : 'Failed to convert';
-              toast.error(msg);
-            } finally {
-              setIsConvertingProforma(false);
-            }
-          }}
-        />
-      )}
-
-      {/* Record Payment Modal */}
-      {modals.showRecordPaymentModal && (
-        <RecordPaymentModal
-          isOpen={modals.showRecordPaymentModal}
-          onClose={() => {
-            modals.setShowRecordPaymentModal(false);
-            modals.setSelectedInvoiceForPayment(null);
-          }}
-          preselectedCaseId={id ?? undefined}
-          preselectedInvoiceId={(modals.selectedInvoiceForPayment as { id?: string } | null)?.id ?? undefined}
-          onSave={async (paymentData, allocations) => {
-            await createPaymentMutation.mutateAsync({
-              paymentData: paymentData as Omit<PaymentShape, 'id' | 'payment_number' | 'created_at' | 'updated_at'>,
-              allocations,
-            });
-            invalidateCaseFinanceQueries();
-          }}
-        />
-      )}
-    </div>
-    </>
+    </DetailPageTemplate>
   );
 };
 
