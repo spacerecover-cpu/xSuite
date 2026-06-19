@@ -26,6 +26,10 @@ interface ConfigurableDataTableProps<T> {
   /** Extra classes per row (e.g. status-based row tinting); applied to the
    *  desktop <tr> and the mobile card alike. */
   rowClassName?: (row: T) => string | undefined;
+  /** Column key that absorbs leftover width instead of the last column, so
+   *  spare space flows into a text column rather than a trailing actions
+   *  column. Falls back to last-column flex when unset or not currently fit. */
+  elasticColumnKey?: string;
 }
 
 const SELECTION_W = 48;
@@ -48,6 +52,7 @@ export function ConfigurableDataTable<T>({
   onWidthsChange,
   rowAriaLabel,
   rowClassName,
+  elasticColumnKey,
 }: ConfigurableDataTableProps<T>) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = useState<number>(1200);
@@ -142,8 +147,13 @@ export function ConfigurableDataTable<T>({
     }
   };
 
-  const widthFor = (def: TableColumnDef<T>, isLast: boolean) =>
-    isLast ? undefined : Math.max(def.minWidth, widths[def.key] ?? def.minWidth);
+  // Leftover width goes to the elastic column when one is named and visible;
+  // otherwise it flows to the last column (the original behavior).
+  const elasticPresent = !!elasticColumnKey && fitDefs.some((d) => d.key === elasticColumnKey);
+  const widthFor = (def: TableColumnDef<T>, isLast: boolean) => {
+    const isAuto = elasticPresent ? def.key === elasticColumnKey : isLast;
+    return isAuto ? undefined : Math.max(def.minWidth, widths[def.key] ?? def.minWidth);
+  };
 
   return (
     <div ref={containerRef}>

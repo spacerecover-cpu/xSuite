@@ -1,4 +1,5 @@
 import { Badge } from '../../components/ui/Badge';
+import { RowActionsMenu, type RowAction } from '../../components/ui/RowActionsMenu';
 import { statusToBadgeVariant } from '../ui/variants';
 import { formatDate } from '../format';
 import type { InvoiceWithDetails } from '../invoiceService';
@@ -55,7 +56,7 @@ export function buildInvoicesColumns(ctx: InvoiceColumnContext): TableColumnDef<
     {
       key: 'invoice_number',
       label: 'Invoice #',
-      minWidth: 120,
+      minWidth: 150,
       priority: 1,
       defaultVisible: true,
       render: (r) => <span className="font-semibold text-primary">{r.invoice_number}</span>,
@@ -63,7 +64,7 @@ export function buildInvoicesColumns(ctx: InvoiceColumnContext): TableColumnDef<
     {
       key: 'invoice_type',
       label: 'Type',
-      minWidth: 110,
+      minWidth: 135,
       priority: 4,
       defaultVisible: true,
       render: (r) => (
@@ -75,7 +76,7 @@ export function buildInvoicesColumns(ctx: InvoiceColumnContext): TableColumnDef<
     {
       key: 'case',
       label: 'Case',
-      minWidth: 140,
+      minWidth: 160,
       priority: 3,
       defaultVisible: true,
       render: (r) =>
@@ -91,7 +92,7 @@ export function buildInvoicesColumns(ctx: InvoiceColumnContext): TableColumnDef<
     {
       key: 'customer',
       label: 'Customer',
-      minWidth: 150,
+      minWidth: 170,
       priority: 1,
       defaultVisible: true,
       render: (r) => (
@@ -108,8 +109,8 @@ export function buildInvoicesColumns(ctx: InvoiceColumnContext): TableColumnDef<
     {
       key: 'invoice_date',
       label: 'Date',
-      minWidth: 110,
-      priority: 3,
+      minWidth: 140,
+      priority: 2,
       defaultVisible: true,
       render: (r) => (
         <div className="min-w-0">
@@ -123,7 +124,7 @@ export function buildInvoicesColumns(ctx: InvoiceColumnContext): TableColumnDef<
     {
       key: 'due_date',
       label: 'Due Date',
-      minWidth: 110,
+      minWidth: 130,
       priority: 5,
       defaultVisible: true,
       render: (r) => (
@@ -133,7 +134,7 @@ export function buildInvoicesColumns(ctx: InvoiceColumnContext): TableColumnDef<
     {
       key: 'amount',
       label: 'Amount',
-      minWidth: 130,
+      minWidth: 160,
       priority: 1,
       defaultVisible: true,
       render: (r) => (
@@ -150,7 +151,7 @@ export function buildInvoicesColumns(ctx: InvoiceColumnContext): TableColumnDef<
     {
       key: 'status',
       label: 'Status',
-      minWidth: 140,
+      minWidth: 150,
       priority: 1,
       defaultVisible: true,
       render: (r) => {
@@ -193,49 +194,37 @@ export function buildInvoicesColumns(ctx: InvoiceColumnContext): TableColumnDef<
     {
       key: 'actions',
       label: 'Actions',
-      minWidth: 120,
+      minWidth: 110,
       priority: 1,
       defaultVisible: true,
       align: 'end',
-      render: (r) => (
-        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-          <button
-            onClick={() => r.id && ctx.navigate(`/invoices/${r.id}`)}
-            className="p-1.5 text-primary hover:bg-info-muted rounded transition-colors"
-            title="View"
-          >
-            <Eye className="w-4 h-4" />
-          </button>
-          {ctx.canEdit(r) && (
-            <button
-              onClick={() => ctx.onEdit(r)}
-              className="p-1.5 text-slate-600 hover:bg-slate-100 rounded transition-colors"
-              title="Edit"
-            >
-              <Edit className="w-4 h-4" />
-            </button>
-          )}
-          {ctx.canRecordPayment(r) && (
-            <button
-              onClick={() => ctx.onRecordPayment(r)}
-              className="p-1.5 text-success hover:bg-success-muted rounded transition-colors"
-              title="Record Payment"
-            >
-              <DollarSign className="w-4 h-4" />
-            </button>
-          )}
-          {r.invoice_type === 'proforma' && r.status === 'converted' && (
-            <div className="flex items-center gap-1 text-xs text-slate-500" title="Read-only (Converted)">
-              <Lock className="w-3 h-3" />
-            </div>
-          )}
-          {r.invoice_type === 'proforma' && r.status !== 'converted' && (
-            <div className="flex items-center gap-1 text-xs text-warning" title="Payments not allowed on proforma">
-              <AlertCircle className="w-3 h-3" />
-            </div>
-          )}
-        </div>
-      ),
+      render: (r) => {
+        const actions: RowAction[] = [
+          { label: 'Open invoice', icon: Eye, onClick: () => r.id && ctx.navigate(`/invoices/${r.id}`) },
+        ];
+        if (ctx.canEdit(r)) {
+          actions.push({ label: 'Edit', icon: Edit, onClick: () => ctx.onEdit(r) });
+        }
+        if (ctx.canRecordPayment(r)) {
+          actions.push({
+            label: 'Record payment',
+            icon: DollarSign,
+            tone: 'success',
+            onClick: () => ctx.onRecordPayment(r),
+          });
+        }
+        const note =
+          r.invoice_type === 'proforma'
+            ? r.status === 'converted'
+              ? { label: 'Read-only (converted)', icon: Lock }
+              : { label: 'Payments disabled on proforma', icon: AlertCircle }
+            : undefined;
+        return (
+          <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+            <RowActionsMenu actions={actions} note={note} ariaLabel={`Actions for ${r.invoice_number ?? 'invoice'}`} />
+          </div>
+        );
+      },
     },
   ];
 }

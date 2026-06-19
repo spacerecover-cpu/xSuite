@@ -516,16 +516,16 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
                     Capacity
                   </label>
                   {editingSection === 'device' ? (
-                    <select
-                      value={editedDeviceData.capacity_id ?? devices[0]?.capacity_id ?? ''}
-                      onChange={(e) => handleDeviceFieldChange('capacity_id', e.target.value || null)}
-                      className="text-sm px-2 py-1 border border-success/40 rounded bg-white focus:outline-none focus:ring-2 focus:ring-success max-w-[200px]"
-                    >
-                      <option value="">Select capacity...</option>
-                      {capacities.map((cap) => (
-                        <option key={cap.id} value={cap.id}>{cap.name}</option>
-                      ))}
-                    </select>
+                    <div className="w-full max-w-[220px]">
+                      <SearchableSelect
+                        value={editedDeviceData.capacity_id ?? devices[0]?.capacity_id ?? ''}
+                        onChange={(value) => handleDeviceFieldChange('capacity_id', value || null)}
+                        options={capacities.map((cap) => ({ id: cap.id, name: cap.name }))}
+                        placeholder="Select capacity..."
+                        usePortal
+                        clearable={false}
+                      />
+                    </div>
                   ) : (
                     <p className="text-sm text-slate-900 font-medium text-right">{devices[0].capacity?.name || '-'}</p>
                   )}
@@ -543,6 +543,7 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
                         onChange={(value) => handleDeviceFieldChange('accessories', value)}
                         options={accessories.map(a => ({ id: a.id, name: a.name }))}
                         placeholder="Select accessories..."
+                        usePortal
                       />
                     </div>
                   ) : (

@@ -672,6 +672,7 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
                   onChange={(value) => setFormData({ ...formData, accessories: value })}
                   options={accessories.map(a => ({ id: a.id, name: a.name }))}
                   placeholder="Select accessories (optional)..."
+                  usePortal
                 />
               </div>
             )}

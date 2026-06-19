@@ -66,6 +66,7 @@ export const InvoicesTable: React.FC<InvoicesTableProps> = ({
       rowKey={(r) => r.id ?? ''}
       onRowClick={(r) => r.id && navigate(`/invoices/${r.id}`)}
       selection={selection}
+      elasticColumnKey="customer"
       rowAriaLabel={(r) => `Invoice ${r.invoice_number ?? ''}`}
       rowClassName={(r) => (r.status === 'overdue' ? 'bg-danger-muted' : undefined)}
     />

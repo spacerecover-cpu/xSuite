@@ -47,3 +47,34 @@ describe('ConfigurableDataTable rowClassName', () => {
     expect(normalRow?.className).not.toContain('bg-danger-muted');
   });
 });
+
+describe('ConfigurableDataTable elasticColumnKey', () => {
+  const threeCols: TableColumnDef<Row>[] = [
+    { key: 'a', label: 'A', minWidth: 100, priority: 1, defaultVisible: true, render: (r) => <span>{r.name}</span> },
+    { key: 'b', label: 'B', minWidth: 100, priority: 1, defaultVisible: true, render: () => <span>b</span> },
+    { key: 'c', label: 'C', minWidth: 100, priority: 1, defaultVisible: true, render: () => <span>c</span> },
+  ];
+  const threeView: ResolvedTableView = { orderedVisible: ['a', 'b', 'c'], locked: [], widths: {} };
+  const headerByText = (label: string) =>
+    screen.getAllByRole('columnheader').find((h) => h.textContent === label);
+
+  it('flexes the last column by default (no fixed width on the last header)', () => {
+    render(<ConfigurableDataTable rows={rows} columns={threeCols} view={threeView} rowKey={(r) => r.id} />);
+    expect(headerByText('C')?.style.width).toBe('');
+    expect(headerByText('A')?.style.width).not.toBe('');
+  });
+
+  it('flexes the named elastic column instead of the last one', () => {
+    render(
+      <ConfigurableDataTable
+        rows={rows}
+        columns={threeCols}
+        view={threeView}
+        rowKey={(r) => r.id}
+        elasticColumnKey="b"
+      />,
+    );
+    expect(headerByText('B')?.style.width).toBe('');
+    expect(headerByText('C')?.style.width).not.toBe('');
+  });
+});

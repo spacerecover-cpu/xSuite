@@ -66,10 +66,11 @@ describe('invoicesColumns', () => {
     expect(ctx.navigate).toHaveBeenCalledWith('/invoices/pro-9');
   });
 
-  it('invokes the row edit handler from the actions column', () => {
+  it('invokes the row edit handler from the actions menu', () => {
     const ctx = makeCtx();
     render(<>{col(ctx, 'actions').render(baseInvoice)}</>);
-    fireEvent.click(screen.getByTitle('Edit'));
+    fireEvent.click(screen.getByLabelText(/Actions for/));
+    fireEvent.click(screen.getByText('Edit'));
     expect(ctx.onEdit).toHaveBeenCalledWith(baseInvoice);
   });
 });
