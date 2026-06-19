@@ -5,7 +5,7 @@ import { Users, DollarSign, TrendingUp, Ticket, AlertTriangle } from 'lucide-rea
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getDashboardStats, getMRRTrend, getPlanDistribution, getAtRiskTenants } from '../../lib/platformAdminService';
 import { platformAdminKeys } from '../../lib/queryKeys';
-import { StatsCard } from '../../components/ui/StatsCard';
+import { StatCard } from '../../components/shared/StatCard';
 import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { chartAxis, chartCategorical, chartGrid } from '../../lib/chartTheme';
@@ -79,57 +79,57 @@ export const PlatformDashboard: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div onClick={() => navigate('/platform-admin/tenants')} className="cursor-pointer">
-          <StatsCard
-            title="Total Tenants"
+          <StatCard
+            label="Total Tenants"
             value={String(stats?.totalTenants ?? 0)}
             icon={Users}
-            color="blue"
+            tone="info"
           />
         </div>
-        <StatsCard
-          title="Active Tenants"
+        <StatCard
+          label="Active Tenants"
           value={String(stats?.activeTenants ?? 0)}
           icon={Users}
-          color="green"
+          tone="success"
         />
-        <StatsCard
-          title="Monthly Recurring Revenue"
+        <StatCard
+          label="Monthly Recurring Revenue"
           value={formatCurrency(stats?.mrr || 0)}
           icon={DollarSign}
-          color="green"
+          tone="success"
         />
-        <StatsCard
-          title="Annual Recurring Revenue"
+        <StatCard
+          label="Annual Recurring Revenue"
           value={formatCurrency(stats?.arr || 0)}
           icon={TrendingUp}
-          color="blue"
+          tone="info"
         />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatsCard
-          title="Total Users"
+        <StatCard
+          label="Total Users"
           value={String(stats?.totalUsers ?? 0)}
           icon={Users}
         />
-        <StatsCard
-          title="Active Users Today"
+        <StatCard
+          label="Active Users Today"
           value={String(stats?.activeUsersToday ?? 0)}
           icon={Users}
-          color="green"
+          tone="success"
         />
-        <StatsCard
-          title="Trial Tenants"
+        <StatCard
+          label="Trial Tenants"
           value={String(stats?.trialTenants ?? 0)}
           icon={Users}
-          color="orange"
+          tone="warning"
         />
         <div onClick={() => navigate('/platform-admin/tickets')} className="cursor-pointer">
-          <StatsCard
-            title="Open Support Tickets"
+          <StatCard
+            label="Open Support Tickets"
             value={String(stats?.openTickets ?? 0)}
             icon={Ticket}
-            color="purple"
+            tone="cat-7"
           />
         </div>
       </div>
