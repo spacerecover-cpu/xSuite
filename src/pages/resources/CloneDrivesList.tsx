@@ -4,11 +4,12 @@ import { supabase } from '../../lib/supabaseClient';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
-import { Pager } from '../../components/ui/Pager';
 import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
+import { KpiRow } from '../../components/templates/KpiRow';
 import { ResourceCloneDriveModal } from '../../components/resources/ResourceCloneDriveModal';
-import { HardDrive, Search, Filter, Plus, Database, AlertCircle, CheckCircle, CreditCard as Edit2, MapPin, Calendar, ArrowUpDown, FileText, X } from 'lucide-react';
+import { HardDrive, Search, Filter, Plus, AlertCircle, CreditCard as Edit2, MapPin, Calendar, ArrowUpDown, FileText, X } from 'lucide-react';
 
 const PAGE_SIZE = 50;
 
@@ -260,108 +261,32 @@ export const CloneDrivesList: React.FC = () => {
     setDriveTypeFilter('all');
   };
 
-  if (isLoading) {
-    return (
-      <div className="p-8">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Database className="w-12 h-12 text-slate-400 mx-auto mb-3 animate-pulse" />
-            <p className="text-slate-600">Loading clone drives...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-8 max-w-full mx-auto">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg">
-              <HardDrive className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">Clone Drives Resources</h1>
-              <p className="text-slate-600">
-                Manage physical clone drives and track their usage across cases
-              </p>
-            </div>
-          </div>
-          <Button onClick={handleAddDrive} className="flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Add Clone Drive
-          </Button>
-        </div>
-      </div>
-
-      <Card className="mb-6">
-        <div className="p-6">
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <HardDrive className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide mb-0.5">Total Drives</p>
-                <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-success-muted flex items-center justify-center flex-shrink-0">
-                <CheckCircle className="w-5 h-5 text-success" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide mb-0.5">Available</p>
-                <p className="text-2xl font-bold text-success">{stats.available}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-info-muted flex items-center justify-center flex-shrink-0">
-                <Database className="w-5 h-5 text-info" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide mb-0.5">In Use</p>
-                <p className="text-2xl font-bold text-info">{stats.inUse}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-warning-muted flex items-center justify-center flex-shrink-0">
-                <AlertCircle className="w-5 h-5 text-warning" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide mb-0.5">Needs Attention</p>
-                <p className="text-2xl font-bold text-warning">{stats.needsAttention}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center flex-shrink-0">
-                <Database className="w-5 h-5 text-slate-600" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide mb-0.5">Total Capacity</p>
-                <p className="text-2xl font-bold text-slate-900">{formatCapacity(stats.totalCapacity)}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-success-muted flex items-center justify-center flex-shrink-0">
-                <Database className="w-5 h-5 text-success" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide mb-0.5">Available Capacity</p>
-                <p className="text-2xl font-bold text-success">{formatCapacity(stats.availableCapacity)}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      <Card className="mb-6">
+    <ListPageTemplate
+      title="Clone Drives Resources"
+      loading={isLoading}
+      isEmpty={sortedDrives.length === 0}
+      headerActions={
+        <Button onClick={handleAddDrive} className="flex items-center gap-2">
+          <Plus className="w-4 h-4" />
+          Add Clone Drive
+        </Button>
+      }
+      kpis={
+        <KpiRow
+          cols="grid-cols-2 md:grid-cols-6"
+          stats={[
+            { label: 'Total Drives', value: stats.total, tone: 'neutral' },
+            { label: 'Available', value: stats.available, tone: 'success' },
+            { label: 'In Use', value: stats.inUse, tone: 'info' },
+            { label: 'Needs Attention', value: stats.needsAttention, tone: 'warning' },
+            { label: 'Total Capacity', value: formatCapacity(stats.totalCapacity), tone: 'neutral' },
+            { label: 'Available Capacity', value: formatCapacity(stats.availableCapacity), tone: 'success' },
+          ]}
+        />
+      }
+      toolbar={
+        <Card className="mb-6">
         <div className="p-6">
           <div className="flex items-center gap-3 mb-4">
             <Filter className="w-5 h-5 text-slate-400" />
@@ -500,8 +425,8 @@ export const CloneDrivesList: React.FC = () => {
           </div>
         </div>
       </Card>
-
-      {sortedDrives.length === 0 ? (
+      }
+      empty={
         <Card>
           <div className="text-center py-12">
             <HardDrive className="w-16 h-16 text-slate-300 mx-auto mb-4" />
@@ -523,10 +448,17 @@ export const CloneDrivesList: React.FC = () => {
             )}
           </div>
         </Card>
-      ) : (
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full">
+      }
+      pager={{
+        page,
+        pageSize: PAGE_SIZE,
+        total: sortedDrives.length,
+        onPageChange: setPage,
+        itemNoun: 'clone drives',
+      }}
+      table={
+        <div className="overflow-x-auto">
+          <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50">
                   <th className="text-left p-4 text-sm font-semibold text-slate-700">
@@ -840,24 +772,16 @@ export const CloneDrivesList: React.FC = () => {
                     )}
                   </React.Fragment>
                 ))}
-              </tbody>
-            </table>
-          </div>
-          <Pager
-            page={page}
-            pageSize={PAGE_SIZE}
-            total={sortedDrives.length}
-            onPageChange={setPage}
-            itemNoun="clone drives"
-          />
-        </Card>
-      )}
-
+            </tbody>
+          </table>
+        </div>
+      }
+    >
       <ResourceCloneDriveModal
         isOpen={isModalOpen}
         onClose={handleModalClose}
         editingDrive={editingDrive}
       />
-    </div>
+    </ListPageTemplate>
   );
 };

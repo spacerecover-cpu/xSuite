@@ -4,8 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../hooks/useToast';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { Skeleton } from '../../components/ui/Skeleton';
-import { Pager } from '../../components/ui/Pager';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
 import AddInventoryModal from '../../components/inventory/AddInventoryModal';
 import InventoryDetailModal from '../../components/inventory/InventoryDetailModal';
 import DeleteInventoryConfirmationModal from '../../components/inventory/DeleteInventoryConfirmationModal';
@@ -275,64 +274,55 @@ export default function InventoryListPage() {
     return `${item.brand?.name || ''} ${item.model || ''}`.trim() || 'Inventory Item';
   };
 
-  return (
-    <div className="p-6 max-w-[1800px] mx-auto">
-      <div className="mb-6 flex items-start justify-between">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg bg-primary">
-            <Package className="w-6 h-6 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-1">Inventory Management</h1>
-            <p className="text-slate-600 text-base">
-              Track and manage physical inventory items
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={() => navigate('/inventory/donor-search')}
-            variant="secondary"
-          >
-            <Zap className="w-4 h-4 mr-2" />
-            Donor Search
-          </Button>
-          <Button
-            onClick={() => setIsBulkImportOpen(true)}
-            variant="secondary"
-            className="bg-success-muted hover:bg-success-muted/80 text-success border-success/30"
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            Bulk Import
-          </Button>
-          <Button
-            onClick={handleRefresh}
-            variant="secondary"
-            disabled={isRefreshing}
-            title="Refresh inventory list"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
-          <Button onClick={() => setIsAddModalOpen(true)} variant="primary">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Item
-          </Button>
-        </div>
-      </div>
+  const headerActions = (
+    <div className="flex gap-2">
+      <Button
+        onClick={() => navigate('/inventory/donor-search')}
+        variant="secondary"
+      >
+        <Zap className="w-4 h-4 mr-2" />
+        Donor Search
+      </Button>
+      <Button
+        onClick={() => setIsBulkImportOpen(true)}
+        variant="secondary"
+        className="bg-success-muted hover:bg-success-muted/80 text-success border-success/30"
+      >
+        <Upload className="w-4 h-4 mr-2" />
+        Bulk Import
+      </Button>
+      <Button
+        onClick={handleRefresh}
+        variant="secondary"
+        disabled={isRefreshing}
+        title="Refresh inventory list"
+      >
+        <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+        {isRefreshing ? 'Refreshing...' : 'Refresh'}
+      </Button>
+      <Button onClick={() => setIsAddModalOpen(true)} variant="primary">
+        <Plus className="w-4 h-4 mr-2" />
+        Add Item
+      </Button>
+    </div>
+  );
 
-      <div className="mb-6">
-        <InventoryInsightsHeader
-          hddCount={insights.hddCount}
-          ssdCount={insights.ssdCount}
-          pcbCount={insights.pcbCount}
-          totalValue={insights.totalValue}
-          totalItems={statistics.totalItems}
-          inUseCount={insights.totalInUse}
-          loading={loading}
-        />
-      </div>
+  const kpis = (
+    <div className="mb-6">
+      <InventoryInsightsHeader
+        hddCount={insights.hddCount}
+        ssdCount={insights.ssdCount}
+        pcbCount={insights.pcbCount}
+        totalValue={insights.totalValue}
+        totalItems={statistics.totalItems}
+        inUseCount={insights.totalInUse}
+        loading={loading}
+      />
+    </div>
+  );
 
+  const toolbar = (
+    <>
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
         <div className="p-6">
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
@@ -454,35 +444,23 @@ export default function InventoryListPage() {
           </div>
         </div>
       )}
+    </>
+  );
 
-      {loading ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
-          <div className="space-y-3">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4">
-                <Skeleton className="h-10 w-10 rounded-lg" />
-                <Skeleton className="h-4 flex-1" />
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-6 w-20 rounded-full" />
-                <Skeleton className="h-8 w-16" />
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : items.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500 text-lg">
-            {searchTerm || selectedCategory || selectedStatus
-              ? 'No inventory items found matching your criteria.'
-              : 'No inventory items yet. Add your first item to get started.'}
-          </p>
-        </div>
-      ) : (
-        <>
-          <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
+  const emptyState = (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
+      <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+      <p className="text-slate-500 text-lg">
+        {searchTerm || selectedCategory || selectedStatus
+          ? 'No inventory items found matching your criteria.'
+          : 'No inventory items yet. Add your first item to get started.'}
+      </p>
+    </div>
+  );
+
+  const tableNode = (
+    <div className="overflow-x-auto">
+      <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
@@ -683,15 +661,21 @@ export default function InventoryListPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
-          </div>
+    </div>
+  );
 
-          {total > 0 && (
-            <Pager page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} itemNoun="inventory items" />
-          )}
-        </>
-      )}
-
+  return (
+    <ListPageTemplate
+      title="Inventory Management"
+      headerActions={headerActions}
+      kpis={kpis}
+      toolbar={toolbar}
+      table={tableNode}
+      pager={total > 0 ? { page, pageSize: PAGE_SIZE, total, onPageChange: setPage, itemNoun: 'inventory items' } : undefined}
+      empty={emptyState}
+      isEmpty={items.length === 0}
+      loading={loading}
+    >
       <AddInventoryModal
         isOpen={isAddModalOpen || !!editingItemId}
         onClose={() => {
@@ -734,6 +718,6 @@ export default function InventoryListPage() {
           loadData();
         }}
       />
-    </div>
+    </ListPageTemplate>
   );
 }
