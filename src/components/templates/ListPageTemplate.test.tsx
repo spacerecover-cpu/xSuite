@@ -1,8 +1,18 @@
 // src/components/templates/ListPageTemplate.test.tsx
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { HeaderSlotProvider } from '../../contexts/HeaderSlotContext';
+
+// CollapsibleKpis (rendered around the kpis slot) reads/persists a user pref;
+// stub it so the KPI row renders deterministically without a live supabase call.
+vi.mock('../../lib/uiPrefsService', () => ({
+  UI_FLAG_KPIS_COLLAPSED: 'kpisCollapsed',
+  readUiFlagHint: () => false,
+  loadUiFlag: async () => false,
+  setUiFlag: async () => {},
+}));
+
 import { ListPageTemplate } from './ListPageTemplate';
 
 function renderTemplate(ui: React.ReactNode) {

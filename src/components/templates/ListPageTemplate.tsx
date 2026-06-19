@@ -4,6 +4,7 @@ import { cn } from '../../lib/utils';
 import { PageHeaderSlot } from '../layout/PageHeaderSlot';
 import { Pager } from '../ui/Pager';
 import { ListPageSkeleton } from './ListPageSkeleton';
+import { CollapsibleKpis } from './CollapsibleKpis';
 import type { PagerSlotProps } from '../../hooks/useListPage';
 
 export interface ListPageTemplateProps {
@@ -55,7 +56,7 @@ export const ListPageTemplate: React.FC<ListPageTemplateProps> = ({
       loadingFallback ?? <ListPageSkeleton />
     ) : (
       <>
-        {kpis}
+        {kpis && <CollapsibleKpis>{kpis}</CollapsibleKpis>}
         {toolbar}
         {isEmpty ? (
           empty
