@@ -11,7 +11,7 @@ import {
   AlertCircle,
   ChevronRight,
 } from 'lucide-react';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -88,11 +88,7 @@ export const ImportExport: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      <PageHeader
-        title="Import / Export"
-        description="Migrate data from your legacy ERP system or export current data"
-        icon={Database}
-      />
+      <PageHeaderSlot title="Import / Export" />
 
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

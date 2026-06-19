@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -73,10 +73,7 @@ export default function PlansPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
-      <PageHeader
-        title="Choose Your Plan"
-        description="Select the perfect plan for your data recovery business"
-      />
+      <PageHeaderSlot title="Choose Your Plan" />
 
       <div className="flex items-center justify-center gap-4">
         <button
