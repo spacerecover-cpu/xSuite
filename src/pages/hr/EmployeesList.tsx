@@ -8,8 +8,7 @@ import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
-import { Skeleton } from '../../components/ui/Skeleton';
-import { Pager } from '../../components/ui/Pager';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { Database } from '../../types/database.types';
 
@@ -99,34 +98,106 @@ export const EmployeesList: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['employee_stats'] });
   };
 
-  return (
-    <div className="p-8 max-w-[1800px] mx-auto">
-      <div className="mb-8 flex items-start justify-between">
-        <div className="flex items-start gap-6">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg bg-primary shadow-primary/40">
-            <Users className="w-7 h-7 text-primary-foreground" />
+  const toolbar = (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
+      <div className="p-6">
+        <div className="flex flex-col lg:flex-row gap-4 lg:items-center">
+          <div className="lg:w-80 flex-shrink-0">
+            <Input
+              type="text"
+              placeholder="Search by name or employee #..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              leftIcon={<Search className="w-4 h-4" />}
+            />
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-2">Employees</h1>
-            <p className="text-slate-600 text-base">
-              Manage your organization's workforce
-            </p>
-            <div className="flex gap-4 mt-3">
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-info"></div>
-                <span className="text-slate-600">{stats?.total ?? 0} Total Employees</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setStatusFilter(statusFilter === 'active' ? 'all' : 'active')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                statusFilter === 'active'
+                  ? 'bg-success text-success-foreground shadow-md'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Active
+            </button>
+            <button
+              onClick={() => setStatusFilter(statusFilter === 'on_leave' ? 'all' : 'on_leave')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                statusFilter === 'on_leave'
+                  ? 'bg-warning text-warning-foreground shadow-md'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              On Leave
+            </button>
+            {statusFilter !== 'all' && (
+              <button
+                onClick={() => setStatusFilter('all')}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-200 text-slate-700 hover:bg-slate-300 transition-all"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const table = (
+    <div className="grid grid-cols-1 gap-4">
+      {employees.map((employee) => (
+        <div
+          key={employee.id}
+          className="bg-white rounded-2xl shadow-lg border border-slate-200 hover:shadow-xl transition-shadow cursor-pointer overflow-hidden"
+          onClick={() => navigate(`/hr/employees/${employee.id}`)}
+        >
+          <div className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-semibold text-lg">
+                  {employee.profiles?.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U'}
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">{employee.profiles?.full_name}</h3>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-sm text-slate-600">{employee.employee_number}</span>
+                    {employee.positions && (
+                      <>
+                        <span className="text-slate-300">•</span>
+                        <span className="text-sm text-slate-600">{employee.positions.title}</span>
+                      </>
+                    )}
+                    {employee.departments && (
+                      <>
+                        <span className="text-slate-300">•</span>
+                        <span className="text-sm text-slate-600">{employee.departments.name}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-success"></div>
-                <span className="text-slate-600">{stats?.active ?? 0} Active</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-warning"></div>
-                <span className="text-slate-600">{stats?.onLeave ?? 0} On Leave</span>
+              <div className="flex items-center gap-3">
+                <Badge variant={statusToBadgeVariant(employee.employment_status ?? '')}>
+                  {(employee.employment_status ?? 'unknown').replace('_', ' ')}
+                </Badge>
+                <Badge variant="info">
+                  {(employee.employment_type ?? 'unknown').replace('_', ' ')}
+                </Badge>
               </div>
             </div>
           </div>
         </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <ListPageTemplate
+      title="Employees"
+      headerActions={
         <div className="flex gap-2">
           <Button
             onClick={handleRefresh}
@@ -142,61 +213,29 @@ export const EmployeesList: React.FC = () => {
             Add Employee
           </Button>
         </div>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
-        <div className="p-6">
-          <div className="flex flex-col lg:flex-row gap-4 lg:items-center">
-            <div className="lg:w-80 flex-shrink-0">
-              <Input
-                type="text"
-                placeholder="Search by name or employee #..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                leftIcon={<Search className="w-4 h-4" />}
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => setStatusFilter(statusFilter === 'active' ? 'all' : 'active')}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  statusFilter === 'active'
-                    ? 'bg-success text-success-foreground shadow-md'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Active
-              </button>
-              <button
-                onClick={() => setStatusFilter(statusFilter === 'on_leave' ? 'all' : 'on_leave')}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  statusFilter === 'on_leave'
-                    ? 'bg-warning text-warning-foreground shadow-md'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                On Leave
-              </button>
-              {statusFilter !== 'all' && (
-                <button
-                  onClick={() => setStatusFilter('all')}
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-200 text-slate-700 hover:bg-slate-300 transition-all"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
+      }
+      kpis={
+        <div className="flex gap-4 mb-6">
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-2 h-2 rounded-full bg-info"></div>
+            <span className="text-slate-600">{stats?.total ?? 0} Total Employees</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-2 h-2 rounded-full bg-success"></div>
+            <span className="text-slate-600">{stats?.active ?? 0} Active</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-2 h-2 rounded-full bg-warning"></div>
+            <span className="text-slate-600">{stats?.onLeave ?? 0} On Leave</span>
           </div>
         </div>
-      </div>
-
-      {loading ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-3">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full rounded-lg" />
-          ))}
-        </div>
-      ) : employees.length === 0 ? (
+      }
+      toolbar={toolbar}
+      table={table}
+      pager={{ page, pageSize: PAGE_SIZE, total: totalEmployees, onPageChange: setPage, itemNoun: 'employees' }}
+      loading={loading}
+      isEmpty={employees.length === 0}
+      empty={
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
           <EmptyState
             icon={Users}
@@ -208,64 +247,8 @@ export const EmployeesList: React.FC = () => {
             }
           />
         </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 gap-4">
-            {employees.map((employee) => (
-              <div
-                key={employee.id}
-                className="bg-white rounded-2xl shadow-lg border border-slate-200 hover:shadow-xl transition-shadow cursor-pointer overflow-hidden"
-                onClick={() => navigate(`/hr/employees/${employee.id}`)}
-              >
-                <div className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-semibold text-lg">
-                        {employee.profiles?.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U'}
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-slate-900">{employee.profiles?.full_name}</h3>
-                        <div className="flex items-center gap-3 mt-1">
-                          <span className="text-sm text-slate-600">{employee.employee_number}</span>
-                          {employee.positions && (
-                            <>
-                              <span className="text-slate-300">•</span>
-                              <span className="text-sm text-slate-600">{employee.positions.title}</span>
-                            </>
-                          )}
-                          {employee.departments && (
-                            <>
-                              <span className="text-slate-300">•</span>
-                              <span className="text-sm text-slate-600">{employee.departments.name}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Badge variant={statusToBadgeVariant(employee.employment_status ?? '')}>
-                        {(employee.employment_status ?? 'unknown').replace('_', ' ')}
-                      </Badge>
-                      <Badge variant="info">
-                        {(employee.employment_type ?? 'unknown').replace('_', ' ')}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-            <Pager
-              page={page}
-              pageSize={PAGE_SIZE}
-              total={totalEmployees}
-              onPageChange={setPage}
-              itemNoun="employees"
-            />
-          </div>
-        </>
-      )}
-    </div>
+      }
+      unstyledBody
+    />
   );
 };
