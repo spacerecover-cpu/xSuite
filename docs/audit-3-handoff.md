@@ -26,7 +26,9 @@
 - **H1 ✅** — detail-page compaction shipped. **L3 ✅** (detail container `px-6 py-5`).
 - **H2 ✅** — page header merged into the top bar. **L2 ✅** (breadcrumb-vs-title roles documented in `DESIGN.md`).
 
-**Remaining:** **H3** (List/Detail templates — its H2 dependency is now satisfied; **recommended next**, §4), **H4** (data-driven sidebar nav), **M1–M5** (M3 mostly done), **L1** (deprecate `StatsCard` → `StatCard`; folds into H3). See §5.
+**In progress — branch `claude/audit-h3-list-detail-templates` (2 feat commits, gates green, pending PR):** **H3 foundation** — `ListPageTemplate` + `DetailPageTemplate` (thin slot shells), `useListPage` (the C1 recipe), `KpiRow` (single KPI path; folds in the **L1** mechanism) + standardized skeletons/not-found + `DetailSidebarCard`, and the **Invoices list + detail reference migration**. `typecheck` 0 · `eslint` 0 errors · `vitest` green (only the documented local-only `i18n`/`LocaleContext` jsdom artifact fails locally; passes in CI). 6 new TDD test files.
+
+**Remaining:** **H3 sweep** (migrate the other ~18 list + ~3 detail pages onto the templates) + **L1 retirement** (replace the 12 `StatsCard` call sites with `KpiRow`/`StatCard`, then delete `FinancialStatsCard`) + `SupplierProfilePage` `DetailPageHeader` adoption + `CaseDetail`/`CustomerProfilePage` shell adoption; **H4** (data-driven sidebar nav), **M1–M5** (M3 mostly done). See §5.
 
 ## 2. Workflow & conventions (operate exactly like this)
 
@@ -47,9 +49,13 @@
 
 **H1 — `DetailPageHeader`** (`src/components/shared/DetailPageHeader.tsx`). Breadcrumb-led detail header: `breadcrumbs: Crumb[]` where the **final crumb is the page title** rendered once as `<h1 aria-current="page">` (no duplicate title); `badges` / `actions` / `meta` slots. **Gutter-neutral** (`mb-4` only) — the page's `px-6 py-5` container supplies the gutter (don't double-pad). Used on Invoice/Case/Customer detail. Spec/plan: `docs/superpowers/{specs,plans}/2026-06-18-audit-h1-detail-page-compaction*`.
 
+**H3 — page templates** (`src/components/templates/`, built 2026-06-19). `ListPageTemplate` + `DetailPageTemplate` are thin `ReactNode`-slot shells: they own only the drift-prone frame (the `px-6 py-5 max-w-[1800px]` container, `PageHeaderSlot`/`DetailPageHeader` wiring, the table-card + `Pager` footer, standardized loading/empty/not-found) and never fetch — every domain region is a slot, no column/filter/modal registry. `useListPage` (`src/hooks/useListPage.ts`) extracts the C1 recipe (zero-indexed page + 300 ms debounce + page-reset-on-filter + `{rows,total}` `keepPreviousData` query) and ONLY that (no selection/url-sync/sort/invalidation; flat JSON-stable filters only). `KpiRow` is the single sanctioned KPI path — `KpiSpec` = `StatCard`'s contract (no icon/trend) so legacy `StatsCard` is structurally unreachable (the L1 fold). Plus standardized `ListPageSkeleton`/`DetailPageSkeleton`/`DetailPageNotFound` + opt-in `DetailSidebarCard`. Reference migration: `InvoicesListPage` (+ extracted `InvoicesFilterBar`/`InvoicesTable`) and `InvoiceDetailPage` (print `<style>` + modals in the `outside` slot). Spec/plan: `docs/superpowers/{specs,plans}/2026-06-19-audit-h3-list-detail-templates*`.
+
 **H2 — `HeaderSlot`** (`src/contexts/HeaderSlotContext.tsx`). A list page registers `usePageHeaderSlot({ title, actions })` (or `<PageHeaderSlot title actions/>` from `src/components/layout/PageHeaderSlot.tsx`). **Title** → context state (set in `useLayoutEffect`, no flash); the AppLayout top bar renders `title ?? routeLabel` as the breadcrumb's current crumb (fixes coarse first-segment-only breadcrumbs on nested routes). **Actions** → portaled into a `hidden md:flex empty:hidden` host in the bar (live every render, so selection-driven actions stay current). **Backward-compatible:** a page that doesn't register leaves the bar exactly as before. The per-page `PageHeader` row is then deleted (icon + subtitle dropped; page filters stay in-content). `PageHeader` (`src/components/shared/PageHeader.tsx`) remains only for shells with no global bar (portal, platform-admin). Spec/plan: `docs/superpowers/{specs,plans}/2026-06-19-audit-h2-header-into-topbar*`. Contract recorded in `DESIGN.md` → "Page header & breadcrumb roles".
 
 ## 4. Recommended next increment — H3 (List/Detail templates)
+
+> **Status (2026-06-19): the H3 FOUNDATION + Invoices reference migration are BUILT** on branch `claude/audit-h3-list-detail-templates` (commits `47fe69d` foundation, `cd64abb` Invoices migration; spec/plan committed in `7884727`). Gates green. What remains of H3 is the **broad sweep + L1 retirement** (§5). The bullets below describe the now-shipped foundation.
 
 **Why now:** H3 depends on H2 + `DataTable`, both of which now exist — so H3 is largely **composition of primitives already shipped**, not new infrastructure.
 
