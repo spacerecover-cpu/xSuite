@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, getTenantId } from './supabaseClient';
 import { logger } from './logger';
 
 export interface Module {
@@ -99,7 +99,11 @@ class RolePermissionsService {
   }
 
   async getRolePermissions(role: 'owner' | 'admin' | 'technician' | 'sales' | 'accounts' | 'hr'): Promise<RolePermissions> {
-    const cacheKey = role;
+    // Accessible modules are resolved per-tenant (via get_accessible_modules),
+    // so the cache must be keyed by tenant too — a role-only key let one
+    // tenant's cached module set leak to a same-role user of another tenant on
+    // a shared device within the TTL.
+    const cacheKey = `${getTenantId() ?? 'none'}:${role}`;
     const cached = this.permissionsCache.get(cacheKey);
 
     if (cached && Date.now() - this.cacheTimestamp < this.CACHE_DURATION) {

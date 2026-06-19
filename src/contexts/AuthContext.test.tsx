@@ -24,7 +24,10 @@ vi.mock('../lib/supabaseClient', () => ({
   },
 }));
 vi.mock('../lib/mfaService', () => ({ mfaService: { needsMFAVerification: () => needsMFAImpl() } }));
-vi.mock('../lib/logger', () => ({ logger: { error: vi.fn() } }));
+const clearPermissionCache = vi.fn();
+vi.mock('../lib/rolePermissionsService', () => ({ rolePermissionsService: { clearCache: () => clearPermissionCache() } }));
+const setSentryUser = vi.fn();
+vi.mock('../lib/logger', () => ({ logger: { error: vi.fn() }, setSentryUser: (u: unknown) => setSentryUser(u) }));
 
 const APPROVED = {
   id: 'u1', full_name: 'T', role: 'admin', is_active: true,
@@ -32,12 +35,13 @@ const APPROVED = {
 };
 
 function Harness() {
-  const { profileStatus, loading, profile, mfaPending, signOut } = useAuth();
+  const { profileStatus, loading, profile, mfaPending, signOut, refreshProfile } = useAuth();
   return (
     <div>
       <span data-testid="state">{`${profileStatus}|${loading}|${profile ? 'yes' : 'no'}`}</span>
       <span data-testid="mfa">{String(mfaPending)}</span>
       <button onClick={() => void signOut()}>logout</button>
+      <button onClick={() => void refreshProfile()}>refresh</button>
     </div>
   );
 }
@@ -50,6 +54,8 @@ describe('AuthContext', () => {
     maybeSingleImpl = async () => ({ data: null, error: null });
     needsMFAImpl = async () => false;
     signOutMock.mockClear();
+    clearPermissionCache.mockClear();
+    setSentryUser.mockClear();
   });
 
   it('loads an approved profile on boot', async () => {
@@ -108,5 +114,42 @@ describe('AuthContext', () => {
 
     fireEvent.click(screen.getByText('logout'));
     await waitFor(() => expect(screen.getByTestId('mfa').textContent).toBe('false'));
+  });
+
+  it('clears the role-permission cache on sign-out (H6 — no cross-tenant bleed on next login)', async () => {
+    maybeSingleImpl = async () => ({ data: APPROVED, error: null });
+    render(<AuthProvider><Harness /></AuthProvider>);
+    await waitFor(() => expect(state()).toBe('approved|false|yes'));
+
+    fireEvent.click(screen.getByText('logout'));
+    await waitFor(() => expect(clearPermissionCache).toHaveBeenCalled());
+  });
+
+  it('refreshProfile() still fetches while a boot fetch is in flight (L8)', async () => {
+    let calls = 0;
+    // First fetch hangs (stays in flight); later calls resolve immediately.
+    maybeSingleImpl = () => {
+      calls += 1;
+      if (calls === 1) return new Promise(() => {});
+      return Promise.resolve({ data: APPROVED, error: null });
+    };
+    render(<AuthProvider><Harness /></AuthProvider>);
+    await waitFor(() => expect(calls).toBe(1)); // boot fetch in flight
+
+    fireEvent.click(screen.getByText('refresh'));
+    // Without the force bypass the in-flight dedupe would drop this and calls
+    // would stay at 1.
+    await waitFor(() => expect(calls).toBe(2));
+  });
+
+  it('stamps Sentry with the user on profile load and clears it on sign-out (M8)', async () => {
+    maybeSingleImpl = async () => ({ data: APPROVED, error: null });
+    render(<AuthProvider><Harness /></AuthProvider>);
+    await waitFor(() => expect(setSentryUser).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'u1', tenant_id: 't1', role: 'admin' }),
+    ));
+
+    fireEvent.click(screen.getByText('logout'));
+    await waitFor(() => expect(setSentryUser).toHaveBeenCalledWith(null));
   });
 });
