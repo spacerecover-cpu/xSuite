@@ -11,6 +11,7 @@ import { CommandPalette } from '../shared/CommandPalette';
 import { useCommandPalette } from '../../hooks/useCommandPalette';
 import { SidebarPreferencesProvider } from '../../contexts/SidebarPreferencesContext';
 import { useLocale } from '../../contexts/LocaleContext';
+import { HeaderSlotProvider, useHeaderSlot } from '../../contexts/HeaderSlotContext';
 
 const routeLabels: Record<string, string> = {
   '': 'Dashboard',
@@ -86,6 +87,16 @@ function getBreadcrumbs(pathname: string): { label: string; section?: string } {
   return { label, section };
 }
 
+const HeaderCurrentTitle: React.FC<{ routeLabel: string }> = ({ routeLabel }) => {
+  const { title } = useHeaderSlot();
+  return <span className="text-[13px] font-semibold text-slate-700 truncate">{title ?? routeLabel}</span>;
+};
+
+const HeaderActionsHost: React.FC = () => {
+  const { setActionsHost } = useHeaderSlot();
+  return <div ref={setActionsHost} className="hidden md:flex items-center gap-2 empty:hidden" />;
+};
+
 export const AppLayout: React.FC = () => {
   const location = useLocation();
   const { label, section } = getBreadcrumbs(location.pathname);
@@ -106,6 +117,7 @@ export const AppLayout: React.FC = () => {
 
   return (
     <SidebarPreferencesProvider>
+    <HeaderSlotProvider>
     <div className="h-dvh flex flex-col bg-slate-100">
       <a
         href="#main-content"
@@ -136,9 +148,10 @@ export const AppLayout: React.FC = () => {
                 <ChevronRight className="w-3.5 h-3.5 text-slate-300 flex-shrink-0" />
               </>
             )}
-            <span className="text-[13px] font-semibold text-slate-700 truncate">{label}</span>
+            <HeaderCurrentTitle routeLabel={label} />
           </div>
           <div className="flex items-center gap-2 ml-4">
+            <HeaderActionsHost />
             {/* Click-target for users who don't know the keyboard shortcut.
                 Discoverability matters — power users hit Cmd+K, the rest
                 click the button. */}
@@ -171,6 +184,7 @@ export const AppLayout: React.FC = () => {
       <MobileNavDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} side={isRTL ? 'right' : 'left'} />
       <CommandPalette isOpen={palette.isOpen} onClose={palette.close} />
     </div>
+    </HeaderSlotProvider>
     </SidebarPreferencesProvider>
   );
 };
