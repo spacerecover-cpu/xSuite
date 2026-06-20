@@ -14,8 +14,11 @@ function mergeContext(base: TemplateContext, overlay?: TemplateContext): Templat
   if (!overlay) return base;
   const out: TemplateContext = { ...base };
   for (const [key, value] of Object.entries(overlay)) {
+    // Skip empty overlay values so a partial overlay never clobbers a populated
+    // base sub-object (e.g. { invoice: undefined } must not wipe ctx.invoice).
+    if (value === null || value === undefined) continue;
     const existing = out[key];
-    if (existing && typeof existing === 'object' && value && typeof value === 'object') {
+    if (existing && typeof existing === 'object' && typeof value === 'object') {
       out[key] = { ...(existing as TemplateContext), ...(value as TemplateContext) };
     } else {
       out[key] = value;

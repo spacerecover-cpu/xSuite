@@ -23,10 +23,11 @@ const tmpl = (content: string) => ({
 describe('resolveInvoiceTermsHtml', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('returns empty string when there is no default template', async () => {
+  it('returns empty string (and skips context build) when there is no default template', async () => {
     mockedGetDefault.mockResolvedValue(null);
     mockedBuildCtx.mockResolvedValue({});
     expect(await resolveInvoiceTermsHtml({ refs: {} })).toBe('');
+    expect(mockedBuildCtx).not.toHaveBeenCalled();
   });
 
   it('substitutes variables and sanitizes the result', async () => {
@@ -42,6 +43,15 @@ describe('resolveInvoiceTermsHtml', () => {
     mockedGetDefault.mockResolvedValue(tmpl('<p>{{invoice.due_date}}</p>'));
     mockedBuildCtx.mockResolvedValue({ invoice: { due_date: 'OLD' } });
     const out = await resolveInvoiceTermsHtml({ refs: {}, overlay: { invoice: { due_date: '30/11/2026' } } });
+    expect(out).toContain('30/11/2026');
+    expect(out).not.toContain('OLD');
+  });
+
+  it('nested merge preserves sibling base keys while overlay wins on conflicts', async () => {
+    mockedGetDefault.mockResolvedValue(tmpl('<p>{{invoice.number}} due {{invoice.due_date}}</p>'));
+    mockedBuildCtx.mockResolvedValue({ invoice: { number: 'INV-1', due_date: 'OLD' } });
+    const out = await resolveInvoiceTermsHtml({ refs: {}, overlay: { invoice: { due_date: '30/11/2026' } } });
+    expect(out).toContain('INV-1');
     expect(out).toContain('30/11/2026');
     expect(out).not.toContain('OLD');
   });
