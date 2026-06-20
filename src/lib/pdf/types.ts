@@ -110,14 +110,6 @@ export interface CompanySettingsData {
   legal_compliance?: {
     terms_conditions_url?: string;
     privacy_policy_url?: string;
-    /**
-     * Tenant STANDARD Terms & Conditions shown on documents (Settings → Legal).
-     * When `standard_terms_en` is set it is the document T&C (taking precedence
-     * over per-document terms); `standard_terms_ar` renders alongside on
-     * bilingual documents so the same standard reads in both languages.
-     */
-    standard_terms_en?: string;
-    standard_terms_ar?: string;
   };
   localization?: {
     document_language_settings?: {

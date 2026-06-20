@@ -279,16 +279,25 @@ describe('invoice parity — engine output matches the legacy builder', () => {
     expect(engine.some((t) => t.includes('Balance Due:'))).toBe(false);
   });
 
-  it('renders Payment Terms + Notes as separate stacks + bank box (gap 3)', () => {
+  it('renders config Terms + Notes and the bank box (terms are per-template, not per-record)', () => {
     const data = makeInvoiceData();
-    const engine = allTexts(renderEngine(data));
-    const legacy = allTexts(renderLegacy(data));
+    // T&C is now OWNED BY THE TEMPLATE (config.termsContent + the section label),
+    // a deliberate divergence from the legacy builder's per-record invoice terms.
+    const config = {
+      ...BUILT_IN_TEMPLATE_CONFIGS.invoice,
+      labels: { ...BUILT_IN_TEMPLATE_CONFIGS.invoice.labels, terms: { en: 'Payment Terms' } },
+      termsContent: {
+        terms: { en: 'Net 14 days from the invoice date.' },
+        notes: { en: 'Thank you for trusting our lab with your data recovery.' },
+      },
+    };
+    const engineData = toEngineData(data, config);
+    const engine = allTexts(renderTemplate(config, engineData, englishCtx, null, TINY_PNG));
 
     for (const probe of ['Payment Terms', 'Notes', 'Net 14 days from the invoice date.', 'Thank you for trusting our lab with your data recovery.']) {
-      expect(legacy.some((t) => t.includes(probe))).toBe(true);
       expect(engine.some((t) => t.includes(probe))).toBe(true);
     }
-    // Bank box detail rows (folded into the terms row, parity with legacy).
+    // Bank box detail rows (folded into the terms row) — still parity with legacy.
     for (const probe of ['Acme Data Recovery LLC', 'First National Bank', 'AE12 0000 0000 0123 4567 89', 'FNBKAEXX']) {
       expect(engine.some((t) => t.includes(probe))).toBe(true);
     }

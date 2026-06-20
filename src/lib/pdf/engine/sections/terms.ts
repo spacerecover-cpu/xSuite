@@ -1,34 +1,30 @@
 /**
- * Terms section — terms & conditions / notes block + optional bank box.
+ * Terms section — per-document-type Terms & Conditions + Notes, plus optional
+ * bank box.
  *
- * Two layouts, matching the legacy `documents/InvoiceDocument.ts`:
+ * T&C content is OWNED BY THE TEMPLATE (`config.termsContent`), edited in the
+ * Studio per document type — a Quotation's terms differ from an Invoice's. Each
+ * block (Terms, then Notes) renders a bold heading (from `labels.terms` /
+ * `labels.notes`) + the English body, and on bilingual documents the Arabic body
+ * alongside (right-aligned). The tenant-wide `legal_compliance.standard_terms_*`
+ * and per-record document terms are NOT read — the template is the single source.
  *
- * 1. Legacy-flat (`data.terms.body`): a single EN/AR terms box via the shared
- *    `createTermsBox` helper. The Arabic title surfaces in bilingual modes.
- *
- * 2. Structured (`data.terms.blocks`): separate Payment Terms / Notes stacks
- *    (each a bold heading + prose body) laid out alongside the bank-account box
- *    in a two-column row — mirroring `InvoiceDocument`'s `termsAndBankSection`
- *    (lines ~370-485). When a `bank` block is present the stacks take the left
- *    50% and the bank box the right 50%; otherwise the stacks span full width.
- *
- * The bank box is rendered HERE when `blocks` is used (the legacy builder folds
- * bank into the terms row). The standalone `bank` section renderer still exists
- * for configs that place a `bank` section on its own; this section consumes
- * `data.bank` only in the structured-blocks layout to avoid double-rendering.
+ * The bank box is folded into the terms row (left 50% terms / right 50% bank)
+ * when the standalone, movable `bank` section is hidden; when that section is
+ * enabled it renders there instead and this section omits it (no double-render).
  */
 
 import type { Content } from 'pdfmake/interfaces';
-import { PDF_COLORS, createTermsBox } from '../../styles';
+import { PDF_COLORS } from '../../styles';
 import { safeString } from '../../utils';
 import { isBilingualMode, en, ar, resolveLabel } from '../labels';
 import type {
   BankBlock,
   EngineContext,
   EngineDocData,
+  LabelText,
   SectionRenderer,
 } from '../types';
-import type { CompanySettingsData } from '../../types';
 
 /** Build the bilingual bank-account box used in the structured terms+bank row. */
 function bankBox(bank: BankBlock, engine: EngineContext): Content {
@@ -74,7 +70,6 @@ export const renderTerms: SectionRenderer = (
   engine: EngineContext,
   data: EngineDocData,
 ): Content | null => {
-  const terms = data.terms;
   const language = engine.config.language;
   const bilingual = isBilingualMode(language);
 
@@ -84,40 +79,36 @@ export const renderTerms: SectionRenderer = (
   const bankSectionVisible = engine.config.sections.some((s) => s.key === 'bank' && s.visible);
   const bank = !bankSectionVisible && data.bank && data.bank.rows.length > 0 ? data.bank : null;
 
-  // Build the terms-stack column. A tenant STANDARD Terms & Conditions
-  // (Settings → Legal) takes precedence over per-document terms: one source,
-  // shown in English and — on bilingual documents — with the Arabic alongside.
-  const lc = (data.identity as CompanySettingsData | undefined)?.legal_compliance;
-  const standardEn = lc?.standard_terms_en?.trim();
-  const standardAr = lc?.standard_terms_ar?.trim();
-
+  // T&C content is per-document-type, owned by the template
+  // (Studio → Other Details → Terms & Conditions). Each block renders its
+  // heading + English body, with the Arabic body alongside on bilingual docs.
+  const tc = engine.config.termsContent;
   const termsStack: Content[] = [];
-  if (standardEn) {
+
+  const pushBlock = (heading: LabelText, body: { en?: string; ar?: string } | undefined): void => {
+    const enBody = body?.en?.trim();
+    if (!enBody) return; // both Terms and Notes are optional — skip empty blocks
+    if (termsStack.length > 0) {
+      termsStack.push({ text: '', margin: [0, 4, 0, 0] as [number, number, number, number] });
+    }
     termsStack.push(
       {
-        text: bilingual
-          ? resolveLabel({ en: 'Terms & Conditions', ar: 'الشروط والأحكام' }, language)
-          : 'Terms & Conditions',
+        text: bilingual ? resolveLabel(heading, language) : en(heading),
         fontSize: 9, bold: true, color: PDF_COLORS.text, margin: [0, 0, 0, 3] as [number, number, number, number],
       },
-      { text: standardEn, fontSize: 7, color: PDF_COLORS.textLight, lineHeight: 1.3 },
+      { text: enBody, fontSize: 7, color: PDF_COLORS.textLight, lineHeight: 1.3 },
     );
-    if (bilingual && standardAr) {
+    const arBody = body?.ar?.trim();
+    if (bilingual && arBody) {
       termsStack.push({
-        text: standardAr, fontSize: 7, color: PDF_COLORS.textLight, lineHeight: 1.3,
+        text: arBody, fontSize: 7, color: PDF_COLORS.textLight, lineHeight: 1.3,
         alignment: 'right', margin: [0, 2, 0, 0] as [number, number, number, number],
       });
     }
-  } else {
-    (terms?.blocks?.filter((b) => b.body) ?? []).forEach((b, idx) => {
-      if (idx > 0) termsStack.push({ text: '', margin: [0, 4, 0, 0] as [number, number, number, number] });
-      const heading = bilingual ? resolveLabel(b.title, language) : en(b.title);
-      termsStack.push(
-        { text: heading, fontSize: 9, bold: true, color: PDF_COLORS.text, margin: [0, 0, 0, 3] as [number, number, number, number] },
-        { text: b.body, fontSize: 7, color: PDF_COLORS.textLight, lineHeight: 1.3 },
-      );
-    });
-  }
+  };
+
+  pushBlock(engine.config.labels.terms ?? { en: 'Terms & Conditions', ar: 'الشروط والأحكام' }, tc?.terms);
+  pushBlock(engine.config.labels.notes ?? { en: 'Notes', ar: 'ملاحظات' }, tc?.notes);
 
   // ---- Structured layout: terms stack + optional bank box -----------------
   if (termsStack.length > 0 || bank) {
@@ -138,12 +129,5 @@ export const renderTerms: SectionRenderer = (
     };
   }
 
-  // ---- Legacy-flat layout: single EN/AR terms box -------------------------
-  if (!terms || !terms.body) return null;
-  return createTermsBox(
-    en(terms.title, 'Terms & Conditions'),
-    bilingual ? ar(terms.title) : null,
-    terms.body,
-    null,
-  ) as Content;
+  return null;
 };

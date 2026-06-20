@@ -7,7 +7,6 @@ import type { LanguageCode } from '../../lib/documentTranslations';
 import type { Database } from '../../types/database.types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Textarea } from '../../components/ui/Textarea';
 import { ImageUpload } from '../../components/ui/ImageUpload';
 import { CollapsibleSection } from '../../components/ui/CollapsibleSection';
 import { SearchableSelect } from '../../components/ui/SearchableSelect';
@@ -26,7 +25,6 @@ import {
   CheckCircle2,
   Upload as UploadIcon,
   Shield,
-  FileText,
   Maximize2,
   Minimize2,
   HardDrive,
@@ -1005,7 +1003,7 @@ export const GeneralSettings: React.FC = () => {
           title="Legal & Compliance"
           icon={Shield}
           color="rgb(var(--color-cat-7))"
-          fieldCount={7}
+          fieldCount={5}
           isOpen={openSections.has('legal_compliance')}
           onToggle={() => toggleSection('legal_compliance')}
         >
@@ -1050,38 +1048,6 @@ export const GeneralSettings: React.FC = () => {
               type="url"
               helpText="Link to your service level agreement (optional)"
             />
-          </div>
-
-          <div className="mt-6 pt-6 border-t border-slate-200">
-            <h4 className="text-sm font-bold text-slate-900 mb-1 flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              Standard Terms &amp; Conditions
-            </h4>
-            <p className="text-xs text-slate-500 mb-4">
-              Printed on quotations and invoices. When set, this standard text is used
-              in place of any per-document terms. Fill in the Arabic translation to have
-              it appear alongside the English on bilingual documents.
-            </p>
-            <div className="space-y-4">
-              <Textarea
-                label="Standard Terms & Conditions (English)"
-                value={toStr(formData.legal_compliance?.standard_terms_en)}
-                onChange={(e) => updateField('legal_compliance', 'standard_terms_en', e.target.value)}
-                placeholder="e.g. 50% advance required to begin recovery. Balance due on successful data delivery. All work is best-effort; no recovery is guaranteed."
-                rows={5}
-                hint="Appears on every quotation and invoice."
-              />
-              <Textarea
-                label="Standard Terms & Conditions (Arabic)"
-                value={toStr(formData.legal_compliance?.standard_terms_ar)}
-                onChange={(e) => updateField('legal_compliance', 'standard_terms_ar', e.target.value)}
-                placeholder="الترجمة العربية للشروط والأحكام القياسية…"
-                rows={5}
-                dir="rtl"
-                className="text-right"
-                hint="Optional — shown beneath the English on bilingual documents."
-              />
-            </div>
           </div>
         </CollapsibleSection>
 

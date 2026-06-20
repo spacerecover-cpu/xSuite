@@ -327,6 +327,18 @@ export interface LocaleConfig {
   decimalPlaces?: number;
 }
 
+/**
+ * Per-document-type Terms & Conditions content (Studio-edited, bilingual).
+ * Each document type's template carries its own — a Quote's terms differ from
+ * an Invoice's. Rendered by the `terms` section; headings come from
+ * `labels.terms` / `labels.notes`. The template is the single source of truth
+ * (no tenant-wide or per-record override).
+ */
+export interface TermsContentConfig {
+  terms?: { en?: string; ar?: string };
+  notes?: { en?: string; ar?: string };
+}
+
 /** The resolved, render-ready template configuration for one document. */
 export interface DocumentTemplateConfig {
   paper: PaperConfig;
@@ -352,6 +364,8 @@ export interface DocumentTemplateConfig {
   signatureImages?: SignatureImagesConfig;
   /** Resolved date/number locale (§8d). Absent = neutral PDF default. */
   locale?: LocaleConfig;
+  /** Per-document-type Terms & Conditions content (bilingual). */
+  termsContent?: TermsContentConfig;
 }
 
 /**
@@ -405,6 +419,8 @@ export interface TemplateConfigOverride {
   translationPolicy?: TranslationPolicyConfig;
   signatureImages?: SignatureImagesConfig;
   locale?: LocaleConfig;
+  /** Per-document-type Terms & Conditions content (deep-merged: terms + notes). */
+  termsContent?: TermsContentConfig;
 }
 
 /** Partial section override; `key` identifies the target section. */
@@ -931,6 +947,18 @@ function mergeTranslationPolicy(
   return { ...base, ...override, ...(groups ? { groups } : {}) };
 }
 
+/** Merge T&C content, deep-merging the `terms` and `notes` EN/AR bodies by key. */
+function mergeTermsContent(
+  base: TermsContentConfig | undefined,
+  override: TermsContentConfig | undefined,
+): TermsContentConfig | undefined {
+  if (!base) return override;
+  if (!override) return base;
+  const terms = mergeGroup(base.terms, override.terms);
+  const notes = mergeGroup(base.notes, override.notes);
+  return { ...(terms ? { terms } : {}), ...(notes ? { notes } : {}) };
+}
+
 function applyOverride(
   base: DocumentTemplateConfig,
   override: TemplateConfigOverride | undefined,
@@ -959,6 +987,7 @@ function applyOverride(
     translationPolicy: mergeTranslationPolicy(base.translationPolicy, override.translationPolicy),
     signatureImages: mergeSignatureImages(base.signatureImages, override.signatureImages),
     locale: mergeGroup(base.locale, override.locale),
+    termsContent: mergeTermsContent(base.termsContent, override.termsContent),
   };
 }
 

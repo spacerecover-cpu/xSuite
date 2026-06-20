@@ -222,12 +222,17 @@ describe('payment receipt parity — engine output matches the legacy builder', 
     }
   });
 
-  it('renders notes + bank box in both', () => {
+  it('renders config notes + bank box (notes are per-template, not per-record)', () => {
     const data = makeReceiptData();
-    const engine = allTexts(renderEngine(data));
-    const legacy = allTexts(renderLegacy(data));
+    // Notes are now OWNED BY THE TEMPLATE (config.termsContent.notes), a deliberate
+    // divergence from the legacy builder's per-record receipt notes.
+    const config = {
+      ...BUILT_IN_TEMPLATE_CONFIGS.payment_receipt,
+      termsContent: { notes: { en: 'Partial payment received with thanks.' } },
+    };
+    const engineData = toEngineData(data, config);
+    const engine = allTexts(renderTemplate(config, engineData, englishCtx, null, TINY_PNG));
 
-    expect(legacy.some((t) => t.includes('Partial payment received with thanks.'))).toBe(true);
     expect(engine.some((t) => t.includes('Partial payment received with thanks.'))).toBe(true);
 
     for (const probe of ['Acme Data Recovery LLC', 'First National Bank', 'AE12 0000 0000 0123 4567 89', 'FNBKAEXX']) {

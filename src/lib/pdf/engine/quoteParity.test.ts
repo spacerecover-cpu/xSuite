@@ -256,19 +256,27 @@ describe('quote parity — engine output matches the legacy builder', () => {
     expect(engine).toContain('13 Jul 2026');
   });
 
-  it('renders terms + notes + bank box in both (gap — terms/bank)', () => {
+  it('renders config Terms + Notes and the bank box (terms are per-template, not per-record)', () => {
     const data = makeQuoteData();
-    const engine = allTexts(renderEngine(data));
-    const legacy = allTexts(renderLegacy(data));
+    // T&C is now OWNED BY THE TEMPLATE (config.termsContent), a deliberate
+    // divergence from the legacy builder's per-record quote.terms_and_conditions.
+    const config = {
+      ...BUILT_IN_TEMPLATE_CONFIGS.quote,
+      termsContent: {
+        terms: { en: 'Quote valid for 30 days. 50% advance required to begin.' },
+        notes: { en: 'Diagnostics are non-destructive.' },
+      },
+    };
+    const engineData = toEngineData(data, config);
+    const engine = allTexts(renderTemplate(config, engineData, englishCtx, null, TINY_PNG));
 
     for (const probe of [
       'Quote valid for 30 days. 50% advance required to begin.',
       'Diagnostics are non-destructive.',
     ]) {
-      expect(legacy.some((t) => t.includes(probe))).toBe(true);
       expect(engine.some((t) => t.includes(probe))).toBe(true);
     }
-    // Bank box detail rows (folded into the terms row, parity with legacy).
+    // Bank box detail rows (folded into the terms row) — still parity with legacy.
     for (const probe of ['Acme Data Recovery LLC', 'First National Bank', 'AE12 0000 0000 0123 4567 89', 'FNBKAEXX']) {
       expect(engine.some((t) => t.includes(probe))).toBe(true);
     }

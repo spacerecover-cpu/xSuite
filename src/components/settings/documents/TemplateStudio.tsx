@@ -34,6 +34,7 @@ import {
   type StampImageOptions,
   type TableConfig,
   type TaxBarConfig,
+  type TermsContentConfig,
   type TemplateConfigOverride,
   type TemplateDocumentType,
   type TranslationPolicyConfig,
@@ -80,6 +81,7 @@ export interface StudioApi {
   setLayout: (patch: Partial<LayoutConfig>) => void;
   setTranslationPolicy: (patch: Partial<TranslationPolicyConfig>) => void;
   setTranslationGroup: (group: keyof NonNullable<TranslationPolicyConfig['groups']>, value: boolean) => void;
+  setTermsContent: (patch: Partial<TermsContentConfig>) => void;
   setPageFitting: (patch: Partial<PageFittingConfig>) => void;
   patchSection: (key: string, patch: { visible?: boolean; order?: number }) => void;
   patchColumn: (key: string, patch: { visible?: boolean; labelEn?: string; labelAr?: string }) => void;
@@ -316,6 +318,15 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
           translationPolicy: {
             ...prev.translationPolicy,
             groups: { ...prev.translationPolicy?.groups, [group]: value },
+          },
+        })),
+      setTermsContent: (patch) =>
+        setOverride((prev) => ({
+          ...prev,
+          termsContent: {
+            ...prev.termsContent,
+            ...(patch.terms ? { terms: { ...prev.termsContent?.terms, ...patch.terms } } : {}),
+            ...(patch.notes ? { notes: { ...prev.termsContent?.notes, ...patch.notes } } : {}),
           },
         })),
       setPageFitting: (patch) => mergeGroup('pageFitting', patch),

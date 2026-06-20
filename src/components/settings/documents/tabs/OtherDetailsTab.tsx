@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
 import { Input } from '../../../ui/Input';
 import { Select } from '../../../ui/Select';
+import { Textarea } from '../../../ui/Textarea';
 import { FieldGroup, ToggleRow } from '../controls';
 import type { LanguageMode, SectionConfig, TranslationPolicyConfig } from '../../../../lib/pdf/templateConfig';
 import type { StudioApi } from '../TemplateStudio';
@@ -139,6 +140,46 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
           />
         </FieldGroup>
       )}
+
+      <FieldGroup
+        title="Terms & Conditions"
+        description="Printed on this document type — a Quotation's terms differ from an Invoice's, so each template has its own. Fill in the Arabic to show terms in both languages on bilingual documents."
+      >
+        <div className="space-y-4">
+          <Textarea
+            label="Terms & Conditions (English)"
+            value={api.resolved.termsContent?.terms?.en ?? ''}
+            onChange={(e) => api.setTermsContent({ terms: { en: e.target.value } })}
+            rows={4}
+            placeholder="e.g. This quotation is valid for 30 days. 50% advance required to begin."
+          />
+          <Textarea
+            label="Terms & Conditions (Arabic)"
+            value={api.resolved.termsContent?.terms?.ar ?? ''}
+            onChange={(e) => api.setTermsContent({ terms: { ar: e.target.value } })}
+            rows={4}
+            dir="rtl"
+            className="text-right"
+            placeholder="الترجمة العربية للشروط والأحكام…"
+          />
+          <Textarea
+            label="Notes (English)"
+            value={api.resolved.termsContent?.notes?.en ?? ''}
+            onChange={(e) => api.setTermsContent({ notes: { en: e.target.value } })}
+            rows={3}
+            placeholder="Optional — shown beneath the terms."
+          />
+          <Textarea
+            label="Notes (Arabic)"
+            value={api.resolved.termsContent?.notes?.ar ?? ''}
+            onChange={(e) => api.setTermsContent({ notes: { ar: e.target.value } })}
+            rows={3}
+            dir="rtl"
+            className="text-right"
+            placeholder="ملاحظات اختيارية…"
+          />
+        </div>
+      </FieldGroup>
 
       <FieldGroup title="Sections" description="Show, hide, reorder, and rename each section.">
         <ul className="space-y-2">
