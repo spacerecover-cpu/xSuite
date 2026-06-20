@@ -10,6 +10,15 @@ import {
 } from '../templateConfig';
 import { engineLayoutDirection } from './rtl';
 
+/** Walk a pdfmake doc-definition collecting every `text` string run. */
+function collectText(node: unknown, out: string[]): void {
+  if (node == null || typeof node !== 'object') return;
+  if (Array.isArray(node)) return node.forEach((c) => collectText(c, out));
+  const o = node as Record<string, unknown>;
+  if (typeof o.text === 'string') out.push(o.text);
+  Object.values(o).forEach((v) => collectText(v, out));
+}
+
 // ---------------------------------------------------------------------------
 // applyTenantLanguage bridges the tenant's `document_language_settings`
 // (english_only | bilingual + secondary_language) into the engine's
@@ -106,6 +115,43 @@ describe('applyTenantLanguage', () => {
     expect(out.sections).toEqual(cfg.sections);
     expect(out.labels).toEqual(cfg.labels);
   });
+
+  it('keeps an explicit Studio language (bilingual side-by-side) even when the tenant Localization is english_only', () => {
+    const cfg: DocumentTemplateConfig = {
+      ...baseConfig(),
+      language: { mode: 'bilingual_sidebyside', primary: 'en' },
+    };
+    const out = applyTenantLanguage(cfg, settings({
+      mode: 'english_only',
+      secondary_language: null,
+      language_name: null,
+    }));
+    expect(out.language.mode).toBe('bilingual_sidebyside');
+    expect(out.language.primary).toBe('en');
+  });
+
+  it('keeps an explicit Arabic-only Studio language regardless of tenant settings', () => {
+    const cfg: DocumentTemplateConfig = {
+      ...baseConfig(),
+      language: { mode: 'ar', primary: 'ar' },
+    };
+    const out = applyTenantLanguage(cfg, settings(undefined));
+    expect(out.language.mode).toBe('ar');
+    expect(out.language.primary).toBe('ar');
+  });
+
+  it('falls back to the tenant Localization when the template is at the English default', () => {
+    // baseConfig()'s language is the built-in { mode: 'en' } default, so the
+    // tenant-wide setting still governs — preserving back-compat for tenants who
+    // configure language in Settings, not the Studio picker.
+    const out = applyTenantLanguage(baseConfig(), settings({
+      mode: 'bilingual',
+      secondary_language: 'ar',
+      language_name: 'Arabic',
+    }));
+    expect(out.language.mode).toBe('bilingual_stacked');
+    expect(out.language.primary).toBe('ar');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -172,5 +218,27 @@ describe('applyTenantLanguage → renderTemplate (build path)', () => {
     const doc = renderTemplate(cfg, minimalData(), ctx);
     const defaultStyle = doc.defaultStyle as { font?: string; alignment?: string };
     expect(defaultStyle.alignment).toBeUndefined();
+  });
+
+  it('regression: an explicit bilingual_sidebyside picker survives an english_only tenant and renders Arabic (was clobbered to English)', () => {
+    const cfg: DocumentTemplateConfig = {
+      ...baseConfig(),
+      language: { mode: 'bilingual_sidebyside', primary: 'en' },
+    };
+    const applied = applyTenantLanguage(cfg, settings({
+      mode: 'english_only',
+      secondary_language: null,
+      language_name: null,
+    }));
+    expect(applied.language.mode).toBe('bilingual_sidebyside');
+
+    const doc = renderTemplate(applied, minimalData(), ctx);
+    // The Arabic-capable font is selected for any non-'en' mode (rtl.ts), and
+    // Arabic system-label text is present — neither happens if the tenant
+    // override collapses the document back to English.
+    expect((doc.defaultStyle as { font?: string }).font).toBe('Tajawal');
+    const texts: string[] = [];
+    collectText(doc, texts);
+    expect(texts.some((t) => /[؀-ۿ]/.test(t))).toBe(true);
   });
 });
