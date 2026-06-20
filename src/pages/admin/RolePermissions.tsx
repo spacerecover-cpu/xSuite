@@ -18,15 +18,20 @@ import {
   Info,
 } from 'lucide-react';
 
-type Role = 'admin' | 'technician' | 'sales' | 'accounts' | 'hr';
+type Role = 'admin' | 'manager' | 'technician' | 'sales' | 'accounts' | 'hr' | 'viewer';
 
-const ROLES: Role[] = ['admin', 'technician', 'sales', 'accounts', 'hr'];
+const ROLES: Role[] = ['admin', 'manager', 'technician', 'sales', 'accounts', 'hr', 'viewer'];
 
 const ROLE_DETAILS = {
   admin: {
     name: 'Admin',
     color: 'red' as const,
     description: 'Full system access - cannot be modified',
+  },
+  manager: {
+    name: 'Manager',
+    color: 'slategray' as const,
+    description: 'Team manager — module access granted below',
   },
   technician: {
     name: 'Technician',
@@ -47,6 +52,11 @@ const ROLE_DETAILS = {
     name: 'HR',
     color: 'teal' as const,
     description: 'Human resources managing employees and payroll',
+  },
+  viewer: {
+    name: 'Viewer',
+    color: 'gray' as const,
+    description: 'Read-only — module access granted below',
   },
 };
 
@@ -220,7 +230,7 @@ export const RolePermissions: React.FC = () => {
         <label className="block text-sm font-medium text-slate-700 mb-3">
           Select Role to Manage
         </label>
-        <div className="grid grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
           {ROLES.map((role) => {
             const roleInfo = ROLE_DETAILS[role];
             const isSelected = selectedRole === role;

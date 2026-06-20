@@ -31,12 +31,9 @@ export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ c
     try {
       setLoading(true);
 
-      if (role === 'manager' || role === 'viewer') {
-        setPermissions(null);
-        setAccessibleModules([]);
-        return;
-      }
-
+      // manager/viewer used to be hardcoded to zero access here; they now resolve
+      // through role_module_permissions like every other non-admin role and
+      // default to nothing until an admin grants modules (M3).
       const [userPermissions, modules] = await Promise.all([
         rolePermissionsService.getRolePermissions(role),
         rolePermissionsService.getAccessibleModules(role),
