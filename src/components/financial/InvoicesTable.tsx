@@ -10,7 +10,6 @@ export interface InvoicesTableProps {
   selection: BulkSelection;
   navigate: (path: string) => void;
   formatCurrency: (amount: number) => string;
-  getTypeColor: (type: string) => string;
   getClientName: (invoice: InvoiceWithDetails) => string;
   canEdit: (invoice: InvoiceWithDetails) => boolean;
   canRecordPayment: (invoice: InvoiceWithDetails) => boolean;
@@ -31,7 +30,6 @@ export const InvoicesTable: React.FC<InvoicesTableProps> = ({
   selection,
   navigate,
   formatCurrency,
-  getTypeColor,
   getClientName,
   canEdit,
   canRecordPayment,
@@ -43,14 +41,13 @@ export const InvoicesTable: React.FC<InvoicesTableProps> = ({
       buildInvoicesColumns({
         navigate,
         formatCurrency,
-        getTypeColor,
         getClientName,
         canEdit,
         canRecordPayment,
         onEdit,
         onRecordPayment,
       }),
-    [navigate, formatCurrency, getTypeColor, getClientName, canEdit, canRecordPayment, onEdit, onRecordPayment],
+    [navigate, formatCurrency, getClientName, canEdit, canRecordPayment, onEdit, onRecordPayment],
   );
 
   const view: ResolvedTableView = useMemo(
@@ -66,7 +63,7 @@ export const InvoicesTable: React.FC<InvoicesTableProps> = ({
       rowKey={(r) => r.id ?? ''}
       onRowClick={(r) => r.id && navigate(`/invoices/${r.id}`)}
       selection={selection}
-      elasticColumnKey="customer"
+      fillMode="proportional"
       rowAriaLabel={(r) => `Invoice ${r.invoice_number ?? ''}`}
       rowClassName={(r) => (r.status === 'overdue' ? 'bg-danger-muted' : undefined)}
     />

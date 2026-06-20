@@ -46,7 +46,6 @@ function renderTable() {
       selection={selection}
       navigate={vi.fn()}
       formatCurrency={(n) => `OMR ${n}`}
-      getTypeColor={() => '#0ea5e9'}
       getClientName={(i) => i.customers_enhanced?.customer_name ?? 'N/A'}
       canEdit={() => true}
       canRecordPayment={() => true}

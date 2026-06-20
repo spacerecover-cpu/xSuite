@@ -30,7 +30,6 @@ type InvoiceWithLegacyLinks = InvoiceWithDetails & {
 export interface InvoiceColumnContext {
   navigate: (path: string) => void;
   formatCurrency: (amount: number) => string;
-  getTypeColor: (type: string) => string;
   getClientName: (invoice: InvoiceWithDetails) => string;
   canEdit: (invoice: InvoiceWithDetails) => boolean;
   canRecordPayment: (invoice: InvoiceWithDetails) => boolean;
@@ -67,11 +66,16 @@ export function buildInvoicesColumns(ctx: InvoiceColumnContext): TableColumnDef<
       minWidth: 135,
       priority: 4,
       defaultVisible: true,
-      render: (r) => (
-        <Badge variant="custom" color={ctx.getTypeColor(r.invoice_type)} size="sm">
-          {r.invoice_type === 'proforma' ? 'Proforma' : 'Tax Invoice'}
-        </Badge>
-      ),
+      // Semantic variants (not a custom raw colour): legible muted chip with a
+      // proper foreground tone. The previous custom-colour path fed an
+      // `rgb(var(--token))` into a `${color}20` opacity hack that isn't valid
+      // CSS, so the proforma chip rendered as near-invisible pale text.
+      render: (r) =>
+        r.invoice_type === 'proforma' ? (
+          <Badge variant="secondary" size="sm">Proforma</Badge>
+        ) : (
+          <Badge variant="info" size="sm">Tax Invoice</Badge>
+        ),
     },
     {
       key: 'case',
@@ -134,19 +138,33 @@ export function buildInvoicesColumns(ctx: InvoiceColumnContext): TableColumnDef<
     {
       key: 'amount',
       label: 'Amount',
-      minWidth: 160,
+      minWidth: 140,
       priority: 1,
       defaultVisible: true,
+      align: 'end',
       render: (r) => (
-        <div>
-          <p className="text-sm font-medium text-slate-900 tabular-nums">
-            {ctx.formatCurrency(r.total_amount || 0)}
-          </p>
-          {r.balance_due && r.balance_due > 0 ? (
-            <p className="text-xs text-warning tabular-nums">Due: {ctx.formatCurrency(r.balance_due)}</p>
-          ) : null}
-        </div>
+        <span className="text-sm font-medium text-slate-900 tabular-nums">
+          {ctx.formatCurrency(r.total_amount || 0)}
+        </span>
       ),
+    },
+    {
+      key: 'balance',
+      label: 'Balance',
+      minWidth: 130,
+      priority: 2,
+      defaultVisible: true,
+      align: 'end',
+      // Outstanding amount split out of Amount so it scans as its own column;
+      // urgency colour stays on the Status column. Settled rows show a muted dash.
+      render: (r) =>
+        r.balance_due && r.balance_due > 0 ? (
+          <span className="text-sm font-medium text-slate-900 tabular-nums">
+            {ctx.formatCurrency(r.balance_due)}
+          </span>
+        ) : (
+          <span className="text-xs text-slate-400">—</span>
+        ),
     },
     {
       key: 'status',

@@ -30,6 +30,12 @@ interface ConfigurableDataTableProps<T> {
    *  spare space flows into a text column rather than a trailing actions
    *  column. Falls back to last-column flex when unset or not currently fit. */
   elasticColumnKey?: string;
+  /** How leftover width is allocated once all columns meet their minWidth.
+   *  'elastic' (default) pours it into elasticColumnKey/last column — fine when
+   *  one column has growable content. 'proportional' spreads it across every
+   *  column so a content-light table on an ultra-wide screen breathes evenly
+   *  instead of opening a dead zone behind one column. */
+  fillMode?: 'elastic' | 'proportional';
 }
 
 const SELECTION_W = 48;
@@ -53,6 +59,7 @@ export function ConfigurableDataTable<T>({
   rowAriaLabel,
   rowClassName,
   elasticColumnKey,
+  fillMode = 'elastic',
 }: ConfigurableDataTableProps<T>) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = useState<number>(1200);
@@ -148,9 +155,15 @@ export function ConfigurableDataTable<T>({
   };
 
   // Leftover width goes to the elastic column when one is named and visible;
-  // otherwise it flows to the last column (the original behavior).
+  // otherwise it flows to the last column (the original behavior). In
+  // 'proportional' mode every column keeps an explicit width, so the fixed
+  // table layout spreads the slack across all of them instead of pooling it
+  // behind one auto column (which reads as a dead zone on wide screens).
   const elasticPresent = !!elasticColumnKey && fitDefs.some((d) => d.key === elasticColumnKey);
   const widthFor = (def: TableColumnDef<T>, isLast: boolean) => {
+    if (fillMode === 'proportional') {
+      return Math.max(def.minWidth, widths[def.key] ?? def.minWidth);
+    }
     const isAuto = elasticPresent ? def.key === elasticColumnKey : isLast;
     return isAuto ? undefined : Math.max(def.minWidth, widths[def.key] ?? def.minWidth);
   };

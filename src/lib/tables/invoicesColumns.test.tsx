@@ -7,7 +7,6 @@ function makeCtx(over: Partial<InvoiceColumnContext> = {}): InvoiceColumnContext
   return {
     navigate: vi.fn(),
     formatCurrency: (n: number) => `OMR ${n.toFixed(3)}`,
-    getTypeColor: () => '#0ea5e9',
     getClientName: () => 'Ramcharan',
     canEdit: () => true,
     canRecordPayment: () => true,
@@ -46,16 +45,47 @@ describe('invoicesColumns', () => {
       'invoice_date',
       'due_date',
       'amount',
+      'balance',
       'status',
       'actions',
     ]);
   });
 
-  it('renders the formatted total and the outstanding balance in the amount column', () => {
+  it('renders the total in Amount (right-aligned) and the outstanding in its own Balance column', () => {
     const ctx = makeCtx();
-    render(<>{col(ctx, 'amount').render(baseInvoice)}</>);
+    const amount = col(ctx, 'amount');
+    const balance = col(ctx, 'balance');
+    expect(amount.align).toBe('end');
+    expect(balance.align).toBe('end');
+
+    render(<>{amount.render(baseInvoice)}</>);
     expect(screen.getByText('OMR 273.000')).toBeInTheDocument();
-    expect(screen.getByText(/Due:/)).toBeInTheDocument();
+    expect(screen.queryByText(/Due:/)).not.toBeInTheDocument();
+
+    const { container } = render(<>{balance.render(baseInvoice)}</>);
+    expect(container.textContent).toContain('OMR 273.000');
+  });
+
+  it('shows a muted dash in Balance when the invoice is settled', () => {
+    const ctx = makeCtx();
+    const settled = { ...baseInvoice, balance_due: 0 } as unknown as InvoiceWithDetails;
+    const { container } = render(<>{col(ctx, 'balance').render(settled)}</>);
+    expect(container.textContent).toContain('—');
+  });
+
+  it('renders legible Type chips (no invalid custom-colour) for both invoice kinds', () => {
+    const ctx = makeCtx();
+    const type = col(ctx, 'invoice_type');
+    render(<>{type.render(baseInvoice)}</>);
+    expect(screen.getByText('Tax Invoice')).toBeInTheDocument();
+
+    const proforma = { ...baseInvoice, invoice_type: 'proforma' } as unknown as InvoiceWithDetails;
+    const { getByText } = render(<>{type.render(proforma)}</>);
+    const chip = getByText('Proforma');
+    expect(chip).toBeInTheDocument();
+    // The proforma chip must NOT fall back to the broken inline custom colour
+    // (rgb(var(--token)) fed into a `${color}20` hack rendered invisible text).
+    expect(chip.getAttribute('style') ?? '').not.toContain('var(--color-accent)');
   });
 
   it('links a converted-from-proforma row back to its proforma from the status column', () => {

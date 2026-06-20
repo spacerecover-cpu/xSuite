@@ -81,10 +81,6 @@ export const InvoicesListPage: React.FC<unknown> = () => {
     refetchOnWindowFocus: false,
   });
 
-  const getTypeColor = (type: string) => {
-    return type === 'proforma' ? 'rgb(var(--color-accent))' : 'rgb(var(--color-info))';
-  };
-
   const getClientName = (invoice: {
     customers_enhanced?: { customer_name: string } | null;
     companies?: { company_name: string | null } | null;
@@ -343,7 +339,6 @@ export const InvoicesListPage: React.FC<unknown> = () => {
           selection={selection}
           navigate={navigate}
           formatCurrency={formatCurrency}
-          getTypeColor={getTypeColor}
           getClientName={getClientName}
           canEdit={(invoice) => getInvoiceEditability(invoice).mode !== 'none'}
           canRecordPayment={invoiceCanRecordPayment}
