@@ -14,6 +14,18 @@ const DATA_DEPENDENT_HINTS: Record<string, string> = {
   qr: 'Renders a scannable verification QR code.',
 };
 
+/**
+ * Always-on guidance for sections whose CONTENT or behavior is configured
+ * elsewhere — so the option isn't a scavenger hunt. Shown regardless of the
+ * section's show/hide state (e.g. the bank hint is most useful while hidden).
+ */
+const GUIDANCE_HINTS: Record<string, string> = {
+  terms:
+    'Body text uses your Standard Terms & Conditions (Settings → General → Legal & Compliance) when set; otherwise the terms entered on the document. Add the Arabic Standard T&C there to show terms in both languages on bilingual documents.',
+  bank:
+    'Shown inside the Terms section by default. Enable it here to place the bank-account details as their own movable, reorderable section.',
+};
+
 const SECTION_LABELS: Record<string, string> = {
   header: 'Header & logo',
   parties: 'Customer / party details',
@@ -169,6 +181,9 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
                 </div>
                 {section.visible && DATA_DEPENDENT_HINTS[section.key] && (
                   <p className="mt-2 text-xs text-slate-500">{DATA_DEPENDENT_HINTS[section.key]}</p>
+                )}
+                {GUIDANCE_HINTS[section.key] && (
+                  <p className="mt-2 text-xs text-slate-500">{GUIDANCE_HINTS[section.key]}</p>
                 )}
                 {label && (
                   <div className="mt-3 grid grid-cols-2 gap-2">
