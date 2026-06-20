@@ -1,22 +1,61 @@
 /**
- * Bank section — pre-labelled bank-detail rows in a bordered box. Generalized
- * from the bank-account block embedded in the financial builders' terms area
- * (see `documents/InvoiceDocument.ts` lines ~407-441), rendered through the
- * shared `createBilingualInfoBox` helper.
+ * Bank section — a COMPACT bank-account box.
  *
- * Modeling note: this section key is not in the built-in financial defaults
- * (the hand-written builders fold bank details into the terms row). It is
- * registered for forward-compatibility so a tenant override that adds a `bank`
- * section renders correctly; absent a `bank` section in config it is simply
- * never dispatched.
+ * Field labels (Account Name, Account No., Bank, IBAN, SWIFT …) render
+ * English-only: these are functional identifiers and a translated label only
+ * adds clutter. The box HEADER stays bilingual on bilingual documents (English
+ * left / Arabic right), matching the other info-boxes.
+ *
+ * `buildBankBox` is the shared builder, used both as the standalone, movable
+ * `bank` section (this renderer) and inline within the terms section.
  */
 
 import type { Content } from 'pdfmake/interfaces';
-import { createBilingualInfoBox } from '../../styles';
 import { PDF_COLORS } from '../../styles';
 import { safeString } from '../../utils';
-import { isBilingualMode, en, ar, resolveLabel } from '../labels';
-import type { EngineContext, EngineDocData, SectionRenderer } from '../types';
+import { isBilingualMode, en, ar } from '../labels';
+import type { BankBlock, EngineContext, EngineDocData, SectionRenderer } from '../types';
+
+/** A compact bank-account box: bilingual header, English-only field labels. */
+export function buildBankBox(bank: BankBlock, engine: EngineContext): Content {
+  const { language } = engine.config;
+  const bilingual = isBilingualMode(language);
+
+  const headerColumns: object[] = [
+    { text: en(bank.title, 'Bank Account'), fontSize: 8, bold: true, color: PDF_COLORS.text, width: 'auto' },
+    { text: '', width: '*' },
+  ];
+  if (bilingual) {
+    headerColumns.push({
+      text: ar(bank.title) ?? 'تفاصيل البنك',
+      fontSize: 8, bold: true, color: PDF_COLORS.text, alignment: 'right', width: 'auto',
+    });
+  }
+
+  return {
+    table: {
+      widths: ['*'],
+      body: [
+        [{ columns: headerColumns, columnGap: 6, fillColor: PDF_COLORS.background, margin: [6, 3, 6, 3] }],
+        [{
+          stack: bank.rows.map((r) => ({
+            text: `${en(r.label)} ${safeString(r.value)}`,
+            fontSize: 7,
+            color: PDF_COLORS.text,
+            margin: [0, 0.5, 0, 0.5],
+          })),
+          margin: [6, 3, 6, 4],
+        }],
+      ],
+    },
+    layout: {
+      hLineWidth: () => 0.5,
+      vLineWidth: () => 0.5,
+      hLineColor: () => PDF_COLORS.border,
+      vLineColor: () => PDF_COLORS.border,
+    },
+  } as Content;
+}
 
 export const renderBank: SectionRenderer = (
   engine: EngineContext,
@@ -24,22 +63,5 @@ export const renderBank: SectionRenderer = (
 ): Content | null => {
   const bank = data.bank;
   if (!bank || bank.rows.length === 0) return null;
-
-  const { language } = engine.config;
-  const bilingual = isBilingualMode(language);
-
-  const rows: object[] = bank.rows.map((r) => ({
-    text: `${resolveLabel(r.label, language)} ${safeString(r.value)}`,
-    fontSize: 7,
-    color: PDF_COLORS.text,
-    margin: [0, 1, 0, 1],
-  }));
-
-  const box = createBilingualInfoBox(
-    en(bank.title, 'Bank Account'),
-    bilingual ? ar(bank.title) : null,
-    rows,
-  ) as Content;
-
-  return { stack: [box], margin: [0, 8, 0, 0] };
+  return { stack: [buildBankBox(bank, engine)], margin: [0, 8, 0, 0] as [number, number, number, number] };
 };
