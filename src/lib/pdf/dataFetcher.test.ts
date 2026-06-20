@@ -118,6 +118,28 @@ describe('toQuoteData — customer/company contract (regression: customer info s
     expect(result.created_by_profile?.full_name).toBe('Tech One');
   });
 
+  it('maps a separately-fetched bank account into bank_accounts (so the quote-selected bank shows on the PDF)', () => {
+    const result = toQuoteData(QUOTE_ROW, {
+      currency: OMR,
+      bankAccounts: {
+        id: 'b1',
+        account_name: 'Future Space LLC',
+        bank_name: 'Sohar International',
+        account_number: '217-02003-0438',
+        iban: 'OM93...',
+        swift_code: 'SWIFTX',
+      },
+    });
+    expect(result.bank_accounts?.account_name).toBe('Future Space LLC');
+    expect(result.bank_accounts?.bank_name).toBe('Sohar International');
+    expect(result.bank_accounts?.account_number).toBe('217-02003-0438');
+    expect(result.bank_accounts?.iban).toBe('OM93...');
+  });
+
+  it('leaves bank_accounts undefined when the quote has no bank account', () => {
+    expect(toQuoteData(QUOTE_ROW, { currency: OMR }).bank_accounts).toBeUndefined();
+  });
+
   it('reduces the associated company to { id, company_name }', () => {
     const result = toQuoteData(QUOTE_ROW, {
       currency: OMR,

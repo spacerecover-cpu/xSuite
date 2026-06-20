@@ -433,6 +433,7 @@ export function toQuoteData(
     createdByProfile?: unknown;
     customerAssociatedCompany?: unknown;
     items?: QuoteItemData[] | null;
+    bankAccounts?: unknown;
   },
 ): QuoteData {
   // Built field-by-field from the typed row (no `as unknown as`): a renamed or
@@ -462,6 +463,7 @@ export function toQuoteData(
     created_by_profile: toCreatedByProfile(extras.createdByProfile),
     customer_associated_company: toAssociatedCompany(extras.customerAssociatedCompany),
     quote_items: extras.items ?? [],
+    bank_accounts: toBankAccount(extras.bankAccounts),
     accounting_locales: currencyToBlock(extras.currency),
   } satisfies QuoteData;
 }
@@ -498,7 +500,7 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
   // alias that can drift away from the builder's `customer`/`company` reads.
   // quotes.created_by FKs to auth.users (not profiles), so the creator profile is
   // also a separate lookup.
-  const [customerRes, companyRes, createdByRes] = await Promise.all([
+  const [customerRes, companyRes, createdByRes, bankRes] = await Promise.all([
     quoteRow.customer_id
       ? supabase
           .from('customers_enhanced')
@@ -515,6 +517,15 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
       : Promise.resolve({ data: null }),
     quoteRow.created_by
       ? supabase.from('profiles').select('id, full_name').eq('id', quoteRow.created_by).maybeSingle()
+      : Promise.resolve({ data: null }),
+    // The quote's selected bank account (Edit Quote → Bank Account). Fetched the
+    // same way invoices do so the structured bank block renders on the PDF.
+    quoteRow.bank_account_id
+      ? supabase
+          .from('bank_accounts')
+          .select('id, account_name:name, bank_name, account_number, iban, swift_code')
+          .eq('id', quoteRow.bank_account_id)
+          .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
 
@@ -553,6 +564,7 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
     createdByProfile: createdByRes.data,
     customerAssociatedCompany,
     items: toQuoteItems(items),
+    bankAccounts: bankRes.data,
   });
 }
 
