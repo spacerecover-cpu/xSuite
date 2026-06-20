@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useId } from 'react';
+import React, { useState, useEffect, useId, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Trash2, Search, FileText, Download, DollarSign, FileBarChart, Briefcase, Calculator, Package, Info, X, Percent, Lock } from 'lucide-react';
 import { Modal } from '../ui/Modal';
@@ -12,10 +12,13 @@ import { resolveDefaultRate, resolveTaxLabel } from './taxFieldConfig';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
 import { getSupportedCurrencies, getBaseCurrency, getConversionRate, type SupportedCurrency } from '../../lib/currencyService';
-import { formatCurrency, formatBaseEquivalent } from '../../lib/format';
+import { formatCurrency, formatBaseEquivalent, toDateInputValue } from '../../lib/format';
 import { getInvoiceEditability } from '../../lib/invoicePermissions';
 import { listTemplates, recordTemplateUsage } from '../../lib/documentTemplatesService';
 import { templateKeys } from '../../lib/queryKeys';
+import { sanitizeHtml } from '../../lib/sanitizeHtml';
+import { RichTextEditor, type RichTextEditorHandle } from '../ui/RichTextEditor';
+import { resolveInvoiceTermsHtml, resolveTermsHtmlFromContent } from '../../lib/invoiceTermsService';
 
 interface LineItemTemplate {
   id: string;
@@ -108,12 +111,13 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
   const currencyId = useId();
   const discountAmountId = useId();
   const bankAccountId = useId();
-  const paymentTermsId = useId();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedQuoteId, setSelectedQuoteId] = useState<string>('');
   const [showTermsTemplates, setShowTermsTemplates] = useState(false);
+  const [editingTerms, setEditingTerms] = useState(false);
+  const termsEditorRef = useRef<RichTextEditorHandle>(null);
   const [invoiceNumber, setInvoiceNumber] = useState<string>('');
   const [caseNumber, setCaseNumber] = useState<string>('');
   const [selectedCaseId, setSelectedCaseId] = useState<string>(caseId || '');
@@ -135,6 +139,32 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
   });
 
   const [dueDateManuallySet, setDueDateManuallySet] = useState(false);
+
+  const buildTermsOverlay = () => ({
+    invoice: {
+      due_date: invoiceData.due_date ? toDateInputValue(invoiceData.due_date) : '',
+      due_days: invoiceData.invoice_date && invoiceData.due_date
+        ? String(Math.max(0, Math.round(
+            (new Date(invoiceData.due_date).getTime() - new Date(invoiceData.invoice_date).getTime()) / 86_400_000)))
+        : '',
+    },
+  });
+
+  useEffect(() => {
+    if (!isOpen || initialData) return; // edit mode keeps saved terms
+    let cancelled = false;
+    (async () => {
+      const html = await resolveInvoiceTermsHtml({
+        refs: { caseId: selectedCaseId || caseId, customerId: customerId ?? undefined },
+        overlay: buildTermsOverlay(),
+      });
+      if (!cancelled && html) {
+        setInvoiceData((prev) => (prev.terms_and_conditions ? prev : { ...prev, terms_and_conditions: html }));
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialData, selectedCaseId, caseId, customerId]);
 
   const [currencies, setCurrencies] = useState<SupportedCurrency[]>([]);
   const [baseCurrency, setBaseCurrency] = useState<string>('');
@@ -356,9 +386,14 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
     setInvoiceData((prev) => ({
       ...prev,
       notes: quoteData.notes || prev.notes,
-      terms_and_conditions: quoteData.terms || prev.terms_and_conditions,
       discount_amount: quoteData.discount_amount ?? 0,
     }));
+
+    const defaultHtml = await resolveInvoiceTermsHtml({
+      refs: { caseId: selectedCaseId || caseId, customerId: customerId ?? undefined, quoteId },
+      overlay: buildTermsOverlay(),
+    });
+    if (defaultHtml) setInvoiceData((prev) => ({ ...prev, terms_and_conditions: defaultHtml }));
   };
 
   const addLineItem = () => {
@@ -408,15 +443,12 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
     }
   };
 
-  const stripHtmlTags = (html: string): string => {
-    const div = document.createElement('div');
-    div.textContent = html.replace(/<[^>]*>/g, ' ');
-    return (div.textContent || '').trim();
-  };
-
-  const applyTermsTemplate = (template: InvoiceTermsTemplate) => {
-    const plainText = stripHtmlTags(template.content ?? '');
-    setInvoiceData(prev => ({ ...prev, terms_and_conditions: plainText }));
+  const applyTermsTemplate = async (template: InvoiceTermsTemplate) => {
+    const html = await resolveTermsHtmlFromContent(template.content ?? '', {
+      refs: { caseId: selectedCaseId || caseId, customerId: customerId ?? undefined },
+      overlay: buildTermsOverlay(),
+    });
+    setInvoiceData((prev) => ({ ...prev, terms_and_conditions: html }));
     setShowTermsTemplates(false);
     void recordTemplateUsage(template.id);
   };
@@ -944,17 +976,26 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor={paymentTermsId} className="block text-xs font-medium text-slate-700">
+                  <span className="block text-xs font-medium text-slate-700">
                     Payment Terms
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowTermsTemplates(!showTermsTemplates)}
-                    className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1"
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    Quick Add
-                  </button>
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowTermsTemplates(!showTermsTemplates)}
+                      className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      Quick Add
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingTerms((v) => !v)}
+                      className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1"
+                    >
+                      {editingTerms ? 'Done' : 'Edit'}
+                    </button>
+                  </div>
                 </div>
                 {showTermsTemplates && (
                   <div className="mb-2 p-2 bg-slate-50 rounded-lg border border-slate-200 max-h-32 overflow-y-auto">
@@ -985,16 +1026,24 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                     </div>
                   </div>
                 )}
-                <textarea
-                  id={paymentTermsId}
-                  value={invoiceData.terms_and_conditions}
-                  onChange={(e) =>
-                    setInvoiceData({ ...invoiceData, terms_and_conditions: e.target.value })
-                  }
-                  rows={4}
-                  className="w-full px-2.5 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                  placeholder="When payment is due (e.g., Net 30, Due on receipt)"
-                />
+                {editingTerms ? (
+                  <RichTextEditor
+                    ref={termsEditorRef}
+                    value={invoiceData.terms_and_conditions}
+                    onChange={(html) => setInvoiceData({ ...invoiceData, terms_and_conditions: html })}
+                    minHeight="160px"
+                    placeholder="Payment terms (e.g., Net 30, Due on receipt)"
+                  />
+                ) : invoiceData.terms_and_conditions ? (
+                  <div
+                    className="prose prose-sm max-w-none border border-slate-200 rounded-lg bg-slate-50 p-3 text-sm text-slate-700"
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(invoiceData.terms_and_conditions) }}
+                  />
+                ) : (
+                  <p className="border border-dashed border-slate-300 rounded-lg p-3 text-sm text-slate-400">
+                    No payment terms yet. Use Quick Add or Edit.
+                  </p>
+                )}
               </div>
             </div>
           </div>
