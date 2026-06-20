@@ -127,3 +127,28 @@ Until this lands, C4's customer manifest-acceptance stays **staff-attested** (th
 3. **Verify minting:** `curl -X POST https://<ref>.supabase.co/functions/v1/portal-login -H "apikey: <anon>" -H "Content-Type: application/json" -d '{"email":"<t>","password":"<p>"}'` → expect `200` + `access_token`. Decode it: claims must be `role:portal`, `customer_id`, `tenant_id`, `aud:authenticated`, `exp`.
 4. **Verify the hosted gateway accepts `role='portal'`** (the one thing not provable without the secret): `curl "https://<ref>.supabase.co/rest/v1/cases?select=id,customer_id" -H "apikey: <anon>" -H "Authorization: Bearer <access_token>"` → must return **only that customer's** cases and **zero** of any other (the live counterpart of the role-sim anti-leak test that already passed at the DB layer). If PostgREST rejects the role, confirm Supabase gateway role config (the DB side — `grant portal to authenticator` — is already in place).
 5. **Frontend cutover (next PR, only after 3–4 pass):** a portal-scoped Supabase client that sends the minted JWT; `PortalAuthContext.login` calls `portal-login` and stores the token (sessionStorage to match current posture; in-memory+short-TTL is the hardening option); cut the portal pages from the anon client + client-JS `customer_id` filter over to the portal client (RLS now enforces scoping — keep the `.eq` as defense-in-depth). Deliberately deferred here because it is unverifiable until steps 3–4 succeed, and a blind cutover would break the live portal.
+
+## 12. Re-verification + read-path completion (2026-06-20)
+
+Re-audited the live DB against the page-read surface. **The backend foundation from §6–§7 is in place and correct:** the `portal` role exists with `authenticator` membership + grants, `get_current_portal_customer_id()` reads the `customer_id` claim, `portal-login` is ACTIVE (v3), and the `TO portal` SELECT policies isolate correctly — **re-proven by SQL role/claim simulation:** a `portal` principal for customer A saw its 2 cases and **0** of another same-tenant customer's; an empty/forged claim saw **0**.
+
+Landed in this PR (additive, inert for staff/anon, SQL-verified):
+- **`case_quotes_portal_read`** — the one portal-reachable table that was missing a `TO portal` policy (scoped via `case_id → cases.customer_id`; migration `20260620051740`).
+
+**Still blocking a page cutover (new findings — do these in the verified DB PR before any frontend work):**
+
+1. **Six more tables the portal pages read have no `TO portal` policy**, so cutting the pages over to the portal client would return **zero rows** for them:
+   | Table | Read by | Scope path for the policy |
+   |---|---|---|
+   | `case_report_sections` | PortalReports | `report → case_reports.case_id → cases.customer_id` |
+   | `case_job_history` | PortalCases | `case_id → cases.customer_id` |
+   | `customer_communications` | PortalCommunications | `customer_id = get_current_portal_customer_id()` |
+   | `case_quote_items` | PortalQuotes | `quote → case_quotes.case_id → cases.customer_id` |
+   | `stock_sales` | PortalPurchasesPage | confirm the customer link first (decide if purchases belong in the portal) |
+   | `master_case_priorities` | PortalDashboard, PortalCases | global lookup — `GRANT SELECT` to `portal` + a `USING (true)` read policy (no tenant data) |
+
+2. **Quote write-path is tenant-scoped, not customer-scoped (authz gap).** `approve_quote(p_quote_id)` / `reject_quote(p_quote_id, p_reason)` are `SECURITY DEFINER` and filter `WHERE … tenant_id = get_current_tenant_id()`. Today they no-op for the portal (anon → NULL tenant), but once a portal customer holds a tenant-bearing JWT they would be able to approve/reject **any** quote in their tenant, not just their own. Before the cutover activates these, re-scope them to `EXISTS (quote → case → cases.customer_id = get_current_portal_customer_id())` for portal principals (keep the tenant path for staff).
+
+3. **Frontend still un-cut-over (C3/C4 open on the client).** `PortalAuthContext.login` still calls `authenticate_portal_customer` via the **anon** client and stores plain customer JSON in `sessionStorage`; portal pages still query via the anon client (so reads are 0 against the `TO authenticated` policies). A prototype cutover (portal `accessToken` client + edge-function login) was built and **reverted** this session because completing it safely depends on (1), (2), and the still-unmet go-live steps 1–4 above (JWT secret unset, 0 customer passwords) — a partial cutover would break the live portal and could expose the quote authz gap.
+
+**Recommended order:** one verified DB PR for (1)+(2) (each policy SQL-sim checked like `case_quotes` was), then go-live steps 1–4 (owner sets the JWT secret + a test password), then the frontend cutover PR.
