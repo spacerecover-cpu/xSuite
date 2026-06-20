@@ -66,15 +66,30 @@ export function resolveTenantLanguageConfig(
 }
 
 /**
- * Return a copy of `config` whose `language` reflects the tenant's
- * document-language setting. Non-mutating: `config` and `config.language` are
- * not modified. This is the ONE call that makes engine output bilingual/RTL for
- * bilingual tenants.
+ * Resolve the document's `language`, giving the per-template language (the
+ * Settings → Documents Studio "Document language" picker) precedence over the
+ * tenant-wide Settings → Localization default.
+ *
+ * PRECEDENCE: the Studio picker is authoritative once it selects a non-default —
+ * i.e. non-English-only — document language. The picker can express
+ * `bilingual_sidebyside` and Arabic-lead, neither of which the tenant setting can
+ * represent, so it must NOT be clobbered. Only when the template is still at the
+ * built-in English default (`mode: 'en'`) do we fall back to the tenant-wide
+ * setting — preserving the legacy behavior for tenants who configure language in
+ * Settings → Localization rather than the Studio.
+ *
+ * Non-mutating: when the template wins we return it unchanged; otherwise a fresh
+ * config with a fresh `language`. This is the ONE call every render path
+ * (preview + every `build*ViaEngine`) funnels through, so the precedence holds
+ * uniformly across the live preview and the generated PDF.
  */
 export function applyTenantLanguage(
   config: DocumentTemplateConfig,
   companySettings: CompanySettingsData,
 ): DocumentTemplateConfig {
+  if (config.language && config.language.mode !== 'en') {
+    return config;
+  }
   return {
     ...config,
     language: resolveTenantLanguageConfig(companySettings),
