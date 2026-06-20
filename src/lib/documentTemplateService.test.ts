@@ -91,8 +91,9 @@ vi.mock('./companySettingsService', () => ({
 // Import after mocks are in place
 // ---------------------------------------------------------------------------
 
-import { getDeployedVersionByType } from './documentTemplateService';
+import { getDeployedVersionByType, seedTemplateLanguage, type TemplateConfigPayload } from './documentTemplateService';
 import { supabase } from './supabaseClient';
+import type { CompanySettingsData } from './pdf/types';
 
 const mockFrom = supabase.from as ReturnType<typeof vi.fn>;
 
@@ -253,5 +254,39 @@ describe('getDeployedVersionByType — scope resolution (R6)', () => {
     const result = await getDeployedVersionByType('invoice');
 
     expect(result?.id).toBe('ver-tenant');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// seedTemplateLanguage — a brand-new template inherits the tenant-wide default
+// document language so its persisted config carries an explicit `language`,
+// while an explicit Studio choice is never overwritten (single source of truth).
+// ---------------------------------------------------------------------------
+
+describe('seedTemplateLanguage', () => {
+  const tenant = (
+    mode: 'english_only' | 'bilingual' | undefined,
+    secondary: string | null,
+  ): CompanySettingsData =>
+    ({
+      localization: mode
+        ? { document_language_settings: { mode, secondary_language: secondary, language_name: null } }
+        : undefined,
+    } as unknown as CompanySettingsData);
+
+  it('seeds a new template language from a bilingual-Arabic tenant default', () => {
+    const out = seedTemplateLanguage({}, tenant('bilingual', 'ar'));
+    expect(out.language).toEqual({ mode: 'bilingual_stacked', primary: 'ar' });
+  });
+
+  it('seeds explicit English from an english_only tenant (was implicit default)', () => {
+    const out = seedTemplateLanguage({}, tenant('english_only', null));
+    expect(out.language).toEqual({ mode: 'en', primary: 'en' });
+  });
+
+  it('does not overwrite an explicit Studio language choice', () => {
+    const cfg = { language: { mode: 'bilingual_sidebyside', primary: 'en' } } as TemplateConfigPayload;
+    const out = seedTemplateLanguage(cfg, tenant('bilingual', 'ar'));
+    expect(out.language).toEqual({ mode: 'bilingual_sidebyside', primary: 'en' });
   });
 });

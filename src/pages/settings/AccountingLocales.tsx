@@ -476,16 +476,22 @@ export const LocalizationCenter: React.FC = () => {
         {activeTab === 'document' && (
           <>
             <SectionCard
-              title="Document language"
-              description="Add a second language to printed and emailed documents. Headings and labels appear in both languages; content stays in English."
+              title="Default document language"
+              description="The tenant-wide default language for printed and emailed documents. Headings and labels appear in both languages; content stays in English."
             >
-              <div className="max-w-md">
+              <div className="rounded-lg border border-info/30 bg-info-muted p-3 text-xs text-info">
+                Each document type can set its own language, which takes precedence over this
+                default. Open <span className="font-medium">Settings → Documents</span>, edit a
+                template, and choose <span className="font-medium">Other Details → Document language</span>
+                {' '}(English, Arabic, or bilingual — including side-by-side).
+              </div>
+              <div className="mt-4 max-w-md">
                 <Select
-                  label="Document language mode"
+                  label="Default document language mode"
                   value={docDraft.secondary_language ?? 'none'}
                   onChange={(e) => onDocLanguageChange(e.target.value)}
                   options={SUPPORTED_LANGUAGES.map((lang) => ({ value: lang.code ?? 'none', label: lang.displayName }))}
-                  hint="Choose the language combination for your documents."
+                  hint="Applied to documents whose template hasn't set its own language."
                 />
               </div>
 
