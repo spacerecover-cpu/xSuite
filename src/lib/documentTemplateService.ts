@@ -29,6 +29,8 @@ import { logger } from './logger';
 import type { Database, Json } from '../types/database.types';
 import type { TemplateConfigOverride } from './pdf/templateConfig';
 import { BUILT_IN_TEMPLATE_CONFIGS } from './pdf/templateConfig';
+import { resolveTenantLanguageConfig } from './pdf/engine/applyTenantLanguage';
+import type { CompanySettingsData } from './pdf/types';
 import { getOrCreateCompanySettings } from './companySettingsService';
 
 // ---------------------------------------------------------------------------
@@ -65,6 +67,23 @@ export function readConfig(config: Json): TemplateConfigPayload {
 /** Cast a typed override to the Json column shape for writes. */
 function toJson(config: TemplateConfigPayload): Json {
   return config as unknown as Json;
+}
+
+/**
+ * Seed a brand-new template's document `language` from the tenant-wide default
+ * (Settings → Localization) when the template hasn't explicitly chosen one, so
+ * the persisted config carries an explicit `language` from birth — the per-template
+ * config is the single source of truth for document language. An explicit
+ * (non-English) Studio choice is never overwritten. Pure: no I/O.
+ */
+export function seedTemplateLanguage(
+  config: TemplateConfigPayload,
+  companySettings: CompanySettingsData,
+): TemplateConfigPayload {
+  if (config.language && config.language.mode && config.language.mode !== 'en') {
+    return config;
+  }
+  return { ...config, language: resolveTenantLanguageConfig(companySettings) };
 }
 
 // ===========================================================================
@@ -382,11 +401,22 @@ export async function createVersion(
   const nextVersion = (await maxVersionNumber(templateId)) + 1;
   const tenant_id = options?.tenant_id ?? (await resolveTenantId());
 
+  // A brand-new template (its first version) inherits the tenant-wide default
+  // document language so its persisted config is explicit from birth; later
+  // versions keep whatever the Studio saved (the per-template picker rules).
+  const seededConfig =
+    nextVersion === 1
+      ? seedTemplateLanguage(
+          config,
+          (await getOrCreateCompanySettings()) as unknown as CompanySettingsData,
+        )
+      : config;
+
   const insert: DocumentTemplateVersionInsert = {
     template_id: templateId,
     tenant_id,
     version_number: nextVersion,
-    config: toJson(config),
+    config: toJson(seededConfig),
     is_deployed: false,
     ...(options?.changeNote !== undefined ? { change_note: options.changeNote } : {}),
   };
