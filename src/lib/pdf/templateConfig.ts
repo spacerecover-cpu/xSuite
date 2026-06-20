@@ -520,9 +520,14 @@ function financialSections(): SectionConfig[] {
     // (proforma, quotes), so it is harmless on the shared financial base.
     section('paymentHistory', 6),
     section('terms', 7),
-    section('signature', 8, { visible: false }),
-    section('qr', 9),
-    section('footer', 10),
+    // Bank account as its own movable section — hidden by default so existing
+    // layouts are unchanged (the terms section keeps rendering the bank box
+    // inline). Enabling it in the Studio moves the bank here, where it can be
+    // shown/hidden and reordered like any other section.
+    section('bank', 8, { visible: false }),
+    section('signature', 9, { visible: false }),
+    section('qr', 10),
+    section('footer', 11),
   ];
 }
 
