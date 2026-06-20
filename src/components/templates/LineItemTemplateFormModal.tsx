@@ -4,7 +4,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
-import { RichTextEditor } from '../ui/RichTextEditor';
+import { RichTextEditor, type RichTextEditorHandle } from '../ui/RichTextEditor';
 import { DollarSign, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
 import { logger } from '../../lib/logger';
@@ -81,10 +81,9 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const firstFieldRef = useRef<HTMLInputElement>(null);
-  const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const richEditorRef = useRef<RichTextEditorHandle>(null);
   const descriptionId = useId();
   const defaultPriceId = useId();
-  const templateContentId = useId();
   const currencyConfig = useCurrencyConfig();
   const decimalPlaces = currencyConfig.decimalPlaces ?? DEFAULT_DECIMAL_PLACES;
   const [formData, setFormData] = useState<LineItemTemplateFormState>({
@@ -137,20 +136,7 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
   }, [initialData]);
 
   const insertVariable = (variableKey: string) => {
-    const token = `{{${variableKey}}}`;
-    const el = contentTextareaRef.current;
-    if (el) {
-      const start = el.selectionStart ?? formData.content.length;
-      const end = el.selectionEnd ?? start;
-      const next = formData.content.slice(0, start) + token + formData.content.slice(end);
-      setFormData((prev) => ({ ...prev, content: next }));
-      requestAnimationFrame(() => {
-        el.focus();
-        el.setSelectionRange(start + token.length, start + token.length);
-      });
-    } else {
-      setFormData((prev) => ({ ...prev, content: prev.content + token }));
-    }
+    richEditorRef.current?.insertAtCursor(`{{${variableKey}}}`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -323,7 +309,7 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
             ) : (
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label htmlFor={templateContentId} className="block text-sm font-medium text-slate-700">
+                  <label className="block text-sm font-medium text-slate-700">
                     Template Content
                   </label>
                   <div className="flex items-center gap-2">
@@ -338,19 +324,14 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
                     </button>
                   </div>
                 </div>
-                <textarea
-                  id={templateContentId}
-                  ref={contentTextareaRef}
+                <RichTextEditor
+                  ref={richEditorRef}
                   value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  rows={12}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary font-mono text-sm"
-                  placeholder="Enter your template content. Use Insert variable to add placeholders like {{customer.name}}."
-                  style={{ whiteSpace: 'pre-wrap' }}
+                  onChange={(content) => setFormData({ ...formData, content })}
+                  minHeight="220px"
+                  placeholder="Use the toolbar to format. Use Insert variable for placeholders like {{customer.name}}."
+                  helpText="Placeholders like {{case.number}} are filled with real data when the template is applied."
                 />
-                <p className="mt-1 text-xs text-slate-500">
-                  Line breaks are preserved exactly as entered. Placeholders like {'{{case.number}}'} are filled with real data when the template is applied.
-                </p>
 
                 {unknownVariables.length > 0 && (
                   <div className="mt-2 flex items-start gap-2 p-2.5 bg-warning-muted border border-warning/30 rounded-lg">
@@ -374,7 +355,7 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
                       </p>
                     )}
                     <div
-                      className="prose prose-sm max-w-none text-sm text-slate-700 whitespace-pre-wrap"
+                      className="prose prose-sm max-w-none text-sm text-slate-700"
                       dangerouslySetInnerHTML={{
                         __html: sanitizeHtml(renderTemplate(formData.content, SAMPLE_CONTEXT)),
                       }}
