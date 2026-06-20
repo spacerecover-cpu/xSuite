@@ -431,7 +431,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[180px_minmax(0,1fr)_minmax(0,46%)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[168px_minmax(0,1fr)_minmax(0,55%)]">
         {/* Tab rail */}
         <nav aria-label="Template settings" className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
           {TABS.map((tab) => {
