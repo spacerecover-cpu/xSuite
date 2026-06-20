@@ -6,8 +6,11 @@ import { AuthProvider, useAuth } from './AuthContext';
 let authStateCb: ((event: string, session: unknown) => void) | null = null;
 let maybeSingleImpl: () => Promise<{ data: unknown; error: unknown }> = async () => ({ data: null, error: null });
 let needsMFAImpl: () => Promise<boolean> = async () => false;
+// Real supabase.auth.signOut() fires SIGNED_OUT only after a network round-trip;
+// let tests suppress it to exercise the window between signOut() and SIGNED_OUT.
+let autoFireSignedOut = true;
 const signOutMock = vi.fn(async () => {
-  authStateCb?.('SIGNED_OUT', null);
+  if (autoFireSignedOut) authStateCb?.('SIGNED_OUT', null);
 });
 
 vi.mock('../lib/supabaseClient', () => ({
@@ -53,6 +56,7 @@ describe('AuthContext', () => {
     authStateCb = null;
     maybeSingleImpl = async () => ({ data: null, error: null });
     needsMFAImpl = async () => false;
+    autoFireSignedOut = true;
     signOutMock.mockClear();
     clearPermissionCache.mockClear();
     setSentryUser.mockClear();
@@ -83,6 +87,29 @@ describe('AuthContext', () => {
 
     expect(state()).not.toContain('approved');
     expect(state().endsWith('|no')).toBe(true);
+  });
+
+  it('does not flash profileStatus="error" when a fetch starts during sign-out and fails before SIGNED_OUT lands (A1 race)', async () => {
+    maybeSingleImpl = async () => ({ data: APPROVED, error: null });
+    render(<AuthProvider><Harness /></AuthProvider>);
+    await waitFor(() => expect(state()).toBe('approved|false|yes'));
+
+    // Real signOut fires SIGNED_OUT only after a network round-trip; suppress it
+    // so the epoch is bumped just once (by signOut) — the residual window.
+    autoFireSignedOut = false;
+    // A poll (e.g. PendingApprovalScreen) refetches mid-logout; the torn-down
+    // session makes it fail. Without the signingOut guard this surfaces 'error'.
+    let refreshCalls = 0;
+    maybeSingleImpl = async () => { refreshCalls += 1; return { data: null, error: new Error('session gone') }; };
+
+    fireEvent.click(screen.getByText('logout'));
+    await waitFor(() => expect(signOutMock).toHaveBeenCalled());
+    fireEvent.click(screen.getByText('refresh')); // refreshProfile() starts AFTER signOut
+
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(refreshCalls).toBe(0); // guard dropped the fetch before it could query
+    expect(state()).not.toContain('error');
   });
 
   it('retries a transient profile-fetch failure before surfacing an error (H8)', async () => {

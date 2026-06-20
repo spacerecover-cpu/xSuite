@@ -60,6 +60,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // apart from a token-expiry / revoked-refresh eject (H4) and leave the login
   // page a breadcrumb to explain the latter.
   const userInitiatedSignOut = useRef(false);
+  // True from the moment signOut() is called until the next session is
+  // established. fetchProfile checks it at resolve time (not just the epoch it
+  // snapshotted at start), so a fetch that *starts* during the teardown — e.g.
+  // the PendingApprovalScreen poll — can't surface 'error' / clear loading in
+  // the window before SIGNED_OUT lands, which is what still flashed the card.
+  const signingOut = useRef(false);
 
   const fetchProfile = useCallback(async (userId: string, force = false) => {
     // Boot fires this twice (getSession() resolution AND the INITIAL_SESSION
@@ -69,12 +75,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!force && profileFetchInFlight.current === userId) return;
     profileFetchInFlight.current = userId;
     const epoch = authEpoch.current;
-    const isStale = () => authEpoch.current !== epoch;
+    // Stale if the auth identity changed (epoch) OR we've begun signing out —
+    // the latter catches a fetch that started *after* signOut bumped the epoch
+    // but before SIGNED_OUT bumps it again.
+    const isStale = () => authEpoch.current !== epoch || signingOut.current;
     try {
       // Retry transient failures (network / RLS hiccup) before surfacing the
       // dead-end error screen — a single blip shouldn't strand the user.
       let lastError: unknown = null;
       for (let attempt = 0; attempt < 3; attempt++) {
+        if (isStale()) return;
         try {
           const { data, error } = await supabase
             .from('profiles')
@@ -141,6 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
+        signingOut.current = false;
         fetchProfile(session.user.id);
         checkMFAStatus();
       } else {
@@ -154,6 +165,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
+          // A fresh/restored session — clear the signing-out guard so the next
+          // login's profile fetch isn't dropped.
+          signingOut.current = false;
           // TOKEN_REFRESHED fires roughly hourly for the SAME user; re-fetching
           // the profile then produced a new profile identity and re-rendered
           // every consumer for no data change. All other events (sign-in, user
@@ -257,6 +271,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // set and `loading` is false is what flashed the Profile Error card.
     authEpoch.current++;
     userInitiatedSignOut.current = true;
+    signingOut.current = true;
     setLoading(true);
     profileCache.current = null;
     setProfile(null);
