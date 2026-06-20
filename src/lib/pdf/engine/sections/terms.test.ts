@@ -93,6 +93,36 @@ describe('renderTerms — per-document-type Terms & Conditions', () => {
   });
 });
 
+describe('renderTerms — centre-split box layout', () => {
+  type Box = { table?: { widths?: unknown[]; body?: unknown[][] } };
+  const firstBox = (out: unknown): Box => (out as { stack: Box[] }).stack[0];
+
+  it('renders a single centre-split box on a bilingual document (English | Arabic)', () => {
+    const out = renderTerms(
+      engine({ termsContent: { terms: { en: TERMS_EN, ar: TERMS_AR } }, language: BILINGUAL }),
+      NO_DATA,
+    );
+    const box = firstBox(out);
+    expect(box.table?.widths).toHaveLength(2); // two columns = centre split
+    const row = box.table?.body?.[0] ?? [];
+    const enText: string[] = [];
+    const arText: string[] = [];
+    collectText(row[0], enText);
+    collectText(row[1], arText);
+    expect(enText.some((t) => t.includes(TERMS_EN))).toBe(true);
+    expect(arText.some((t) => t.includes(TERMS_AR))).toBe(true);
+    expect(arText.some((t) => t.includes(TERMS_EN))).toBe(false);
+  });
+
+  it('renders a single full-width box on an English-only document', () => {
+    const out = renderTerms(
+      engine({ termsContent: { terms: { en: TERMS_EN } }, language: EN }),
+      NO_DATA,
+    );
+    expect(firstBox(out).table?.widths).toHaveLength(1);
+  });
+});
+
 describe('renderTerms — movable bank section coordination', () => {
   it('renders the bank box inline when the standalone bank section is hidden (default layout)', () => {
     const out = renderTerms(
@@ -126,5 +156,24 @@ describe('renderTerms — movable bank section coordination', () => {
     expect(texts.some((t) => t.includes('Future Space LLC'))).toBe(false);
     // Terms still render — only the bank moved out.
     expect(texts.some((t) => t.includes(TERMS_EN))).toBe(true);
+  });
+
+  it('renders the inline bank box with English-only field labels (no translated labels)', () => {
+    const out = renderTerms(
+      engine({
+        termsContent: { terms: { en: TERMS_EN } },
+        language: BILINGUAL,
+        sections: [
+          { key: 'terms', visible: true, order: 7 },
+          { key: 'bank', visible: false, order: 8 },
+        ],
+      }),
+      BANK,
+    );
+    const texts: string[] = [];
+    collectText(out, texts);
+    expect(texts.some((t) => t.includes('Account Name:'))).toBe(true); // English field label
+    expect(texts.some((t) => t.includes('اسم الحساب:'))).toBe(false); // translated field label omitted
+    expect(texts.some((t) => t.includes('Future Space LLC'))).toBe(true); // value present
   });
 });

@@ -22,7 +22,7 @@ const DATA_DEPENDENT_HINTS: Record<string, string> = {
  */
 const GUIDANCE_HINTS: Record<string, string> = {
   terms:
-    'Body text uses your Standard Terms & Conditions (Settings → General → Legal & Compliance) when set; otherwise the terms entered on the document. Add the Arabic Standard T&C there to show terms in both languages on bilingual documents.',
+    'Set the Terms & Conditions and Notes content (English + Arabic) in the Terms & Conditions section above. It is specific to this document type, and the Arabic shows alongside the English on bilingual documents.',
   bank:
     'Shown inside the Terms section by default. Enable it here to place the bank-account details as their own movable, reorderable section.',
 };
