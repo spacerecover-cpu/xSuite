@@ -9,10 +9,23 @@ import { MultiSelectDropdown } from '../../ui/MultiSelectDropdown';
 import { EngineerSelector } from '../EngineerSelector';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
+import { getAllowedTransitions } from '@/lib/caseStateMachineService';
+import { buildCaseStatusOptions, type StatusOptionGroup } from '@/lib/caseStatusOptions';
 import type { Database } from '../../../types/database.types';
 
 type CaseRow = Database['public']['Tables']['cases']['Row'];
 type CaseDeviceRow = Database['public']['Tables']['case_devices']['Row'];
+
+// Optgroup labels + render order for the status picker. Hoisted (static) so they
+// are not rebuilt each render.
+const STATUS_GROUP_LABELS: Record<StatusOptionGroup, string> = {
+  current: 'Current',
+  lateral: 'Within this stage',
+  advance: 'Move to',
+  cancel: 'Cancel case',
+  reopen: 'Reopen case',
+};
+const STATUS_CHANGE_GROUPS: StatusOptionGroup[] = ['lateral', 'advance', 'cancel', 'reopen'];
 
 type GeoNameEmbed = { name: string | null } | null;
 type NamedRefEmbed = { id: string; name: string | null } | null;
@@ -147,7 +160,7 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
   const { data: caseStatuses = [] } = useQuery({
     queryKey: ['case_statuses'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('master_case_statuses').select('id, name, color, is_active').eq('is_active', true).order('sort_order');
+      const { data, error } = await supabase.from('master_case_statuses').select('id, name, color, is_active, type').eq('is_active', true).order('sort_order');
       if (error) throw error;
       return data || [];
     },
@@ -160,6 +173,19 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
       if (error) throw error;
       return data || [];
     },
+  });
+
+  // The status picker must only offer moves the state machine accepts: the
+  // current status, its same-phase siblings (intra-phase moves), and the
+  // role-filtered cross-phase transitions for the current phase. The old "offer
+  // every status" dropdown produced HTTP 400s from transition_case_status on any
+  // same-phase or non-adjacent pick.
+  const currentStatus = caseStatuses.find((s) => s.name === caseData.status) ?? null;
+
+  const { data: allowedTransitions = [] } = useQuery({
+    queryKey: ['case_allowed_transitions', currentStatus?.id ?? null, profile?.role ?? null],
+    queryFn: () => getAllowedTransitions(currentStatus?.id ?? null, profile?.role ?? null),
+    enabled: !!currentStatus?.id && !!profile?.role,
   });
 
   const { data: deviceTypes = [] } = useQuery({
@@ -246,7 +272,12 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
       .join(', ');
   };
 
-  const statusOptions = caseStatuses.map(status => ({ value: status.name, label: status.name }));
+  const statusChangeOptions = buildCaseStatusOptions({
+    current: currentStatus,
+    allActiveStatuses: caseStatuses,
+    allowedTransitions,
+  });
+  const hasStatusChangeTargets = statusChangeOptions.some((o) => o.group !== 'current');
   const priorityOptions = casePriorities.map(priority => ({ value: priority.name.toLowerCase(), label: priority.name }));
 
   const handleCancelEdit = () => {
@@ -366,11 +397,33 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
                     value={caseData.status ?? ''}
                     onChange={(e) => { onUpdateStatus(e.target.value); setIsEditingStatus(false); }}
                     className="text-xs px-2 py-1 border border-primary/40 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary"
+                    aria-label="Change case status"
                     autoFocus
                   >
-                    {statusOptions.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
+                    {/* Keep the current value selectable even if it isn't in the
+                        reachable set, so the field never renders blank. */}
+                    {caseData.status && !statusChangeOptions.some((o) => o.value === caseData.status) && (
+                      <option value={caseData.status}>{caseData.status}</option>
+                    )}
+                    {statusChangeOptions
+                      .filter((o) => o.group === 'current')
+                      .map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    {STATUS_CHANGE_GROUPS.map((g) => {
+                      const groupOpts = statusChangeOptions.filter((o) => o.group === g);
+                      if (groupOpts.length === 0) return null;
+                      return (
+                        <optgroup key={g} label={STATUS_GROUP_LABELS[g]}>
+                          {groupOpts.map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </optgroup>
+                      );
+                    })}
+                    {!hasStatusChangeTargets && (
+                      <option value="__none__" disabled>No status changes available from here</option>
+                    )}
                   </select>
                 )}
               </div>
