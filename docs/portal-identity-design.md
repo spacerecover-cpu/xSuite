@@ -140,15 +140,17 @@ Landed in this PR (additive, inert for staff/anon, SQL-verified):
 1. **Six more tables the portal pages read have no `TO portal` policy**, so cutting the pages over to the portal client would return **zero rows** for them:
    | Table | Read by | Scope path for the policy |
    |---|---|---|
-   | `case_report_sections` | PortalReports | `report → case_reports.case_id → cases.customer_id` |
-   | `case_job_history` | PortalCases | `case_id → cases.customer_id` |
-   | `customer_communications` | PortalCommunications | `customer_id = get_current_portal_customer_id()` |
-   | `case_quote_items` | PortalQuotes | `quote → case_quotes.case_id → cases.customer_id` |
-   | `stock_sales` | PortalPurchasesPage | confirm the customer link first (decide if purchases belong in the portal) |
-   | `master_case_priorities` | PortalDashboard, PortalCases | global lookup — `GRANT SELECT` to `portal` + a `USING (true)` read policy (no tenant data) |
+   | `case_report_sections` | PortalReports | ✅ added — `report → case_reports.case_id → cases.customer_id` |
+   | `customer_communications` | PortalCommunications | ✅ added — `customer_id = get_current_portal_customer_id()` |
+   | `case_quote_items` | PortalQuotes | ✅ added — `quote → case_quotes.case_id → cases.customer_id` |
+   | `stock_sales` | PortalPurchasesPage | ✅ added — `customer_id = get_current_portal_customer_id()` (has a direct customer_id) |
+   | `master_case_priorities` | PortalDashboard, PortalCases | ✅ added — `GRANT SELECT TO portal` + `USING (true)` (global lookup) |
+   | `case_job_history` | PortalCases | ⛔ **HELD** — raw internal audit log (`action/details/old_value/new_value/performed_by`, no visibility flag). Exposing it wholesale leaks internal operations. Needs a **curated customer timeline** (e.g. a `case_job_history_public` view or a `customer_visible` flag) — a product decision, not a blanket policy. Until then PortalCases shows 0 history rows (same as today). |
 
-2. **Quote write-path is tenant-scoped, not customer-scoped (authz gap).** `approve_quote(p_quote_id)` / `reject_quote(p_quote_id, p_reason)` are `SECURITY DEFINER` and filter `WHERE … tenant_id = get_current_tenant_id()`. Today they no-op for the portal (anon → NULL tenant), but once a portal customer holds a tenant-bearing JWT they would be able to approve/reject **any** quote in their tenant, not just their own. Before the cutover activates these, re-scope them to `EXISTS (quote → case → cases.customer_id = get_current_portal_customer_id())` for portal principals (keep the tenant path for staff).
+   The five ✅ rows landed in migration `20260620053512`, each **SQL-sim verified** for zero cross-customer leakage.
 
-3. **Frontend still un-cut-over (C3/C4 open on the client).** `PortalAuthContext.login` still calls `authenticate_portal_customer` via the **anon** client and stores plain customer JSON in `sessionStorage`; portal pages still query via the anon client (so reads are 0 against the `TO authenticated` policies). A prototype cutover (portal `accessToken` client + edge-function login) was built and **reverted** this session because completing it safely depends on (1), (2), and the still-unmet go-live steps 1–4 above (JWT secret unset, 0 customer passwords) — a partial cutover would break the live portal and could expose the quote authz gap.
+2. **Quote write-path authz — ✅ fixed (`20260620053512`).** `approve_quote`/`reject_quote` now carry `AND (get_current_portal_customer_id() IS NULL OR customer_id = get_current_portal_customer_id())`, so a portal principal can only act on its own quotes (staff path with a null portal claim is byte-identical). Verified: a portal principal could approve its own quote but **no-op'd** on another customer's. **Caveat (separate pre-existing bug):** `case_quotes` is a distinct table from `quotes` (not a view), yet `PortalQuotes` passes a `case_quotes.id` to `approve_quote`, which updates `quotes WHERE id = p_quote_id` — so the IDs don't line up and the portal approval is **non-functional today regardless of authz**. Reconcile the `case_quotes`↔`quotes` model (or pass the right id) as part of the cutover; the authz guard above is correct for when that lands.
 
-**Recommended order:** one verified DB PR for (1)+(2) (each policy SQL-sim checked like `case_quotes` was), then go-live steps 1–4 (owner sets the JWT secret + a test password), then the frontend cutover PR.
+3. **Frontend still un-cut-over (C3/C4 open on the client).** `PortalAuthContext.login` still calls `authenticate_portal_customer` via the **anon** client and stores plain customer JSON in `sessionStorage`; portal pages still query via the anon client (so reads are 0 against the `TO authenticated` policies). A prototype cutover (portal `accessToken` client + edge-function login) was built and **reverted** this session because completing it safely depends on the go-live steps 1–4 above (JWT secret unset, 0 customer passwords) — a partial cutover would break the live portal.
+
+**Status / recommended order:** the DB read-path + quote authz (1)+(2) are now **done and verified** (`case_quotes` in `20260620051740`; the other five + quote authz in `20260620053512`), except the held `case_job_history`. Remaining: go-live steps 1–4 (owner sets the JWT secret + a test password), reconcile the `case_quotes`↔`quotes` id model, then the frontend cutover PR.
