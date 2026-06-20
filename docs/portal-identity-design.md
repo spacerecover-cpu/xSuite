@@ -59,10 +59,13 @@ create function get_current_portal_customer_id() returns uuid
 $$ select nullif(current_setting('request.jwt.claims', true)::json->>'customer_id','')::uuid $$;
 
 -- Tenant resolution: staff (profiles) FIRST, portal claim as fallback, else NULL (fail-closed).
+-- NOTE: migration 20260620020115 (audit finding M1) added `and is_active = true` to the
+-- profiles subquery to deny deactivated staff at the resolver. PRESERVE that predicate when
+-- this function is rewritten for portal support — dropping it silently re-opens M1.
 create or replace function get_current_tenant_id() returns uuid
   language sql stable security definer set search_path = public as
 $$ select coalesce(
-     (select tenant_id from profiles where id = auth.uid() and deleted_at is null),
+     (select tenant_id from profiles where id = auth.uid() and is_active = true and deleted_at is null),
      nullif(current_setting('request.jwt.claims', true)::json->>'tenant_id','')::uuid
    ) $$;
 ```
