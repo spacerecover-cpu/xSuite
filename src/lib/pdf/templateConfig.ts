@@ -316,6 +316,8 @@ export interface TranslationPolicyGroups {
   collector?: boolean;
   payslip?: boolean;
   diagnostics?: boolean;
+  /** Payment-history statement column headers (financial documents). */
+  paymentHistory?: boolean;
 }
 
 /** Controls which FIELD-ROW labels render bilingually (no effect on data values). */

@@ -11,7 +11,7 @@
 
 import type { Content, TableCell, Size } from 'pdfmake/interfaces';
 import { PDF_COLORS } from '../../styles';
-import { resolveLabel } from '../labels';
+import { resolveLabel, fieldLabelLanguage } from '../labels';
 import { engineLayoutDirection, mirrorAlign } from '../rtl';
 import type {
   EngineContext,
@@ -46,6 +46,7 @@ export const renderPaymentHistory: SectionRenderer = (
   if (!history || history.rows.length === 0) return null;
 
   const { language } = engine.config;
+  const labelLang = fieldLabelLanguage(language, engine.config.translationPolicy, 'paymentHistory');
   const direction = engineLayoutDirection(language);
   const { columns } = history;
 
@@ -69,7 +70,7 @@ export const renderPaymentHistory: SectionRenderer = (
       : baseColumns;
 
   const headerRow: TableCell[] = ordered.map((c) => ({
-    text: resolveLabel(c.label, language),
+    text: resolveLabel(c.label, labelLang),
     fontSize: 8,
     bold: true,
     color: PDF_COLORS.textLight,
