@@ -90,6 +90,7 @@ export const EXPENSE_LIST_COLUMNS = `
   approved_at,
   notes,
   rejection_reason,
+  updated_at,
   category:master_expense_categories(id, name),
   case:cases(case_no, title)
 `;
@@ -223,7 +224,8 @@ export const createExpense = async (
 
 export const updateExpense = async (
   id: string,
-  expense: Partial<Expense>
+  expense: Partial<Expense>,
+  expectedUpdatedAt?: string
 ) => {
   // Block edits once money has posted to the ledger — otherwise expenses.amount and
   // the frozen, append-only ledger row diverge (EXP-006 / EXP-011). Void & reissue instead.
@@ -238,6 +240,14 @@ export const updateExpense = async (
   }
 
   const updatePayload = { ...expense } as unknown as Database['public']['Tables']['expenses']['Update'];
+
+  // Resubmitting a draft/rejected expense (status -> pending) clears stale rejection
+  // metadata so the next review starts clean (EXP-016).
+  if (expense.status === 'pending') {
+    updatePayload.rejection_reason = null;
+    updatePayload.rejected_by = null;
+    updatePayload.rejected_at = null;
+  }
 
   // Re-snapshot base amounts when the money or currency changes, reusing the
   // expense's frozen rate unless the caller changes currency / overrides the rate.
@@ -283,14 +293,21 @@ export const updateExpense = async (
     if (docCurrency != null) updatePayload.currency = docCurrency;
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('expenses')
     .update(updatePayload)
-    .eq('id', id)
-    .select()
-    .maybeSingle();
+    .eq('id', id);
+  // Optimistic lock: only write if the row has not changed since it was loaded, so
+  // two concurrent editors can't silently overwrite each other (EXP-019).
+  if (expectedUpdatedAt) {
+    query = query.eq('updated_at', expectedUpdatedAt);
+  }
+  const { data, error } = await query.select().maybeSingle();
 
   if (error) throw error;
+  if (expectedUpdatedAt && !data) {
+    throw new Error('This expense was changed by someone else since you opened it. Please reload and try again.');
+  }
   return data;
 };
 
