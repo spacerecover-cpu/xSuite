@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
-
-type AccentColor = 'amber' | 'emerald' | 'teal' | 'sky' | 'slate' | 'blue' | 'payroll' | 'employee';
+import type { LucideIcon } from 'lucide-react';
 
 interface SidebarSectionProps {
   title: string;
@@ -10,19 +9,13 @@ interface SidebarSectionProps {
   onToggle?: (collapsed: boolean) => void;
   isCollapsed?: boolean;
   alwaysExpanded?: boolean;
-  accentColor?: AccentColor;
+  /**
+   * Monochrome identity glyph for the group header. Stays slate at rest and
+   * adopts the brand colour when the group is open/hovered. Replaces the old
+   * per-group `cat-*` dot — see note below.
+   */
+  icon?: LucideIcon;
 }
-
-const accentDotColors: Record<AccentColor, string> = {
-  amber: '#D97706',
-  emerald: '#059669',
-  teal: '#0D9488',
-  sky: '#0284C7',
-  payroll: '#0891B2',
-  employee: '#DB2777',
-  slate: '#475569',
-  blue: '#3b82f6',
-};
 
 export const SidebarSection: React.FC<SidebarSectionProps> = ({
   title,
@@ -31,10 +24,10 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
   onToggle,
   isCollapsed = false,
   alwaysExpanded = false,
-  accentColor,
+  icon: Icon,
 }) => {
   const [isOpen, setIsOpen] = useState(!defaultCollapsed);
-  const [isHeaderHovered, setIsHeaderHovered] = useState(false);
+  const contentId = useId();
 
   useEffect(() => {
     setIsOpen(!defaultCollapsed);
@@ -48,97 +41,72 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
     onToggle?.(!newState);
   };
 
+  // Collapsed icon rail: drop the group label/glyph and separate groups with a
+  // hairline divider so the rail stays scannable without text.
   if (isCollapsed) {
     return (
-      <div className="py-2" style={{ borderBottom: '1px solid #edf0f5' }}>
-        {accentColor && (
-          <div className="flex justify-center mb-1.5">
-            <div
-              className="w-1.5 h-1.5 rounded-full"
-              style={{ background: accentDotColors[accentColor] }}
-            />
-          </div>
-        )}
-        <div className="space-y-1">
-          {children}
-        </div>
+      <div className="py-2 border-b border-border">
+        <div className="space-y-1">{children}</div>
       </div>
     );
   }
 
-  return (
-    <div className="py-1">
-      {!alwaysExpanded ? (
-        <button
-          onClick={handleToggle}
-          className="w-full flex items-center justify-between rounded-lg transition-all duration-[180ms]"
-          style={{
-            padding: '9px 10px',
-            background: isHeaderHovered ? '#E8ECF2' : 'transparent',
-            borderLeft: `3px solid ${isHeaderHovered ? 'rgb(var(--color-primary) / 0.4)' : 'transparent'}`,
-          }}
-          onMouseEnter={() => setIsHeaderHovered(true)}
-          onMouseLeave={() => setIsHeaderHovered(false)}
-        >
-          <div className="flex items-center gap-2">
-            {accentColor && (
-              <div
-                className="rounded-full flex-shrink-0"
-                style={{
-                  width: '8px',
-                  height: '8px',
-                  background: accentDotColors[accentColor],
-                  transform: isHeaderHovered ? 'scale(1.3)' : 'scale(1)',
-                  transition: 'transform 0.2s ease',
-                }}
-              />
-            )}
-            <span
-              className="font-[600] uppercase tracking-[0.07em] transition-colors duration-[180ms]"
-              style={{ fontSize: '11.5px', color: isHeaderHovered ? 'rgb(var(--color-primary))' : '#5A6A7A' }}
-            >
-              {title}
-            </span>
-          </div>
-          <ChevronRight
-            className="transition-all duration-200"
-            style={{
-              width: '14px',
-              height: '14px',
-              color: isHeaderHovered ? 'rgb(var(--color-primary))' : '#7A8A9A',
-              transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-            }}
-          />
-        </button>
-      ) : (
-        <div style={{ padding: '9px 10px' }}>
-          <div className="flex items-center gap-2">
-            {accentColor && (
-              <div
-                className="rounded-full flex-shrink-0"
-                style={{
-                  width: '8px',
-                  height: '8px',
-                  background: accentDotColors[accentColor],
-                }}
-              />
-            )}
-            <span
-              className="font-[600] uppercase tracking-[0.07em]"
-              style={{ fontSize: '11.5px', color: '#5A6A7A' }}
-            >
-              {title}
-            </span>
-          </div>
-        </div>
-      )}
+  // An open group reads as the active section: its glyph, label and chevron take
+  // the brand colour. This is what replaced the per-group identity dots — colour
+  // now means "you are here" rather than a fixed (and arbitrary) hue per group,
+  // which freed the cat-* palette for its real job (charts / device tiles).
+  const isActiveGroup = isOpen && !alwaysExpanded;
+  const iconColor = isActiveGroup ? 'text-primary' : 'text-slate-500 group-hover:text-primary';
+  const labelColor = isActiveGroup ? 'text-primary' : 'text-slate-700 group-hover:text-primary';
 
-      <div
-        className={`mt-0.5 space-y-0.5 overflow-hidden transition-all duration-300 ease-in-out ${
-          (isOpen || alwaysExpanded) ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'
-        }`}
-      >
-        {children}
+  const headerInner = (
+    <div className="flex items-center gap-3 min-w-0">
+      {Icon && (
+        <Icon className={`w-[17px] h-[17px] flex-shrink-0 transition-colors ${iconColor}`} strokeWidth={1.75} />
+      )}
+      <span className={`text-xxs font-semibold uppercase tracking-[0.1em] transition-colors ${labelColor}`}>
+        {title}
+      </span>
+    </div>
+  );
+
+  return (
+    <div className={alwaysExpanded ? 'py-1' : 'pt-3 mt-1.5 border-t border-border'}>
+      {/* The open group rides a faint navy band + a 2px spine so the active
+          branch carries real weight instead of dissolving into the chrome. */}
+      <div className={isActiveGroup ? 'relative rounded-xl bg-primary/[0.06] py-1' : ''}>
+        {isActiveGroup && (
+          <span aria-hidden="true" className="absolute left-0 top-2.5 bottom-2.5 w-[3px] rounded-full bg-primary" />
+        )}
+        {!alwaysExpanded ? (
+          <button
+            type="button"
+            onClick={handleToggle}
+            aria-expanded={isOpen}
+            aria-controls={contentId}
+            className="group w-full flex items-center justify-between px-2.5 py-2 rounded-lg transition-colors hover:bg-primary/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+          >
+            {headerInner}
+            <ChevronRight
+              className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${
+                isOpen ? 'rotate-90 text-primary' : 'text-slate-500 group-hover:text-primary'
+              }`}
+            />
+          </button>
+        ) : (
+          <div className="px-2.5 py-2">{headerInner}</div>
+        )}
+
+        <div
+          id={contentId}
+          role="group"
+          aria-label={title}
+          className={`mt-0.5 space-y-0.5 overflow-hidden transition-all duration-300 ease-in-out ${
+            isOpen || alwaysExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'
+          }`}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

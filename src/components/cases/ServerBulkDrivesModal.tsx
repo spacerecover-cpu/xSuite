@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabaseClient';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { SearchableSelect } from '../ui/SearchableSelect';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
 import {
   Plus,
   Trash2,
@@ -41,6 +43,8 @@ export const ServerBulkDrivesModal: React.FC<ServerBulkDrivesModalProps> = ({
   existingDrives = [],
   defaultDeviceTypeId: _defaultDeviceTypeId,
 }) => {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [drives, setDrives] = useState<BulkDriveRow[]>([]);
   const [smartFillEnabled, setSmartFillEnabled] = useState(true);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
@@ -243,23 +247,29 @@ export const ServerBulkDrivesModal: React.FC<ServerBulkDrivesModalProps> = ({
     return new Set(duplicates);
   }, [drives]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (validDrives.length === 0) {
-      alert('Please add at least one complete drive before saving.');
+      toast.warning('Please add at least one complete drive before saving.');
       return;
     }
 
     if (incompleteDrives.length > 0) {
-      const confirmed = window.confirm(
-        `You have ${incompleteDrives.length} incomplete drive(s). Only ${validDrives.length} complete drive(s) will be saved. Continue?`
-      );
+      const confirmed = await confirm({
+        title: 'Incomplete Drives',
+        message: `You have ${incompleteDrives.length} incomplete drive(s). Only ${validDrives.length} complete drive(s) will be saved. Continue?`,
+        confirmLabel: 'Continue',
+        tone: 'danger',
+      });
       if (!confirmed) return;
     }
 
     if (checkForDuplicateSerials.size > 0) {
-      const confirmed = window.confirm(
-        `Warning: Duplicate serial numbers detected! This may indicate data entry errors. Continue anyway?`
-      );
+      const confirmed = await confirm({
+        title: 'Duplicate Serial Numbers',
+        message: `Warning: Duplicate serial numbers detected! This may indicate data entry errors. Continue anyway?`,
+        confirmLabel: 'Continue Anyway',
+        tone: 'danger',
+      });
       if (!confirmed) return;
     }
 
@@ -268,9 +278,14 @@ export const ServerBulkDrivesModal: React.FC<ServerBulkDrivesModalProps> = ({
     onClose();
   };
 
-  const handleClose = () => {
+  const handleClose = async () => {
     if (hasUnsavedChanges) {
-      const confirmed = window.confirm('You have unsaved changes. Are you sure you want to close?');
+      const confirmed = await confirm({
+        title: 'Unsaved Changes',
+        message: 'You have unsaved changes. Are you sure you want to close?',
+        confirmLabel: 'Close',
+        tone: 'danger',
+      });
       if (!confirmed) return;
     }
     onClose();

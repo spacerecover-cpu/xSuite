@@ -11,6 +11,7 @@ import {
 } from '../styles';
 import { formatDate, formatCapacity, buildCompanyAddress, safeString } from '../utils';
 import { getDeviceIconSvg, getGeneralIconSvg } from '../../deviceIconMapper';
+import { buildLogoNode } from '../brandingImage';
 
 export function buildCustomerCopyDocument(
   data: ReceiptData,
@@ -38,14 +39,11 @@ export function buildCustomerCopyDocument(
 
   const headerContent: Content[] = [];
 
-  if (logoBase64) {
+  const customerCopyLogoNode = buildLogoNode(logoBase64, { width: 130, margin: [0, 0, 0, 5] });
+  if (customerCopyLogoNode) {
     headerContent.push({
       columns: [
-        {
-          image: logoBase64,
-          width: 130,
-          margin: [0, 0, 0, 5],
-        },
+        customerCopyLogoNode,
         {
           stack: [
             { text: legalName, fontSize: 14, bold: true, color: PDF_COLORS.text, alignment: 'right' },

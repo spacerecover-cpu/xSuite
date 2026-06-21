@@ -6,6 +6,7 @@ import { stockKeys } from '../../lib/queryKeys';
 import { StockSaleModal } from './StockSaleModal';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface QuickSaleWidgetProps {
   caseId: string;
@@ -23,11 +24,6 @@ const paymentStatusConfig: Record<
   refunded: { label: 'Refunded', variant: 'secondary' },
 };
 
-const formatAmount = (value: number | null): string => {
-  if (value === null || value === undefined) return '—';
-  return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
-
 const getSaleItemNames = (sale: StockSaleWithDetails): string => {
   if (!sale.stock_sale_items || sale.stock_sale_items.length === 0) return 'No items';
   return sale.stock_sale_items
@@ -40,6 +36,9 @@ export const QuickSaleWidget: React.FC<QuickSaleWidgetProps> = ({
   customerId,
   onSaleCreated,
 }) => {
+  const { formatCurrency } = useCurrency();
+  const formatAmount = (value: number | null): string =>
+    value === null || value === undefined ? '—' : formatCurrency(value);
   const [modalOpen, setModalOpen] = useState(false);
 
   const { data: sales = [], refetch } = useQuery({

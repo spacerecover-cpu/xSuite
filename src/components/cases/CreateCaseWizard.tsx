@@ -10,7 +10,7 @@ import { CustomerFormModal } from '../customers/CustomerFormModal';
 import { CaseSuccessModal } from './CaseSuccessModal';
 import { ServerBulkDrivesModal } from './ServerBulkDrivesModal';
 import { UsageLimitGuard } from '../shared/UsageLimitGuard';
-import { printReceipt, printLabel } from '../../lib/printUtils';
+import { printReceipt, printLabel, printCustomerCopy } from '../../lib/printUtils';
 import {
   Users,
   HardDrive,
@@ -26,6 +26,8 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { setPrimaryDevice } from '../../lib/deviceService';
 import { logger } from '../../lib/logger';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
 import type { Database } from '../../types/database.types';
 
 type CasesInsert = Database['public']['Tables']['cases']['Insert'];
@@ -55,6 +57,8 @@ interface CreateCaseWizardProps {
 export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onSuccess }) => {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [showPassword, setShowPassword] = useState(false);
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -400,6 +404,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
           .from('customer_company_relationships')
           .select('company_id')
           .eq('customer_id', formData.customer_id)
+          .is('deleted_at', null)
           .order('is_primary', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -491,7 +496,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
     },
     onError: (error) => {
       logger.error('Case creation error:', error);
-      alert(`Failed to create case: ${error.message}`);
+      toast.error(`Failed to create case: ${error.message}`);
     },
   });
 
@@ -739,8 +744,13 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                           View/Edit
                         </button>
                         <button
-                          onClick={() => {
-                            const confirmed = window.confirm(`Remove all ${bulkServerDrives.length} bulk drives?`);
+                          onClick={async () => {
+                            const confirmed = await confirm({
+                              title: 'Remove All Bulk Drives',
+                              message: `Remove all ${bulkServerDrives.length} bulk drives?`,
+                              confirmLabel: 'Remove All',
+                              tone: 'danger',
+                            });
                             if (confirmed) setBulkServerDrives([]);
                           }}
                           className="text-xs text-danger hover:text-danger/80 font-medium"
@@ -950,15 +960,18 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                       Device Password
                     </label>
                     <div className="relative">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={devices[0].device_password}
-                        onChange={(e) =>
-                          updateDevice('1', 'device_password', e.target.value)
-                        }
-                        className="w-full px-3 py-2 pr-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-warning focus:border-warning text-sm"
-                        placeholder="Password needed to access encrypted data (if applicable)"
-                      />
+                      <form className="contents" onSubmit={(e) => e.preventDefault()}>
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={devices[0].device_password}
+                          onChange={(e) =>
+                            updateDevice('1', 'device_password', e.target.value)
+                          }
+                          className="w-full px-3 py-2 pr-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-warning focus:border-warning text-sm"
+                          placeholder="Password needed to access encrypted data (if applicable)"
+                          autoComplete="off"
+                        />
+                      </form>
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
@@ -1055,6 +1068,8 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
         <CaseSuccessModal
           caseNumber={createdCase.case_no}
           caseId={createdCase.id}
+          customerName={customers.find((c) => c.id === formData.customer_id)?.customer_name}
+          customerEmail={customers.find((c) => c.id === formData.customer_id)?.email ?? undefined}
           onClose={() => {
             setShowSuccessModal(false);
             onClose();
@@ -1062,6 +1077,9 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
           }}
           onPrintReceipt={() => {
             printReceipt(createdCase.id, createdCase.case_no);
+          }}
+          onPrintCustomerCopy={() => {
+            printCustomerCopy(createdCase.id, createdCase.case_no);
           }}
           onPrintLabel={() => {
             printLabel(createdCase.id, createdCase.case_no);

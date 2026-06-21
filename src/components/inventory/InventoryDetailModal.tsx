@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import { SearchableSelect } from '../ui/SearchableSelect';
+import { Skeleton } from '../ui/Skeleton';
 import {
   getInventoryItemById,
   getInventoryStatusHistory,
@@ -120,8 +121,17 @@ export default function InventoryDetailModal({
   if (loading) {
     return (
       <Modal isOpen={isOpen} onClose={onClose} title="Loading..." size="xl">
-        <div className="flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="space-y-4 py-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i}>
+                <Skeleton className="h-3 w-24 mb-2" />
+                <Skeleton className="h-5 w-full" />
+              </div>
+            ))}
+          </div>
+          <Skeleton className="h-px w-full" />
+          <Skeleton className="h-24 w-full" />
         </div>
       </Modal>
     );

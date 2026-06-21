@@ -4,12 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import { ShoppingBag, Shield, Hash, ExternalLink, Package } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
+import { Skeleton } from '../ui/Skeleton';
 import {
   getSalesByCustomer,
   getCustomerWarranties,
   getCustomerSerialNumbers,
 } from '../../lib/stockService';
 import { formatDate } from '../../lib/format';
+import { baseAmount } from '../../lib/financialMath';
 import { useCurrency } from '../../hooks/useCurrency';
 
 interface CustomerPurchasesTabProps {
@@ -65,8 +67,10 @@ export const CustomerPurchasesTab: React.FC<CustomerPurchasesTabProps> = ({ cust
           </div>
 
           {loadingSales ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
+            <div className="space-y-3 py-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
             </div>
           ) : sales.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-slate-400">
@@ -122,7 +126,7 @@ export const CustomerPurchasesTab: React.FC<CustomerPurchasesTabProps> = ({ cust
                   <tr className="border-t border-slate-200">
                     <td colSpan={3} className="pt-3 text-sm font-medium text-slate-500">Total Purchases</td>
                     <td className="pt-3 text-right font-bold text-slate-900">
-                      {formatCurrency(sales.reduce((sum, s) => sum + (s.total_amount ?? 0), 0))}
+                      {formatCurrency(sales.reduce((sum, s) => sum + baseAmount(s as unknown as Record<string, unknown>, 'total_amount'), 0))}
                     </td>
                     <td colSpan={2} />
                   </tr>
@@ -141,8 +145,10 @@ export const CustomerPurchasesTab: React.FC<CustomerPurchasesTabProps> = ({ cust
           </div>
 
           {loadingWarranties ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
+            <div className="space-y-3 py-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
             </div>
           ) : warranties.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-slate-400">
@@ -203,8 +209,10 @@ export const CustomerPurchasesTab: React.FC<CustomerPurchasesTabProps> = ({ cust
           </div>
 
           {loadingSerials ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
+            <div className="space-y-3 py-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
             </div>
           ) : serialNumbers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-slate-400">

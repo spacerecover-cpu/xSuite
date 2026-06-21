@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, Star } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTenantConfig } from '../../contexts/TenantConfigContext';
 import { useToast } from '../../hooks/useToast';
 import {
   listTenantCurrencies,
@@ -12,6 +13,7 @@ import {
 
 export function CurrencySettings() {
   const { profile } = useAuth();
+  const { refreshConfig } = useTenantConfig();
   const isAdmin = profile?.role === 'owner' || profile?.role === 'admin';
   const toast = useToast();
   const [rows, setRows] = useState<TenantCurrencyRow[]>([]);
@@ -43,6 +45,9 @@ export function CurrencySettings() {
       await addTenantCurrency(selected);
       toast.success(`${selected} added`);
       await refresh();
+      // The tenant's currency set feeds TenantConfigContext; invalidate its cache
+      // so the change reflects app-wide without a hard reload.
+      await refreshConfig();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to add currency');
     }
@@ -52,6 +57,7 @@ export function CurrencySettings() {
     try {
       await setCurrencyActive(row.id, !row.is_active);
       await refresh();
+      await refreshConfig();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to update currency');
     }

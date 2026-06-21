@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
+import { assertOnboardableCountry, ProvisionGuardError } from './provisionGuards.ts';
 
 const ALLOWED_ORIGINS = [
   'https://xsuite.space',
@@ -62,6 +63,11 @@ interface ProvisionTenantRequest {
   planId: string;
   countryId: string;
   base_currency_code?: string;
+  ui_language?: string;
+  legal_entity_type?: string;
+  tax_number?: string;
+  fiscal_year_start?: string;
+  timezone?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -132,7 +138,52 @@ Deno.serve(async (req: Request) => {
 
     const requestData: ProvisionTenantRequest = await req.json();
 
-    const { name, slug, adminEmail, adminPassword, adminFullName, planId, countryId, base_currency_code } = requestData;
+    const {
+      name, slug, adminEmail, adminPassword, adminFullName, planId, countryId, base_currency_code,
+      ui_language, tax_number, fiscal_year_start, timezone: requestTimezone, legal_entity_type,
+    } = requestData;
+
+    // Self-service signups (no Authorization header) must have an OTP-verified
+    // email before we create anything. Admin-provisioned (authed) flows bypass,
+    // as before. We re-verify against signup_otps so a client that skipped the
+    // wizard OTP gate can't provision, then atomically consume the row so a
+    // verified code is SINGLE-USE (consumed_at, migration 20260615200307).
+    if (!authHeader) {
+      const { data: otpRow } = await supabase
+        .from('signup_otps')
+        .select('id, verified, expires_at')
+        .eq('email', adminEmail.toLowerCase())
+        .eq('verified', true)
+        .is('consumed_at', null)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!otpRow) {
+        return new Response(
+          JSON.stringify({ error: 'Email not verified. Please verify your email with the code we sent before continuing.' }),
+          { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Single-use: claim the row atomically — the `consumed_at IS NULL` guard on
+      // the UPDATE means two concurrent provisions can't both pass this gate.
+      const { data: claimed } = await supabase
+        .from('signup_otps')
+        .update({ consumed_at: new Date().toISOString() })
+        .eq('id', otpRow.id)
+        .is('consumed_at', null)
+        .select('id')
+        .maybeSingle();
+
+      if (!claimed) {
+        return new Response(
+          JSON.stringify({ error: 'This verification code has already been used. Please request a new code.' }),
+          { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
 
     if (!name || !slug || !adminEmail || !adminPassword || !adminFullName || !planId || !countryId) {
       return new Response(
@@ -142,6 +193,27 @@ Deno.serve(async (req: Request) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
+    }
+
+    // Fail-loud country gate (§9.4): fetch the country and assert it is
+    // formatting-ready BEFORE creating any tenant/user. A stub country is
+    // rejected with 422 — never silently provisioned with US defaults.
+    const { data: countryData } = await supabase
+      .from('geo_countries')
+      .select('name, currency_code, currency_symbol, decimal_places, currency_position, decimal_separator, thousands_separator, timezone, date_format, fiscal_year_start, locale_code, config_status, language_code, tax_system, tax_number_format')
+      .eq('id', countryId)
+      .maybeSingle();
+
+    try {
+      assertOnboardableCountry(countryData);
+    } catch (guardErr) {
+      if (guardErr instanceof ProvisionGuardError) {
+        return new Response(
+          JSON.stringify({ error: guardErr.message }),
+          { status: guardErr.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      throw guardErr;
     }
 
     // Check for duplicate slug
@@ -198,6 +270,9 @@ Deno.serve(async (req: Request) => {
         status: 'trial',
         trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         ...(base_currency_code ? { base_currency_code } : {}),
+        // ui_language only when the wizard overrode the country default; else the
+        // sync_tenant_config_from_country trigger sets it (§9.2).
+        ...(ui_language ? { ui_language } : {}),
       })
       .select()
       .single();
@@ -220,7 +295,8 @@ Deno.serve(async (req: Request) => {
       });
 
       if (updateError) {
-        await supabase.from('tenants').delete().eq('id', tenant.id);
+        // Soft-delete rollback (never hard delete — CLAUDE.md additive/soft rule).
+        await supabase.from('tenants').update({ deleted_at: new Date().toISOString() }).eq('id', tenant.id);
         throw updateError;
       }
     } else {
@@ -237,7 +313,8 @@ Deno.serve(async (req: Request) => {
       });
 
       if (authError || !authData.user) {
-        await supabase.from('tenants').delete().eq('id', tenant.id);
+        // Soft-delete rollback (never hard delete — CLAUDE.md additive/soft rule).
+        await supabase.from('tenants').update({ deleted_at: new Date().toISOString() }).eq('id', tenant.id);
         throw authError || new Error('User creation failed');
       }
       userId = authData.user.id;
@@ -259,12 +336,8 @@ Deno.serve(async (req: Request) => {
       console.error('Profile update failed:', profileError);
     }
 
-    // Fetch country details for pre-populating company settings
-    const { data: countryData } = await supabase
-      .from('geo_countries')
-      .select('name, currency_code, currency_symbol, decimal_places, currency_position, decimal_separator, thousands_separator, timezone, date_format, fiscal_year_start, locale_code')
-      .eq('id', countryId)
-      .maybeSingle();
+    // countryData was fetched + guarded above (fail-loud). It is non-stub here,
+    // so all formatting fields resolve — no US fallback is needed or used.
 
     // Create company_settings pre-populated with signup data
     const { error: settingsError } = await supabase
@@ -296,25 +369,62 @@ Deno.serve(async (req: Request) => {
       console.error('Company settings creation failed:', settingsError);
     }
 
-    // Create default accounting locale pre-populated from country config
+    // Create default accounting locale from the (guaranteed non-stub) country
+    // config. NO US fallbacks: the required fields resolve because the country
+    // passed assertOnboardableCountry; cosmetic fields pass through as-is (null
+    // rather than a fabricated '$'/'before'/'.'/',').
     const { error: localeError } = await supabase
       .from('accounting_locales')
       .insert({
         tenant_id: tenant.id,
         name: `${countryData?.name || name} - Default`,
-        locale_code: countryData?.locale_code || 'en-US',
-        currency_code: countryData?.currency_code || 'USD',
-        currency_symbol: countryData?.currency_symbol || '$',
-        decimal_places: countryData?.decimal_places ?? 2,
-        currency_position: countryData?.currency_position || 'before',
-        decimal_separator: countryData?.decimal_separator || '.',
-        thousands_separator: countryData?.thousands_separator || ',',
-        date_format: countryData?.date_format || 'DD/MM/YYYY',
+        locale_code: countryData!.locale_code,
+        currency_code: countryData!.currency_code,
+        currency_symbol: countryData?.currency_symbol ?? null,
+        decimal_places: countryData?.decimal_places ?? null,
+        currency_position: countryData?.currency_position ?? null,
+        decimal_separator: countryData?.decimal_separator ?? null,
+        thousands_separator: countryData?.thousands_separator ?? null,
+        date_format: countryData!.date_format,
         is_default: true,
       });
 
     if (localeError) {
       console.error('Default accounting locale creation failed:', localeError);
+    }
+
+    // Create the tenant's PRIMARY legal entity from the jurisdiction payload
+    // (tax identity decoupled from tenant, §3e/§2A.2). This is what
+    // seed_new_tenant() will own once that program-track RPC lands — until then
+    // we create it inline so the wizard's jurisdiction capture is honored.
+    // currency_code is required + has NO 'USD' default (fail-loud, D2) — it
+    // resolves from the guaranteed non-stub country.
+    const { error: legalEntityError } = await supabase
+      .from('legal_entities')
+      .insert({
+        tenant_id: tenant.id,
+        country_id: countryId,
+        name,
+        currency_code: base_currency_code || countryData!.currency_code,
+        tax_system: countryData?.tax_system || 'NONE',
+        tax_identifier: tax_number || null,
+        is_primary: true,
+        ...(fiscal_year_start || requestTimezone || legal_entity_type
+          ? {
+              config: {
+                fiscal_year_start: fiscal_year_start ?? null,
+                timezone: requestTimezone ?? null,
+                entity_type: legal_entity_type ?? null,
+              },
+            }
+          : {}),
+      });
+
+    if (legalEntityError) {
+      console.error('Primary legal entity creation failed:', legalEntityError);
+      // Fail-loud: a tenant without its tax-identity entity must not survive.
+      await supabase.from('tenants').update({ deleted_at: new Date().toISOString() }).eq('id', tenant.id);
+      throw new Error(`Provisioning failed: legal_entities insert: ${legalEntityError.message}`);
     }
 
     // Create onboarding progress
@@ -329,7 +439,9 @@ Deno.serve(async (req: Request) => {
 
     if (onboardingError) {
       console.error('Onboarding progress creation failed:', onboardingError);
-      // Non-critical, don't fail the whole flow
+      // FAIL-LOUD: a half-provisioned tenant must not silently lose its wizard.
+      await supabase.from('tenants').update({ deleted_at: new Date().toISOString() }).eq('id', tenant.id);
+      throw new Error(`Provisioning failed: onboarding_progress insert: ${onboardingError.message}`);
     }
 
     return new Response(

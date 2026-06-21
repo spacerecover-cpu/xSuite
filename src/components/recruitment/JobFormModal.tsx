@@ -15,7 +15,7 @@ import {
   type JobWithDetails,
 } from '../../lib/recruitmentService';
 import type { Database } from '../../types/database.types';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
 
 interface JobFormData {
   title: string;
@@ -53,6 +53,7 @@ interface Props {
 
 export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const isEditing = !!job;
 
   const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<JobFormData>({

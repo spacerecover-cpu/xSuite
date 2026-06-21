@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { InvoiceFormModal } from './InvoiceFormModal';
+import { resolveInvoiceTermsHtml } from '../../lib/invoiceTermsService';
 
 // --- Mocks ------------------------------------------------------------------
 
@@ -27,6 +28,12 @@ vi.mock('../../lib/currencyService', () => ({
 vi.mock('../../lib/format', () => ({
   formatCurrency: (v: number) => `$${Number(v).toFixed(2)}`,
   formatBaseEquivalent: () => '',
+  toDateInputValue: (v: string) => v,
+}));
+
+vi.mock('../../lib/invoiceTermsService', () => ({
+  resolveInvoiceTermsHtml: vi.fn().mockResolvedValue('<p>DEFAULT TERMS</p>'),
+  resolveTermsHtmlFromContent: vi.fn().mockResolvedValue('<p>PICKED TERMS</p>'),
 }));
 
 // Chainable Supabase stub: list queries resolve to [], maybeSingle() to null.
@@ -153,5 +160,32 @@ describe('InvoiceFormModal — Client Reference is optional', () => {
     expect(payload.client_reference).toBe('');
     expect(payload.title).toBe('SSD Recovery');
     expect(items[0].description).toBe('Logical recovery');
+  });
+});
+
+describe('InvoiceFormModal — default payment terms', () => {
+  it('auto-fills a new invoice from the default terms template', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <InvoiceFormModal isOpen onClose={() => {}} onSave={vi.fn().mockResolvedValue(undefined)} caseId="case-1" />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('DEFAULT TERMS')).toBeInTheDocument());
+  });
+
+  it('uses the default template (not the quote terms) when converting from a quote', async () => {
+    const resolveMock = vi.mocked(resolveInvoiceTermsHtml);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <InvoiceFormModal
+          isOpen onClose={() => {}} onSave={vi.fn().mockResolvedValue(undefined)} caseId="case-1"
+          quotes={[{ id: 'q1', quote_number: 'QUOT-1', title: 'Recovery', total_amount: 231 }]}
+        />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('DEFAULT TERMS')).toBeInTheDocument());
+    expect(resolveMock).toHaveBeenCalled();
   });
 });

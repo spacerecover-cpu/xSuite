@@ -1,21 +1,46 @@
 import React, { useState } from 'react';
-import { Save, RotateCcw, Settings } from 'lucide-react';
+import { Save, RotateCcw } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { payrollService } from '../../lib/payrollService';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
+import { supabase } from '../../lib/supabaseClient';
+import { buildCurrencyOptions } from './currencyOptions';
 
 export const PayrollSettingsPage: React.FC = () => {
   const toast = useToast();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ['payroll-settings'],
     queryFn: () => payrollService.getPayrollSettings(),
   });
+
+  // D17 — source the currency dropdown from master_currency_codes, not a hardcoded
+  // USD/EUR/... map that drifts from the data.
+  const { data: currencyRows } = useQuery({
+    queryKey: ['master-currency-codes'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('master_currency_codes')
+        .select('code, symbol, decimal_places')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true, nullsFirst: false })
+        .order('code', { ascending: true });
+      if (error) throw error;
+      return (data || []).map((r) => ({
+        code: r.code,
+        symbol: r.symbol ?? r.code,
+        decimal_places: r.decimal_places,
+      }));
+    },
+  });
+  const currencyOptions = buildCurrencyOptions(currencyRows || []);
 
   const [formData, setFormData] = useState({
     working_days_per_month: settings?.working_days_per_month || 22,
@@ -88,8 +113,14 @@ export const PayrollSettingsPage: React.FC = () => {
     updateSettingsMutation.mutate(formData);
   };
 
-  const handleReset = () => {
-    if (confirm('Are you sure you want to reset all settings to default values?')) {
+  const handleReset = async () => {
+    const ok = await confirm({
+      title: 'Reset Settings',
+      message: 'Are you sure you want to reset all settings to default values?',
+      confirmLabel: 'Reset',
+      tone: 'danger',
+    });
+    if (ok) {
       resetSettingsMutation.mutate();
     }
   };
@@ -106,10 +137,29 @@ export const PayrollSettingsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHeaderSlot
         title="Payroll Settings"
-        description="Configure payroll calculation parameters and defaults"
-        icon={Settings}
+        actions={
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleReset}
+              disabled={resetSettingsMutation.isPending}
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Reset to Defaults
+            </Button>
+            <Button
+              type="button"
+              onClick={() => updateSettingsMutation.mutate(formData)}
+              disabled={updateSettingsMutation.isPending}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {updateSettingsMutation.isPending ? 'Saving...' : 'Save Settings'}
+            </Button>
+          </>
+        }
       />
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -243,33 +293,19 @@ export const PayrollSettingsPage: React.FC = () => {
                   value={formData.currency_code}
                   onChange={(e) => {
                     const code = e.target.value;
-                    const currencyMap: Record<string, { symbol: string; decimals: number }> =
-                      {
-                        OMR: { symbol: 'ر.ع.', decimals: 3 },
-                        USD: { symbol: '$', decimals: 2 },
-                        EUR: { symbol: '€', decimals: 2 },
-                        GBP: { symbol: '£', decimals: 2 },
-                        AED: { symbol: 'د.إ', decimals: 2 },
-                        SAR: { symbol: 'ر.س', decimals: 2 },
-                      };
-                    const currency = currencyMap[code] || { symbol: code, decimals: 2 };
+                    const selected = currencyOptions.find((o) => o.value === code);
                     handleChange('currency_code', code);
-                    handleChange('currency_symbol', currency.symbol);
-                    handleChange('currency_decimals', currency.decimals);
+                    handleChange('currency_symbol', selected?.symbol ?? code);
+                    handleChange('currency_decimals', selected?.decimals ?? 2);
                   }}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   required
                 >
-                  <option value="USD">US Dollar (USD)</option>
-                  <option value="EUR">Euro (EUR)</option>
-                  <option value="GBP">British Pound (GBP)</option>
-                  <option value="AED">UAE Dirham (AED)</option>
-                  <option value="SAR">Saudi Riyal (SAR)</option>
-                  <option value="OMR">Omani Rial (OMR)</option>
-                  <option value="INR">Indian Rupee (INR)</option>
-                  <option value="QAR">Qatari Riyal (QAR)</option>
-                  <option value="KWD">Kuwaiti Dinar (KWD)</option>
-                  <option value="BHD">Bahraini Dinar (BHD)</option>
+                  {currencyOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -317,21 +353,6 @@ export const PayrollSettingsPage: React.FC = () => {
           </div>
         </Card>
 
-        <div className="flex justify-between items-center pt-6">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleReset}
-            disabled={resetSettingsMutation.isPending}
-          >
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Reset to Defaults
-          </Button>
-          <Button type="submit" disabled={updateSettingsMutation.isPending}>
-            <Save className="h-4 w-4 mr-2" />
-            {updateSettingsMutation.isPending ? 'Saving...' : 'Save Settings'}
-          </Button>
-        </div>
       </form>
     </div>
   );

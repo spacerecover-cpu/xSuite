@@ -7,7 +7,8 @@
 import React from 'react';
 import { User, Building2, FileText } from 'lucide-react';
 import { Badge } from '../ui/Badge';
-import { formatDate, cleanBankFieldValue } from '../../lib/format';
+import { formatDate, cleanBankFieldValue, formatCurrencyWithConfig } from '../../lib/format';
+import { useCurrencyConfig, useTaxConfig } from '../../contexts/TenantConfigContext';
 
 interface CompanySettings {
   basic_info?: {
@@ -89,10 +90,15 @@ const getInvoiceTypeColor = (type: string) => {
 export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
   invoice,
   companySettings,
-  currencyFormat,
+  currencyFormat: _currencyFormat,
   t,
   elementId = 'print-frame',
 }) => {
+  const currencyConfig = useCurrencyConfig();
+  const taxConfig = useTaxConfig();
+  const formatMoney = (n: number | null | undefined): string =>
+    formatCurrencyWithConfig(n ?? 0, currencyConfig);
+
   if (!invoice) return null;
 
   const customerAssociatedCompany = invoice.customer_associated_company;
@@ -265,7 +271,7 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
               <div className="flex">
                 <span className="font-semibold text-slate-700 w-28 flex-shrink-0">Invoice Value:</span>
                 <span className="text-slate-900 flex-1">
-                  {currencyFormat.currencySymbol}{invoice.total_amount?.toFixed(currencyFormat.decimalPlaces) || (0).toFixed(currencyFormat.decimalPlaces)}
+                  {formatMoney(invoice.total_amount)}
                 </span>
               </div>
             </div>
@@ -302,10 +308,10 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
                       {item.quantity}
                     </td>
                     <td className="px-2 py-1.5 text-xs text-slate-900 text-right font-medium">
-                      {currencyFormat.currencySymbol} {item.unit_price.toFixed(currencyFormat.decimalPlaces)}
+                      {formatMoney(item.unit_price)}
                     </td>
                     <td className="px-2 py-1.5 text-xs font-semibold text-slate-900 text-right">
-                      {currencyFormat.currencySymbol} {(item.line_total || (item.quantity * item.unit_price)).toFixed(currencyFormat.decimalPlaces)}
+                      {formatMoney(item.line_total || (item.quantity * item.unit_price))}
                     </td>
                   </tr>
                 ))}
@@ -320,7 +326,7 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
             <div className="flex justify-between text-sm">
               <span className="text-slate-700 font-medium">{t('subtotal', 'Subtotal')}:</span>
               <span className="font-semibold text-slate-900 text-right">
-                {currencyFormat.currencySymbol} {invoice.subtotal?.toFixed(currencyFormat.decimalPlaces) || (0).toFixed(currencyFormat.decimalPlaces)}
+                {formatMoney(invoice.subtotal)}
               </span>
             </div>
             {invoice.discount_amount > 0 && (
@@ -329,23 +335,23 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
                   {t('discount', 'Discount')}:
                 </span>
                 <span className="font-semibold text-red-600 text-right">
-                  - {currencyFormat.currencySymbol} {invoice.discount_amount.toFixed(currencyFormat.decimalPlaces)}
+                  - {formatMoney(invoice.discount_amount)}
                 </span>
               </div>
             )}
             <div className="flex justify-between text-sm" style={{ marginBottom: '12px' }}>
               <span className="text-slate-700 font-medium">
-                VAT {invoice.tax_rate || 0}% | ضريبة القيمة المضافة:
+                {taxConfig.label} {invoice.tax_rate || 0}%:
               </span>
               <span className="font-semibold text-slate-900 text-right">
-                {currencyFormat.currencySymbol} {correctTaxAmount.toFixed(currencyFormat.decimalPlaces)}
+                {formatMoney(correctTaxAmount)}
               </span>
             </div>
             <div className="total-row-band">
               <div className="total-row-band-inner">
                 <span className="total-label">{t('total', 'Total')} | الإجمالي:</span>
                 <span className="total-amount">
-                  {currencyFormat.currencySymbol} {correctTotalAmount.toFixed(currencyFormat.decimalPlaces)}
+                  {formatMoney(correctTotalAmount)}
                 </span>
               </div>
             </div>
@@ -354,13 +360,13 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
                 <div className="flex justify-between text-sm mt-3">
                   <span className="text-green-700 font-medium">{t('amountPaid', 'Amount Paid')}:</span>
                   <span className="font-semibold text-green-600 text-right">
-                    {currencyFormat.currencySymbol} {invoice.amount_paid.toFixed(currencyFormat.decimalPlaces)}
+                    {formatMoney(invoice.amount_paid)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-orange-700 font-medium">{t('balanceDue', 'Balance Due')}:</span>
                   <span className="font-bold text-orange-600 text-right">
-                    {currencyFormat.currencySymbol} {(correctTotalAmount - invoice.amount_paid).toFixed(currencyFormat.decimalPlaces)}
+                    {formatMoney(correctTotalAmount - invoice.amount_paid)}
                   </span>
                 </div>
               </>

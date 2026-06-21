@@ -1,6 +1,7 @@
 import { supabase, resolveTenantId } from './supabaseClient';
 import { deriveInvoiceStatus } from './invoiceStatus';
 import { sanitizeFilterValue, isValidUuid } from './postgrestSanitizer';
+import { sumBankBalanceBase } from './financialReportsService';
 import type { Database } from '../types/database.types';
 
 type BankAccountRow = Database['public']['Tables']['bank_accounts']['Row'];
@@ -712,7 +713,7 @@ export const bankingService = {
   }> {
     const { data: accounts } = await supabase
       .from('bank_accounts')
-      .select('account_type, current_balance')
+      .select('account_type, current_balance, current_balance_base, currency')
       .eq('is_active', true)
       .is('deleted_at', null);
 
@@ -721,17 +722,20 @@ export const bankingService = {
       .select('id', { count: 'exact', head: true })
       .eq('is_reconciled', false);
 
-    const bankBalance = accounts
-      ?.filter((a) => a.account_type === 'bank' || a.account_type === 'checking' || a.account_type === 'savings')
-      .reduce((sum, a) => sum + (a.current_balance ?? 0), 0) ?? 0;
+    const bankBalance = sumBankBalanceBase(
+      (accounts ?? []).filter((a) => a.account_type === 'bank' || a.account_type === 'checking' || a.account_type === 'savings'),
+      'current_balance',
+    );
 
-    const cashBalance = accounts
-      ?.filter((a) => a.account_type === 'cash')
-      .reduce((sum, a) => sum + (a.current_balance ?? 0), 0) ?? 0;
+    const cashBalance = sumBankBalanceBase(
+      (accounts ?? []).filter((a) => a.account_type === 'cash'),
+      'current_balance',
+    );
 
-    const mobileBalance = accounts
-      ?.filter((a) => a.account_type === 'mobile')
-      .reduce((sum, a) => sum + (a.current_balance ?? 0), 0) ?? 0;
+    const mobileBalance = sumBankBalanceBase(
+      (accounts ?? []).filter((a) => a.account_type === 'mobile'),
+      'current_balance',
+    );
 
     return {
       totalBankBalance: bankBalance,
@@ -905,7 +909,12 @@ export const bankingService = {
     }));
   },
 
-  async getInvoicesByCase(caseId: string) {
+  // Payment-allocation sources. Only OPEN, PAYABLE tax documents may receive
+  // allocations: proformas are not payable documents, converted shells point
+  // at their tax invoice, drafts haven't been issued, void/cancelled are dead,
+  // and balance_due=0 has nothing to allocate. Oldest due first (the
+  // Xero/QuickBooks auto-apply order).
+  async getOpenInvoicesByCase(caseId: string) {
     const { data, error } = await supabase
       .from('invoices')
       .select(`
@@ -918,14 +927,50 @@ export const bankingService = {
         total_amount,
         amount_paid,
         balance_due,
+        balance_due_base,
         currency
       `)
       .eq('case_id', caseId)
+      .eq('invoice_type', 'tax_invoice')
+      .not('status', 'in', '(converted,void,cancelled,draft)')
+      .gt('balance_due', 0)
       .is('deleted_at', null)
-      .order('invoice_date', { ascending: false });
+      .order('due_date', { ascending: true, nullsFirst: false })
+      .limit(200);
 
     if (error) throw error;
     return data ?? [];
+  },
+
+  // Read-only statement context for the collapsed "settled" disclosure.
+  async getSettledInvoicesByCase(caseId: string) {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('id, invoice_number, invoice_date, status, total_amount, amount_paid, currency')
+      .eq('case_id', caseId)
+      .eq('invoice_type', 'tax_invoice')
+      .eq('payment_status', 'paid')
+      .neq('status', 'converted')
+      .is('deleted_at', null)
+      .order('invoice_date', { ascending: false })
+      .limit(20);
+
+    if (error) throw error;
+    return data ?? [];
+  },
+
+  // Single-invoice mode fetches its target directly so the flow still works
+  // if the invoice slipped out of the open set between page load and click.
+  async getInvoiceForPayment(invoiceId: string) {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('id, invoice_number, invoice_date, due_date, invoice_type, status, total_amount, amount_paid, balance_due, balance_due_base, currency')
+      .eq('id', invoiceId)
+      .is('deleted_at', null)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
   },
 
   async createReceiptWithAllocations(

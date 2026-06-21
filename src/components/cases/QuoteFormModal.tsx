@@ -7,10 +7,15 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { supabase } from '../../lib/supabaseClient';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useTaxConfig } from '../../contexts/TenantConfigContext';
+import { resolveDefaultRate, resolveTaxLabel } from './taxFieldConfig';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
 import { getSupportedCurrencies, getBaseCurrency, getConversionRate, type SupportedCurrency } from '../../lib/currencyService';
 import { formatCurrency, formatBaseEquivalent } from '../../lib/format';
+import { listTemplates, recordTemplateUsage } from '../../lib/documentTemplatesService';
+import { htmlToPlainText } from '../../lib/sanitizeHtml';
+import { templateKeys } from '../../lib/queryKeys';
 
 interface LineItemTemplate {
   id: string;
@@ -73,6 +78,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
   clientReference,
 }) => {
   const { currencyFormat } = useCurrency();
+  const taxConfig = useTaxConfig();
   const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
@@ -108,7 +114,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
     status: asString(initialData?.status) ?? 'draft',
     valid_until: asString(initialData?.valid_until) ?? getDefaultValidUntil(),
     client_reference: asString(initialData?.client_reference) ?? clientReference ?? '',
-    tax_rate: asNumber(initialData?.tax_rate) ?? 5,
+    tax_rate: resolveDefaultRate(asNumber(initialData?.tax_rate), taxConfig.defaultRate),
     discount_amount: asNumber(initialData?.discount_amount) ?? 0,
     discount_type: asString(initialData?.discount_type) ?? 'fixed',
     terms_and_conditions: asString(initialData?.terms_and_conditions) ?? '',
@@ -123,7 +129,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
         status: asString(initialData.status) ?? 'draft',
         valid_until: asString(initialData.valid_until) ?? getDefaultValidUntil(),
         client_reference: asString(initialData.client_reference) ?? clientReference ?? '',
-        tax_rate: asNumber(initialData.tax_rate) ?? 5,
+        tax_rate: resolveDefaultRate(asNumber(initialData.tax_rate), taxConfig.defaultRate),
         discount_amount: asNumber(initialData.discount_amount) ?? 0,
         discount_type: asString(initialData.discount_type) ?? 'fixed',
         terms_and_conditions: asString(initialData.terms_and_conditions) ?? '',
@@ -238,26 +244,15 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
   });
 
   const { data: termsTemplates = [], isLoading: termsLoading } = useQuery({
-    queryKey: ['quote_terms_templates'],
-    queryFn: async () => {
-      const { data: typeData, error: typeError } = await supabase
-        .from('master_template_types')
-        .select('id')
-        .eq('code', 'quote_terms')
-        .maybeSingle();
-
-      if (typeError || !typeData) return [];
-
-      const { data, error } = await supabase
-        .from('document_templates')
-        .select('id, name, content, is_default')
-        .eq('template_type_id', typeData.id)
-        .eq('is_active', true)
-        .order('is_default', { ascending: false })
-        .order('name');
-
-      if (error) throw error;
-      return data as QuoteTermsTemplate[];
+    queryKey: templateKeys.list('quote_terms'),
+    queryFn: async (): Promise<QuoteTermsTemplate[]> => {
+      const templates = await listTemplates('quote_terms');
+      return templates.map((t) => ({
+        id: t.id,
+        name: t.name,
+        content: t.content,
+        is_default: t.isDefault,
+      }));
     },
     enabled: isOpen,
   });
@@ -336,21 +331,14 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
     setSearchQuery('');
   };
 
-  const stripHtmlTags = (html: string): string => {
-    const div = document.createElement('div');
-    div.textContent = html.replace(/<[^>]*>/g, ' ');
-    return (div.textContent || '').trim();
-  };
-
   const applyTermsTemplate = (template: QuoteTermsTemplate) => {
-    const plainText = stripHtmlTags(template.content);
+    const plainText = htmlToPlainText(template.content);
     setQuoteData(prev => ({ ...prev, terms_and_conditions: plainText }));
     setShowTermsTemplates(false);
-    // Schema drift: document_templates.usage_count / last_used_at no longer
-    // exist, so per-template usage telemetry is dropped.
+    void recordTemplateUsage(template.id);
   };
 
-  const docCurrency = quoteData.currency || baseCurrency || 'USD';
+  const docCurrency = quoteData.currency || baseCurrency || currencyFormat.currencyCode;
   const fmtDoc = (v: number) => formatCurrency(v, docCurrency);
 
   const subtotal = lineItems.reduce((sum, item) => {
@@ -731,7 +719,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                   </>
                 )}
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-700">VAT ({quoteData.tax_rate}%)</span>
+                  <span className="text-slate-700">{resolveTaxLabel(taxConfig.label, quoteData.tax_rate)}</span>
                   <span className="font-medium text-slate-900">
                     {fmtDoc(taxAmount)}
                   </span>
@@ -785,7 +773,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-medium text-slate-700">
-                    Terms & Conditions
+                    Quote Terms
                   </label>
                   <button
                     type="button"
@@ -793,7 +781,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                     className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1"
                   >
                     <FileText className="w-3.5 h-3.5" />
-                    Quick Add
+                    Terms & Templates
                   </button>
                 </div>
                 {showTermsTemplates && (
@@ -802,7 +790,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                       {termsLoading ? (
                         <div className="text-center py-2 text-xs text-slate-500">Loading...</div>
                       ) : termsTemplates.length === 0 ? (
-                        <div className="text-center py-2 text-xs text-slate-500">No templates found</div>
+                        <div className="text-center py-2 text-xs text-slate-500">No saved terms yet</div>
                       ) : (
                         termsTemplates.map((template) => (
                           <button
@@ -923,8 +911,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                         </div>
                         <div className="text-right ml-4">
                           <div className="font-bold text-lg text-success">
-                            {currencyFormat.currencySymbol}
-                            {item.default_price.toFixed(2)}
+                            {fmtDoc(item.default_price)}
                           </div>
                         </div>
                       </div>

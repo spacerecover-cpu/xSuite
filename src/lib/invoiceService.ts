@@ -2,6 +2,8 @@ import { supabase, resolveTenantId } from './supabaseClient';
 import type { Database } from '../types/database.types';
 import { checkRateLimit, RATE_LIMITS } from './rateLimiter';
 import { logAuditTrail } from './auditTrailService';
+import { logInvoiceCreated, logInvoicePayment, logInvoiceStatusChanged } from './chainOfCustodyService';
+import { logger } from './logger';
 import { sanitizeUuidFields as sanitizeUuids, dropEmptyKeys } from './dataValidation';
 import { sanitizeFilterValue } from './postgrestSanitizer';
 import { calculateInvoiceTotals, calculateInvoiceTotalsBase, convertToBase, roundMoney } from './financialMath';
@@ -9,6 +11,7 @@ import { resolveRateContext, getBaseCurrency, getCurrencyDecimals } from './curr
 import { deriveInvoiceStatus } from './invoiceStatus';
 import { getInvoiceEditability, RESTRICTED_EDITABLE_FIELDS } from './invoicePermissions';
 import { toDateInputValue } from './format';
+import { getTenantConfig } from './tenantConfigService';
 
 type InvoiceInsert = Database['public']['Tables']['invoices']['Insert'];
 type InvoiceUpdate = Database['public']['Tables']['invoices']['Update'];
@@ -73,6 +76,7 @@ export interface Invoice {
   payment_terms?: string;
   sent_at?: string | null;
   created_by?: string;
+  updated_by?: string | null;
   /** @deprecated TODO(B8): not persisted — invoices table has no `template_id` column */
   template_id?: string | null;
   /** @deprecated TODO(B8): not persisted — invoices table has no `accounting_locale_id` column */
@@ -173,7 +177,7 @@ const pickInvoicePersistFields = (input: Partial<Invoice>): InvoiceUpdate => {
   return out;
 };
 
-export const fetchInvoices = async (filters?: {
+export const fetchInvoicesPage = async (filters?: {
   status?: string;
   invoiceType?: string;
   search?: string;
@@ -182,7 +186,7 @@ export const fetchInvoices = async (filters?: {
   companyId?: string;
   page?: number;
   pageSize?: number;
-}): Promise<InvoiceWithDetails[]> => {
+}): Promise<{ rows: InvoiceWithDetails[]; total: number }> => {
   let query = supabase
     .from('invoices')
     .select(`
@@ -205,7 +209,7 @@ export const fetchInvoices = async (filters?: {
         email,
         phone
       )
-    `)
+    `, { count: 'exact' })
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
@@ -238,10 +242,24 @@ export const fetchInvoices = async (filters?: {
   const page = filters?.page || 0;
   query = query.range(page * pageSize, (page + 1) * pageSize - 1);
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
 
   if (error) throw error;
-  return (data ?? []) as unknown as InvoiceWithDetails[];
+  return { rows: (data ?? []) as unknown as InvoiceWithDetails[], total: count ?? 0 };
+};
+
+export const fetchInvoices = async (filters?: {
+  status?: string;
+  invoiceType?: string;
+  search?: string;
+  caseId?: string;
+  customerId?: string;
+  companyId?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<InvoiceWithDetails[]> => {
+  const { rows } = await fetchInvoicesPage(filters);
+  return rows;
 };
 
 export const fetchInvoiceById = async (id: string): Promise<InvoiceWithDetails | null> => {
@@ -305,6 +323,7 @@ export const fetchInvoiceById = async (id: string): Promise<InvoiceWithDetails |
       `)
       .eq('customer_id', data.customer_id)
       .eq('is_primary', true)
+      .is('deleted_at', null)
       .maybeSingle();
 
     if (relationshipData?.companies) {
@@ -364,9 +383,16 @@ export const toInvoiceEditInitialData = (invoice: Record<string, unknown>): Reco
     '',
 });
 
-export const getNextInvoiceNumber = async (_invoiceType?: 'proforma' | 'tax_invoice'): Promise<string> => {
-  // Live function signature: get_next_invoice_number() — takes no args.
-  // _invoiceType retained for API compatibility but ignored.
+export const getNextInvoiceNumber = async (invoiceType?: 'proforma' | 'tax_invoice'): Promise<string> => {
+  // Separate series per document family: proformas are not tax documents and
+  // must not consume tax-invoice sequence numbers (sequential tax numbering —
+  // EU VAT Art. 226 / GCC VAT). Tax invoices stay on the 'invoices' scope
+  // (INVO-); proformas draw from 'proforma_invoices' (PRO-).
+  if (invoiceType === 'proforma') {
+    const { data, error } = await supabase.rpc('get_next_number', { p_scope: 'proforma_invoices' });
+    if (error) throw error;
+    return (data ?? '') as string;
+  }
   const { data, error } = await supabase.rpc('get_next_invoice_number');
 
   if (error) throw error;
@@ -479,6 +505,22 @@ export const createInvoice = async (invoice: Partial<Invoice>, items: InvoiceIte
   if (itemsError) throw itemsError;
 
   await logAuditTrail('create', 'invoices', invoiceData.id, {}, { invoice_number: invoiceData.invoice_number, total_amount: totalAmount });
+
+  // Forensic ledger: invoices are always case-linked (guarded above). A ledger
+  // failure must not abort the already-created invoice — log and continue.
+  try {
+    await logInvoiceCreated({
+      caseId: invoice.case_id,
+      invoiceNo: invoiceData.invoice_number ?? invoiceNumber,
+      total: totalAmount,
+      subtotal,
+      discount: invoice.discount_amount ?? 0,
+      tax: taxAmount,
+      dueDate: invoiceData.due_date ?? undefined,
+    });
+  } catch (custodyError) {
+    logger.error('Invoice created but chain-of-custody event failed:', custodyError);
+  }
 
   return invoiceData;
 };
@@ -643,6 +685,55 @@ export const deleteInvoice = async (id: string) => {
   if (error) throw error;
 };
 
+/**
+ * Issue a draft tax invoice (draft → sent, stamping sent_at). Payments can only
+ * be recorded against issued invoices (canRecordPayment), so this is the
+ * explicit step that makes a converted/new invoice payable.
+ */
+export const issueInvoice = async (id: string) => {
+  const { data: inv, error: fetchError } = await supabase
+    .from('invoices')
+    .select('id, status, invoice_type, case_id, invoice_number')
+    .eq('id', id)
+    .maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!inv) throw new Error('Invoice not found');
+  if (inv.invoice_type !== 'tax_invoice') {
+    throw new Error('Only Tax Invoices are issued for payment. Convert the proforma first.');
+  }
+  if ((inv.status ?? 'draft') !== 'draft') {
+    throw new Error('Only draft invoices can be issued.');
+  }
+
+  const sentAt = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('invoices')
+    .update({ status: 'sent', sent_at: sentAt })
+    .eq('id', id)
+    .eq('status', 'draft')
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('Invoice was already issued.');
+
+  await logAuditTrail('update', 'invoices', id, { status: 'draft' }, { status: 'sent', sent_at: sentAt });
+
+  if (inv.case_id) {
+    try {
+      await logInvoiceStatusChanged({
+        caseId: inv.case_id,
+        invoiceNo: inv.invoice_number ?? id,
+        oldStatus: 'draft',
+        newStatus: 'sent',
+      });
+    } catch (custodyError) {
+      logger.error('Invoice issued but chain-of-custody event failed:', custodyError);
+    }
+  }
+
+  return data;
+};
+
 export const updateInvoiceStatus = async (
   id: string,
   status: string,
@@ -779,16 +870,12 @@ export const getInvoicesByCaseId = async (caseId: string) => {
 
   if (error) throw error;
 
-  const { data: defaultLocale } = await supabase
-    .from('accounting_locales')
-    .select('currency_symbol, currency_position, decimal_places')
-    .eq('is_default', true)
-    .eq('is_active', true)
-    .maybeSingle();
-
-  const defaultCurrencySymbol = defaultLocale?.currency_symbol || 'USD';
-  const defaultCurrencyPosition = defaultLocale?.currency_position || 'before';
-  const defaultDecimalPlaces = defaultLocale?.decimal_places || 2;
+  // Currency from the Country Engine (single source of truth), not the legacy
+  // accounting_locales table. Derived from the rows' tenant_id; never defaults to USD.
+  const cur = data && data.length > 0 ? (await getTenantConfig(data[0].tenant_id)).currency : null;
+  const defaultCurrencySymbol = cur ? (cur.symbol || (typeof cur.code === 'string' ? cur.code : '')) : '';
+  const defaultCurrencyPosition = cur?.position ?? 'before';
+  const defaultDecimalPlaces = cur?.decimalPlaces ?? 2;
 
   return (data ?? []).map((invoice) => ({
     ...invoice,
@@ -810,7 +897,7 @@ export const recordPayment = async (
 ) => {
   const { data: invoice, error: fetchError } = await supabase
     .from('invoices')
-    .select('total_amount, amount_paid, invoice_type, customer_id, currency, exchange_rate')
+    .select('total_amount, amount_paid, invoice_type, customer_id, currency, exchange_rate, case_id, invoice_number')
     .eq('id', invoiceId)
     .maybeSingle();
 
@@ -883,83 +970,34 @@ export const recordPayment = async (
 
   if (updateError) throw updateError;
 
+  if (invoice.case_id) {
+    try {
+      await logInvoicePayment({
+        caseId: invoice.case_id,
+        invoiceNo: invoice.invoice_number ?? invoiceId,
+        paymentAmount: paymentData.amount,
+        totalPaid: newAmountPaid,
+        totalAmount,
+        paymentMethod: paymentData.payment_method,
+      });
+    } catch (custodyError) {
+      logger.error('Payment recorded but chain-of-custody event failed:', custodyError);
+    }
+  }
+
   return payment;
 };
 
-export interface PaymentHistoryEntry {
-  id: string;
-  payment_number: string | null;
-  payment_date: string | null;
-  amount: number;
-  currency: string | null;
-  method: string | null;
-  reference: string | null;
-  transaction_id: string | null;
-  status: string | null;
-  notes: string | null;
-  recorded_by: string | null;
-}
+// Unified payment ledger: receipts (receipt_allocations), allocated payments
+// (payment_allocations) and legacy direct payments merged into one
+// date-ordered statement with running balances — src/lib/paymentLedger.ts.
+// The old payments-only query here was why money recorded through the
+// Record Payment modal (receipts path) showed in no payment history surface.
+export type { InvoiceLedgerEntry as PaymentHistoryEntry } from './paymentLedger';
 
-interface RawPaymentRow {
-  id: string;
-  payment_number?: string | null;
-  payment_date?: string | null;
-  amount?: number | string | null;
-  currency?: string | null;
-  reference?: string | null;
-  transaction_id?: string | null;
-  status?: string | null;
-  notes?: string | null;
-  created_by?: string | null;
-  payment_method?: { name: string | null } | null;
-}
-
-// Pure shaping of payment rows into the UI/PDF/portal payment-history trail.
-// Kept separate from the fetch so it is unit-testable without Supabase.
-export function mapPaymentHistory(
-  rows: RawPaymentRow[],
-  nameById: Record<string, string>,
-): PaymentHistoryEntry[] {
-  return rows.map((r) => ({
-    id: r.id,
-    payment_number: r.payment_number ?? null,
-    payment_date: r.payment_date ?? null,
-    amount: typeof r.amount === 'number' ? r.amount : Number(r.amount ?? 0),
-    currency: r.currency ?? null,
-    method: r.payment_method?.name ?? null,
-    reference: r.reference ?? null,
-    transaction_id: r.transaction_id ?? null,
-    status: r.status ?? null,
-    notes: r.notes ?? null,
-    recorded_by: r.created_by ? (nameById[r.created_by] ?? null) : null,
-  }));
-}
-
-// payments has no FK to profiles, so the recorder name is resolved with a second
-// batched fetch and joined in `mapPaymentHistory`.
-export const getPaymentHistory = async (invoiceId: string): Promise<PaymentHistoryEntry[]> => {
-  const { data, error } = await supabase
-    .from('payments')
-    .select(
-      'id, payment_number, payment_date, amount, currency, reference, transaction_id, status, notes, created_by, payment_method:master_payment_methods(name)',
-    )
-    .eq('invoice_id', invoiceId)
-    .is('deleted_at', null)
-    .order('payment_date', { ascending: false });
-
-  if (error) throw error;
-  const rows = (data ?? []) as unknown as RawPaymentRow[];
-
-  const ids = Array.from(new Set(rows.map((r) => r.created_by).filter((v): v is string => !!v)));
-  let nameById: Record<string, string> = {};
-  if (ids.length > 0) {
-    const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', ids);
-    nameById = Object.fromEntries(
-      (profiles ?? []).map((p: { id: string; full_name: string | null }) => [p.id, p.full_name ?? '']),
-    );
-  }
-
-  return mapPaymentHistory(rows, nameById);
+export const getPaymentHistory = async (invoiceId: string) => {
+  const { fetchInvoicePaymentLedger } = await import('./paymentLedger');
+  return fetchInvoicePaymentLedger(invoiceId);
 };
 
 export const convertProformaToTaxInvoice = async (
@@ -1144,6 +1182,7 @@ export const invoiceService = {
   createInvoice,
   updateInvoice,
   deleteInvoice,
+  issueInvoice,
   updateInvoiceStatus,
   getInvoiceStats,
   recordPayment,

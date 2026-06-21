@@ -16,13 +16,12 @@ import {
   type StockSaleWithDetails,
   type SalesFilters,
 } from '../../lib/stockService';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { baseAmount } from '../../lib/financialMath';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Button } from '../../components/ui/Button';
 import { StockSalesTable } from '../../components/stock/StockSalesTable';
 import { StockSaleModal } from '../../components/stock/StockSaleModal';
-
-const formatCurrency = (value: number): string =>
-  value.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+import { useCurrency } from '../../hooks/useCurrency';
 
 const getTodayIso = (): string => new Date().toISOString().split('T')[0];
 
@@ -32,6 +31,7 @@ const getMonthStartIso = (): string => {
 };
 
 export const StockSalesPage: React.FC = () => {
+  const { formatCurrency } = useCurrency();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -84,7 +84,11 @@ export const StockSalesPage: React.FC = () => {
   );
 
   const todayRevenue = useMemo(
-    () => todaySales.reduce((sum, s) => sum + (s.total_amount ?? 0), 0),
+    () =>
+      todaySales.reduce(
+        (sum, s) => sum + baseAmount(s as unknown as Record<string, unknown>, 'total_amount'),
+        0
+      ),
     [todaySales]
   );
 
@@ -95,7 +99,11 @@ export const StockSalesPage: React.FC = () => {
   });
 
   const monthRevenue = useMemo(
-    () => monthlySalesData.reduce((sum, s) => sum + (s.total_amount ?? 0), 0),
+    () =>
+      monthlySalesData.reduce(
+        (sum, s) => sum + baseAmount(s as unknown as Record<string, unknown>, 'total_amount'),
+        0
+      ),
     [monthlySalesData]
   );
 
@@ -111,10 +119,8 @@ export const StockSalesPage: React.FC = () => {
 
   return (
     <div className="p-6 max-w-[1800px] mx-auto space-y-6">
-      <PageHeader
+      <PageHeaderSlot
         title="Device Sales"
-        description="Track and manage all backup device and parts sales"
-        icon={ShoppingCart}
         actions={
           <Button
             variant="primary"

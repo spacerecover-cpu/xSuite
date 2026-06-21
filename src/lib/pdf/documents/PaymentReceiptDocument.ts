@@ -8,6 +8,7 @@ import {
 } from '../styles';
 import { formatDate, buildCompanyAddress, safeString } from '../utils';
 import { getGeneralIconSvg } from '../../deviceIconMapper';
+import { buildLogoNode } from '../brandingImage';
 
 export function buildPaymentReceiptDocument(
   data: PaymentReceiptDocumentData,
@@ -35,14 +36,11 @@ export function buildPaymentReceiptDocument(
 
   const headerContent: Content[] = [];
 
-  if (logoBase64) {
+  const paymentReceiptLogoNode = buildLogoNode(logoBase64, { width: 130, margin: [0, 0, 0, 5] });
+  if (paymentReceiptLogoNode) {
     headerContent.push({
       columns: [
-        {
-          image: logoBase64,
-          width: 130,
-          margin: [0, 0, 0, 5],
-        },
+        paymentReceiptLogoNode,
         {
           stack: [
             { text: legalName, fontSize: 14, bold: true, color: PDF_COLORS.text, alignment: 'right' },

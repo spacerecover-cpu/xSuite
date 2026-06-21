@@ -19,34 +19,38 @@ interface SidebarBadgeCounts {
  * - pendingQuotesCount: Number of quotes pending customer response (sent status)
  */
 export const useSidebarBadges = (): SidebarBadgeCounts => {
+  // Master statuses change rarely; share the cache entry CasesList already uses
+  // (same query key + select) instead of re-fetching them inside every badge
+  // poll cycle. The count query below re-keys when the active names change.
+  const { data: caseStatuses } = useQuery({
+    queryKey: ['case_statuses'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('master_case_statuses')
+        .select('id, name, type, color')
+        .eq('is_active', true)
+        .order('sort_order');
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const excludedTypes = ['completed', 'delivered', 'cancelled'];
+  const activeStatusNames = (caseStatuses ?? [])
+    .filter(s => !excludedTypes.includes(s.type?.toLowerCase() || ''))
+    .map(s => s.name);
+
   // Get cases created today with active statuses (not completed, delivered, or cancelled)
   const { data: casesTodayCount = 0 } = useQuery({
-    queryKey: ['sidebar_badges_cases_today'],
+    queryKey: ['sidebar_badges_cases_today', activeStatusNames],
+    enabled: activeStatusNames.length > 0,
     queryFn: async () => {
       try {
         // Get start of today in user's timezone
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const todayISO = today.toISOString();
-
-        // First, get all case statuses to filter by type
-        const { data: statuses, error: statusError } = await supabase
-          .from('master_case_statuses')
-          .select('name, type')
-          .eq('is_active', true);
-
-        if (statusError) throw statusError;
-
-        // Filter out completed, delivered, and cancelled status types
-        const excludedTypes = ['completed', 'delivered', 'cancelled'];
-        const activeStatusNames = statuses
-          ?.filter(s => !excludedTypes.includes(s.type?.toLowerCase() || ''))
-          .map(s => s.name) || [];
-
-        // If no active statuses found, return 0
-        if (activeStatusNames.length === 0) {
-          return 0;
-        }
 
         // Count cases created today with active statuses
         const { count, error } = await supabase
@@ -115,16 +119,12 @@ export const useSidebarBadges = (): SidebarBadgeCounts => {
     queryKey: ['sidebar_badges_low_stock'],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase
-          .from('stock_items')
-          .select('id, current_quantity, minimum_quantity')
-          .is('deleted_at', null)
-          .eq('is_active', true);
-
+        // DB-side count (get_low_stock_count, SECURITY INVOKER so RLS applies):
+        // PostgREST can't filter on current_quantity <= minimum_quantity, and
+        // fetching every stock row to count client-side grew with stock volume.
+        const { data, error } = await supabase.rpc('get_low_stock_count');
         if (error) throw error;
-        return (data ?? []).filter(
-          (item) => (item.current_quantity ?? 0) <= (item.minimum_quantity ?? 0)
-        ).length;
+        return data ?? 0;
       } catch {
         return 0;
       }

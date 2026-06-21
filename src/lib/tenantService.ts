@@ -14,6 +14,13 @@ interface CreateTenantParams {
   planId: string;
   countryId: string;
   baseCurrencyCode: string;
+  /** ui_language override — omit to let the DB country-sync trigger default it (§9.2). */
+  uiLanguage?: string;
+  /** Jurisdiction payload → primary legal_entity (only when the country has a tax system). */
+  legalEntityType?: string;
+  taxNumber?: string;
+  fiscalYearStart?: string;
+  timezone?: string;
 }
 
 interface TenantWithPlan extends Tenant {
@@ -85,6 +92,11 @@ export const tenantService = {
         planId: params.planId,
         countryId: params.countryId,
         base_currency_code: params.baseCurrencyCode,
+        ...(params.uiLanguage ? { ui_language: params.uiLanguage } : {}),
+        ...(params.legalEntityType ? { legal_entity_type: params.legalEntityType } : {}),
+        ...(params.taxNumber ? { tax_number: params.taxNumber } : {}),
+        ...(params.fiscalYearStart ? { fiscal_year_start: params.fiscalYearStart } : {}),
+        ...(params.timezone ? { timezone: params.timezone } : {}),
       }),
     });
 

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import type { Database } from '../../types/database.types';
-import { createCustomer } from '../../lib/customerService';
+import { createCustomer, getCustomerStats } from '../../lib/customerService';
 import { createCompany } from '../../lib/companyService';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -12,14 +13,17 @@ import { Badge } from '../../components/ui/Badge';
 import { PhoneInput } from '../../components/ui/PhoneInput';
 import { SearchableSelect } from '../../components/ui/SearchableSelect';
 import { CustomerAvatar } from '../../components/ui/CustomerAvatar';
-import { Plus, Search, Filter, Mail, Phone, Building2, MapPin, Users, UserCheck, Clock, ChevronLeft, ChevronRight, Archive, Download } from 'lucide-react';
+import { Plus, Search, Filter, Mail, Phone, Building2, MapPin, Users, UserCheck, Clock, Archive, Download } from 'lucide-react';
 import { ExportButton } from '../../components/shared/ExportButton';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { downloadCSV } from '../../lib/csvExport';
 import { formatDate } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
 
 interface Customer {
   id: string;
@@ -75,8 +79,12 @@ interface City {
   is_active: boolean;
 }
 
+const PAGE_SIZE = 50;
+
 export const CustomersListPage: React.FC = () => {
   const navigate = useNavigate();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
@@ -87,15 +95,20 @@ export const CustomersListPage: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterGroup, setFilterGroup] = useState<string>('all');
   const [filterPortal, setFilterPortal] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const CUSTOMERS_PER_PAGE = 10;
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterGroup, filterPortal]);
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, filterGroup, filterPortal]);
 
   // Command-palette deep-link: /customers?new=1 opens the create modal.
   useEffect(() => {
@@ -138,10 +151,10 @@ export const CustomersListPage: React.FC = () => {
     company_name: '',
   });
 
-  const { data: customers = [], isLoading } = useQuery({
-    queryKey: ['customers_enhanced'],
+  const { data: customersPage, isLoading } = useQuery({
+    queryKey: ['customers_enhanced', debouncedSearch, filterGroup, filterPortal, page],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('customers_enhanced')
         .select(`
           *,
@@ -151,12 +164,36 @@ export const CustomersListPage: React.FC = () => {
           customer_company_relationships (
             companies (id, company_name, company_number)
           )
-        `)
-        .order('created_at', { ascending: false });
+        `, { count: 'exact' })
+        .is('deleted_at', null);
 
+      if (debouncedSearch) {
+        const s = sanitizeFilterValue(debouncedSearch);
+        query = query.or(`customer_name.ilike.%${s}%,customer_number.ilike.%${s}%,email.ilike.%${s}%,mobile_number.ilike.%${s}%`);
+      }
+      if (filterGroup !== 'all') {
+        query = query.eq('customer_group_id', filterGroup);
+      }
+      if (filterPortal === 'enabled') {
+        query = query.eq('portal_enabled', true);
+      } else if (filterPortal === 'disabled') {
+        query = query.eq('portal_enabled', false);
+      }
+
+      const { data, error, count } = await query
+        .order('created_at', { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
       if (error) throw error;
-      return (data ?? []) as unknown as Customer[];
+      return { rows: (data ?? []) as unknown as Customer[], total: count ?? 0 };
     },
+    placeholderData: keepPreviousData,
+  });
+  const customers = customersPage?.rows ?? [];
+  const totalCustomers = customersPage?.total ?? 0;
+
+  const { data: customerStats } = useQuery({
+    queryKey: ['customer_stats'],
+    queryFn: getCustomerStats,
   });
 
   const { data: customerGroups = [] } = useQuery({
@@ -346,29 +383,7 @@ export const CustomersListPage: React.FC = () => {
     updateCustomerMutation.mutate(editFormData);
   };
 
-  const filteredCustomers = customers.filter((customer) => {
-    const matchesSearch =
-      customer.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.customer_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.mobile_number?.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesGroup =
-      filterGroup === 'all' || customer.customer_group_id === filterGroup;
-
-    const matchesPortal =
-      filterPortal === 'all' ||
-      (filterPortal === 'enabled' && customer.portal_enabled) ||
-      (filterPortal === 'disabled' && !customer.portal_enabled);
-
-    return matchesSearch && matchesGroup && matchesPortal;
-  });
-
-  const totalPages = Math.ceil(filteredCustomers.length / CUSTOMERS_PER_PAGE);
-  const startIndex = (currentPage - 1) * CUSTOMERS_PER_PAGE;
-  const endIndex = Math.min(startIndex + CUSTOMERS_PER_PAGE, filteredCustomers.length);
-  const paginatedCustomers = filteredCustomers.slice(startIndex, endIndex);
-  const visibleIds = paginatedCustomers.map((c) => c.id);
+  const visibleIds = customers.map((c) => c.id);
 
   const handleBulkExport = async () => {
     if (selection.selectedCount === 0) return;
@@ -420,12 +435,13 @@ export const CustomersListPage: React.FC = () => {
     // Be explicit about the cascade reality — archiving a customer
     // doesn't archive their cases, but those cases will render with
     // a missing-customer placeholder until restored.
-    if (!window.confirm(
-      `Archive ${n} customer${n === 1 ? '' : 's'}?\n\n` +
-      `Their cases and invoices will remain but will show "Unknown customer" until the customer is restored.`
-    )) {
-      return;
-    }
+    const ok = await confirm({
+      title: `Archive ${n} customer${n === 1 ? '' : 's'}?`,
+      message: `Their cases and invoices will remain but will show "Unknown customer" until the customer is restored.`,
+      confirmLabel: 'Archive',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setIsArchiving(true);
     try {
       const { error } = await supabase
@@ -443,44 +459,13 @@ export const CustomersListPage: React.FC = () => {
     }
   };
 
-  const recentCustomers = customers.filter((c) => {
-    const createdDate = new Date(c.created_at);
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    return createdDate >= thirtyDaysAgo;
-  });
-
-  return (
-    <div className="p-6 max-w-[1800px] mx-auto">
-      <div className="mb-6 flex items-start justify-between">
-        <div className="flex items-start gap-4">
-          <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg bg-primary"
-            style={{
-              boxShadow: '0 10px 40px -10px rgb(var(--color-primary) / 0.5)',
-            }}
-          >
-            <Users className="w-6 h-6 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-1">Customers</h1>
-            <p className="text-slate-600 text-base">
-              Manage individual customer records and relationships
-            </p>
-          </div>
-        </div>
-        <Button onClick={handleOpenModal}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Customer
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+  const kpis = (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-info-muted rounded-xl p-4 border border-info/20">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-info uppercase tracking-wide">Total Customers</p>
-              <p className="text-2xl font-bold text-info mt-1">{customers.length}</p>
+              <p className="text-2xl font-bold text-info mt-1">{customerStats?.total ?? 0}</p>
             </div>
             <div className="w-10 h-10 bg-info rounded-lg flex items-center justify-center">
               <Users className="w-5 h-5 text-info-foreground" />
@@ -492,7 +477,7 @@ export const CustomersListPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-success uppercase tracking-wide">Portal Enabled</p>
-              <p className="text-2xl font-bold text-success mt-1">{customers.filter((c) => c.portal_enabled).length}</p>
+              <p className="text-2xl font-bold text-success mt-1">{customerStats?.portalEnabled ?? 0}</p>
             </div>
             <div className="w-10 h-10 bg-success rounded-lg flex items-center justify-center">
               <UserCheck className="w-5 h-5 text-success-foreground" />
@@ -504,7 +489,7 @@ export const CustomersListPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-accent-foreground uppercase tracking-wide">Recent (30d)</p>
-              <p className="text-2xl font-bold text-accent-foreground mt-1">{recentCustomers.length}</p>
+              <p className="text-2xl font-bold text-accent-foreground mt-1">{customerStats?.recent30d ?? 0}</p>
             </div>
             <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center">
               <Clock className="w-5 h-5 text-accent-foreground" />
@@ -516,7 +501,7 @@ export const CustomersListPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-success uppercase tracking-wide">Active</p>
-              <p className="text-2xl font-bold text-success mt-1">{customers.filter((c) => c.is_active).length}</p>
+              <p className="text-2xl font-bold text-success mt-1">{customerStats?.active ?? 0}</p>
             </div>
             <div className="w-10 h-10 bg-success rounded-lg flex items-center justify-center">
               <UserCheck className="w-5 h-5 text-success-foreground" />
@@ -524,8 +509,10 @@ export const CustomersListPage: React.FC = () => {
           </div>
         </div>
       </div>
+  );
 
-      <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
+  const toolbar = (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
         <div className="p-6">
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
             <div className="w-full lg:w-80 relative flex-shrink-0">
@@ -615,7 +602,8 @@ export const CustomersListPage: React.FC = () => {
                   .select('customer_number, customer_name, email, mobile_number, phone, address, portal_enabled, created_at, customer_groups:customer_group_id(name)')
                   .is('deleted_at', null);
                 if (searchTerm) {
-                  q = q.or(`customer_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,customer_number.ilike.%${searchTerm}%`);
+                  const s = sanitizeFilterValue(searchTerm);
+                  q = q.or(`customer_name.ilike.%${s}%,customer_number.ilike.%${s}%,email.ilike.%${s}%,mobile_number.ilike.%${s}%`);
                 }
                 if (filterGroup !== 'all') q = q.eq('customer_group_id', filterGroup);
                 if (filterPortal === 'enabled') q = q.eq('portal_enabled', true);
@@ -664,25 +652,37 @@ export const CustomersListPage: React.FC = () => {
           )}
         </div>
       </div>
+  );
 
-      {isLoading ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading customers...</p>
+  const loadingFallback = (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-4">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-4">
+          <Skeleton className="w-10 h-10 rounded-full flex-shrink-0" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-1/3" />
+            <Skeleton className="h-3 w-1/4" />
+          </div>
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-6 w-16 rounded-full" />
         </div>
-      ) : filteredCustomers.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500 text-lg">
-            {searchTerm || filterGroup !== 'all' || filterPortal !== 'all'
-              ? 'No customers found matching your criteria.'
-              : 'No customers yet. Add your first customer to get started.'}
-          </p>
-        </div>
-      ) : (
-        <>
-          <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
+      ))}
+    </div>
+  );
+
+  const empty = (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
+      <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+      <p className="text-slate-500 text-lg">
+        {searchTerm || filterGroup !== 'all' || filterPortal !== 'all'
+          ? 'No customers found matching your criteria.'
+          : 'No customers yet. Add your first customer to get started.'}
+      </p>
+    </div>
+  );
+
+  const table = (
+    <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
@@ -731,7 +731,7 @@ export const CustomersListPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {paginatedCustomers.map((customer) => (
+                  {customers.map((customer) => (
                     <tr
                       key={customer.id}
                       onClick={() => navigate(`/customers/${customer.id}`)}
@@ -841,50 +841,49 @@ export const CustomersListPage: React.FC = () => {
                 </tbody>
               </table>
             </div>
-          </div>
+  );
 
-          {totalPages > 1 && (
-            <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mt-4 p-2.5">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-slate-600">
-                  Showing <span className="font-medium text-slate-900">{startIndex + 1}</span> to{' '}
-                  <span className="font-medium text-slate-900">{endIndex}</span> of{' '}
-                  <span className="font-medium text-slate-900">{filteredCustomers.length}</span> customers
-                </div>
-                <div className="flex items-center gap-4">
-                  <p className="text-sm text-slate-600">
-                    Page <span className="font-medium text-slate-900">{currentPage}</span> of{' '}
-                    <span className="font-medium text-slate-900">{totalPages}</span>
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                      className="flex items-center gap-1"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                      Previous
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                      className="flex items-center gap-1"
-                    >
-                      Next
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
+  return (
+    <ListPageTemplate
+      title="Customers"
+      headerActions={
+        <Button onClick={handleOpenModal}>
+          <Plus className="w-4 h-4 mr-2" />
+          Add Customer
+        </Button>
+      }
+      kpis={kpis}
+      toolbar={toolbar}
+      table={table}
+      pager={{ page, pageSize: PAGE_SIZE, total: totalCustomers, onPageChange: setPage, itemNoun: 'customers' }}
+      loading={isLoading}
+      loadingFallback={loadingFallback}
+      isEmpty={customers.length === 0}
+      empty={empty}
+      footer={
+        <BulkActionsBar
+          count={selection.selectedCount}
+          onClear={selection.clear}
+          itemNoun="customer"
+        >
+          <BulkActionButton
+            variant="ghost"
+            icon={<Download className="w-4 h-4" />}
+            label="Export"
+            onClick={handleBulkExport}
+          />
+          {canBulkArchive && (
+            <BulkActionButton
+              variant="danger"
+              icon={<Archive className="w-4 h-4" />}
+              label={isArchiving ? 'Archiving…' : 'Archive'}
+              onClick={handleBulkArchive}
+              disabled={isArchiving}
+            />
           )}
-        </>
-      )}
-
+        </BulkActionsBar>
+      }
+    >
       <Modal
         isOpen={isModalOpen}
         onClose={() => {
@@ -1180,28 +1179,6 @@ export const CustomersListPage: React.FC = () => {
           </div>
         </form>
       </Modal>
-
-      <BulkActionsBar
-        count={selection.selectedCount}
-        onClear={selection.clear}
-        itemNoun="customer"
-      >
-        <BulkActionButton
-          variant="ghost"
-          icon={<Download className="w-4 h-4" />}
-          label="Export"
-          onClick={handleBulkExport}
-        />
-        {canBulkArchive && (
-          <BulkActionButton
-            variant="danger"
-            icon={<Archive className="w-4 h-4" />}
-            label={isArchiving ? 'Archiving…' : 'Archive'}
-            onClick={handleBulkArchive}
-            disabled={isArchiving}
-          />
-        )}
-      </BulkActionsBar>
-    </div>
+    </ListPageTemplate>
   );
 };

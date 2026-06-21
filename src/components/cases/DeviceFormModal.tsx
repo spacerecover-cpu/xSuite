@@ -672,6 +672,7 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
                   onChange={(value) => setFormData({ ...formData, accessories: value })}
                   options={accessories.map(a => ({ id: a.id, name: a.name }))}
                   placeholder="Select accessories (optional)..."
+                  usePortal
                 />
               </div>
             )}
@@ -710,14 +711,17 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
                     Device Password
                   </label>
                   <div className="flex items-center gap-2">
-                    <input
-                      id={passwordId}
-                      type={showPassword ? 'text' : 'password'}
-                      value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      placeholder="Enter device password if applicable..."
-                      className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
+                    <form className="contents" onSubmit={(e) => e.preventDefault()}>
+                      <input
+                        id={passwordId}
+                        type={showPassword ? 'text' : 'password'}
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        placeholder="Enter device password if applicable..."
+                        autoComplete="off"
+                        className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </form>
                     <Button
                       variant="secondary"
                       size="sm"

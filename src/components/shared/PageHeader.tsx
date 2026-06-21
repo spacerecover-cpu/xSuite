@@ -4,60 +4,41 @@ import { LucideIcon } from 'lucide-react';
 interface PageHeaderProps {
   title: string;
   description?: string;
-  icon?: LucideIcon;
+  /** A Lucide icon component (e.g. `Package`) or an already-rendered node. */
+  icon?: LucideIcon | React.ReactNode;
   actions?: React.ReactNode;
-  stats?: Array<{
-    label: string;
-    value: string | number;
-    color?: string;
-  }>;
 }
 
-export const PageHeader: React.FC<PageHeaderProps> = ({
-  title,
-  description,
-  icon: Icon,
-  actions,
-  stats,
-}) => {
-  return (
-    <div className="mb-8">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          {Icon && (
-            <div className="p-3 bg-gradient-to-br from-primary to-primary rounded-xl shadow-lg shadow-primary/30">
-              <Icon className="w-6 h-6 text-white" />
-            </div>
-          )}
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">{title}</h1>
-            {description && (
-              <p className="text-slate-600 mt-1">{description}</p>
-            )}
-          </div>
-        </div>
-        {actions && <div className="flex items-center gap-3">{actions}</div>}
-      </div>
+/**
+ * Compact, standardized page header: a single toolbar row with a tokenized icon
+ * chip + title + optional subtitle on the start edge and actions on the end.
+ * Tightened for information density — keep page chrome short so content (tables)
+ * sits high in the viewport.
+ */
+export const PageHeader: React.FC<PageHeaderProps> = ({ title, description, icon, actions }) => {
+  let iconNode: React.ReactNode = null;
+  if (icon) {
+    iconNode = React.isValidElement(icon)
+      ? icon
+      : React.createElement(icon as LucideIcon, { className: 'w-5 h-5' });
+  }
 
-      {stats && stats.length > 0 && (
-        <div className="flex gap-4 mt-6">
-          {stats.map((stat, index) => (
-            <div
-              key={index}
-              className="flex-1 bg-white rounded-lg border border-slate-200 p-4"
-            >
-              <p className="text-sm text-slate-600 mb-1">{stat.label}</p>
-              <p
-                className={`text-2xl font-bold ${
-                  stat.color ? `text-${stat.color}-600` : 'text-slate-900'
-                }`}
-              >
-                {stat.value}
-              </p>
-            </div>
-          ))}
+  return (
+    <div className="mb-4 flex items-center justify-between gap-4">
+      <div className="flex items-center gap-3 min-w-0">
+        {iconNode && (
+          <div className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-sm">
+            {iconNode}
+          </div>
+        )}
+        <div className="min-w-0">
+          <h1 className="text-lg font-semibold text-slate-900 leading-tight truncate">{title}</h1>
+          {description && (
+            <p className="text-sm text-slate-500 leading-tight truncate">{description}</p>
+          )}
         </div>
-      )}
+      </div>
+      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
     </div>
   );
 };

@@ -15,7 +15,7 @@ import {
 import { kbKeys } from '../../lib/queryKeys';
 import { formatDate } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
 
 const STATUS_COLORS: Record<string, string> = {
   published: 'bg-success-muted text-success',
@@ -76,6 +76,7 @@ function VersionItem({
 }
 
 export const KBArticleDetailPage: React.FC = () => {
+  const toast = useToast();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();

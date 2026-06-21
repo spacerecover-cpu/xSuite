@@ -6,6 +6,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
+import { Skeleton } from '../../components/ui/Skeleton';
 import {
   getStockItem,
   getStockTransactions,
@@ -267,8 +268,13 @@ export const StockItemDetail: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-6 w-48 rounded" />
+        <Skeleton className="h-28 w-full rounded-xl" />
+        <div className="grid grid-cols-2 gap-4">
+          <Skeleton className="h-40 w-full rounded-xl" />
+          <Skeleton className="h-40 w-full rounded-xl" />
+        </div>
       </div>
     );
   }

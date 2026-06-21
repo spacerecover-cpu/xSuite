@@ -4,7 +4,9 @@ import { DollarSign, Receipt, FileText, ExternalLink } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
+import { Skeleton } from '../ui/Skeleton';
 import { formatDate } from '../../lib/format';
+import { baseAmount } from '../../lib/financialMath';
 import { useCurrency } from '../../hooks/useCurrency';
 
 interface CustomerFinancialTabProps {
@@ -19,8 +21,12 @@ interface InvoiceRow {
   total_amount: number | null;
   amount_paid: number | null;
   balance_due: number | null;
+  total_amount_base: number | null;
+  amount_paid_base: number | null;
+  balance_due_base: number | null;
   status: string | null;
   is_proforma: boolean | null;
+  [key: string]: unknown;
 }
 
 interface QuoteRow {
@@ -54,7 +60,7 @@ export function CustomerFinancialTab({ customerId, companyId }: CustomerFinancia
       if (!filterVal) return [];
       const { data, error } = await supabase
         .from('invoices')
-        .select('id, invoice_number, invoice_date, total_amount, amount_paid, balance_due, status, is_proforma')
+        .select('id, invoice_number, invoice_date, total_amount, amount_paid, balance_due, total_amount_base, amount_paid_base, balance_due_base, status, is_proforma')
         .eq(filterCol, filterVal)
         .is('deleted_at', null)
         .order('invoice_date', { ascending: false, nullsFirst: false });
@@ -85,9 +91,9 @@ export function CustomerFinancialTab({ customerId, companyId }: CustomerFinancia
   const realInvoices = invoices.filter((i) => !i.is_proforma);
   const totals = realInvoices.reduce(
     (acc, inv) => {
-      acc.invoiced += inv.total_amount ?? 0;
-      acc.paid += inv.amount_paid ?? 0;
-      acc.outstanding += inv.balance_due ?? 0;
+      acc.invoiced += baseAmount(inv, 'total_amount');
+      acc.paid += baseAmount(inv, 'amount_paid');
+      acc.outstanding += baseAmount(inv, 'balance_due');
       return acc;
     },
     { invoiced: 0, paid: 0, outstanding: 0 },
@@ -97,8 +103,25 @@ export function CustomerFinancialTab({ customerId, companyId }: CustomerFinancia
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}>
+              <div className="p-4 space-y-2">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-7 w-24" />
+              </div>
+            </Card>
+          ))}
+        </div>
+        <Card>
+          <div className="p-6 space-y-3">
+            <Skeleton className="h-5 w-40" />
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-8 w-full" />
+            ))}
+          </div>
+        </Card>
       </div>
     );
   }

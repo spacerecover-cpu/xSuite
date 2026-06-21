@@ -1,27 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { formatDate } from '../../lib/format';
-import { FinancialModuleHeader } from '../../components/financial/FinancialModuleHeader';
-import { FinancialStatsCard } from '../../components/financial/FinancialStatsCard';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
+import { KpiRow } from '../../components/templates/KpiRow';
 import { RecordPaymentModal } from '../../components/financial/RecordPaymentModal';
 import { PaymentViewModal } from '../../components/financial/PaymentViewModal';
 import { PaymentReceiptModal } from '../../components/financial/PaymentReceiptModal';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useConfirm } from '../../hooks/useConfirm';
+import { useToast } from '../../hooks/useToast';
 import { createPayment, getPaymentStats, voidPayment, fetchPaymentById } from '../../lib/paymentsService';
+import { baseAmount } from '../../lib/financialMath';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { logger } from '../../lib/logger';
 import {
   Plus,
   Search,
   CreditCard,
-  Calendar,
-  DollarSign,
   User,
   Eye,
   Receipt,
@@ -35,15 +37,19 @@ import {
   BarChart3,
 } from 'lucide-react';
 
+const PAGE_SIZE = 50;
+
 export const PaymentsList: React.FC = () => {
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
   const confirm = useConfirm();
+  const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
+  const [page, setPage] = useState(0);
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
   const [_selectedPayment, _setSelectedPayment] = useState<any>(null);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -62,6 +68,11 @@ export const PaymentsList: React.FC = () => {
     }
   }, [searchParams, setSearchParams]);
 
+  // Reset to the first page whenever the active filters/search change.
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, statusFilter, dateFilter, paymentMethodFilter]);
+
   const { data: paymentMethods = [] } = useQuery({
     queryKey: ['payment_methods_active'],
     queryFn: async () => {
@@ -75,8 +86,8 @@ export const PaymentsList: React.FC = () => {
     },
   });
 
-  const { data: payments = [], isLoading } = useQuery({
-    queryKey: ['payments', searchTerm, statusFilter, dateFilter, paymentMethodFilter],
+  const { data: paymentsPage, isLoading } = useQuery({
+    queryKey: ['payments', searchTerm, statusFilter, dateFilter, paymentMethodFilter, page],
     queryFn: async () => {
       let query = supabase
         .from('payments')
@@ -85,6 +96,7 @@ export const PaymentsList: React.FC = () => {
           payment_number,
           payment_date,
           amount,
+          amount_base,
           reference,
           status,
           notes,
@@ -96,11 +108,13 @@ export const PaymentsList: React.FC = () => {
             amount,
             invoice:invoices(invoice_number, case_id)
           )
-        `)
-        .order('payment_date', { ascending: false });
+        `, { count: 'exact' })
+        .order('payment_date', { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (searchTerm) {
-        query = query.or(`payment_number.ilike.%${searchTerm}%,reference.ilike.%${searchTerm}%`);
+        const s = sanitizeFilterValue(searchTerm);
+        query = query.or(`payment_number.ilike.%${s}%,reference.ilike.%${s}%`);
       }
 
       if (statusFilter !== 'all') {
@@ -135,11 +149,14 @@ export const PaymentsList: React.FC = () => {
         query = query.gte('payment_date', startDate.toISOString().split('T')[0]);
       }
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
       if (error) throw error;
-      return data || [];
+      return { rows: data || [], total: count || 0 };
     },
+    placeholderData: keepPreviousData,
   });
+  const payments = paymentsPage?.rows ?? [];
+  const totalPaymentsCount = paymentsPage?.total ?? 0;
 
   const { data: stats } = useQuery({
     queryKey: ['payment_stats'],
@@ -195,7 +212,7 @@ export const PaymentsList: React.FC = () => {
       setShowViewModal(true);
     } catch (error) {
       logger.error('Error fetching payment details:', error);
-      alert('Failed to load payment details');
+      toast.error('Failed to load payment details');
     }
   };
 
@@ -206,7 +223,7 @@ export const PaymentsList: React.FC = () => {
       setShowReceiptModal(true);
     } catch (error) {
       logger.error('Error fetching payment details:', error);
-      alert('Failed to load payment receipt');
+      toast.error('Failed to load payment receipt');
     }
   };
 
@@ -215,9 +232,44 @@ export const PaymentsList: React.FC = () => {
     setShowReceiptModal(true);
   };
 
-  const handleExportToCSV = () => {
+  const handleExportToCSV = async () => {
+    // Export ALL rows matching the active filters (not just the current page).
+    let query = supabase
+      .from('payments')
+      .select(`
+        payment_number, payment_date, amount, reference, status,
+        customer:customers_enhanced(customer_name),
+        payment_method:master_payment_methods(name)
+      `)
+      .order('payment_date', { ascending: false });
+
+    if (searchTerm) {
+      const s = sanitizeFilterValue(searchTerm);
+      query = query.or(`payment_number.ilike.%${s}%,reference.ilike.%${s}%`);
+    }
+    if (statusFilter !== 'all') query = query.eq('status', statusFilter);
+    if (paymentMethodFilter !== 'all') query = query.eq('payment_method_id', paymentMethodFilter);
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      let startDate: Date;
+      switch (dateFilter) {
+        case 'today': startDate = new Date(now.setHours(0, 0, 0, 0)); break;
+        case 'week': startDate = new Date(now.setDate(now.getDate() - 7)); break;
+        case 'month': startDate = new Date(now.setMonth(now.getMonth() - 1)); break;
+        case 'year': startDate = new Date(now.setFullYear(now.getFullYear() - 1)); break;
+        default: startDate = new Date(0);
+      }
+      query = query.gte('payment_date', startDate.toISOString().split('T')[0]);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      toast.error('Failed to export payments');
+      return;
+    }
+
     const headers = ['Payment #', 'Date', 'Customer', 'Amount', 'Method', 'Reference', 'Status'];
-    const rows = payments.map(p => [
+    const rows = (data ?? []).map((p: any) => [
       p.payment_number,
       p.payment_date ? formatDate(p.payment_date) : '',
       p.customer?.customer_name || 'N/A',
@@ -271,69 +323,42 @@ export const PaymentsList: React.FC = () => {
     }
   };
 
-  const totalPayments = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
-  const completedPayments = payments.filter(p => p.status === 'completed');
-  const todayPayments = payments.filter(p => p.payment_date && new Date(p.payment_date).toDateString() === new Date().toDateString());
-  const pendingPayments = payments.filter(p => p.status === 'pending');
-
-  if (isLoading) {
-    return (
-      <div className="p-8 max-w-[1800px] mx-auto">
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading payments...</p>
-        </div>
+  const loadingFallback = (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+        ))}
       </div>
-    );
-  }
-
-  return (
-    <div className="p-8 max-w-[1800px] mx-auto">
-      <FinancialModuleHeader
-        icon={<CreditCard className="w-7 h-7 text-white" />}
-        title="Payments"
-        description="Track and manage customer payments"
-        iconBgColor="#10b981"
-        statistics={[
-          { label: 'Total Payments', value: payments.length, color: '#3b82f6' },
-          { label: 'Completed', value: completedPayments.length, color: '#10b981' },
-          { label: 'Today', value: todayPayments.length, color: '#f59e0b' },
-          { label: 'Pending', value: pendingPayments.length, color: '#ef4444' },
-        ]}
-        primaryAction={{
-          label: 'Record Payment',
-          onClick: () => setShowRecordPaymentModal(true),
-          icon: <Plus className="w-4 h-4" />,
-        }}
-      />
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <FinancialStatsCard
-          label="Total Received"
-          value={formatCurrency(stats?.totalAmount || totalPayments)}
-          icon={<DollarSign className="w-5 h-5 text-white" />}
-          color="green"
-        />
-        <FinancialStatsCard
-          label="This Month"
-          value={formatCurrency(stats?.thisMonthAmount || 0)}
-          icon={<Calendar className="w-5 h-5 text-white" />}
-          color="blue"
-        />
-        <FinancialStatsCard
-          label="Completed"
-          value={stats?.completed || completedPayments.length}
-          icon={<CheckCircle className="w-5 h-5 text-white" />}
-          color="green"
-        />
-        <FinancialStatsCard
-          label="Total Count"
-          value={stats?.total || payments.length}
-          icon={<Receipt className="w-5 h-5 text-white" />}
-          color="slate"
-        />
+      <Skeleton className="h-20 w-full rounded-2xl" />
+      <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-12 w-full rounded-lg" />
+        ))}
       </div>
+    </div>
+  );
 
+  const headerActions = (
+    <Button onClick={() => setShowRecordPaymentModal(true)} className="flex items-center gap-2">
+      <Plus className="w-4 h-4" />
+      Record Payment
+    </Button>
+  );
+
+  const kpis = (
+    <KpiRow
+      stats={[
+        { label: 'Total Received', value: formatCurrency(stats?.totalAmount || 0), tone: 'success' },
+        { label: 'This Month', value: formatCurrency(stats?.thisMonthAmount || 0), tone: 'info' },
+        { label: 'Completed', value: stats?.completed ?? 0, tone: 'success' },
+        { label: 'Total Count', value: stats?.total ?? 0, tone: 'neutral' },
+      ]}
+    />
+  );
+
+  const toolbar = (
+    <>
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
         <div className="p-6">
           <div className="flex flex-col gap-4">
@@ -403,7 +428,7 @@ export const PaymentsList: React.FC = () => {
                   variant="secondary"
                   onClick={handleExportToCSV}
                   className="flex items-center gap-2"
-                  disabled={payments.length === 0}
+                  disabled={totalPaymentsCount === 0}
                 >
                   <Download className="w-4 h-4" />
                   Export CSV
@@ -432,42 +457,45 @@ export const PaymentsList: React.FC = () => {
             <div className="bg-white rounded-lg p-4 border border-info/20">
               <p className="text-xs text-slate-500 mb-1">Average Payment</p>
               <p className="text-2xl font-bold text-primary">
-                {formatCurrency(payments.length > 0 ? totalPayments / payments.length : 0)}
+                {formatCurrency(stats && stats.total > 0 ? stats.totalAmount / stats.total : 0)}
               </p>
             </div>
             <div className="bg-white rounded-lg p-4 border border-success/20">
               <p className="text-xs text-slate-500 mb-1">Success Rate</p>
               <p className="text-2xl font-bold text-success">
-                {payments.length > 0
-                  ? ((completedPayments.length / payments.length) * 100).toFixed(1)
+                {stats && stats.total > 0
+                  ? ((stats.completed / stats.total) * 100).toFixed(1)
                   : 0}%
               </p>
             </div>
             <div className="bg-white rounded-lg p-4 border border-accent/20">
               <p className="text-xs text-slate-500 mb-1">Total Transactions</p>
-              <p className="text-2xl font-bold text-accent-foreground">{payments.length}</p>
+              <p className="text-2xl font-bold text-accent-foreground">{stats?.total ?? 0}</p>
             </div>
           </div>
         </div>
       )}
+    </>
+  );
 
-      {payments.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
-          <EmptyState
-            icon={CreditCard}
-            title="No payments found"
-            description={
-              searchTerm || statusFilter !== 'all' || dateFilter !== 'all'
-                ? 'No payments found matching your criteria.'
-                : 'No payments yet. Record your first payment to get started.'
-            }
-            action={{ label: 'Record Payment', onClick: () => setShowRecordPaymentModal(true) }}
-          />
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
+  const empty = (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
+      <EmptyState
+        icon={CreditCard}
+        title="No payments found"
+        description={
+          searchTerm || statusFilter !== 'all' || dateFilter !== 'all'
+            ? 'No payments found matching your criteria.'
+            : 'No payments yet. Record your first payment to get started.'
+        }
+        action={{ label: 'Record Payment', onClick: () => setShowRecordPaymentModal(true) }}
+      />
+    </div>
+  );
+
+  const table = (
+    <div className="overflow-x-auto">
+      <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Payment #</th>
@@ -507,7 +535,7 @@ export const PaymentsList: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <span className="text-sm font-bold text-success">
-                        {formatCurrency(payment.amount)}
+                        {formatCurrency(baseAmount(payment, 'amount'))}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -603,10 +631,28 @@ export const PaymentsList: React.FC = () => {
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
-      )}
+    </div>
+  );
 
+  return (
+    <ListPageTemplate
+      title="Payments"
+      headerActions={headerActions}
+      kpis={kpis}
+      toolbar={toolbar}
+      table={table}
+      pager={{
+        page,
+        pageSize: PAGE_SIZE,
+        total: totalPaymentsCount,
+        onPageChange: setPage,
+        itemNoun: 'payments',
+      }}
+      loading={isLoading}
+      loadingFallback={loadingFallback}
+      isEmpty={payments.length === 0}
+      empty={empty}
+    >
       <RecordPaymentModal
         isOpen={showRecordPaymentModal}
         onClose={() => setShowRecordPaymentModal(false)}
@@ -633,6 +679,6 @@ export const PaymentsList: React.FC = () => {
         }}
         payment={fullPaymentData}
       />
-    </div>
+    </ListPageTemplate>
   );
 };

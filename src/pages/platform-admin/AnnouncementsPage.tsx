@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Megaphone } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { AnnouncementCard } from '../../components/platform-admin/announcements/AnnouncementCard';
 import { AnnouncementFormModal } from '../../components/platform-admin/announcements/AnnouncementFormModal';
 import { getAnnouncements } from '../../lib/platformAdminService';
@@ -98,8 +99,11 @@ export const AnnouncementsPage: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        <div className="space-y-3">
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
         </div>
       ) : filteredAnnouncements.length === 0 ? (
         <div className="text-center py-12">

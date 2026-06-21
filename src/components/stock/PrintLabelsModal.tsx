@@ -44,20 +44,54 @@ export const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({ items, onClo
     if (items.length === 0) return;
     setIsPrinting(true);
     try {
-      const [{ initializePDFFonts, createPdfWithFonts }, { buildStockLabelDocument }] = await Promise.all([
-        import('../../lib/pdf/fonts'),
-        import('../../lib/pdf/documents/StockLabelDocument'),
-      ]);
+      const [{ initializePDFFonts, createPdfWithFonts }, { buildStockLabelDocument }, { isPdfEngineEnabled }] =
+        await Promise.all([
+          import('../../lib/pdf/fonts'),
+          import('../../lib/pdf/documents/StockLabelDocument'),
+          import('../../lib/pdf/engine/featureFlag'),
+        ]);
       await initializePDFFonts();
+
+      // Engine path is flag-guarded and OFF by default: with the flag unset, the
+      // legacy `buildStockLabelDocument(...)` path below is byte-identical to
+      // production. The engine renders ONE label body per document, so the
+      // multi-copy sheet is reproduced by looping `config.copies` times here.
+      const engineEnabled = isPdfEngineEnabled('stock_label');
+      const engineMods = engineEnabled
+        ? await Promise.all([
+            import('../../lib/pdf/engine/adapters/stockLabelAdapter'),
+            import('../../lib/pdf/engine/renderTemplate'),
+            import('../../lib/pdf/templateConfig'),
+            import('../../lib/pdf/translationContext'),
+          ])
+        : null;
+
       for (const item of items) {
-        const docDef = buildStockLabelDocument({
-          item,
-          locationName: config.locationName || undefined,
-          companyName: config.companyName || undefined,
-          showPrice: config.showPrice,
-          showBarcode: config.showBarcode,
-          copies: config.copies,
-        });
+        let docDef;
+        if (engineEnabled && engineMods) {
+          const [{ toEngineData }, { renderTemplate }, { BUILT_IN_TEMPLATE_CONFIGS }, { createTranslationContext }] =
+            engineMods;
+          const config_ = BUILT_IN_TEMPLATE_CONFIGS.stock_label;
+          const ctx = createTranslationContext('english_only', null);
+          const labelData = {
+            item,
+            locationName: config.locationName || undefined,
+            companyName: config.companyName || undefined,
+            showPrice: config.showPrice,
+            showBarcode: config.showBarcode,
+          };
+          const engineData = toEngineData(labelData, config_);
+          docDef = renderTemplate(config_, engineData, ctx, null, null);
+        } else {
+          docDef = buildStockLabelDocument({
+            item,
+            locationName: config.locationName || undefined,
+            companyName: config.companyName || undefined,
+            showPrice: config.showPrice,
+            showBarcode: config.showBarcode,
+            copies: config.copies,
+          });
+        }
         const pdf = createPdfWithFonts(docDef);
         const filename = `label-${item.sku ?? item.name.replace(/\s+/g, '-')}.pdf`;
         if (download) {

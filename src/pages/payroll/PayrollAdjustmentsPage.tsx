@@ -4,7 +4,7 @@ import { Plus, Check, X, Search, TrendingUp, TrendingDown } from 'lucide-react';
 import { payrollService } from '../../lib/payrollService';
 import { payrollKeys } from '../../lib/queryKeys';
 import { Button } from '../../components/ui/Button';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Badge } from '../../components/ui/Badge';
 import { useToast } from '../../hooks/useToast';
 import { useCurrency } from '../../hooks/useCurrency';
@@ -104,39 +104,38 @@ export default function PayrollAdjustmentsPage() {
 
   return (
     <div className="p-8 max-w-[1400px] mx-auto">
-      <PageHeader
+      <PageHeaderSlot
         title="Payroll Adjustments"
-        description="Manage one-time bonuses, deductions, and other payroll adjustments"
+        actions={
+          <Button onClick={() => setShowFormModal(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Adjustment
+          </Button>
+        }
       />
 
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search adjustments..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="all">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="applied">Applied</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+      <div className="mb-6 flex items-center gap-3 flex-wrap">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search adjustments..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+          />
         </div>
-        <Button onClick={() => setShowFormModal(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Adjustment
-        </Button>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+        >
+          <option value="all">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="applied">Applied</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">

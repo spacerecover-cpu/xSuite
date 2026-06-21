@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Search, Filter, Truck, UserCheck, Users, Mail, Phone, MapPin, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { Plus, Search, Filter, Truck, Mail, Phone, MapPin } from 'lucide-react';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { ExportButton } from '../../components/shared/ExportButton';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
+import { KpiRow } from '../../components/templates/KpiRow';
 import SupplierFormModal from '../../components/suppliers/SupplierFormModal';
 import { supabase } from '../../lib/supabaseClient';
-import { useToast } from '../../hooks/useToast';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { useCurrency } from '../../hooks/useCurrency';
 import { formatDate } from '../../lib/format';
-import { logger } from '../../lib/logger';
+import { baseAmount } from '../../lib/financialMath';
 
 interface Supplier {
   id: string;
@@ -21,7 +24,6 @@ interface Supplier {
   country: string | null;
   city: string | null;
   is_active: boolean | null;
-  is_approved: boolean;
   created_at: string;
   category_id: string | null;
   category: { name: string } | null;
@@ -33,38 +35,29 @@ interface Category {
   name: string;
 }
 
+const PAGE_SIZE = 50;
+
 export default function SuppliersListPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const toast = useToast();
   const { formatCurrency } = useCurrency();
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [approvalFilter, setApprovalFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const SUPPLIERS_PER_PAGE = 10;
-
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [stats, setStats] = useState({
-    total: 0,
-    active: 0,
-    approved: 0,
-    totalSpend: 0,
-  });
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, statusFilter, approvalFilter, categoryFilter]);
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
-    loadSuppliers();
-    loadCategories();
-  }, []);
+    setPage(0);
+  }, [debouncedSearch, statusFilter, categoryFilter]);
 
   // Command-palette deep-link: /suppliers?new=1 opens the create modal.
   useEffect(() => {
@@ -76,22 +69,30 @@ export default function SuppliersListPage() {
     }
   }, [searchParams, setSearchParams]);
 
-  const loadSuppliers = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
+  const { data: suppliersPage, isLoading: loading } = useQuery({
+    queryKey: ['suppliers', debouncedSearch, statusFilter, categoryFilter, page],
+    queryFn: async () => {
+      let query = supabase
         .from('suppliers')
         .select(`
           *,
           category:master_supplier_categories(name),
           payment_terms:master_supplier_payment_terms(name, days)
-        `)
+        `, { count: 'exact' })
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
+      if (debouncedSearch) {
+        const s = sanitizeFilterValue(debouncedSearch);
+        query = query.or(`name.ilike.%${s}%,supplier_number.ilike.%${s}%,email.ilike.%${s}%,phone.ilike.%${s}%`);
+      }
+      if (statusFilter === 'active') query = query.eq('is_active', true);
+      else if (statusFilter === 'inactive') query = query.eq('is_active', false);
+      if (categoryFilter !== 'all') query = query.eq('category_id', categoryFilter);
+
+      const { data, error, count } = await query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
       if (error) throw error;
 
-      // DB rows don't have UI-only `is_approved`, `country`, `city` strings.
-      // Default them so the local Supplier shape is satisfied.
       const rows: Supplier[] = (data ?? []).map((row) => ({
         id: row.id,
         supplier_number: row.supplier_number,
@@ -101,177 +102,61 @@ export default function SuppliersListPage() {
         country: null,
         city: null,
         is_active: row.is_active,
-        is_approved: false,
         created_at: row.created_at,
         category_id: row.category_id,
         category: row.category,
         payment_terms: row.payment_terms,
       }));
+      return { rows, total: count ?? 0 };
+    },
+    placeholderData: keepPreviousData,
+  });
+  const suppliers = suppliersPage?.rows ?? [];
+  const totalSuppliers = suppliersPage?.total ?? 0;
 
-      setSuppliers(rows);
-      calculateStats(rows);
-    } catch (error: unknown) {
-      logger.error('Error loading suppliers:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to load suppliers');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadCategories = async () => {
-    try {
+  const { data: categories = [] } = useQuery({
+    queryKey: ['supplier_categories'],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('master_supplier_categories')
         .select('id, name')
         .eq('is_active', true)
         .order('name');
-
       if (error) throw error;
-      setCategories(data ?? []);
-    } catch (error) {
-      logger.error('Error loading categories:', error);
-    }
-  };
+      return (data ?? []) as Category[];
+    },
+  });
 
-  const calculateStats = async (supplierData: Supplier[]) => {
-    const activeSuppliers = supplierData.filter(s => s.is_active);
-    const approvedSuppliers = supplierData.filter(s => s.is_approved);
-
-    try {
-      const { data: poData } = await supabase
-        .from('purchase_orders')
-        .select('total_amount');
-
-      const totalSpend = poData?.reduce((sum, po) => sum + (po.total_amount || 0), 0) || 0;
-
-      setStats({
-        total: supplierData.length,
-        active: activeSuppliers.length,
-        approved: approvedSuppliers.length,
-        totalSpend,
-      });
-    } catch (error) {
-      logger.error('Error calculating stats:', error);
-      setStats({
-        total: supplierData.length,
-        active: activeSuppliers.length,
-        approved: approvedSuppliers.length,
-        totalSpend: 0,
-      });
-    }
-  };
+  const { data: stats } = useQuery({
+    queryKey: ['supplier_stats'],
+    queryFn: async () => {
+      const base = () =>
+        supabase.from('suppliers').select('*', { count: 'exact', head: true }).is('deleted_at', null);
+      const [totalRes, activeRes, poRes] = await Promise.all([
+        base(),
+        base().eq('is_active', true),
+        supabase.from('purchase_orders').select('total_amount, total_amount_base'),
+      ]);
+      const totalSpend = (poRes.data ?? []).reduce((sum, po) => sum + baseAmount(po, 'total_amount'), 0);
+      return { total: totalRes.count ?? 0, active: activeRes.count ?? 0, totalSpend };
+    },
+  });
 
   const handleModalClose = () => {
     setShowAddModal(false);
   };
 
   const handleModalSuccess = () => {
-    loadSuppliers();
+    queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+    queryClient.invalidateQueries({ queryKey: ['supplier_stats'] });
   };
 
   const handleOpenModal = () => {
     setShowAddModal(true);
   };
 
-  const filteredSuppliers = suppliers.filter((supplier) => {
-    const matchesSearch =
-      supplier.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      supplier.supplier_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      supplier.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      supplier.phone?.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus =
-      statusFilter === 'all' ||
-      (statusFilter === 'active' && supplier.is_active) ||
-      (statusFilter === 'inactive' && !supplier.is_active);
-
-    const matchesApproval =
-      approvalFilter === 'all' ||
-      (approvalFilter === 'approved' && supplier.is_approved) ||
-      (approvalFilter === 'pending' && !supplier.is_approved);
-
-    const matchesCategory =
-      categoryFilter === 'all' || supplier.category_id?.toString() === categoryFilter;
-
-    return matchesSearch && matchesStatus && matchesApproval && matchesCategory;
-  });
-
-  const totalPages = Math.ceil(filteredSuppliers.length / SUPPLIERS_PER_PAGE);
-  const startIndex = (currentPage - 1) * SUPPLIERS_PER_PAGE;
-  const endIndex = Math.min(startIndex + SUPPLIERS_PER_PAGE, filteredSuppliers.length);
-  const paginatedSuppliers = filteredSuppliers.slice(startIndex, endIndex);
-
-  return (
-    <div className="p-6 max-w-[1800px] mx-auto">
-      <div className="mb-6 flex items-start justify-between">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg bg-primary">
-            <Truck className="w-6 h-6 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-1">Suppliers</h1>
-            <p className="text-slate-600 text-base">
-              Manage your supplier relationships and purchase orders
-            </p>
-          </div>
-        </div>
-        <Button onClick={handleOpenModal} variant="primary">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Supplier
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-gradient-to-br from-info-muted to-info-muted rounded-xl p-4 border border-info/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-info uppercase tracking-wide">Total Suppliers</p>
-              <p className="text-2xl font-bold text-info mt-1">{stats.total}</p>
-            </div>
-            <div className="w-10 h-10 bg-info rounded-lg flex items-center justify-center">
-              <Truck className="w-5 h-5 text-white" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-success-muted to-success-muted rounded-xl p-4 border border-success/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-success uppercase tracking-wide">Active</p>
-              <p className="text-2xl font-bold text-success mt-1">{stats.active}</p>
-            </div>
-            <div className="w-10 h-10 bg-success rounded-lg flex items-center justify-center">
-              <UserCheck className="w-5 h-5 text-white" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-accent/10 to-accent/20 rounded-xl p-4 border border-accent/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-accent-foreground uppercase tracking-wide">Approved</p>
-              <p className="text-2xl font-bold text-accent-foreground mt-1">{stats.approved}</p>
-            </div>
-            <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-accent-foreground" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-warning-muted to-warning-muted rounded-xl p-4 border border-warning/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-warning uppercase tracking-wide">Total Spend (YTD)</p>
-              <p className="text-2xl font-bold text-warning mt-1">{formatCurrency(stats.totalSpend)}</p>
-            </div>
-            <div className="w-10 h-10 bg-warning rounded-lg flex items-center justify-center">
-              <Users className="w-5 h-5 text-white" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
+  const toolbar = (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
         <div className="p-6">
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
             <div className="w-full lg:w-80 relative flex-shrink-0">
@@ -306,11 +191,10 @@ export default function SuppliersListPage() {
               >
                 Inactive
               </button>
-              {(statusFilter !== 'all' || approvalFilter !== 'all' || categoryFilter !== 'all') && (
+              {(statusFilter !== 'all' || categoryFilter !== 'all') && (
                 <button
                   onClick={() => {
                     setStatusFilter('all');
-                    setApprovalFilter('all');
                     setCategoryFilter('all');
                   }}
                   className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-200 text-slate-700 hover:bg-slate-300 transition-all"
@@ -327,7 +211,7 @@ export default function SuppliersListPage() {
             >
               <Filter className="w-4 h-4" />
               More Filters
-              {(approvalFilter !== 'all' || categoryFilter !== 'all') && (
+              {categoryFilter !== 'all' && (
                 <span className="ml-1 w-2 h-2 rounded-full bg-primary"></span>
               )}
             </Button>
@@ -352,17 +236,15 @@ export default function SuppliersListPage() {
                 },
               ]}
               getRows={async () => {
-                // Only filters that map to actual columns:
-                //   search → name/email/supplier_number ilike
-                //   statusFilter (active/inactive) → is_active
-                //   categoryFilter → category_id
-                // The approvalFilter is UI-only (no DB column yet); ignore.
+                // Filters map to real columns: search → name/email/supplier_number ilike;
+                // statusFilter (active/inactive) → is_active; categoryFilter → category_id.
                 let q = supabase
                   .from('suppliers')
                   .select('supplier_number, name, contact_person, email, phone, tax_number, is_active, master_supplier_categories:category_id(name)')
                   .is('deleted_at', null);
                 if (searchTerm) {
-                  q = q.or(`name.ilike.%${searchTerm}%,supplier_number.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+                  const s = sanitizeFilterValue(searchTerm);
+                  q = q.or(`name.ilike.%${s}%,supplier_number.ilike.%${s}%,email.ilike.%${s}%`);
                 }
                 if (statusFilter === 'active') q = q.eq('is_active', true);
                 if (statusFilter === 'inactive') q = q.eq('is_active', false);
@@ -375,7 +257,7 @@ export default function SuppliersListPage() {
           </div>
 
           {showFilters && (
-            <div className="mt-4 pt-4 border-t border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="mt-4 pt-4 border-t border-slate-200 grid grid-cols-1 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Category
@@ -393,46 +275,28 @@ export default function SuppliersListPage() {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Approval Status
-                </label>
-                <select
-                  value={approvalFilter}
-                  onChange={(e) => setApprovalFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                >
-                  <option value="all">All Approval Statuses</option>
-                  <option value="approved">Approved</option>
-                  <option value="pending">Pending</option>
-                </select>
-              </div>
             </div>
           )}
         </div>
       </div>
+  );
 
-      {loading ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading suppliers...</p>
-        </div>
-      ) : filteredSuppliers.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
-          <EmptyState
-            icon={Truck}
-            title="No suppliers found"
-            description={
-              searchTerm || statusFilter !== 'all' || approvalFilter !== 'all' || categoryFilter !== 'all'
-                ? 'No suppliers found matching your criteria.'
-                : 'No suppliers yet. Add your first supplier to get started.'
-            }
-            action={{ label: 'Add Supplier', onClick: handleOpenModal }}
-          />
-        </div>
-      ) : (
-        <>
-          <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+  const emptyState = (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
+      <EmptyState
+        icon={Truck}
+        title="No suppliers found"
+        description={
+          searchTerm || statusFilter !== 'all' || categoryFilter !== 'all'
+            ? 'No suppliers found matching your criteria.'
+            : 'No suppliers yet. Add your first supplier to get started.'
+        }
+        action={{ label: 'Add Supplier', onClick: handleOpenModal }}
+      />
+    </div>
+  );
+
+  const table = (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
@@ -467,7 +331,7 @@ export default function SuppliersListPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {paginatedSuppliers.map((supplier) => (
+                  {suppliers.map((supplier) => (
                     <tr
                       key={supplier.id}
                       onClick={() => navigate(`/suppliers/${supplier.id}`)}
@@ -547,11 +411,6 @@ export default function SuppliersListPage() {
                               Inactive
                             </Badge>
                           )}
-                          {supplier.is_approved && (
-                            <Badge variant="success" size="sm">
-                              Approved
-                            </Badge>
-                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
@@ -562,50 +421,34 @@ export default function SuppliersListPage() {
                 </tbody>
               </table>
             </div>
-          </div>
+  );
 
-          {totalPages > 1 && (
-            <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mt-4 p-2.5">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-slate-600">
-                  Showing <span className="font-medium text-slate-900">{startIndex + 1}</span> to{' '}
-                  <span className="font-medium text-slate-900">{endIndex}</span> of{' '}
-                  <span className="font-medium text-slate-900">{filteredSuppliers.length}</span> suppliers
-                </div>
-                <div className="flex items-center gap-4">
-                  <p className="text-sm text-slate-600">
-                    Page <span className="font-medium text-slate-900">{currentPage}</span> of{' '}
-                    <span className="font-medium text-slate-900">{totalPages}</span>
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                      className="flex items-center gap-1"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                      Previous
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                      className="flex items-center gap-1"
-                    >
-                      Next
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
+  return (
+    <ListPageTemplate
+      title="Suppliers"
+      headerActions={
+        <Button onClick={handleOpenModal} variant="primary">
+          <Plus className="w-4 h-4 mr-2" />
+          Add Supplier
+        </Button>
+      }
+      kpis={
+        <KpiRow
+          cols="grid-cols-1 md:grid-cols-3"
+          stats={[
+            { label: 'Total Suppliers', value: stats?.total ?? 0, tone: 'info' },
+            { label: 'Active', value: stats?.active ?? 0, tone: 'success' },
+            { label: 'Total Spend (YTD)', value: formatCurrency(stats?.totalSpend ?? 0), tone: 'warning' },
+          ]}
+        />
+      }
+      toolbar={toolbar}
+      table={table}
+      pager={{ page, pageSize: PAGE_SIZE, total: totalSuppliers, onPageChange: setPage, itemNoun: 'suppliers' }}
+      loading={loading}
+      isEmpty={suppliers.length === 0}
+      empty={emptyState}
+    >
       {showAddModal && (
         <SupplierFormModal
           isOpen={showAddModal}
@@ -614,6 +457,6 @@ export default function SuppliersListPage() {
           supplier={null}
         />
       )}
-    </div>
+    </ListPageTemplate>
   );
 }

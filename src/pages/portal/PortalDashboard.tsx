@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { usePortalAuth } from '../../contexts/PortalAuthContext';
 import { supabase } from '../../lib/supabaseClient';
 import { Card } from '../../components/ui/Card';
@@ -8,15 +9,18 @@ import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { FileText, DollarSign, MessageSquare, Clock } from 'lucide-react';
 import { formatDate } from '../../lib/format';
+import { useCurrency } from '../../hooks/useCurrency';
 import { fetchPortalVisibility, getVisibleCaseIds, getCaseIdsWithFlag } from '../../lib/portalVisibility';
 
 export const PortalDashboard: React.FC = () => {
+  const { t } = useTranslation();
   const { customer } = usePortalAuth();
+  const { formatCurrency } = useCurrency();
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = 'Dashboard — Customer Portal';
-  }, []);
+    document.title = t('portal.dashboard.tabTitle');
+  }, [t]);
 
   const { data: casePriorities = [] } = useQuery({
     queryKey: ['case_priorities'],
@@ -135,10 +139,10 @@ export const PortalDashboard: React.FC = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900 mb-2">
-          Welcome back, {customer?.customer_name}!
+          {t('portal.dashboard.welcomeBack', { name: customer?.customer_name })}
         </h1>
         <p className="text-slate-600">
-          Track your data recovery cases and manage quotes from your dashboard.
+          {t('portal.dashboard.subtitle')}
         </p>
       </div>
 
@@ -147,7 +151,7 @@ export const PortalDashboard: React.FC = () => {
           role="alert"
           className="rounded-lg border border-danger/30 bg-danger-muted p-4 text-sm"
         >
-          <p className="text-danger">Some dashboard data failed to load. Please try again.</p>
+          <p className="text-danger">{t('portal.dashboard.loadError')}</p>
           <button
             onClick={() => {
               if (casesStatsError) refetchCasesStats();
@@ -156,7 +160,7 @@ export const PortalDashboard: React.FC = () => {
             }}
             className="mt-2 text-primary underline"
           >
-            Retry
+            {t('portal.dashboard.retry')}
           </button>
         </div>
       )}
@@ -168,7 +172,7 @@ export const PortalDashboard: React.FC = () => {
               <FileText className="w-6 h-6 text-white" aria-hidden="true" />
             </div>
             <div>
-              <p className="text-sm text-slate-600 mb-1">Total Cases</p>
+              <p className="text-sm text-slate-600 mb-1">{t('portal.dashboard.totalCases')}</p>
               <p className="text-3xl font-bold text-slate-900">{casesStats?.total || 0}</p>
             </div>
           </div>
@@ -180,7 +184,7 @@ export const PortalDashboard: React.FC = () => {
               <Clock className="w-6 h-6 text-white" aria-hidden="true" />
             </div>
             <div>
-              <p className="text-sm text-slate-600 mb-1">Active Cases</p>
+              <p className="text-sm text-slate-600 mb-1">{t('portal.dashboard.activeCases')}</p>
               <p className="text-3xl font-bold text-slate-900">{casesStats?.active || 0}</p>
             </div>
           </div>
@@ -192,7 +196,7 @@ export const PortalDashboard: React.FC = () => {
               <DollarSign className="w-6 h-6 text-white" aria-hidden="true" />
             </div>
             <div>
-              <p className="text-sm text-slate-600 mb-1">Pending Quotes</p>
+              <p className="text-sm text-slate-600 mb-1">{t('portal.dashboard.pendingQuotes')}</p>
               <p className="text-3xl font-bold text-slate-900">{pendingQuotes.length}</p>
             </div>
           </div>
@@ -202,9 +206,9 @@ export const PortalDashboard: React.FC = () => {
       {pendingQuotes.length > 0 && (
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-slate-900">Quotes Awaiting Your Response</h2>
+            <h2 className="text-lg font-bold text-slate-900">{t('portal.dashboard.quotesAwaitingResponse')}</h2>
             <Badge variant="warning">
-              {pendingQuotes.length} Pending
+              {pendingQuotes.length} {t('portal.dashboard.pending')}
             </Badge>
           </div>
           <div className="space-y-3">
@@ -226,18 +230,18 @@ export const PortalDashboard: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-slate-900">
-                        {Number(quote.total_amount).toLocaleString()}
+                        {formatCurrency(Number(quote.total_amount) || 0)}
                       </p>
                       {quote.valid_until && (
                         <p className="text-xs text-slate-500">
-                          Valid until {formatDate(quote.valid_until)}
+                          {t('portal.dashboard.validUntil', { date: formatDate(quote.valid_until) })}
                         </p>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <MessageSquare className="w-4 h-4 text-warning" aria-hidden="true" />
-                    <span className="text-sm text-warning">Response required</span>
+                    <span className="text-sm text-warning">{t('portal.dashboard.responseRequired')}</span>
                   </div>
                 </div>
               );
@@ -248,13 +252,13 @@ export const PortalDashboard: React.FC = () => {
 
       <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-slate-900">Recent Cases</h2>
+          <h2 className="text-lg font-bold text-slate-900">{t('portal.dashboard.recentCases')}</h2>
           {recentCases.length > 0 && (
             <button
               onClick={() => navigate('/portal/cases')}
               className="text-sm font-medium text-primary hover:text-primary/80"
             >
-              View All
+              {t('portal.dashboard.viewAll')}
             </button>
           )}
         </div>
@@ -262,9 +266,9 @@ export const PortalDashboard: React.FC = () => {
         {recentCases.length === 0 ? (
           <div className="text-center py-12">
             <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" aria-hidden="true" />
-            <p className="text-slate-600">No cases found</p>
+            <p className="text-slate-600">{t('portal.dashboard.noCasesFound')}</p>
             <p className="text-sm text-slate-500 mt-2">
-              Your data recovery cases will appear here
+              {t('portal.dashboard.noCasesSubtitle')}
             </p>
           </div>
         ) : (
@@ -289,7 +293,7 @@ export const PortalDashboard: React.FC = () => {
                     {caseItem.status}
                   </Badge>
                 </div>
-                <p className="text-xs text-slate-500">Created {formatDate(caseItem.created_at)}</p>
+                <p className="text-xs text-slate-500">{t('portal.dashboard.createdDate', { date: formatDate(caseItem.created_at) })}</p>
               </div>
             ))}
           </div>

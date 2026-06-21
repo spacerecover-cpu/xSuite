@@ -45,10 +45,11 @@ export type BadgeVariant =
  * token-vocabulary-backed source of truth. Adopt incrementally; this only ADDS
  * the function. Matching is case-insensitive and ignores surrounding whitespace.
  *
- * Unknown statuses fall back to the neutral `secondary` variant.
+ * Unknown statuses — including null/undefined from nullable DB columns
+ * (e.g. `invoices.status`) — fall back to the neutral `secondary` variant.
  */
-export function statusToBadgeVariant(status: string): BadgeVariant {
-  switch (status.trim().toLowerCase()) {
+export function statusToBadgeVariant(status: string | null | undefined): BadgeVariant {
+  switch (status?.trim().toLowerCase()) {
     // Positive / terminal-good outcomes. Domain additions: 'ready' (recovery
     // data ready for delivery — matches the internal "Ready" success stat card),
     // 'available' (clone drive free for use).

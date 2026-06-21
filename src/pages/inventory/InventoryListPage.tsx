@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Package, Zap, Edit2, Trash2, RefreshCw, Filter, ChevronLeft, ChevronRight, Upload } from 'lucide-react';
+import { Plus, Search, Package, Zap, Edit2, Trash2, RefreshCw, Filter, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../hooks/useToast';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
 import AddInventoryModal from '../../components/inventory/AddInventoryModal';
 import InventoryDetailModal from '../../components/inventory/InventoryDetailModal';
 import DeleteInventoryConfirmationModal from '../../components/inventory/DeleteInventoryConfirmationModal';
 import { InventoryInsightsHeader } from '../../components/inventory/InventoryInsightsHeader';
 import { BulkInventoryImportModal } from '../../components/importExport/BulkInventoryImportModal';
 import {
-  getInventoryItems,
+  getInventoryItemsPage,
   getInventoryCategories,
   getInventoryStatusTypes,
   getInventoryStatistics,
@@ -23,6 +24,8 @@ import {
 } from '../../lib/inventoryService';
 import { format } from 'date-fns';
 import { logger } from '../../lib/logger';
+
+const PAGE_SIZE = 50;
 
 export default function InventoryListPage() {
   const navigate = useNavigate();
@@ -48,6 +51,7 @@ export default function InventoryListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -59,17 +63,22 @@ export default function InventoryListPage() {
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
-  const ITEMS_PER_PAGE = 7;
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     loadData();
-  }, [selectedCategory, selectedStatus, searchTerm, currentPage]);
+  }, [selectedCategory, selectedStatus, debouncedSearch, page]);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, selectedCategory, selectedStatus]);
+    setPage(0);
+  }, [debouncedSearch, selectedCategory, selectedStatus]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -105,10 +114,12 @@ export default function InventoryListPage() {
 
       const [itemsData, categoriesData, statusTypesData, statsData, insightsData] =
         await Promise.all([
-          getInventoryItems({
+          getInventoryItemsPage({
             category_id: selectedCategory || undefined,
             status_id: selectedStatus || undefined,
-            search: searchTerm || undefined,
+            search: debouncedSearch || undefined,
+            page,
+            pageSize: PAGE_SIZE,
           }),
           getInventoryCategories(),
           getInventoryStatusTypes(),
@@ -116,7 +127,8 @@ export default function InventoryListPage() {
           getInventoryInsights(),
         ]);
 
-      setItems(itemsData || []);
+      setItems(itemsData?.rows || []);
+      setTotal(itemsData?.total || 0);
       setCategories(categoriesData || []);
       setStatusTypes(statusTypesData || []);
       setStatistics(statsData || {
@@ -262,69 +274,55 @@ export default function InventoryListPage() {
     return `${item.brand?.name || ''} ${item.model || ''}`.trim() || 'Inventory Item';
   };
 
-  const totalPages = Math.ceil(items.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE + 1;
-  const endIndex = Math.min(currentPage * ITEMS_PER_PAGE, items.length);
-  const paginatedItems = items.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const headerActions = (
+    <div className="flex gap-2">
+      <Button
+        onClick={() => navigate('/inventory/donor-search')}
+        variant="secondary"
+      >
+        <Zap className="w-4 h-4 mr-2" />
+        Donor Search
+      </Button>
+      <Button
+        onClick={() => setIsBulkImportOpen(true)}
+        variant="secondary"
+        className="bg-success-muted hover:bg-success-muted/80 text-success border-success/30"
+      >
+        <Upload className="w-4 h-4 mr-2" />
+        Bulk Import
+      </Button>
+      <Button
+        onClick={handleRefresh}
+        variant="secondary"
+        disabled={isRefreshing}
+        title="Refresh inventory list"
+      >
+        <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+        {isRefreshing ? 'Refreshing...' : 'Refresh'}
+      </Button>
+      <Button onClick={() => setIsAddModalOpen(true)} variant="primary">
+        <Plus className="w-4 h-4 mr-2" />
+        Add Item
+      </Button>
+    </div>
+  );
 
-  return (
-    <div className="p-6 max-w-[1800px] mx-auto">
-      <div className="mb-6 flex items-start justify-between">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg bg-primary">
-            <Package className="w-6 h-6 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-1">Inventory Management</h1>
-            <p className="text-slate-600 text-base">
-              Track and manage physical inventory items
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={() => navigate('/inventory/donor-search')}
-            variant="secondary"
-          >
-            <Zap className="w-4 h-4 mr-2" />
-            Donor Search
-          </Button>
-          <Button
-            onClick={() => setIsBulkImportOpen(true)}
-            variant="secondary"
-            className="bg-success-muted hover:bg-success-muted/80 text-success border-success/30"
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            Bulk Import
-          </Button>
-          <Button
-            onClick={handleRefresh}
-            variant="secondary"
-            disabled={isRefreshing}
-            title="Refresh inventory list"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
-          <Button onClick={() => setIsAddModalOpen(true)} variant="primary">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Item
-          </Button>
-        </div>
-      </div>
+  const kpis = (
+    <div className="mb-6">
+      <InventoryInsightsHeader
+        hddCount={insights.hddCount}
+        ssdCount={insights.ssdCount}
+        pcbCount={insights.pcbCount}
+        totalValue={insights.totalValue}
+        totalItems={statistics.totalItems}
+        inUseCount={insights.totalInUse}
+        loading={loading}
+      />
+    </div>
+  );
 
-      <div className="mb-6">
-        <InventoryInsightsHeader
-          hddCount={insights.hddCount}
-          ssdCount={insights.ssdCount}
-          pcbCount={insights.pcbCount}
-          totalValue={insights.totalValue}
-          totalItems={statistics.totalItems}
-          inUseCount={insights.totalInUse}
-          loading={loading}
-        />
-      </div>
-
+  const toolbar = (
+    <>
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
         <div className="p-6">
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
@@ -446,26 +444,23 @@ export default function InventoryListPage() {
           </div>
         </div>
       )}
+    </>
+  );
 
-      {loading ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading inventory...</p>
-        </div>
-      ) : items.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500 text-lg">
-            {searchTerm || selectedCategory || selectedStatus
-              ? 'No inventory items found matching your criteria.'
-              : 'No inventory items yet. Add your first item to get started.'}
-          </p>
-        </div>
-      ) : (
-        <>
-          <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
+  const emptyState = (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
+      <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+      <p className="text-slate-500 text-lg">
+        {searchTerm || selectedCategory || selectedStatus
+          ? 'No inventory items found matching your criteria.'
+          : 'No inventory items yet. Add your first item to get started.'}
+      </p>
+    </div>
+  );
+
+  const tableNode = (
+    <div className="overflow-x-auto">
+      <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
@@ -498,7 +493,7 @@ export default function InventoryListPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {paginatedItems.map((item) => (
+                  {items.map((item) => (
                     <tr
                       key={item.id}
                       onClick={(e) => handleRowClick(item, e)}
@@ -666,51 +661,21 @@ export default function InventoryListPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
-          </div>
+    </div>
+  );
 
-          {totalPages > 1 && (
-            <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mt-4 p-2.5">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-slate-600">
-                  Showing <span className="font-medium text-slate-900">{startIndex}</span> to{' '}
-                  <span className="font-medium text-slate-900">{endIndex}</span> of{' '}
-                  <span className="font-medium text-slate-900">{items.length}</span> items
-                </div>
-                <div className="flex items-center gap-4">
-                  <p className="text-sm text-slate-600">
-                    Page <span className="font-medium text-slate-900">{currentPage}</span> of{' '}
-                    <span className="font-medium text-slate-900">{totalPages}</span>
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1 || isRefreshing}
-                      className="flex items-center gap-1"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                      Previous
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages || isRefreshing}
-                      className="flex items-center gap-1"
-                    >
-                      Next
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
+  return (
+    <ListPageTemplate
+      title="Inventory Management"
+      headerActions={headerActions}
+      kpis={kpis}
+      toolbar={toolbar}
+      table={tableNode}
+      pager={total > 0 ? { page, pageSize: PAGE_SIZE, total, onPageChange: setPage, itemNoun: 'inventory items' } : undefined}
+      empty={emptyState}
+      isEmpty={items.length === 0}
+      loading={loading}
+    >
       <AddInventoryModal
         isOpen={isAddModalOpen || !!editingItemId}
         onClose={() => {
@@ -753,6 +718,6 @@ export default function InventoryListPage() {
           loadData();
         }}
       />
-    </div>
+    </ListPageTemplate>
   );
 }

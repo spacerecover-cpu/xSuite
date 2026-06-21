@@ -17,7 +17,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { logger } from '../../lib/logger';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
 
 interface ExpenseFormModalProps {
   isOpen: boolean;
@@ -34,6 +34,7 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
   initialData,
   preselectedCaseId,
 }) => {
+  const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
   const [amount, setAmount] = useState<number>(0);

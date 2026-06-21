@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { usePortalAuth } from '../../contexts/PortalAuthContext';
 import { supabase } from '../../lib/supabaseClient';
 import { Card } from '../../components/ui/Card';
@@ -9,6 +10,7 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { DollarSign, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
 import { formatDate } from '../../lib/format';
+import { useCurrency } from '../../hooks/useCurrency';
 import { fetchPortalVisibility, getCaseIdsWithFlag } from '../../lib/portalVisibility';
 
 interface Quote {
@@ -40,7 +42,9 @@ interface QuoteItem {
 }
 
 export const PortalQuotes: React.FC = () => {
+  const { t } = useTranslation();
   const { customer } = usePortalAuth();
+  const { formatCurrency } = useCurrency();
   const queryClient = useQueryClient();
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -49,8 +53,8 @@ export const PortalQuotes: React.FC = () => {
   const [response, setResponse] = useState('');
 
   useEffect(() => {
-    document.title = 'Quotes — Customer Portal';
-  }, []);
+    document.title = t('portal.quotes.tabTitle');
+  }, [t]);
 
   const { data: visibility = [] } = useQuery({
     queryKey: ['portal_visibility', customer?.id],
@@ -174,8 +178,8 @@ export const PortalQuotes: React.FC = () => {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">Quotes</h1>
-          <p className="text-slate-600">Review and respond to quotes for your data recovery cases</p>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">{t('portal.quotes.heading')}</h1>
+          <p className="text-slate-600">{t('portal.quotes.subtitle')}</p>
         </div>
         <div className="grid grid-cols-1 gap-4">
           {[0, 1].map((i) => (
@@ -205,16 +209,16 @@ export const PortalQuotes: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">Quotes</h1>
+        <h1 className="text-2xl font-bold text-slate-900 mb-2">{t('portal.quotes.heading')}</h1>
         <p className="text-slate-600">
-          Review and respond to quotes for your data recovery cases
+          {t('portal.quotes.subtitle')}
         </p>
       </div>
 
       {isError && (
         <div role="alert" className="rounded-lg border border-danger/30 bg-danger-muted p-4 text-sm">
-          <p className="text-danger">Failed to load quotes. Please try again.</p>
-          <button onClick={() => refetch()} className="mt-2 text-primary underline">Retry</button>
+          <p className="text-danger">{t('portal.quotes.loadError')}</p>
+          <button onClick={() => refetch()} className="mt-2 text-primary underline">{t('portal.quotes.retry')}</button>
         </div>
       )}
 
@@ -222,7 +226,7 @@ export const PortalQuotes: React.FC = () => {
         <div>
           <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
             <Clock className="w-5 h-5 text-warning" aria-hidden="true" />
-            Awaiting Your Response
+            {t('portal.quotes.awaitingResponse')}
           </h2>
           <div className="grid grid-cols-1 gap-4">
             {pendingQuotes.map((quote) => (
@@ -232,7 +236,7 @@ export const PortalQuotes: React.FC = () => {
                 onClick={() => handleViewDetails(quote)}
                 role="button"
                 tabIndex={0}
-                aria-label={`Open quote ${quote.quote_number}`}
+                aria-label={t('portal.quotes.openQuote', { quoteNo: quote.quote_number })}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
@@ -242,26 +246,26 @@ export const PortalQuotes: React.FC = () => {
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
-                    <h3 className="text-lg font-bold text-slate-900 mb-1">{quote.cases?.title ?? 'Quote'}</h3>
+                    <h3 className="text-lg font-bold text-slate-900 mb-1">{quote.cases?.title ?? t('portal.quotes.heading')}</h3>
                     <p className="text-sm text-slate-600 mb-2">{quote.quote_number}</p>
-                    <p className="text-sm text-slate-700">Case: {quote.cases?.case_no} - {quote.cases?.title}</p>
+                    <p className="text-sm text-slate-700">{t('portal.quotes.caseLabel', { caseNo: quote.cases?.case_no, caseTitle: quote.cases?.title })}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold text-slate-900">
-                      {Number(quote.total_amount).toLocaleString()}
+                      {formatCurrency(Number(quote.total_amount) || 0)}
                     </p>
                     {quote.valid_until && (
                       <p className="text-xs text-slate-500 mt-1">
-                        Valid until {formatDate(quote.valid_until)}
+                        {t('portal.quotes.validUntil', { date: formatDate(quote.valid_until) })}
                       </p>
                     )}
                   </div>
                 </div>
                 <div className="flex items-center justify-between pt-4 border-t border-warning/30">
                   <Badge variant="warning">
-                    Response Required
+                    {t('portal.quotes.responseRequired')}
                   </Badge>
-                  <span className="text-sm text-primary font-medium">View & Respond →</span>
+                  <span className="text-sm text-primary font-medium">{t('portal.quotes.viewAndRespond')}</span>
                 </div>
               </Card>
             ))}
@@ -271,7 +275,7 @@ export const PortalQuotes: React.FC = () => {
 
       {processedQuotes.length > 0 && (
         <div>
-          <h2 className="text-lg font-bold text-slate-900 mb-4">Quote History</h2>
+          <h2 className="text-lg font-bold text-slate-900 mb-4">{t('portal.quotes.quoteHistory')}</h2>
           <div className="grid grid-cols-1 gap-4">
             {processedQuotes.map((quote) => (
               <Card
@@ -280,7 +284,7 @@ export const PortalQuotes: React.FC = () => {
                 onClick={() => handleViewDetails(quote)}
                 role="button"
                 tabIndex={0}
-                aria-label={`Open quote ${quote.quote_number}`}
+                aria-label={t('portal.quotes.openQuote', { quoteNo: quote.quote_number })}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
@@ -298,17 +302,17 @@ export const PortalQuotes: React.FC = () => {
                       </Badge>
                     </div>
                     <p className="text-sm text-slate-600 mb-2">{quote.quote_number}</p>
-                    <p className="text-sm text-slate-700">Case: {quote.cases?.case_no}</p>
+                    <p className="text-sm text-slate-700">{t('portal.quotes.caseLabelShort', { caseNo: quote.cases?.case_no })}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-xl font-bold text-slate-900">
-                      {Number(quote.total_amount).toLocaleString()}
+                      {formatCurrency(Number(quote.total_amount) || 0)}
                     </p>
                   </div>
                 </div>
                 {quote.approved_at && (
                   <p className="text-xs text-slate-500 pt-4 border-t border-slate-200">
-                    Approved on {formatDate(quote.approved_at)}
+                    {t('portal.quotes.approvedOn', { date: formatDate(quote.approved_at) })}
                   </p>
                 )}
               </Card>
@@ -320,9 +324,9 @@ export const PortalQuotes: React.FC = () => {
       {quotes.length === 0 && !isError && (
         <Card className="p-12 text-center">
           <DollarSign className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <p className="text-lg text-slate-600 mb-2">No quotes yet</p>
+          <p className="text-lg text-slate-600 mb-2">{t('portal.quotes.noQuotesFound')}</p>
           <p className="text-sm text-slate-500">
-            Quotes for your data recovery cases will appear here
+            {t('portal.quotes.noQuotesSubtitle')}
           </p>
         </Card>
       )}
@@ -330,7 +334,7 @@ export const PortalQuotes: React.FC = () => {
       <Modal
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
-        title="Quote Details"
+        title={t('portal.quotes.quoteDetails')}
       >
         {selectedQuote && (
           <div className="space-y-6">
@@ -343,7 +347,7 @@ export const PortalQuotes: React.FC = () => {
               </div>
               <p className="text-sm text-slate-600 mb-2">{selectedQuote.quote_number}</p>
               <p className="text-sm text-slate-700">
-                Case: {selectedQuote.cases?.case_no} - {selectedQuote.cases?.title}
+                {t('portal.quotes.caseLabel', { caseNo: selectedQuote.cases?.case_no, caseTitle: selectedQuote.cases?.title })}
               </p>
               {selectedQuote.notes && (
                 <p className="text-slate-700 mt-3 whitespace-pre-wrap">{selectedQuote.notes}</p>
@@ -353,16 +357,16 @@ export const PortalQuotes: React.FC = () => {
             {quoteItems.length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider mb-3">
-                  Quote Items
+                  {t('portal.quotes.quoteItems')}
                 </h3>
                 <div className="border border-slate-200 rounded-lg overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-slate-50 border-b border-slate-200">
                       <tr>
-                        <th className="text-left p-3 font-semibold text-slate-700">Item</th>
-                        <th className="text-center p-3 font-semibold text-slate-700">Qty</th>
-                        <th className="text-right p-3 font-semibold text-slate-700">Unit Price</th>
-                        <th className="text-right p-3 font-semibold text-slate-700">Total</th>
+                        <th className="text-left p-3 font-semibold text-slate-700">{t('portal.quotes.tableItem')}</th>
+                        <th className="text-center p-3 font-semibold text-slate-700">{t('portal.quotes.tableQty')}</th>
+                        <th className="text-right p-3 font-semibold text-slate-700">{t('portal.quotes.tableUnitPrice')}</th>
+                        <th className="text-right p-3 font-semibold text-slate-700">{t('portal.quotes.tableTotal')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -373,10 +377,10 @@ export const PortalQuotes: React.FC = () => {
                           </td>
                           <td className="p-3 text-center text-slate-700">{item.quantity ?? 1}</td>
                           <td className="p-3 text-right text-slate-700">
-                            {Number(item.unit_price).toLocaleString()}
+                            {formatCurrency(Number(item.unit_price) || 0)}
                           </td>
                           <td className="p-3 text-right font-medium text-slate-900">
-                            {Number(item.total_price).toLocaleString()}
+                            {formatCurrency(Number(item.total_price) || 0)}
                           </td>
                         </tr>
                       ))}
@@ -384,38 +388,38 @@ export const PortalQuotes: React.FC = () => {
                     <tfoot className="bg-slate-100 border-t-2 border-slate-300">
                       <tr>
                         <td colSpan={3} className="p-3 text-right font-bold text-slate-900">
-                          Subtotal:
+                          {t('portal.quotes.subtotal')}
                         </td>
                         <td className="p-3 text-right text-slate-900">
-                          {Number(selectedQuote.subtotal).toLocaleString()}
+                          {formatCurrency(Number(selectedQuote.subtotal) || 0)}
                         </td>
                       </tr>
                       {Number(selectedQuote.discount_amount) > 0 && (
                         <tr>
                           <td colSpan={3} className="p-3 text-right font-bold text-slate-900">
-                            Discount:
+                            {t('portal.quotes.discount')}
                           </td>
                           <td className="p-3 text-right text-slate-900">
-                            -{Number(selectedQuote.discount_amount).toLocaleString()}
+                            -{formatCurrency(Number(selectedQuote.discount_amount) || 0)}
                           </td>
                         </tr>
                       )}
                       {Number(selectedQuote.tax_amount) > 0 && (
                         <tr>
                           <td colSpan={3} className="p-3 text-right font-bold text-slate-900">
-                            Tax:
+                            {t('portal.quotes.tax')}
                           </td>
                           <td className="p-3 text-right text-slate-900">
-                            {Number(selectedQuote.tax_amount).toLocaleString()}
+                            {formatCurrency(Number(selectedQuote.tax_amount) || 0)}
                           </td>
                         </tr>
                       )}
                       <tr>
                         <td colSpan={3} className="p-3 text-right font-bold text-slate-900">
-                          Total Amount:
+                          {t('portal.quotes.totalAmount')}
                         </td>
                         <td className="p-3 text-right font-bold text-slate-900 text-lg">
-                          {Number(selectedQuote.total_amount).toLocaleString()}
+                          {formatCurrency(Number(selectedQuote.total_amount) || 0)}
                         </td>
                       </tr>
                     </tfoot>
@@ -435,7 +439,7 @@ export const PortalQuotes: React.FC = () => {
                   className="flex-1 text-danger hover:bg-danger-muted"
                 >
                   <XCircle className="w-4 h-4 mr-2" />
-                  Reject Quote
+                  {t('portal.quotes.rejectQuote')}
                 </Button>
                 <Button
                   onClick={() => {
@@ -445,7 +449,7 @@ export const PortalQuotes: React.FC = () => {
                   className="flex-1 bg-success hover:bg-success/90"
                 >
                   <CheckCircle className="w-4 h-4 mr-2" />
-                  Approve Quote
+                  {t('portal.quotes.approveQuote')}
                 </Button>
               </div>
             )}
@@ -459,11 +463,11 @@ export const PortalQuotes: React.FC = () => {
           setIsApproveModalOpen(false);
           setResponse('');
         }}
-        title="Approve Quote"
+        title={t('portal.quotes.approveModal.title')}
       >
         <div className="space-y-4">
           <p className="text-slate-700">
-            You are about to approve this quote. This action will notify our team to proceed with the work.
+            {t('portal.quotes.approveModal.body')}
           </p>
           <div className="flex gap-3 justify-end pt-3 border-t">
             <Button
@@ -473,14 +477,14 @@ export const PortalQuotes: React.FC = () => {
                 setResponse('');
               }}
             >
-              Cancel
+              {t('portal.quotes.approveModal.cancel')}
             </Button>
             <Button
               onClick={handleApprove}
               disabled={approveMutation.isPending}
               className="bg-success hover:bg-success/90"
             >
-              {approveMutation.isPending ? 'Approving...' : 'Confirm Approval'}
+              {approveMutation.isPending ? t('portal.quotes.approveModal.approving') : t('portal.quotes.approveModal.confirmApproval')}
             </Button>
           </div>
         </div>
@@ -492,22 +496,22 @@ export const PortalQuotes: React.FC = () => {
           setIsRejectModalOpen(false);
           setResponse('');
         }}
-        title="Reject Quote"
+        title={t('portal.quotes.rejectModal.title')}
       >
         <div className="space-y-4">
           <p className="text-slate-700">
-            You are about to reject this quote. Please provide a reason to help us understand your concerns.
+            {t('portal.quotes.rejectModal.body')}
           </p>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Reason for Rejection
+              {t('portal.quotes.rejectModal.reasonLabel')}
             </label>
             <textarea
               value={response}
               onChange={(e) => setResponse(e.target.value)}
               rows={3}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-              placeholder="Please explain why you're rejecting this quote..."
+              placeholder={t('portal.quotes.rejectModal.reasonPlaceholder')}
             />
           </div>
           <div className="flex gap-3 justify-end pt-3 border-t">
@@ -518,14 +522,14 @@ export const PortalQuotes: React.FC = () => {
                 setResponse('');
               }}
             >
-              Cancel
+              {t('portal.quotes.rejectModal.cancel')}
             </Button>
             <Button
               onClick={handleReject}
               disabled={rejectMutation.isPending}
               className="bg-danger hover:bg-danger/90"
             >
-              {rejectMutation.isPending ? 'Rejecting...' : 'Confirm Rejection'}
+              {rejectMutation.isPending ? t('portal.quotes.rejectModal.rejecting') : t('portal.quotes.rejectModal.confirmRejection')}
             </Button>
           </div>
         </div>

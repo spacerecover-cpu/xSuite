@@ -1,6 +1,8 @@
 import { supabase } from './supabaseClient';
 import { logger } from './logger';
+import { sanitizeFilterValue } from './postgrestSanitizer';
 import type { Database } from '../types/database.types';
+import type { ActivityEntry } from '../components/shared/ActivityTimeline';
 
 export type ActionCategory =
   | 'creation'
@@ -396,12 +398,14 @@ export async function logChainOfCustody(params: {
     action_type: params.actionType,
   };
 
+  // p_device_id is omitted for case-level events: the RPC defaults it to NULL.
+  // (Sending '' here used to fail the uuid cast and broke every deviceless event.)
   const { data, error } = await supabase.rpc('log_chain_of_custody', {
     p_case_id: params.caseId,
     p_action_category: params.actionCategory,
     p_action: params.actionType,
     p_description: params.actionDescription,
-    p_device_id: params.deviceId ?? '',
+    ...(params.deviceId ? { p_device_id: params.deviceId } : {}),
     p_metadata: mergedMetadata,
   });
 
@@ -491,49 +495,20 @@ export async function acceptCustodyTransfer(params: {
   newSealNumber?: string;
   signature?: string;
 }): Promise<CustodyTransfer> {
-  // Fetch existing notes so we merge with rather than overwrite the
-  // packed transfer fields from initiateCustodyTransfer.
-  const { data: existing, error: fetchError } = await supabase
-    .from('chain_of_custody_transfers')
-    .select('notes')
-    .eq('id', params.transferId)
-    .maybeSingle();
-
-  if (fetchError) {
-    logger.error('Error fetching custody transfer for accept:', fetchError);
-    throw fetchError;
-  }
-
-  let mergedNotes: Record<string, any> = {};
-  if (existing?.notes) {
-    try {
-      const parsed = JSON.parse(existing.notes);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        mergedNotes = parsed as Record<string, any>;
-      }
-    } catch {
-      // Preserve legacy free-text notes
-      mergedNotes = { _raw: existing.notes };
-    }
-  }
-  mergedNotes.condition_after = params.conditionAfter;
-  mergedNotes.seal_intact = params.sealIntact;
-  mergedNotes.new_seal_number = params.newSealNumber;
-  mergedNotes.to_signature = params.signature;
-  mergedNotes.condition_verified = true;
-
-  const updatePayload: Database['public']['Tables']['chain_of_custody_transfers']['Update'] = {
-    transfer_status: 'accepted',
-    accepted_at: new Date().toISOString(),
-    notes: JSON.stringify(mergedNotes),
-  };
-
-  const { data, error } = await supabase
-    .from('chain_of_custody_transfers')
-    .update(updatePayload)
-    .eq('id', params.transferId)
-    .select()
-    .maybeSingle();
+  // The transfers table is append-only for clients (guard trigger + revoked
+  // grants), so the pending -> accepted transition only exists through the
+  // SECURITY DEFINER RPC. It merges the response fields into the packed-notes
+  // JSON and writes the chain_of_custody event server-side.
+  const { data, error } = await supabase.rpc('respond_to_custody_transfer', {
+    p_transfer_id: params.transferId,
+    p_action: 'accept',
+    p_payload: {
+      condition_after: params.conditionAfter ?? null,
+      seal_intact: params.sealIntact ?? null,
+      new_seal_number: params.newSealNumber ?? null,
+      signature: params.signature ?? null,
+    },
+  });
 
   if (error) {
     logger.error('Error accepting custody transfer:', error);
@@ -544,17 +519,6 @@ export async function acceptCustodyTransfer(params: {
     throw new Error(`Custody transfer ${params.transferId} not found`);
   }
 
-  await logChainOfCustody({
-    caseId: data.case_id,
-    actionCategory: 'transfer',
-    actionType: 'CUSTODY_TRANSFER_ACCEPTED',
-    actionDescription: `Custody transfer accepted by ${data.to_person_name}`,
-    metadata: {
-      transfer_id: data.id,
-      seal_intact: params.sealIntact,
-    },
-  });
-
   return mapCustodyTransferRow(data);
 }
 
@@ -562,18 +526,11 @@ export async function rejectCustodyTransfer(params: {
   transferId: string;
   rejectionReason: string;
 }): Promise<CustodyTransfer> {
-  const updatePayload: Database['public']['Tables']['chain_of_custody_transfers']['Update'] = {
-    transfer_status: 'rejected',
-    rejected_at: new Date().toISOString(),
-    rejection_reason: params.rejectionReason,
-  };
-
-  const { data, error } = await supabase
-    .from('chain_of_custody_transfers')
-    .update(updatePayload)
-    .eq('id', params.transferId)
-    .select()
-    .maybeSingle();
+  const { data, error } = await supabase.rpc('respond_to_custody_transfer', {
+    p_transfer_id: params.transferId,
+    p_action: 'reject',
+    p_payload: { rejection_reason: params.rejectionReason },
+  });
 
   if (error) {
     logger.error('Error rejecting custody transfer:', error);
@@ -583,17 +540,6 @@ export async function rejectCustodyTransfer(params: {
   if (!data) {
     throw new Error(`Custody transfer ${params.transferId} not found`);
   }
-
-  await logChainOfCustody({
-    caseId: data.case_id,
-    actionCategory: 'transfer',
-    actionType: 'CUSTODY_TRANSFER_REJECTED',
-    actionDescription: `Custody transfer rejected: ${params.rejectionReason}`,
-    metadata: {
-      transfer_id: data.id,
-      reason: params.rejectionReason,
-    },
-  });
 
   return mapCustodyTransferRow(data);
 }
@@ -1215,54 +1161,76 @@ export async function logPortalApproval(params: {
   });
 }
 
-export async function logDeviceCheckout(params: {
-  caseId: string;
-  deviceId?: string;
-  collectorName: string;
-  collectorMobile?: string;
-  collectorId?: string;
-  checkoutDate: string;
-}): Promise<string> {
-  return await logChainOfCustody({
-    caseId: params.caseId,
-    actionCategory: 'transfer',
-    actionType: 'DEVICE_CHECKED_OUT',
-    actionDescription: `Device checked out to ${params.collectorName}`,
-    deviceId: params.deviceId,
-    afterValues: {
-      checkout_date: params.checkoutDate,
-      collector_name: params.collectorName,
-      collector_mobile: params.collectorMobile,
-      collector_id: params.collectorId,
-    },
-    metadata: {
-      checkout_date: params.checkoutDate,
-    },
-  });
+export async function fetchCustomerTimeline(customerId: string): Promise<ActivityEntry[]> {
+  const { data: cases } = await supabase
+    .from('cases').select('id').eq('customer_id', customerId).is('deleted_at', null);
+  const caseIds = (cases ?? []).map((c) => c.id);
+  if (caseIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('case_job_history')
+    .select('id, action, details, old_value, new_value, performed_by, created_at')
+    .in('case_id', caseIds)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  const rows = data ?? [];
+  const actorIds = [...new Set(rows.map((r) => r.performed_by).filter(Boolean))] as string[];
+  const names = new Map<string, string | null>();
+  if (actorIds.length > 0) {
+    const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', actorIds);
+    for (const p of profiles ?? []) names.set(p.id, p.full_name);
+  }
+  return rows.map((r) => ({
+    ...r,
+    actor_name: r.performed_by ? names.get(r.performed_by) ?? 'Unknown user' : 'System',
+  }));
 }
 
-export async function logDeviceReturn(params: {
-  caseId: string;
-  deviceId?: string;
-  returnedBy: string;
-  returnDate: string;
-  condition?: string;
-  integrityVerified?: boolean;
-}): Promise<string> {
-  return await logChainOfCustody({
-    caseId: params.caseId,
-    actionCategory: 'transfer',
-    actionType: 'DEVICE_RETURNED',
-    actionDescription: `Device returned by ${params.returnedBy}`,
-    deviceId: params.deviceId,
-    afterValues: {
-      return_date: params.returnDate,
-      returned_by: params.returnedBy,
-      condition: params.condition,
-      integrity_verified: params.integrityVerified,
-    },
-    metadata: {
-      return_date: params.returnDate,
-    },
+// logDeviceCheckout / logDeviceReturn were removed: checkout custody events are
+// written server-side by log_case_checkout (DEVICE_CHECKED_OUT / CASE_CHECKED_OUT),
+// so no client path can record a physical handoff without the ledger entry.
+
+export interface CustodyFeedRow {
+  id: string;
+  case_id: string;
+  device_id: string | null;
+  action: string;
+  action_category: string;
+  description: string | null;
+  actor_name: string | null;
+  custody_status: string | null;
+  created_at: string;
+  case_no: string | null;
+}
+
+/** Tenant-wide custody ledger feed for the admin audit view. RLS already
+ *  scopes rows to the current tenant (platform admins see all). */
+export async function fetchCustodyFeed(opts: {
+  page: number;
+  pageSize: number;
+  search?: string;
+}): Promise<{ rows: CustodyFeedRow[]; total: number }> {
+  const { page, pageSize, search } = opts;
+  let query = supabase
+    .from('chain_of_custody')
+    .select(
+      'id, case_id, device_id, action, action_category, description, actor_name, custody_status, created_at, cases:case_id(case_no)',
+      { count: 'exact' },
+    )
+    .order('created_at', { ascending: false });
+
+  if (search) {
+    const s = sanitizeFilterValue(search);
+    query = query.or(`action.ilike.%${s}%,description.ilike.%${s}%,actor_name.ilike.%${s}%`);
+  }
+
+  const { data, error, count } = await query.range(page * pageSize, (page + 1) * pageSize - 1);
+  if (error) {
+    logger.error('Error fetching custody feed:', error);
+    throw error;
+  }
+  const rows = (data ?? []).map((r) => {
+    const row = r as unknown as CustodyFeedRow & { cases?: { case_no?: string | null } | null };
+    return { ...row, case_no: row.cases?.case_no ?? null };
   });
+  return { rows, total: count ?? 0 };
 }

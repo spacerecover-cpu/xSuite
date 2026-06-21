@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { LowStockWidget } from '../../components/dashboard/LowStockWidget';
+import { DueFollowUpsWidget } from '../../components/dashboard/DueFollowUpsWidget';
 import { StockSalesWidget } from '../../components/dashboard/StockSalesWidget';
 import { StockValueWidget } from '../../components/dashboard/StockValueWidget';
 import { supabase } from '../../lib/supabaseClient';
@@ -153,6 +154,10 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
       )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <DueFollowUpsWidget />
+      </div>
 
       {isEnabled('dashboard.stock_widgets') && (
       <div>

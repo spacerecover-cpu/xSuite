@@ -14,7 +14,9 @@ import {
   REVIEW_STATUSES,
 } from '../../lib/performanceService';
 import { ReviewFormModal } from '../../components/performance/ReviewFormModal';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 const statusBadgeVariant: Record<string, 'default' | 'info' | 'success' | 'warning'> = {
   draft: 'default',
@@ -155,6 +157,8 @@ function ReviewCard({
 
 export const PerformanceReviewsPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -278,8 +282,10 @@ export const PerformanceReviewsPage: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-56 rounded-2xl" />
+          ))}
         </div>
       ) : filteredReviews.length === 0 ? (
         <div className="text-center py-16">
@@ -303,8 +309,14 @@ export const PerformanceReviewsPage: React.FC = () => {
               key={review.id}
               review={review}
               onEdit={r => { setEditingReview(r); setShowModal(true); }}
-              onDelete={id => {
-                if (confirm('Delete this review?')) {
+              onDelete={async id => {
+                const ok = await confirm({
+                  title: 'Delete Review',
+                  message: 'Delete this review?',
+                  confirmLabel: 'Delete',
+                  tone: 'danger',
+                });
+                if (ok) {
                   deleteMutation.mutate(id);
                 }
               }}

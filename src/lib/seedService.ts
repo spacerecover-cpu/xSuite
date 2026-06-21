@@ -973,6 +973,18 @@ export async function seedTemplates(): Promise<SeedResult> {
       };
     }
 
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (!profile?.tenant_id) {
+      return {
+        success: false,
+        message: 'No active tenant for the current user',
+      };
+    }
+
     const details: TableSeedResult[] = [];
     let totalInserted = 0;
 
@@ -987,17 +999,20 @@ export async function seedTemplates(): Promise<SeedResult> {
           .maybeSingle();
 
         if (templateType) {
+          const extras = template as { subject?: string; document_type?: string };
           const { error } = await supabase
             .from('document_templates')
             .insert({
               template_type_id: templateType.id,
+              tenant_id: profile.tenant_id,
               name: template.name,
               content: template.content,
-              subject_line: (template as any).subject || null,
+              subject_line: extras.subject || null,
+              document_type: extras.document_type || null,
               is_default: template.is_default,
               is_active: true,
               created_by: user.id,
-            } as never);
+            });
 
           if (error) {
             logger.error(`Error seeding template ${template.name}:`, error);

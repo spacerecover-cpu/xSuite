@@ -63,6 +63,7 @@ function mapTemplateRow(row: TemplateRow): ReportTemplate {
     },
     is_active: row.is_active ?? true,
     is_default: readBool(data, 'is_default') ?? false,
+    tenant_id: row.tenant_id ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -195,7 +196,9 @@ export const reportsService = {
   },
 
   /**
-   * Get the default template for a specific report type
+   * Get the default template for a specific report type.
+   * A tenant override (tenant_id NOT NULL) beats the system default (NULL) —
+   * RLS already restricts visible tenant rows to the caller's tenant.
    */
   async getDefaultTemplate(reportType: ReportType): Promise<ReportTemplate | null> {
     const { data, error } = await supabase
@@ -203,14 +206,16 @@ export const reportsService = {
       .select('*')
       .contains('template_data', { report_type: reportType, is_default: true })
       .eq('is_active', true)
-      .maybeSingle();
+      .order('tenant_id', { ascending: true, nullsFirst: false })
+      .limit(1);
 
     if (error) {
       logger.error('Error fetching default template:', error);
       throw error;
     }
 
-    return data ? mapTemplateRow(data) : null;
+    const row = data?.[0];
+    return row ? mapTemplateRow(row) : null;
   },
 
   /**
@@ -230,6 +235,248 @@ export const reportsService = {
     }
 
     return (data ?? []).map(mapTemplateRow);
+  },
+
+  /**
+   * Create a tenant report template (Report Studio).
+   */
+  async createReportTemplate(input: {
+    name: string;
+    description?: string;
+    reportType: ReportType;
+    isDefault?: boolean;
+    tenantId: string;
+  }): Promise<ReportTemplate> {
+    if (input.isDefault) {
+      await this.clearTenantDefault(input.reportType, input.tenantId);
+    }
+
+    const { data, error } = await supabase
+      .from('master_case_report_templates')
+      .insert({
+        name: input.name,
+        description: input.description ?? null,
+        is_active: true,
+        tenant_id: input.tenantId,
+        template_data: {
+          report_type: input.reportType,
+          is_default: input.isDefault ?? false,
+        } as Json,
+      })
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      logger.error('Error creating report template:', error);
+      throw error;
+    }
+    if (!data) throw new Error('Failed to create report template');
+    return mapTemplateRow(data);
+  },
+
+  /**
+   * Update a tenant report template's metadata (system rows are RLS-protected;
+   * clone them to the tenant first).
+   */
+  async updateReportTemplate(
+    templateId: string,
+    input: { name?: string; description?: string; isDefault?: boolean; isActive?: boolean }
+  ): Promise<ReportTemplate> {
+    const { data: existing, error: fetchError } = await supabase
+      .from('master_case_report_templates')
+      .select('*')
+      .eq('id', templateId)
+      .maybeSingle();
+
+    if (fetchError) throw fetchError;
+    if (!existing) throw new Error('Template not found');
+
+    const data = isJsonObject(existing.template_data) ? { ...existing.template_data } : {};
+    if (input.isDefault !== undefined) {
+      if (input.isDefault && existing.tenant_id) {
+        await this.clearTenantDefault(
+          (readString(data, 'report_type') as ReportType) ?? 'evaluation',
+          existing.tenant_id
+        );
+      }
+      data.is_default = input.isDefault;
+    }
+
+    const { data: updated, error } = await supabase
+      .from('master_case_report_templates')
+      .update({
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.description !== undefined ? { description: input.description } : {}),
+        ...(input.isActive !== undefined ? { is_active: input.isActive } : {}),
+        template_data: data as Json,
+      })
+      .eq('id', templateId)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      logger.error('Error updating report template:', error);
+      throw error;
+    }
+    if (!updated) throw new Error('Template not found');
+    return mapTemplateRow(updated);
+  },
+
+  /** Unset is_default on the tenant's other templates of the same type. */
+  async clearTenantDefault(reportType: ReportType, tenantId: string): Promise<void> {
+    const { data } = await supabase
+      .from('master_case_report_templates')
+      .select('id, template_data')
+      .eq('tenant_id', tenantId)
+      .contains('template_data', { report_type: reportType, is_default: true });
+
+    for (const row of data ?? []) {
+      const templateData = isJsonObject(row.template_data) ? { ...row.template_data } : {};
+      templateData.is_default = false;
+      await supabase
+        .from('master_case_report_templates')
+        .update({ template_data: templateData as Json })
+        .eq('id', row.id);
+    }
+  },
+
+  /**
+   * Clone a (system) template into the tenant, copying its section mappings,
+   * so admins can customize without touching shared masters.
+   */
+  async cloneTemplateToTenant(templateId: string, tenantId: string): Promise<ReportTemplate> {
+    const { data: source, error: sourceError } = await supabase
+      .from('master_case_report_templates')
+      .select('*')
+      .eq('id', templateId)
+      .maybeSingle();
+
+    if (sourceError) throw sourceError;
+    if (!source) throw new Error('Template not found');
+
+    const sourceData = isJsonObject(source.template_data) ? { ...source.template_data } : {};
+    sourceData.is_default = false;
+
+    const { data: created, error: createError } = await supabase
+      .from('master_case_report_templates')
+      .insert({
+        name: `${source.name} (Custom)`,
+        description: source.description,
+        is_active: true,
+        tenant_id: tenantId,
+        template_data: sourceData as Json,
+      })
+      .select()
+      .maybeSingle();
+
+    if (createError) {
+      logger.error('Error cloning report template:', createError);
+      throw createError;
+    }
+    if (!created) throw new Error('Failed to clone template');
+
+    const { data: mappings, error: mappingsError } = await supabase
+      .from('report_template_section_mappings')
+      .select('section_id, sort_order, is_required')
+      .eq('template_id', templateId);
+
+    if (mappingsError) {
+      logger.error('Error reading source template mappings:', mappingsError);
+      throw mappingsError;
+    }
+
+    if (mappings && mappings.length > 0) {
+      const { error: copyError } = await supabase
+        .from('report_template_section_mappings')
+        .insert(
+          mappings.map((m) => ({
+            template_id: created.id,
+            section_id: m.section_id,
+            sort_order: m.sort_order,
+            is_required: m.is_required,
+            tenant_id: tenantId,
+          }))
+        );
+      if (copyError) {
+        logger.error('Error copying template mappings:', copyError);
+        throw copyError;
+      }
+    }
+
+    return mapTemplateRow(created);
+  },
+
+  /**
+   * Cross-case report list for the Case Reports hub. Search is applied
+   * client-side by the caller (bounded by the row limit here).
+   */
+  async listReports(
+    filters: {
+      reportType?: ReportType | 'all';
+      status?: ReportStatus | 'all';
+      latestOnly?: boolean;
+      limit?: number;
+    } = {}
+  ): Promise<Array<Report & { case_number: string; case_title: string | null }>> {
+    let query = supabase
+      .from('case_reports')
+      .select('*, cases!inner(case_number, title)')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(filters.limit ?? 200);
+
+    if (filters.status && filters.status !== 'all') {
+      query = query.eq('status', filters.status);
+    }
+    if (filters.reportType && filters.reportType !== 'all') {
+      query = query.eq('content->>report_type', filters.reportType);
+    }
+    if (filters.latestOnly) {
+      // Old rows may predate the flag; absent counts as latest.
+      query = query.or(
+        'content->>is_latest_version.eq.true,content->>is_latest_version.is.null'
+      );
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      logger.error('Error listing case reports:', error);
+      throw error;
+    }
+
+    type RowWithCase = CaseReportRow & {
+      cases: { case_number: string | null; title: string | null } | null;
+    };
+    const rows = (data ?? []) as unknown as RowWithCase[];
+    const withProfiles = await attachCreatedByProfiles(rows);
+
+    return withProfiles.map((row, index) => ({
+      ...mapReportRow(row),
+      case_number: rows[index].cases?.case_number ?? '',
+      case_title: rows[index].cases?.title ?? null,
+    }));
+  },
+
+  /**
+   * Move a draft report into the review stage.
+   */
+  async submitForReview(reportId: string): Promise<Report> {
+    const { data, error } = await supabase
+      .from('case_reports')
+      .update({ status: 'review' })
+      .eq('id', reportId)
+      .eq('status', 'draft')
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      logger.error('Error submitting report for review:', error);
+      throw error;
+    }
+    if (!data) {
+      throw new Error('Report not found or not in draft');
+    }
+    return mapReportRow(data);
   },
 
   /**
@@ -662,9 +909,14 @@ export const reportsService = {
       throw fetchError;
     }
 
+    const existingContent = isJsonObject(existing?.content) ? existing!.content : null;
+    const now = new Date().toISOString();
     const mergedContent = mergeContent(existing?.content, {
       approved_by: approverId,
-      approved_at: new Date().toISOString(),
+      approved_at: now,
+      // The approver acts as reviewer when no separate review pass happened.
+      reviewed_by: readString(existingContent, 'reviewed_by') ?? approverId,
+      reviewed_at: readString(existingContent, 'reviewed_at') ?? now,
     });
 
     const { data, error } = await supabase

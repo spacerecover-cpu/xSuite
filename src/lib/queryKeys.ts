@@ -6,6 +6,7 @@ export const caseKeys = {
   devices: (caseId: string) => [...caseKeys.all, 'devices', caseId] as const,
   reports: (caseId: string) => [...caseKeys.all, 'reports', caseId] as const,
   custody: (caseId: string) => [...caseKeys.all, 'custody', caseId] as const,
+  activity: (caseId: string) => [...caseKeys.all, 'activity', caseId] as const,
   finance: (caseId: string) => [...caseKeys.all, 'finance', caseId] as const,
 };
 
@@ -14,6 +15,7 @@ export const customerKeys = {
   lists: () => [...customerKeys.all, 'list'] as const,
   list: (filters: Record<string, unknown>) => [...customerKeys.lists(), filters] as const,
   detail: (id: string) => [...customerKeys.all, 'detail', id] as const,
+  timeline: (id: string) => [...customerKeys.all, 'timeline', id] as const,
 };
 
 export const companyKeys = {
@@ -42,6 +44,12 @@ export const paymentKeys = {
   all: ['payments'] as const,
   lists: () => [...paymentKeys.all, 'list'] as const,
   list: (filters: Record<string, unknown>) => [...paymentKeys.lists(), filters] as const,
+};
+
+export const creditNoteKeys = {
+  all: ['credit_notes'] as const,
+  byInvoice: (invoiceId: string) => [...creditNoteKeys.all, 'invoice', invoiceId] as const,
+  byCase: (caseId: string) => [...creditNoteKeys.all, 'case', caseId] as const,
 };
 
 export const inventoryKeys = {
@@ -118,6 +126,58 @@ export const stockKeys = {
   itemLocations: (itemId: string) => [...stockKeys.all, 'item-locations', itemId] as const,
   transfers: () => [...stockKeys.all, 'transfers'] as const,
   transfer: (id: string) => [...stockKeys.all, 'transfer', id] as const,
+};
+
+export const followUpKeys = {
+  all: ['follow-ups'] as const,
+  byCase: (caseId: string) => [...followUpKeys.all, 'case', caseId] as const,
+  due: () => [...followUpKeys.all, 'due'] as const,
+};
+
+export const communicationKeys = {
+  all: ['communications'] as const,
+  byCase: (caseId: string) => [...communicationKeys.all, 'case', caseId] as const,
+  byCustomer: (customerId: string) =>
+    [...communicationKeys.all, 'customer', customerId] as const,
+};
+
+export const reportKeys = {
+  all: ['case-reports'] as const,
+  hub: (filters: Record<string, unknown>) => [...reportKeys.all, 'hub', filters] as const,
+  templates: (reportType?: string) => [...reportKeys.all, 'templates', reportType ?? 'all'] as const,
+  templateSections: (templateId: string) =>
+    [...reportKeys.all, 'template-sections', templateId] as const,
+};
+
+export const templateKeys = {
+  all: ['document-templates'] as const,
+  list: (typeCode: string, documentType?: string) =>
+    [...templateKeys.all, 'list', typeCode, documentType ?? null] as const,
+  variables: () => [...templateKeys.all, 'variables'] as const,
+  context: (refs: Record<string, unknown>) => [...templateKeys.all, 'context', refs] as const,
+};
+
+export const brandingThemeKeys = {
+  all: ['branding-themes'] as const,
+  list: () => [...brandingThemeKeys.all, 'list'] as const,
+  detail: (id: string) => [...brandingThemeKeys.all, 'detail', id] as const,
+};
+
+export const documentTemplatePdfKeys = {
+  all: ['document-templates-pdf'] as const,
+  list: () => [...documentTemplatePdfKeys.all, 'list'] as const,
+  detail: (id: string) => [...documentTemplatePdfKeys.all, 'detail', id] as const,
+  byType: (documentType: string) =>
+    [...documentTemplatePdfKeys.all, 'by-type', documentType] as const,
+};
+
+export const documentTemplateVersionKeys = {
+  all: ['document-template-versions'] as const,
+  list: (templateId: string) =>
+    [...documentTemplateVersionKeys.all, 'list', templateId] as const,
+  detail: (id: string) => [...documentTemplateVersionKeys.all, 'detail', id] as const,
+  deployed: (templateId: string) =>
+    [...documentTemplateVersionKeys.all, 'deployed', templateId] as const,
 };
 
 export const masterDataKeys = {
@@ -295,4 +355,12 @@ export const platformAdminKeys = {
   coupons: () => [...platformAdminKeys.all, 'coupons'] as const,
   couponsList: () => [...platformAdminKeys.coupons(), 'list'] as const,
   couponRedemptions: (couponId: string) => [...platformAdminKeys.coupons(), 'redemptions', couponId] as const,
+};
+
+export const legalEntityKeys = {
+  all: ['legal_entities'] as const,
+  lists: () => [...legalEntityKeys.all, 'list'] as const,
+  list: (tenantId: string) => [...legalEntityKeys.all, 'list', tenantId] as const,
+  primary: (tenantId: string) => [...legalEntityKeys.all, 'primary', tenantId] as const,
+  detail: (id: string) => [...legalEntityKeys.all, 'detail', id] as const,
 };

@@ -14,6 +14,8 @@ import {
   Bell,
   Coins,
   SlidersHorizontal,
+  Columns3,
+  FileStack,
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 
@@ -72,6 +74,16 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     tables: [],
     actionLabel: 'Choose Theme',
     description: 'Pick the look and feel of xSuite for everyone in your workspace.',
+  },
+  {
+    id: 'table-columns',
+    title: 'Table Columns',
+    icon: Columns3,
+    backgroundColor: '#475569',
+    borderColor: '#475569',
+    tables: [],
+    actionLabel: 'Configure Columns',
+    description: 'Choose the default and locked columns your team sees on the Cases table.',
   },
   {
     id: 'features',
@@ -173,13 +185,23 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   },
   {
     id: 'templates',
-    title: 'Templates',
+    title: 'Terms & Templates',
     icon: FileText,
     backgroundColor: '#ec4899',
     borderColor: '#ec4899',
     tables: [],
     actionLabel: 'Manage Categories',
-    description: 'Email templates, document templates, and print layouts',
+    description: 'Quote/invoice terms, email and document templates, and print layouts',
+  },
+  {
+    id: 'documents',
+    title: 'Documents',
+    icon: FileStack,
+    backgroundColor: '#0369a1',
+    borderColor: '#0369a1',
+    tables: [],
+    actionLabel: 'Customize Documents',
+    description: 'Customize how invoices, quotes, and receipts look when printed or emailed.',
   },
   {
     id: 'report-sections',
@@ -203,13 +225,13 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   },
   {
     id: 'localization',
-    title: 'Localization',
+    title: 'Localization Center',
     icon: Globe,
     backgroundColor: '#14b8a6',
     borderColor: '#14b8a6',
     tables: [],
-    actionLabel: 'Go to Page',
-    description: 'Language, timezone, currency, and regional settings',
+    actionLabel: 'Configure',
+    description: 'Currency display, date & time, timezone, and document language',
   },
   {
     id: 'currencies',

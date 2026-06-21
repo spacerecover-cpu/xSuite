@@ -1,10 +1,7 @@
 import { format as dateFnsFormat, parseISO } from 'date-fns';
 import { ar as arDateLocale } from 'date-fns/locale/ar';
-import { supabase } from './supabaseClient';
-import { logger } from './logger';
 import { normalizeLang } from './locale';
 import type { CurrencyConfig } from '../types/tenantConfig';
-import { DEFAULT_TENANT_CONFIG } from '../types/tenantConfig';
 
 // Phase 4a: locale-aware formatting. All locale params are OPTIONAL (additive) and
 // every locale-dependent branch is gated on normalizeLang(localeCode) === 'ar', so
@@ -13,6 +10,8 @@ import { DEFAULT_TENANT_CONFIG } from '../types/tenantConfig';
 // natively emits Arabic-Indic digits, so the 'ar' branch forces numberingSystem 'latn'.
 const DEFAULT_LOCALE = 'en-US';
 
+// Backward-compat display shape consumed by useCurrency(); the tenant-aware
+// formatting itself now flows through formatCurrencyWithConfig.
 export interface CurrencyFormat {
   currencySymbol: string;
   currencyPosition: 'before' | 'after';
@@ -20,67 +19,28 @@ export interface CurrencyFormat {
   currencyCode: string;
 }
 
-let cachedCurrencyFormat: CurrencyFormat | null = null;
-
-export const fetchCurrencyFormat = async (): Promise<CurrencyFormat> => {
-  if (cachedCurrencyFormat) {
-    return cachedCurrencyFormat;
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('accounting_locales')
-      .select('currency_code, date_format, number_format, is_default, decimal_places')
-      .eq('is_default', true)
-      .maybeSingle();
-
-    if (error || !data) {
-      const def = DEFAULT_TENANT_CONFIG.currency;
-      return {
-        currencySymbol: def.symbol,
-        currencyPosition: def.position,
-        decimalPlaces: def.decimalPlaces,
-        currencyCode: def.code,
-      };
-    }
-
-    cachedCurrencyFormat = {
-      currencySymbol: data.currency_code || DEFAULT_TENANT_CONFIG.currency.code,
-      currencyPosition: 'before',
-      decimalPlaces: (data as { decimal_places?: number }).decimal_places
-        ?? DEFAULT_TENANT_CONFIG.currency.decimalPlaces,
-      currencyCode: data.currency_code || DEFAULT_TENANT_CONFIG.currency.code,
-    };
-    return cachedCurrencyFormat;
-  } catch (error) {
-    logger.error('Error fetching currency format:', error);
-    const def = DEFAULT_TENANT_CONFIG.currency;
-    return {
-      currencySymbol: def.symbol,
-      currencyPosition: def.position,
-      decimalPlaces: def.decimalPlaces,
-      currencyCode: def.code,
-    };
-  }
-};
-
-export const clearCurrencyFormatCache = () => {
-  cachedCurrencyFormat = null;
-};
-
-export const formatCurrencyWithSettings = (
-  amount: number,
-  format: CurrencyFormat
-): string => {
-  const formattedNumber = amount.toFixed(format.decimalPlaces);
-  const [integerPart, decimalPart] = formattedNumber.split('.');
-  const formattedInteger = parseInt(integerPart).toLocaleString('en-US');
-  const fullNumber = decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger;
-
-  if (format.currencyPosition === 'before') {
-    return `${format.currencySymbol} ${fullNumber}`;
-  } else {
-    return `${fullNumber} ${format.currencySymbol}`;
+/**
+ * The currency TOKEN the tenant chose to see: the display symbol ('ر.ع.'), the ISO
+ * 4217 code ('OMR'), or both ('ر.ع. OMR'). Pure — Phase 2's single place the
+ * symbol-vs-code decision is made (currencyToBlock feeds it into the PDF/document
+ * layer; formatCurrencyWithConfig uses it for in-app rendering). Falls back to the
+ * code when no display symbol exists, and to the symbol when the code is the
+ * unresolved REQUIRED_SENTINEL — never blank, never a Symbol→string crash.
+ */
+export const renderCurrencyToken = (config: CurrencyConfig): string => {
+  const code = typeof config.code === 'string' ? config.code : '';
+  const symbol = config.symbol || code;
+  switch (config.displayMode) {
+    case 'iso_code':
+      return code || symbol;
+    case 'symbol_code':
+      // Avoid duplicating ('OMR OMR') when there is no distinct display symbol.
+      return code && config.symbol && config.symbol !== code
+        ? `${config.symbol} ${code}`
+        : code || symbol;
+    case 'symbol':
+    default:
+      return symbol;
   }
 };
 
@@ -93,16 +53,23 @@ export const formatCurrencyWithConfig = (
   // opt-in without a breaking signature change.
   _localeCode?: string,
 ): string => {
-  const parts = amount.toFixed(config.decimalPlaces).split('.');
+  const token = renderCurrencyToken(config);
+  // Parentheses mode renders the MAGNITUDE then wraps it; minus mode (the default)
+  // keeps the sign inside the number via toFixed — byte-identical to pre-Phase-2.
+  const useParens = config.negativeFormat === 'parentheses' && amount < 0;
+  const magnitude = useParens ? Math.abs(amount) : amount;
+
+  const parts = magnitude.toFixed(config.decimalPlaces).split('.');
   const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, config.thousandsSeparator);
   const decimalPart = parts[1];
   const formattedNumber = config.decimalPlaces > 0
     ? `${integerPart}${config.decimalSeparator}${decimalPart}`
     : integerPart;
 
-  return config.position === 'before'
-    ? `${config.symbol}${formattedNumber}`
-    : `${formattedNumber} ${config.symbol}`;
+  const body = config.position === 'before'
+    ? `${token}${formattedNumber}`
+    : `${formattedNumber} ${token}`;
+  return useParens ? `(${body})` : body;
 };
 
 export const formatCurrency = (amount: number, currency = 'USD', localeCode?: string): string => {
@@ -154,6 +121,54 @@ export const formatDate = (
 
 export const formatDateTime = (date: string | Date, localeCode?: string): string => {
   return formatDate(date, 'MMM dd, yyyy HH:mm', localeCode);
+};
+
+/** The slice of DateTimeConfig the audit formatter needs (structural, so it is
+ *  testable without the tenant-config context). */
+export interface AuditDateTimeConfig {
+  timezone?: string | null;
+  timeFormat?: '12h' | '24h' | null;
+}
+
+/**
+ * Tenant-timezone date-time for audit surfaces ("Created … by …").
+ * Timestamps are stored as UTC timestamptz; this renders them in the tenant's
+ * IANA timezone with an explicit zone label so "when" is unambiguous in
+ * disputes. Month-name format is deliberate — numeric day/month order varies
+ * by tenant and audit strings must not be misread. Built on Intl (no extra
+ * dependency; date-fns cannot do timezones).
+ */
+export const formatDateTimeWithConfig = (
+  date: string | Date | null | undefined,
+  config?: AuditDateTimeConfig | null,
+  opts?: { withTz?: boolean },
+): string => {
+  if (!date) return '';
+  const dateObj = typeof date === 'string' ? parseISO(date) : date;
+  if (Number.isNaN(dateObj.getTime())) return '';
+
+  const timeZone = config?.timezone || undefined;
+  const hour12 = (config?.timeFormat ?? '24h') === '12h';
+  const withTz = opts?.withTz ?? true;
+  const baseOptions: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12,
+  };
+  try {
+    return new Intl.DateTimeFormat(DEFAULT_LOCALE, {
+      ...baseOptions,
+      ...(timeZone ? { timeZone } : {}),
+      ...(withTz && timeZone ? { timeZoneName: 'short' } : {}),
+    }).format(dateObj);
+  } catch {
+    // Unknown IANA zone in tenant config — degrade to browser-local time
+    // rather than rendering nothing.
+    return new Intl.DateTimeFormat(DEFAULT_LOCALE, baseOptions).format(dateObj);
+  }
 };
 
 /**

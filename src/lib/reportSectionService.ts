@@ -72,6 +72,8 @@ export interface SectionPreset {
   is_active: boolean;
   display_order: number;
   created_by?: string;
+  /** NULL = shared system preset (read-only for tenants); non-NULL = tenant preset. */
+  tenant_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -124,6 +126,7 @@ function mapPresetRow(row: ReportSectionPresetRow): SectionPreset {
     is_active: true,
     display_order: 0,
     created_by: row.created_by ?? undefined,
+    tenant_id: row.tenant_id ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -403,28 +406,42 @@ export const reportSectionService = {
   },
 
   /**
-   * Increment preset usage count
+   * Increment preset usage count.
+   * Best-effort only — usage stats must never break the caller. RLS blocks
+   * tenant staff from bumping counters on shared system presets (tenant
+   * presets work), so every failure here is logged and swallowed.
    */
   async incrementPresetUsage(id: string): Promise<void> {
-    const { error } = await supabase.rpc('increment_preset_usage', {
-      p_table_name: 'report_section_presets',
-      p_preset_id: id,
-    });
+    try {
+      const { error } = await supabase.rpc('increment_preset_usage', {
+        p_table_name: 'report_section_presets',
+        p_preset_id: id,
+      });
 
-    if (error) {
-      // Fallback if function doesn't exist
-      const { data: preset } = await supabase
+      if (!error) return;
+
+      // Fallback if the function doesn't exist or rejected the call.
+      const { data: preset, error: readError } = await supabase
         .from('report_section_presets')
         .select('usage_count')
         .eq('id', id)
         .maybeSingle();
 
-      if (preset) {
-        await supabase
-          .from('report_section_presets')
-          .update({ usage_count: (preset.usage_count ?? 0) + 1 })
-          .eq('id', id);
+      if (readError || !preset) {
+        if (readError) logger.warn('Skipped preset usage increment:', readError);
+        return;
       }
+
+      const { error: updateError } = await supabase
+        .from('report_section_presets')
+        .update({ usage_count: (preset.usage_count ?? 0) + 1 })
+        .eq('id', id);
+
+      if (updateError) {
+        logger.warn('Skipped preset usage increment:', updateError);
+      }
+    } catch (err) {
+      logger.warn('Skipped preset usage increment:', err);
     }
   },
 
@@ -466,11 +483,27 @@ export const reportSectionService = {
    * Update template section mappings.
    * report_template_section_mappings is a join table with no deleted_at;
    * replacing mappings requires removing existing rows first.
+   * Mapping rows must carry the owning template's tenant_id explicitly
+   * (NULL = shared system row) — these master tables have no tenant trigger.
    */
   async updateTemplateSections(
     templateId: string,
     sections: Array<{ section_id: string; section_order: number; is_required: boolean }>,
   ): Promise<void> {
+    const { data: template, error: templateError } = await supabase
+      .from('master_case_report_templates')
+      .select('tenant_id')
+      .eq('id', templateId)
+      .maybeSingle();
+
+    if (templateError) {
+      logger.error('Error fetching template for section mapping update:', templateError);
+      throw templateError;
+    }
+    if (!template) {
+      throw new Error('Template not found');
+    }
+
     const { error: deleteError } = await supabase
       .from('report_template_section_mappings')
       .delete()
@@ -486,6 +519,7 @@ export const reportSectionService = {
       section_id: s.section_id,
       sort_order: s.section_order,
       is_required: s.is_required,
+      tenant_id: template.tenant_id,
     }));
 
     if (mappings.length === 0) return;

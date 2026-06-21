@@ -9,6 +9,8 @@
   import noRawTailwindColors from './eslint-rules/no-raw-tailwind-colors.js';
   import noRawStyleColors from './eslint-rules/no-raw-style-colors.js';
   import noUnfilteredItemEmbed from './eslint-rules/no-unfiltered-item-embed.js';
+  import noRawCurrencyAggregation from './eslint-rules/no-raw-currency-aggregation.js';
+  import noHardcodedLocaleFormat from './eslint-rules/no-hardcoded-locale-format.js';
 
   // Hoisted so the main config and the fixed-surface override below share one
   // identical xsuite plugin object (flat config resolves plugin rules per block).
@@ -19,6 +21,8 @@
       'no-raw-tailwind-colors': noRawTailwindColors,
       'no-raw-style-colors': noRawStyleColors,
       'no-unfiltered-item-embed': noUnfilteredItemEmbed,
+      'no-raw-currency-aggregation': noRawCurrencyAggregation,
+      'no-hardcoded-locale-format': noHardcodedLocaleFormat,
     },
   };
 
@@ -81,6 +85,17 @@
         // neutral-chrome are baselined OFF per-file below (same pattern as
         // no-raw-tailwind-colors).
         'xsuite/no-raw-style-colors': 'error',
+        // D7/D8: cross-document money sums must use the *_base shadow. Flipped to
+        // 'error' after the 57-site burndown — every cross-document rollup now routes
+        // through baseAmount/sumBankBalanceBase, and genuine single-currency rollups
+        // carry a reasoned inline disable. New raw aggregations fail CI.
+        'xsuite/no-raw-currency-aggregation': 'error',
+        // Worldwide currency/locale guardrail (P4): hardcoded 'en-US'/'en-GB'
+        // number/date formatting bypasses the tenant's Country-Engine locale.
+        // 'warn' (not 'error') because ~15 pre-existing sites are being burned
+        // down across other P4 slices — like no-untranslated-jsx-text, this
+        // surfaces NEW violations in review without failing CI on existing debt.
+        'xsuite/no-hardcoded-locale-format': 'warn',
         '@typescript-eslint/no-unused-vars': ['error', {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
@@ -127,19 +142,26 @@
       },
     },
     {
-      // no-raw-style-colors baseline (per-file OFF), mirroring the
-      // no-raw-tailwind-colors burndown pattern:
+      // no-raw-style-colors baseline (per-file OFF):
       //  - *.test.* — fixtures legitimately pass literal hex to components.
-      //  - app-shell chrome (Sidebar/AppLayout) still uses raw *neutral* hex
-      //    (slate/gray) inside inline styles with hover handlers; neutrals are
-      //    allowed by DESIGN.md, pending a separate slate-class migration.
+      // (The app-shell chrome — Sidebar/SidebarSection/AppLayout — was migrated
+      //  to semantic tokens + neutral classes, so it is now enforced.)
       files: [
         'src/**/*.test.{ts,tsx}',
-        'src/components/layout/Sidebar.tsx',
-        'src/components/layout/SidebarSection.tsx',
-        'src/components/layout/AppLayout.tsx',
       ],
       plugins: { 'xsuite': xsuitePlugin },
       rules: { 'xsuite/no-raw-style-colors': 'off' },
+    },
+    {
+      // i18n enforcement gate (A0/A3, Country Engine Phase 2): the portal is the
+      // externally-visible non-English surface and is now fully extracted, so a
+      // NEW untranslated literal there must FAIL CI (not just warn). The rest of
+      // the app stays 'warn' until its slices are extracted (deferred breadth).
+      files: [
+        'src/pages/portal/**/*.{ts,tsx}',
+        'src/components/portal/**/*.{ts,tsx}',
+      ],
+      plugins: { 'xsuite': xsuitePlugin },
+      rules: { 'xsuite/no-untranslated-jsx-text': 'error' },
     }
   );

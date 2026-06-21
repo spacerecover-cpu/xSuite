@@ -1,66 +1,43 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePermissions } from '../../contexts/PermissionsContext';
 import { useTenantFeatures } from '../../contexts/TenantConfigContext';
 import { useSidebarPreferences } from '../../contexts/SidebarPreferencesContext';
 import { useLocale } from '../../contexts/LocaleContext';
-import {
-  LayoutDashboard,
-  FolderOpen,
-  Users,
-  Building2,
-  FileText,
-  Receipt,
-  Package,
-  Wrench,
-  Calendar,
-  BookOpen,
-  TrendingUp,
-  CreditCard,
-  Landmark,
-  BarChart3,
-  Settings,
-  UserCog,
-  Shield,
-  HardDrive,
-  Plug,
-  LogOut,
-  ChevronLeft,
-  ChevronRight,
-  Truck,
-  LifeBuoy,
-  ShoppingCart,
-  Wallet,
-  ArrowLeftRight,
-  FileCheck,
-  UserCheck,
-  ClipboardList,
-  CalendarCheck,
-  Timer as TimerIcon,
-  UserPlus as UserPlusIcon,
-  Layers,
-  DollarSign as DollarSignIcon,
-  Briefcase,
-  Copy,
-} from 'lucide-react';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { HardDrive, LogOut, ChevronLeft, ChevronRight, LifeBuoy } from 'lucide-react';
 import { SidebarSection } from './SidebarSection';
 import { ProtectedSidebarNavItem } from './ProtectedSidebarNavItem';
+import { Tooltip } from '../ui/Tooltip';
 import { useSidebarBadges } from '../../hooks/useSidebarBadges';
+import { NAV_SECTIONS } from './navConfig';
 
-export const Sidebar: React.FC = () => {
+interface SidebarProps {
+  /** 'docked' = the persistent desktop rail; 'drawer' = inside the mobile off-canvas panel. */
+  mode?: 'docked' | 'drawer';
+}
+
+const FOCUS_RING =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface';
+
+export const Sidebar: React.FC<SidebarProps> = ({ mode = 'docked' }) => {
   const { profile, signOut } = useAuth();
   const { hasModuleAccess } = usePermissions();
   const { isEnabled } = useTenantFeatures();
-  const { casesTodayCount, invoicesAttentionCount, pendingQuotesCount, lowStockCount } = useSidebarBadges();
+  const badges = useSidebarBadges();
   const { position, isCollapsed, toggleCollapsed, expandedSection, setExpandedSection } = useSidebarPreferences();
   const { locale } = useLocale();
   const navigate = useNavigate();
-  const [userCardHovered, setUserCardHovered] = useState(false);
-  const [helpHovered, setHelpHovered] = useState(false);
 
-  const handleSectionToggle = (sectionName: string, collapsed: boolean) => {
-    setExpandedSection(collapsed ? null : sectionName);
+  // ≥1024 honors the saved collapse preference; 768–1023 forces the icon rail
+  // (without clobbering the stored value); the drawer always renders expanded.
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const collapsed = mode === 'drawer' ? false : isCollapsed || !isDesktop;
+  const showToggle = mode === 'docked' && isDesktop;
+
+  const handleSectionToggle = (sectionName: string, sectionCollapsed: boolean) => {
+    setExpandedSection(sectionCollapsed ? null : sectionName);
   };
 
   const handleSignOut = async () => {
@@ -70,24 +47,17 @@ export const Sidebar: React.FC = () => {
 
   // Sidebar side is a per-user, physical preference. The first flex child sits on
   // the inline-start edge — left in LTR, right in RTL — so push the sidebar to
-  // order-last only when the wanted physical side differs from that edge. The
-  // divider, collapse affordance, and chevron all key off the physical side.
+  // order-last only when the wanted physical side differs from that edge.
   const isRTL = locale === 'ar';
   const isRight = position === 'right';
   const orderLast = isRTL ? !isRight : isRight;
+  const tooltipSide = isRight ? 'left' : 'right';
   const CollapseChevron = isRight
-    ? (isCollapsed ? ChevronLeft : ChevronRight)
-    : (isCollapsed ? ChevronRight : ChevronLeft);
+    ? (collapsed ? ChevronLeft : ChevronRight)
+    : (collapsed ? ChevronRight : ChevronLeft);
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'owner';
-  const canViewFinance = (hasModuleAccess('invoices') || hasModuleAccess('payments')) && isEnabled('nav.financial');
-  const canViewClients = (hasModuleAccess('customers') || hasModuleAccess('companies')) && isEnabled('nav.business');
-  const canViewLab = (hasModuleAccess('inventory') || hasModuleAccess('stock') || hasModuleAccess('clone-drives')) && isEnabled('nav.resources');
-  const canViewHR = (hasModuleAccess('hr-dashboard') || hasModuleAccess('employees')) && isEnabled('nav.hr');
-
-  const getRoleColor = (_role?: string) => {
-    return { bg: 'rgb(var(--color-primary) / 0.12)', text: 'rgb(var(--color-primary))' };
-  };
+  const navGateContext = { isAdmin, hasModuleAccess, isEnabled };
 
   const getRoleAvatarBg = (role?: string) => {
     switch (role) {
@@ -105,540 +75,179 @@ export const Sidebar: React.FC = () => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  const roleColors = getRoleColor(profile?.role ?? undefined);
+  const body = (
+    <div className={`flex flex-col h-full ${collapsed ? 'items-center' : ''}`}>
+      {/* Brand Header */}
+      <div className={`relative border-b border-primary/15 ${collapsed ? 'px-3 py-4' : 'px-5 py-5'}`}>
+        <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3.5'}`}>
+          <div className="flex items-center justify-center flex-shrink-0 w-9 h-9 rounded-xl bg-primary text-primary-foreground ring-1 ring-primary/30 shadow-md">
+            <HardDrive className="w-5 h-5" strokeWidth={1.75} />
+          </div>
+          {!collapsed && (
+            <div>
+              <h1 className="text-[15px] font-semibold tracking-tight leading-tight text-slate-900">DataRecovery</h1>
+              <p className="mt-0.5 text-xxs font-medium uppercase tracking-[0.16em] text-slate-500">Professional Suite</p>
+            </div>
+          )}
+        </div>
+
+        {showToggle && (
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            className={`absolute top-1/2 -translate-y-1/2 ${isRight ? 'left-3' : 'right-3'} w-6 h-6 flex items-center justify-center rounded-lg bg-slate-200 text-slate-500 hover:bg-slate-300 hover:text-slate-700 transition-colors ${FOCUS_RING}`}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={!collapsed}
+          >
+            <CollapseChevron className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* Navigation */}
+      <nav aria-label="Primary" className={`flex-1 min-h-0 overflow-y-auto w-full ${collapsed ? 'px-2' : 'px-3'} py-2`}>
+        {NAV_SECTIONS.map((section) => {
+          if (section.gate && !section.gate(navGateContext)) return null;
+          const items = section.items.map((item) => {
+            const count = item.badgeKey ? badges[item.badgeKey] : 0;
+            return (
+              <ProtectedSidebarNavItem
+                key={item.to}
+                to={item.to}
+                icon={item.icon}
+                label={item.label}
+                moduleKey={item.moduleKey}
+                badge={item.badgeKey && count > 0 ? count : undefined}
+                badgeColor={item.badgeColor}
+                isCollapsed={collapsed}
+              />
+            );
+          });
+          return section.alwaysExpanded ? (
+            <SidebarSection key={section.key} title={section.title} isCollapsed={collapsed} alwaysExpanded>
+              {items}
+            </SidebarSection>
+          ) : (
+            <SidebarSection
+              key={section.key}
+              title={section.title}
+              icon={section.icon}
+              isCollapsed={collapsed}
+              defaultCollapsed={expandedSection !== section.key}
+              onToggle={(c) => handleSectionToggle(section.key, c)}
+            >
+              {items}
+            </SidebarSection>
+          );
+        })}
+      </nav>
+
+      {/* Footer */}
+      <div className="w-full border-t border-primary/15">
+        {/* Help button */}
+        <div className={collapsed ? 'px-2 py-2' : 'px-3 py-2'}>
+          {(() => {
+            const helpButton = (
+              <button
+                type="button"
+                onClick={() => navigate('/procedures')}
+                className={`group flex items-center rounded-lg text-slate-700 hover:bg-primary/[0.06] hover:text-primary transition-colors ${FOCUS_RING} ${
+                  collapsed ? 'w-10 h-10 mx-auto justify-center' : 'w-full gap-3 px-2.5 h-9'
+                }`}
+                aria-label="Help & Support"
+              >
+                <LifeBuoy className="w-[18px] h-[18px] flex-shrink-0 text-slate-500 group-hover:text-primary" strokeWidth={1.75} />
+                {!collapsed && <span className="text-[13px] font-medium tracking-tight">Help &amp; Support</span>}
+              </button>
+            );
+            return collapsed ? (
+              <Tooltip label="Help & Support" side={tooltipSide}>
+                {helpButton}
+              </Tooltip>
+            ) : (
+              helpButton
+            );
+          })()}
+        </div>
+
+        {/* User card */}
+        {profile && (
+          <div className={collapsed ? 'px-2 pb-3' : 'px-3 pb-3'}>
+            {collapsed ? (
+              <div className="relative flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => navigate('/profile')}
+                  className={`w-[34px] h-[34px] rounded-xl bg-gradient-to-br ${getRoleAvatarBg(profile?.role ?? undefined)} flex items-center justify-center text-white font-bold text-sm shadow-md transition-transform hover:scale-105 ${FOCUS_RING}`}
+                  title={profile.full_name}
+                  aria-label={profile.full_name}
+                >
+                  {getInitials(profile.full_name)}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className={`absolute -top-1 -right-1 w-5 h-5 bg-danger hover:bg-danger/90 text-danger-foreground rounded-full flex items-center justify-center shadow-lg transition-colors ${FOCUS_RING}`}
+                  title="Logout"
+                  aria-label="Logout"
+                >
+                  <LogOut className="w-2.5 h-2.5" />
+                </button>
+              </div>
+            ) : (
+              <div
+                onClick={() => navigate('/profile')}
+                className="group flex items-center gap-3 p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 cursor-pointer transition-colors"
+              >
+                <div
+                  className={`w-[34px] h-[34px] rounded-xl bg-gradient-to-br ${getRoleAvatarBg(profile?.role ?? undefined)} flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-md`}
+                >
+                  {getInitials(profile.full_name)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="truncate text-[13px] font-semibold tracking-tight leading-tight text-slate-900">
+                    {profile.full_name}
+                  </p>
+                  <span className="inline-block mt-1 px-1.5 py-px text-xxs font-semibold uppercase tracking-wider rounded bg-primary text-primary-foreground">
+                    {profile.role}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSignOut();
+                  }}
+                  className={`ml-auto p-1.5 rounded-lg flex-shrink-0 text-slate-500 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-danger-muted hover:text-danger transition-all ${FOCUS_RING}`}
+                  title="Logout"
+                  aria-label="Logout"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  if (mode === 'drawer') {
+    return <div className="flex flex-col h-full w-full bg-primary/5">{body}</div>;
+  }
 
   return (
     <aside
       className={`
-        ${isCollapsed ? 'w-[72px]' : 'w-72'}
+        ${collapsed ? 'w-[72px]' : 'w-72'}
         ${orderLast ? 'order-last' : ''}
-        flex flex-col transition-all duration-300 ease-in-out flex-shrink-0
-        relative
+        ${isRight ? 'border-l' : 'border-r'} border-primary/15
+        hidden md:flex flex-col flex-shrink-0 relative bg-primary/5
+        transition-[width] duration-300 ease-in-out
       `}
-      style={{
-        background: 'rgb(var(--color-primary) / 0.05)',
-        ...(isRight
-          ? { borderLeft: '1px solid rgb(var(--color-primary) / 0.15)' }
-          : { borderRight: '1px solid rgb(var(--color-primary) / 0.15)' }),
-        fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif",
-      }}
     >
-      <div className={`flex flex-col h-full ${isCollapsed ? 'items-center' : ''}`}>
-
-        {/* Brand Header */}
-        <div
-          className={`${isCollapsed ? 'px-3 py-4' : 'px-5 py-5'} relative`}
-          style={{ borderBottom: '1px solid rgb(var(--color-primary) / 0.15)' }}
-        >
-          <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3.5'}`}>
-            <div
-              className="flex items-center justify-center flex-shrink-0"
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '10px',
-                background: 'rgb(var(--color-primary))',
-                boxShadow: '0 0 0 1px rgb(var(--color-primary) / 0.3), 0 4px 12px rgb(var(--color-primary) / 0.25)',
-              }}
-            >
-              <HardDrive className="w-5 h-5 text-white" />
-            </div>
-            {!isCollapsed && (
-              <div>
-                <h1 style={{ fontSize: '15px', fontWeight: 600, color: '#151E2C', lineHeight: 1.2, letterSpacing: '-0.01em' }}>DataRecovery</h1>
-                <p style={{ fontSize: '11.5px', fontWeight: 500, color: '#64748b', marginTop: '2px', letterSpacing: '0.02em' }}>Professional Suite</p>
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={toggleCollapsed}
-            className={`absolute top-1/2 -translate-y-1/2 ${isRight ? 'left-3' : 'right-3'} w-6 h-6 flex items-center justify-center rounded-lg transition-all duration-200`}
-            style={{ background: '#E0E6ED', color: '#64748b' }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLButtonElement).style.background = '#D4DCE8';
-              (e.currentTarget as HTMLButtonElement).style.color = '#3A4A5C';
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLButtonElement).style.background = '#E0E6ED';
-              (e.currentTarget as HTMLButtonElement).style.color = '#64748b';
-            }}
-            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            <CollapseChevron className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        {/* Navigation */}
-        <nav
-          className={`flex-1 overflow-y-auto ${isCollapsed ? 'px-2' : 'px-3'} py-2`}
-          style={{ scrollbarWidth: 'thin', scrollbarColor: '#CBD5E1 transparent' }}
-        >
-          <SidebarSection
-            title="Core Operations"
-            defaultCollapsed={false}
-            onToggle={() => {}}
-            isCollapsed={isCollapsed}
-            alwaysExpanded={true}
-          >
-            <ProtectedSidebarNavItem
-              to="/"
-              icon={LayoutDashboard}
-              label="Dashboard"
-              isCollapsed={isCollapsed}
-            />
-            <ProtectedSidebarNavItem
-              to="/cases"
-              icon={FolderOpen}
-              label="Cases"
-              badge={casesTodayCount > 0 ? casesTodayCount : undefined}
-              badgeColor="blue"
-              isCollapsed={isCollapsed}
-            />
-          </SidebarSection>
-
-          {canViewFinance && (
-            <SidebarSection
-              title="Financial"
-              defaultCollapsed={expandedSection !== 'financial'}
-              onToggle={(collapsed) => handleSectionToggle('financial', collapsed)}
-              isCollapsed={isCollapsed}
-              accentColor="amber"
-            >
-              <ProtectedSidebarNavItem
-                to="/invoices"
-                icon={Receipt}
-                label="Invoices"
-                badge={invoicesAttentionCount > 0 ? invoicesAttentionCount : undefined}
-                badgeColor="blue"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/payments"
-                icon={CreditCard}
-                label="Payments"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/expenses"
-                icon={Wallet}
-                label="Expenses"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/finance"
-                icon={TrendingUp}
-                label="Revenue"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/transactions"
-                icon={ArrowLeftRight}
-                label="Transactions"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/banking"
-                icon={Landmark}
-                label="Banking"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/vat-audit"
-                icon={FileCheck}
-                label="VAT & Audit"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/reports"
-                icon={BarChart3}
-                label="Reports"
-                isCollapsed={isCollapsed}
-              />
-            </SidebarSection>
-          )}
-
-          {canViewClients && (
-            <SidebarSection
-              title="Business"
-              defaultCollapsed={expandedSection !== 'business'}
-              onToggle={(collapsed) => handleSectionToggle('business', collapsed)}
-              isCollapsed={isCollapsed}
-              accentColor="emerald"
-            >
-              <ProtectedSidebarNavItem
-                to="/customers"
-                icon={Users}
-                label="Customers"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/quotes"
-                icon={FileText}
-                label="Quotes"
-                badge={pendingQuotesCount > 0 ? pendingQuotesCount : undefined}
-                badgeColor="green"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/companies"
-                icon={Building2}
-                label="Companies"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/suppliers"
-                icon={Truck}
-                label="Suppliers"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/purchase-orders"
-                icon={ShoppingCart}
-                label="Purchase Orders"
-                isCollapsed={isCollapsed}
-              />
-            </SidebarSection>
-          )}
-
-          {canViewLab && (
-            <SidebarSection
-              title="Resources"
-              defaultCollapsed={expandedSection !== 'resources'}
-              onToggle={(collapsed) => handleSectionToggle('resources', collapsed)}
-              isCollapsed={isCollapsed}
-              accentColor="teal"
-            >
-              <ProtectedSidebarNavItem
-                to="/tools"
-                icon={Wrench}
-                label="Inventory"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/stock"
-                icon={Package}
-                label="Stock"
-                badge={lowStockCount > 0 ? lowStockCount : undefined}
-                badgeColor="orange"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/clone-drives"
-                icon={Copy}
-                label="Clone Drives"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/procedures"
-                icon={BookOpen}
-                label="KB Center"
-                isCollapsed={isCollapsed}
-              />
-            </SidebarSection>
-          )}
-
-          {canViewHR && (
-            <SidebarSection
-              title="Human Resources"
-              defaultCollapsed={expandedSection !== 'hr'}
-              onToggle={(collapsed) => handleSectionToggle('hr', collapsed)}
-              isCollapsed={isCollapsed}
-              accentColor="sky"
-            >
-              <ProtectedSidebarNavItem
-                to="/hr"
-                icon={UserCheck}
-                label="HR Dashboard"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/hr/employees"
-                icon={Users}
-                label="Employees"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/hr/recruitment"
-                icon={Briefcase}
-                label="Recruitment"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/hr/onboarding"
-                icon={UserPlusIcon}
-                label="Onboarding"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/hr/performance"
-                icon={TrendingUp}
-                label="Performance"
-                isCollapsed={isCollapsed}
-              />
-            </SidebarSection>
-          )}
-
-          {canViewHR && (
-            <SidebarSection
-              title="Payroll"
-              defaultCollapsed={expandedSection !== 'payroll'}
-              onToggle={(collapsed) => handleSectionToggle('payroll', collapsed)}
-              isCollapsed={isCollapsed}
-              accentColor="payroll"
-            >
-              <ProtectedSidebarNavItem
-                to="/payroll"
-                icon={DollarSignIcon}
-                label="Payroll Dashboard"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/payroll/process"
-                icon={Calendar}
-                label="Process Payroll"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/payroll/components"
-                icon={Layers}
-                label="Salary Components"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/payroll/history"
-                icon={ClipboardList}
-                label="History"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/payroll/adjustments"
-                icon={TrendingUp}
-                label="Adjustments"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/payroll/loans"
-                icon={Wallet}
-                label="Loans"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/payroll/settings"
-                icon={Settings}
-                label="Settings"
-                isCollapsed={isCollapsed}
-              />
-            </SidebarSection>
-          )}
-
-          {canViewHR && (
-            <SidebarSection
-              title="Employee Management"
-              defaultCollapsed={expandedSection !== 'employee'}
-              onToggle={(collapsed) => handleSectionToggle('employee', collapsed)}
-              isCollapsed={isCollapsed}
-              accentColor="employee"
-            >
-              <ProtectedSidebarNavItem
-                to="/attendance"
-                icon={CalendarCheck}
-                label="Attendance"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/leave"
-                icon={Calendar}
-                label="Leave Management"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/timesheets"
-                icon={TimerIcon}
-                label="Timesheets"
-                isCollapsed={isCollapsed}
-              />
-            </SidebarSection>
-          )}
-
-          {isAdmin && (
-            <SidebarSection
-              title="System"
-              defaultCollapsed={expandedSection !== 'system'}
-              onToggle={(collapsed) => handleSectionToggle('system', collapsed)}
-              isCollapsed={isCollapsed}
-              accentColor="slate"
-            >
-              <ProtectedSidebarNavItem
-                to="/settings"
-                icon={Settings}
-                label="Settings"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/users"
-                icon={UserCog}
-                label="User Management"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/integrations"
-                icon={Plug}
-                label="Integrations"
-                isCollapsed={isCollapsed}
-              />
-              <ProtectedSidebarNavItem
-                to="/admin"
-                icon={Shield}
-                label="Admin Panel"
-                isCollapsed={isCollapsed}
-              />
-            </SidebarSection>
-          )}
-        </nav>
-
-        {/* Footer */}
-        <div style={{ borderTop: '1px solid rgb(var(--color-primary) / 0.15)' }}>
-          {/* Help button */}
-          <div className={`${isCollapsed ? 'px-2 py-2' : 'px-3 py-2'}`}>
-            {isCollapsed ? (
-              <button
-                className="w-10 h-10 flex items-center justify-center rounded-lg transition-all duration-[180ms] mx-auto"
-                title="Help & Support"
-                style={{ background: 'transparent', color: '#64748b' }}
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLButtonElement).style.background = '#E8ECF2';
-                  (e.currentTarget as HTMLButtonElement).style.color = 'rgb(var(--color-primary))';
-                }}
-                onMouseLeave={e => {
-                  (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
-                  (e.currentTarget as HTMLButtonElement).style.color = '#64748b';
-                }}
-              >
-                <LifeBuoy className="w-5 h-5" />
-              </button>
-            ) : (
-              <button
-                className="w-full flex items-center gap-3 rounded-lg transition-all duration-[180ms]"
-                style={{
-                  padding: '9px 10px',
-                  background: helpHovered ? '#E8ECF2' : 'transparent',
-                  borderLeft: `3px solid ${helpHovered ? '#A8C4E8' : 'transparent'}`,
-                }}
-                onMouseEnter={() => setHelpHovered(true)}
-                onMouseLeave={() => setHelpHovered(false)}
-              >
-                <div
-                  className="flex items-center justify-center flex-shrink-0 transition-all duration-[180ms]"
-                  style={{
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '6px',
-                    background: helpHovered ? '#D4DCE8' : '#E8ECF2',
-                  }}
-                >
-                  <LifeBuoy
-                    style={{
-                      width: '13px',
-                      height: '13px',
-                      strokeWidth: 1.5,
-                      color: helpHovered ? 'rgb(var(--color-primary))' : '#6880A0',
-                      transition: 'color 0.18s ease',
-                    }}
-                  />
-                </div>
-                <span
-                  className="font-medium transition-colors duration-[180ms]"
-                  style={{ fontSize: '13px', color: helpHovered ? 'rgb(var(--color-primary))' : '#64748b' }}
-                >
-                  Help & Support
-                </span>
-              </button>
-            )}
-          </div>
-
-          {/* User card */}
-          {profile && (
-            <div className={`${isCollapsed ? 'px-2 pb-3' : 'px-3 pb-3'}`}>
-              {isCollapsed ? (
-                <div className="relative flex justify-center">
-                  <div
-                    onClick={() => navigate('/profile')}
-                    className={`rounded-xl bg-gradient-to-br ${getRoleAvatarBg(profile?.role ?? undefined)} flex items-center justify-center text-white font-bold text-sm cursor-pointer transition-all duration-200`}
-                    style={{ width: '34px', height: '34px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}
-                    title={profile.full_name}
-                  >
-                    {getInitials(profile.full_name)}
-                  </div>
-                  <button
-                    onClick={handleSignOut}
-                    className="absolute -top-1 -right-1 w-5 h-5 bg-danger hover:bg-danger/90 text-danger-foreground rounded-full flex items-center justify-center transition-all duration-200 shadow-lg"
-                    title="Logout"
-                  >
-                    <LogOut className="w-2.5 h-2.5" />
-                  </button>
-                </div>
-              ) : (
-                <div
-                  onClick={() => navigate('/profile')}
-                  className="flex items-center gap-3 cursor-pointer transition-all duration-[180ms]"
-                  style={{
-                    padding: '10px',
-                    borderRadius: '10px',
-                    background: userCardHovered ? '#DDE4EC' : '#EAEFF4',
-                    boxShadow: userCardHovered ? '0 1px 4px rgb(var(--color-primary) / 0.08)' : 'none',
-                  }}
-                  onMouseEnter={() => setUserCardHovered(true)}
-                  onMouseLeave={() => setUserCardHovered(false)}
-                >
-                  <div
-                    className={`rounded-xl bg-gradient-to-br ${getRoleAvatarBg(profile?.role ?? undefined)} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}
-                    style={{ width: '34px', height: '34px', boxShadow: '0 2px 6px rgba(0,0,0,0.12)' }}
-                  >
-                    {getInitials(profile.full_name)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="truncate leading-tight" style={{ fontSize: '13px', fontWeight: 500, color: '#151E2C' }}>
-                      {profile.full_name}
-                    </p>
-                    <span
-                      className="inline-block mt-1 uppercase tracking-wider"
-                      style={{ fontSize: '10px', fontWeight: 500, padding: '1px 6px', borderRadius: '4px', background: roleColors.bg, color: roleColors.text }}
-                    >
-                      {profile.role}
-                    </span>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSignOut();
-                    }}
-                    className="p-1.5 rounded-lg flex-shrink-0"
-                    style={{
-                      opacity: userCardHovered ? 1 : 0,
-                      background: 'transparent',
-                      color: '#64748b',
-                      transition: 'opacity 0.18s ease, background 0.18s ease, color 0.18s ease',
-                      marginLeft: 'auto',
-                    }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLButtonElement).style.background = 'rgb(var(--color-danger-muted))';
-                      (e.currentTarget as HTMLButtonElement).style.color = 'rgb(var(--color-danger))';
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
-                      (e.currentTarget as HTMLButtonElement).style.color = '#64748b';
-                    }}
-                    title="Logout"
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+      {body}
     </aside>
   );
 };

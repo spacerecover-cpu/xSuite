@@ -21,10 +21,12 @@ export const useCasesRealtime = () => {
       }
 
       debounceTimers.current[key] = setTimeout(() => {
-        queryClient.invalidateQueries({
-          queryKey,
-          refetchType: 'none'
-        });
+        // Default refetchType ('active') so a realtime change actually refetches
+        // queries currently on screen. 'none' only marked them stale, which the
+        // global refetchOnMount/refetchOnWindowFocus settings then never picked
+        // up — live updates were silently dropped. The debounce above already
+        // protects against event bursts.
+        queryClient.invalidateQueries({ queryKey });
         delete debounceTimers.current[key];
       }, delay);
     };

@@ -1,0 +1,30 @@
+{
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "myCases": "الحالات",
+    "quotes": "عروض الأسعار",
+    "reports": "التقارير",
+    "myPurchases": "مشترياتي",
+    "payments": "المدفوعات",
+    "messages": "الرسائل",
+    "settings": "الإعدادات"
+  },
+  "common": {
+    "menuSettings": "الإعدادات",
+    "menuLogout": "تسجيل الخروج"
+  },
+  "login": {
+    "signIn": "تسجيل الدخول",
+    "emailLabel": "البريد الإلكتروني",
+    "passwordLabel": "كلمة المرور",
+    "forgotPassword": "نسيت كلمة المرور؟"
+  },
+  "quotes": {
+    "approveModal": {
+      "cancel": "إلغاء"
+    },
+    "rejectModal": {
+      "cancel": "إلغاء"
+    }
+  }
+}

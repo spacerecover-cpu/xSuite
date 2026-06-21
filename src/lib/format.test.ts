@@ -1,19 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { format as dateFnsFormat, parseISO } from 'date-fns';
 import { ar as arDateLocale } from 'date-fns/locale/ar';
-
-// Mock supabaseClient so format.ts can be imported without env vars
-vi.mock('./supabaseClient', () => ({
-  supabase: {
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-        }),
-      }),
-    }),
-  },
-}));
 
 import {
   formatCurrency,
@@ -22,9 +9,11 @@ import {
   formatDate,
   formatDateTime,
   formatCurrencyWithConfig,
+  renderCurrencyToken,
   toDateInputValue,
 } from './format';
 import type { CurrencyConfig } from '../types/tenantConfig';
+import { REQUIRED_SENTINEL } from '../types/tenantConfig';
 
 describe('formatCurrency (currency-aware decimals)', () => {
   it('uses 2 decimals for USD', () => {
@@ -84,6 +73,8 @@ describe('en path is byte-identical to current main (regression pin)', () => {
       decimalSeparator: '.',
       thousandsSeparator: ',',
       position: 'before',
+      displayMode: 'symbol',
+      negativeFormat: 'minus',
     };
     expect(formatCurrencyWithConfig(1234.5, cfg)).toBe('$1,234.50');
   });
@@ -96,6 +87,8 @@ describe('en path is byte-identical to current main (regression pin)', () => {
       decimalSeparator: '.',
       thousandsSeparator: ',',
       position: 'before',
+      displayMode: 'symbol',
+      negativeFormat: 'minus',
     };
     expect(formatCurrencyWithConfig(1234.5, cfg, 'en-US')).toBe('$1,234.50');
   });
@@ -147,12 +140,106 @@ describe('ar path is locale-aware (Gregorian, Western numerals)', () => {
       decimalSeparator: '.',
       thousandsSeparator: ',',
       position: 'before',
+      displayMode: 'symbol',
+      negativeFormat: 'minus',
     };
     const out = formatCurrencyWithConfig(1234.5, cfg, 'ar-SA');
     // v1 policy: Western numerals (Gulf-ERP norm) — output digit set unchanged.
     expect(out).toMatch(/[0-9]/);
     expect(out).not.toMatch(/[٠-٩]/); // no Arabic-Indic digits
     expect(out).toContain('1,234.50');
+  });
+});
+
+// --- Phase 2: currency display_mode + negative_format ---
+
+const cfg = (over: Partial<CurrencyConfig> = {}): CurrencyConfig => ({
+  code: 'USD',
+  symbol: '$',
+  name: 'US Dollar',
+  decimalPlaces: 2,
+  decimalSeparator: '.',
+  thousandsSeparator: ',',
+  position: 'before',
+  displayMode: 'symbol',
+  negativeFormat: 'minus',
+  ...over,
+});
+
+const omr = (over: Partial<CurrencyConfig> = {}): CurrencyConfig =>
+  cfg({ code: 'OMR', symbol: 'ر.ع.', name: 'Omani Rial', decimalPlaces: 3, position: 'after', ...over });
+
+describe('renderCurrencyToken — which token a tenant sees', () => {
+  it("'symbol' mode returns the display symbol (default, byte-identical)", () => {
+    expect(renderCurrencyToken(cfg())).toBe('$');
+    expect(renderCurrencyToken(omr())).toBe('ر.ع.');
+  });
+
+  it("'iso_code' mode returns the ISO 4217 code", () => {
+    expect(renderCurrencyToken(cfg({ displayMode: 'iso_code' }))).toBe('USD');
+    expect(renderCurrencyToken(omr({ displayMode: 'iso_code' }))).toBe('OMR');
+  });
+
+  it("'symbol_code' mode returns 'symbol code' (e.g. 'ر.ع. OMR')", () => {
+    expect(renderCurrencyToken(omr({ displayMode: 'symbol_code' }))).toBe('ر.ع. OMR');
+    expect(renderCurrencyToken(cfg({ displayMode: 'symbol_code' }))).toBe('$ USD');
+  });
+
+  it('falls back to the ISO code when the display symbol is empty (never blank)', () => {
+    expect(renderCurrencyToken(omr({ symbol: '' }))).toBe('OMR');
+    // symbol_code with no symbol must NOT duplicate the code ('OMR OMR')
+    expect(renderCurrencyToken(omr({ symbol: '', displayMode: 'symbol_code' }))).toBe('OMR');
+  });
+
+  it('falls back to the symbol when the code is the unresolved sentinel (no Symbol→string crash)', () => {
+    expect(renderCurrencyToken(cfg({ code: REQUIRED_SENTINEL, displayMode: 'iso_code' }))).toBe('$');
+  });
+});
+
+describe('formatCurrencyWithConfig — display_mode + negative_format', () => {
+  it("'iso_code' renders the code as the token (OMR after-position, 3dp)", () => {
+    expect(formatCurrencyWithConfig(1234.5, omr({ displayMode: 'iso_code' }))).toBe('1,234.500 OMR');
+  });
+
+  it("'symbol_code' renders 'symbol code' as the token", () => {
+    expect(formatCurrencyWithConfig(1234.5, omr({ displayMode: 'symbol_code' }))).toBe('1,234.500 ر.ع. OMR');
+  });
+
+  it("'iso_code' before-position renders the token verbatim (no injected space)", () => {
+    expect(formatCurrencyWithConfig(1234.5, cfg({ displayMode: 'iso_code' }))).toBe('USD1,234.50');
+  });
+
+  it("negative_format 'parentheses' wraps negatives in accounting parens (before position)", () => {
+    expect(formatCurrencyWithConfig(-1234.5, cfg({ negativeFormat: 'parentheses' }))).toBe('($1,234.50)');
+  });
+
+  it("negative_format 'parentheses' wraps negatives (after position, iso_code)", () => {
+    expect(
+      formatCurrencyWithConfig(-1234.5, omr({ negativeFormat: 'parentheses', displayMode: 'iso_code' })),
+    ).toBe('(1,234.500 OMR)');
+  });
+
+  it("negative_format 'parentheses' leaves POSITIVE amounts unwrapped", () => {
+    expect(formatCurrencyWithConfig(1234.5, cfg({ negativeFormat: 'parentheses' }))).toBe('$1,234.50');
+  });
+
+  it("default negative_format 'minus' is byte-identical to pre-Phase-2 (sign inside the number)", () => {
+    expect(formatCurrencyWithConfig(-1234.5, cfg())).toBe('$-1,234.50');
+  });
+});
+
+// D18 grouping coverage, migrated from the retired formatCurrencyWithSettings.
+// formatCurrencyWithConfig is now the single tenant-separator-aware formatter.
+describe('formatCurrencyWithConfig — tenant grouping separators (D18)', () => {
+  it('honors a custom thousands separator (space), not forced en-US comma grouping', () => {
+    const out = formatCurrencyWithConfig(
+      1234567.5,
+      omr({ thousandsSeparator: ' ', decimalSeparator: '.', position: 'after', displayMode: 'iso_code' }),
+    );
+    expect(out).toBe('1 234 567.500 OMR');
+  });
+  it('defaults to comma/dot grouping for a standard before-position config', () => {
+    expect(formatCurrencyWithConfig(1234567.5, cfg())).toBe('$1,234,567.50');
   });
 });
 

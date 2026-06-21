@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { FinancialModuleHeader } from '../../components/financial/FinancialModuleHeader';
-import { FinancialStatsCard } from '../../components/financial/FinancialStatsCard';
+import { StatCard } from '../../components/shared/StatCard';
 import { formatDate } from '../../lib/format';
 import { useCurrency } from '../../hooks/useCurrency';
 import {
@@ -12,7 +13,7 @@ import {
   generateRevenueByCaseReport,
 } from '../../lib/financialReportsService';
 import { baseAmount } from '../../lib/financialMath';
-import { TrendingUp, DollarSign, PieChart, BarChart3, Plus, Search, Users, Briefcase } from 'lucide-react';
+import { TrendingUp, BarChart3, Plus, Search, Users, Briefcase } from 'lucide-react';
 
 type RevenueInvoiceRow = {
   id: string;
@@ -134,10 +135,18 @@ export const RevenueDashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-8 max-w-[1800px] mx-auto">
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading revenue data...</p>
+      <div className="p-8 max-w-[1800px] mx-auto space-y-6">
+        <Skeleton className="h-28 w-full rounded-2xl" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+          ))}
+        </div>
+        <Skeleton className="h-20 w-full rounded-2xl" />
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full rounded-lg" />
+          ))}
         </div>
       </div>
     );
@@ -163,29 +172,25 @@ export const RevenueDashboard: React.FC = () => {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <FinancialStatsCard
+        <StatCard
           label="Total Revenue"
           value={formatCurrency(totalRevenue)}
-          icon={<DollarSign className="w-5 h-5 text-white" />}
-          color="green"
+          tone="success"
         />
-        <FinancialStatsCard
+        <StatCard
           label="This Month"
           value={formatCurrency(thisMonthRevenue)}
-          icon={<TrendingUp className="w-5 h-5 text-white" />}
-          color="blue"
+          tone="info"
         />
-        <FinancialStatsCard
+        <StatCard
           label="Growth Rate"
           value={`${growthRate.toFixed(2)}%`}
-          icon={<BarChart3 className="w-5 h-5 text-white" />}
-          color="green"
+          tone="success"
         />
-        <FinancialStatsCard
+        <StatCard
           label="Revenue Streams"
           value={revenueData.length}
-          icon={<PieChart className="w-5 h-5 text-white" />}
-          color="slate"
+          tone="neutral"
         />
       </div>
 
@@ -365,6 +370,7 @@ export const RevenueDashboard: React.FC = () => {
                   </tr>
                 ) : (
                   customerRevenue.map((customer) => {
+                    // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- CustomerRevenueRow.amount is already base-currency (accumulated via baseAmount in generateRevenueByCustomerReport); summing it is a base rollup, not raw native.
                     const totalCustomerRevenue = customerRevenue.reduce<number>((sum, c) => sum + c.amount, 0);
                     const percentage = totalCustomerRevenue > 0 ? (customer.amount / totalCustomerRevenue) * 100 : 0;
                     return (

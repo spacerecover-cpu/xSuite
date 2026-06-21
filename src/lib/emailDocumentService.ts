@@ -8,8 +8,9 @@ export interface SendDocumentEmailParams {
   bcc?: string[];
   subject: string;
   body: string;
-  blob: Blob;
-  filename: string;
+  /** Omit both blob and filename to send a plain (attachment-less) email. */
+  blob?: Blob;
+  filename?: string;
   caseId?: string;
   documentType?: string;
 }
@@ -59,7 +60,7 @@ export async function sendDocumentEmail(params: SendDocumentEmailParams): Promis
   }
 
   try {
-    if (!validatePDFBlob(params.blob)) {
+    if (params.blob && !validatePDFBlob(params.blob)) {
       return {
         success: false,
         error: 'Invalid PDF document. The file may be corrupted or empty. Please regenerate the document and try again.'
@@ -72,7 +73,7 @@ export async function sendDocumentEmail(params: SendDocumentEmailParams): Promis
       return { success: false, error: 'Not authenticated' };
     }
 
-    const attachmentBase64 = await blobToBase64(params.blob);
+    const attachmentBase64 = params.blob ? await blobToBase64(params.blob) : undefined;
 
     const response = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-document-email`,

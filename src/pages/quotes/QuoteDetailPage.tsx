@@ -15,18 +15,23 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { PDFDownloadButton } from '../../components/shared/PDFDownloadButton';
 import { QuoteDocument } from '../../components/documents/QuoteDocument';
 import { QuoteFormModal } from '../../components/cases/QuoteFormModal';
 import { ConvertToInvoiceModal } from '../../components/cases/ConvertToInvoiceModal';
 import { useCurrency } from '../../hooks/useCurrency';
 import { usePDFDownload } from '../../hooks/usePDFDownload';
+import { useProfileNames } from '../../hooks/useProfileNames';
+import { AuditInfo } from '../../components/ui/AuditInfo';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
 import { supabase } from '../../lib/supabaseClient';
 import { convertQuoteToInvoice } from '../../lib/invoiceService';
-import { ArrowLeft, CreditCard as Edit, Trash2, Send, CheckCircle, XCircle, FileText, Copy, Clock, FileCheck, AlertCircle, Receipt } from 'lucide-react';
+import { ArrowLeft, CreditCard as Edit, Trash2, Send, CheckCircle, XCircle, FileText, Copy, Clock, FileCheck, AlertCircle, Receipt, CalendarClock } from 'lucide-react';
 import { BackupDeviceRecommendation } from '../../components/quotes/BackupDeviceRecommendation';
+import { FollowUpFormModal } from '../../components/communications/FollowUpFormModal';
+import { useTenantFeature } from '../../contexts/TenantConfigContext';
 import { logger } from '../../lib/logger';
 
 const statusConfig = {
@@ -57,6 +62,8 @@ export const QuoteDetailPage: React.FC = () => {
   } = usePDFDownload();
   const { profile: _profile } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showQuoteChaseModal, setShowQuoteChaseModal] = useState(false);
+  const followUpsEnabled = useTenantFeature('automation.case_follow_ups');
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -71,6 +78,7 @@ export const QuoteDetailPage: React.FC = () => {
     queryFn: () => fetchQuoteById(id!),
     enabled: !!id,
   });
+  const { nameOf } = useProfileNames([quote?.created_by, quote?.updated_by]);
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteQuote(id!),
@@ -195,9 +203,9 @@ export const QuoteDetailPage: React.FC = () => {
   if (isLoading) {
     return (
       <div className="p-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-slate-200 rounded w-1/4"></div>
-          <div className="h-64 bg-slate-200 rounded"></div>
+        <div className="space-y-4">
+          <Skeleton className="h-8 w-1/4" />
+          <Skeleton className="h-64 w-full" />
         </div>
       </div>
     );
@@ -578,6 +586,17 @@ export const QuoteDetailPage: React.FC = () => {
                   </Button>
                 )}
 
+                {followUpsEnabled && quote.case_id && (
+                  <Button
+                    onClick={() => setShowQuoteChaseModal(true)}
+                    variant="secondary"
+                    className="w-full"
+                  >
+                    <CalendarClock className="w-4 h-4 mr-2" />
+                    Schedule Quote Chase
+                  </Button>
+                )}
+
                 <Button
                   onClick={() => duplicateMutation.mutate()}
                   variant="secondary"
@@ -639,12 +658,13 @@ export const QuoteDetailPage: React.FC = () => {
             <Card className="p-6">
               <h3 className="text-lg font-semibold text-slate-900 mb-4">Quote Details</h3>
               <div className="space-y-3 text-sm">
-                <div>
-                  <span className="text-slate-600">Created:</span>
-                  <span className="ml-2 text-slate-900 font-medium">
-                    {quote.created_at ? new Date(quote.created_at).toLocaleDateString() : 'N/A'}
-                  </span>
-                </div>
+                <AuditInfo
+                  variant="stacked"
+                  createdAt={quote.created_at}
+                  createdByName={nameOf(quote.created_by)}
+                  updatedAt={quote.updated_at}
+                  updatedByName={nameOf(quote.updated_by)}
+                />
                 {quote.valid_until && (
                   <div>
                     <span className="text-slate-600">Valid Until:</span>
@@ -774,6 +794,18 @@ export const QuoteDetailPage: React.FC = () => {
           companyId={quote.company_id}
           initialData={quote ? toQuoteEditInitialData(quote as unknown as Record<string, unknown>) : undefined}
           clientReference={quote.client_reference}
+        />
+      )}
+
+      {/* Quote chase follow-up */}
+      {showQuoteChaseModal && quote?.case_id && (
+        <FollowUpFormModal
+          isOpen={showQuoteChaseModal}
+          onClose={() => setShowQuoteChaseModal(false)}
+          caseId={quote.case_id}
+          quoteId={quote.id}
+          defaultType="quote_chase"
+          defaultInDays={3}
         />
       )}
 

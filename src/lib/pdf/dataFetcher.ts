@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient';
+import { fetchInvoicePaymentLedger } from '../paymentLedger';
 import { getOrCreateCompanySettings } from '../companySettingsService';
 import type {
   CaseData,
@@ -10,6 +11,7 @@ import type {
   QuoteItemData,
   InvoiceData,
   InvoiceDocumentData,
+  CreditNoteDocumentData,
   InvoicePaymentLine,
   InvoiceItemData,
   PaymentReceiptData,
@@ -20,6 +22,9 @@ import type {
   ChainOfCustodyEntryData,
 } from './types';
 import type { Database } from '../../types/database.types';
+import type { CurrencyConfig } from '../../types/tenantConfig';
+import { getTenantConfig } from '../tenantConfigService';
+import { renderCurrencyToken } from '../format';
 
 type QuotesRow = Database['public']['Tables']['quotes']['Row'];
 type InvoicesRow = Database['public']['Tables']['invoices']['Row'];
@@ -143,13 +148,19 @@ function toBankAccount(src: unknown): NonNullable<InvoiceData['bank_accounts']> 
   };
 }
 
-function toLocale(src: unknown): NonNullable<QuoteData['accounting_locales']> {
-  const r = pickRecord(src);
-  const position = r && r.currency_position === 'after' ? 'after' : 'before';
+/**
+ * The document currency block, sourced from the resolved Country Engine
+ * CurrencyConfig (NOT the legacy accounting_locales table). The rendered token
+ * honors the tenant's display_mode (symbol 'ر.ع.' / ISO code 'OMR' / both
+ * 'ر.ع. OMR') via renderCurrencyToken, which also falls back to the ISO code when
+ * a tenant has no display symbol — never to a US '$'/'USD' default. This is the
+ * single place currency formatting enters the PDF/document layer.
+ */
+export function currencyToBlock(c: CurrencyConfig): NonNullable<QuoteData['accounting_locales']> {
   return {
-    currency_symbol: (r && optStr(r.currency_symbol)) || 'USD',
-    currency_position: position,
-    decimal_places: r && typeof r.decimal_places === 'number' ? r.decimal_places : 2,
+    currency_symbol: renderCurrencyToken(c),
+    currency_position: c.position,
+    decimal_places: c.decimalPlaces,
   };
 }
 
@@ -373,10 +384,16 @@ async function fetchCaseDevices(caseId: string): Promise<DeviceData[]> {
     role: device.device_role_id ? roleMap.get(device.device_role_id) ?? undefined : undefined,
     notes: device.symptoms ?? (device.accessories ? device.accessories.join(', ') : undefined),
     device_problem: device.symptoms ?? undefined,
+    checked_out_at: device.checked_out_at ?? undefined,
+    checkout_batch_id: device.checkout_batch_id ?? undefined,
+    checkout_collector_name: device.checkout_collector_name ?? undefined,
+    checkout_collector_mobile: device.checkout_collector_mobile ?? undefined,
+    checkout_collector_id: device.checkout_collector_id ?? undefined,
+    checkout_collector_relationship: device.checkout_collector_relationship ?? undefined,
   }));
 }
 
-async function fetchCompanySettings(): Promise<CompanySettingsData> {
+export async function fetchCompanySettings(): Promise<CompanySettingsData> {
   try {
     const settings = await getOrCreateCompanySettings();
     return {
@@ -416,12 +433,13 @@ async function fetchCompanySettings(): Promise<CompanySettingsData> {
 export function toQuoteData(
   quoteRow: Partial<QuotesRow> & { cases?: unknown },
   extras: {
+    currency: CurrencyConfig;
     customer?: unknown;
     company?: unknown;
     createdByProfile?: unknown;
     customerAssociatedCompany?: unknown;
     items?: QuoteItemData[] | null;
-    locale?: unknown;
+    bankAccounts?: unknown;
   },
 ): QuoteData {
   // Built field-by-field from the typed row (no `as unknown as`): a renamed or
@@ -451,7 +469,8 @@ export function toQuoteData(
     created_by_profile: toCreatedByProfile(extras.createdByProfile),
     customer_associated_company: toAssociatedCompany(extras.customerAssociatedCompany),
     quote_items: extras.items ?? [],
-    accounting_locales: toLocale(extras.locale),
+    bank_accounts: toBankAccount(extras.bankAccounts),
+    accounting_locales: currencyToBlock(extras.currency),
   } satisfies QuoteData;
 }
 
@@ -487,7 +506,7 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
   // alias that can drift away from the builder's `customer`/`company` reads.
   // quotes.created_by FKs to auth.users (not profiles), so the creator profile is
   // also a separate lookup.
-  const [customerRes, companyRes, createdByRes] = await Promise.all([
+  const [customerRes, companyRes, createdByRes, bankRes] = await Promise.all([
     quoteRow.customer_id
       ? supabase
           .from('customers_enhanced')
@@ -505,6 +524,15 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
     quoteRow.created_by
       ? supabase.from('profiles').select('id, full_name').eq('id', quoteRow.created_by).maybeSingle()
       : Promise.resolve({ data: null }),
+    // The quote's selected bank account (Edit Quote → Bank Account). Fetched the
+    // same way invoices do so the structured bank block renders on the PDF.
+    quoteRow.bank_account_id
+      ? supabase
+          .from('bank_accounts')
+          .select('id, account_name:name, bank_name, account_number, iban, swift_code')
+          .eq('id', quoteRow.bank_account_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   let customerAssociatedCompany: unknown = null;
@@ -514,6 +542,7 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
       .select('companies (id, name, company_name)')
       .eq('customer_id', quoteRow.customer_id)
       .eq('is_primary', true)
+      .is('deleted_at', null)
       .maybeSingle();
 
     customerAssociatedCompany = relationshipData?.companies ?? null;
@@ -530,20 +559,18 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
     console.error('Error fetching quote items:', itemsError);
   }
 
-  const { data: defaultLocale } = await supabase
-    .from('accounting_locales')
-    .select('currency_symbol, currency_position, decimal_places')
-    .eq('is_default', true)
-    .eq('is_active', true)
-    .maybeSingle();
+  // Currency is resolved through the Country Engine (single source of truth), not
+  // the legacy accounting_locales table. quotes.tenant_id scopes the resolution.
+  const cfg = await getTenantConfig(quoteRow.tenant_id);
 
   return toQuoteData(quoteRow, {
+    currency: cfg.currency,
     customer: customerRes.data,
     company: companyRes.data,
     createdByProfile: createdByRes.data,
     customerAssociatedCompany,
     items: toQuoteItems(items),
-    locale: defaultLocale,
+    bankAccounts: bankRes.data,
   });
 }
 
@@ -554,11 +581,11 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
 export function toInvoiceData(
   invoiceRow: Partial<InvoicesRow> & { cases?: unknown; bank_accounts?: unknown },
   extras: {
+    currency: CurrencyConfig;
     customer?: unknown;
     company?: unknown;
     customerAssociatedCompany?: unknown;
     items?: InvoiceItemData[] | null;
-    locale?: unknown;
   },
 ): InvoiceData {
   // Built field-by-field from the typed row (no `as unknown as`): column drift is
@@ -580,6 +607,9 @@ export function toInvoiceData(
     total_amount: invoiceRow.total_amount ?? 0,
     amount_paid: invoiceRow.amount_paid ?? 0,
     balance_due: invoiceRow.balance_due ?? 0,
+    // The DB column is `terms`; the document layer reads `payment_terms`. Surface
+    // it so the per-record invoice terms reach the engine's terms section.
+    payment_terms: optStr(invoiceRow.terms),
     notes: invoiceRow.notes ?? undefined,
     created_at: invoiceRow.created_at ?? '',
     created_by: invoiceRow.created_by ?? undefined,
@@ -589,7 +619,7 @@ export function toInvoiceData(
     bank_accounts: toBankAccount(invoiceRow.bank_accounts),
     customer_associated_company: toAssociatedCompany(extras.customerAssociatedCompany),
     invoice_line_items: extras.items ?? [],
-    accounting_locales: toLocale(extras.locale),
+    accounting_locales: currencyToBlock(extras.currency),
   } satisfies InvoiceData;
 }
 
@@ -607,46 +637,102 @@ export async function fetchInvoiceData(invoiceId: string): Promise<InvoiceDocume
   };
 }
 
-type RawInvoicePayment = {
-  payment_date: string | null;
-  amount: number | string | null;
-  reference: string | null;
-  transaction_id: string | null;
-  status: string | null;
-  notes: string | null;
-  created_by: string | null;
-  payment_method: { name: string | null } | null;
-};
+export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditNoteDocumentData> {
+  const { data: cnRow, error } = await supabase
+    .from('credit_notes')
+    .select('*')
+    .eq('id', creditNoteId)
+    .maybeSingle();
 
-// Payment trail for the invoice PDF. Mirrors invoiceService.getPaymentHistory but
-// kept local so the pdf module stays free of the (lazily-loaded) invoiceService.
-async function fetchInvoicePaymentHistory(invoiceId: string): Promise<InvoicePaymentLine[]> {
-  const { data } = await supabase
-    .from('payments')
-    .select('payment_date, amount, reference, transaction_id, status, notes, created_by, payment_method:master_payment_methods(name)')
-    .eq('invoice_id', invoiceId)
-    .is('deleted_at', null)
-    .order('payment_date', { ascending: false });
-
-  const rows = (data ?? []) as unknown as RawInvoicePayment[];
-  const ids = Array.from(new Set(rows.map((r) => r.created_by).filter((v): v is string => !!v)));
-  let nameById: Record<string, string> = {};
-  if (ids.length > 0) {
-    const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', ids);
-    nameById = Object.fromEntries(
-      (profiles ?? []).map((p: { id: string; full_name: string | null }) => [p.id, p.full_name ?? '']),
-    );
+  if (error) {
+    console.error('Error fetching credit note data:', error);
+    throw new Error('Failed to load credit note data');
+  }
+  if (!cnRow) {
+    throw new Error('Credit note not found');
   }
 
-  return rows.map((r) => ({
-    payment_date: r.payment_date ?? null,
-    amount: typeof r.amount === 'number' ? r.amount : Number(r.amount ?? 0),
-    method: r.payment_method?.name ?? null,
-    reference: r.reference ?? null,
-    transaction_id: r.transaction_id ?? null,
-    status: r.status ?? null,
-    recorded_by: r.created_by ? (nameById[r.created_by] ?? null) : null,
-    notes: r.notes ?? null,
+  // Related records fetched separately (mirrors fetchInvoiceDetails — no embed/alias drift).
+  // Currency from the Country Engine (single source), not accounting_locales.
+  const cfg = await getTenantConfig(cnRow.tenant_id);
+  const [settings, invoiceRes, customerRes, companyRes, caseRes, itemsRes] = await Promise.all([
+    fetchCompanySettings(),
+    cnRow.invoice_id
+      ? supabase.from('invoices').select('invoice_number').eq('id', cnRow.invoice_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    cnRow.customer_id
+      ? supabase.from('customers_enhanced').select('customer_name').eq('id', cnRow.customer_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    cnRow.company_id
+      ? supabase.from('companies').select('company_name, name').eq('id', cnRow.company_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    cnRow.case_id
+      ? supabase.from('cases').select('case_no').eq('id', cnRow.case_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from('credit_note_items')
+      .select('description, quantity, unit_price, total')
+      .eq('credit_note_id', creditNoteId)
+      .is('deleted_at', null)
+      .order('sort_order', { ascending: true }),
+  ]);
+
+  const invoice = invoiceRes.data as { invoice_number?: string | null } | null;
+  const customer = customerRes.data as { customer_name?: string | null } | null;
+  const company = companyRes.data as { company_name?: string | null; name?: string | null } | null;
+  const caseRow = caseRes.data as { case_no?: string | null } | null;
+  const block = currencyToBlock(cfg.currency);
+  const items = (itemsRes.data ?? []) as Array<{ description?: string | null; quantity?: number | null; unit_price?: number | null; total?: number | null }>;
+
+  return {
+    creditNoteData: {
+      credit_note_number: cnRow.credit_note_number ?? null,
+      credit_note_date: cnRow.credit_note_date ?? null,
+      credit_type: cnRow.credit_type ?? null,
+      status: cnRow.status ?? null,
+      reason_code: cnRow.reason_code ?? null,
+      reason_notes: cnRow.reason_notes ?? null,
+      subtotal: cnRow.subtotal ?? null,
+      tax_rate: cnRow.tax_rate ?? null,
+      tax_amount: cnRow.tax_amount ?? null,
+      total_amount: cnRow.total_amount ?? null,
+      applied_amount: cnRow.applied_amount ?? null,
+      invoice_number: invoice?.invoice_number ?? null,
+      customer_name: customer?.customer_name ?? null,
+      company_name: company?.company_name ?? company?.name ?? null,
+      case_no: caseRow?.case_no ?? null,
+      currency_symbol: block.currency_symbol,
+      currency_position: block.currency_position,
+      decimal_places: block.decimal_places,
+      items: items.map((it) => ({
+        description: it.description ?? '',
+        quantity: typeof it.quantity === 'number' ? it.quantity : 0,
+        unit_price: typeof it.unit_price === 'number' ? it.unit_price : 0,
+        line_total: typeof it.total === 'number' ? it.total : 0,
+      })),
+    },
+    companySettings: settings,
+  };
+}
+
+// Payment trail for the invoice PDF: the unified ledger (receipts + allocated
+// payments + legacy direct payments with running balances). paymentLedger is
+// dependency-light (supabase client only), so the pdf module still stays free
+// of the lazily-loaded invoiceService.
+async function fetchInvoicePaymentHistory(invoiceId: string): Promise<InvoicePaymentLine[]> {
+  const entries = await fetchInvoicePaymentLedger(invoiceId);
+  return entries.map((e) => ({
+    payment_date: e.payment_date,
+    amount: e.amount,
+    method: e.method,
+    reference: e.reference,
+    transaction_id: e.transaction_id,
+    status: e.status,
+    recorded_by: e.recorded_by,
+    notes: e.notes,
+    doc_number: e.doc_number,
+    source: e.source,
+    running_balance: e.running_balance,
   }));
 }
 
@@ -703,6 +789,7 @@ async function fetchInvoiceDetails(invoiceId: string): Promise<InvoiceData> {
       .select('companies (id, name, company_name)')
       .eq('customer_id', invoiceRow.customer_id)
       .eq('is_primary', true)
+      .is('deleted_at', null)
       .maybeSingle();
 
     customerAssociatedCompany = relationshipData?.companies ?? null;
@@ -719,19 +806,15 @@ async function fetchInvoiceDetails(invoiceId: string): Promise<InvoiceData> {
     console.error('Error fetching invoice items:', itemsError);
   }
 
-  const { data: defaultLocale } = await supabase
-    .from('accounting_locales')
-    .select('currency_symbol, currency_position, decimal_places')
-    .eq('is_default', true)
-    .eq('is_active', true)
-    .maybeSingle();
+  // Currency from the Country Engine (single source), not accounting_locales.
+  const cfg = await getTenantConfig(invoiceRow.tenant_id);
 
   return toInvoiceData(invoiceRow, {
+    currency: cfg.currency,
     customer: customerRes.data,
     company: companyRes.data,
     customerAssociatedCompany,
     items: toInvoiceItems(items),
-    locale: defaultLocale,
   });
 }
 
@@ -747,11 +830,11 @@ async function fetchInvoiceDetails(invoiceId: string): Promise<InvoiceData> {
 export function toPaymentReceiptData(
   paymentRow: Partial<PaymentsRow>,
   extras: {
+    currency: CurrencyConfig;
     invoice?: unknown;
     customer?: unknown;
     bankAccounts?: unknown;
     cases?: unknown;
-    locale?: unknown;
   },
 ): PaymentReceiptData {
   const invoiceRef = pickRecord(extras.invoice);
@@ -775,7 +858,7 @@ export function toPaymentReceiptData(
     customer: toCustomerBlock(extras.customer),
     bank_accounts: toBankAccount(extras.bankAccounts),
     cases: toCaseRef(extras.cases),
-    accounting_locales: toLocale(extras.locale),
+    accounting_locales: currencyToBlock(extras.currency),
   } satisfies PaymentReceiptData;
 }
 
@@ -842,19 +925,15 @@ async function fetchPaymentDetails(paymentId: string): Promise<PaymentReceiptDat
     caseInfo = invoiceData?.cases ?? null;
   }
 
-  const { data: defaultLocale } = await supabase
-    .from('accounting_locales')
-    .select('currency_symbol, currency_position, decimal_places')
-    .eq('is_default', true)
-    .eq('is_active', true)
-    .maybeSingle();
+  // Currency from the Country Engine (single source), not accounting_locales.
+  const cfg = await getTenantConfig(paymentData.tenant_id);
 
   return toPaymentReceiptData(paymentData, {
+    currency: cfg.currency,
     invoice: paymentData.invoices,
     customer: customerRow,
     bankAccounts: paymentData.bank_accounts,
     cases: caseInfo,
-    locale: defaultLocale,
   });
 }
 
@@ -869,10 +948,10 @@ async function fetchPaymentDetails(paymentId: string): Promise<PaymentReceiptDat
 export function toPayslipData(
   recordRow: Partial<PayrollRecordsRow>,
   extras: {
+    currency: CurrencyConfig;
     employee?: unknown;
     period?: unknown;
     items?: PayslipData['items'];
-    locale?: unknown;
   },
 ): PayslipData {
   const employeeRow = pickRecord(extras.employee);
@@ -898,7 +977,7 @@ export function toPayslipData(
     gross_salary: recordRow.total_earnings ?? undefined,
     net_salary: recordRow.net_salary ?? 0,
     items: extras.items ?? [],
-    accounting_locales: toLocale(extras.locale),
+    accounting_locales: currencyToBlock(extras.currency),
   } satisfies PayslipData;
 }
 
@@ -948,12 +1027,8 @@ async function fetchPayslipDetails(recordId: string): Promise<PayslipData> {
     .eq('record_id', recordId)
     .order('sort_order', { ascending: true });
 
-  const { data: defaultLocale } = await supabase
-    .from('accounting_locales')
-    .select('currency_symbol, currency_position, decimal_places')
-    .eq('is_default', true)
-    .eq('is_active', true)
-    .maybeSingle();
+  // Currency from the Country Engine (single source), not accounting_locales.
+  const cfg = await getTenantConfig(recordData.tenant_id);
 
   const mappedItems = (items || []).map(item => ({
     component_code: item.component_id ?? '',
@@ -963,10 +1038,10 @@ async function fetchPayslipDetails(recordId: string): Promise<PayslipData> {
   }));
 
   return toPayslipData(recordData, {
+    currency: cfg.currency,
     employee: recordData.employee,
     period: recordData.payroll_period,
     items: mappedItems,
-    locale: defaultLocale,
   });
 }
 

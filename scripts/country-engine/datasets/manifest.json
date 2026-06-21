@@ -1,0 +1,19 @@
+{
+  "$comment": "Pinned reference-dataset manifest for the geo_countries seed generator. PHASE 1 STATUS: the full CLDR/ISO/libphonenumber/i18n-postal-address dataset import is DEFERRED (owner decision on deps + license + refresh owner — see PR blockers). Until then the generator is fed by the hand-verified GCC + priority-country seed (scripts/country-engine/gcc-priority-seed.ts), and these dataset entries record the INTENDED pinned versions for when the dependency is approved.",
+  "referenceDatasetVersion": "gcc-priority-2026-06-15",
+  "mode": "hand-verified-seed",
+  "coverage": {
+    "countries": ["SA", "AE", "OM", "KW", "QA", "BH", "GB", "IN", "US"],
+    "note": "GCC-6 launch markets + priority anchor markets only. NOT ~195 countries."
+  },
+  "intendedDatasets": {
+    "cldr-core": { "intendedVersion": "48.2.0", "license": "Unicode-3.0", "provides": ["weekData.firstDay", "weekData.weekend", "numbers", "dates", "currency-display"], "status": "deferred-not-installed" },
+    "cldr-numbers-full": { "intendedVersion": "48.2.0", "license": "Unicode-3.0", "provides": ["decimalSeparator", "groupSeparator", "numberingSystem"], "status": "deferred-not-installed" },
+    "cldr-dates-full": { "intendedVersion": "48.2.0", "license": "Unicode-3.0", "provides": ["dateFormat", "timeFormat"], "status": "deferred-not-installed" },
+    "iso-4217": { "source": "via CLDR currencyData", "provides": ["currencyMinorUnits"], "status": "hand-verified-for-seed" },
+    "libphonenumber-js": { "intendedVersion": "^1.11", "license": "Apache-2.0", "provides": ["phone.code", "phone.format"], "status": "deferred-not-installed" },
+    "i18n-postal-address": { "intendedVersion": "^1.0", "license": "Apache-2.0 (data unspecified-but-unrestricted)", "provides": ["address.lines"], "status": "deferred-not-installed" },
+    "iana-tz": { "source": "runtime Intl / pg_timezone_names", "provides": ["timezone resolution"], "status": "runtime-not-snapshotted" },
+    "date-holidays": { "intendedVersion": "^3", "license": "code ISC / data CC-BY-SA-3.0", "provides": ["geo_public_holidays (Phase 3)"], "status": "out-of-phase-1-scope" }
+  }
+}

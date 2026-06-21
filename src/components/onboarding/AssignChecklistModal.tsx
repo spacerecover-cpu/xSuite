@@ -10,7 +10,7 @@ import {
   assignChecklistToEmployee,
 } from '../../lib/employeeOnboardingService';
 import { supabase } from '../../lib/supabaseClient';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
 
 interface FormData {
   employee_id: string;
@@ -30,6 +30,7 @@ export const AssignChecklistModal: React.FC<Props> = ({
   preselectedEmployeeId,
 }) => {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const employeeFieldId = useId();
   const checklistFieldId = useId();
   const startDateFieldId = useId();

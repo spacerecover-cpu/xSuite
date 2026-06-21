@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { sanitizeFilterValue } from './postgrestSanitizer';
 import type { Database } from '../types/database.types';
 
 type Timesheet = Database['public']['Tables']['timesheets']['Row'];
@@ -69,8 +70,9 @@ export const timesheetService = {
       query = query.lte('work_date', filters.endDate);
     }
     if (filters?.search) {
+      const s = sanitizeFilterValue(filters.search);
       query = query.or(
-        `project_name.ilike.%${filters.search}%,task_description.ilike.%${filters.search}%`
+        `project_name.ilike.%${s}%,task_description.ilike.%${s}%`
       );
     }
 

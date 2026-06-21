@@ -685,9 +685,9 @@ CREATE TABLE public.cases (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   deleted_at timestamp with time zone,
-  case_no text DEFAULT case_number,
-  title text DEFAULT subject,
-  assigned_engineer_id uuid DEFAULT assigned_to,
+  case_no text GENERATED ALWAYS AS (case_number) STORED,
+  title text GENERATED ALWAYS AS (subject) STORED,
+  assigned_engineer_id uuid GENERATED ALWAYS AS (assigned_to) STORED,
   status text,
   priority text,
   client_reference text,
@@ -1038,7 +1038,7 @@ CREATE TABLE public.companies (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   deleted_at timestamp with time zone,
-  company_name text DEFAULT name
+  company_name text GENERATED ALWAYS AS (name) STORED
 );
 
 -- Table: company_documents
@@ -2088,7 +2088,7 @@ CREATE TABLE public.master_modules (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   category text,
-  order_index integer DEFAULT sort_order
+  order_index integer GENERATED ALWAYS AS (sort_order) STORED
 );
 
 -- Table: master_payment_methods
@@ -3046,7 +3046,7 @@ CREATE TABLE public.stock_items (
   tax_rate numeric(5,2),
   quantity_on_hand integer DEFAULT 0,
   quantity_reserved integer DEFAULT 0,
-  quantity_available integer DEFAULT (quantity_on_hand - quantity_reserved),
+  quantity_available integer GENERATED ALWAYS AS (quantity_on_hand - quantity_reserved) STORED,
   reorder_level integer DEFAULT 0,
   reorder_quantity integer DEFAULT 0,
   is_saleable boolean DEFAULT true,
@@ -3063,8 +3063,8 @@ CREATE TABLE public.stock_items (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   deleted_at timestamp with time zone,
   item_type text DEFAULT 'part'::text,
-  current_quantity numeric DEFAULT quantity_on_hand,
-  minimum_quantity numeric DEFAULT reorder_level,
+  current_quantity numeric GENERATED ALWAYS AS (quantity_on_hand) STORED,
+  minimum_quantity numeric GENERATED ALWAYS AS (reorder_level) STORED,
   brand text
 );
 
@@ -3757,7 +3757,303 @@ CREATE TABLE public.vat_transactions (
 
 -- ============================================================
 -- 4. PRIMARY KEYS & UNIQUE CONSTRAINTS
+-- (regenerated from the live database 2026-06-10 — the original dump
+--  emitted this section header with no statements, so no table had a PK
+--  and every FK below failed on fresh replay)
 -- ============================================================
+
+ALTER TABLE public.account_balance_snapshots ADD CONSTRAINT account_balance_snapshots_pkey PRIMARY KEY (id);
+ALTER TABLE public.account_transfers ADD CONSTRAINT account_transfers_pkey PRIMARY KEY (id);
+ALTER TABLE public.accounting_locales ADD CONSTRAINT accounting_locales_pkey PRIMARY KEY (id);
+ALTER TABLE public.announcement_dismissals ADD CONSTRAINT announcement_dismissals_announcement_id_user_id_key UNIQUE (announcement_id, user_id);
+ALTER TABLE public.announcement_dismissals ADD CONSTRAINT announcement_dismissals_pkey PRIMARY KEY (id);
+ALTER TABLE public.asset_assignments ADD CONSTRAINT asset_assignments_pkey PRIMARY KEY (id);
+ALTER TABLE public.asset_categories ADD CONSTRAINT asset_categories_pkey PRIMARY KEY (id);
+ALTER TABLE public.asset_depreciation ADD CONSTRAINT asset_depreciation_pkey PRIMARY KEY (id);
+ALTER TABLE public.asset_maintenance ADD CONSTRAINT asset_maintenance_pkey PRIMARY KEY (id);
+ALTER TABLE public.assets ADD CONSTRAINT assets_pkey PRIMARY KEY (id);
+ALTER TABLE public.attendance_records ADD CONSTRAINT attendance_records_pkey PRIMARY KEY (id);
+ALTER TABLE public.audit_trails ADD CONSTRAINT audit_trails_pkey PRIMARY KEY (id);
+ALTER TABLE public.bank_accounts ADD CONSTRAINT bank_accounts_pkey PRIMARY KEY (id);
+ALTER TABLE public.bank_reconciliation_sessions ADD CONSTRAINT bank_reconciliation_sessions_pkey PRIMARY KEY (id);
+ALTER TABLE public.bank_transactions ADD CONSTRAINT bank_transactions_pkey PRIMARY KEY (id);
+ALTER TABLE public.billing_coupons ADD CONSTRAINT billing_coupons_code_key UNIQUE (code);
+ALTER TABLE public.billing_coupons ADD CONSTRAINT billing_coupons_pkey PRIMARY KEY (id);
+ALTER TABLE public.billing_events ADD CONSTRAINT billing_events_paypal_event_id_key UNIQUE (paypal_event_id);
+ALTER TABLE public.billing_events ADD CONSTRAINT billing_events_pkey PRIMARY KEY (id);
+ALTER TABLE public.billing_invoice_items ADD CONSTRAINT billing_invoice_items_pkey PRIMARY KEY (id);
+ALTER TABLE public.billing_invoices ADD CONSTRAINT billing_invoices_invoice_number_key UNIQUE (invoice_number);
+ALTER TABLE public.billing_invoices ADD CONSTRAINT billing_invoices_pkey PRIMARY KEY (id);
+ALTER TABLE public.branches ADD CONSTRAINT branches_pkey PRIMARY KEY (id);
+ALTER TABLE public.case_attachments ADD CONSTRAINT case_attachments_pkey PRIMARY KEY (id);
+ALTER TABLE public.case_communications ADD CONSTRAINT case_communications_pkey PRIMARY KEY (id);
+ALTER TABLE public.case_devices ADD CONSTRAINT case_devices_pkey PRIMARY KEY (id);
+ALTER TABLE public.case_diagnostics ADD CONSTRAINT case_diagnostics_pkey PRIMARY KEY (id);
+ALTER TABLE public.case_engineers ADD CONSTRAINT case_engineers_pkey PRIMARY KEY (id);
+ALTER TABLE public.case_follow_ups ADD CONSTRAINT case_follow_ups_pkey PRIMARY KEY (id);
+ALTER TABLE public.case_internal_notes ADD CONSTRAINT case_internal_notes_pkey PRIMARY KEY (id);
+ALTER TABLE public.case_job_history ADD CONSTRAINT case_job_history_pkey PRIMARY KEY (id);
+ALTER TABLE public.case_milestones ADD CONSTRAINT case_milestones_pkey PRIMARY KEY (id);
+ALTER TABLE public.case_portal_visibility ADD CONSTRAINT case_portal_visibility_case_id_key UNIQUE (case_id);
+ALTER TABLE public.case_portal_visibility ADD CONSTRAINT case_portal_visibility_pkey PRIMARY KEY (id);
+ALTER TABLE public.case_qa_checklists ADD CONSTRAINT case_qa_checklists_pkey PRIMARY KEY (id);
+ALTER TABLE public.case_quote_items ADD CONSTRAINT case_quote_items_pkey PRIMARY KEY (id);
+ALTER TABLE public.case_quotes ADD CONSTRAINT case_quotes_pkey PRIMARY KEY (id);
+ALTER TABLE public.case_recovery_attempts ADD CONSTRAINT case_recovery_attempts_pkey PRIMARY KEY (id);
+ALTER TABLE public.case_report_sections ADD CONSTRAINT case_report_sections_pkey PRIMARY KEY (id);
+ALTER TABLE public.case_reports ADD CONSTRAINT case_reports_pkey PRIMARY KEY (id);
+ALTER TABLE public.cases ADD CONSTRAINT cases_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_accessories ADD CONSTRAINT catalog_accessories_name_key UNIQUE (name);
+ALTER TABLE public.catalog_accessories ADD CONSTRAINT catalog_accessories_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_device_brands ADD CONSTRAINT catalog_device_brands_name_key UNIQUE (name);
+ALTER TABLE public.catalog_device_brands ADD CONSTRAINT catalog_device_brands_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_device_capacities ADD CONSTRAINT catalog_device_capacities_name_key UNIQUE (name);
+ALTER TABLE public.catalog_device_capacities ADD CONSTRAINT catalog_device_capacities_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_device_component_statuses ADD CONSTRAINT catalog_device_component_statuses_name_key UNIQUE (name);
+ALTER TABLE public.catalog_device_component_statuses ADD CONSTRAINT catalog_device_component_statuses_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_device_conditions ADD CONSTRAINT catalog_device_conditions_name_key UNIQUE (name);
+ALTER TABLE public.catalog_device_conditions ADD CONSTRAINT catalog_device_conditions_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_device_encryption ADD CONSTRAINT catalog_device_encryption_name_key UNIQUE (name);
+ALTER TABLE public.catalog_device_encryption ADD CONSTRAINT catalog_device_encryption_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_device_form_factors ADD CONSTRAINT catalog_device_form_factors_name_key UNIQUE (name);
+ALTER TABLE public.catalog_device_form_factors ADD CONSTRAINT catalog_device_form_factors_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_device_head_counts ADD CONSTRAINT catalog_device_head_counts_name_key UNIQUE (name);
+ALTER TABLE public.catalog_device_head_counts ADD CONSTRAINT catalog_device_head_counts_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_device_interfaces ADD CONSTRAINT catalog_device_interfaces_name_key UNIQUE (name);
+ALTER TABLE public.catalog_device_interfaces ADD CONSTRAINT catalog_device_interfaces_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_device_made_in ADD CONSTRAINT catalog_device_made_in_name_key UNIQUE (name);
+ALTER TABLE public.catalog_device_made_in ADD CONSTRAINT catalog_device_made_in_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_device_platter_counts ADD CONSTRAINT catalog_device_platter_counts_name_key UNIQUE (name);
+ALTER TABLE public.catalog_device_platter_counts ADD CONSTRAINT catalog_device_platter_counts_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_device_roles ADD CONSTRAINT catalog_device_roles_name_key UNIQUE (name);
+ALTER TABLE public.catalog_device_roles ADD CONSTRAINT catalog_device_roles_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_device_types ADD CONSTRAINT catalog_device_types_name_key UNIQUE (name);
+ALTER TABLE public.catalog_device_types ADD CONSTRAINT catalog_device_types_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_donor_compatibility_matrix ADD CONSTRAINT catalog_donor_compatibility_matrix_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_interfaces ADD CONSTRAINT catalog_interfaces_name_key UNIQUE (name);
+ALTER TABLE public.catalog_interfaces ADD CONSTRAINT catalog_interfaces_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_service_categories ADD CONSTRAINT catalog_service_categories_name_key UNIQUE (name);
+ALTER TABLE public.catalog_service_categories ADD CONSTRAINT catalog_service_categories_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_service_line_items ADD CONSTRAINT catalog_service_line_items_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_service_locations ADD CONSTRAINT catalog_service_locations_name_key UNIQUE (name);
+ALTER TABLE public.catalog_service_locations ADD CONSTRAINT catalog_service_locations_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_service_problems ADD CONSTRAINT catalog_service_problems_name_key UNIQUE (name);
+ALTER TABLE public.catalog_service_problems ADD CONSTRAINT catalog_service_problems_pkey PRIMARY KEY (id);
+ALTER TABLE public.catalog_service_types ADD CONSTRAINT catalog_service_types_name_key UNIQUE (name);
+ALTER TABLE public.catalog_service_types ADD CONSTRAINT catalog_service_types_pkey PRIMARY KEY (id);
+ALTER TABLE public.chain_of_custody ADD CONSTRAINT chain_of_custody_pkey PRIMARY KEY (id);
+ALTER TABLE public.chain_of_custody_access_log ADD CONSTRAINT chain_of_custody_access_log_pkey PRIMARY KEY (id);
+ALTER TABLE public.chain_of_custody_integrity_checks ADD CONSTRAINT chain_of_custody_integrity_checks_pkey PRIMARY KEY (id);
+ALTER TABLE public.chain_of_custody_transfers ADD CONSTRAINT chain_of_custody_transfers_pkey PRIMARY KEY (id);
+ALTER TABLE public.clone_drives ADD CONSTRAINT clone_drives_pkey PRIMARY KEY (id);
+ALTER TABLE public.companies ADD CONSTRAINT companies_pkey PRIMARY KEY (id);
+ALTER TABLE public.company_documents ADD CONSTRAINT company_documents_pkey PRIMARY KEY (id);
+ALTER TABLE public.company_settings ADD CONSTRAINT company_settings_tenant_id_key UNIQUE (tenant_id);
+ALTER TABLE public.company_settings ADD CONSTRAINT company_settings_pkey PRIMARY KEY (id);
+ALTER TABLE public.coupon_redemptions ADD CONSTRAINT coupon_redemptions_pkey PRIMARY KEY (id);
+ALTER TABLE public.customer_communications ADD CONSTRAINT customer_communications_pkey PRIMARY KEY (id);
+ALTER TABLE public.customer_company_relationships ADD CONSTRAINT customer_company_relationship_tenant_id_customer_id_company_key UNIQUE (tenant_id, customer_id, company_id);
+ALTER TABLE public.customer_company_relationships ADD CONSTRAINT customer_company_relationships_pkey PRIMARY KEY (id);
+ALTER TABLE public.customer_groups ADD CONSTRAINT customer_groups_pkey PRIMARY KEY (id);
+ALTER TABLE public.customers_enhanced ADD CONSTRAINT customers_enhanced_pkey PRIMARY KEY (id);
+ALTER TABLE public.database_backups ADD CONSTRAINT database_backups_pkey PRIMARY KEY (id);
+ALTER TABLE public.departments ADD CONSTRAINT departments_pkey PRIMARY KEY (id);
+ALTER TABLE public.device_diagnostics ADD CONSTRAINT device_diagnostics_pkey PRIMARY KEY (id);
+ALTER TABLE public.document_templates ADD CONSTRAINT document_templates_pkey PRIMARY KEY (id);
+ALTER TABLE public.employee_documents ADD CONSTRAINT employee_documents_pkey PRIMARY KEY (id);
+ALTER TABLE public.employee_loans ADD CONSTRAINT employee_loans_pkey PRIMARY KEY (id);
+ALTER TABLE public.employee_salary_components ADD CONSTRAINT employee_salary_components_pkey PRIMARY KEY (id);
+ALTER TABLE public.employee_salary_config ADD CONSTRAINT employee_salary_config_pkey PRIMARY KEY (id);
+ALTER TABLE public.employee_salary_structures ADD CONSTRAINT employee_salary_structures_pkey PRIMARY KEY (id);
+ALTER TABLE public.employees ADD CONSTRAINT employees_pkey PRIMARY KEY (id);
+ALTER TABLE public.expense_attachments ADD CONSTRAINT expense_attachments_pkey PRIMARY KEY (id);
+ALTER TABLE public.expenses ADD CONSTRAINT expenses_pkey PRIMARY KEY (id);
+ALTER TABLE public.financial_audit_logs ADD CONSTRAINT financial_audit_logs_pkey PRIMARY KEY (id);
+ALTER TABLE public.financial_transactions ADD CONSTRAINT financial_transactions_pkey PRIMARY KEY (id);
+ALTER TABLE public.geo_cities ADD CONSTRAINT geo_cities_pkey PRIMARY KEY (id);
+ALTER TABLE public.geo_countries ADD CONSTRAINT geo_countries_code3_key UNIQUE (code3);
+ALTER TABLE public.geo_countries ADD CONSTRAINT geo_countries_code_key UNIQUE (code);
+ALTER TABLE public.geo_countries ADD CONSTRAINT geo_countries_pkey PRIMARY KEY (id);
+ALTER TABLE public.import_export_jobs ADD CONSTRAINT import_export_jobs_pkey PRIMARY KEY (id);
+ALTER TABLE public.import_export_logs ADD CONSTRAINT import_export_logs_pkey PRIMARY KEY (id);
+ALTER TABLE public.import_export_templates ADD CONSTRAINT import_export_templates_pkey PRIMARY KEY (id);
+ALTER TABLE public.import_field_mappings ADD CONSTRAINT import_field_mappings_pkey PRIMARY KEY (id);
+ALTER TABLE public.inventory_assignments ADD CONSTRAINT inventory_assignments_pkey PRIMARY KEY (id);
+ALTER TABLE public.inventory_case_assignments ADD CONSTRAINT inventory_case_assignments_pkey PRIMARY KEY (id);
+ALTER TABLE public.inventory_items ADD CONSTRAINT inventory_items_pkey PRIMARY KEY (id);
+ALTER TABLE public.inventory_locations ADD CONSTRAINT inventory_locations_pkey PRIMARY KEY (id);
+ALTER TABLE public.inventory_parts_usage ADD CONSTRAINT inventory_parts_usage_pkey PRIMARY KEY (id);
+ALTER TABLE public.inventory_photos ADD CONSTRAINT inventory_photos_pkey PRIMARY KEY (id);
+ALTER TABLE public.inventory_reservations ADD CONSTRAINT inventory_reservations_pkey PRIMARY KEY (id);
+ALTER TABLE public.inventory_search_templates ADD CONSTRAINT inventory_search_templates_pkey PRIMARY KEY (id);
+ALTER TABLE public.inventory_status_history ADD CONSTRAINT inventory_status_history_pkey PRIMARY KEY (id);
+ALTER TABLE public.inventory_transactions ADD CONSTRAINT inventory_transactions_pkey PRIMARY KEY (id);
+ALTER TABLE public.invoice_line_items ADD CONSTRAINT invoice_line_items_pkey PRIMARY KEY (id);
+ALTER TABLE public.invoices ADD CONSTRAINT invoices_pkey PRIMARY KEY (id);
+ALTER TABLE public.kb_article_tags ADD CONSTRAINT kb_article_tags_article_id_tag_id_key UNIQUE (article_id, tag_id);
+ALTER TABLE public.kb_article_tags ADD CONSTRAINT kb_article_tags_pkey PRIMARY KEY (id);
+ALTER TABLE public.kb_article_versions ADD CONSTRAINT kb_article_versions_pkey PRIMARY KEY (id);
+ALTER TABLE public.kb_articles ADD CONSTRAINT kb_articles_pkey PRIMARY KEY (id);
+ALTER TABLE public.kb_categories ADD CONSTRAINT kb_categories_pkey PRIMARY KEY (id);
+ALTER TABLE public.kb_tags ADD CONSTRAINT kb_tags_pkey PRIMARY KEY (id);
+ALTER TABLE public.leave_balances ADD CONSTRAINT leave_balances_tenant_id_employee_id_leave_type_id_year_key UNIQUE (tenant_id, employee_id, leave_type_id, year);
+ALTER TABLE public.leave_balances ADD CONSTRAINT leave_balances_pkey PRIMARY KEY (id);
+ALTER TABLE public.leave_requests ADD CONSTRAINT leave_requests_pkey PRIMARY KEY (id);
+ALTER TABLE public.loan_repayments ADD CONSTRAINT loan_repayments_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_case_priorities ADD CONSTRAINT master_case_priorities_name_key UNIQUE (name);
+ALTER TABLE public.master_case_priorities ADD CONSTRAINT master_case_priorities_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_case_report_templates ADD CONSTRAINT master_case_report_templates_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_case_statuses ADD CONSTRAINT master_case_statuses_name_key UNIQUE (name);
+ALTER TABLE public.master_case_statuses ADD CONSTRAINT master_case_statuses_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_expense_categories ADD CONSTRAINT master_expense_categories_name_key UNIQUE (name);
+ALTER TABLE public.master_expense_categories ADD CONSTRAINT master_expense_categories_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_industries ADD CONSTRAINT master_industries_name_key UNIQUE (name);
+ALTER TABLE public.master_industries ADD CONSTRAINT master_industries_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_inventory_categories ADD CONSTRAINT master_inventory_categories_name_key UNIQUE (name);
+ALTER TABLE public.master_inventory_categories ADD CONSTRAINT master_inventory_categories_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_inventory_condition_types ADD CONSTRAINT master_inventory_condition_types_name_key UNIQUE (name);
+ALTER TABLE public.master_inventory_condition_types ADD CONSTRAINT master_inventory_condition_types_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_inventory_item_categories ADD CONSTRAINT master_inventory_item_categories_name_key UNIQUE (name);
+ALTER TABLE public.master_inventory_item_categories ADD CONSTRAINT master_inventory_item_categories_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_inventory_status_types ADD CONSTRAINT master_inventory_status_types_name_key UNIQUE (name);
+ALTER TABLE public.master_inventory_status_types ADD CONSTRAINT master_inventory_status_types_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_invoice_statuses ADD CONSTRAINT master_invoice_statuses_name_key UNIQUE (name);
+ALTER TABLE public.master_invoice_statuses ADD CONSTRAINT master_invoice_statuses_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_leave_types ADD CONSTRAINT master_leave_types_name_key UNIQUE (name);
+ALTER TABLE public.master_leave_types ADD CONSTRAINT master_leave_types_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_modules ADD CONSTRAINT master_modules_name_key UNIQUE (name);
+ALTER TABLE public.master_modules ADD CONSTRAINT master_modules_slug_key UNIQUE (slug);
+ALTER TABLE public.master_modules ADD CONSTRAINT master_modules_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_payment_methods ADD CONSTRAINT master_payment_methods_name_key UNIQUE (name);
+ALTER TABLE public.master_payment_methods ADD CONSTRAINT master_payment_methods_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_payroll_components ADD CONSTRAINT master_payroll_components_name_key UNIQUE (name);
+ALTER TABLE public.master_payroll_components ADD CONSTRAINT master_payroll_components_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_purchase_order_statuses ADD CONSTRAINT master_purchase_order_statuses_name_key UNIQUE (name);
+ALTER TABLE public.master_purchase_order_statuses ADD CONSTRAINT master_purchase_order_statuses_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_quote_statuses ADD CONSTRAINT master_quote_statuses_name_key UNIQUE (name);
+ALTER TABLE public.master_quote_statuses ADD CONSTRAINT master_quote_statuses_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_supplier_categories ADD CONSTRAINT master_supplier_categories_name_key UNIQUE (name);
+ALTER TABLE public.master_supplier_categories ADD CONSTRAINT master_supplier_categories_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_supplier_payment_terms ADD CONSTRAINT master_supplier_payment_terms_name_key UNIQUE (name);
+ALTER TABLE public.master_supplier_payment_terms ADD CONSTRAINT master_supplier_payment_terms_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_template_categories ADD CONSTRAINT master_template_categories_name_key UNIQUE (name);
+ALTER TABLE public.master_template_categories ADD CONSTRAINT master_template_categories_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_template_types ADD CONSTRAINT master_template_types_name_key UNIQUE (name);
+ALTER TABLE public.master_template_types ADD CONSTRAINT master_template_types_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_template_variables ADD CONSTRAINT master_template_variables_name_key UNIQUE (name);
+ALTER TABLE public.master_template_variables ADD CONSTRAINT master_template_variables_pkey PRIMARY KEY (id);
+ALTER TABLE public.master_transaction_categories ADD CONSTRAINT master_transaction_categories_name_key UNIQUE (name);
+ALTER TABLE public.master_transaction_categories ADD CONSTRAINT master_transaction_categories_pkey PRIMARY KEY (id);
+ALTER TABLE public.ndas ADD CONSTRAINT ndas_pkey PRIMARY KEY (id);
+ALTER TABLE public.number_sequences ADD CONSTRAINT number_sequences_tenant_id_scope_key UNIQUE (tenant_id, scope);
+ALTER TABLE public.number_sequences ADD CONSTRAINT number_sequences_pkey PRIMARY KEY (id);
+ALTER TABLE public.number_sequences_audit ADD CONSTRAINT number_sequences_audit_pkey PRIMARY KEY (id);
+ALTER TABLE public.onboarding_checklist_items ADD CONSTRAINT onboarding_checklist_items_pkey PRIMARY KEY (id);
+ALTER TABLE public.onboarding_checklists ADD CONSTRAINT onboarding_checklists_pkey PRIMARY KEY (id);
+ALTER TABLE public.onboarding_progress ADD CONSTRAINT onboarding_progress_tenant_id_key UNIQUE (tenant_id);
+ALTER TABLE public.onboarding_progress ADD CONSTRAINT onboarding_progress_pkey PRIMARY KEY (id);
+ALTER TABLE public.onboarding_tasks ADD CONSTRAINT onboarding_tasks_pkey PRIMARY KEY (id);
+ALTER TABLE public.payment_allocations ADD CONSTRAINT payment_allocations_pkey PRIMARY KEY (id);
+ALTER TABLE public.payment_disbursements ADD CONSTRAINT payment_disbursements_pkey PRIMARY KEY (id);
+ALTER TABLE public.payment_receipts ADD CONSTRAINT payment_receipts_pkey PRIMARY KEY (id);
+ALTER TABLE public.payments ADD CONSTRAINT payments_pkey PRIMARY KEY (id);
+ALTER TABLE public.payroll_adjustments ADD CONSTRAINT payroll_adjustments_pkey PRIMARY KEY (id);
+ALTER TABLE public.payroll_bank_files ADD CONSTRAINT payroll_bank_files_pkey PRIMARY KEY (id);
+ALTER TABLE public.payroll_periods ADD CONSTRAINT payroll_periods_pkey PRIMARY KEY (id);
+ALTER TABLE public.payroll_record_items ADD CONSTRAINT payroll_record_items_pkey PRIMARY KEY (id);
+ALTER TABLE public.payroll_records ADD CONSTRAINT payroll_records_pkey PRIMARY KEY (id);
+ALTER TABLE public.payroll_settings ADD CONSTRAINT payroll_settings_tenant_id_key UNIQUE (tenant_id);
+ALTER TABLE public.payroll_settings ADD CONSTRAINT payroll_settings_pkey PRIMARY KEY (id);
+ALTER TABLE public.pdf_generation_logs ADD CONSTRAINT pdf_generation_logs_pkey PRIMARY KEY (id);
+ALTER TABLE public.performance_reviews ADD CONSTRAINT performance_reviews_pkey PRIMARY KEY (id);
+ALTER TABLE public.plan_features ADD CONSTRAINT plan_features_pkey PRIMARY KEY (id);
+ALTER TABLE public.platform_admins ADD CONSTRAINT platform_admins_email_key UNIQUE (email);
+ALTER TABLE public.platform_admins ADD CONSTRAINT platform_admins_user_id_key UNIQUE (user_id);
+ALTER TABLE public.platform_admins ADD CONSTRAINT platform_admins_pkey PRIMARY KEY (id);
+ALTER TABLE public.platform_announcements ADD CONSTRAINT platform_announcements_pkey PRIMARY KEY (id);
+ALTER TABLE public.platform_audit_logs ADD CONSTRAINT platform_audit_logs_pkey PRIMARY KEY (id);
+ALTER TABLE public.platform_metrics ADD CONSTRAINT platform_metrics_metric_date_key UNIQUE (metric_date);
+ALTER TABLE public.platform_metrics ADD CONSTRAINT platform_metrics_pkey PRIMARY KEY (id);
+ALTER TABLE public.portal_link_history ADD CONSTRAINT portal_link_history_pkey PRIMARY KEY (id);
+ALTER TABLE public.positions ADD CONSTRAINT positions_pkey PRIMARY KEY (id);
+ALTER TABLE public.profiles ADD CONSTRAINT profiles_tenant_email_key UNIQUE (tenant_id, email);
+ALTER TABLE public.profiles ADD CONSTRAINT profiles_pkey PRIMARY KEY (id);
+ALTER TABLE public.purchase_order_items ADD CONSTRAINT purchase_order_items_pkey PRIMARY KEY (id);
+ALTER TABLE public.purchase_orders ADD CONSTRAINT purchase_orders_pkey PRIMARY KEY (id);
+ALTER TABLE public.quote_history ADD CONSTRAINT quote_history_pkey PRIMARY KEY (id);
+ALTER TABLE public.quote_items ADD CONSTRAINT quote_items_pkey PRIMARY KEY (id);
+ALTER TABLE public.quotes ADD CONSTRAINT quotes_pkey PRIMARY KEY (id);
+ALTER TABLE public.receipt_allocations ADD CONSTRAINT receipt_allocations_pkey PRIMARY KEY (id);
+ALTER TABLE public.receipts ADD CONSTRAINT receipts_pkey PRIMARY KEY (id);
+ALTER TABLE public.reconciliation_matches ADD CONSTRAINT reconciliation_matches_pkey PRIMARY KEY (id);
+ALTER TABLE public.recruitment_candidates ADD CONSTRAINT recruitment_candidates_pkey PRIMARY KEY (id);
+ALTER TABLE public.recruitment_jobs ADD CONSTRAINT recruitment_jobs_pkey PRIMARY KEY (id);
+ALTER TABLE public.report_section_library ADD CONSTRAINT report_section_library_pkey PRIMARY KEY (id);
+ALTER TABLE public.report_section_presets ADD CONSTRAINT report_section_presets_pkey PRIMARY KEY (id);
+ALTER TABLE public.report_template_section_mappings ADD CONSTRAINT report_template_section_mappings_pkey PRIMARY KEY (id);
+ALTER TABLE public.resource_clone_drives ADD CONSTRAINT resource_clone_drives_pkey PRIMARY KEY (id);
+ALTER TABLE public.role_module_permissions ADD CONSTRAINT role_module_permissions_tenant_id_role_module_id_key UNIQUE (tenant_id, role, module_id);
+ALTER TABLE public.role_module_permissions ADD CONSTRAINT role_module_permissions_pkey PRIMARY KEY (id);
+ALTER TABLE public.salary_components ADD CONSTRAINT salary_components_pkey PRIMARY KEY (id);
+ALTER TABLE public.signup_otps ADD CONSTRAINT signup_otps_pkey PRIMARY KEY (id);
+ALTER TABLE public.stock_adjustment_session_items ADD CONSTRAINT stock_adjustment_session_items_pkey PRIMARY KEY (id);
+ALTER TABLE public.stock_adjustment_sessions ADD CONSTRAINT stock_adjustment_sessions_pkey PRIMARY KEY (id);
+ALTER TABLE public.stock_adjustments ADD CONSTRAINT stock_adjustments_pkey PRIMARY KEY (id);
+ALTER TABLE public.stock_alerts ADD CONSTRAINT stock_alerts_pkey PRIMARY KEY (id);
+ALTER TABLE public.stock_categories ADD CONSTRAINT stock_categories_pkey PRIMARY KEY (id);
+ALTER TABLE public.stock_items ADD CONSTRAINT stock_items_pkey PRIMARY KEY (id);
+ALTER TABLE public.stock_locations ADD CONSTRAINT stock_locations_pkey PRIMARY KEY (id);
+ALTER TABLE public.stock_movements ADD CONSTRAINT stock_movements_pkey PRIMARY KEY (id);
+ALTER TABLE public.stock_price_history ADD CONSTRAINT stock_price_history_pkey PRIMARY KEY (id);
+ALTER TABLE public.stock_sale_items ADD CONSTRAINT stock_sale_items_pkey PRIMARY KEY (id);
+ALTER TABLE public.stock_sales ADD CONSTRAINT stock_sales_pkey PRIMARY KEY (id);
+ALTER TABLE public.stock_serial_numbers ADD CONSTRAINT stock_serial_numbers_pkey PRIMARY KEY (id);
+ALTER TABLE public.stock_transactions ADD CONSTRAINT stock_transactions_pkey PRIMARY KEY (id);
+ALTER TABLE public.subscription_plans ADD CONSTRAINT subscription_plans_slug_key UNIQUE (slug);
+ALTER TABLE public.subscription_plans ADD CONSTRAINT subscription_plans_pkey PRIMARY KEY (id);
+ALTER TABLE public.supplier_audit_trail ADD CONSTRAINT supplier_audit_trail_pkey PRIMARY KEY (id);
+ALTER TABLE public.supplier_communications ADD CONSTRAINT supplier_communications_pkey PRIMARY KEY (id);
+ALTER TABLE public.supplier_contacts ADD CONSTRAINT supplier_contacts_pkey PRIMARY KEY (id);
+ALTER TABLE public.supplier_documents ADD CONSTRAINT supplier_documents_pkey PRIMARY KEY (id);
+ALTER TABLE public.supplier_performance_metrics ADD CONSTRAINT supplier_performance_metrics_pkey PRIMARY KEY (id);
+ALTER TABLE public.supplier_products ADD CONSTRAINT supplier_products_pkey PRIMARY KEY (id);
+ALTER TABLE public.suppliers ADD CONSTRAINT suppliers_pkey PRIMARY KEY (id);
+ALTER TABLE public.support_ticket_messages ADD CONSTRAINT support_ticket_messages_pkey PRIMARY KEY (id);
+ALTER TABLE public.support_tickets ADD CONSTRAINT support_tickets_ticket_number_key UNIQUE (ticket_number);
+ALTER TABLE public.support_tickets ADD CONSTRAINT support_tickets_pkey PRIMARY KEY (id);
+ALTER TABLE public.system_logs ADD CONSTRAINT system_logs_pkey PRIMARY KEY (id);
+ALTER TABLE public.system_seed_status ADD CONSTRAINT system_seed_status_category_key UNIQUE (category);
+ALTER TABLE public.system_seed_status ADD CONSTRAINT system_seed_status_pkey PRIMARY KEY (id);
+ALTER TABLE public.system_settings ADD CONSTRAINT system_settings_key_key UNIQUE (key);
+ALTER TABLE public.system_settings ADD CONSTRAINT system_settings_pkey PRIMARY KEY (id);
+ALTER TABLE public.tax_rates ADD CONSTRAINT tax_rates_pkey PRIMARY KEY (id);
+ALTER TABLE public.template_versions ADD CONSTRAINT template_versions_pkey PRIMARY KEY (id);
+ALTER TABLE public.templates ADD CONSTRAINT templates_pkey PRIMARY KEY (id);
+ALTER TABLE public.tenant_activity_log ADD CONSTRAINT tenant_activity_log_pkey PRIMARY KEY (id);
+ALTER TABLE public.tenant_health_metrics ADD CONSTRAINT tenant_health_metrics_pkey PRIMARY KEY (id);
+ALTER TABLE public.tenant_impersonation_sessions ADD CONSTRAINT tenant_impersonation_sessions_pkey PRIMARY KEY (id);
+ALTER TABLE public.tenant_payment_methods ADD CONSTRAINT tenant_payment_methods_pkey PRIMARY KEY (id);
+ALTER TABLE public.tenant_subscriptions ADD CONSTRAINT tenant_subscriptions_paypal_subscription_id_key UNIQUE (paypal_subscription_id);
+ALTER TABLE public.tenant_subscriptions ADD CONSTRAINT tenant_subscriptions_tenant_id_key UNIQUE (tenant_id);
+ALTER TABLE public.tenant_subscriptions ADD CONSTRAINT tenant_subscriptions_pkey PRIMARY KEY (id);
+ALTER TABLE public.tenants ADD CONSTRAINT tenants_domain_key UNIQUE (domain);
+ALTER TABLE public.tenants ADD CONSTRAINT tenants_paypal_customer_id_key UNIQUE (paypal_customer_id);
+ALTER TABLE public.tenants ADD CONSTRAINT tenants_paypal_subscription_id_key UNIQUE (paypal_subscription_id);
+ALTER TABLE public.tenants ADD CONSTRAINT tenants_slug_key UNIQUE (slug);
+ALTER TABLE public.tenants ADD CONSTRAINT tenants_pkey PRIMARY KEY (id);
+ALTER TABLE public.timesheets ADD CONSTRAINT timesheets_pkey PRIMARY KEY (id);
+ALTER TABLE public.usage_records ADD CONSTRAINT usage_records_pkey PRIMARY KEY (id);
+ALTER TABLE public.usage_snapshots ADD CONSTRAINT usage_snapshots_pkey PRIMARY KEY (id);
+ALTER TABLE public.user_activity_logs ADD CONSTRAINT user_activity_logs_pkey PRIMARY KEY (id);
+ALTER TABLE public.user_activity_sessions ADD CONSTRAINT user_activity_sessions_pkey PRIMARY KEY (id);
+ALTER TABLE public.user_preferences ADD CONSTRAINT user_preferences_tenant_id_user_id_key UNIQUE (tenant_id, user_id);
+ALTER TABLE public.user_preferences ADD CONSTRAINT user_preferences_pkey PRIMARY KEY (id);
+ALTER TABLE public.user_sessions ADD CONSTRAINT user_sessions_pkey PRIMARY KEY (id);
+ALTER TABLE public.user_sidebar_preferences ADD CONSTRAINT user_sidebar_preferences_tenant_id_user_id_key UNIQUE (tenant_id, user_id);
+ALTER TABLE public.user_sidebar_preferences ADD CONSTRAINT user_sidebar_preferences_pkey PRIMARY KEY (id);
+ALTER TABLE public.vat_records ADD CONSTRAINT vat_records_pkey PRIMARY KEY (id);
+ALTER TABLE public.vat_returns ADD CONSTRAINT vat_returns_pkey PRIMARY KEY (id);
+ALTER TABLE public.vat_transactions ADD CONSTRAINT vat_transactions_pkey PRIMARY KEY (id);
 
 -- Primary keys and unique constraints are defined inline in the CREATE TABLE statements above.
 
@@ -4847,6 +5143,1033 @@ ALTER TABLE public.vat_returns FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.vat_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vat_transactions FORCE ROW LEVEL SECURITY;
 
+
+-- ============================================================
+-- 10. FUNCTIONS
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.admin_validate_user_creation(p_email text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE v_existing uuid; v_role text;
+BEGIN
+  SELECT role INTO v_role FROM profiles WHERE id = auth.uid();
+  IF v_role NOT IN ('owner', 'admin') THEN RETURN jsonb_build_object('success', false, 'error', 'Unauthorized'); END IF;
+  SELECT id INTO v_existing FROM profiles WHERE email = p_email AND deleted_at IS NULL;
+  IF v_existing IS NOT NULL THEN RETURN jsonb_build_object('success', false, 'error', 'User exists'); END IF;
+  RETURN jsonb_build_object('success', true, 'can_create', true);
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.anonymize_customer_data(p_customer_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_tenant_id uuid;
+  v_anon_email text;
+BEGIN
+  SELECT tenant_id INTO v_tenant_id
+  FROM customers_enhanced
+  WHERE id = p_customer_id AND deleted_at IS NULL;
+
+  IF v_tenant_id IS NULL THEN
+    RAISE EXCEPTION 'Customer not found';
+  END IF;
+
+  IF v_tenant_id != get_current_tenant_id() AND NOT is_platform_admin() THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
+  v_anon_email := 'anonymized_' || encode(gen_random_bytes(8), 'hex') || '@redacted.local';
+
+  UPDATE customers_enhanced SET
+    first_name = 'ANONYMIZED',
+    last_name = 'CUSTOMER',
+    email = v_anon_email,
+    phone = NULL,
+    mobile = NULL,
+    address_line1 = NULL,
+    address_line2 = NULL,
+    city = NULL,
+    postal_code = NULL,
+    notes = 'Data anonymized per GDPR request',
+    updated_at = now()
+  WHERE id = p_customer_id AND tenant_id = v_tenant_id;
+
+  UPDATE customer_communications SET
+    subject = 'ANONYMIZED',
+    content = 'Content removed per GDPR request',
+    updated_at = now()
+  WHERE customer_id = p_customer_id AND tenant_id = v_tenant_id;
+
+  INSERT INTO audit_trails (tenant_id, table_name, record_id, action, changes, performed_by)
+  VALUES (
+    v_tenant_id,
+    'customers_enhanced',
+    p_customer_id,
+    'anonymize',
+    jsonb_build_object('reason', 'GDPR data deletion request', 'anonymized_at', now()),
+    auth.uid()
+  );
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.approve_quote(p_quote_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  UPDATE quotes SET status_id = (SELECT id FROM master_quote_statuses WHERE name = 'Approved'), approved_at = now(), approved_by = auth.uid()::text, updated_at = now()
+  WHERE id = p_quote_id AND tenant_id = get_current_tenant_id();
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.authenticate_portal_customer(p_email text, p_password text)
+ RETURNS json
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE v_customer RECORD;
+BEGIN
+  SELECT id, customer_number, customer_name, email, mobile_number, profile_photo_url, portal_enabled, portal_password_hash
+  INTO v_customer FROM customers_enhanced
+  WHERE LOWER(email) = LOWER(p_email) AND portal_enabled = true AND deleted_at IS NULL;
+  IF NOT FOUND OR v_customer.portal_password_hash IS NULL THEN RETURN NULL; END IF;
+  UPDATE customers_enhanced SET portal_last_login = now() WHERE id = v_customer.id;
+  RETURN json_build_object('id', v_customer.id, 'customer_number', v_customer.customer_number, 'customer_name', v_customer.customer_name, 'email', v_customer.email, 'mobile_number', v_customer.mobile_number, 'profile_photo_url', v_customer.profile_photo_url);
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.belongs_to_tenant(check_tenant_id uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_active = true AND deleted_at IS NULL AND (tenant_id IS NULL OR tenant_id = check_tenant_id)); $function$;
+
+CREATE OR REPLACE FUNCTION public.change_portal_password(p_customer_id uuid, p_new_hash text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  UPDATE customers_enhanced SET portal_password_hash = p_new_hash, updated_at = now()
+  WHERE id = p_customer_id;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.check_module_access(p_module_slug text)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE v_role text; v_has_access boolean;
+BEGIN
+  SELECT role INTO v_role FROM profiles WHERE id = auth.uid() AND deleted_at IS NULL;
+  IF v_role IN ('owner', 'admin') THEN RETURN true; END IF;
+  SELECT can_access INTO v_has_access FROM role_module_permissions rmp
+  JOIN master_modules m ON m.id = rmp.module_id
+  WHERE rmp.role = v_role AND m.slug = p_module_slug AND rmp.tenant_id = get_current_tenant_id();
+  RETURN COALESCE(v_has_access, false);
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.check_rate_limit(p_key text, p_max_requests integer, p_window_seconds integer)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_window_start timestamptz;
+  v_count int;
+BEGIN
+  v_window_start := now() - (p_window_seconds || ' seconds')::interval;
+  DELETE FROM rate_limits WHERE key = p_key AND window_start < v_window_start;
+  SELECT COALESCE(SUM(request_count), 0) INTO v_count
+  FROM rate_limits
+  WHERE key = p_key AND window_start >= v_window_start;
+  IF v_count >= p_max_requests THEN
+    RETURN false;
+  END IF;
+  INSERT INTO rate_limits (key, request_count, window_start)
+  VALUES (p_key, 1, now());
+  RETURN true;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.check_tenant_rate_limit(p_tenant_id uuid, p_resource text)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_max_requests integer;
+  v_window_seconds integer;
+  v_current_count integer;
+  v_window_start timestamptz;
+BEGIN
+  SELECT
+    CASE p_resource
+      WHEN 'api_calls' THEN sp.api_calls_per_hour
+      WHEN 'email_sends' THEN sp.email_sends_per_day
+      WHEN 'pdf_generations' THEN sp.pdf_generations_per_hour
+      ELSE 1000
+    END,
+    CASE p_resource
+      WHEN 'email_sends' THEN 86400
+      ELSE 3600
+    END
+  INTO v_max_requests, v_window_seconds
+  FROM tenant_subscriptions ts
+  JOIN subscription_plans sp ON sp.id = ts.plan_id
+  WHERE ts.tenant_id = p_tenant_id
+    AND ts.status = 'active'
+  LIMIT 1;
+
+  IF v_max_requests IS NULL THEN
+    v_max_requests := 100;
+    v_window_seconds := 3600;
+  END IF;
+
+  INSERT INTO tenant_rate_limits (tenant_id, resource_type, max_requests, window_seconds, current_count, window_start)
+  VALUES (p_tenant_id, p_resource, v_max_requests, v_window_seconds, 1, now())
+  ON CONFLICT (tenant_id, resource_type) WHERE deleted_at IS NULL
+  DO UPDATE SET
+    current_count = CASE
+      WHEN tenant_rate_limits.window_start + (tenant_rate_limits.window_seconds || ' seconds')::interval < now()
+      THEN 1
+      ELSE tenant_rate_limits.current_count + 1
+    END,
+    window_start = CASE
+      WHEN tenant_rate_limits.window_start + (tenant_rate_limits.window_seconds || ' seconds')::interval < now()
+      THEN now()
+      ELSE tenant_rate_limits.window_start
+    END,
+    updated_at = now()
+  RETURNING current_count, window_start INTO v_current_count, v_window_start;
+
+  RETURN v_current_count <= v_max_requests;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.convert_proforma_to_tax_invoice(p_quote_id uuid)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE v_invoice_id uuid; v_quote RECORD;
+BEGIN
+  SELECT * INTO v_quote FROM quotes WHERE id = p_quote_id AND tenant_id = get_current_tenant_id();
+  IF NOT FOUND THEN RAISE EXCEPTION 'Quote not found'; END IF;
+
+  INSERT INTO invoices (tenant_id, case_id, customer_id, company_id, invoice_type, subtotal, tax_amount, discount_amount, total_amount, converted_from_quote_id, created_by)
+  VALUES (v_quote.tenant_id, v_quote.case_id, v_quote.customer_id, v_quote.company_id, 'tax_invoice', v_quote.subtotal, v_quote.tax_amount, v_quote.discount_amount, v_quote.total_amount, p_quote_id, auth.uid())
+  RETURNING id INTO v_invoice_id;
+
+  INSERT INTO invoice_line_items (tenant_id, invoice_id, description, quantity, unit_price, total)
+  SELECT v_quote.tenant_id, v_invoice_id, qi.description, qi.quantity, qi.unit_price, qi.total
+  FROM quote_items qi WHERE qi.quote_id = p_quote_id;
+
+  UPDATE quotes SET converted_to_invoice_id = v_invoice_id, updated_at = now() WHERE id = p_quote_id;
+  RETURN v_invoice_id;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.delete_case_permanently(p_case_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF NOT has_role('admin') THEN RAISE EXCEPTION 'Admin access required'; END IF;
+  UPDATE cases SET deleted_at = now(), updated_at = now() WHERE id = p_case_id AND tenant_id = get_current_tenant_id();
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.disable_customer_portal_access(p_customer_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  UPDATE customers_enhanced SET portal_enabled = false, portal_password_hash = NULL, updated_at = now()
+  WHERE id = p_customer_id AND tenant_id = get_current_tenant_id();
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.export_customer_data(p_customer_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_tenant_id uuid;
+  v_result jsonb;
+BEGIN
+  SELECT tenant_id INTO v_tenant_id
+  FROM customers_enhanced
+  WHERE id = p_customer_id AND deleted_at IS NULL;
+
+  IF v_tenant_id IS NULL THEN
+    RAISE EXCEPTION 'Customer not found';
+  END IF;
+
+  IF v_tenant_id != get_current_tenant_id() AND NOT is_platform_admin() THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
+  v_result := jsonb_build_object(
+    'exported_at', now(),
+    'customer_id', p_customer_id,
+    'personal_info', (
+      SELECT to_jsonb(c.*) FROM customers_enhanced c WHERE c.id = p_customer_id AND c.deleted_at IS NULL
+    ),
+    'cases', COALESCE((
+      SELECT jsonb_agg(to_jsonb(cs.*))
+      FROM cases cs
+      WHERE cs.customer_id = p_customer_id AND cs.tenant_id = v_tenant_id AND cs.deleted_at IS NULL
+    ), '[]'::jsonb),
+    'invoices', COALESCE((
+      SELECT jsonb_agg(to_jsonb(inv.*))
+      FROM invoices inv
+      WHERE inv.customer_id = p_customer_id AND inv.tenant_id = v_tenant_id AND inv.deleted_at IS NULL
+    ), '[]'::jsonb),
+    'quotes', COALESCE((
+      SELECT jsonb_agg(to_jsonb(q.*))
+      FROM quotes q
+      WHERE q.customer_id = p_customer_id AND q.tenant_id = v_tenant_id AND q.deleted_at IS NULL
+    ), '[]'::jsonb),
+    'communications', COALESCE((
+      SELECT jsonb_agg(to_jsonb(cc.*))
+      FROM customer_communications cc
+      WHERE cc.customer_id = p_customer_id AND cc.tenant_id = v_tenant_id AND cc.deleted_at IS NULL
+    ), '[]'::jsonb),
+    'payments', COALESCE((
+      SELECT jsonb_agg(to_jsonb(p.*))
+      FROM payments p
+      WHERE p.customer_id = p_customer_id AND p.tenant_id = v_tenant_id AND p.deleted_at IS NULL
+    ), '[]'::jsonb)
+  );
+
+  RETURN v_result;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.generate_next_number(p_scope text)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ BEGIN RETURN get_next_number(p_scope); END; $function$;
+
+CREATE OR REPLACE FUNCTION public.get_accessible_modules()
+ RETURNS TABLE(module_id uuid, module_name text, module_slug text, can_access boolean)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE v_role text;
+BEGIN
+  SELECT role INTO v_role FROM profiles WHERE id = auth.uid() AND deleted_at IS NULL;
+  RETURN QUERY
+  SELECT m.id, m.name, m.slug,
+    CASE WHEN v_role IN ('owner', 'admin') THEN true
+    ELSE COALESCE((SELECT rmp.can_access FROM role_module_permissions rmp WHERE rmp.module_id = m.id AND rmp.role = v_role AND rmp.tenant_id = get_current_tenant_id()), false)
+    END
+  FROM master_modules m WHERE m.is_active = true ORDER BY m.sort_order;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.get_current_portal_customer_id()
+ RETURNS uuid
+ LANGUAGE plpgsql
+ STABLE
+AS $function$ BEGIN RETURN NULLIF(current_setting('app.portal_customer_id', true), '')::UUID; EXCEPTION WHEN OTHERS THEN RETURN NULL; END; $function$;
+
+CREATE OR REPLACE FUNCTION public.get_current_tenant_id()
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ SELECT tenant_id FROM profiles WHERE id = auth.uid() AND deleted_at IS NULL; $function$;
+
+CREATE OR REPLACE FUNCTION public.get_my_role()
+ RETURNS text
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ SELECT role FROM profiles WHERE id = auth.uid() AND deleted_at IS NULL; $function$;
+
+CREATE OR REPLACE FUNCTION public.get_next_case_number()
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ BEGIN RETURN get_next_number('cases'); END; $function$;
+
+CREATE OR REPLACE FUNCTION public.get_next_company_number()
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ BEGIN RETURN get_next_number('companies'); END; $function$;
+
+CREATE OR REPLACE FUNCTION public.get_next_customer_number()
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ BEGIN RETURN get_next_number('customers'); END; $function$;
+
+CREATE OR REPLACE FUNCTION public.get_next_disbursement_number()
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ BEGIN RETURN get_next_number('disbursements'); END; $function$;
+
+CREATE OR REPLACE FUNCTION public.get_next_invoice_number()
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ BEGIN RETURN get_next_number('invoices'); END; $function$;
+
+CREATE OR REPLACE FUNCTION public.get_next_number(p_scope text)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_tenant_id uuid;
+  v_prefix text;
+  v_padding integer;
+  v_next_val bigint;
+  v_reset boolean;
+  v_current_year integer;
+  v_last_year integer;
+BEGIN
+  v_tenant_id := get_current_tenant_id();
+  v_current_year := EXTRACT(YEAR FROM now())::integer;
+
+  SELECT prefix, padding, reset_annually, current_value, last_reset_year
+  INTO v_prefix, v_padding, v_reset, v_next_val, v_last_year
+  FROM number_sequences
+  WHERE tenant_id = v_tenant_id AND scope = p_scope;
+
+  IF NOT FOUND THEN
+    INSERT INTO number_sequences (tenant_id, scope, prefix, current_value, padding)
+    VALUES (v_tenant_id, p_scope, UPPER(LEFT(p_scope, 4)), 1, 4)
+    RETURNING prefix, padding, current_value INTO v_prefix, v_padding, v_next_val;
+  ELSE
+    IF v_reset AND (v_last_year IS NULL OR v_last_year < v_current_year) THEN
+      v_next_val := 1;
+      UPDATE number_sequences SET current_value = 1, last_reset_year = v_current_year, updated_at = now()
+      WHERE tenant_id = v_tenant_id AND scope = p_scope;
+    ELSE
+      v_next_val := v_next_val + 1;
+      UPDATE number_sequences SET current_value = v_next_val, updated_at = now()
+      WHERE tenant_id = v_tenant_id AND scope = p_scope;
+    END IF;
+  END IF;
+
+  RETURN COALESCE(v_prefix, '') || '-' || LPAD(v_next_val::text, COALESCE(v_padding, 4), '0');
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.get_next_po_number()
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ BEGIN RETURN get_next_number('purchase_orders'); END; $function$;
+
+CREATE OR REPLACE FUNCTION public.get_next_receipt_number()
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ BEGIN RETURN get_next_number('receipts'); END; $function$;
+
+CREATE OR REPLACE FUNCTION public.get_next_supplier_number()
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ BEGIN RETURN get_next_number('suppliers'); END; $function$;
+
+CREATE OR REPLACE FUNCTION public.get_next_ticket_number()
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ BEGIN RETURN get_next_number('support_tickets'); END; $function$;
+
+CREATE OR REPLACE FUNCTION public.get_next_transfer_number()
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ BEGIN RETURN get_next_number('transfers'); END; $function$;
+
+CREATE OR REPLACE FUNCTION public.get_tenant_storage_bytes(p_tenant_id uuid)
+ RETURNS bigint
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE v_total bigint := 0;
+BEGIN
+  SELECT COALESCE(SUM(file_size), 0) INTO v_total FROM case_attachments WHERE tenant_id = p_tenant_id AND deleted_at IS NULL;
+  RETURN v_total;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.get_user_case_access_level()
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ DECLARE al TEXT; BEGIN SELECT case_access_level INTO al FROM profiles WHERE id = auth.uid(); RETURN COALESCE(al, 'full'); END; $function$;
+
+CREATE OR REPLACE FUNCTION public.get_user_profiles_with_email()
+ RETURNS TABLE(id uuid, full_name text, role text, phone text, avatar_url text, is_active boolean, last_login_at timestamp with time zone, password_reset_required boolean, case_access_level text, created_at timestamp with time zone, updated_at timestamp with time zone, email text, tenant_id uuid)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
+  RETURN QUERY
+  SELECT p.id, p.full_name, p.role, p.phone, p.avatar_url, p.is_active, p.last_login_at, p.password_reset_required, p.case_access_level, p.created_at, p.updated_at, u.email::text, p.tenant_id
+  FROM profiles p LEFT JOIN auth.users u ON p.id = u.id
+  WHERE p.tenant_id = get_current_tenant_id() OR is_platform_admin()
+  ORDER BY p.created_at DESC;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.get_user_role()
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ DECLARE user_role text; BEGIN SELECT role INTO user_role FROM profiles WHERE id = auth.uid() AND deleted_at IS NULL; RETURN COALESCE(user_role, 'none'); END; $function$;
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  INSERT INTO profiles (id, email, full_name, role, tenant_id, is_active)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.email, ''),
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email, ''),
+    COALESCE(NEW.raw_user_meta_data->>'role', 'viewer'),
+    (NEW.raw_user_meta_data->>'tenant_id')::uuid,
+    true
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = COALESCE(EXCLUDED.email, profiles.email),
+    full_name = COALESCE(NULLIF(EXCLUDED.full_name, ''), profiles.full_name),
+    role = COALESCE(NULLIF(EXCLUDED.role, 'viewer'), profiles.role),
+    tenant_id = COALESCE(EXCLUDED.tenant_id, profiles.tenant_id),
+    updated_at = now();
+  RETURN NEW;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.has_role(required_role text)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  SELECT EXISTS (
+    SELECT 1 FROM profiles
+    WHERE id = auth.uid() AND is_active = true AND deleted_at IS NULL
+    AND CASE required_role
+      WHEN 'viewer' THEN role IN ('owner','admin','manager','technician','sales','accounts','hr','viewer')
+      WHEN 'member' THEN role IN ('owner','admin','manager','technician','sales','accounts','hr')
+      WHEN 'technician' THEN role IN ('owner','admin','manager','technician')
+      WHEN 'sales' THEN role IN ('owner','admin','manager','sales')
+      WHEN 'accounts' THEN role IN ('owner','admin','manager','accounts')
+      WHEN 'hr' THEN role IN ('owner','admin','manager','hr')
+      WHEN 'manager' THEN role IN ('owner','admin','manager')
+      WHEN 'admin' THEN role IN ('owner','admin')
+      WHEN 'owner' THEN role = 'owner'
+      ELSE false
+    END
+  );
+$function$;
+
+CREATE OR REPLACE FUNCTION public.increment_preset_usage(p_preset_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+AS $function$
+BEGIN UPDATE report_section_presets SET usage_count = usage_count + 1 WHERE id = p_preset_id; END; $function$;
+
+CREATE OR REPLACE FUNCTION public.is_admin()
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('owner', 'admin') AND is_active = true AND deleted_at IS NULL); $function$;
+
+CREATE OR REPLACE FUNCTION public.is_admin_user()
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('owner', 'admin') AND is_active = true AND deleted_at IS NULL); $function$;
+
+CREATE OR REPLACE FUNCTION public.is_hr_or_admin()
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ BEGIN RETURN EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('owner', 'admin', 'hr') AND is_active = true AND deleted_at IS NULL); END; $function$;
+
+CREATE OR REPLACE FUNCTION public.is_platform_admin()
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND tenant_id IS NULL AND role IN ('owner', 'admin') AND is_active = true AND deleted_at IS NULL); $function$;
+
+CREATE OR REPLACE FUNCTION public.is_portal_account_locked(p_email text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE v_locked_until timestamptz;
+BEGIN
+  SELECT portal_locked_until INTO v_locked_until FROM customers_enhanced WHERE email = p_email;
+  IF v_locked_until IS NULL OR v_locked_until < now() THEN
+    UPDATE customers_enhanced SET portal_failed_login_attempts = 0, portal_locked_until = NULL WHERE email = p_email AND (portal_locked_until IS NOT NULL OR portal_failed_login_attempts > 0);
+    RETURN jsonb_build_object('locked', false);
+  END IF;
+  RETURN jsonb_build_object('locked', true, 'locked_until', v_locked_until, 'minutes_remaining', EXTRACT(EPOCH FROM (v_locked_until - now())) / 60);
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.is_portal_enabled()
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ DECLARE v_enabled boolean; BEGIN SELECT COALESCE(portal_enabled, true) INTO v_enabled FROM company_settings LIMIT 1; RETURN COALESCE(v_enabled, true); EXCEPTION WHEN OTHERS THEN RETURN true; END; $function$;
+
+CREATE OR REPLACE FUNCTION public.is_portal_in_maintenance_mode()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ DECLARE v_mm boolean; v_msg text; BEGIN SELECT COALESCE(portal_maintenance_mode, false), COALESCE(portal_maintenance_message, 'The portal is currently undergoing maintenance.') INTO v_mm, v_msg FROM company_settings LIMIT 1; RETURN jsonb_build_object('maintenance_mode', COALESCE(v_mm, false), 'maintenance_message', COALESCE(v_msg, '')); EXCEPTION WHEN OTHERS THEN RETURN jsonb_build_object('maintenance_mode', false, 'maintenance_message', ''); END; $function$;
+
+CREATE OR REPLACE FUNCTION public.is_portal_user()
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ BEGIN RETURN (current_setting('request.jwt.claims', true)::json->>'portal_token') IS NOT NULL; END; $function$;
+
+CREATE OR REPLACE FUNCTION public.is_staff_user()
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('owner', 'admin', 'manager', 'technician', 'sales', 'accounts', 'hr') AND is_active = true AND deleted_at IS NULL); $function$;
+
+CREATE OR REPLACE FUNCTION public.is_tenant_admin()
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND tenant_id IS NOT NULL AND role IN ('owner', 'admin') AND is_active = true AND deleted_at IS NULL); $function$;
+
+CREATE OR REPLACE FUNCTION public.is_tenant_owner()
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$ SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND tenant_id IS NOT NULL AND role = 'owner' AND is_active = true AND deleted_at IS NULL); $function$;
+
+CREATE OR REPLACE FUNCTION public.log_audit_trail(p_record_type text, p_record_id uuid, p_action text, p_old_values jsonb DEFAULT NULL::jsonb, p_new_values jsonb DEFAULT NULL::jsonb, p_changed_fields text[] DEFAULT NULL::text[])
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  INSERT INTO audit_trails (tenant_id, record_type, record_id, action, old_values, new_values, changed_fields, performed_by)
+  VALUES (get_current_tenant_id(), p_record_type, p_record_id, p_action, p_old_values, p_new_values, p_changed_fields, auth.uid());
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.log_case_communication(p_case_id uuid, p_type text, p_subject text DEFAULT NULL::text, p_content text DEFAULT NULL::text, p_direction text DEFAULT 'internal'::text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE v_id uuid;
+BEGIN
+  INSERT INTO case_communications (tenant_id, case_id, type, subject, content, direction, sent_by)
+  VALUES (get_current_tenant_id(), p_case_id, p_type, p_subject, p_content, p_direction, auth.uid())
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.log_case_history(p_case_id uuid, p_action text, p_details text DEFAULT NULL::text, p_old_value text DEFAULT NULL::text, p_new_value text DEFAULT NULL::text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  INSERT INTO case_job_history (tenant_id, case_id, action, details, old_value, new_value, performed_by)
+  VALUES (get_current_tenant_id(), p_case_id, p_action, p_details, p_old_value, p_new_value, auth.uid());
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.log_chain_of_custody(p_case_id uuid, p_device_id uuid, p_action_category text, p_action text, p_description text DEFAULT NULL::text, p_location text DEFAULT NULL::text, p_custody_status text DEFAULT NULL::text, p_metadata jsonb DEFAULT '{}'::jsonb)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_id uuid;
+  v_user_name text;
+  v_user_role text;
+BEGIN
+  SELECT full_name, role INTO v_user_name, v_user_role FROM profiles WHERE id = auth.uid();
+  INSERT INTO chain_of_custody (tenant_id, case_id, device_id, action_category, action, description, actor_id, actor_name, actor_role, location, custody_status, metadata)
+  VALUES (get_current_tenant_id(), p_case_id, p_device_id, p_action_category::custody_action_category, p_action, p_description, auth.uid(), COALESCE(v_user_name, 'System'), v_user_role, p_location, p_custody_status::custody_status, p_metadata)
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.lookup_brand(p_name text)
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE
+AS $function$ SELECT id FROM catalog_device_brands WHERE LOWER(name) = LOWER(p_name) LIMIT 1; $function$;
+
+CREATE OR REPLACE FUNCTION public.lookup_capacity(p_name text)
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE
+AS $function$ SELECT id FROM catalog_device_capacities WHERE LOWER(name) = LOWER(p_name) LIMIT 1; $function$;
+
+CREATE OR REPLACE FUNCTION public.lookup_condition_type(p_name text)
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE
+AS $function$ SELECT id FROM catalog_device_conditions WHERE LOWER(name) = LOWER(p_name) LIMIT 1; $function$;
+
+CREATE OR REPLACE FUNCTION public.lookup_country(p_name text)
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE
+AS $function$ SELECT id FROM geo_countries WHERE LOWER(name) = LOWER(p_name) OR LOWER(code) = LOWER(p_name) LIMIT 1; $function$;
+
+CREATE OR REPLACE FUNCTION public.lookup_device_type(p_name text)
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE
+AS $function$ SELECT id FROM catalog_device_types WHERE LOWER(name) = LOWER(p_name) LIMIT 1; $function$;
+
+CREATE OR REPLACE FUNCTION public.lookup_interface(p_name text)
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE
+AS $function$ SELECT id FROM catalog_interfaces WHERE LOWER(name) = LOWER(p_name) LIMIT 1; $function$;
+
+CREATE OR REPLACE FUNCTION public.lookup_status_type(p_name text)
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE
+AS $function$ SELECT id FROM master_inventory_status_types WHERE LOWER(name) = LOWER(p_name) LIMIT 1; $function$;
+
+CREATE OR REPLACE FUNCTION public.lookup_storage_location(p_name text)
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE
+AS $function$ SELECT id FROM inventory_locations WHERE LOWER(name) = LOWER(p_name) LIMIT 1; $function$;
+
+CREATE OR REPLACE FUNCTION public.reject_quote(p_quote_id uuid, p_reason text DEFAULT NULL::text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  UPDATE quotes SET status_id = (SELECT id FROM master_quote_statuses WHERE name = 'Rejected'), rejected_at = now(), rejection_reason = p_reason, updated_at = now()
+  WHERE id = p_quote_id AND tenant_id = get_current_tenant_id();
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.search_donor_drives(p_criteria jsonb)
+ RETURNS SETOF inventory_items
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  RETURN QUERY
+  SELECT i.* FROM inventory_items i
+  WHERE i.tenant_id = get_current_tenant_id()
+  AND i.is_donor = true AND i.deleted_at IS NULL
+  AND (p_criteria->>'brand_id' IS NULL OR i.brand_id = (p_criteria->>'brand_id')::uuid)
+  AND (p_criteria->>'capacity_id' IS NULL OR i.capacity_id = (p_criteria->>'capacity_id')::uuid)
+  AND (p_criteria->>'model' IS NULL OR i.model ILIKE '%' || (p_criteria->>'model') || '%');
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.set_customer_portal_password(p_customer_id uuid, p_password_hash text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  UPDATE customers_enhanced SET portal_password_hash = p_password_hash, portal_enabled = true, updated_at = now()
+  WHERE id = p_customer_id AND tenant_id = get_current_tenant_id();
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.set_tenant_and_audit_fields()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE current_tenant uuid;
+BEGIN
+  current_tenant := get_current_tenant_id();
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.tenant_id IS NULL THEN NEW.tenant_id := current_tenant; END IF;
+    IF NEW.tenant_id IS DISTINCT FROM current_tenant AND NOT is_platform_admin() THEN
+      RAISE EXCEPTION 'Cannot insert data for a different tenant';
+    END IF;
+    NEW.created_at := COALESCE(NEW.created_at, now());
+    NEW.updated_at := now();
+  ELSIF TG_OP = 'UPDATE' THEN
+    IF NEW.tenant_id IS DISTINCT FROM OLD.tenant_id THEN
+      RAISE EXCEPTION 'Cannot change tenant_id of existing record';
+    END IF;
+    NEW.updated_at := now();
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.sync_tenant_config_from_country()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  country_config RECORD;
+BEGIN
+  IF TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND NEW.country_id IS DISTINCT FROM OLD.country_id) THEN
+    IF NEW.country_id IS NOT NULL THEN
+      SELECT * INTO country_config FROM geo_countries WHERE id = NEW.country_id;
+      IF FOUND THEN
+        NEW.currency_code := country_config.currency_code;
+        NEW.currency_symbol := country_config.currency_symbol;
+        NEW.decimal_places := country_config.decimal_places;
+        NEW.tax_system := country_config.tax_system;
+        NEW.tax_label := country_config.tax_label;
+        NEW.tax_number_label := country_config.tax_number_label;
+        NEW.default_tax_rate := country_config.default_tax_rate;
+        NEW.locale_code := country_config.locale_code;
+        NEW.timezone := country_config.timezone;
+        NEW.date_format := country_config.date_format;
+        NEW.fiscal_year_start := country_config.fiscal_year_start;
+      END IF;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.test_tenant_isolation()
+ RETURNS TABLE(test_name text, passed boolean, details text)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_table_name text;
+  v_has_tenant_id boolean;
+  v_has_rls boolean;
+  v_restrictive_count integer;
+  v_total_tables integer := 0;
+  v_passed_tables integer := 0;
+BEGIN
+  FOR v_table_name IN
+    SELECT t.table_name
+    FROM information_schema.tables t
+    WHERE t.table_schema = 'public'
+      AND t.table_type = 'BASE TABLE'
+      AND EXISTS (
+        SELECT 1 FROM information_schema.columns c
+        WHERE c.table_schema = 'public'
+          AND c.table_name = t.table_name
+          AND c.column_name = 'tenant_id'
+      )
+    ORDER BY t.table_name
+  LOOP
+    v_total_tables := v_total_tables + 1;
+
+    SELECT relrowsecurity INTO v_has_rls
+    FROM pg_class
+    WHERE relname = v_table_name AND relnamespace = 'public'::regnamespace;
+
+    SELECT count(*) INTO v_restrictive_count
+    FROM pg_policies
+    WHERE tablename = v_table_name
+      AND schemaname = 'public'
+      AND permissive = 'RESTRICTIVE';
+
+    IF v_has_rls AND v_restrictive_count > 0 THEN
+      v_passed_tables := v_passed_tables + 1;
+      test_name := 'RLS + RESTRICTIVE policy: ' || v_table_name;
+      passed := true;
+      details := 'RLS enabled, ' || v_restrictive_count || ' restrictive policy(ies)';
+      RETURN NEXT;
+    ELSE
+      test_name := 'RLS + RESTRICTIVE policy: ' || v_table_name;
+      passed := false;
+      details := 'RLS=' || COALESCE(v_has_rls::text, 'null') || ', restrictive_policies=' || v_restrictive_count;
+      RETURN NEXT;
+    END IF;
+  END LOOP;
+
+  test_name := 'SUMMARY: Tenant-scoped tables with proper isolation';
+  passed := (v_passed_tables = v_total_tables);
+  details := v_passed_tables || '/' || v_total_tables || ' tables pass';
+  RETURN NEXT;
+
+  FOR v_table_name IN
+    SELECT unnest(ARRAY[
+      'get_current_tenant_id',
+      'is_platform_admin',
+      'is_tenant_owner',
+      'is_tenant_admin',
+      'is_admin',
+      'is_staff_user',
+      'has_role',
+      'belongs_to_tenant',
+      'get_my_role'
+    ])
+  LOOP
+    test_name := 'Security function exists: ' || v_table_name;
+    passed := EXISTS (
+      SELECT 1 FROM pg_proc
+      WHERE proname = v_table_name AND pronamespace = 'public'::regnamespace
+    );
+    details := CASE WHEN passed THEN 'Function exists' ELSE 'MISSING' END;
+    RETURN NEXT;
+  END LOOP;
+
+  SELECT count(*) INTO v_total_tables
+  FROM information_schema.tables t
+  WHERE t.table_schema = 'public'
+    AND t.table_type = 'BASE TABLE'
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns c
+      WHERE c.table_schema = 'public' AND c.table_name = t.table_name AND c.column_name = 'tenant_id'
+    );
+
+  SELECT count(*) INTO v_passed_tables
+  FROM information_schema.tables t
+  WHERE t.table_schema = 'public'
+    AND t.table_type = 'BASE TABLE'
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns c
+      WHERE c.table_schema = 'public' AND c.table_name = t.table_name AND c.column_name = 'tenant_id'
+    )
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns c
+      WHERE c.table_schema = 'public' AND c.table_name = t.table_name AND c.column_name = 'deleted_at'
+    );
+
+  test_name := 'SUMMARY: Tenant tables with soft-delete (deleted_at)';
+  passed := (v_passed_tables = v_total_tables);
+  details := v_passed_tables || '/' || v_total_tables || ' tables have deleted_at';
+  RETURN NEXT;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.update_number_sequence(p_scope text, p_prefix text, p_padding integer, p_reset boolean)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  UPDATE number_sequences SET prefix = p_prefix, padding = p_padding, reset_annually = p_reset, updated_at = now()
+  WHERE tenant_id = get_current_tenant_id() AND scope = p_scope;
+  IF NOT FOUND THEN
+    INSERT INTO number_sequences (tenant_id, scope, prefix, padding, reset_annually)
+    VALUES (get_current_tenant_id(), p_scope, p_prefix, p_padding, p_reset);
+  END IF;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$ BEGIN NEW.updated_at = now(); RETURN NEW; END; $function$;
+
+
+
+-- (added: existed on the live DB since the v1.0 rebuild; missed by the dump)
+CREATE OR REPLACE FUNCTION public.prevent_audit_mutation()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_role text;
+BEGIN
+  v_role := current_setting('role', true);
+  -- service_role and postgres can do anything (DB owner needs DDL ability)
+  IF v_role IN ('service_role', 'postgres') THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+  RAISE EXCEPTION 'Audit table % is append-only. Mutations are not permitted.', TG_TABLE_NAME
+    USING ERRCODE = 'insufficient_privilege';
+END;
+$function$;
 
 -- ============================================================
 -- 9. RLS POLICIES
@@ -8337,1013 +9660,6 @@ CREATE POLICY "vat_transactions_tenant_isolation" ON public.vat_transactions
 CREATE POLICY "vat_transactions_update" ON public.vat_transactions FOR UPDATE TO authenticated
   USING (true)
   WITH CHECK (true);
-
-
--- ============================================================
--- 10. FUNCTIONS
--- ============================================================
-
-CREATE OR REPLACE FUNCTION public.admin_validate_user_creation(p_email text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE v_existing uuid; v_role text;
-BEGIN
-  SELECT role INTO v_role FROM profiles WHERE id = auth.uid();
-  IF v_role NOT IN ('owner', 'admin') THEN RETURN jsonb_build_object('success', false, 'error', 'Unauthorized'); END IF;
-  SELECT id INTO v_existing FROM profiles WHERE email = p_email AND deleted_at IS NULL;
-  IF v_existing IS NOT NULL THEN RETURN jsonb_build_object('success', false, 'error', 'User exists'); END IF;
-  RETURN jsonb_build_object('success', true, 'can_create', true);
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.anonymize_customer_data(p_customer_id uuid)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_tenant_id uuid;
-  v_anon_email text;
-BEGIN
-  SELECT tenant_id INTO v_tenant_id
-  FROM customers_enhanced
-  WHERE id = p_customer_id AND deleted_at IS NULL;
-
-  IF v_tenant_id IS NULL THEN
-    RAISE EXCEPTION 'Customer not found';
-  END IF;
-
-  IF v_tenant_id != get_current_tenant_id() AND NOT is_platform_admin() THEN
-    RAISE EXCEPTION 'Access denied';
-  END IF;
-
-  v_anon_email := 'anonymized_' || encode(gen_random_bytes(8), 'hex') || '@redacted.local';
-
-  UPDATE customers_enhanced SET
-    first_name = 'ANONYMIZED',
-    last_name = 'CUSTOMER',
-    email = v_anon_email,
-    phone = NULL,
-    mobile = NULL,
-    address_line1 = NULL,
-    address_line2 = NULL,
-    city = NULL,
-    postal_code = NULL,
-    notes = 'Data anonymized per GDPR request',
-    updated_at = now()
-  WHERE id = p_customer_id AND tenant_id = v_tenant_id;
-
-  UPDATE customer_communications SET
-    subject = 'ANONYMIZED',
-    content = 'Content removed per GDPR request',
-    updated_at = now()
-  WHERE customer_id = p_customer_id AND tenant_id = v_tenant_id;
-
-  INSERT INTO audit_trails (tenant_id, table_name, record_id, action, changes, performed_by)
-  VALUES (
-    v_tenant_id,
-    'customers_enhanced',
-    p_customer_id,
-    'anonymize',
-    jsonb_build_object('reason', 'GDPR data deletion request', 'anonymized_at', now()),
-    auth.uid()
-  );
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.approve_quote(p_quote_id uuid)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-BEGIN
-  UPDATE quotes SET status_id = (SELECT id FROM master_quote_statuses WHERE name = 'Approved'), approved_at = now(), approved_by = auth.uid()::text, updated_at = now()
-  WHERE id = p_quote_id AND tenant_id = get_current_tenant_id();
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.authenticate_portal_customer(p_email text, p_password text)
- RETURNS json
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE v_customer RECORD;
-BEGIN
-  SELECT id, customer_number, customer_name, email, mobile_number, profile_photo_url, portal_enabled, portal_password_hash
-  INTO v_customer FROM customers_enhanced
-  WHERE LOWER(email) = LOWER(p_email) AND portal_enabled = true AND deleted_at IS NULL;
-  IF NOT FOUND OR v_customer.portal_password_hash IS NULL THEN RETURN NULL; END IF;
-  UPDATE customers_enhanced SET portal_last_login = now() WHERE id = v_customer.id;
-  RETURN json_build_object('id', v_customer.id, 'customer_number', v_customer.customer_number, 'customer_name', v_customer.customer_name, 'email', v_customer.email, 'mobile_number', v_customer.mobile_number, 'profile_photo_url', v_customer.profile_photo_url);
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.belongs_to_tenant(check_tenant_id uuid)
- RETURNS boolean
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_active = true AND deleted_at IS NULL AND (tenant_id IS NULL OR tenant_id = check_tenant_id)); $function$;
-
-CREATE OR REPLACE FUNCTION public.change_portal_password(p_customer_id uuid, p_new_hash text)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-BEGIN
-  UPDATE customers_enhanced SET portal_password_hash = p_new_hash, updated_at = now()
-  WHERE id = p_customer_id;
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.check_module_access(p_module_slug text)
- RETURNS boolean
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE v_role text; v_has_access boolean;
-BEGIN
-  SELECT role INTO v_role FROM profiles WHERE id = auth.uid() AND deleted_at IS NULL;
-  IF v_role IN ('owner', 'admin') THEN RETURN true; END IF;
-  SELECT can_access INTO v_has_access FROM role_module_permissions rmp
-  JOIN master_modules m ON m.id = rmp.module_id
-  WHERE rmp.role = v_role AND m.slug = p_module_slug AND rmp.tenant_id = get_current_tenant_id();
-  RETURN COALESCE(v_has_access, false);
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.check_rate_limit(p_key text, p_max_requests integer, p_window_seconds integer)
- RETURNS boolean
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_window_start timestamptz;
-  v_count int;
-BEGIN
-  v_window_start := now() - (p_window_seconds || ' seconds')::interval;
-  DELETE FROM rate_limits WHERE key = p_key AND window_start < v_window_start;
-  SELECT COALESCE(SUM(request_count), 0) INTO v_count
-  FROM rate_limits
-  WHERE key = p_key AND window_start >= v_window_start;
-  IF v_count >= p_max_requests THEN
-    RETURN false;
-  END IF;
-  INSERT INTO rate_limits (key, request_count, window_start)
-  VALUES (p_key, 1, now());
-  RETURN true;
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.check_tenant_rate_limit(p_tenant_id uuid, p_resource text)
- RETURNS boolean
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_max_requests integer;
-  v_window_seconds integer;
-  v_current_count integer;
-  v_window_start timestamptz;
-BEGIN
-  SELECT
-    CASE p_resource
-      WHEN 'api_calls' THEN sp.api_calls_per_hour
-      WHEN 'email_sends' THEN sp.email_sends_per_day
-      WHEN 'pdf_generations' THEN sp.pdf_generations_per_hour
-      ELSE 1000
-    END,
-    CASE p_resource
-      WHEN 'email_sends' THEN 86400
-      ELSE 3600
-    END
-  INTO v_max_requests, v_window_seconds
-  FROM tenant_subscriptions ts
-  JOIN subscription_plans sp ON sp.id = ts.plan_id
-  WHERE ts.tenant_id = p_tenant_id
-    AND ts.status = 'active'
-  LIMIT 1;
-
-  IF v_max_requests IS NULL THEN
-    v_max_requests := 100;
-    v_window_seconds := 3600;
-  END IF;
-
-  INSERT INTO tenant_rate_limits (tenant_id, resource_type, max_requests, window_seconds, current_count, window_start)
-  VALUES (p_tenant_id, p_resource, v_max_requests, v_window_seconds, 1, now())
-  ON CONFLICT (tenant_id, resource_type) WHERE deleted_at IS NULL
-  DO UPDATE SET
-    current_count = CASE
-      WHEN tenant_rate_limits.window_start + (tenant_rate_limits.window_seconds || ' seconds')::interval < now()
-      THEN 1
-      ELSE tenant_rate_limits.current_count + 1
-    END,
-    window_start = CASE
-      WHEN tenant_rate_limits.window_start + (tenant_rate_limits.window_seconds || ' seconds')::interval < now()
-      THEN now()
-      ELSE tenant_rate_limits.window_start
-    END,
-    updated_at = now()
-  RETURNING current_count, window_start INTO v_current_count, v_window_start;
-
-  RETURN v_current_count <= v_max_requests;
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.convert_proforma_to_tax_invoice(p_quote_id uuid)
- RETURNS uuid
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE v_invoice_id uuid; v_quote RECORD;
-BEGIN
-  SELECT * INTO v_quote FROM quotes WHERE id = p_quote_id AND tenant_id = get_current_tenant_id();
-  IF NOT FOUND THEN RAISE EXCEPTION 'Quote not found'; END IF;
-
-  INSERT INTO invoices (tenant_id, case_id, customer_id, company_id, invoice_type, subtotal, tax_amount, discount_amount, total_amount, converted_from_quote_id, created_by)
-  VALUES (v_quote.tenant_id, v_quote.case_id, v_quote.customer_id, v_quote.company_id, 'tax_invoice', v_quote.subtotal, v_quote.tax_amount, v_quote.discount_amount, v_quote.total_amount, p_quote_id, auth.uid())
-  RETURNING id INTO v_invoice_id;
-
-  INSERT INTO invoice_line_items (tenant_id, invoice_id, description, quantity, unit_price, total)
-  SELECT v_quote.tenant_id, v_invoice_id, qi.description, qi.quantity, qi.unit_price, qi.total
-  FROM quote_items qi WHERE qi.quote_id = p_quote_id;
-
-  UPDATE quotes SET converted_to_invoice_id = v_invoice_id, updated_at = now() WHERE id = p_quote_id;
-  RETURN v_invoice_id;
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.delete_case_permanently(p_case_id uuid)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-BEGIN
-  IF NOT has_role('admin') THEN RAISE EXCEPTION 'Admin access required'; END IF;
-  UPDATE cases SET deleted_at = now(), updated_at = now() WHERE id = p_case_id AND tenant_id = get_current_tenant_id();
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.disable_customer_portal_access(p_customer_id uuid)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-BEGIN
-  UPDATE customers_enhanced SET portal_enabled = false, portal_password_hash = NULL, updated_at = now()
-  WHERE id = p_customer_id AND tenant_id = get_current_tenant_id();
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.export_customer_data(p_customer_id uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_tenant_id uuid;
-  v_result jsonb;
-BEGIN
-  SELECT tenant_id INTO v_tenant_id
-  FROM customers_enhanced
-  WHERE id = p_customer_id AND deleted_at IS NULL;
-
-  IF v_tenant_id IS NULL THEN
-    RAISE EXCEPTION 'Customer not found';
-  END IF;
-
-  IF v_tenant_id != get_current_tenant_id() AND NOT is_platform_admin() THEN
-    RAISE EXCEPTION 'Access denied';
-  END IF;
-
-  v_result := jsonb_build_object(
-    'exported_at', now(),
-    'customer_id', p_customer_id,
-    'personal_info', (
-      SELECT to_jsonb(c.*) FROM customers_enhanced c WHERE c.id = p_customer_id AND c.deleted_at IS NULL
-    ),
-    'cases', COALESCE((
-      SELECT jsonb_agg(to_jsonb(cs.*))
-      FROM cases cs
-      WHERE cs.customer_id = p_customer_id AND cs.tenant_id = v_tenant_id AND cs.deleted_at IS NULL
-    ), '[]'::jsonb),
-    'invoices', COALESCE((
-      SELECT jsonb_agg(to_jsonb(inv.*))
-      FROM invoices inv
-      WHERE inv.customer_id = p_customer_id AND inv.tenant_id = v_tenant_id AND inv.deleted_at IS NULL
-    ), '[]'::jsonb),
-    'quotes', COALESCE((
-      SELECT jsonb_agg(to_jsonb(q.*))
-      FROM quotes q
-      WHERE q.customer_id = p_customer_id AND q.tenant_id = v_tenant_id AND q.deleted_at IS NULL
-    ), '[]'::jsonb),
-    'communications', COALESCE((
-      SELECT jsonb_agg(to_jsonb(cc.*))
-      FROM customer_communications cc
-      WHERE cc.customer_id = p_customer_id AND cc.tenant_id = v_tenant_id AND cc.deleted_at IS NULL
-    ), '[]'::jsonb),
-    'payments', COALESCE((
-      SELECT jsonb_agg(to_jsonb(p.*))
-      FROM payments p
-      WHERE p.customer_id = p_customer_id AND p.tenant_id = v_tenant_id AND p.deleted_at IS NULL
-    ), '[]'::jsonb)
-  );
-
-  RETURN v_result;
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.generate_next_number(p_scope text)
- RETURNS text
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ BEGIN RETURN get_next_number(p_scope); END; $function$;
-
-CREATE OR REPLACE FUNCTION public.get_accessible_modules()
- RETURNS TABLE(module_id uuid, module_name text, module_slug text, can_access boolean)
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE v_role text;
-BEGIN
-  SELECT role INTO v_role FROM profiles WHERE id = auth.uid() AND deleted_at IS NULL;
-  RETURN QUERY
-  SELECT m.id, m.name, m.slug,
-    CASE WHEN v_role IN ('owner', 'admin') THEN true
-    ELSE COALESCE((SELECT rmp.can_access FROM role_module_permissions rmp WHERE rmp.module_id = m.id AND rmp.role = v_role AND rmp.tenant_id = get_current_tenant_id()), false)
-    END
-  FROM master_modules m WHERE m.is_active = true ORDER BY m.sort_order;
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.get_current_portal_customer_id()
- RETURNS uuid
- LANGUAGE plpgsql
- STABLE
-AS $function$ BEGIN RETURN NULLIF(current_setting('app.portal_customer_id', true), '')::UUID; EXCEPTION WHEN OTHERS THEN RETURN NULL; END; $function$;
-
-CREATE OR REPLACE FUNCTION public.get_current_tenant_id()
- RETURNS uuid
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ SELECT tenant_id FROM profiles WHERE id = auth.uid() AND deleted_at IS NULL; $function$;
-
-CREATE OR REPLACE FUNCTION public.get_my_role()
- RETURNS text
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ SELECT role FROM profiles WHERE id = auth.uid() AND deleted_at IS NULL; $function$;
-
-CREATE OR REPLACE FUNCTION public.get_next_case_number()
- RETURNS text
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ BEGIN RETURN get_next_number('cases'); END; $function$;
-
-CREATE OR REPLACE FUNCTION public.get_next_company_number()
- RETURNS text
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ BEGIN RETURN get_next_number('companies'); END; $function$;
-
-CREATE OR REPLACE FUNCTION public.get_next_customer_number()
- RETURNS text
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ BEGIN RETURN get_next_number('customers'); END; $function$;
-
-CREATE OR REPLACE FUNCTION public.get_next_disbursement_number()
- RETURNS text
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ BEGIN RETURN get_next_number('disbursements'); END; $function$;
-
-CREATE OR REPLACE FUNCTION public.get_next_invoice_number()
- RETURNS text
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ BEGIN RETURN get_next_number('invoices'); END; $function$;
-
-CREATE OR REPLACE FUNCTION public.get_next_number(p_scope text)
- RETURNS text
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_tenant_id uuid;
-  v_prefix text;
-  v_padding integer;
-  v_next_val bigint;
-  v_reset boolean;
-  v_current_year integer;
-  v_last_year integer;
-BEGIN
-  v_tenant_id := get_current_tenant_id();
-  v_current_year := EXTRACT(YEAR FROM now())::integer;
-
-  SELECT prefix, padding, reset_annually, current_value, last_reset_year
-  INTO v_prefix, v_padding, v_reset, v_next_val, v_last_year
-  FROM number_sequences
-  WHERE tenant_id = v_tenant_id AND scope = p_scope;
-
-  IF NOT FOUND THEN
-    INSERT INTO number_sequences (tenant_id, scope, prefix, current_value, padding)
-    VALUES (v_tenant_id, p_scope, UPPER(LEFT(p_scope, 4)), 1, 4)
-    RETURNING prefix, padding, current_value INTO v_prefix, v_padding, v_next_val;
-  ELSE
-    IF v_reset AND (v_last_year IS NULL OR v_last_year < v_current_year) THEN
-      v_next_val := 1;
-      UPDATE number_sequences SET current_value = 1, last_reset_year = v_current_year, updated_at = now()
-      WHERE tenant_id = v_tenant_id AND scope = p_scope;
-    ELSE
-      v_next_val := v_next_val + 1;
-      UPDATE number_sequences SET current_value = v_next_val, updated_at = now()
-      WHERE tenant_id = v_tenant_id AND scope = p_scope;
-    END IF;
-  END IF;
-
-  RETURN COALESCE(v_prefix, '') || '-' || LPAD(v_next_val::text, COALESCE(v_padding, 4), '0');
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.get_next_po_number()
- RETURNS text
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ BEGIN RETURN get_next_number('purchase_orders'); END; $function$;
-
-CREATE OR REPLACE FUNCTION public.get_next_receipt_number()
- RETURNS text
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ BEGIN RETURN get_next_number('receipts'); END; $function$;
-
-CREATE OR REPLACE FUNCTION public.get_next_supplier_number()
- RETURNS text
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ BEGIN RETURN get_next_number('suppliers'); END; $function$;
-
-CREATE OR REPLACE FUNCTION public.get_next_ticket_number()
- RETURNS text
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ BEGIN RETURN get_next_number('support_tickets'); END; $function$;
-
-CREATE OR REPLACE FUNCTION public.get_next_transfer_number()
- RETURNS text
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ BEGIN RETURN get_next_number('transfers'); END; $function$;
-
-CREATE OR REPLACE FUNCTION public.get_tenant_storage_bytes(p_tenant_id uuid)
- RETURNS bigint
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE v_total bigint := 0;
-BEGIN
-  SELECT COALESCE(SUM(file_size), 0) INTO v_total FROM case_attachments WHERE tenant_id = p_tenant_id AND deleted_at IS NULL;
-  RETURN v_total;
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.get_user_case_access_level()
- RETURNS text
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ DECLARE al TEXT; BEGIN SELECT case_access_level INTO al FROM profiles WHERE id = auth.uid(); RETURN COALESCE(al, 'full'); END; $function$;
-
-CREATE OR REPLACE FUNCTION public.get_user_profiles_with_email()
- RETURNS TABLE(id uuid, full_name text, role text, phone text, avatar_url text, is_active boolean, last_login_at timestamp with time zone, password_reset_required boolean, case_access_level text, created_at timestamp with time zone, updated_at timestamp with time zone, email text, tenant_id uuid)
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-BEGIN
-  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
-  RETURN QUERY
-  SELECT p.id, p.full_name, p.role, p.phone, p.avatar_url, p.is_active, p.last_login_at, p.password_reset_required, p.case_access_level, p.created_at, p.updated_at, u.email::text, p.tenant_id
-  FROM profiles p LEFT JOIN auth.users u ON p.id = u.id
-  WHERE p.tenant_id = get_current_tenant_id() OR is_platform_admin()
-  ORDER BY p.created_at DESC;
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.get_user_role()
- RETURNS text
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ DECLARE user_role text; BEGIN SELECT role INTO user_role FROM profiles WHERE id = auth.uid() AND deleted_at IS NULL; RETURN COALESCE(user_role, 'none'); END; $function$;
-
-CREATE OR REPLACE FUNCTION public.handle_new_user()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-BEGIN
-  INSERT INTO profiles (id, email, full_name, role, tenant_id, is_active)
-  VALUES (
-    NEW.id,
-    COALESCE(NEW.email, ''),
-    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email, ''),
-    COALESCE(NEW.raw_user_meta_data->>'role', 'viewer'),
-    (NEW.raw_user_meta_data->>'tenant_id')::uuid,
-    true
-  )
-  ON CONFLICT (id) DO UPDATE SET
-    email = COALESCE(EXCLUDED.email, profiles.email),
-    full_name = COALESCE(NULLIF(EXCLUDED.full_name, ''), profiles.full_name),
-    role = COALESCE(NULLIF(EXCLUDED.role, 'viewer'), profiles.role),
-    tenant_id = COALESCE(EXCLUDED.tenant_id, profiles.tenant_id),
-    updated_at = now();
-  RETURN NEW;
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.has_role(required_role text)
- RETURNS boolean
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-  SELECT EXISTS (
-    SELECT 1 FROM profiles
-    WHERE id = auth.uid() AND is_active = true AND deleted_at IS NULL
-    AND CASE required_role
-      WHEN 'viewer' THEN role IN ('owner','admin','manager','technician','sales','accounts','hr','viewer')
-      WHEN 'member' THEN role IN ('owner','admin','manager','technician','sales','accounts','hr')
-      WHEN 'technician' THEN role IN ('owner','admin','manager','technician')
-      WHEN 'sales' THEN role IN ('owner','admin','manager','sales')
-      WHEN 'accounts' THEN role IN ('owner','admin','manager','accounts')
-      WHEN 'hr' THEN role IN ('owner','admin','manager','hr')
-      WHEN 'manager' THEN role IN ('owner','admin','manager')
-      WHEN 'admin' THEN role IN ('owner','admin')
-      WHEN 'owner' THEN role = 'owner'
-      ELSE false
-    END
-  );
-$function$;
-
-CREATE OR REPLACE FUNCTION public.increment_preset_usage(p_preset_id uuid)
- RETURNS void
- LANGUAGE plpgsql
-AS $function$
-BEGIN UPDATE report_section_presets SET usage_count = usage_count + 1 WHERE id = p_preset_id; END; $function$;
-
-CREATE OR REPLACE FUNCTION public.is_admin()
- RETURNS boolean
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('owner', 'admin') AND is_active = true AND deleted_at IS NULL); $function$;
-
-CREATE OR REPLACE FUNCTION public.is_admin_user()
- RETURNS boolean
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('owner', 'admin') AND is_active = true AND deleted_at IS NULL); $function$;
-
-CREATE OR REPLACE FUNCTION public.is_hr_or_admin()
- RETURNS boolean
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ BEGIN RETURN EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('owner', 'admin', 'hr') AND is_active = true AND deleted_at IS NULL); END; $function$;
-
-CREATE OR REPLACE FUNCTION public.is_platform_admin()
- RETURNS boolean
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND tenant_id IS NULL AND role IN ('owner', 'admin') AND is_active = true AND deleted_at IS NULL); $function$;
-
-CREATE OR REPLACE FUNCTION public.is_portal_account_locked(p_email text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE v_locked_until timestamptz;
-BEGIN
-  SELECT portal_locked_until INTO v_locked_until FROM customers_enhanced WHERE email = p_email;
-  IF v_locked_until IS NULL OR v_locked_until < now() THEN
-    UPDATE customers_enhanced SET portal_failed_login_attempts = 0, portal_locked_until = NULL WHERE email = p_email AND (portal_locked_until IS NOT NULL OR portal_failed_login_attempts > 0);
-    RETURN jsonb_build_object('locked', false);
-  END IF;
-  RETURN jsonb_build_object('locked', true, 'locked_until', v_locked_until, 'minutes_remaining', EXTRACT(EPOCH FROM (v_locked_until - now())) / 60);
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.is_portal_enabled()
- RETURNS boolean
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ DECLARE v_enabled boolean; BEGIN SELECT COALESCE(portal_enabled, true) INTO v_enabled FROM company_settings LIMIT 1; RETURN COALESCE(v_enabled, true); EXCEPTION WHEN OTHERS THEN RETURN true; END; $function$;
-
-CREATE OR REPLACE FUNCTION public.is_portal_in_maintenance_mode()
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ DECLARE v_mm boolean; v_msg text; BEGIN SELECT COALESCE(portal_maintenance_mode, false), COALESCE(portal_maintenance_message, 'The portal is currently undergoing maintenance.') INTO v_mm, v_msg FROM company_settings LIMIT 1; RETURN jsonb_build_object('maintenance_mode', COALESCE(v_mm, false), 'maintenance_message', COALESCE(v_msg, '')); EXCEPTION WHEN OTHERS THEN RETURN jsonb_build_object('maintenance_mode', false, 'maintenance_message', ''); END; $function$;
-
-CREATE OR REPLACE FUNCTION public.is_portal_user()
- RETURNS boolean
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ BEGIN RETURN (current_setting('request.jwt.claims', true)::json->>'portal_token') IS NOT NULL; END; $function$;
-
-CREATE OR REPLACE FUNCTION public.is_staff_user()
- RETURNS boolean
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('owner', 'admin', 'manager', 'technician', 'sales', 'accounts', 'hr') AND is_active = true AND deleted_at IS NULL); $function$;
-
-CREATE OR REPLACE FUNCTION public.is_tenant_admin()
- RETURNS boolean
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND tenant_id IS NOT NULL AND role IN ('owner', 'admin') AND is_active = true AND deleted_at IS NULL); $function$;
-
-CREATE OR REPLACE FUNCTION public.is_tenant_owner()
- RETURNS boolean
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$ SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND tenant_id IS NOT NULL AND role = 'owner' AND is_active = true AND deleted_at IS NULL); $function$;
-
-CREATE OR REPLACE FUNCTION public.log_audit_trail(p_record_type text, p_record_id uuid, p_action text, p_old_values jsonb DEFAULT NULL::jsonb, p_new_values jsonb DEFAULT NULL::jsonb, p_changed_fields text[] DEFAULT NULL::text[])
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-BEGIN
-  INSERT INTO audit_trails (tenant_id, record_type, record_id, action, old_values, new_values, changed_fields, performed_by)
-  VALUES (get_current_tenant_id(), p_record_type, p_record_id, p_action, p_old_values, p_new_values, p_changed_fields, auth.uid());
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.log_case_communication(p_case_id uuid, p_type text, p_subject text DEFAULT NULL::text, p_content text DEFAULT NULL::text, p_direction text DEFAULT 'internal'::text)
- RETURNS uuid
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE v_id uuid;
-BEGIN
-  INSERT INTO case_communications (tenant_id, case_id, type, subject, content, direction, sent_by)
-  VALUES (get_current_tenant_id(), p_case_id, p_type, p_subject, p_content, p_direction, auth.uid())
-  RETURNING id INTO v_id;
-  RETURN v_id;
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.log_case_history(p_case_id uuid, p_action text, p_details text DEFAULT NULL::text, p_old_value text DEFAULT NULL::text, p_new_value text DEFAULT NULL::text)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-BEGIN
-  INSERT INTO case_job_history (tenant_id, case_id, action, details, old_value, new_value, performed_by)
-  VALUES (get_current_tenant_id(), p_case_id, p_action, p_details, p_old_value, p_new_value, auth.uid());
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.log_chain_of_custody(p_case_id uuid, p_device_id uuid, p_action_category text, p_action text, p_description text DEFAULT NULL::text, p_location text DEFAULT NULL::text, p_custody_status text DEFAULT NULL::text, p_metadata jsonb DEFAULT '{}'::jsonb)
- RETURNS uuid
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_id uuid;
-  v_user_name text;
-  v_user_role text;
-BEGIN
-  SELECT full_name, role INTO v_user_name, v_user_role FROM profiles WHERE id = auth.uid();
-  INSERT INTO chain_of_custody (tenant_id, case_id, device_id, action_category, action, description, actor_id, actor_name, actor_role, location, custody_status, metadata)
-  VALUES (get_current_tenant_id(), p_case_id, p_device_id, p_action_category::custody_action_category, p_action, p_description, auth.uid(), COALESCE(v_user_name, 'System'), v_user_role, p_location, p_custody_status::custody_status, p_metadata)
-  RETURNING id INTO v_id;
-  RETURN v_id;
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.lookup_brand(p_name text)
- RETURNS uuid
- LANGUAGE sql
- STABLE
-AS $function$ SELECT id FROM catalog_device_brands WHERE LOWER(name) = LOWER(p_name) LIMIT 1; $function$;
-
-CREATE OR REPLACE FUNCTION public.lookup_capacity(p_name text)
- RETURNS uuid
- LANGUAGE sql
- STABLE
-AS $function$ SELECT id FROM catalog_device_capacities WHERE LOWER(name) = LOWER(p_name) LIMIT 1; $function$;
-
-CREATE OR REPLACE FUNCTION public.lookup_condition_type(p_name text)
- RETURNS uuid
- LANGUAGE sql
- STABLE
-AS $function$ SELECT id FROM catalog_device_conditions WHERE LOWER(name) = LOWER(p_name) LIMIT 1; $function$;
-
-CREATE OR REPLACE FUNCTION public.lookup_country(p_name text)
- RETURNS uuid
- LANGUAGE sql
- STABLE
-AS $function$ SELECT id FROM geo_countries WHERE LOWER(name) = LOWER(p_name) OR LOWER(code) = LOWER(p_name) LIMIT 1; $function$;
-
-CREATE OR REPLACE FUNCTION public.lookup_device_type(p_name text)
- RETURNS uuid
- LANGUAGE sql
- STABLE
-AS $function$ SELECT id FROM catalog_device_types WHERE LOWER(name) = LOWER(p_name) LIMIT 1; $function$;
-
-CREATE OR REPLACE FUNCTION public.lookup_interface(p_name text)
- RETURNS uuid
- LANGUAGE sql
- STABLE
-AS $function$ SELECT id FROM catalog_interfaces WHERE LOWER(name) = LOWER(p_name) LIMIT 1; $function$;
-
-CREATE OR REPLACE FUNCTION public.lookup_status_type(p_name text)
- RETURNS uuid
- LANGUAGE sql
- STABLE
-AS $function$ SELECT id FROM master_inventory_status_types WHERE LOWER(name) = LOWER(p_name) LIMIT 1; $function$;
-
-CREATE OR REPLACE FUNCTION public.lookup_storage_location(p_name text)
- RETURNS uuid
- LANGUAGE sql
- STABLE
-AS $function$ SELECT id FROM inventory_locations WHERE LOWER(name) = LOWER(p_name) LIMIT 1; $function$;
-
-CREATE OR REPLACE FUNCTION public.reject_quote(p_quote_id uuid, p_reason text DEFAULT NULL::text)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-BEGIN
-  UPDATE quotes SET status_id = (SELECT id FROM master_quote_statuses WHERE name = 'Rejected'), rejected_at = now(), rejection_reason = p_reason, updated_at = now()
-  WHERE id = p_quote_id AND tenant_id = get_current_tenant_id();
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.search_donor_drives(p_criteria jsonb)
- RETURNS SETOF inventory_items
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-BEGIN
-  RETURN QUERY
-  SELECT i.* FROM inventory_items i
-  WHERE i.tenant_id = get_current_tenant_id()
-  AND i.is_donor = true AND i.deleted_at IS NULL
-  AND (p_criteria->>'brand_id' IS NULL OR i.brand_id = (p_criteria->>'brand_id')::uuid)
-  AND (p_criteria->>'capacity_id' IS NULL OR i.capacity_id = (p_criteria->>'capacity_id')::uuid)
-  AND (p_criteria->>'model' IS NULL OR i.model ILIKE '%' || (p_criteria->>'model') || '%');
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.set_customer_portal_password(p_customer_id uuid, p_password_hash text)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-BEGIN
-  UPDATE customers_enhanced SET portal_password_hash = p_password_hash, portal_enabled = true, updated_at = now()
-  WHERE id = p_customer_id AND tenant_id = get_current_tenant_id();
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.set_tenant_and_audit_fields()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE current_tenant uuid;
-BEGIN
-  current_tenant := get_current_tenant_id();
-  IF TG_OP = 'INSERT' THEN
-    IF NEW.tenant_id IS NULL THEN NEW.tenant_id := current_tenant; END IF;
-    IF NEW.tenant_id IS DISTINCT FROM current_tenant AND NOT is_platform_admin() THEN
-      RAISE EXCEPTION 'Cannot insert data for a different tenant';
-    END IF;
-    NEW.created_at := COALESCE(NEW.created_at, now());
-    NEW.updated_at := now();
-  ELSIF TG_OP = 'UPDATE' THEN
-    IF NEW.tenant_id IS DISTINCT FROM OLD.tenant_id THEN
-      RAISE EXCEPTION 'Cannot change tenant_id of existing record';
-    END IF;
-    NEW.updated_at := now();
-  END IF;
-  RETURN NEW;
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.sync_tenant_config_from_country()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE
-  country_config RECORD;
-BEGIN
-  IF TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND NEW.country_id IS DISTINCT FROM OLD.country_id) THEN
-    IF NEW.country_id IS NOT NULL THEN
-      SELECT * INTO country_config FROM geo_countries WHERE id = NEW.country_id;
-      IF FOUND THEN
-        NEW.currency_code := country_config.currency_code;
-        NEW.currency_symbol := country_config.currency_symbol;
-        NEW.decimal_places := country_config.decimal_places;
-        NEW.tax_system := country_config.tax_system;
-        NEW.tax_label := country_config.tax_label;
-        NEW.tax_number_label := country_config.tax_number_label;
-        NEW.default_tax_rate := country_config.default_tax_rate;
-        NEW.locale_code := country_config.locale_code;
-        NEW.timezone := country_config.timezone;
-        NEW.date_format := country_config.date_format;
-        NEW.fiscal_year_start := country_config.fiscal_year_start;
-      END IF;
-    END IF;
-  END IF;
-  RETURN NEW;
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.test_tenant_isolation()
- RETURNS TABLE(test_name text, passed boolean, details text)
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_table_name text;
-  v_has_tenant_id boolean;
-  v_has_rls boolean;
-  v_restrictive_count integer;
-  v_total_tables integer := 0;
-  v_passed_tables integer := 0;
-BEGIN
-  FOR v_table_name IN
-    SELECT t.table_name
-    FROM information_schema.tables t
-    WHERE t.table_schema = 'public'
-      AND t.table_type = 'BASE TABLE'
-      AND EXISTS (
-        SELECT 1 FROM information_schema.columns c
-        WHERE c.table_schema = 'public'
-          AND c.table_name = t.table_name
-          AND c.column_name = 'tenant_id'
-      )
-    ORDER BY t.table_name
-  LOOP
-    v_total_tables := v_total_tables + 1;
-
-    SELECT relrowsecurity INTO v_has_rls
-    FROM pg_class
-    WHERE relname = v_table_name AND relnamespace = 'public'::regnamespace;
-
-    SELECT count(*) INTO v_restrictive_count
-    FROM pg_policies
-    WHERE tablename = v_table_name
-      AND schemaname = 'public'
-      AND permissive = 'RESTRICTIVE';
-
-    IF v_has_rls AND v_restrictive_count > 0 THEN
-      v_passed_tables := v_passed_tables + 1;
-      test_name := 'RLS + RESTRICTIVE policy: ' || v_table_name;
-      passed := true;
-      details := 'RLS enabled, ' || v_restrictive_count || ' restrictive policy(ies)';
-      RETURN NEXT;
-    ELSE
-      test_name := 'RLS + RESTRICTIVE policy: ' || v_table_name;
-      passed := false;
-      details := 'RLS=' || COALESCE(v_has_rls::text, 'null') || ', restrictive_policies=' || v_restrictive_count;
-      RETURN NEXT;
-    END IF;
-  END LOOP;
-
-  test_name := 'SUMMARY: Tenant-scoped tables with proper isolation';
-  passed := (v_passed_tables = v_total_tables);
-  details := v_passed_tables || '/' || v_total_tables || ' tables pass';
-  RETURN NEXT;
-
-  FOR v_table_name IN
-    SELECT unnest(ARRAY[
-      'get_current_tenant_id',
-      'is_platform_admin',
-      'is_tenant_owner',
-      'is_tenant_admin',
-      'is_admin',
-      'is_staff_user',
-      'has_role',
-      'belongs_to_tenant',
-      'get_my_role'
-    ])
-  LOOP
-    test_name := 'Security function exists: ' || v_table_name;
-    passed := EXISTS (
-      SELECT 1 FROM pg_proc
-      WHERE proname = v_table_name AND pronamespace = 'public'::regnamespace
-    );
-    details := CASE WHEN passed THEN 'Function exists' ELSE 'MISSING' END;
-    RETURN NEXT;
-  END LOOP;
-
-  SELECT count(*) INTO v_total_tables
-  FROM information_schema.tables t
-  WHERE t.table_schema = 'public'
-    AND t.table_type = 'BASE TABLE'
-    AND EXISTS (
-      SELECT 1 FROM information_schema.columns c
-      WHERE c.table_schema = 'public' AND c.table_name = t.table_name AND c.column_name = 'tenant_id'
-    );
-
-  SELECT count(*) INTO v_passed_tables
-  FROM information_schema.tables t
-  WHERE t.table_schema = 'public'
-    AND t.table_type = 'BASE TABLE'
-    AND EXISTS (
-      SELECT 1 FROM information_schema.columns c
-      WHERE c.table_schema = 'public' AND c.table_name = t.table_name AND c.column_name = 'tenant_id'
-    )
-    AND EXISTS (
-      SELECT 1 FROM information_schema.columns c
-      WHERE c.table_schema = 'public' AND c.table_name = t.table_name AND c.column_name = 'deleted_at'
-    );
-
-  test_name := 'SUMMARY: Tenant tables with soft-delete (deleted_at)';
-  passed := (v_passed_tables = v_total_tables);
-  details := v_passed_tables || '/' || v_total_tables || ' tables have deleted_at';
-  RETURN NEXT;
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.update_number_sequence(p_scope text, p_prefix text, p_padding integer, p_reset boolean)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-BEGIN
-  UPDATE number_sequences SET prefix = p_prefix, padding = p_padding, reset_annually = p_reset, updated_at = now()
-  WHERE tenant_id = get_current_tenant_id() AND scope = p_scope;
-  IF NOT FOUND THEN
-    INSERT INTO number_sequences (tenant_id, scope, prefix, padding, reset_annually)
-    VALUES (get_current_tenant_id(), p_scope, p_prefix, p_padding, p_reset);
-  END IF;
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.update_updated_at_column()
- RETURNS trigger
- LANGUAGE plpgsql
-AS $function$ BEGIN NEW.updated_at = now(); RETURN NEW; END; $function$;
 
 
 -- ============================================================

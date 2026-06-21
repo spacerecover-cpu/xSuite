@@ -19,16 +19,20 @@ import {
 import { sendDocumentEmail } from '../../lib/emailDocumentService';
 import { isValidEmail } from '../../lib/utils';
 import { getEmailTemplate, getDocumentTypeLabel } from '../../lib/emailTemplates';
+import { TemplatePicker } from '../templates/TemplatePicker';
 import type { DocumentType } from '../../lib/pdf/types';
 
 interface EmailDocumentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  blob: Blob;
-  filename: string;
-  documentType: DocumentType;
-  caseId: string;
-  caseNumber: string;
+  /** Omit blob/filename for a plain (attachment-less) templated email. */
+  blob?: Blob;
+  filename?: string;
+  documentType?: DocumentType;
+  caseId?: string;
+  /** Logs to customer_communications after a send without a caseId. */
+  customerId?: string;
+  caseNumber?: string;
   customerName: string;
   customerEmail?: string;
   companyName: string;
@@ -41,6 +45,7 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
   filename,
   documentType,
   caseId,
+  customerId,
   caseNumber,
   customerName,
   customerEmail,
@@ -64,12 +69,17 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      const template = getEmailTemplate(documentType, {
-        customerName: customerName || 'Valued Customer',
-        caseNumber,
-        companyName,
-        documentType,
-      });
+      // Hardcoded system default; the TemplatePicker below replaces it with the
+      // tenant's default document_templates row (rendered with real context)
+      // as soon as one resolves. Plain compose (no documentType) starts empty.
+      const template = documentType
+        ? getEmailTemplate(documentType, {
+            customerName: customerName || 'Valued Customer',
+            caseNumber: caseNumber ?? '',
+            companyName,
+            documentType,
+          })
+        : { subject: '', body: '' };
 
       setTo(customerEmail || '');
       setCc([]);
@@ -113,6 +123,21 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
     setIsSending(false);
 
     if (result.success) {
+      // Case sends are logged by the edge function; customer-context sends
+      // (no case) are logged here, best-effort.
+      if (!caseId && customerId) {
+        try {
+          const { logCustomerCommunication } = await import('../../lib/communicationsService');
+          await logCustomerCommunication({
+            customerId,
+            type: 'email',
+            subject,
+            content: body,
+          });
+        } catch {
+          // best-effort log only
+        }
+      }
       setSuccess(true);
       setTimeout(() => {
         onClose();
@@ -128,8 +153,8 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
     }
   };
 
-  const fileSizeKB = Math.round(blob.size / 1024);
-  const documentLabel = getDocumentTypeLabel(documentType);
+  const fileSizeKB = blob ? Math.round(blob.size / 1024) : 0;
+  const documentLabel = documentType ? getDocumentTypeLabel(documentType) : null;
 
   return (
     <Modal
@@ -149,33 +174,35 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="bg-slate-50 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <FileText className="w-5 h-5 text-primary" />
+          {blob && filename && (
+            <div className="bg-slate-50 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <FileText className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-slate-900">{documentLabel ?? 'Document'}</p>
+                  {caseNumber && <p className="text-sm text-slate-500">Case #{caseNumber}</p>}
+                </div>
+                <div className="flex items-center gap-2 text-sm text-slate-500">
+                  <Paperclip className="w-4 h-4" />
+                  <span>{filename}</span>
+                  <span className="text-slate-400">({fileSizeKB} KB)</span>
+                </div>
               </div>
-              <div className="flex-1">
-                <p className="font-medium text-slate-900">{documentLabel}</p>
-                <p className="text-sm text-slate-500">Case #{caseNumber}</p>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Paperclip className="w-4 h-4" />
-                <span>{filename}</span>
-                <span className="text-slate-400">({fileSizeKB} KB)</span>
+              <div className="mt-3 pt-3 border-t border-slate-200">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowPdfPreview(true)}
+                  disabled={isSending}
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  View PDF
+                </Button>
               </div>
             </div>
-            <div className="mt-3 pt-3 border-t border-slate-200">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowPdfPreview(true)}
-                disabled={isSending}
-              >
-                <Eye className="w-4 h-4 mr-2" />
-                View PDF
-              </Button>
-            </div>
-          </div>
+          )}
 
           <div>
             <label htmlFor={toId} className="block text-sm font-medium text-slate-700 mb-1">
@@ -191,6 +218,20 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
               disabled={isSending}
             />
           </div>
+
+          <TemplatePicker
+            typeCode="email"
+            documentType={documentType}
+            contextRefs={{ caseId, customerId }}
+            channel="plain"
+            autoApplyDefault
+            label="Email template"
+            disabled={isSending}
+            onApply={({ subject: appliedSubject, body: appliedBody }) => {
+              if (appliedSubject) setSubject(appliedSubject);
+              setBody(appliedBody);
+            }}
+          />
 
           <div className="flex gap-2">
             {!showCc && (
@@ -330,6 +371,7 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
         </div>
       )}
 
+      {blob && (
       <Dialog
         open={showPdfPreview}
         onClose={() => setShowPdfPreview(false)}
@@ -367,6 +409,7 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
           </Button>
         </div>
       </Dialog>
+      )}
     </Modal>
   );
 };

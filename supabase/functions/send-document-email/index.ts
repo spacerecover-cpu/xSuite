@@ -294,6 +294,9 @@ Deno.serve(async (req: Request) => {
           p_subject: body.subject,
           p_content: body.body,
           p_sent_to: recipients.join(", "),
+          // Service-role context has no auth.uid(); attribute the send to the
+          // authenticated user we validated above.
+          p_sent_by: user.id,
         });
       } catch (logError) {
         console.error("Failed to log communication:", logError);

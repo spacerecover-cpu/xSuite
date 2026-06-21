@@ -105,6 +105,16 @@ Best regards,
 {{companyName}} Team`,
   },
 
+  credit_note: {
+    subject: 'Credit Note - {{caseNumber}}',
+    body: `Dear {{customerName}},
+
+Please find attached your credit note.
+
+Best regards,
+{{companyName}} Team`,
+  },
+
   payment_receipt: {
     subject: 'Payment Receipt - {{caseNumber}}',
     body: `Dear {{customerName}},
@@ -154,6 +164,7 @@ export function getDocumentTypeLabel(documentType: DocumentType): string {
     chain_of_custody: 'Chain of Custody',
     quote: 'Quote',
     invoice: 'Invoice',
+    credit_note: 'Credit Note',
     payment_receipt: 'Payment Receipt',
     payslip: 'Payslip',
   };

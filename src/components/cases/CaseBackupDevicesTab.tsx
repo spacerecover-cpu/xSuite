@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
+import { Skeleton } from '../ui/Skeleton';
 import { SaleableItemsGrid } from '../stock/SaleableItemsGrid';
 import { StockSaleModal } from '../stock/StockSaleModal';
 import { StockTransactionModal } from '../stock/StockTransactionModal';
@@ -129,8 +130,14 @@ export const CaseBackupDevicesTab: React.FC<CaseBackupDevicesTabProps> = ({
           </div>
 
           {loadingRecommended ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="border border-slate-200 rounded-lg p-4 space-y-3">
+                  <Skeleton className="h-24 w-full rounded" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
+                </div>
+              ))}
             </div>
           ) : recommendedItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-slate-400">
@@ -157,8 +164,16 @@ export const CaseBackupDevicesTab: React.FC<CaseBackupDevicesTabProps> = ({
           </div>
 
           {loadingSales ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-32 flex-1" />
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </div>
+              ))}
             </div>
           ) : sales.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-slate-400">
@@ -235,8 +250,15 @@ export const CaseBackupDevicesTab: React.FC<CaseBackupDevicesTabProps> = ({
           </div>
 
           {loadingUsage ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <Skeleton className="h-4 w-40 flex-1" />
+                  <Skeleton className="h-4 w-12" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+              ))}
             </div>
           ) : usageTransactions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-slate-400">

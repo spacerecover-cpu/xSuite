@@ -755,6 +755,7 @@ export const TEMPLATE_SEED_DATA = {
     {
       type_code: 'email',
       name: 'Quote Sent',
+      document_type: 'quote',
       subject: 'Quote {{quote.number}} - {{company.name}}',
       content: `<p>Dear {{customer.name}},</p>
 
@@ -799,6 +800,139 @@ export const TEMPLATE_SEED_DATA = {
 {{technician.name}}<br>
 {{company.name}}<br>
 {{company.phone}}</p>`,
+      is_default: true,
+    },
+    {
+      type_code: 'email',
+      name: 'Office Receipt Email',
+      document_type: 'office_receipt',
+      subject: 'Office Receipt - Case #{{case.number}}',
+      content: `Dear {{customer.name}},
+
+Please find attached the Office Receipt for your case.
+
+Case Reference: #{{case.number}}
+
+This document confirms the receipt of your device(s) at our facility. Please keep this for your records.
+
+If you have any questions, please don't hesitate to contact us.
+
+Best regards,
+{{company.name}} Team`,
+      is_default: true,
+    },
+    {
+      type_code: 'email',
+      name: 'Customer Copy Email',
+      document_type: 'customer_copy',
+      subject: 'Device Receipt - Case #{{case.number}}',
+      content: `Dear {{customer.name}},
+
+Please find attached the Customer Copy receipt for your case.
+
+Case Reference: #{{case.number}}
+
+This document provides a summary of your device(s) and case details. Please review and keep this for your records.
+
+If you have any questions or concerns, please don't hesitate to reach out.
+
+Best regards,
+{{company.name}} Team`,
+      is_default: true,
+    },
+    {
+      type_code: 'email',
+      name: 'Checkout Confirmation Email',
+      document_type: 'checkout_form',
+      subject: 'Device Checkout Confirmation - Case #{{case.number}}',
+      content: `Dear {{customer.name}},
+
+Please find attached the Checkout Confirmation for your case.
+
+Case Reference: #{{case.number}}
+
+This document confirms the collection of your device(s) from our facility. Please keep this for your records.
+
+Thank you for choosing our services.
+
+Best regards,
+{{company.name}} Team`,
+      is_default: true,
+    },
+    {
+      type_code: 'email',
+      name: 'Case Label Email',
+      document_type: 'case_label',
+      subject: 'Case Label - #{{case.number}}',
+      content: `Dear {{customer.name}},
+
+Please find attached the Case Label for your reference.
+
+Case Reference: #{{case.number}}
+
+Best regards,
+{{company.name}} Team`,
+      is_default: true,
+    },
+    {
+      type_code: 'email',
+      name: 'Chain of Custody Email',
+      document_type: 'chain_of_custody',
+      subject: 'Chain of Custody - Case #{{case.number}}',
+      content: `Dear {{customer.name}},
+
+Please find attached the Chain of Custody document for your case.
+
+Case Reference: #{{case.number}}
+
+Best regards,
+{{company.name}} Team`,
+      is_default: true,
+    },
+    {
+      type_code: 'email',
+      name: 'Invoice Email',
+      document_type: 'invoice',
+      subject: 'Invoice {{invoice.number}} - {{company.name}}',
+      content: `Dear {{customer.name}},
+
+Please find attached invoice {{invoice.number}}.
+
+Amount due: {{invoice.total}}
+Due date: {{invoice.due_date}}
+
+If you have any questions about this invoice, please contact us.
+
+Best regards,
+{{company.name}} Team`,
+      is_default: true,
+    },
+    {
+      type_code: 'email',
+      name: 'Payment Receipt Email',
+      document_type: 'payment_receipt',
+      subject: 'Payment Receipt - Case #{{case.number}}',
+      content: `Dear {{customer.name}},
+
+Please find attached your payment receipt.
+
+Thank you for your payment.
+
+Best regards,
+{{company.name}} Team`,
+      is_default: true,
+    },
+    {
+      type_code: 'email',
+      name: 'Payslip Email',
+      document_type: 'payslip',
+      subject: 'Payslip - {{company.name}}',
+      content: `Dear {{customer.name}},
+
+Please find attached your payslip.
+
+Best regards,
+{{company.name}} Team`,
       is_default: true,
     },
     {

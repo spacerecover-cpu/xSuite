@@ -3,6 +3,7 @@ import type { ReceiptData, TranslationContext } from '../types';
 import { PDF_COLORS, getPriorityColor, getStylesWithFont } from '../styles';
 import { formatDate, safeString } from '../utils';
 import { getDeviceIconSvg } from '../../deviceIconMapper';
+import { buildLogoNode } from '../brandingImage';
 
 export function buildCaseLabelDocument(
   data: ReceiptData,
@@ -19,18 +20,12 @@ export function buildCaseLabelDocument(
 
   const headerContent: Content = {
     columns: [
-      logoBase64
-        ? {
-            image: logoBase64,
-            width: 60,
-            margin: [0, 0, 0, 0],
-          }
-        : {
-            text: companyName,
-            fontSize: 12,
-            bold: true,
-            color: PDF_COLORS.text,
-          },
+      buildLogoNode(logoBase64, { width: 60, margin: [0, 0, 0, 0] }) ?? {
+        text: companyName,
+        fontSize: 12,
+        bold: true,
+        color: PDF_COLORS.text,
+      },
       {
         stack: [
           {

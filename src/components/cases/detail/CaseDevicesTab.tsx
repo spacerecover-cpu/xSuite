@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { HardDrive, Grid2x2 as Grid, History, Clock, Eye, EyeOff, Shield, Package } from 'lucide-react';
 import { CreditCard as Edit } from 'lucide-react';
+import { ChainOfCustodyTab } from '../ChainOfCustodyTab';
 import { Button } from '../../ui/Button';
 import { Badge } from '../../ui/Badge';
 import { Card } from '../../ui/Card';
@@ -38,6 +39,8 @@ export interface CaseDeviceWithEmbeds {
 
 interface CaseDevicesTabProps {
   caseData: Record<string, unknown>;
+  caseId: string;
+  caseNumber: string;
   devices: CaseDeviceWithEmbeds[];
   expandedDevices: Set<string>;
   showPassword: boolean;
@@ -48,6 +51,8 @@ interface CaseDevicesTabProps {
 }
 
 export const CaseDevicesTab: React.FC<CaseDevicesTabProps> = ({
+  caseId,
+  caseNumber,
   devices,
   expandedDevices,
   showPassword,
@@ -56,6 +61,7 @@ export const CaseDevicesTab: React.FC<CaseDevicesTabProps> = ({
   onSetEditingDevice,
   onSetShowPassword,
 }) => {
+  const [openHistory, setOpenHistory] = useState<string | null>(null);
   const patientDevices = devices.filter(d => d.device_role?.name?.toLowerCase() === 'patient');
   const backupAndSupportDevices = devices.filter(d => {
     const roleName = d.device_role?.name?.toLowerCase();
@@ -147,18 +153,39 @@ export const CaseDevicesTab: React.FC<CaseDevicesTabProps> = ({
                 <div>
                   <span className="text-slate-500 text-xs font-medium block mb-1.5">Device Password</span>
                   <div className="flex items-center gap-1.5">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={device.password}
-                      readOnly
-                      className="font-mono text-xs bg-slate-50 px-2 py-1.5 rounded border border-slate-300 flex-1"
-                    />
+                    <form className="contents" onSubmit={(e) => e.preventDefault()}>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={device.password}
+                        readOnly
+                        autoComplete="off"
+                        className="font-mono text-xs bg-slate-50 px-2 py-1.5 rounded border border-slate-300 flex-1"
+                      />
+                    </form>
                     <Button variant="secondary" size="sm" onClick={() => onSetShowPassword(!showPassword)} className="!p-1.5">
                       {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </Button>
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setOpenHistory((cur) => (cur === device.id ? null : device.id))}
+            className="mt-2 flex items-center gap-1 text-sm font-medium text-primary hover:text-primary/80"
+            aria-expanded={openHistory === device.id}
+          >
+            <History className="h-4 w-4" /> {openHistory === device.id ? 'Hide history' : 'View history'}
+          </button>
+          {openHistory === device.id && (
+            <div className="mt-2 rounded-lg border border-slate-200">
+              <ChainOfCustodyTab
+                caseId={caseId}
+                caseNumber={caseNumber}
+                deviceId={device.id}
+              />
             </div>
           )}
         </div>

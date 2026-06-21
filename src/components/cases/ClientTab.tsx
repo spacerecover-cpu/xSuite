@@ -92,6 +92,7 @@ export const ClientTab: React.FC<ClientTabProps> = ({ caseId, caseData }) => {
             companies (id, company_number, name, company_name, email, phone, tax_number, geo_countries(name), geo_cities(name))
           `)
           .eq('customer_id', caseData.customer_id)
+          .is('deleted_at', null)
           .order('is_primary', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -231,14 +232,17 @@ export const ClientTab: React.FC<ClientTabProps> = ({ caseId, caseData }) => {
 
       if (error) throw error;
 
-      // Log the change in history
+      // Log the change in history. (The RPC takes p_details text — the previous
+      // p_details_json arg didn't exist, so this call failed silently.)
       await supabase.rpc('log_case_history', {
         p_case_id: caseId,
         p_action: 'COMPANY_CHANGED',
-        p_details_json: {
+        p_details: JSON.stringify({
           old_company_id: caseData?.company_id,
           new_company_id: newCompanyId,
-        },
+        }),
+        p_old_value: caseData?.company_id ?? undefined,
+        p_new_value: newCompanyId ?? undefined,
       });
     },
     onSuccess: () => {
@@ -455,6 +459,14 @@ export const ClientTab: React.FC<ClientTabProps> = ({ caseId, caseData }) => {
             <h2 className="text-base font-bold text-success flex items-center gap-2">
               <Building2 className="w-4 h-4 text-success" />
               Company Details
+              {!caseData?.company_id && companyData && (
+                <span
+                  className="text-xs font-normal text-slate-500"
+                  title="No company is pinned to this case; showing the customer's current primary company. Changing the customer's companies will change what appears here."
+                >
+                  (customer's current primary company)
+                </span>
+              )}
             </h2>
             <div className="flex items-center gap-1">
               <Button

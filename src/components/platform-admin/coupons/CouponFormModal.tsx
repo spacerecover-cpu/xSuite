@@ -4,7 +4,7 @@ import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
 import { createCoupon, updateCoupon } from '../../../lib/billingService';
 import { platformAdminKeys } from '../../../lib/queryKeys';
-import toast from 'react-hot-toast';
+import { useToast } from '../../../hooks/useToast';
 import type { Database } from '../../../types/database.types';
 
 type BillingCoupon = Database['public']['Tables']['billing_coupons']['Row'];
@@ -17,6 +17,7 @@ interface CouponFormModalProps {
 
 export const CouponFormModal: React.FC<CouponFormModalProps> = ({ isOpen, onClose, coupon }) => {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const isEditing = !!coupon;
   const codeInputRef = useRef<HTMLInputElement>(null);
 

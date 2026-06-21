@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FolderOpen, Plus, CreditCard as Edit2, Trash2, ChevronRight, Tag, Layers } from 'lucide-react';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
+import { Skeleton } from '../../components/ui/Skeleton';
 import {
   getStockCategories,
   createStockCategory,
@@ -268,10 +269,8 @@ export const StockCategoriesPage: React.FC = () => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <PageHeader
+      <PageHeaderSlot
         title="Stock Categories"
-        description="Organize your stock items into categories and subcategories"
-        icon={FolderOpen}
         actions={
           <Button onClick={openAdd} size="sm">
             <Plus className="w-4 h-4 mr-1.5" />
@@ -282,8 +281,10 @@ export const StockCategoriesPage: React.FC = () => {
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
         {isLoading ? (
-          <div className="py-16 flex items-center justify-center">
-            <div className="w-7 h-7 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="p-4 space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full rounded-lg" />
+            ))}
           </div>
         ) : treeRoots.length === 0 ? (
           <div className="py-16 text-center">

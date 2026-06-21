@@ -56,6 +56,13 @@ describe('statusToBadgeVariant', () => {
     expect(statusToBadgeVariant('frobnicated')).toBe('secondary');
     expect(statusToBadgeVariant('')).toBe('secondary');
   });
+
+  it('falls back to secondary for nullish statuses instead of throwing', () => {
+    // Nullable DB columns (e.g. invoices.status) reach this shared helper as
+    // null/undefined; an unknown status must degrade to secondary, never crash.
+    expect(statusToBadgeVariant(null)).toBe('secondary');
+    expect(statusToBadgeVariant(undefined)).toBe('secondary');
+  });
 });
 
 describe('statusToBadgeVariant — domain lifecycle/resource/employment vocab', () => {

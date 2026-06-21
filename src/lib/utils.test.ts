@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cn, isValidEmail } from './utils';
+import { cn, isValidEmail, safeInternalRedirect } from './utils';
 
 describe('cn', () => {
   it('resolves conflicting spacing utilities to the last one', () => {
@@ -52,5 +52,28 @@ describe('isValidEmail', () => {
 
   it('rejects a string missing the local part', () => {
     expect(isValidEmail('@example.com')).toBe(false);
+  });
+});
+
+describe('safeInternalRedirect', () => {
+  it('allows a root-relative app path', () => {
+    expect(safeInternalRedirect('/cases')).toBe('/cases');
+    expect(safeInternalRedirect('/')).toBe('/');
+  });
+
+  it('returns null for empty / missing input', () => {
+    expect(safeInternalRedirect(null)).toBeNull();
+    expect(safeInternalRedirect(undefined)).toBeNull();
+    expect(safeInternalRedirect('')).toBeNull();
+  });
+
+  it('rejects protocol-relative and backslash paths that browsers treat as external', () => {
+    expect(safeInternalRedirect('//evil.com')).toBeNull();
+    expect(safeInternalRedirect('/\\evil.com')).toBeNull();
+  });
+
+  it('rejects absolute and scheme URLs', () => {
+    expect(safeInternalRedirect('https://evil.com')).toBeNull();
+    expect(safeInternalRedirect('javascript:alert(1)')).toBeNull();
   });
 });

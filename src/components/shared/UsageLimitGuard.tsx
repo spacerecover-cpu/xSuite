@@ -3,7 +3,7 @@ import { AlertTriangle, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { UsageLimitKey, canPerformAction } from '../../lib/featureGateService';
 import { Button } from '../ui/Button';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
 
 interface UsageLimitGuardProps {
   limitKey: UsageLimitKey;
@@ -26,6 +26,7 @@ export function UsageLimitGuard({
   } | null>(null);
   const [hasShownWarning, setHasShownWarning] = useState(false);
   const navigate = useNavigate();
+  const toast = useToast();
 
   useEffect(() => {
     canPerformAction(limitKey, additionalCount).then(setCheckResult);
@@ -33,7 +34,7 @@ export function UsageLimitGuard({
 
   useEffect(() => {
     if (checkResult?.allowed && checkResult.message && !hasShownWarning && showToast) {
-      toast(checkResult.message, { icon: '⚠️', duration: 5000 });
+      toast.warning(checkResult.message);
       setHasShownWarning(true);
     }
   }, [checkResult, hasShownWarning, showToast]);
@@ -51,7 +52,7 @@ export function UsageLimitGuard({
   }
 
   if (showToast) {
-    toast.error(checkResult.message || 'Plan limit reached', { duration: 5000 });
+    toast.error(checkResult.message || 'Plan limit reached');
   }
 
   return (

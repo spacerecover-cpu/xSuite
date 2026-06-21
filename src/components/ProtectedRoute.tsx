@@ -1,10 +1,13 @@
 import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { PendingApprovalScreen } from './PendingApprovalScreen';
+import { MFAChallenge } from './auth/MFAChallenge';
+import { PasswordChangeModal } from './users/PasswordChangeModal';
 
 interface ProtectedRouteProps {
-  children: React.ReactNode;
+  /** Omit to use the guard as a pathless layout route — children render via <Outlet/>. */
+  children?: React.ReactNode;
   allowedRoles?: Array<'owner' | 'admin' | 'manager' | 'technician' | 'sales' | 'accounts' | 'hr' | 'viewer'>;
 }
 
@@ -42,7 +45,7 @@ const AuthLoadingSkeleton = () => (
 );
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
-  const { user, profile, loading, profileStatus } = useAuth();
+  const { user, profile, loading, profileStatus, mfaPending, passwordResetRequired, completeMFAChallenge, signOut } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -51,6 +54,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // MFA gate: an authenticated-but-not-yet-elevated (aal1) session must present
+  // its second factor before any protected page renders. Without this the
+  // challenge lived only on /login, so a deep link / second tab bypassed it.
+  if (mfaPending) {
+    return <MFAChallenge onVerified={completeMFAChallenge} onCancel={() => void signOut()} />;
   }
 
   if (profileStatus === 'pending_approval') {
@@ -75,7 +85,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
     );
   }
 
-  if (profileStatus === 'error' || !profile) {
+  if (profileStatus === 'error') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
@@ -91,6 +101,20 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
         </div>
       </div>
     );
+  }
+
+  // Profile not present yet/anymore but not a hard error — e.g. the logout
+  // transition (signOut clears profile before user) or a transient refetch.
+  // Show the skeleton, never the dead-end error card, until the auth state
+  // settles (redirect on signed-out, or profile resolves).
+  if (!profile) {
+    return <AuthLoadingSkeleton />;
+  }
+
+  // Forced password rotation: enforce on every route, not just /login, so a
+  // deep link or browser refresh can't walk past an admin-mandated reset (H5).
+  if (passwordResetRequired) {
+    return <PasswordChangeModal isOpen userName={profile.full_name} />;
   }
 
   const isPlatformAdmin = !profile.tenant_id && (profile.role === 'owner' || profile.role === 'admin');
@@ -109,5 +133,5 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
     );
   }
 
-  return <>{children}</>;
+  return <>{children ?? <Outlet />}</>;
 };

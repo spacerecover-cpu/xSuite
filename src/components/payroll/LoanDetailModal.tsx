@@ -10,6 +10,7 @@ import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface LoanDetailModalProps {
@@ -25,6 +26,7 @@ export const LoanDetailModal: React.FC<LoanDetailModalProps> = ({
 }) => {
   const { formatCurrency } = useCurrency();
   const toast = useToast();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -356,12 +358,15 @@ export const LoanDetailModal: React.FC<LoanDetailModalProps> = ({
             {(loan.status === 'pending' || loan.status === 'active') && (
               <Button
                 variant="secondary"
-                onClick={() => {
-                  if (
-                    confirm(
-                      'Are you sure you want to cancel this loan? This action cannot be undone.'
-                    )
-                  ) {
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: 'Cancel Loan',
+                    message:
+                      'Are you sure you want to cancel this loan? This action cannot be undone.',
+                    confirmLabel: 'Cancel Loan',
+                    tone: 'danger',
+                  });
+                  if (ok) {
                     cancelLoanMutation.mutate();
                   }
                 }}

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MapPin, Plus, Pencil, Check, X } from 'lucide-react';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { useToast } from '../../hooks/useToast';
 import {
   getStockLocations,
@@ -100,10 +101,8 @@ const StockLocationsPage: React.FC = () => {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <PageHeader
+      <PageHeaderSlot
         title="Stock Locations"
-        description="Manage storage locations for your stock items"
-        icon={MapPin}
         actions={
           <Button
             variant="primary"
@@ -131,8 +130,10 @@ const StockLocationsPage: React.FC = () => {
       )}
 
       {isLoading ? (
-        <div className="py-12 flex items-center justify-center">
-          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="space-y-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full rounded-lg" />
+          ))}
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

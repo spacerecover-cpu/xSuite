@@ -1,16 +1,26 @@
-import React, { useState, useEffect, useRef, useId } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useId } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { RichTextEditor } from '../ui/RichTextEditor';
-import { DollarSign } from 'lucide-react';
-import { useAccountingLocale } from '../../hooks/useAccountingLocale';
+import { Select } from '../ui/Select';
+import { RichTextEditor, type RichTextEditorHandle } from '../ui/RichTextEditor';
+import { DollarSign, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
 import { logger } from '../../lib/logger';
+import { useToast } from '../../hooks/useToast';
+import { VariableInsertMenu } from './VariableInsertMenu';
+import { renderTemplate, validateTemplate, SAMPLE_CONTEXT } from '../../lib/templateEngine';
+import { getVariableRegistry } from '../../lib/templateContextService';
+import { sanitizeHtml } from '../../lib/sanitizeHtml';
+import { templateKeys } from '../../lib/queryKeys';
 
 interface LineItemTemplateFormState {
   name: string;
   description: string;
   content: string;
+  subject_line: string;
+  document_type: string;
   default_price: number;
   unit_of_measure: string;
   item_category: string;
@@ -22,6 +32,8 @@ interface LineItemTemplateInitialData {
   name?: string | null;
   description?: string | null;
   content?: string | null;
+  subject_line?: string | null;
+  document_type?: string | null;
   default_price?: number | null;
   unit_of_measure?: string | null;
   item_category?: string | null;
@@ -37,7 +49,22 @@ interface LineItemTemplateFormModalProps {
   initialData?: LineItemTemplateInitialData;
   templateTypeId: string;
   isLineItemType: boolean;
+  /** master_template_types.code — drives subject/document-type fields for 'email'. */
+  typeCode?: string | null;
 }
+
+const DOCUMENT_TYPE_OPTIONS = [
+  { value: '', label: 'All documents (generic)' },
+  { value: 'office_receipt', label: 'Office Receipt' },
+  { value: 'customer_copy', label: 'Customer Copy' },
+  { value: 'checkout_form', label: 'Checkout Form' },
+  { value: 'case_label', label: 'Case Label' },
+  { value: 'chain_of_custody', label: 'Chain of Custody' },
+  { value: 'quote', label: 'Quote' },
+  { value: 'invoice', label: 'Invoice' },
+  { value: 'payment_receipt', label: 'Payment Receipt' },
+  { value: 'payslip', label: 'Payslip' },
+];
 
 const DEFAULT_DECIMAL_PLACES = 2;
 
@@ -48,18 +75,24 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
   initialData,
   templateTypeId,
   isLineItemType,
+  typeCode,
 }) => {
+  const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const firstFieldRef = useRef<HTMLInputElement>(null);
+  const richEditorRef = useRef<RichTextEditorHandle>(null);
   const descriptionId = useId();
   const defaultPriceId = useId();
   const templateContentId = useId();
-  const { locale, getCurrencySymbol } = useAccountingLocale();
-  const decimalPlaces = locale?.decimal_places ?? DEFAULT_DECIMAL_PLACES;
+  const currencyConfig = useCurrencyConfig();
+  const decimalPlaces = currencyConfig.decimalPlaces ?? DEFAULT_DECIMAL_PLACES;
   const [formData, setFormData] = useState<LineItemTemplateFormState>({
     name: '',
     description: '',
     content: '',
+    subject_line: '',
+    document_type: '',
     default_price: 0,
     unit_of_measure: 'service',
     item_category: '',
@@ -67,12 +100,33 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
     is_active: true,
   });
 
+  const isEmailType = typeCode === 'email';
+  const supportsVariables = !isLineItemType;
+
+  const { data: variableRegistry = [] } = useQuery({
+    queryKey: templateKeys.variables(),
+    queryFn: getVariableRegistry,
+    staleTime: 5 * 60 * 1000,
+    enabled: isOpen && supportsVariables,
+  });
+
+  const unknownVariables = useMemo(() => {
+    if (!supportsVariables || variableRegistry.length === 0) return [];
+    const knownKeys = variableRegistry.map((v) => v.variableKey);
+    return validateTemplate(
+      `${formData.subject_line} ${formData.content}`,
+      knownKeys
+    ).unknown;
+  }, [supportsVariables, variableRegistry, formData.subject_line, formData.content]);
+
   useEffect(() => {
     if (initialData) {
       setFormData({
         name: initialData.name ?? '',
         description: initialData.description ?? '',
         content: initialData.content ?? '',
+        subject_line: initialData.subject_line ?? '',
+        document_type: initialData.document_type ?? '',
         default_price: initialData.default_price ?? 0,
         unit_of_measure: initialData.unit_of_measure ?? 'service',
         item_category: initialData.item_category ?? '',
@@ -82,25 +136,29 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
     }
   }, [initialData]);
 
+  const insertVariable = (variableKey: string) => {
+    richEditorRef.current?.insertAtCursor(`{{${variableKey}}}`);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      alert('Please enter a template name');
+      toast.error('Please enter a template name');
       return;
     }
 
     if (isLineItemType && formData.default_price < 0) {
-      alert('Price cannot be negative');
+      toast.error('Price cannot be negative');
       return;
     }
 
-    if (isLineItemType && locale) {
+    if (isLineItemType) {
       const factor = Math.pow(10, decimalPlaces);
       const roundedPrice = Math.round(formData.default_price * factor) / factor;
 
       if (formData.default_price !== roundedPrice) {
-        alert(`Price must have at most ${decimalPlaces} decimal places`);
+        toast.error(`Price must have at most ${decimalPlaces} decimal places`);
         return;
       }
     }
@@ -109,12 +167,14 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
     try {
       await onSave({
         ...formData,
+        subject_line: formData.subject_line.trim() || null,
+        document_type: isEmailType ? formData.document_type || null : null,
         template_type_id: templateTypeId,
       });
       onClose();
     } catch (error: unknown) {
       logger.error('Error saving template:', error);
-      alert(error instanceof Error ? error.message : 'Failed to save template. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to save template. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -124,7 +184,15 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={initialData ? 'Edit Line Item Template' : 'Create Line Item Template'}
+      title={
+        isLineItemType
+          ? initialData
+            ? 'Edit Line Item Template'
+            : 'Create Line Item Template'
+          : initialData
+            ? 'Edit Template'
+            : 'Create Template'
+      }
       size="large"
       closeOnBackdrop={false}
       initialFocusRef={firstFieldRef}
@@ -163,29 +231,29 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
                   Default Price <span className="text-danger ml-1">*</span>
                 </label>
                 <div className="relative">
-                  {locale?.currency_position === 'before' && (
+                  {currencyConfig.position === 'before' && (
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-slate-500 sm:text-sm">{getCurrencySymbol()}</span>
+                      <span className="text-slate-500 sm:text-sm">{currencyConfig.symbol}</span>
                     </div>
                   )}
                   <input
                     id={defaultPriceId}
                     type="number"
-                    step={locale ? Math.pow(10, -decimalPlaces).toFixed(decimalPlaces) : "0.01"}
+                    step={Math.pow(10, -decimalPlaces).toFixed(decimalPlaces)}
                     min="0"
                     value={formData.default_price}
                     onChange={(e) =>
                       setFormData({ ...formData, default_price: parseFloat(e.target.value) || 0 })
                     }
                     required
-                    placeholder={locale ? `0.${'0'.repeat(decimalPlaces)}` : "0.00"}
+                    placeholder={`0.${'0'.repeat(decimalPlaces)}`}
                     className={`w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${
-                      locale?.currency_position === 'before' ? 'pl-12' : locale?.currency_position === 'after' ? 'pr-16' : ''
+                      currencyConfig.position === 'before' ? 'pl-12' : currencyConfig.position === 'after' ? 'pr-16' : ''
                     }`}
                   />
-                  {locale?.currency_position === 'after' && (
+                  {currencyConfig.position === 'after' && (
                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                      <span className="text-slate-500 sm:text-sm">{getCurrencySymbol()}</span>
+                      <span className="text-slate-500 sm:text-sm">{currencyConfig.symbol}</span>
                     </div>
                   )}
                 </div>
@@ -207,6 +275,28 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
             </>
           )}
 
+          {isEmailType && (
+            <>
+              <div className="md:col-span-2">
+                <Input
+                  label="Subject Line"
+                  value={formData.subject_line}
+                  onChange={(e) => setFormData({ ...formData, subject_line: e.target.value })}
+                  placeholder="e.g., Quote {{quote.number}} for case {{case.number}}"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Select
+                  label="Applies To Document"
+                  value={formData.document_type}
+                  onChange={(e) => setFormData({ ...formData, document_type: e.target.value })}
+                  options={DOCUMENT_TYPE_OPTIONS}
+                  hint="Pin this template to one document type to make it the suggested default when emailing that document."
+                />
+              </div>
+            </>
+          )}
+
           <div className="md:col-span-2">
             {isLineItemType ? (
               <RichTextEditor
@@ -219,21 +309,61 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
               />
             ) : (
               <div>
-                <label htmlFor={templateContentId} className="block text-sm font-medium text-slate-700 mb-1">
-                  Template Content
-                </label>
-                <textarea
+                <div className="flex items-center justify-between mb-1">
+                  <label htmlFor={templateContentId} className="block text-sm font-medium text-slate-700">
+                    Template Content
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <VariableInsertMenu onInsert={insertVariable} disabled={isSubmitting} />
+                    <button
+                      type="button"
+                      onClick={() => setShowPreview((v) => !v)}
+                      className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1 px-2 py-1 hover:bg-primary/10 rounded transition-colors"
+                    >
+                      {showPreview ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      {showPreview ? 'Hide preview' : 'Preview'}
+                    </button>
+                  </div>
+                </div>
+                <RichTextEditor
+                  ref={richEditorRef}
                   id={templateContentId}
                   value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  rows={12}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary font-mono text-sm"
-                  placeholder="Enter your terms and conditions here. Line breaks will be preserved exactly as you type them."
-                  style={{ whiteSpace: 'pre-wrap' }}
+                  onChange={(content) => setFormData({ ...formData, content })}
+                  minHeight="220px"
+                  placeholder="Use the toolbar to format. Use Insert variable for placeholders like {{customer.name}}."
+                  helpText="Placeholders like {{case.number}} are filled with real data when the template is applied."
                 />
-                <p className="mt-1 text-xs text-slate-500">
-                  Line breaks will be preserved exactly as entered. Each new line you press will appear as a new line in quotes and invoices.
-                </p>
+
+                {unknownVariables.length > 0 && (
+                  <div className="mt-2 flex items-start gap-2 p-2.5 bg-warning-muted border border-warning/30 rounded-lg">
+                    <AlertTriangle className="w-4 h-4 text-warning flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-warning-foreground">
+                      Unknown variable{unknownVariables.length > 1 ? 's' : ''} (will render blank):{' '}
+                      <span className="font-mono">{unknownVariables.join(', ')}</span>
+                    </p>
+                  </div>
+                )}
+
+                {showPreview && (
+                  <div className="mt-2 border border-slate-200 rounded-lg bg-slate-50 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                      Preview with sample data
+                    </p>
+                    {isEmailType && formData.subject_line && (
+                      <p className="text-sm text-slate-700 mb-2">
+                        <span className="font-medium">Subject:</span>{' '}
+                        {renderTemplate(formData.subject_line, SAMPLE_CONTEXT)}
+                      </p>
+                    )}
+                    <div
+                      className="prose prose-sm max-w-none text-sm text-slate-700"
+                      dangerouslySetInnerHTML={{
+                        __html: sanitizeHtml(renderTemplate(formData.content, SAMPLE_CONTEXT)),
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>

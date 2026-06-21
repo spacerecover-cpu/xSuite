@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Building2, Mail, Phone, MapPin, Globe, FileText, Edit, ArrowLeft,
+  Building2, Mail, Phone, MapPin, Globe, FileText, Edit,
   User, MessageSquare, FileStack, TrendingUp, Package, Activity,
   CheckCircle, Star, DollarSign
 } from 'lucide-react';
@@ -9,12 +9,17 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
 import { DataTable, type Column } from '../../components/shared/DataTable';
+import { DetailPageTemplate } from '../../components/templates/DetailPageTemplate';
+import { DetailPageSkeleton } from '../../components/templates/DetailPageSkeleton';
+import { DetailPageNotFound } from '../../components/templates/DetailPageNotFound';
+import type { DetailPageHeaderProps } from '../../components/shared/DetailPageHeader';
 import SupplierFormModal from '../../components/suppliers/SupplierFormModal';
 import CommunicationFormModal from '../../components/suppliers/CommunicationFormModal';
 import ContactFormModal from '../../components/suppliers/ContactFormModal';
 import DocumentUploadModal from '../../components/suppliers/DocumentUploadModal';
 import { supabase } from '../../lib/supabaseClient';
 import { useToast } from '../../hooks/useToast';
+import { useCurrency } from '../../hooks/useCurrency';
 import { format } from 'date-fns';
 import { logger } from '../../lib/logger';
 import type { Database } from '../../types/database.types';
@@ -189,15 +194,11 @@ export default function SupplierProfilePage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading supplier...</div>
-      </div>
-    );
+    return <DetailPageSkeleton />;
   }
 
   if (!supplier) {
-    return null;
+    return <DetailPageNotFound backTo={{ to: '/suppliers', label: 'Back to Suppliers' }} />;
   }
 
   const tabs: { id: TabType; label: string; icon: React.ComponentType<{ className?: string }>; count?: number }[] = [
@@ -210,34 +211,117 @@ export default function SupplierProfilePage() {
     { id: 'audit', label: 'Audit Trail', icon: Activity, count: auditTrail.length },
   ];
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="secondary" onClick={() => navigate('/suppliers')}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-gray-900">{supplier.name}</h1>
-              <Badge variant={supplier.is_active ? 'success' : 'default'}>
-                {supplier.is_active ? (
-                  <>
-                    <CheckCircle className="w-3 h-3 mr-1" />
-                    Active
-                  </>
-                ) : 'Inactive'}
-              </Badge>
-            </div>
-            <p className="text-gray-500 mt-1">{supplier.supplier_number ?? ''}</p>
-          </div>
-        </div>
-        <Button onClick={() => setShowEditModal(true)}>
-          <Edit className="w-4 h-4 mr-2" />
-          Edit Supplier
-        </Button>
-      </div>
+  const header: DetailPageHeaderProps = {
+    breadcrumbs: [
+      { label: 'Suppliers', to: '/suppliers' },
+      { label: supplier.name },
+    ],
+    badges: (
+      <Badge variant={supplier.is_active ? 'success' : 'default'}>
+        {supplier.is_active ? (
+          <>
+            <CheckCircle className="w-3 h-3 mr-1" />
+            Active
+          </>
+        ) : 'Inactive'}
+      </Badge>
+    ),
+    actions: (
+      <Button onClick={() => setShowEditModal(true)}>
+        <Edit className="w-4 h-4 mr-2" />
+        Edit Supplier
+      </Button>
+    ),
+    meta: supplier.supplier_number ?? undefined,
+  };
 
+  return (
+    <DetailPageTemplate
+      header={header}
+      outside={
+        <>
+          {showEditModal && (
+            <SupplierFormModal
+              isOpen={showEditModal}
+              onClose={() => setShowEditModal(false)}
+              onSuccess={() => {
+                loadSupplier();
+                setShowEditModal(false);
+              }}
+              supplier={{
+                id: supplier.id,
+                name: supplier.name,
+                supplier_number: supplier.supplier_number ?? undefined,
+                email: supplier.email ?? undefined,
+                phone: supplier.phone ?? undefined,
+                address: supplier.address ?? undefined,
+                website: supplier.website ?? undefined,
+                category_id: supplier.category_id ?? undefined,
+                payment_terms_id: supplier.payment_terms_id ?? undefined,
+                is_active: supplier.is_active ?? undefined,
+                // Map DB columns -> the modal's form-field prop names so the edit form
+                // loads these instead of blanking them (the modal's save maps back).
+                tax_id: supplier.tax_number ?? undefined,
+                description: supplier.notes ?? undefined,
+                primary_contact_name: supplier.contact_person ?? undefined,
+                primary_contact_email: supplier.contact_email ?? undefined,
+                primary_contact_phone: supplier.contact_phone ?? undefined,
+              }}
+            />
+          )}
+
+          {showCommunicationModal && id && (
+            <CommunicationFormModal
+              isOpen={showCommunicationModal}
+              onClose={() => setShowCommunicationModal(false)}
+              onSuccess={() => {
+                loadCommunications();
+                setShowCommunicationModal(false);
+              }}
+              supplierId={id}
+            />
+          )}
+
+          {showContactModal && id && (
+            <ContactFormModal
+              isOpen={showContactModal}
+              onClose={() => {
+                setShowContactModal(false);
+                setEditingContact(null);
+              }}
+              onSuccess={() => {
+                loadContacts();
+                setShowContactModal(false);
+                setEditingContact(null);
+              }}
+              supplierId={id}
+              contact={editingContact ? {
+                id: editingContact.id,
+                name: editingContact.name,
+                title: editingContact.title ?? undefined,
+                email: editingContact.email ?? undefined,
+                phone: editingContact.phone ?? undefined,
+                mobile: editingContact.mobile ?? undefined,
+                notes: editingContact.notes ?? undefined,
+                is_primary: editingContact.is_primary ?? undefined,
+              } : null}
+            />
+          )}
+
+          {showDocumentModal && id && (
+            <DocumentUploadModal
+              isOpen={showDocumentModal}
+              onClose={() => setShowDocumentModal(false)}
+              onSuccess={() => {
+                loadDocuments();
+                setShowDocumentModal(false);
+              }}
+              supplierId={id}
+            />
+          )}
+        </>
+      }
+    >
       <div className="border-b border-gray-200">
         <nav className="flex space-x-8 overflow-x-auto">
           {tabs.map((tab) => {
@@ -300,91 +384,12 @@ export default function SupplierProfilePage() {
         {activeTab === 'orders' && <OrdersTab orders={orders} supplierId={id ?? ''} />}
         {activeTab === 'audit' && <AuditTab auditTrail={auditTrail} />}
       </div>
-
-      {showEditModal && (
-        <SupplierFormModal
-          isOpen={showEditModal}
-          onClose={() => setShowEditModal(false)}
-          onSuccess={() => {
-            loadSupplier();
-            setShowEditModal(false);
-          }}
-          supplier={{
-            id: supplier.id,
-            name: supplier.name,
-            supplier_number: supplier.supplier_number ?? undefined,
-            email: supplier.email ?? undefined,
-            phone: supplier.phone ?? undefined,
-            address: supplier.address ?? undefined,
-            website: supplier.website ?? undefined,
-            category_id: supplier.category_id ?? undefined,
-            payment_terms_id: supplier.payment_terms_id ?? undefined,
-            is_active: supplier.is_active ?? undefined,
-            // Map DB columns -> the modal's form-field prop names so the edit form
-            // loads these instead of blanking them (the modal's save maps back).
-            tax_id: supplier.tax_number ?? undefined,
-            description: supplier.notes ?? undefined,
-            primary_contact_name: supplier.contact_person ?? undefined,
-            primary_contact_email: supplier.contact_email ?? undefined,
-            primary_contact_phone: supplier.contact_phone ?? undefined,
-          }}
-        />
-      )}
-
-      {showCommunicationModal && id && (
-        <CommunicationFormModal
-          isOpen={showCommunicationModal}
-          onClose={() => setShowCommunicationModal(false)}
-          onSuccess={() => {
-            loadCommunications();
-            setShowCommunicationModal(false);
-          }}
-          supplierId={id}
-        />
-      )}
-
-      {showContactModal && id && (
-        <ContactFormModal
-          isOpen={showContactModal}
-          onClose={() => {
-            setShowContactModal(false);
-            setEditingContact(null);
-          }}
-          onSuccess={() => {
-            loadContacts();
-            setShowContactModal(false);
-            setEditingContact(null);
-          }}
-          supplierId={id}
-          contact={editingContact ? {
-            id: editingContact.id,
-            name: editingContact.name,
-            title: editingContact.title ?? undefined,
-            email: editingContact.email ?? undefined,
-            phone: editingContact.phone ?? undefined,
-            mobile: editingContact.mobile ?? undefined,
-            notes: editingContact.notes ?? undefined,
-            is_primary: editingContact.is_primary ?? undefined,
-          } : null}
-        />
-      )}
-
-      {showDocumentModal && id && (
-        <DocumentUploadModal
-          isOpen={showDocumentModal}
-          onClose={() => setShowDocumentModal(false)}
-          onSuccess={() => {
-            loadDocuments();
-            setShowDocumentModal(false);
-          }}
-          supplierId={id}
-        />
-      )}
-    </div>
+    </DetailPageTemplate>
   );
 }
 
 function OverviewTab({ supplier }: { supplier: SupplierWithRelations }) {
+  const { formatCurrency } = useCurrency();
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2 space-y-6">
@@ -492,11 +497,11 @@ function OverviewTab({ supplier }: { supplier: SupplierWithRelations }) {
             <div className="space-y-3">
               <div>
                 <label className="text-sm text-gray-500">Credit Limit</label>
-                <p className="font-medium">{supplier.credit_limit != null ? supplier.credit_limit.toLocaleString() : '-'}</p>
+                <p className="font-medium">{supplier.credit_limit != null ? formatCurrency(supplier.credit_limit) : '-'}</p>
               </div>
               <div>
                 <label className="text-sm text-gray-500">Outstanding Balance</label>
-                <p className="font-medium">{supplier.outstanding_balance != null ? supplier.outstanding_balance.toLocaleString() : '-'}</p>
+                <p className="font-medium">{supplier.outstanding_balance != null ? formatCurrency(supplier.outstanding_balance) : '-'}</p>
               </div>
               <div>
                 <label className="text-sm text-gray-500">Bank</label>
@@ -700,6 +705,7 @@ function DocumentsTab({
 }
 
 function PerformanceTab({ supplier, performance }: { supplier: SupplierWithRelations; performance: SupplierPerformanceMetricRow[] }) {
+  const { formatCurrency } = useCurrency();
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -727,7 +733,7 @@ function PerformanceTab({ supplier, performance }: { supplier: SupplierWithRelat
               <DollarSign className="w-4 h-4" />
               <span className="text-sm">Credit Limit</span>
             </div>
-            <div className="text-2xl font-bold text-gray-900">{supplier.credit_limit != null ? supplier.credit_limit.toLocaleString() : '-'}</div>
+            <div className="text-2xl font-bold text-gray-900">{supplier.credit_limit != null ? formatCurrency(supplier.credit_limit) : '-'}</div>
           </div>
         </Card>
         <Card>
@@ -736,7 +742,7 @@ function PerformanceTab({ supplier, performance }: { supplier: SupplierWithRelat
               <CheckCircle className="w-4 h-4" />
               <span className="text-sm">Outstanding</span>
             </div>
-            <div className="text-2xl font-bold text-gray-900">{supplier.outstanding_balance != null ? supplier.outstanding_balance.toLocaleString() : '-'}</div>
+            <div className="text-2xl font-bold text-gray-900">{supplier.outstanding_balance != null ? formatCurrency(supplier.outstanding_balance) : '-'}</div>
           </div>
         </Card>
       </div>
@@ -785,6 +791,7 @@ function PerformanceTab({ supplier, performance }: { supplier: SupplierWithRelat
 
 function OrdersTab({ orders, supplierId }: { orders: PurchaseOrderWithStatus[]; supplierId: string }) {
   const navigate = useNavigate();
+  const { formatCurrency } = useCurrency();
 
   const columns: Column<PurchaseOrderWithStatus>[] = [
     {
@@ -812,7 +819,7 @@ function OrdersTab({ orders, supplierId }: { orders: PurchaseOrderWithStatus[]; 
     {
       key: 'total_amount',
       header: 'Amount',
-      render: (order) => order.total_amount != null ? order.total_amount.toLocaleString() : '0.00',
+      render: (order) => formatCurrency(order.total_amount ?? 0),
     },
     {
       key: 'status',

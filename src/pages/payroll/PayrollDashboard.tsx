@@ -4,11 +4,13 @@ import { DollarSign, Users, Calendar, CheckCircle, TrendingUp, AlertCircle, Plus
 import { payrollService } from '../../lib/payrollService';
 import { payrollKeys } from '../../lib/queryKeys';
 import { Button } from '../../components/ui/Button';
-import { StatsCard } from '../../components/ui/StatsCard';
-import { formatCurrency } from '../../lib/format';
+import { StatCard } from '../../components/shared/StatCard';
+import { useCurrency } from '../../hooks/useCurrency';
 import { format } from 'date-fns';
 
 export const PayrollDashboard = () => {
+  const { formatCurrency } = useCurrency();
+
   const { data: stats, isLoading } = useQuery({
     queryKey: payrollKeys.dashboardStats(),
     queryFn: () => payrollService.getDashboardStats(),
@@ -78,33 +80,33 @@ export const PayrollDashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatsCard
-          title="Total Payroll"
+        <StatCard
+          label="Total Payroll"
           value={isLoading ? '...' : formatCurrency(stats?.totalPayroll || 0)}
           icon={DollarSign}
-          trend={stats?.totalPayroll ? { value: 0, isPositive: true } : undefined}
-          color="green"
+          sub={stats?.totalPayroll ? '+0%' : undefined}
+          tone="success"
         />
 
-        <StatsCard
-          title="Active Employees"
+        <StatCard
+          label="Active Employees"
           value={isLoading ? '...' : stats?.employeeCount.toString() || '0'}
           icon={Users}
-          color="blue"
+          tone="info"
         />
 
-        <StatsCard
-          title="Pending Approvals"
+        <StatCard
+          label="Pending Approvals"
           value={isLoading ? '...' : stats?.pendingApprovals.toString() || '0'}
           icon={AlertCircle}
-          color="orange"
+          tone="warning"
         />
 
-        <StatsCard
-          title="Processed This Month"
+        <StatCard
+          label="Processed This Month"
           value={isLoading ? '...' : stats?.processedThisMonth.toString() || '0'}
           icon={CheckCircle}
-          color="green"
+          tone="success"
         />
       </div>
 

@@ -14,10 +14,12 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState } from '../../components/shared/EmptyState';
 import type { Database } from '../../types/database.types';
 
@@ -77,7 +79,7 @@ export function NotificationsHistory() {
       if (search.trim()) {
         // ilike across title + body — server-side so pagination stays
         // honest. Empty search short-circuits this branch.
-        const term = `%${search.trim()}%`;
+        const term = `%${sanitizeFilterValue(search.trim())}%`;
         q = q.or(`title.ilike.${term},body.ilike.${term}`);
       }
 
@@ -246,8 +248,11 @@ export function NotificationsHistory() {
 
       <Card>
         {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
+          <div className="p-4 space-y-3">
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
           </div>
         ) : rows.length === 0 ? (
           <EmptyState

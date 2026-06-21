@@ -19,32 +19,55 @@ const ENTITY_REF = /&(?:#\d+|#x[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g;
 // a number, symbol, or single-char glyph.
 const LETTER_RUN = /[A-Za-z]{2,}/;
 
+// User-facing string attributes whose literal values are visible copy and must
+// route through t(). `name`, `id`, `type`, `href`, etc. are intentionally excluded.
+const TRANSLATABLE_ATTRS = new Set(['placeholder', 'title', 'aria-label', 'alt']);
+
+// Shared predicate: after stripping HTML entities, does the string still contain
+// a >=2 letter run (real prose)? Used by both the JSXText and JSXAttribute visitors.
+function isReportableText(str) {
+  const trimmed = str.replace(ENTITY_REF, ' ').trim();
+  if (trimmed.length === 0) return false;
+  return LETTER_RUN.test(trimmed);
+}
+
+function preview(str) {
+  const trimmed = str.replace(ENTITY_REF, ' ').trim();
+  const clipped = trimmed.length > 40 ? trimmed.slice(0, 40) + '…' : trimmed;
+  return clipped.replace(/\s+/g, ' ');
+}
+
 export default {
   meta: {
     type: 'suggestion',
     docs: {
       description:
-        'Flag hardcoded user-facing JSX text that should be routed through i18n t().',
+        'Flag hardcoded user-facing JSX text/attributes that should be routed through i18n t().',
     },
     schema: [],
     messages: {
       untranslated:
         'Hardcoded user-facing text "{{text}}". Route copy through i18n t() instead of literal JSX text.',
+      untranslatedAttr:
+        'Hardcoded user-facing {{attr}} "{{text}}". Route copy through i18n t() instead of a literal attribute value.',
     },
   },
   create(context) {
     return {
       JSXText(node) {
-        const withoutEntities = node.value.replace(ENTITY_REF, ' ');
-        const trimmed = withoutEntities.trim();
-        if (trimmed.length === 0) return;
-        if (!LETTER_RUN.test(trimmed)) return;
-
-        const preview = trimmed.length > 40 ? trimmed.slice(0, 40) + '…' : trimmed;
+        if (!isReportableText(node.value)) return;
+        context.report({ node, messageId: 'untranslated', data: { text: preview(node.value) } });
+      },
+      JSXAttribute(node) {
+        if (!node.name || !TRANSLATABLE_ATTRS.has(node.name.name)) return;
+        const v = node.value;
+        // Only flag a plain string literal; skip {t(...)} / dynamic / boolean attrs.
+        if (!v || v.type !== 'Literal' || typeof v.value !== 'string') return;
+        if (!isReportableText(v.value)) return;
         context.report({
           node,
-          messageId: 'untranslated',
-          data: { text: preview.replace(/\s+/g, ' ') },
+          messageId: 'untranslatedAttr',
+          data: { attr: node.name.name, text: preview(v.value) },
         });
       },
     };

@@ -170,6 +170,18 @@ export const deleteLogo = async (
   return deleteCompanyAsset(filePath, BUCKETS.ASSETS);
 };
 
+export const uploadStamp = async (file: File, metadata?: Partial<FileMetadata>): Promise<UploadResult> =>
+  uploadCompanyAsset(file, BUCKETS.ASSETS, 'stamps', metadata);
+
+export const uploadSignature = async (file: File, metadata?: Partial<FileMetadata>): Promise<UploadResult> =>
+  uploadCompanyAsset(file, BUCKETS.ASSETS, 'signatures', metadata);
+
+export const deleteStamp = async (filePath: string): Promise<{ success: boolean; error?: string }> =>
+  deleteCompanyAsset(filePath, BUCKETS.ASSETS);
+
+export const deleteSignature = async (filePath: string): Promise<{ success: boolean; error?: string }> =>
+  deleteCompanyAsset(filePath, BUCKETS.ASSETS);
+
 export const deleteQRCode = async (
   filePath: string
 ): Promise<{ success: boolean; error?: string }> => {
@@ -235,6 +247,42 @@ export const getCompanyLogo = async (
     return branding[fieldName] || null;
   } catch (error) {
     logger.error('Get logo error:', error);
+    return null;
+  }
+};
+
+export const getCompanyStamp = async (): Promise<string | null> => {
+  try {
+    const { data } = await supabase
+      .from('company_settings')
+      .select('branding')
+      .limit(1)
+      .maybeSingle();
+
+    if (!data?.branding) return null;
+
+    const branding = data.branding as Record<string, string | undefined>;
+    return branding.stamp_url || null;
+  } catch (error) {
+    logger.error('Get stamp error:', error);
+    return null;
+  }
+};
+
+export const getCompanySignature = async (): Promise<string | null> => {
+  try {
+    const { data } = await supabase
+      .from('company_settings')
+      .select('branding')
+      .limit(1)
+      .maybeSingle();
+
+    if (!data?.branding) return null;
+
+    const branding = data.branding as Record<string, string | undefined>;
+    return branding.signature_url || null;
+  } catch (error) {
+    logger.error('Get signature error:', error);
     return null;
   }
 };

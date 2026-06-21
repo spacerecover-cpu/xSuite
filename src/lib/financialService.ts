@@ -1,6 +1,6 @@
 import { supabase, resolveTenantId } from './supabaseClient';
-import { AccountingLocale } from '../types/accountingLocale';
 import { logger } from './logger';
+import { baseAmount } from './financialMath';
 import type { Database } from '../types/database.types';
 
 type FinancialTransactionInsert = Database['public']['Tables']['financial_transactions']['Insert'];
@@ -76,26 +76,6 @@ export interface TransactionType {
   description?: string;
 }
 
-export const fetchDefaultLocale = async (): Promise<AccountingLocale | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('accounting_locales')
-      .select('*')
-      .eq('is_default', true)
-      .maybeSingle();
-
-    if (error) {
-      logger.error('Error fetching default locale:', error);
-      return null;
-    }
-
-    return data;
-  } catch (error) {
-    logger.error('Error fetching default locale:', error);
-    return null;
-  }
-};
-
 export const calculateVAT = (amount: number, taxRate: number): number => {
   return Math.round(amount * taxRate * 100) / 100;
 };
@@ -115,12 +95,12 @@ export const fetchFinancialSummary = async (
   try {
     let invoiceQuery = supabase
       .from('invoices')
-      .select('total_amount, amount_paid, balance_due, status')
+      .select('total_amount, total_amount_base, amount_paid, amount_paid_base, balance_due, balance_due_base, status')
       .is('deleted_at', null);
 
     let expenseQuery = supabase
       .from('expenses')
-      .select('amount, status')
+      .select('amount, amount_base, status')
       .is('deleted_at', null);
 
     if (startDate && endDate) {
@@ -140,13 +120,13 @@ export const fetchFinancialSummary = async (
     const invoices = invoicesResult.data || [];
     const expenses = expensesResult.data || [];
 
-    const totalInvoiced = invoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
-    const totalPaid = invoices.reduce((sum, inv) => sum + (inv.amount_paid || 0), 0);
-    const totalOutstanding = invoices.reduce((sum, inv) => sum + (inv.balance_due || 0), 0);
+    const totalInvoiced = invoices.reduce((sum, inv) => sum + baseAmount(inv, 'total_amount'), 0);
+    const totalPaid = invoices.reduce((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
+    const totalOutstanding = invoices.reduce((sum, inv) => sum + baseAmount(inv, 'balance_due'), 0);
 
     const totalExpenses = expenses
       .filter(exp => exp.status === 'approved' || exp.status === 'paid')
-      .reduce((sum, exp) => sum + (exp.amount || 0), 0);
+      .reduce((sum, exp) => sum + baseAmount(exp, 'amount'), 0);
 
     const totalRevenue = totalPaid;
     const netProfit = totalRevenue - totalExpenses;
@@ -202,22 +182,6 @@ export const getNextTransactionNumber = async (prefix: string): Promise<string> 
       throw error;
     }
     throw new Error(`Failed to generate ${prefix} number: ${msg}`);
-  }
-};
-
-export const formatCurrencyWithLocale = (
-  amount: number,
-  locale: AccountingLocale
-): string => {
-  const formattedNumber = amount.toFixed(locale.decimal_places ?? 2);
-  const [integerPart, decimalPart] = formattedNumber.split('.');
-  const formattedInteger = parseInt(integerPart).toLocaleString('en-US');
-  const fullNumber = decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger;
-
-  if (locale.currency_position === 'before') {
-    return `${locale.currency_symbol} ${fullNumber}`;
-  } else {
-    return `${fullNumber} ${locale.currency_symbol}`;
   }
 };
 

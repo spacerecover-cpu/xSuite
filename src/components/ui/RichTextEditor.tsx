@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useId } from 'react';
+import React, { useRef, useEffect, useState, useId, forwardRef, useImperativeHandle } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cva } from 'class-variance-authority';
 import { sanitizeHtml } from '../../lib/sanitizeHtml';
@@ -19,6 +19,9 @@ import {
   Code,
   Zap,
   AlertTriangle,
+  Link2,
+  Image as ImageIcon,
+  Table as TableIcon,
 } from 'lucide-react';
 
 interface RichTextEditorProps {
@@ -66,7 +69,12 @@ const PRESET_HIGHLIGHTS = [
   { name: 'None', value: 'transparent' },
 ];
 
-export const RichTextEditor: React.FC<RichTextEditorProps> = ({
+export interface RichTextEditorHandle {
+  /** Insert plain text (e.g. a {{variable}} token) at the caret. */
+  insertAtCursor: (text: string) => void;
+}
+
+export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   value,
   onChange,
   placeholder,
@@ -77,7 +85,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   'aria-invalid': ariaInvalid,
   'aria-describedby': ariaDescribedBy,
   'aria-labelledby': ariaLabelledBy,
-}) => {
+}, ref) => {
   const { t } = useTranslation();
   const editorRef = useRef<HTMLDivElement>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -109,10 +117,49 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     }
   };
 
+  // Keep a live ref to handleInput so the imperative insertAtCursor (built once via
+  // useImperativeHandle with []) never calls a stale closure over value/onChange.
+  const handleInputRef = useRef(handleInput);
+  handleInputRef.current = handleInput;
+  // Live source-mode flag for the imperative handle (also built once with []).
+  const isSourceModeRef = useRef(isSourceMode);
+  isSourceModeRef.current = isSourceMode;
+
   const execCommand = (command: string, value?: string) => {
     document.execCommand(command, false, value);
     editorRef.current?.focus();
     handleInput();
+  };
+
+  useImperativeHandle(ref, () => ({
+    insertAtCursor: (text: string) => {
+      // In HTML source mode the contentEditable region is unmounted; append to the
+      // source textarea instead so the token isn't silently dropped.
+      if (isSourceModeRef.current) {
+        setSourceValue((prev) => prev + text);
+        return;
+      }
+      editorRef.current?.focus();
+      document.execCommand('insertText', false, text);
+      handleInputRef.current();
+    },
+  }), []);
+
+  const insertLink = () => {
+    const url = window.prompt(t('ui.richText.linkPrompt', 'Link URL (https://…)'));
+    if (url) execCommand('createLink', url);
+  };
+  const insertImage = () => {
+    const url = window.prompt(t('ui.richText.imagePrompt', 'Image URL (https://…)'));
+    if (url) execCommand('insertImage', url);
+  };
+  const insertTable = () => {
+    const html =
+      '<table><tbody>' +
+      '<tr><td>&nbsp;</td><td>&nbsp;</td></tr>' +
+      '<tr><td>&nbsp;</td><td>&nbsp;</td></tr>' +
+      '</tbody></table><p><br></p>';
+    execCommand('insertHTML', html);
   };
 
   const applyTextColor = (color: string) => {
@@ -355,6 +402,21 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             </button>
           </div>
 
+          <div className="w-px h-6 bg-slate-300 mx-1" />
+
+          <button type="button" onClick={insertLink} title="Insert Link"
+            aria-label={t('ui.richText.insertLink', 'Insert link')} className={toolbarButtonVariants()}>
+            <Link2 className="w-4 h-4 text-slate-700" aria-hidden="true" />
+          </button>
+          <button type="button" onClick={insertImage} title="Insert Image"
+            aria-label={t('ui.richText.insertImage', 'Insert image')} className={toolbarButtonVariants()}>
+            <ImageIcon className="w-4 h-4 text-slate-700" aria-hidden="true" />
+          </button>
+          <button type="button" onClick={insertTable} title="Insert Table"
+            aria-label={t('ui.richText.insertTable', 'Insert table')} className={toolbarButtonVariants()}>
+            <TableIcon className="w-4 h-4 text-slate-700" aria-hidden="true" />
+          </button>
+
           <div className="flex-1" />
 
           <button
@@ -443,7 +505,19 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         [contentEditable] s {
           text-decoration: line-through;
         }
+
+        [contentEditable] table {
+          border-collapse: collapse;
+          width: 100%;
+        }
+        [contentEditable] td,
+        [contentEditable] th {
+          border: 1px solid #cbd5e1;
+          padding: 4px 6px;
+        }
       `}</style>
     </div>
   );
-};
+});
+
+RichTextEditor.displayName = 'RichTextEditor';

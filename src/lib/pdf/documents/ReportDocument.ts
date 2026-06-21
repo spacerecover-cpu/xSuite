@@ -8,6 +8,7 @@ import {
 } from '../styles';
 import { formatDate, buildCompanyAddressLines, safeString } from '../utils';
 import { getGeneralIconSvg } from '../../deviceIconMapper';
+import { buildLogoNode } from '../brandingImage';
 
 export interface ReportData {
   report: {
@@ -160,14 +161,11 @@ export function buildReportDocument(
   const headerContent: Content[] = [];
 
   // Header with logo and company details
-  if (logoBase64) {
+  const reportLogoNode = buildLogoNode(logoBase64, { width: 130, margin: [0, 0, 0, 5] });
+  if (reportLogoNode) {
     headerContent.push({
       columns: [
-        {
-          image: logoBase64,
-          width: 130,
-          margin: [0, 0, 0, 5],
-        },
+        reportLogoNode,
         {
           stack: [
             { text: legalName, fontSize: 14, bold: true, color: PDF_COLORS.text, alignment: 'right' },

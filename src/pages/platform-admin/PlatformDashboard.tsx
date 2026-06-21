@@ -5,8 +5,9 @@ import { Users, DollarSign, TrendingUp, Ticket, AlertTriangle } from 'lucide-rea
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getDashboardStats, getMRRTrend, getPlanDistribution, getAtRiskTenants } from '../../lib/platformAdminService';
 import { platformAdminKeys } from '../../lib/queryKeys';
-import { StatsCard } from '../../components/ui/StatsCard';
+import { StatCard } from '../../components/shared/StatCard';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { chartAxis, chartCategorical, chartGrid } from '../../lib/chartTheme';
 
 export const PlatformDashboard: React.FC = () => {
@@ -35,16 +36,32 @@ export const PlatformDashboard: React.FC = () => {
 
   if (statsLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-600">Loading dashboard...</p>
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-72" />
+          <Skeleton className="h-72" />
         </div>
       </div>
     );
   }
 
+  // NOTE (currency P4 / deferred): MRR/ARR here aggregate billing ACROSS all
+  // tenants, so no single tenant's currency applies — and this platform-admin
+  // surface lives OUTSIDE TenantConfigProvider, so useCurrency()/tenant config
+  // is unavailable AND semantically wrong. The platform has no first-class
+  // "platform base currency" yet (subscription_plans carries no currency column),
+  // so the correct fix is to introduce one and format against it. Until then the
+  // 'en-US'/'USD' literal is an intentional, documented placeholder for the
+  // platform's implicit single-denomination billing figures — not a leaked
+  // tenant fallback. Tracked for a dedicated platform-currency pass.
   const formatCurrency = (amount: number) => {
+    // eslint-disable-next-line xsuite/no-hardcoded-locale-format -- cross-tenant platform surface, no platform base currency yet (see note above)
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -62,57 +79,57 @@ export const PlatformDashboard: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div onClick={() => navigate('/platform-admin/tenants')} className="cursor-pointer">
-          <StatsCard
-            title="Total Tenants"
+          <StatCard
+            label="Total Tenants"
             value={String(stats?.totalTenants ?? 0)}
             icon={Users}
-            color="blue"
+            tone="info"
           />
         </div>
-        <StatsCard
-          title="Active Tenants"
+        <StatCard
+          label="Active Tenants"
           value={String(stats?.activeTenants ?? 0)}
           icon={Users}
-          color="green"
+          tone="success"
         />
-        <StatsCard
-          title="Monthly Recurring Revenue"
+        <StatCard
+          label="Monthly Recurring Revenue"
           value={formatCurrency(stats?.mrr || 0)}
           icon={DollarSign}
-          color="green"
+          tone="success"
         />
-        <StatsCard
-          title="Annual Recurring Revenue"
+        <StatCard
+          label="Annual Recurring Revenue"
           value={formatCurrency(stats?.arr || 0)}
           icon={TrendingUp}
-          color="blue"
+          tone="info"
         />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatsCard
-          title="Total Users"
+        <StatCard
+          label="Total Users"
           value={String(stats?.totalUsers ?? 0)}
           icon={Users}
         />
-        <StatsCard
-          title="Active Users Today"
+        <StatCard
+          label="Active Users Today"
           value={String(stats?.activeUsersToday ?? 0)}
           icon={Users}
-          color="green"
+          tone="success"
         />
-        <StatsCard
-          title="Trial Tenants"
+        <StatCard
+          label="Trial Tenants"
           value={String(stats?.trialTenants ?? 0)}
           icon={Users}
-          color="orange"
+          tone="warning"
         />
         <div onClick={() => navigate('/platform-admin/tickets')} className="cursor-pointer">
-          <StatsCard
-            title="Open Support Tickets"
+          <StatCard
+            label="Open Support Tickets"
             value={String(stats?.openTickets ?? 0)}
             icon={Ticket}
-            color="purple"
+            tone="cat-7"
           />
         </div>
       </div>

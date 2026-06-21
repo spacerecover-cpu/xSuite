@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { installDomTranslationGuard } from './lib/domTranslationGuard';
+import { logger } from './lib/logger';
+import { isChunkLoadError } from './lib/chunkError';
 import './index.css';
 import './lib/i18n';
 
@@ -11,6 +13,30 @@ import './lib/i18n';
 // et al.) re-parenting nodes, which otherwise crashes the app with a removeChild
 // NotFoundError. Installed before any DOM work. See domTranslationGuard.ts.
 installDomTranslationGuard();
+
+// Global safety net. React error boundaries only catch render-phase errors, so
+// failures in async paths (floating promise rejections, event handlers, dynamic
+// imports) otherwise vanish silently — a major reason a broken navigation can
+// leave the UI inert with no visible error. Route everything to the logger.
+// Chunk-load failures are tagged at warn-level so a stale-deploy freeze is
+// distinguishable from genuine app errors in telemetry.
+window.addEventListener('unhandledrejection', (event) => {
+  const reason = event.reason;
+  if (isChunkLoadError(reason)) {
+    logger.warn('Unhandled dynamic-import rejection (likely stale deploy)', reason);
+  } else {
+    logger.error('Unhandled promise rejection', reason);
+  }
+});
+
+window.addEventListener('error', (event) => {
+  if (!event.error) return;
+  if (isChunkLoadError(event.error)) {
+    logger.warn('Script error from dynamic import (likely stale deploy)', event.error);
+  } else {
+    logger.error('Uncaught error', event.error);
+  }
+});
 
 // Anti-flash: apply the user's last-seen theme synchronously before React mounts,
 // so returning visitors don't see a Royal-default paint before their saved theme loads.
@@ -36,8 +62,12 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 60000,
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
+      // refetchOnMount must stay at the default (true): invalidateQueries only
+      // refetches ACTIVE queries, so screens you are not currently on are merely
+      // marked stale and rely on the next mount to refetch. With it false, every
+      // cross-screen invalidation was silently lost and the UI needed a manual
+      // browser refresh. Same reasoning for window focus in a multi-user lab.
+      refetchOnWindowFocus: true,
       refetchOnReconnect: true,
       retry: 2,
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),

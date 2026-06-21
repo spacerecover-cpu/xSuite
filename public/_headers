@@ -1,0 +1,29 @@
+# Cloudflare Pages response headers.
+#
+# Cache strategy is the deploy-config half of the stale-chunk navigation fix:
+# the SPA entry (index.html) must ALWAYS be revalidated so a new deploy's
+# content-hashed chunk filenames are picked up immediately. Hashed build assets
+# are immutable and safe to cache for a year. Without this, a returning visitor
+# can run an index.html that references chunk hashes the server has already
+# purged — clicking a nav item then loads a dead chunk and the view freezes
+# until a manual hard refresh.
+
+# Immutable, content-hashed build output (Vite emits new hashes per deploy).
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Static fonts shipped from public/fonts.
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Always revalidate the SPA entry document so chunk references are never stale.
+/index.html
+  Cache-Control: no-cache
+
+/
+  Cache-Control: no-cache
+
+# NOTE: production security headers (CSP, HSTS, X-Frame-Options, etc.) belong
+# here too — the headers in vite.config.ts only apply to the dev/preview
+# servers, not the static Cloudflare Pages deploy. Adding them is tracked as a
+# separate (security-gated) change; see the audit report.

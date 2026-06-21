@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   Package,
   Plus,
@@ -24,13 +24,13 @@ import {
 import { EmptyState } from '../../components/shared/EmptyState';
 import { stockKeys } from '../../lib/queryKeys';
 import {
-  getStockItems,
+  getStockItemsPage,
   getStockStats,
   deleteStockItem,
   type StockItemWithCategory,
   type StockFilters,
 } from '../../lib/stockService';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { StockItemsTable } from '../../components/stock/StockItemsTable';
@@ -45,6 +45,7 @@ import { BulkPriceUpdateModal } from '../../components/stock/BulkPriceUpdateModa
 import { PrintLabelsModal } from '../../components/stock/PrintLabelsModal';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useToast } from '../../hooks/useToast';
+import { useCurrency } from '../../hooks/useCurrency';
 
 type TabId = 'all' | 'saleable' | 'internal' | 'low_stock';
 
@@ -55,10 +56,10 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'low_stock', label: 'Low Stock' },
 ];
 
-const formatCurrency = (value: number): string =>
-  value.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+const PAGE_SIZE = 50;
 
 export const StockListPage: React.FC = () => {
+  const { formatCurrency } = useCurrency();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -68,6 +69,7 @@ export const StockListPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [alertDismissed, setAlertDismissed] = useState(false);
 
@@ -99,6 +101,10 @@ export const StockListPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [search]);
 
+  useEffect(() => {
+    setPage(0);
+  }, [activeTab, debouncedSearch, categoryId]);
+
   const filters = useMemo((): StockFilters => {
     const base: StockFilters = {
       search: debouncedSearch || undefined,
@@ -110,11 +116,14 @@ export const StockListPage: React.FC = () => {
     return base;
   }, [activeTab, debouncedSearch, categoryId]);
 
-  const { data: items = [], isLoading: itemsLoading } = useQuery({
-    queryKey: [...stockKeys.items(), filters],
-    queryFn: () => getStockItems(filters),
+  const { data: itemsPage, isLoading: itemsLoading } = useQuery({
+    queryKey: [...stockKeys.items(), filters, page],
+    queryFn: () => getStockItemsPage(filters, page, PAGE_SIZE),
     staleTime: 30000,
+    placeholderData: keepPreviousData,
   });
+  const items = itemsPage?.rows ?? [];
+  const total = itemsPage?.total ?? 0;
 
   const { data: stats } = useQuery({
     queryKey: stockKeys.stats(),
@@ -234,125 +243,126 @@ export const StockListPage: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-[1800px] mx-auto space-y-6">
-      <PageHeader
-        title="Stock"
-        description="Manage backup devices and internal supplies"
-        icon={Package}
-        actions={
-          <>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="gap-2"
-              onClick={() => setScanModalOpen(true)}
-            >
-              <Scan className="w-4 h-4" />
-              Scan Barcode
+    <ListPageTemplate
+      title="Stock"
+      headerActions={
+        <>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="gap-2"
+            onClick={() => setScanModalOpen(true)}
+          >
+            <Scan className="w-4 h-4" />
+            Scan Barcode
+          </Button>
+          <Button
+            variant={selectionMode ? 'primary' : 'secondary'}
+            size="sm"
+            className="gap-2"
+            onClick={() => {
+              if (selectionMode) exitSelectionMode();
+              else setSelectionMode(true);
+            }}
+          >
+            <CheckSquare className="w-4 h-4" />
+            {selectionMode ? 'Exit Select' : 'Bulk Select'}
+          </Button>
+          <Link to="/resources/stock/adjustments">
+            <Button variant="secondary" size="sm" className="gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Adjustments
             </Button>
-            <Button
-              variant={selectionMode ? 'primary' : 'secondary'}
-              size="sm"
-              className="gap-2"
-              onClick={() => {
-                if (selectionMode) exitSelectionMode();
-                else setSelectionMode(true);
-              }}
-            >
-              <CheckSquare className="w-4 h-4" />
-              {selectionMode ? 'Exit Select' : 'Bulk Select'}
+          </Link>
+          <Link to="/resources/stock/categories">
+            <Button variant="secondary" size="sm" className="gap-2">
+              <Settings className="w-4 h-4" />
+              Categories
             </Button>
-            <Link to="/resources/stock/adjustments">
-              <Button variant="secondary" size="sm" className="gap-2">
-                <ClipboardList className="w-4 h-4" />
-                Adjustments
-              </Button>
+          </Link>
+          <Button
+            variant="primary"
+            size="sm"
+            className="gap-2"
+            onClick={() => {
+              setEditingItem(null);
+              setFormModalOpen(true);
+            }}
+          >
+            <Plus className="w-4 h-4" />
+            Add Item
+          </Button>
+        </>
+      }
+      kpis={
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-start gap-4">
+              <div className="p-2.5 rounded-lg bg-info-muted">
+                <Boxes className="w-5 h-5 text-info" />
+              </div>
+              <div>
+                <p className="text-sm text-slate-500 font-medium">Total Items</p>
+                <p className="text-2xl font-bold text-slate-900 mt-0.5 tabular-nums">
+                  {stats?.totalItems ?? 0}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-start gap-4">
+              <div className="p-2.5 rounded-lg bg-success-muted">
+                <DollarSign className="w-5 h-5 text-success" />
+              </div>
+              <div>
+                <p className="text-sm text-slate-500 font-medium">Stock Value</p>
+                <p className="text-2xl font-bold text-slate-900 mt-0.5 tabular-nums">
+                  {formatCurrency(stats?.stockValue ?? 0)}
+                </p>
+              </div>
+            </div>
+
+            <Link
+              to="/resources/stock?filter=low-stock"
+              className="bg-white rounded-xl border border-warning/30 p-5 flex items-start gap-4 hover:bg-warning-muted transition-colors group"
+              onClick={() => setActiveTab('low_stock')}
+            >
+              <div className="p-2.5 rounded-lg bg-warning-muted group-hover:bg-warning-muted/80 transition-colors">
+                <TrendingDown className="w-5 h-5 text-warning" />
+              </div>
+              <div>
+                <p className="text-sm text-warning font-medium">Low Stock</p>
+                <p className="text-2xl font-bold text-warning mt-0.5 tabular-nums">
+                  {stats?.lowStockCount ?? 0}
+                </p>
+              </div>
             </Link>
-            <Link to="/resources/stock/categories">
-              <Button variant="secondary" size="sm" className="gap-2">
-                <Settings className="w-4 h-4" />
-                Categories
-              </Button>
-            </Link>
-            <Button
-              variant="primary"
-              size="sm"
-              className="gap-2"
-              onClick={() => {
-                setEditingItem(null);
-                setFormModalOpen(true);
-              }}
-            >
-              <Plus className="w-4 h-4" />
-              Add Item
-            </Button>
-          </>
-        }
-      />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-start gap-4">
-          <div className="p-2.5 rounded-lg bg-info-muted">
-            <Boxes className="w-5 h-5 text-info" />
+            <div className="bg-white rounded-xl border border-danger/30 p-5 flex items-start gap-4">
+              <div className="p-2.5 rounded-lg bg-danger-muted">
+                <AlertCircle className="w-5 h-5 text-danger" />
+              </div>
+              <div>
+                <p className="text-sm text-danger font-medium">Out of Stock</p>
+                <p className="text-2xl font-bold text-danger mt-0.5 tabular-nums">
+                  {stats?.outOfStockCount ?? 0}
+                </p>
+              </div>
+            </div>
           </div>
-          <div>
-            <p className="text-sm text-slate-500 font-medium">Total Items</p>
-            <p className="text-2xl font-bold text-slate-900 mt-0.5 tabular-nums">
-              {stats?.totalItems ?? 0}
-            </p>
-          </div>
-        </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-start gap-4">
-          <div className="p-2.5 rounded-lg bg-success-muted">
-            <DollarSign className="w-5 h-5 text-success" />
-          </div>
-          <div>
-            <p className="text-sm text-slate-500 font-medium">Stock Value</p>
-            <p className="text-2xl font-bold text-slate-900 mt-0.5 tabular-nums">
-              {formatCurrency(stats?.stockValue ?? 0)}
-            </p>
-          </div>
-        </div>
-
-        <Link
-          to="/resources/stock?filter=low-stock"
-          className="bg-white rounded-xl border border-warning/30 p-5 flex items-start gap-4 hover:bg-warning-muted transition-colors group"
-          onClick={() => setActiveTab('low_stock')}
-        >
-          <div className="p-2.5 rounded-lg bg-warning-muted group-hover:bg-warning-muted/80 transition-colors">
-            <TrendingDown className="w-5 h-5 text-warning" />
-          </div>
-          <div>
-            <p className="text-sm text-warning font-medium">Low Stock</p>
-            <p className="text-2xl font-bold text-warning mt-0.5 tabular-nums">
-              {stats?.lowStockCount ?? 0}
-            </p>
-          </div>
-        </Link>
-
-        <div className="bg-white rounded-xl border border-danger/30 p-5 flex items-start gap-4">
-          <div className="p-2.5 rounded-lg bg-danger-muted">
-            <AlertCircle className="w-5 h-5 text-danger" />
-          </div>
-          <div>
-            <p className="text-sm text-danger font-medium">Out of Stock</p>
-            <p className="text-2xl font-bold text-danger mt-0.5 tabular-nums">
-              {stats?.outOfStockCount ?? 0}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {!alertDismissed && (stats?.lowStockCount ?? 0) > 0 && (
-        <LowStockAlert
-          count={stats?.lowStockCount ?? 0}
-          onDismiss={() => setAlertDismissed(true)}
-        />
-      )}
-
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <div className="border-b border-slate-200 px-4">
+          {!alertDismissed && (stats?.lowStockCount ?? 0) > 0 && (
+            <div className="mb-6">
+              <LowStockAlert
+                count={stats?.lowStockCount ?? 0}
+                onDismiss={() => setAlertDismissed(true)}
+              />
+            </div>
+          )}
+        </>
+      }
+      table={
+        <>
+          <div className="border-b border-slate-200 px-4">
           <div className="flex items-center gap-0 overflow-x-auto">
             {TABS.map((tab) => (
               <button
@@ -423,8 +433,8 @@ export const StockListPage: React.FC = () => {
           )}
 
           <div className="flex items-center gap-2 text-sm text-slate-500 ml-auto shrink-0">
-            <span className="font-medium text-slate-700 tabular-nums">{items.length}</span>
-            <span>item{items.length !== 1 ? 's' : ''}</span>
+            <span className="font-medium text-slate-700 tabular-nums">{total}</span>
+            <span>item{total !== 1 ? 's' : ''}</span>
           </div>
         </div>
 
@@ -603,9 +613,15 @@ export const StockListPage: React.FC = () => {
               onRecordUsage={handleRecordUsage}
             />
           )}
-        </div>
-      </div>
-
+          </div>
+        </>
+      }
+      pager={
+        total > 0
+          ? { page, pageSize: PAGE_SIZE, total, onPageChange: setPage, itemNoun: 'stock items' }
+          : undefined
+      }
+    >
       <StockItemFormModal
         isOpen={formModalOpen}
         onClose={() => {
@@ -694,7 +710,7 @@ export const StockListPage: React.FC = () => {
           onClose={() => setPrintLabelsOpen(false)}
         />
       )}
-    </div>
+    </ListPageTemplate>
   );
 };
 

@@ -12,6 +12,7 @@ import { Plus, Search, Filter, Mail, Phone, Building2, MapPin, Users, UserCheck,
 import { formatDate } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { logger } from '../../lib/logger';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 interface Company {
   id: string;
@@ -117,6 +118,7 @@ export const CompaniesListPage: React.FC = () => {
             .select('customers_enhanced (id, customer_name)')
             .eq('company_id', company.id)
             .eq('is_primary', true)
+            .is('deleted_at', null)
             .maybeSingle();
 
           return { ...company, primary_contact: relationship?.customers_enhanced || null };
@@ -126,7 +128,6 @@ export const CompaniesListPage: React.FC = () => {
       return companiesWithContacts as unknown as Company[];
     },
     staleTime: 30000,
-    refetchOnMount: true,
     retry: 2,
   });
 
@@ -501,9 +502,18 @@ export const CompaniesListPage: React.FC = () => {
           </Button>
         </div>
       ) : isLoading ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading companies...</p>
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4">
+              <Skeleton className="w-10 h-10 rounded-lg flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-1/3" />
+                <Skeleton className="h-3 w-1/4" />
+              </div>
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-6 w-16 rounded-full" />
+            </div>
+          ))}
         </div>
       ) : filteredCompanies.length === 0 ? (
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">

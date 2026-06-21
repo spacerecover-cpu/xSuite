@@ -5,6 +5,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { SearchableSelect } from '../ui/SearchableSelect';
+import { Skeleton } from '../ui/Skeleton';
 import { SaleableItemsGrid } from './SaleableItemsGrid';
 import { BarcodeLookupInput } from './BarcodeLookupInput';
 import { SerialNumberSelect } from './SerialNumberSelect';
@@ -18,7 +19,9 @@ import {
 } from '../../lib/stockService';
 import { stockKeys } from '../../lib/queryKeys';
 import { supabase } from '../../lib/supabaseClient';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { useToast } from '../../hooks/useToast';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface SerialLinePickerProps {
   itemId: string;
@@ -78,6 +81,7 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
   onSuccess,
 }) => {
   const toast = useToast();
+  const { formatCurrency } = useCurrency();
   const paymentMethodFieldId = useId();
   const notesFieldId = useId();
 
@@ -150,7 +154,7 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
       .from('customers_enhanced')
       .select('id, customer_name, email')
       .is('deleted_at', null)
-      .or(`customer_name.ilike.%${term}%,email.ilike.%${term}%`)
+      .or(`customer_name.ilike.%${sanitizeFilterValue(term)}%,email.ilike.%${sanitizeFilterValue(term)}%`)
       .limit(20);
     setCustomers(
       (data ?? []).map((c) => ({
@@ -307,8 +311,7 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
     }
   };
 
-  const formatAmount = (n: number) =>
-    n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatAmount = (n: number) => formatCurrency(n);
 
   return (
     <Modal
@@ -339,8 +342,10 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
 
           <div className="flex-1 overflow-y-auto pr-1">
             {loadingItems ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <div className="grid grid-cols-2 gap-3 py-2 sm:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-24 w-full rounded-lg" />
+                ))}
               </div>
             ) : (
               <SaleableItemsGrid

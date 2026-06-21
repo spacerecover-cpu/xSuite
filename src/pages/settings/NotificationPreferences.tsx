@@ -22,6 +22,7 @@ import {
   type NotificationFrequency,
   type NotificationSubscriptionRow,
 } from '../../lib/notificationPreferencesService';
+import { NotificationTemplatesTab } from './NotificationTemplatesTab';
 
 // ---------------------------------------------------------------------------
 // Event catalog: stable list of event_types the matrix renders, grouped for UI.
@@ -68,6 +69,10 @@ const EVENT_GROUPS: EventGroup[] = [
         eventType: 'case.sla_breach',
         label: 'SLA breach alerts',
         allowedRoles: ['owner', 'admin', 'manager', 'technician'],
+      },
+      {
+        eventType: 'case.follow_up_due',
+        label: 'Scheduled follow-up due',
       },
     ],
   },
@@ -217,7 +222,9 @@ export const NotificationPreferences: React.FC = () => {
 
   const userId = user?.id ?? '';
   const role = (profile?.role ?? null) as UserRole;
+  const canManageTemplates = role === 'owner' || role === 'admin';
 
+  const [activeTab, setActiveTab] = useState<'preferences' | 'templates'>('preferences');
   const [pendingKeys, setPendingKeys] = useState<Set<string>>(new Set());
 
   const { data: subscriptions, isLoading, error } = useQuery({
@@ -371,16 +378,50 @@ export const NotificationPreferences: React.FC = () => {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-slate-900 mb-1">
-            Notification Preferences
+            Notifications
           </h1>
           <p className="text-slate-600 text-sm">
-            Choose which events notify you, and on which channels. Settings are
-            personal to your account.
+            {activeTab === 'templates'
+              ? 'Customize the automatic emails this lab sends when events happen.'
+              : 'Choose which events notify you, and on which channels. Settings are personal to your account.'}
           </p>
         </div>
       </div>
 
-      {isLoading && (
+      {canManageTemplates && (
+        <div className="mb-6 border-b border-slate-200 flex gap-1" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'preferences'}
+            onClick={() => setActiveTab('preferences')}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === 'preferences'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            My Preferences
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'templates'}
+            onClick={() => setActiveTab('templates')}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === 'templates'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Email Templates
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'templates' && canManageTemplates && <NotificationTemplatesTab />}
+
+      {activeTab === 'preferences' && isLoading && (
         <div className="bg-white rounded-lg border border-slate-200 p-8 flex items-center justify-center">
           <Loader2 className="w-5 h-5 animate-spin text-slate-400 mr-3" />
           <span className="text-slate-500 text-sm">
@@ -389,13 +430,13 @@ export const NotificationPreferences: React.FC = () => {
         </div>
       )}
 
-      {error && (
+      {activeTab === 'preferences' && error && (
         <div className="bg-danger-muted border border-danger/30 rounded-lg p-4 text-sm text-danger">
           Failed to load notification preferences. Please refresh the page.
         </div>
       )}
 
-      {!isLoading && !error && (
+      {activeTab === 'preferences' && !isLoading && !error && (
         <div className="space-y-6">
           {visibleGroups.length === 0 && (
             <div className="bg-white rounded-lg border border-slate-200 p-8 text-center text-slate-500 text-sm">

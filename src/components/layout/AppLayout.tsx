@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import { ChevronRight, Search, Command } from 'lucide-react';
+import { ContentLoadingFallback } from '../shared/ContentLoadingFallback';
+import { ChevronRight, Search, Command, Menu } from 'lucide-react';
 import { Sidebar } from './Sidebar';
+import { MobileNavDrawer } from './MobileNavDrawer';
 import { StockAlertsDropdown } from '../stock/StockAlertsDropdown';
 import { AnnouncementBanner } from '../shared/AnnouncementBanner';
 import { NotificationBell } from './NotificationBell';
 import { CommandPalette } from '../shared/CommandPalette';
 import { useCommandPalette } from '../../hooks/useCommandPalette';
 import { SidebarPreferencesProvider } from '../../contexts/SidebarPreferencesContext';
+import { useLocale } from '../../contexts/LocaleContext';
+import { HeaderSlotProvider, useHeaderSlot } from '../../contexts/HeaderSlotContext';
 
 const routeLabels: Record<string, string> = {
   '': 'Dashboard',
@@ -36,10 +40,8 @@ const routeLabels: Record<string, string> = {
   'timesheets': 'Timesheets',
   'settings': 'Settings',
   'users': 'User Management',
-  'integrations': 'Integrations',
   'admin': 'Admin Panel',
   'profile': 'Profile',
-  'search': 'Search',
 };
 
 const sectionLabels: Record<string, string> = {
@@ -68,7 +70,6 @@ const sectionLabels: Record<string, string> = {
   'timesheets': 'Employee Management',
   'settings': 'System',
   'users': 'System',
-  'integrations': 'System',
   'admin': 'System',
 };
 
@@ -86,10 +87,29 @@ function getBreadcrumbs(pathname: string): { label: string; section?: string } {
   return { label, section };
 }
 
+const HeaderCurrentTitle: React.FC<{ routeLabel: string }> = ({ routeLabel }) => {
+  const { title } = useHeaderSlot();
+  return <span className="text-[13px] font-semibold text-slate-700 truncate">{title ?? routeLabel}</span>;
+};
+
+const HeaderActionsHost: React.FC = () => {
+  const { setActionsHost } = useHeaderSlot();
+  return <div ref={setActionsHost} className="hidden md:flex items-center gap-2 empty:hidden" />;
+};
+
 export const AppLayout: React.FC = () => {
   const location = useLocation();
   const { label, section } = getBreadcrumbs(location.pathname);
   const palette = useCommandPalette();
+  const { locale } = useLocale();
+  const isRTL = locale === 'ar';
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Close the mobile drawer whenever the route changes (webhook events never
+  // cover this — it must be driven off the location).
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [location.pathname]);
   // Detect platform for the keyboard hint — Mac shows ⌘, others show Ctrl.
   // navigator.platform is deprecated but still the most reliable signal here;
   // userAgentData is gated behind feature detection.
@@ -97,7 +117,8 @@ export const AppLayout: React.FC = () => {
 
   return (
     <SidebarPreferencesProvider>
-    <div className="min-h-screen flex flex-col" style={{ background: '#f1f5f9' }}>
+    <HeaderSlotProvider>
+    <div className="h-dvh flex flex-col bg-slate-100">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-surface focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-primary focus:shadow-lg focus:ring-2 focus:ring-ring focus:outline-none"
@@ -108,15 +129,18 @@ export const AppLayout: React.FC = () => {
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
 
-        <div className="flex-1 flex flex-col min-w-0">
-        <header
-          className="flex-shrink-0 flex items-center px-6 h-14"
-          style={{
-            background: '#ffffff',
-            borderBottom: '1px solid rgb(var(--color-primary) / 0.15)',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-          }}
-        >
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
+        <header className="flex-shrink-0 flex items-center gap-2 px-4 md:px-6 h-14 bg-surface border-b border-primary/15 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            className="md:hidden -ms-1 inline-flex items-center justify-center w-9 h-9 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Open navigation menu"
+            aria-controls="mobile-nav-drawer"
+            aria-expanded={drawerOpen}
+          >
+            <Menu className="w-5 h-5" />
+          </button>
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
             {section && (
               <>
@@ -124,9 +148,10 @@ export const AppLayout: React.FC = () => {
                 <ChevronRight className="w-3.5 h-3.5 text-slate-300 flex-shrink-0" />
               </>
             )}
-            <span className="text-[13px] font-semibold text-slate-700 truncate">{label}</span>
+            <HeaderCurrentTitle routeLabel={label} />
           </div>
           <div className="flex items-center gap-2 ml-4">
+            <HeaderActionsHost />
             {/* Click-target for users who don't know the keyboard shortcut.
                 Discoverability matters — power users hit Cmd+K, the rest
                 click the button. */}
@@ -149,13 +174,17 @@ export const AppLayout: React.FC = () => {
           </div>
         </header>
 
-        <main id="main-content" tabIndex={-1} className="flex-1 p-6 overflow-auto focus:outline-none">
-          <Outlet />
+        <main id="main-content" tabIndex={-1} className="flex-1 min-h-0 p-6 overflow-auto focus:outline-none">
+          <Suspense fallback={<ContentLoadingFallback />}>
+            <Outlet />
+          </Suspense>
         </main>
         </div>
       </div>
+      <MobileNavDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} side={isRTL ? 'right' : 'left'} />
       <CommandPalette isOpen={palette.isOpen} onClose={palette.close} />
     </div>
+    </HeaderSlotProvider>
     </SidebarPreferencesProvider>
   );
 };

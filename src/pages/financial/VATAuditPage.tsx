@@ -3,11 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { formatDate } from '../../lib/format';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useTaxConfig } from '../../contexts/TenantConfigContext';
-import { fetchDefaultLocale } from '../../lib/financialService';
 import { Input } from '../../components/ui/Input';
 import { VATReturnModal } from '../../components/financial/VATReturnModal';
 import {
@@ -194,13 +194,6 @@ export const VATAuditPage: React.FC = () => {
       if (error) throw error;
       return (data || []) as AuditLog[];
     },
-  });
-
-  // locale fetch retained for future use (date format, decimals). Tax rate/name now
-  // come from useTaxConfig(). The query intentionally keeps the cache warm.
-  useQuery({
-    queryKey: ['default_locale'],
-    queryFn: fetchDefaultLocale,
   });
 
   const salesRecords = vatRecords.filter(r => r.record_type === 'sale');
@@ -490,11 +483,13 @@ export const VATAuditPage: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-200">
                       {vatLoading ? (
-                        <tr>
-                          <td colSpan={6} className="py-12 text-center">
-                            <div className="inline-block w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-                          </td>
-                        </tr>
+                        Array.from({ length: 5 }).map((_, i) => (
+                          <tr key={i}>
+                            <td colSpan={6} className="py-3 px-4">
+                              <Skeleton className="h-6 w-full rounded" />
+                            </td>
+                          </tr>
+                        ))
                       ) : vatRecords.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="py-12 text-center">
@@ -570,11 +565,13 @@ export const VATAuditPage: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-slate-200">
                     {auditLoading ? (
-                      <tr>
-                        <td colSpan={6} className="py-12 text-center">
-                          <div className="inline-block w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-                        </td>
-                      </tr>
+                      Array.from({ length: 5 }).map((_, i) => (
+                        <tr key={i}>
+                          <td colSpan={6} className="py-4 px-6">
+                            <Skeleton className="h-6 w-full rounded" />
+                          </td>
+                        </tr>
+                      ))
                     ) : auditLogs.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-12 text-center">

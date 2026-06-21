@@ -14,7 +14,7 @@ import {
   type KBCategory,
 } from '../../lib/kbService';
 import { kbKeys } from '../../lib/queryKeys';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
 
 interface CategoryManagerModalProps {
   isOpen: boolean;
@@ -49,6 +49,7 @@ const defaultForm = (): CategoryFormState => ({
 });
 
 export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOpen, onClose }) => {
+  const toast = useToast();
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);

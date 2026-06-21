@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { Modal } from '../../components/ui/Modal';
 import { formatDate } from '../../lib/format';
-import { FinancialModuleHeader } from '../../components/financial/FinancialModuleHeader';
-import { FinancialStatsCard } from '../../components/financial/FinancialStatsCard';
+import { baseAmount } from '../../lib/financialMath';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
+import { KpiRow } from '../../components/templates/KpiRow';
 import { ExpenseFormModal } from '../../components/financial/ExpenseFormModal';
 import { useCurrency } from '../../hooks/useCurrency';
 import {
@@ -25,14 +27,15 @@ import { ExportButton } from '../../components/shared/ExportButton';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { downloadCSV } from '../../lib/csvExport';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { logger } from '../../lib/logger';
 import type { Database } from '../../types/database.types';
 import {
   Plus,
   Search,
   Wallet,
-  TrendingUp,
   Clock,
   CheckCircle2,
   XCircle,
@@ -54,6 +57,7 @@ type ExpenseRow = Pick<
   | 'expense_number'
   | 'expense_date'
   | 'amount'
+  | 'amount_base'
   | 'description'
   | 'vendor'
   | 'status'
@@ -67,8 +71,12 @@ type ExpenseRow = Pick<
   case: { case_no: string | null; title: string | null } | null;
 };
 
+const PAGE_SIZE = 50;
+
 export const ExpensesList: React.FC = () => {
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const confirm = useConfirm();
   const { formatCurrency } = useCurrency();
   const { profile } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -77,6 +85,7 @@ export const ExpensesList: React.FC = () => {
   const [isArchiving, setIsArchiving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [page, setPage] = useState(0);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState<any>(null);
   const [, setSelectedExpense] = useState<ExpenseRow | null>(null);
@@ -96,10 +105,14 @@ export const ExpensesList: React.FC = () => {
     }
   }, [searchParams, setSearchParams]);
 
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, statusFilter]);
+
   const isAccountsRole = profile?.role === 'admin' || profile?.role === 'accounts';
 
-  const { data: expenses = [], isLoading, error, refetch } = useQuery<ExpenseRow[]>({
-    queryKey: ['expenses', searchTerm, statusFilter],
+  const { data: expensesPage, isLoading, error, refetch } = useQuery({
+    queryKey: ['expenses', searchTerm, statusFilter, page],
     queryFn: async () => {
       try {
         let query = supabase
@@ -109,6 +122,7 @@ export const ExpensesList: React.FC = () => {
             expense_number,
             expense_date,
             amount,
+            amount_base,
             description,
             vendor,
             status,
@@ -119,26 +133,30 @@ export const ExpensesList: React.FC = () => {
             notes,
             category:master_expense_categories(id, name),
             case:cases(case_no, title)
-          `)
+          `, { count: 'exact' })
           .order('expense_date', { ascending: false });
 
         if (searchTerm) {
-          query = query.or(`expense_number.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,vendor.ilike.%${searchTerm}%`);
+          const s = sanitizeFilterValue(searchTerm);
+          query = query.or(`expense_number.ilike.%${s}%,description.ilike.%${s}%,vendor.ilike.%${s}%`);
         }
 
         if (statusFilter !== 'all') {
           query = query.eq('status', statusFilter);
         }
 
-        const { data, error } = await query;
+        const { data, error, count } = await query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
         if (error) throw error;
-        return (data ?? []) as unknown as ExpenseRow[];
+        return { rows: (data ?? []) as unknown as ExpenseRow[], total: count ?? 0 };
       } catch (err) {
         logger.error('Error loading expenses:', err);
-        return [];
+        return { rows: [] as ExpenseRow[], total: 0 };
       }
     },
+    placeholderData: keepPreviousData,
   });
+  const expenses = expensesPage?.rows ?? [];
+  const totalExpensesCount = expensesPage?.total ?? 0;
 
   const { data: stats } = useQuery({
     queryKey: ['expense_stats'],
@@ -236,12 +254,6 @@ export const ExpensesList: React.FC = () => {
     }
   };
 
-  const totalExpenses = expenses
-    .filter((e) => e.status === 'approved' || e.status === 'paid')
-    .reduce((sum, exp) => sum + (exp.amount ?? 0), 0);
-  const pendingExpenses = expenses.filter((e) => e.status === 'pending');
-  const approvedExpenses = expenses.filter((e) => e.status === 'approved' || e.status === 'paid');
-
   const visibleIds = expenses.map((e) => e.id);
 
   const handleBulkExport = async () => {
@@ -284,7 +296,13 @@ export const ExpensesList: React.FC = () => {
       return;
     }
     const n = selection.selectedCount;
-    if (!window.confirm(`Archive ${n} expense${n === 1 ? '' : 's'}? They'll be hidden from lists but recoverable.`)) {
+    const ok = await confirm({
+      title: `Archive ${n} expense${n === 1 ? '' : 's'}?`,
+      message: `They'll be hidden from lists but recoverable.`,
+      confirmLabel: 'Archive',
+      tone: 'danger',
+    });
+    if (!ok) {
       return;
     }
     setIsArchiving(true);
@@ -305,16 +323,21 @@ export const ExpensesList: React.FC = () => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="p-8 max-w-[1800px] mx-auto">
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading expenses...</p>
-        </div>
+  const loadingFallback = (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+        ))}
       </div>
-    );
-  }
+      <Skeleton className="h-20 w-full rounded-2xl" />
+      <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-12 w-full rounded-lg" />
+        ))}
+      </div>
+    </div>
+  );
 
   if (error) {
     return (
@@ -335,137 +358,135 @@ export const ExpensesList: React.FC = () => {
   }
 
   return (
-    <div className="p-8 max-w-[1800px] mx-auto">
-      <FinancialModuleHeader
-        icon={<Wallet className="w-7 h-7 text-white" />}
-        title="Expenses"
-        description="Track and manage business expenses"
-        iconBgColor="#f97316"
-        statistics={[
-          { label: 'Total Expenses', value: expenses.length, color: '#f97316' },
-          { label: 'Pending', value: pendingExpenses.length, color: '#f59e0b' },
-          { label: 'Approved', value: approvedExpenses.length, color: '#10b981' },
-        ]}
-        primaryAction={{
-          label: 'Submit Expense',
-          onClick: () => {
-            setEditingExpense(null);
-            setShowExpenseModal(true);
-          },
-          icon: <Plus className="w-4 h-4" />,
-        }}
-      />
+    <ListPageTemplate
+      title="Expenses"
+      headerActions={
+        <>
+          <ExportButton
+            filename="expenses"
+            columns={[
+              { key: 'expense_number', label: 'Expense #' },
+              { key: 'expense_date', label: 'Date' },
+              { key: 'vendor', label: 'Vendor' },
+              { key: 'description', label: 'Description' },
+              {
+                key: (r) => (r.master_expense_categories as { name?: string } | null)?.name,
+                label: 'Category',
+              },
+              { key: 'amount', label: 'Amount' },
+              { key: 'tax_amount', label: 'Tax' },
+              { key: 'currency', label: 'Currency' },
+              { key: 'status', label: 'Status' },
+              { key: 'is_billable', label: 'Billable', format: (v) => (v ? 'yes' : 'no') },
+            ]}
+            getRows={async () => {
+              let q = supabase
+                .from('expenses')
+                .select('expense_number, expense_date, vendor, description, amount, tax_amount, currency, status, is_billable, master_expense_categories:category_id(name)')
+                .is('deleted_at', null);
+              if (searchTerm) {
+                const s = sanitizeFilterValue(searchTerm);
+                q = q.or(`expense_number.ilike.%${s}%,vendor.ilike.%${s}%,description.ilike.%${s}%`);
+              }
+              if (statusFilter !== 'all') q = q.eq('status', statusFilter);
+              const { data, error } = await q.order('expense_date', { ascending: false, nullsFirst: false });
+              if (error) throw error;
+              return data ?? [];
+            }}
+          />
+          <Button
+            size="sm"
+            onClick={() => {
+              setEditingExpense(null);
+              setShowExpenseModal(true);
+            }}
+          >
+            <Plus className="w-4 h-4 mr-1.5" />
+            Submit Expense
+          </Button>
+        </>
+      }
+      kpis={
+        <KpiRow
+          stats={[
+            {
+              tone: 'warning',
+              label: 'Total Approved',
+              value: formatCurrency(stats?.totalAmount ?? 0),
+            },
+            {
+              tone: 'warning',
+              label: 'Pending Amount',
+              value: formatCurrency(stats?.pendingAmount || 0),
+            },
+            {
+              tone: 'info',
+              label: 'This Month',
+              value: formatCurrency(stats?.thisMonthAmount || 0),
+            },
+            {
+              tone: 'warning',
+              label: 'Pending Count',
+              value: stats?.pending ?? 0,
+            },
+          ]}
+        />
+      }
+      toolbar={
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
+          <div className="p-6">
+            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
+              <div className="w-full lg:w-80 relative flex-shrink-0">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Search expenses..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+              </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <FinancialStatsCard
-          label="Total Approved"
-          value={formatCurrency(stats?.totalAmount || totalExpenses)}
-          icon={<Wallet className="w-5 h-5 text-white" />}
-          color="orange"
-        />
-        <FinancialStatsCard
-          label="Pending Amount"
-          value={formatCurrency(stats?.pendingAmount || 0)}
-          icon={<Clock className="w-5 h-5 text-white" />}
-          color="amber"
-        />
-        <FinancialStatsCard
-          label="This Month"
-          value={formatCurrency(stats?.thisMonthAmount || 0)}
-          icon={<TrendingUp className="w-5 h-5 text-white" />}
-          color="blue"
-        />
-        <FinancialStatsCard
-          label="Pending Count"
-          value={stats?.pending || pendingExpenses.length}
-          icon={<AlertCircle className="w-5 h-5 text-white" />}
-          color="amber"
-        />
-      </div>
+              <div className="flex-1 flex flex-wrap items-center gap-2">
+                {['all', 'draft', 'pending', 'approved', 'rejected', 'paid'].map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setStatusFilter(status)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      statusFilter === status
+                        ? status === 'pending'
+                          ? 'bg-warning text-warning-foreground shadow-md'
+                          : status === 'approved'
+                          ? 'bg-success text-success-foreground shadow-md'
+                          : status === 'rejected'
+                          ? 'bg-danger text-danger-foreground shadow-md'
+                          : status === 'paid'
+                          ? 'bg-info text-info-foreground shadow-md'
+                          : 'bg-slate-600 text-white shadow-md'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
+                  </button>
+                ))}
+              </div>
 
-      <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
-        <div className="p-6">
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
-            <div className="w-full lg:w-80 relative flex-shrink-0">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search expenses..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary"
-              />
+              <Button
+                variant="secondary"
+                onClick={() => refetch()}
+                className="flex items-center gap-2 flex-shrink-0"
+              >
+                <Filter className="w-4 h-4" />
+                Refresh
+              </Button>
             </div>
-
-            <div className="flex-1 flex flex-wrap items-center gap-2">
-              {['all', 'draft', 'pending', 'approved', 'rejected', 'paid'].map((status) => (
-                <button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                    statusFilter === status
-                      ? status === 'pending'
-                        ? 'bg-warning text-warning-foreground shadow-md'
-                        : status === 'approved'
-                        ? 'bg-success text-success-foreground shadow-md'
-                        : status === 'rejected'
-                        ? 'bg-danger text-danger-foreground shadow-md'
-                        : status === 'paid'
-                        ? 'bg-info text-info-foreground shadow-md'
-                        : 'bg-slate-600 text-white shadow-md'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
-                </button>
-              ))}
-            </div>
-
-            <Button
-              variant="secondary"
-              onClick={() => refetch()}
-              className="flex items-center gap-2 flex-shrink-0"
-            >
-              <Filter className="w-4 h-4" />
-              Refresh
-            </Button>
-
-            <ExportButton
-              filename="expenses"
-              columns={[
-                { key: 'expense_number', label: 'Expense #' },
-                { key: 'expense_date', label: 'Date' },
-                { key: 'vendor', label: 'Vendor' },
-                { key: 'description', label: 'Description' },
-                {
-                  key: (r) => (r.master_expense_categories as { name?: string } | null)?.name,
-                  label: 'Category',
-                },
-                { key: 'amount', label: 'Amount' },
-                { key: 'tax_amount', label: 'Tax' },
-                { key: 'currency', label: 'Currency' },
-                { key: 'status', label: 'Status' },
-                { key: 'is_billable', label: 'Billable', format: (v) => (v ? 'yes' : 'no') },
-              ]}
-              getRows={async () => {
-                let q = supabase
-                  .from('expenses')
-                  .select('expense_number, expense_date, vendor, description, amount, tax_amount, currency, status, is_billable, master_expense_categories:category_id(name)')
-                  .is('deleted_at', null);
-                if (searchTerm) {
-                  q = q.or(`expense_number.ilike.%${searchTerm}%,vendor.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
-                }
-                if (statusFilter !== 'all') q = q.eq('status', statusFilter);
-                const { data, error } = await q.order('expense_date', { ascending: false, nullsFirst: false });
-                if (error) throw error;
-                return data ?? [];
-              }}
-            />
           </div>
         </div>
-      </div>
-
-      {expenses.length === 0 ? (
+      }
+      loading={isLoading}
+      loadingFallback={loadingFallback}
+      isEmpty={expenses.length === 0}
+      empty={
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
           <EmptyState
             icon={Wallet}
@@ -478,9 +499,10 @@ export const ExpensesList: React.FC = () => {
             action={{ label: 'Submit Expense', onClick: () => { setEditingExpense(null); setShowExpenseModal(true); } }}
           />
         </div>
-      ) : (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
+      }
+      pager={{ page, pageSize: PAGE_SIZE, total: totalExpensesCount, onPageChange: setPage, itemNoun: 'expenses' }}
+      table={
+        <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
@@ -554,7 +576,7 @@ export const ExpensesList: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <span className="text-sm font-bold text-slate-900">
-                        {formatCurrency(expense.amount)}
+                        {formatCurrency(baseAmount(expense, 'amount'))}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -620,10 +642,32 @@ export const ExpensesList: React.FC = () => {
                 ))}
               </tbody>
             </table>
-          </div>
         </div>
-      )}
-
+      }
+      footer={
+        <BulkActionsBar
+          count={selection.selectedCount}
+          onClear={selection.clear}
+          itemNoun="expense"
+        >
+          <BulkActionButton
+            variant="ghost"
+            icon={<Download className="w-4 h-4" />}
+            label="Export"
+            onClick={handleBulkExport}
+          />
+          {canBulkArchive && (
+            <BulkActionButton
+              variant="danger"
+              icon={<Archive className="w-4 h-4" />}
+              label={isArchiving ? 'Archiving…' : 'Archive'}
+              onClick={handleBulkArchive}
+              disabled={isArchiving}
+            />
+          )}
+        </BulkActionsBar>
+      }
+    >
       <ExpenseFormModal
         isOpen={showExpenseModal}
         onClose={() => {
@@ -727,28 +771,6 @@ export const ExpensesList: React.FC = () => {
           </div>
         </div>
       </Modal>
-
-      <BulkActionsBar
-        count={selection.selectedCount}
-        onClear={selection.clear}
-        itemNoun="expense"
-      >
-        <BulkActionButton
-          variant="ghost"
-          icon={<Download className="w-4 h-4" />}
-          label="Export"
-          onClick={handleBulkExport}
-        />
-        {canBulkArchive && (
-          <BulkActionButton
-            variant="danger"
-            icon={<Archive className="w-4 h-4" />}
-            label={isArchiving ? 'Archiving…' : 'Archive'}
-            onClick={handleBulkArchive}
-            disabled={isArchiving}
-          />
-        )}
-      </BulkActionsBar>
-    </div>
+    </ListPageTemplate>
   );
 };

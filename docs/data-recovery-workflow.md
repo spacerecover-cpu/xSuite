@@ -61,7 +61,7 @@ Each stage is tagged `missing` (no real implementation), or `partial` (exists bu
 - Functions: plain `.from('case_devices').insert` — no device-specific RPC at intake
 - Owning roles: any authenticated staff (no device-level RBAC)
 
-**Verified gaps.** `device_problem_id` (FK to `catalog_service_problems`) is **flattened to a free-text `symptoms` string** at insert — the structured fault code is discarded. `recovery_requirements` is taken only from `devices[0]` for the whole case. `photos[]`/`storage_location`/`physical_damage` columns exist but the wizard never writes them. `password` is stored **plaintext** (`caseService.ts` writes `password: device.password ?? null` with no hashing). **No `chain_of_custody` "creation"/DEVICE_RECEIVED event is logged at intake** (zero custody calls in `CreateCaseWizard`). NDA capture and customer identity verification are absent at intake despite a fully-designed `ndas` table and `customers_enhanced.id_number`/`id_type` columns (see "Generic-CRM assumptions to avoid" and the backlog). The richer device fields are only editable post-intake via `DeviceFormModal`.
+**Verified gaps.** `device_problem_id` (FK to `catalog_service_problems`) is **flattened to a free-text `symptoms` string** at insert — the structured fault code is discarded. `recovery_requirements` is taken only from `devices[0]` for the whole case. `photos[]`/`storage_location`/`physical_damage` columns exist but the wizard never writes them. `password` is stored **plaintext** (`caseService.ts` writes `password: device.password ?? null` with no hashing). ~~No custody event at intake~~ → **resolved 2026-06-10**: `trg_log_device_received_custody` (AFTER INSERT ON `case_devices`) logs a `DEVICE_RECEIVED` `creation` event with `custody_status='in_custody'` for every device — DB-side, so no client path (wizard, bulk RAID add) can skip it; pre-rollout devices carry a labelled retroactive `CUSTODY_BASELINE_ESTABLISHED` event. NDA capture and customer identity verification are absent at intake despite a fully-designed `ndas` table and `customers_enhanced.id_number`/`id_type` columns (see "Generic-CRM assumptions to avoid" and the backlog). The richer device fields are only editable post-intake via `DeviceFormModal`.
 
 ---
 
@@ -74,7 +74,7 @@ Each stage is tagged `missing` (no real implementation), or `partial` (exists bu
 - Tables: `cases`, `case_devices`, `chain_of_custody`, `chain_of_custody_transfers`, `company_settings`
 - Services: `src/lib/pdf/pdfService.ts` (`generateCaseLabel`), `src/lib/chainOfCustodyService.ts`
 - UI: `src/pages/print/PrintLabelPage.tsx`, `src/lib/pdf/documents/CaseLabelDocument.ts`, `src/components/cases/ChainOfCustodyTab.tsx`, `src/components/cases/CustodyTransferModal.tsx`
-- Statuses: `custody_status` (`in_custody|in_transit|checked_out|archived|disposed` — defined, never written at intake); `custody_transfer_status` (transfers only)
+- Statuses: `custody_status` (`in_custody|in_transit|checked_out|archived|disposed` — written on intake (`in_custody`) and checkout (`checked_out`) ledger events since 2026-06-10; not yet a live per-device state column); `custody_transfer_status` (transfers only)
 - Functions: `log_chain_of_custody` (8 params; many rich fields dropped)
 - Owning roles: module-level only (`hasModuleAccess('cases')`); transfers hardcoded to technician/manager/admin/owner client-side
 
@@ -234,7 +234,7 @@ Each stage is tagged `missing` (no real implementation), or `partial` (exists bu
 - Functions: `log_case_checkout` (raw UPDATE `status='Delivered'`, bypasses state machine); `log_chain_of_custody` (`p_custody_status` supported but the wrapper never passes it)
 - Owning roles: checkout button has **no permission/role/status/payment gate**; custody transfers client-side technician/manager/admin/owner only
 
-**Verified gaps.** The `custody_status` enum (`in_custody`/`checked_out`/...) is defined but **never written**, so there is no live device-level custody STATE. `logDeviceCheckout`/`logDeviceReturn` helpers exist but are orphaned (zero callers) — the actual checkout never writes a `chain_of_custody` row. No digital signature is stored; checkout is case-level only (can't record donor retained / one device kept for re-attempt); no condition-on-return capture; no gate against unpaid balance / failed QA.
+**Verified gaps.** ~~Checkout never writes the ledger~~ → **resolved 2026-06-10**: `log_case_checkout` now writes per-device `DEVICE_CHECKED_OUT` (or case-level `CASE_CHECKED_OUT`) `chain_of_custody` events with `custody_status='checked_out'` alongside its transfers/job-history writes; the orphaned `logDeviceCheckout`/`logDeviceReturn` client helpers were removed. Still open: `custody_status` lives on ledger events, not as a live per-device state column; no digital signature is stored; checkout is case-level only (can't record donor retained / one device kept for re-attempt); no condition-on-return capture; no gate against unpaid balance / failed QA.
 
 ---
 
@@ -294,7 +294,7 @@ Each stage is tagged `missing` (no real implementation), or `partial` (exists bu
 
 ## Chain of Custody (cross-cutting)
 
-The chain-of-custody subsystem is substantial in the UI and service layer but its "immutable / cryptographically secured" claim is **not technically backed** — and, critically, it is **not initialized at the one moment that matters: physical device receipt at intake.**
+The chain-of-custody subsystem is substantial in the UI and service layer but its "immutable / cryptographically secured" claim is **not technically backed**. (The other historical headline gap — custody never initialized at device receipt — was **resolved 2026-06-10**: intake, checkout, transfers, integrity checks and financial events now write the ledger; see Stages 3, 4 and 13.)
 
 **Tables / enums.** `chain_of_custody`, `chain_of_custody_access_log`, `chain_of_custody_integrity_checks`, `chain_of_custody_transfers`. Enums: `custody_action_category` (`creation|modification|access|transfer|verification|communication|evidence_handling|financial|critical_event`), `custody_status` (`in_custody|in_transit|checked_out|archived|disposed`), `custody_transfer_status` (`initiated|pending_acceptance|accepted|rejected|cancelled`), `integrity_check_result` (`passed|failed|warning|not_applicable`).
 
@@ -307,7 +307,7 @@ The chain-of-custody subsystem is substantial in the UI and service layer but it
 - `deleted_at` exists on `chain_of_custody`, so rows are soft-deletable at the model level (even though the trigger blocks `authenticated` UPDATE/DELETE).
 - `log_chain_of_custody` accepts exactly 8 params (`p_action`, `p_action_category`, `p_case_id`, `p_custody_status`, `p_description`, `p_device_id`, `p_location`, `p_metadata`); everything richer is folded into `p_metadata` or dropped. Transfers pack seal/signature/condition into a `notes` text column; integrity checks pack into a `details` column.
 
-**Rule.** Do not represent the current custody log as court-grade tamper-evidence. Before relying on it for legal/forensic export, restore real columns + RPC params (hash chaining, monotonic `entry_number`, witness/seal/signature), add a `verifyChain` function, and **initialize a custody `creation`/DEVICE_RECEIVED event at intake** (Stages 3–4).
+**Rule.** Do not represent the current custody log as court-grade tamper-evidence. Before relying on it for legal/forensic export, restore real columns + RPC params (hash chaining, monotonic `entry_number`, witness/seal/signature) and add a `verifyChain` function. (Custody initialization at intake — previously part of this rule — shipped 2026-06-10 via `trg_log_device_received_custody`; `log_chain_of_custody` now also accepts case-level events: `p_device_id`/`p_action_category`/`p_action` carry `DEFAULT NULL` with a required-args guard.)
 
 ---
 
@@ -358,7 +358,7 @@ These are the verified leaks where xSuite reverted toward generic-CRM thinking. 
 
 1. **No lead/enquiry object at all.** The lifecycle begins at a fully-formed customer + case; even a generic CRM has a lead. Lead "source" is a single nullable free-text column, and the diagnostic-quote funnel that defines DR sales has no home (this is generic-CRM **minus**).
 2. **The physical asset is modeled as a CASE, not as N tracked DEVICES.** One label, one static marketing QR, one custody thread. A 12-drive RAID gets one case label, not 12 scannable device tags — the classic "one ticket = one thing" collapse.
-3. **Chain of custody initializes on financial/report/transfer events, not at physical device receipt** — the one moment that matters most for a forensic ledger. It is dressed up as "immutable/cryptographically secured" but is a lean activity log with JSON-stuffed seals/signatures and a row-order-derived entry number.
+3. ~~Chain of custody initializes on financial/report/transfer events, not at physical device receipt~~ — **fixed 2026-06-10** (intake DB trigger + checkout/financial ledger events). The remaining leak: it is dressed up as "immutable/cryptographically secured" but is a lean activity log with JSON-stuffed seals/signatures and a row-order-derived entry number — do not reintroduce claims the data layer can't back.
 4. **Diagnosis is a subject+description shape** — a free-text symptoms string plus one flat "problem" label, with no typed per-device failure-mode classification, severity, or recoverability. That is the generic-ticket way, not a lab's coded failure modes that drive triage and pricing.
 5. **Recovery progress is just a status label moving forward.** The structured lab work record (`case_recovery_attempts`) and the QA checklist exist in the schema but were never built — the generic-CRM "status field" won over the domain design.
 6. **Outcome collapses to ONE case-level status/string.** Per-device `recovery_result` columns exist but are unused, so a job where drive A recovers and drive B is dead cannot be represented — single-record CRM collapse of an inherently multi-device job.
@@ -386,7 +386,7 @@ Severity reflects forensic/legal/customer-trust risk and how load-bearing the ga
 | 3 | 13, 14, 15 | No payment-before-release and no QA-before-close gating; `requires[]` preconditions advisory-only; `log_case_checkout` force-sets `Delivered` via raw UPDATE. A case can close fully unpaid, with no QA, no recovery attempt. | **Critical** |
 | 4 | 12 | No recovered-file listing/manifest and no customer delivery-approval/acceptance gate; portal report is read-only View/Download; delivery proceeds on staff action with no QA/approval precondition. | **Critical** |
 | 5 | 16 | No structured Certificate of Destruction (no media-serial list, destruction-method enum, NIST 800-88 field, verification method, witness/operator signatures); report approval/immutability cannot be DB-enforced because semantics live in a `content` JSONB blob. | **High** |
-| 6 | 16 / CoC | Chain-of-custody "immutable/cryptographically secured" claim is unbacked: no hash chaining, no `verifyChain`, `evidence_hash` never written, `entry_number` row-order-derived, rows soft-deletable; custody not initialized at intake. | **High** |
+| 6 | 16 / CoC | Chain-of-custody "immutable/cryptographically secured" claim is unbacked: no hash chaining, no `verifyChain`, `evidence_hash` never written, `entry_number` row-order-derived, rows soft-deletable. (~~Custody not initialized at intake~~ — resolved 2026-06-10: intake trigger + checkout/financial ledger events + retroactive baseline; hardening remains.) | **High** |
 | 7 | 6, 8, 11, Closure | Structured recovery work-record layer is unwired vaporware: `case_recovery_attempts`, `inventory_parts_usage` (donor consumption), `catalog_donor_compatibility_matrix`, per-device `recovery_result`/`data_recovered_size`, `case_qa_checklists`, `case_milestones` — all 0 refs / 0 rows. | **High** |
 | 8 | 8, 12, Closure | Multi-device outcome collapse: outcome lives only at case level; a multi-drive job where drive A recovers and drive B is dead cannot be represented (per-device columns never written; per-attempt linkage unused). | **High** |
 | 9 | 7 | Customer quote approval loop is non-functional end-to-end: portal reads `case_quotes` (0 rows, never written) while `approve_quote`/`reject_quote` mutate `quotes` looking up status names that don't exist (`'Approved'`/`'Rejected'`). | **High** |

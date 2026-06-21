@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
+import { createRef } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { RichTextEditor } from './RichTextEditor';
+import { RichTextEditor, type RichTextEditorHandle } from './RichTextEditor';
 
 describe('RichTextEditor a11y props (additive, for FormField association)', () => {
   it('forwards id, aria-describedby, aria-invalid and aria-labelledby onto the editable region', () => {
@@ -180,5 +181,20 @@ describe('RichTextEditor copy + toolbar a11y (Phase 3)', () => {
       expect(icon.getAttribute('class')).toContain('me-1');
       expect(icon.getAttribute('class')).not.toContain('mr-1');
     });
+  });
+});
+
+describe('RichTextEditor — link/image/table tools + ref', () => {
+  it('renders Link, Image, and Table toolbar buttons', () => {
+    render(<RichTextEditor value="" onChange={() => {}} />);
+    expect(screen.getByRole('button', { name: /insert link/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /insert image/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /insert table/i })).toBeInTheDocument();
+  });
+
+  it('exposes an imperative insertAtCursor handle', () => {
+    const ref = createRef<RichTextEditorHandle>();
+    render(<RichTextEditor ref={ref} value="" onChange={() => {}} />);
+    expect(typeof ref.current?.insertAtCursor).toBe('function');
   });
 });

@@ -28,6 +28,7 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Input } from '../ui/Input';
+import { Skeleton } from '../ui/Skeleton';
 import {
   getChainOfCustody,
   getCustodyTransfers,
@@ -57,6 +58,7 @@ interface ChainOfCustodyTabProps {
     model?: string | null;
     serial_number?: string | null;
   }>;
+  deviceId?: string;
 }
 
 const TERMINAL_CASE_STATUSES = new Set(['delivered', 'cancelled']);
@@ -113,6 +115,7 @@ export const ChainOfCustodyTab: React.FC<ChainOfCustodyTabProps> = ({
   caseNumber,
   caseStatus,
   caseDevices = [],
+  deviceId,
 }) => {
   const { profile, user } = useAuth();
   const currentUserId = user?.id ?? null;
@@ -197,8 +200,13 @@ export const ChainOfCustodyTab: React.FC<ChainOfCustodyTabProps> = ({
     'critical_event',
   ];
 
+  const visibleEntries = useMemo(
+    () => (deviceId ? custodyData.filter((e) => e.device_id === deviceId) : custodyData),
+    [custodyData, deviceId]
+  );
+
   const filteredData = useMemo(() => {
-    let filtered = custodyData;
+    let filtered = visibleEntries;
 
     if (selectedCategories.length > 0) {
       filtered = filtered.filter((entry) => selectedCategories.includes(entry.action_category));
@@ -216,7 +224,7 @@ export const ChainOfCustodyTab: React.FC<ChainOfCustodyTabProps> = ({
     }
 
     return filtered;
-  }, [custodyData, selectedCategories, searchTerm]);
+  }, [visibleEntries, selectedCategories, searchTerm]);
 
   const toggleCategory = (category: ActionCategory) => {
     setSelectedCategories((prev) =>
@@ -239,7 +247,7 @@ export const ChainOfCustodyTab: React.FC<ChainOfCustodyTabProps> = ({
   const [showExportMenu, setShowExportMenu] = useState(false);
 
   const handleExport = async (format: 'pdf' | 'csv' | 'json') => {
-    const dataToExport = filteredData.length > 0 ? filteredData : custodyData;
+    const dataToExport = filteredData.length > 0 ? filteredData : visibleEntries;
 
     switch (format) {
       case 'pdf': {
@@ -351,9 +359,17 @@ export const ChainOfCustodyTab: React.FC<ChainOfCustodyTabProps> = ({
   if (isLoading) {
     return (
       <Card>
-        <div className="p-6 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-slate-600">Loading Chain of Custody records...</p>
+        <div className="p-6 space-y-4">
+          <Skeleton className="h-6 w-56" />
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4">
+              <Skeleton className="h-9 w-9 rounded-lg" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-1/3" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            </div>
+          ))}
         </div>
       </Card>
     );

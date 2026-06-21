@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React from 'react';
+import { Link, useLocation, useNavigation } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { Tooltip } from '../ui/Tooltip';
+import { useSidebarPreferences } from '../../contexts/SidebarPreferencesContext';
 
 interface SidebarNavItemProps {
   to: string;
@@ -11,6 +14,14 @@ interface SidebarNavItemProps {
   isCollapsed?: boolean;
 }
 
+const badgeColorClasses: Record<NonNullable<SidebarNavItemProps['badgeColor']>, string> = {
+  blue: 'bg-info text-info-foreground',
+  red: 'bg-danger text-danger-foreground',
+  green: 'bg-success text-success-foreground',
+  orange: 'bg-warning text-warning-foreground',
+  purple: 'bg-accent text-accent-foreground',
+};
+
 export const SidebarNavItem: React.FC<SidebarNavItemProps> = ({
   to,
   icon: Icon,
@@ -20,113 +31,62 @@ export const SidebarNavItem: React.FC<SidebarNavItemProps> = ({
   isCollapsed = false,
 }) => {
   const location = useLocation();
+  const navigation = useNavigation();
+  const { position } = useSidebarPreferences();
+  const tooltipSide = position === 'right' ? 'left' : 'right';
   const isActive = location.pathname === to || (to !== '/' && location.pathname.startsWith(to));
-  const [isHovered, setIsHovered] = useState(false);
+  // Route chunks resolve inside the router (route.lazy), so while a section's
+  // chunk downloads the navigation is in 'loading' state with the DESTINATION
+  // in navigation.location. Matching it against this item's target gives the
+  // clicked item an immediate pending indicator — the first click is visibly
+  // acknowledged instead of looking swallowed.
+  const pendingPath = navigation.state === 'loading' ? navigation.location.pathname : null;
+  const isPending =
+    pendingPath !== null && (pendingPath === to || (to !== '/' && pendingPath.startsWith(to)));
+  const isHighlighted = isActive || isPending;
 
-  const badgeColorClasses = {
-    blue: 'bg-info text-info-foreground',
-    red: 'bg-danger text-danger-foreground',
-    green: 'bg-success text-success-foreground',
-    orange: 'bg-warning text-warning-foreground',
-    purple: 'bg-accent text-accent-foreground',
-  };
+  // Solid pill on active maximizes the visible theme change and keeps the
+  // label/icon at AA contrast on every theme (white-on-primary). Hover stays a
+  // light tint so it reads clearly distinct from the active state.
+  const stateClasses = isActive
+    ? 'bg-primary text-primary-foreground shadow-sm'
+    : isPending
+      ? 'bg-primary/10 text-primary'
+      : 'text-slate-700 hover:bg-primary/[0.06] hover:text-primary';
 
-  const getItemStyle = () => {
-    if (isActive) {
-      return {
-        background: 'rgb(var(--color-primary) / 0.10)',
-        boxShadow: '0 1px 4px rgb(var(--color-primary) / 0.15)',
-        borderLeft: '4px solid rgb(var(--color-primary))',
-      };
-    }
-    if (isHovered) {
-      return {
-        background: 'rgb(var(--color-primary) / 0.04)',
-        borderLeft: '4px solid rgb(var(--color-primary) / 0.4)',
-      };
-    }
-    return {
-      background: 'transparent',
-      borderLeft: '4px solid transparent',
-    };
-  };
+  const iconClasses = isHighlighted ? 'text-current' : 'text-slate-500 group-hover:text-primary';
 
-  const getIconBoxStyle = () => {
-    if (isActive) return { background: 'rgb(var(--color-primary) / 0.12)' };
-    if (isHovered) return { background: '#D4DCE8' };
-    return { background: '#E8ECF2' };
-  };
-
-  const getIconColor = () => {
-    if (isActive) return 'rgb(var(--color-primary))';
-    if (isHovered) return 'rgb(var(--color-primary))';
-    return '#4A6080';
-  };
-
-  const getLabelColor = () => {
-    if (isActive) return 'rgb(var(--color-primary))';
-    if (isHovered) return 'rgb(var(--color-primary))';
-    return '#2C3A4A';
-  };
-
-  return (
+  const link = (
     <Link
       to={to}
       className={`
-        relative flex items-center rounded-lg transition-all duration-[180ms] ease-[ease]
-        ${isCollapsed ? 'justify-center w-10 h-10 mx-auto' : 'gap-3'}
+        group relative flex items-center rounded-lg
+        transition-colors duration-200 ease-out
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+        focus-visible:ring-offset-2 focus-visible:ring-offset-surface
+        ${isCollapsed ? 'justify-center w-10 h-10 mx-auto' : 'gap-3 px-2.5 h-9'}
+        ${stateClasses}
       `}
-      style={{
-        ...(isCollapsed ? {} : { padding: '9px 10px' }),
-        ...getItemStyle(),
-      }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      title={isCollapsed ? label : undefined}
+      aria-label={isCollapsed ? label : undefined}
+      aria-current={isActive ? 'page' : undefined}
+      aria-busy={isPending || undefined}
     >
-      {isCollapsed && isActive && (
-        <div
-          className="absolute left-0 top-0 bottom-0 rounded-r-sm"
-          style={{ width: '3px', background: 'rgb(var(--color-primary))' }}
-        />
+      {isPending ? (
+        <Loader2 className={`w-[18px] h-[18px] flex-shrink-0 animate-spin ${iconClasses}`} strokeWidth={1.75} />
+      ) : (
+        <Icon className={`w-[18px] h-[18px] flex-shrink-0 ${iconClasses}`} strokeWidth={1.75} />
       )}
-
-      <div
-        className={`
-          flex items-center justify-center flex-shrink-0 transition-all duration-[180ms]
-          ${isCollapsed ? 'w-10 h-10' : ''}
-          rounded-[7px]
-        `}
-        style={{
-          ...(isCollapsed ? {} : { width: '24px', height: '24px' }),
-          ...getIconBoxStyle(),
-        }}
-      >
-        <Icon
-          style={{
-            width: '15px',
-            height: '15px',
-            color: getIconColor(),
-            strokeWidth: 1.5,
-            transition: 'color 0.18s ease',
-          }}
-        />
-      </div>
 
       {!isCollapsed && (
         <>
-          <span
-            className={`${isActive ? 'font-semibold' : 'font-medium'} flex-1 tracking-tight transition-colors duration-[180ms]`}
-            style={{ fontSize: '13.5px', color: getLabelColor() }}
-          >
+          <span className={`flex-1 text-[13px] tracking-tight ${isActive ? 'font-semibold' : 'font-medium'}`}>
             {label}
           </span>
           {badge !== undefined && (
-            <span className={`
-              ml-auto text-[11px] font-medium rounded-[5px] text-center
-              ${badgeColorClasses[badgeColor]}
-            `}
-            style={{ padding: '2px 8px' }}
+            <span
+              className={`ml-auto px-2 py-0.5 text-[11px] font-semibold rounded text-center ${
+                isActive ? 'bg-primary-foreground/20 text-primary-foreground' : badgeColorClasses[badgeColor]
+              }`}
             >
               {badge}
             </span>
@@ -135,14 +95,22 @@ export const SidebarNavItem: React.FC<SidebarNavItemProps> = ({
       )}
 
       {isCollapsed && badge !== undefined && (
-        <div className={`
-          absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold
-          ${badgeColorClasses[badgeColor]}
-          shadow-lg
-        `}>
+        <span
+          className={`absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center text-[9px] font-bold shadow ${
+            isActive ? 'bg-primary-foreground text-primary' : badgeColorClasses[badgeColor]
+          }`}
+        >
           {typeof badge === 'number' && badge > 9 ? '9+' : badge}
-        </div>
+        </span>
       )}
     </Link>
+  );
+
+  return isCollapsed ? (
+    <Tooltip label={label} side={tooltipSide}>
+      {link}
+    </Tooltip>
+  ) : (
+    link
   );
 };

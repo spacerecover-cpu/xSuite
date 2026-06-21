@@ -62,6 +62,7 @@ export const FEATURE_REGISTRY: FeatureDef[] = [
   { key: 'case.tab.engineers', label: 'Engineers', description: 'Engineer assignment.', category: 'case_tabs', defaultEnabled: true, caseTabId: 'engineers' },
   { key: 'case.tab.recovery_qa', label: 'Recovery & QA', description: 'Recovery progress and QA sign-off.', category: 'case_tabs', defaultEnabled: true, caseTabId: 'recovery_qa' },
   { key: 'case.tab.notes', label: 'Internal Notes', description: 'Internal-only notes & findings.', category: 'case_tabs', defaultEnabled: true, caseTabId: 'notes' },
+  { key: 'case.tab.communications', label: 'Communications', description: 'Case communication log & compose (email / WhatsApp / SMS).', category: 'case_tabs', defaultEnabled: true, caseTabId: 'communications' },
   { key: 'case.tab.portal', label: 'Client Portal (case)', description: "Per-case portal visibility settings.", category: 'case_tabs', defaultEnabled: true, caseTabId: 'portal' },
   { key: 'case.tab.history', label: 'Device Tracking', description: 'Chain-of-custody / device tracking history.', category: 'case_tabs', defaultEnabled: true, caseTabId: 'history' },
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart2,
@@ -19,8 +19,11 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { VirtualizedTableBody } from '../../components/ui/VirtualizedTableBody';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
 import { chartAxis, chartCategorical, chartTooltipBorder } from '../../lib/chartTheme';
 import {
   getStockValuation,
@@ -95,8 +98,14 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, sub, positive, negati
   </div>
 );
 
+// Below this row count the valuation report renders as a plain full-height table
+// (no scroll pane, no virtualization); at/above it we cap + virtualize. Matches
+// VirtualizedTableBody's threshold so the visual cap and the windowing agree.
+const VALUATION_VIRTUALIZE_AT = 100;
+
 export const StockReportsPage: React.FC = () => {
   const { formatCurrency } = useCurrency();
+  const { decimalPlaces } = useCurrencyConfig();
   const today = new Date();
   const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
@@ -107,6 +116,10 @@ export const StockReportsPage: React.FC = () => {
     queryKey: [...stockKeys.all, 'valuation'],
     queryFn: getStockValuation,
   });
+  // valuationScrollRef is the viewport the virtualizer measures once the report is
+  // large enough to cap; below the threshold the table stays full-height as before.
+  const valuationScrollRef = useRef<HTMLDivElement>(null);
+  const virtualizeValuation = valuation.length > VALUATION_VIRTUALIZE_AT;
 
   const { data: salesReport, isLoading: loadingSales } = useQuery({
     queryKey: [...stockKeys.all, 'sales-report', startDate, endDate],
@@ -143,8 +156,8 @@ export const StockReportsPage: React.FC = () => {
         String(v.item.current_quantity),
         String(v.item.cost_price ?? 0),
         String(v.item.selling_price ?? 0),
-        v.costValue.toFixed(3),
-        v.sellValue.toFixed(3),
+        v.costValue.toFixed(decimalPlaces),
+        v.sellValue.toFixed(decimalPlaces),
         v.margin.toFixed(1) + '%',
       ]),
     ];
@@ -153,11 +166,7 @@ export const StockReportsPage: React.FC = () => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <PageHeader
-        title="Stock Reports"
-        description="Valuation, sales performance, and inventory health"
-        icon={BarChart2}
-      />
+      <PageHeaderSlot title="Stock Reports" />
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-end gap-4">
         <div>
@@ -224,13 +233,19 @@ export const StockReportsPage: React.FC = () => {
         </div>
 
         {loadingVal ? (
-          <div className="py-8 flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="py-8 space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full rounded-lg" />
+            ))}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div
+            ref={valuationScrollRef}
+            className={virtualizeValuation ? 'overflow-auto' : 'overflow-x-auto'}
+            style={virtualizeValuation ? { maxHeight: '70vh' } : undefined}
+          >
             <table className="w-full text-sm">
-              <thead>
+              <thead className={virtualizeValuation ? 'sticky top-0 z-10 bg-slate-50' : undefined}>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                     Item
@@ -256,48 +271,55 @@ export const StockReportsPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {valuation.map(({ item, costValue, sellValue, margin }) => (
-                  <tr
-                    key={item.id}
-                    className="border-b border-slate-100 hover:bg-slate-50 transition-colors"
-                  >
-                    <td className="px-3 py-2.5">
-                      <p className="font-medium text-slate-900">{item.name}</p>
-                      <p className="text-xs text-slate-500">
-                        {item.sku && <span className="font-mono mr-1.5">{item.sku}</span>}
-                        {item.brand && <span>{item.brand}</span>}
-                      </p>
-                    </td>
-                    <td className="px-3 py-2.5 text-right font-mono text-slate-700">
-                      {item.current_quantity}
-                    </td>
-                    <td className="px-3 py-2.5 text-right text-slate-600">
-                      {item.cost_price != null ? formatCurrency(item.cost_price) : '—'}
-                    </td>
-                    <td className="px-3 py-2.5 text-right text-slate-600">
-                      {item.selling_price != null ? formatCurrency(item.selling_price) : '—'}
-                    </td>
-                    <td className="px-3 py-2.5 text-right font-medium text-slate-800">
-                      {formatCurrency(costValue)}
-                    </td>
-                    <td className="px-3 py-2.5 text-right font-medium text-slate-800">
-                      {formatCurrency(sellValue)}
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      <span
-                        className={`font-semibold text-sm ${
-                          margin > 30
-                            ? 'text-success'
-                            : margin > 10
-                            ? 'text-warning'
-                            : 'text-danger'
-                        }`}
-                      >
-                        {formatPct(margin)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                <VirtualizedTableBody
+                  items={valuation}
+                  scrollRef={valuationScrollRef}
+                  colSpan={7}
+                  estimateRowHeight={50}
+                  threshold={VALUATION_VIRTUALIZE_AT}
+                  renderRow={({ item, costValue, sellValue, margin }) => (
+                    <tr
+                      key={item.id}
+                      className="border-b border-slate-100 hover:bg-slate-50 transition-colors"
+                    >
+                      <td className="px-3 py-2.5">
+                        <p className="font-medium text-slate-900">{item.name}</p>
+                        <p className="text-xs text-slate-500">
+                          {item.sku && <span className="font-mono mr-1.5">{item.sku}</span>}
+                          {item.brand && <span>{item.brand}</span>}
+                        </p>
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono text-slate-700">
+                        {item.current_quantity}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-slate-600">
+                        {item.cost_price != null ? formatCurrency(item.cost_price) : '—'}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-slate-600">
+                        {item.selling_price != null ? formatCurrency(item.selling_price) : '—'}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-medium text-slate-800">
+                        {formatCurrency(costValue)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-medium text-slate-800">
+                        {formatCurrency(sellValue)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        <span
+                          className={`font-semibold text-sm ${
+                            margin > 30
+                              ? 'text-success'
+                              : margin > 10
+                              ? 'text-warning'
+                              : 'text-danger'
+                          }`}
+                        >
+                          {formatPct(margin)}
+                        </span>
+                      </td>
+                    </tr>
+                  )}
+                />
                 {valuation.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-3 py-8 text-center text-slate-400 text-sm">
@@ -339,8 +361,10 @@ export const StockReportsPage: React.FC = () => {
         />
 
         {loadingSales ? (
-          <div className="py-8 flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="py-8 space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full rounded-lg" />
+            ))}
           </div>
         ) : (
           <>
@@ -448,8 +472,10 @@ export const StockReportsPage: React.FC = () => {
         />
 
         {loadingTop ? (
-          <div className="py-8 flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="py-8 space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full rounded-lg" />
+            ))}
           </div>
         ) : topItems.length === 0 ? (
           <div className="py-8 text-center text-slate-400 text-sm">
@@ -546,8 +572,10 @@ export const StockReportsPage: React.FC = () => {
         />
 
         {loadingLow ? (
-          <div className="py-8 flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="py-8 space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full rounded-lg" />
+            ))}
           </div>
         ) : lowStockItems.length === 0 ? (
           <div className="py-8 text-center">

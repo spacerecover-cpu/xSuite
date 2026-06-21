@@ -15,7 +15,7 @@ import {
   Save,
 } from 'lucide-react';
 import { logger } from '../../lib/logger';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
 
 interface TransactionFormModalProps {
   isOpen: boolean;
@@ -28,6 +28,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
   onClose,
   onSave,
 }) => {
+  const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0]);
   const [amount, setAmount] = useState<number>(0);

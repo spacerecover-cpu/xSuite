@@ -3,7 +3,9 @@ import {
   getPaymentSummary,
   getInvoiceEditability,
   canRecordPayment,
+  canIssueInvoice,
   canDeleteInvoice,
+  canCreditInvoice,
   RESTRICTED_EDITABLE_FIELDS,
   type InvoiceFinancials,
 } from './invoicePermissions';
@@ -97,6 +99,20 @@ describe('canRecordPayment', () => {
   });
 });
 
+describe('canIssueInvoice', () => {
+  it('allows issuing a draft tax invoice (the step that makes it payable)', () => {
+    expect(canIssueInvoice({ ...base, status: 'draft' })).toBe(true);
+    expect(canIssueInvoice({ ...base })).toBe(true); // status defaults to draft
+  });
+
+  it('forbids issuing proformas and already-issued/terminal invoices', () => {
+    expect(canIssueInvoice({ ...base, invoice_type: 'proforma', status: 'draft' })).toBe(false);
+    expect(canIssueInvoice({ ...base, status: 'sent' })).toBe(false);
+    expect(canIssueInvoice({ ...base, status: 'paid' })).toBe(false);
+    expect(canIssueInvoice({ ...base, status: 'void' })).toBe(false);
+  });
+});
+
 describe('canDeleteInvoice', () => {
   it('allows delete only for an unpaid draft', () => {
     expect(canDeleteInvoice({ ...base, status: 'draft', payment_status: 'unpaid' })).toBe(true);
@@ -104,5 +120,52 @@ describe('canDeleteInvoice', () => {
   it('forbids delete once issued or paid', () => {
     expect(canDeleteInvoice({ ...base, status: 'sent', payment_status: 'unpaid' })).toBe(false);
     expect(canDeleteInvoice({ ...base, status: 'partial', payment_status: 'partial', amount_paid: 1, balance_due: 99 })).toBe(false);
+  });
+});
+
+describe('credited_amount in settlement (credit notes)', () => {
+  it('counts credits toward settlement when payment_status is absent: 100 total, 60 paid, 40 credited => paid', () => {
+    const s = getPaymentSummary({ ...base, amount_paid: 60, balance_due: undefined, credited_amount: 40 });
+    expect(s.balance).toBe(0);
+    expect(s.settlement).toBe('paid');
+  });
+
+  it('is partial when only credited: 100 total, 0 paid, 30 credited', () => {
+    const s = getPaymentSummary({ ...base, amount_paid: 0, balance_due: undefined, credited_amount: 30 });
+    expect(s.balance).toBe(70);
+    expect(s.settlement).toBe('partial');
+  });
+
+  it('still prefers an explicit balance_due when present', () => {
+    expect(getPaymentSummary({ ...base, amount_paid: 60, balance_due: 0, credited_amount: 40 }).balance).toBe(0);
+  });
+
+  it('reports actual cash paid separately from credits', () => {
+    expect(getPaymentSummary({ ...base, amount_paid: 60, balance_due: undefined, credited_amount: 40 }).paid).toBe(60);
+  });
+
+  it('locks a fully-credited invoice', () => {
+    const e = getInvoiceEditability({ ...base, status: 'sent', amount_paid: 0, balance_due: undefined, credited_amount: 100 });
+    expect(e.isLocked).toBe(true);
+    expect(e.mode).toBe('restricted');
+  });
+});
+
+describe('canCreditInvoice', () => {
+  it('allows crediting an issued tax invoice with an outstanding balance', () => {
+    expect(canCreditInvoice({ ...base, status: 'sent', amount_paid: 40, balance_due: 60 })).toBe(true);
+    expect(canCreditInvoice({ ...base, status: 'partial', payment_status: 'partial', amount_paid: 40, balance_due: 60 })).toBe(true);
+  });
+
+  it('forbids crediting drafts, proformas, fully-settled, or terminal invoices', () => {
+    expect(canCreditInvoice({ ...base, status: 'draft' })).toBe(false);
+    expect(canCreditInvoice({ ...base, invoice_type: 'proforma', status: 'sent' })).toBe(false);
+    expect(canCreditInvoice({ ...base, status: 'paid', payment_status: 'paid', amount_paid: 100, balance_due: 0 })).toBe(false);
+    expect(canCreditInvoice({ ...base, status: 'void', balance_due: 60 })).toBe(false);
+  });
+
+  it('uses the derived balance when balance_due is absent', () => {
+    expect(canCreditInvoice({ ...base, status: 'sent', amount_paid: 30, balance_due: undefined })).toBe(true);
+    expect(canCreditInvoice({ ...base, status: 'sent', amount_paid: 100, balance_due: undefined })).toBe(false);
   });
 });

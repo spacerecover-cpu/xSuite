@@ -58,6 +58,7 @@ export default {
         'fade-in': 'fadeIn 0.2s ease-out',
         'float': 'float 6s ease-in-out infinite',
         'pulse-glow': 'pulseGlow 3s ease-in-out infinite',
+        'nav-progress': 'navProgress 1.2s ease-in-out infinite',
       },
       keyframes: {
         slideIn: {
@@ -75,6 +76,10 @@ export default {
         pulseGlow: {
           '0%, 100%': { opacity: '0.4' },
           '50%': { opacity: '1' },
+        },
+        navProgress: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(400%)' },
         },
       },
     },

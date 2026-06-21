@@ -35,6 +35,7 @@ export const ClientsList: React.FC = () => {
       const { data, error } = await supabase
         .from('customers_enhanced')
         .select('*')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

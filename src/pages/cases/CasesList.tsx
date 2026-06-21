@@ -1,22 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Button } from '../../components/ui/Button';
-import { Badge } from '../../components/ui/Badge';
 import { Plus, Search, Filter, Briefcase, AlertCircle, CheckCircle, RefreshCw, ChevronLeft, ChevronRight, Archive, Download } from 'lucide-react';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { ExportButton } from '../../components/shared/ExportButton';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { downloadCSV } from '../../lib/csvExport';
-import { formatDate } from '../../lib/format';
+import { ConfigurableDataTable } from '../../components/ui/ConfigurableDataTable';
+import { ColumnPickerPopover } from '../../components/ui/ColumnPickerPopover';
+import { casesColumns, casesRegistryMeta, pickPrimaryDevice, CASES_TABLE_KEY } from '../../lib/tables/casesColumns';
+import type { CaseListRow } from '../../lib/tables/casesColumns';
+import { useTableViewPrefs } from '../../hooks/useTableViewPrefs';
 import { CreateCaseWizard } from '../../components/cases/CreateCaseWizard';
 import { useCasesRealtime } from '../../hooks/useCasesRealtime';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUsageLimit } from '../../hooks/useFeatureGate';
 import { canPerformAction } from '../../lib/featureGateService';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 interface Case {
   id: string;
@@ -41,6 +47,10 @@ interface Case {
   devices: {
     id: string;
     serial_no: string | null;
+    is_primary: boolean | null;
+    model: string | null;
+    brand: { name: string } | null;
+    capacity: { name: string; gb_value: number | null } | null;
     device_type: {
       id: string;
       name: string;
@@ -48,8 +58,21 @@ interface Case {
   }[];
 }
 
+/** Shape of the devices embed on the CSV-export queries. */
+type ExportDevice = {
+  serial_number: string | null;
+  model: string | null;
+  is_primary: boolean | null;
+  catalog_device_types: { name: string } | null;
+  catalog_device_capacities: { name: string } | null;
+};
+const exportPrimaryDevice = (r: Record<string, unknown>) =>
+  pickPrimaryDevice((r.case_devices as ExportDevice[] | null) ?? undefined);
+
 export const CasesList: React.FC = () => {
   const navigate = useNavigate();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile } = useAuth();
   const { usage: caseUsage } = useUsageLimit('max_cases_per_month');
@@ -86,11 +109,13 @@ export const CasesList: React.FC = () => {
   const buildFiltersQuery = () => {
     let query = supabase
       .from('cases')
-      .select('id, case_no, priority, status, customer_id', { count: 'exact', head: false });
+      .select('id, case_no, priority, status, customer_id', { count: 'exact', head: false })
+      .is('deleted_at', null);
 
     if (searchTerm) {
+      const s = sanitizeFilterValue(searchTerm);
       query = query.or(
-        `case_no.ilike.%${searchTerm}%,client_reference.ilike.%${searchTerm}%`
+        `case_no.ilike.%${s}%,client_reference.ilike.%${s}%`
       );
     }
 
@@ -115,7 +140,7 @@ export const CasesList: React.FC = () => {
     },
   });
 
-  const { data: cases = [], isLoading, refetch, isFetching } = useQuery({
+  const { data: cases = [], isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['cases', currentPage, searchTerm, filterStatus, filterPriority],
     queryFn: async () => {
       const from = (currentPage - 1) * CASES_PER_PAGE;
@@ -139,12 +164,14 @@ export const CasesList: React.FC = () => {
           created_by,
           assigned_engineer_id,
           customer:customers_enhanced!customer_id (id, customer_number, customer_name, mobile_number),
-          devices:case_devices (id, serial_number, device_type_id, catalog_device_types (id, name))
-        `);
+          devices:case_devices (id, serial_number, model, is_primary, device_type_id, catalog_device_types (id, name), catalog_device_brands (name), catalog_device_capacities (name, gb_value))
+        `)
+        .is('deleted_at', null);
 
       if (searchTerm) {
+        const s = sanitizeFilterValue(searchTerm);
         query = query.or(
-          `case_no.ilike.%${searchTerm}%,client_reference.ilike.%${searchTerm}%`
+          `case_no.ilike.%${s}%,client_reference.ilike.%${s}%`
         );
       }
 
@@ -158,6 +185,7 @@ export const CasesList: React.FC = () => {
 
       const { data, error } = await query
         .order('created_at', { ascending: false })
+        .order('is_primary', { referencedTable: 'case_devices', ascending: false })
         .order('created_at', { referencedTable: 'case_devices', ascending: true })
         .range(from, to);
 
@@ -184,24 +212,15 @@ export const CasesList: React.FC = () => {
         devices: (caseItem.devices || []).map((device) => ({
           id: device.id,
           serial_no: device.serial_number,
+          is_primary: device.is_primary,
+          model: device.model,
+          brand: device.catalog_device_brands,
+          capacity: device.catalog_device_capacities,
           device_type: device.catalog_device_types,
         })),
       }));
 
       return casesWithRelations as Case[];
-    },
-  });
-
-  const { data: allCasesForStats = [] } = useQuery({
-    queryKey: ['cases_stats'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('cases')
-        .select('id, status, priority')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
     },
   });
 
@@ -215,6 +234,48 @@ export const CasesList: React.FC = () => {
         .order('sort_order');
       if (error) throw error;
       return data;
+    },
+  });
+
+  // Dashboard counters as head-only COUNT queries instead of pulling every
+  // case row to the client (the previous select grew linearly with tenant
+  // case volume). Status-name lists come from master_case_statuses, so this
+  // waits for them and re-keys when they change. "Active" is derived as
+  // (cases with a status) - (cases in a terminal status) because terminal
+  // names can contain PostgREST control characters that .in() quotes safely
+  // but a NOT-IN DSL string would not.
+  const { data: caseStats } = useQuery({
+    queryKey: ['cases_stats', caseStatuses.map((s) => s.id).join(',')],
+    enabled: caseStatuses.length > 0,
+    queryFn: async () => {
+      const namesOfTypes = (types: string[]) =>
+        caseStatuses
+          .filter((s) => s.type !== null && types.includes(s.type))
+          .map((s) => s.name);
+      const terminal = namesOfTypes(['completed', 'delivered', 'cancelled']);
+      const diagnosis = namesOfTypes(['diagnosis']);
+      const ready = namesOfTypes(['ready']);
+
+      const base = () =>
+        supabase.from('cases').select('id', { count: 'exact', head: true }).is('deleted_at', null);
+      const none = { count: 0 as number | null, error: null };
+
+      const [withStatus, inTerminal, urgent, inDiagnosis, inReady] = await Promise.all([
+        base().not('status', 'is', null),
+        terminal.length ? base().in('status', terminal) : Promise.resolve(none),
+        base().eq('priority', 'urgent'),
+        diagnosis.length ? base().in('status', diagnosis) : Promise.resolve(none),
+        ready.length ? base().in('status', ready) : Promise.resolve(none),
+      ]);
+      for (const r of [withStatus, inTerminal, urgent, inDiagnosis, inReady]) {
+        if (r.error) throw r.error;
+      }
+      return {
+        active: Math.max(0, (withStatus.count ?? 0) - (inTerminal.count ?? 0)),
+        urgent: urgent.count ?? 0,
+        diagnosis: inDiagnosis.count ?? 0,
+        ready: inReady.count ?? 0,
+      };
     },
   });
 
@@ -261,9 +322,40 @@ export const CasesList: React.FC = () => {
     return statusItem?.name || status;
   };
 
-  const getStatusesByType = (type: string) => {
-    return caseStatuses.filter(s => s.type === type).map(s => s.name);
-  };
+  // Tenant-configurable columns: registry defaults ← tenant config ← user prefs.
+  const { view, setVisibleAndOrder, setWidths, resetPrefs } = useTableViewPrefs(
+    CASES_TABLE_KEY,
+    casesRegistryMeta,
+  );
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- color/name lookups derive from caseStatuses/casePriorities
+  const tableRows = useMemo<CaseListRow[]>(
+    () =>
+      cases.map((c) => {
+        const primary = pickPrimaryDevice(c.devices);
+        return {
+          id: c.id,
+          case_no: c.case_no,
+          priority: c.priority,
+          priority_color: getPriorityColor(c.priority),
+          status: c.status,
+          status_name: getStatusName(c.status),
+          status_color: getStatusColor(c.status),
+          customer_name: c.customer?.customer_name ?? null,
+          customer_mobile: c.customer?.mobile_number ?? null,
+          client_reference: c.client_reference,
+          created_at: c.created_at,
+          created_by_name: c.created_by_profile?.full_name ?? null,
+          device_type: primary?.device_type?.name ?? null,
+          device_model: primary?.model ?? null,
+          device_brand: primary?.brand?.name ?? null,
+          device_capacity: primary?.capacity?.name ?? null,
+          serial_primary: primary?.serial_no ?? null,
+          device_count: c.devices?.length ?? 0,
+        };
+      }),
+    [cases, caseStatuses, casePriorities],
+  );
 
   const handleCreateCase = async () => {
     const check = await canPerformAction('max_cases_per_month');
@@ -272,21 +364,17 @@ export const CasesList: React.FC = () => {
       return;
     }
     if (check.message) {
-      toast(check.message, { icon: '⚠️' });
+      toast.warning(check.message);
     }
     setIsWizardOpen(true);
   };
-
-  // IDs visible on the current page — drives the header "select all"
-  // checkbox state. Selection state itself spans all pages.
-  const visibleIds = cases.map((c) => c.id);
 
   const handleBulkExport = async () => {
     if (selection.selectedCount === 0) return;
     const ids = Array.from(selection.selectedIds);
     const { data, error } = await supabase
       .from('cases')
-      .select('case_no, title, priority, status, client_reference, created_at, customers_enhanced:customer_id(customer_name)')
+      .select('case_no, title, priority, status, client_reference, created_at, customers_enhanced:customer_id(customer_name), case_devices(serial_number, model, is_primary, catalog_device_types(name), catalog_device_capacities(name))')
       .in('id', ids);
     if (error) {
       toast.error('Failed to export selected cases');
@@ -304,6 +392,10 @@ export const CasesList: React.FC = () => {
           label: 'Customer',
         },
         { key: 'client_reference', label: 'Client Ref' },
+        { key: (r) => exportPrimaryDevice(r)?.catalog_device_types?.name, label: 'Device Type' },
+        { key: (r) => exportPrimaryDevice(r)?.model, label: 'Device Model' },
+        { key: (r) => exportPrimaryDevice(r)?.serial_number, label: 'Serial Number' },
+        { key: (r) => exportPrimaryDevice(r)?.catalog_device_capacities?.name, label: 'Capacity' },
         {
           key: 'created_at',
           label: 'Created',
@@ -322,10 +414,13 @@ export const CasesList: React.FC = () => {
       return;
     }
     const n = selection.selectedCount;
-    // Native confirm — destructive enough to warrant a hard stop. Don't
-    // build a custom modal until users actually request progress bars or
-    // bulk-archive undo; YAGNI.
-    if (!window.confirm(`Archive ${n} case${n === 1 ? '' : 's'}? They'll be hidden from lists but recoverable.`)) {
+    const ok = await confirm({
+      title: 'Archive Cases',
+      message: `Archive ${n} case${n === 1 ? '' : 's'}? They'll be hidden from lists but recoverable.`,
+      confirmLabel: 'Archive',
+      tone: 'danger',
+    });
+    if (!ok) {
       return;
     }
     setIsArchiving(true);
@@ -348,7 +443,7 @@ export const CasesList: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-[1800px] mx-auto">
+    <div className="p-6 max-w-[1800px] 2xl:max-w-[2400px] mx-auto">
       <div className="mb-6 flex items-start justify-between">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg bg-primary">
@@ -398,7 +493,7 @@ export const CasesList: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-info uppercase tracking-wide">Active Cases</p>
-              <p className="text-2xl font-bold text-info mt-1">{allCasesForStats.filter(c => c.status !== null && !getStatusesByType('completed').includes(c.status) && !getStatusesByType('delivered').includes(c.status) && !getStatusesByType('cancelled').includes(c.status)).length}</p>
+              <p className="text-2xl font-bold text-info mt-1">{caseStats?.active ?? 0}</p>
             </div>
             <div className="w-10 h-10 bg-info rounded-lg flex items-center justify-center">
               <Briefcase className="w-5 h-5 text-info-foreground" />
@@ -410,7 +505,7 @@ export const CasesList: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-danger uppercase tracking-wide">Urgent</p>
-              <p className="text-2xl font-bold text-danger mt-1">{allCasesForStats.filter(c => c.priority === 'urgent').length}</p>
+              <p className="text-2xl font-bold text-danger mt-1">{caseStats?.urgent ?? 0}</p>
             </div>
             <div className="w-10 h-10 bg-danger rounded-lg flex items-center justify-center">
               <AlertCircle className="w-5 h-5 text-danger-foreground" />
@@ -422,7 +517,7 @@ export const CasesList: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-warning uppercase tracking-wide">In Diagnosis</p>
-              <p className="text-2xl font-bold text-warning mt-1">{allCasesForStats.filter(c => c.status !== null && getStatusesByType('diagnosis').includes(c.status)).length}</p>
+              <p className="text-2xl font-bold text-warning mt-1">{caseStats?.diagnosis ?? 0}</p>
             </div>
             <div className="w-10 h-10 bg-warning rounded-lg flex items-center justify-center">
               <Search className="w-5 h-5 text-warning-foreground" />
@@ -434,7 +529,7 @@ export const CasesList: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-success uppercase tracking-wide">Ready</p>
-              <p className="text-2xl font-bold text-success mt-1">{allCasesForStats.filter(c => c.status !== null && getStatusesByType('ready').includes(c.status)).length}</p>
+              <p className="text-2xl font-bold text-success mt-1">{caseStats?.ready ?? 0}</p>
             </div>
             <div className="w-10 h-10 bg-success rounded-lg flex items-center justify-center">
               <CheckCircle className="w-5 h-5 text-success-foreground" />
@@ -523,6 +618,13 @@ export const CasesList: React.FC = () => {
               )}
             </Button>
 
+            <ColumnPickerPopover
+              columns={casesColumns.map((c) => ({ key: c.key, label: c.label }))}
+              view={view}
+              onApply={setVisibleAndOrder}
+              onReset={resetPrefs}
+            />
+
             {/* Fetches everything matching the active filter — not just
                 the current page — so accountant handoff CSVs aren't
                 truncated to one paginated screen. */}
@@ -538,6 +640,10 @@ export const CasesList: React.FC = () => {
                   label: 'Customer',
                 },
                 { key: 'client_reference', label: 'Client Ref' },
+                { key: (r) => exportPrimaryDevice(r)?.catalog_device_types?.name, label: 'Device Type' },
+                { key: (r) => exportPrimaryDevice(r)?.model, label: 'Device Model' },
+                { key: (r) => exportPrimaryDevice(r)?.serial_number, label: 'Serial Number' },
+                { key: (r) => exportPrimaryDevice(r)?.catalog_device_capacities?.name, label: 'Capacity' },
                 {
                   key: 'created_at',
                   label: 'Created',
@@ -547,10 +653,11 @@ export const CasesList: React.FC = () => {
               getRows={async () => {
                 let q = supabase
                   .from('cases')
-                  .select('case_no, title, priority, status, client_reference, created_at, customers_enhanced:customer_id(customer_name)')
+                  .select('case_no, title, priority, status, client_reference, created_at, customers_enhanced:customer_id(customer_name), case_devices(serial_number, model, is_primary, catalog_device_types(name), catalog_device_capacities(name))')
                   .is('deleted_at', null);
                 if (searchTerm) {
-                  q = q.or(`case_no.ilike.%${searchTerm}%,client_reference.ilike.%${searchTerm}%`);
+                  const s = sanitizeFilterValue(searchTerm);
+                  q = q.or(`case_no.ilike.%${s}%,client_reference.ilike.%${s}%`);
                 }
                 if (filterStatus !== 'all') q = q.eq('status', filterStatus);
                 if (filterPriority !== 'all') q = q.eq('priority', filterPriority);
@@ -574,7 +681,7 @@ export const CasesList: React.FC = () => {
                 >
                   <option value="all">All Statuses</option>
                   {caseStatuses.map((status) => (
-                    <option key={status.id} value={status.name.toLowerCase()}>
+                    <option key={status.id} value={status.name}>
                       {status.name}
                     </option>
                   ))}
@@ -603,9 +710,43 @@ export const CasesList: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading cases...</p>
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+          <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+            <Skeleton className="h-4 w-32" />
+          </div>
+          <div className="divide-y divide-slate-200">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-6 px-6 py-4">
+                <Skeleton className="h-4 w-4 rounded" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-5 w-16 rounded-full" />
+                <Skeleton className="h-4 w-32 flex-1" />
+                <Skeleton className="h-5 w-24 rounded-full" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : isError ? (
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
+          <div
+            className="flex flex-col items-center text-center px-6 py-16"
+            role="alert"
+            aria-live="assertive"
+          >
+            <div className="w-14 h-14 rounded-full bg-danger-muted flex items-center justify-center mb-4">
+              <AlertCircle className="w-7 h-7 text-danger" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900 mb-1">Couldn't load cases</h3>
+            <p className="text-sm text-slate-500 max-w-md mb-6">
+              {(error as Error)?.message ||
+                'Something went wrong while fetching cases. Please try again.'}
+            </p>
+            <Button onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+              {isFetching ? 'Retrying…' : 'Retry'}
+            </Button>
+          </div>
         </div>
       ) : cases.length === 0 ? (
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
@@ -623,162 +764,16 @@ export const CasesList: React.FC = () => {
       ) : (
         <>
           <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="px-4 py-4 w-10">
-                      <input
-                        type="checkbox"
-                        checked={selection.allSelected(visibleIds)}
-                        // indeterminate state — set imperatively because React
-                        // doesn't support it via prop; ref callback fires on
-                        // every render so the state stays accurate.
-                        ref={(el) => {
-                          if (el) {
-                            el.indeterminate =
-                              !selection.allSelected(visibleIds) && selection.someSelected(visibleIds);
-                          }
-                        }}
-                        onChange={(e) => selection.setMany(visibleIds, e.target.checked)}
-                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
-                        aria-label="Select all on this page"
-                      />
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Case ID
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Priority
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Customer
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Contact Number
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Client Ref
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Device Type
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Serial Number
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Created At
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {cases.map((caseItem) => (
-                  <tr
-                    key={caseItem.id}
-                    onClick={() => navigate(`/cases/${caseItem.id}`)}
-                    className={`hover:bg-slate-50 transition-colors cursor-pointer ${
-                      selection.isSelected(caseItem.id) ? 'bg-info-muted/30' : ''
-                    }`}
-                  >
-                    <td
-                      className="px-4 py-4 w-10"
-                      // Stop event propagation so clicking the checkbox
-                      // doesn't also navigate to the case detail page.
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selection.isSelected(caseItem.id)}
-                        onChange={() => selection.toggle(caseItem.id)}
-                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
-                        aria-label={`Select case ${caseItem.case_no}`}
-                      />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="font-semibold text-primary">
-                        {caseItem.case_no}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge
-                        variant="custom"
-                        color={getPriorityColor(caseItem.priority)}
-                        size="sm"
-                      >
-                        {caseItem.priority}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {caseItem.customer ? (
-                        <div className="font-medium text-slate-900">
-                          {caseItem.customer.customer_name}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {caseItem.customer?.mobile_number ? (
-                        <div className="text-sm text-slate-700 flex items-center gap-1">
-                          <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                          </svg>
-                          {caseItem.customer.mobile_number}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {caseItem.client_reference ? (
-                        <span className="text-sm text-slate-700">
-                          {caseItem.client_reference}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge
-                        variant="custom"
-                        color={getStatusColor(caseItem.status)}
-                        size="sm"
-                      >
-                        {getStatusName(caseItem.status)}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {caseItem.devices && caseItem.devices.length > 0 && caseItem.devices[0].device_type ? (
-                        <span className="text-sm text-slate-700">
-                          {caseItem.devices[0].device_type.name}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {caseItem.devices && caseItem.devices.length > 0 ? (
-                        <div className="text-sm text-slate-700">
-                          {caseItem.devices
-                            .filter(d => d.serial_no)
-                            .map(d => d.serial_no)
-                            .join(', ') || <span className="text-slate-400">-</span>}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                      {formatDate(caseItem.created_at)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            <ConfigurableDataTable
+              rows={tableRows}
+              columns={casesColumns}
+              view={view}
+              rowKey={(r) => r.id}
+              onRowClick={(r) => navigate(`/cases/${r.id}`)}
+              selection={selection}
+              onWidthsChange={setWidths}
+              rowAriaLabel={(r) => `case ${r.case_no}`}
+            />
           </div>
 
           {totalPages > 1 && (

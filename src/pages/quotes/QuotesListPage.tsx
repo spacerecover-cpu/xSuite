@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchQuotes, getQuoteStats, toQuoteEditInitialData } from '../../lib/quotesService';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { fetchQuotesPage, getQuoteStats, toQuoteEditInitialData } from '../../lib/quotesService';
 import type { QuoteWithDetails } from '../../lib/quotesService';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
-import { FinancialModuleHeader } from '../../components/financial/FinancialModuleHeader';
-import { FinancialStatsCard } from '../../components/financial/FinancialStatsCard';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
+import { KpiRow } from '../../components/templates/KpiRow';
 import { QuoteFormModal } from '../../components/cases/QuoteFormModal';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
+import { roundMoney } from '../../lib/financialMath';
 import { supabase } from '../../lib/supabaseClient';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { ExportButton } from '../../components/shared/ExportButton';
@@ -17,15 +19,14 @@ import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkAc
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { downloadCSV } from '../../lib/csvExport';
 import { useAuth } from '../../contexts/AuthContext';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
 import type { Database } from '../../types/database.types';
 import {
   FileText,
   Plus,
   Search,
   Filter,
-  Clock,
-  CheckCircle,
   User,
   Building2,
   Eye,
@@ -55,11 +56,16 @@ const toOptionalString = (value: unknown): string | null => {
   return null;
 };
 
+const PAGE_SIZE = 50;
+
 export const QuotesListPage: React.FC = () => {
   const navigate = useNavigate();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
+  const currencyConfig = useCurrencyConfig();
   const { profile } = useAuth();
   const selection = useBulkSelection();
   const canBulkArchive = profile?.role === 'owner' || profile?.role === 'admin';
@@ -72,6 +78,7 @@ export const QuotesListPage: React.FC = () => {
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [editingQuote, setEditingQuote] = useState<QuoteWithDetails | null>(null);
   const [sendingQuoteId, setSendingQuoteId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
 
   // Command-palette deep-link: /quotes?new=1 opens the create modal.
   useEffect(() => {
@@ -91,6 +98,10 @@ export const QuotesListPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  useEffect(() => {
+    setPage(0);
+  }, [statusFilter, debouncedSearch]);
+
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['quote_stats'],
     queryFn: getQuoteStats,
@@ -99,17 +110,22 @@ export const QuotesListPage: React.FC = () => {
     retry: 2,
   });
 
-  const { data: quotes = [], isLoading, error: quotesError } = useQuery({
-    queryKey: ['quotes', statusFilter, debouncedSearch],
+  const { data: quotesPage, isLoading, error: quotesError } = useQuery({
+    queryKey: ['quotes', statusFilter, debouncedSearch, page],
     queryFn: () =>
-      fetchQuotes({
+      fetchQuotesPage({
         status: statusFilter !== 'all' ? statusFilter : undefined,
         search: debouncedSearch || undefined,
+        page,
+        pageSize: PAGE_SIZE,
       }),
     staleTime: 30000,
     refetchOnWindowFocus: false,
     retry: 2,
+    placeholderData: keepPreviousData,
   });
+  const quotes = quotesPage?.rows ?? [];
+  const totalQuotes = quotesPage?.total ?? 0;
 
   const getClientName = (quote: QuoteWithDetails) => {
     if (quote?.customers?.customer_name) {
@@ -123,12 +139,6 @@ export const QuotesListPage: React.FC = () => {
     }
     return 'N/A';
   };
-
-  const { sentQuotes, acceptedQuotes, expiredQuotes } = useMemo(() => ({
-    sentQuotes: quotes.filter((q) => q.status === 'sent'),
-    acceptedQuotes: quotes.filter((q) => q.status === 'accepted'),
-    expiredQuotes: quotes.filter((q) => q.status === 'expired'),
-  }), [quotes]);
 
   // Quote.id is `string | undefined` in the service-layer type; filter
   // to defined ids so the selection APIs (which expect strings) type-check.
@@ -172,9 +182,13 @@ export const QuotesListPage: React.FC = () => {
       return;
     }
     const n = selection.selectedCount;
-    if (!window.confirm(`Archive ${n} quote${n === 1 ? '' : 's'}? They'll be hidden from lists but recoverable.`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Archive quotes',
+      message: `Archive ${n} quote${n === 1 ? '' : 's'}? They'll be hidden from lists but recoverable.`,
+      confirmLabel: 'Archive',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setIsArchiving(true);
     try {
       const { error } = await supabase
@@ -201,7 +215,13 @@ export const QuotesListPage: React.FC = () => {
       n > 5
         ? `Email ${n} quotes to their customers? Sending is rate-limited to 5/minute — this will take roughly ${Math.ceil(n / 5)} minute(s).`
         : `Email ${n} quote${n === 1 ? '' : 's'} to their customers?`;
-    if (!window.confirm(msg)) return;
+    const ok = await confirm({
+      title: 'Send quotes',
+      message: msg,
+      confirmLabel: 'Send',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setSendProgress({ done: 0, total: n });
     try {
       const { bulkSendQuoteEmails } = await import('../../lib/quotesService');
@@ -214,11 +234,10 @@ export const QuotesListPage: React.FC = () => {
       const failed = results.filter((r) => r.status === 'failed').length;
       if (failed === 0 && skipped === 0) {
         toast.success(`Sent ${sent} quote${sent === 1 ? '' : 's'}`);
+      } else if (failed > 0) {
+        toast.warning(`Bulk send: ${sent} sent, ${skipped} skipped, ${failed} failed`);
       } else {
-        toast(
-          `Bulk send: ${sent} sent, ${skipped} skipped, ${failed} failed`,
-          { icon: failed > 0 ? '⚠️' : 'ℹ️', duration: 6000 },
-        );
+        toast.info(`Bulk send: ${sent} sent, ${skipped} skipped, ${failed} failed`);
       }
       selection.clear();
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
@@ -229,17 +248,6 @@ export const QuotesListPage: React.FC = () => {
       setSendProgress(null);
     }
   };
-
-  if (isLoading || statsLoading) {
-    return (
-      <div className="p-8 max-w-[1800px] mx-auto">
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading quotes...</p>
-        </div>
-      </div>
-    );
-  }
 
   if (quotesError) {
     return (
@@ -258,67 +266,33 @@ export const QuotesListPage: React.FC = () => {
     );
   }
 
-  return (
-    <div className="p-8 max-w-[1800px] mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex-1">
-          <FinancialModuleHeader
-            icon={<FileText className="w-7 h-7 text-white" />}
-            title="Quotes"
-            description="Manage customer quotations and proposals"
-            iconBgColor="#3b82f6"
-            statistics={[
-              { label: 'Total Quotes', value: quotes.length, color: '#3b82f6' },
-              { label: 'Paid', value: acceptedQuotes.length, color: '#10b981' },
-              { label: 'Sent', value: sentQuotes.length, color: '#f59e0b' },
-              { label: 'Overdue', value: expiredQuotes.length, color: '#ef4444' },
-            ]}
-            primaryAction={{
-              label: 'Create Quote',
-              onClick: () => setShowQuoteModal(true),
-              icon: <Plus className="w-4 h-4" />,
-            }}
-          />
-        </div>
-        <Button
-          variant="secondary"
-          onClick={() => navigate('/quotes/recycle-bin')}
-          className="ml-4"
-        >
-          <Trash2 className="w-4 h-4 mr-2" />
-          Recycle Bin
-        </Button>
-      </div>
+  const headerActions = (
+    <>
+      <Button onClick={() => setShowQuoteModal(true)}>
+        <Plus className="w-4 h-4 mr-2" />
+        Create Quote
+      </Button>
+      <Button variant="secondary" onClick={() => navigate('/quotes/recycle-bin')}>
+        <Trash2 className="w-4 h-4 mr-2" />
+        Recycle Bin
+      </Button>
+    </>
+  );
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <FinancialStatsCard
-          label="Total Invoiced"
-          value={formatCurrency(stats?.totalValue || 0)}
-          icon={<FileText className="w-5 h-5 text-white" />}
-          color="blue"
-        />
-        <FinancialStatsCard
-          label="Paid"
-          value={formatCurrency(stats?.acceptedValue || 0)}
-          icon={<CheckCircle className="w-5 h-5 text-white" />}
-          color="green"
-        />
-        <FinancialStatsCard
-          label="Outstanding"
-          value={formatCurrency(stats?.sentValue || 0)}
-          icon={<Clock className="w-5 h-5 text-white" />}
-          color="orange"
-        />
-        <FinancialStatsCard
-          label="Total Count"
-          value={quotes.length}
-          icon={<FileText className="w-5 h-5 text-white" />}
-          color="slate"
-        />
-      </div>
+  const kpis = (
+    <KpiRow
+      stats={[
+        { label: 'Total Invoiced', value: formatCurrency(stats?.totalValue || 0), tone: 'info' },
+        { label: 'Paid', value: formatCurrency(stats?.acceptedValue || 0), tone: 'success' },
+        { label: 'Outstanding', value: formatCurrency(stats?.sentValue || 0), tone: 'warning' },
+        { label: 'Total Count', value: stats?.total ?? 0, tone: 'neutral' },
+      ]}
+    />
+  );
 
-      <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
-        <div className="p-6">
+  const toolbar = (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
+      <div className="p-6">
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
             <div className="w-full lg:w-80 relative flex-shrink-0">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
@@ -471,24 +445,27 @@ export const QuotesListPage: React.FC = () => {
           )}
         </div>
       </div>
+  );
 
-      {quotes.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
-          <EmptyState
-            icon={FileText}
-            title="No quotes found"
-            description={
-              searchTerm || statusFilter !== 'all'
-                ? 'No quotes found matching your criteria.'
-                : 'No quotes yet. Create your first quote to get started.'
-            }
-            action={{ label: 'Create Quote', onClick: () => setShowQuoteModal(true) }}
-          />
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
+  const empty = (
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
+      <EmptyState
+        icon={FileText}
+        title="No quotes found"
+        description={
+          searchTerm || statusFilter !== 'all'
+            ? 'No quotes found matching your criteria.'
+            : 'No quotes yet. Create your first quote to get started.'
+        }
+        action={{ label: 'Create Quote', onClick: () => setShowQuoteModal(true) }}
+      />
+    </div>
+  );
+
+  const table = (
+    <>
+      <div className="overflow-x-auto">
+        <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   <th className="px-4 py-4 w-10">
@@ -643,28 +620,33 @@ export const QuotesListPage: React.FC = () => {
                             onClick={async () => {
                               if (!quote.id) return;
                               const quoteId = quote.id;
-                              if (window.confirm(`Send quote ${quote.quote_number} to ${getClientName(quote)}?`)) {
-                                try {
-                                  setSendingQuoteId(quoteId);
-                                  const { error } = await supabase
-                                    .from('quotes')
-                                    .update({
-                                      status: 'sent',
-                                    })
-                                    .eq('id', quoteId);
+                              const ok = await confirm({
+                                title: 'Send quote',
+                                message: `Send quote ${quote.quote_number} to ${getClientName(quote)}?`,
+                                confirmLabel: 'Send',
+                                tone: 'danger',
+                              });
+                              if (!ok) return;
+                              try {
+                                setSendingQuoteId(quoteId);
+                                const { error } = await supabase
+                                  .from('quotes')
+                                  .update({
+                                    status: 'sent',
+                                  })
+                                  .eq('id', quoteId);
 
-                                  if (error) throw error;
+                                if (error) throw error;
 
-                                  queryClient.invalidateQueries({ queryKey: ['quotes'] });
-                                  queryClient.invalidateQueries({ queryKey: ['quote_stats'] });
+                                queryClient.invalidateQueries({ queryKey: ['quotes'] });
+                                queryClient.invalidateQueries({ queryKey: ['quote_stats'] });
 
-                                  alert(`Quote ${quote.quote_number} has been sent successfully!`);
-                                } catch (error) {
-                                  logger.error('Error sending quote:', error);
-                                  alert('Failed to send quote. Please try again.');
-                                } finally {
-                                  setSendingQuoteId(null);
-                                }
+                                toast.success(`Quote ${quote.quote_number} has been sent successfully!`);
+                              } catch (error) {
+                                logger.error('Error sending quote:', error);
+                                toast.error('Failed to send quote. Please try again.');
+                              } finally {
+                                setSendingQuoteId(null);
                               }
                             }}
                             disabled={sendingQuoteId === quote.id}
@@ -685,9 +667,56 @@ export const QuotesListPage: React.FC = () => {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+    </>
+  );
 
+  return (
+    <ListPageTemplate
+      title="Quotes"
+      headerActions={headerActions}
+      kpis={kpis}
+      toolbar={toolbar}
+      table={table}
+      pager={{ page, pageSize: PAGE_SIZE, total: totalQuotes, onPageChange: setPage, itemNoun: 'quotes' }}
+      loading={isLoading || statsLoading}
+      isEmpty={quotes.length === 0}
+      empty={empty}
+      footer={
+        <BulkActionsBar
+          count={selection.selectedCount}
+          onClear={selection.clear}
+          itemNoun="quote"
+        >
+          <BulkActionButton
+            variant="ghost"
+            icon={<Download className="w-4 h-4" />}
+            label="Export"
+            onClick={handleBulkExport}
+            disabled={sendProgress !== null}
+          />
+          <BulkActionButton
+            variant="primary"
+            icon={<Send className="w-4 h-4" />}
+            label={
+              sendProgress
+                ? `Sending ${sendProgress.done}/${sendProgress.total}…`
+                : 'Send'
+            }
+            onClick={handleBulkSend}
+            disabled={sendProgress !== null || isArchiving}
+          />
+          {canBulkArchive && (
+            <BulkActionButton
+              variant="danger"
+              icon={<Archive className="w-4 h-4" />}
+              label={isArchiving ? 'Archiving…' : 'Archive'}
+              onClick={handleBulkArchive}
+              disabled={isArchiving || sendProgress !== null}
+            />
+          )}
+        </BulkActionsBar>
+      }
+    >
       {showQuoteModal && (
         <QuoteFormModal
           isOpen={showQuoteModal}
@@ -737,7 +766,7 @@ export const QuotesListPage: React.FC = () => {
                 description: item.description,
                 quantity: item.quantity,
                 unit_price: item.unit_price,
-                total: Math.round(item.quantity * item.unit_price * 100) / 100,
+                total: roundMoney(item.quantity * item.unit_price, currencyConfig.decimalPlaces),
                 sort_order: index,
               }));
 
@@ -792,7 +821,7 @@ export const QuotesListPage: React.FC = () => {
                 description: item.description,
                 quantity: item.quantity,
                 unit_price: item.unit_price,
-                total: Math.round(item.quantity * item.unit_price * 100) / 100,
+                total: roundMoney(item.quantity * item.unit_price, currencyConfig.decimalPlaces),
                 sort_order: index,
               }));
 
@@ -813,41 +842,7 @@ export const QuotesListPage: React.FC = () => {
           clientReference={editingQuote?.client_reference}
         />
       )}
-
-      <BulkActionsBar
-        count={selection.selectedCount}
-        onClear={selection.clear}
-        itemNoun="quote"
-      >
-        <BulkActionButton
-          variant="ghost"
-          icon={<Download className="w-4 h-4" />}
-          label="Export"
-          onClick={handleBulkExport}
-          disabled={sendProgress !== null}
-        />
-        <BulkActionButton
-          variant="primary"
-          icon={<Send className="w-4 h-4" />}
-          label={
-            sendProgress
-              ? `Sending ${sendProgress.done}/${sendProgress.total}…`
-              : 'Send'
-          }
-          onClick={handleBulkSend}
-          disabled={sendProgress !== null || isArchiving}
-        />
-        {canBulkArchive && (
-          <BulkActionButton
-            variant="danger"
-            icon={<Archive className="w-4 h-4" />}
-            label={isArchiving ? 'Archiving…' : 'Archive'}
-            onClick={handleBulkArchive}
-            disabled={isArchiving || sendProgress !== null}
-          />
-        )}
-      </BulkActionsBar>
-    </div>
+    </ListPageTemplate>
   );
 };
 

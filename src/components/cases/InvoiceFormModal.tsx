@@ -7,11 +7,18 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { supabase } from '../../lib/supabaseClient';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useTaxConfig } from '../../contexts/TenantConfigContext';
+import { resolveDefaultRate, resolveTaxLabel } from './taxFieldConfig';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
 import { getSupportedCurrencies, getBaseCurrency, getConversionRate, type SupportedCurrency } from '../../lib/currencyService';
-import { formatCurrency, formatBaseEquivalent } from '../../lib/format';
+import { formatCurrency, formatBaseEquivalent, toDateInputValue } from '../../lib/format';
 import { getInvoiceEditability } from '../../lib/invoicePermissions';
+import { listTemplates, recordTemplateUsage } from '../../lib/documentTemplatesService';
+import { templateKeys } from '../../lib/queryKeys';
+import { sanitizeHtml } from '../../lib/sanitizeHtml';
+import { RichTextEditor } from '../ui/RichTextEditor';
+import { resolveInvoiceTermsHtml, resolveTermsHtmlFromContent } from '../../lib/invoiceTermsService';
 
 interface LineItemTemplate {
   id: string;
@@ -97,18 +104,19 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
   clientReference,
 }) => {
   const { currencyFormat } = useCurrency();
+  const taxConfig = useTaxConfig();
   const toast = useToast();
   const caseSelectId = useId();
   const statusId = useId();
   const currencyId = useId();
   const discountAmountId = useId();
   const bankAccountId = useId();
-  const paymentTermsId = useId();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedQuoteId, setSelectedQuoteId] = useState<string>('');
   const [showTermsTemplates, setShowTermsTemplates] = useState(false);
+  const [editingTerms, setEditingTerms] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState<string>('');
   const [caseNumber, setCaseNumber] = useState<string>('');
   const [selectedCaseId, setSelectedCaseId] = useState<string>(caseId || '');
@@ -123,13 +131,43 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
     notes: initialData?.notes || '',
     discount_amount: initialData?.discount_amount || 0,
     discount_type: initialData?.discount_type || 'fixed',
-    tax_rate: initialData?.tax_rate || 5,
+    tax_rate: resolveDefaultRate(initialData?.tax_rate, taxConfig.defaultRate),
     client_reference: initialData?.client_reference || clientReference || '',
     bank_account_id: initialData?.bank_account_id || null,
     currency: initialData?.currency || '',
   });
 
   const [dueDateManuallySet, setDueDateManuallySet] = useState(false);
+
+  const buildTermsOverlay = () => {
+    let dueDays = '';
+    if (invoiceData.invoice_date && invoiceData.due_date) {
+      const ms = new Date(invoiceData.due_date).getTime() - new Date(invoiceData.invoice_date).getTime();
+      if (!Number.isNaN(ms)) dueDays = String(Math.max(0, Math.round(ms / 86_400_000)));
+    }
+    return {
+      invoice: {
+        due_date: invoiceData.due_date ? toDateInputValue(invoiceData.due_date) : '',
+        due_days: dueDays,
+      },
+    };
+  };
+
+  useEffect(() => {
+    if (!isOpen || initialData) return; // edit mode keeps saved terms
+    let cancelled = false;
+    (async () => {
+      const html = await resolveInvoiceTermsHtml({
+        refs: { caseId: selectedCaseId || caseId, customerId: customerId ?? undefined },
+        overlay: buildTermsOverlay(),
+      });
+      if (!cancelled && html) {
+        setInvoiceData((prev) => (prev.terms_and_conditions ? prev : { ...prev, terms_and_conditions: html }));
+      }
+    })().catch(() => { /* best-effort default terms; empty state renders otherwise */ });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialData, selectedCaseId, caseId, customerId]);
 
   const [currencies, setCurrencies] = useState<SupportedCurrency[]>([]);
   const [baseCurrency, setBaseCurrency] = useState<string>('');
@@ -164,7 +202,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
         notes: initialData.notes || '',
         discount_amount: initialData.discount_amount || 0,
         discount_type: initialData.discount_type || 'fixed',
-        tax_rate: initialData.tax_rate || 5,
+        tax_rate: resolveDefaultRate(initialData.tax_rate, taxConfig.defaultRate),
         client_reference: initialData.client_reference || clientReference || '',
         bank_account_id: initialData.bank_account_id || null,
         currency: initialData.currency || '',
@@ -214,26 +252,15 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
   });
 
   const { data: termsTemplates = [], isLoading: termsLoading } = useQuery({
-    queryKey: ['invoice_terms_templates'],
-    queryFn: async () => {
-      const { data: typeData, error: typeError } = await supabase
-        .from('master_template_types')
-        .select('id')
-        .eq('code', 'invoice_terms')
-        .maybeSingle();
-
-      if (typeError || !typeData) return [];
-
-      const { data, error } = await supabase
-        .from('document_templates')
-        .select('id, name, content, is_default')
-        .eq('template_type_id', typeData.id)
-        .eq('is_active', true)
-        .order('is_default', { ascending: false })
-        .order('name');
-
-      if (error) throw error;
-      return data as InvoiceTermsTemplate[];
+    queryKey: templateKeys.list('invoice_terms'),
+    queryFn: async (): Promise<InvoiceTermsTemplate[]> => {
+      const templates = await listTemplates('invoice_terms');
+      return templates.map((t) => ({
+        id: t.id,
+        name: t.name,
+        content: t.content,
+        is_default: t.isDefault,
+      }));
     },
     enabled: isOpen,
   });
@@ -280,19 +307,11 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
         if (initialData?.invoice_number) {
           setInvoiceNumber(initialData.invoice_number);
         } else {
-          try {
-            const { data: nextNumber, error } = await supabase
-              .rpc('get_next_number', { p_scope: 'invoice' });
-
-            if (!error && nextNumber) {
-              setInvoiceNumber(nextNumber);
-            } else {
-              setInvoiceNumber('INV-000001');
-            }
-          } catch (error) {
-            logger.error('Error fetching next invoice number:', error);
-            setInvoiceNumber('INV-000001');
-          }
+          // Never fetch a number for preview: get_next_number INCREMENTS the
+          // sequence, so every modal open burned a number from a parallel
+          // 'invoice' scope that createInvoice never used (it draws from
+          // 'invoices'/'proforma_invoices' at save time). Display-only hint.
+          setInvoiceNumber('Auto-assigned on save');
         }
 
         const activeCaseId = selectedCaseId || caseId;
@@ -370,9 +389,17 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
     setInvoiceData((prev) => ({
       ...prev,
       notes: quoteData.notes || prev.notes,
-      terms_and_conditions: quoteData.terms || prev.terms_and_conditions,
       discount_amount: quoteData.discount_amount ?? 0,
     }));
+
+    // Quote selection is an explicit action: refresh terms from the default
+    // template with quote context. Intentionally replaces current terms, unlike
+    // the passive on-open auto-fill (which only fills when terms are empty).
+    const defaultHtml = await resolveInvoiceTermsHtml({
+      refs: { caseId: selectedCaseId || caseId, customerId: customerId ?? undefined, quoteId },
+      overlay: buildTermsOverlay(),
+    });
+    if (defaultHtml) setInvoiceData((prev) => ({ ...prev, terms_and_conditions: defaultHtml }));
   };
 
   const addLineItem = () => {
@@ -422,19 +449,21 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
     }
   };
 
-  const stripHtmlTags = (html: string): string => {
-    const div = document.createElement('div');
-    div.textContent = html.replace(/<[^>]*>/g, ' ');
-    return (div.textContent || '').trim();
+  const applyTermsTemplate = async (template: InvoiceTermsTemplate) => {
+    try {
+      const html = await resolveTermsHtmlFromContent(template.content ?? '', {
+        refs: { caseId: selectedCaseId || caseId, customerId: customerId ?? undefined },
+        overlay: buildTermsOverlay(),
+      });
+      setInvoiceData((prev) => ({ ...prev, terms_and_conditions: html }));
+      setShowTermsTemplates(false);
+      void recordTemplateUsage(template.id);
+    } catch {
+      toast.error('Could not apply the template. Please try again.');
+    }
   };
 
-  const applyTermsTemplate = (template: InvoiceTermsTemplate) => {
-    const plainText = stripHtmlTags(template.content ?? '');
-    setInvoiceData(prev => ({ ...prev, terms_and_conditions: plainText }));
-    setShowTermsTemplates(false);
-  };
-
-  const docCurrency = invoiceData.currency || baseCurrency || 'USD';
+  const docCurrency = invoiceData.currency || baseCurrency || currencyFormat.currencyCode;
   const fmtDoc = (v: number) => formatCurrency(v, docCurrency);
 
   const subtotal = lineItems.reduce((sum, item) => {
@@ -562,11 +591,32 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
         )}
 
         <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="bg-slate-100 p-1.5 rounded-lg">
-              <FileText className="w-4 h-4 text-slate-600" />
+          <div className="flex flex-col gap-2 mb-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <div className="bg-slate-100 p-1.5 rounded-lg">
+                <FileText className="w-4 h-4 text-slate-600" />
+              </div>
+              <h3 className="text-sm font-semibold text-slate-900">Invoice Details</h3>
             </div>
-            <h3 className="text-sm font-semibold text-slate-900">Invoice Details</h3>
+            {quotes && quotes.length > 0 && !initialData && (
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Download className="w-3.5 h-3.5 text-slate-400 shrink-0 hidden sm:block" />
+                <select
+                  aria-label="Convert from an existing quote"
+                  value={selectedQuoteId}
+                  onChange={(e) => handleQuoteSelection(e.target.value)}
+                  className="w-full sm:w-auto sm:max-w-[16rem] px-2.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-2 focus:ring-primary focus:border-primary"
+                >
+                  <option value="">Convert from a quote…</option>
+                  {quotes.map((quote) => (
+                    <option key={quote.id} value={quote.id}>
+                      {quote.quote_number} - {quote.title} ({currencyFormat.currencySymbol}
+                      {quote.total_amount?.toFixed(2)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
           <div className="space-y-2.5">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
@@ -628,18 +678,18 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
               </div>
             </div>
 
-            <div className="md:col-span-1">
-              <Input
-                label="Invoice Title"
-                value={invoiceData.title}
-                onChange={(e) => setInvoiceData({ ...invoiceData, title: e.target.value })}
-                placeholder="e.g., Data Recovery Services Invoice"
-                required
-                disabled={isRestricted}
-              />
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5">
+              <div className="md:col-span-2">
+                <Input
+                  label="Invoice Title"
+                  value={invoiceData.title}
+                  onChange={(e) => setInvoiceData({ ...invoiceData, title: e.target.value })}
+                  placeholder="e.g., Data Recovery Services Invoice"
+                  required
+                  disabled={isRestricted}
+                />
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
               <div className="md:col-span-1">
                 <Input
                   label="Invoice Date"
@@ -690,30 +740,6 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
             )}
           </div>
         </div>
-
-        {quotes && quotes.length > 0 && !initialData && (
-          <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="bg-slate-100 p-1.5 rounded-lg">
-                <Download className="w-4 h-4 text-slate-600" />
-              </div>
-              <h3 className="text-sm font-semibold text-slate-900">Convert from Existing Quote</h3>
-            </div>
-            <select
-              value={selectedQuoteId}
-              onChange={(e) => handleQuoteSelection(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-            >
-              <option value="">Select a quote to import...</option>
-              {quotes.map((quote) => (
-                <option key={quote.id} value={quote.id}>
-                  {quote.quote_number} - {quote.title} ({currencyFormat.currencySymbol}
-                  {quote.total_amount?.toFixed(2)})
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
 
         <fieldset disabled={isRestricted} className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm min-w-0">
           <div className="flex items-center justify-between mb-3">
@@ -906,7 +932,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                   </>
                 )}
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-700">VAT ({invoiceData.tax_rate}%)</span>
+                  <span className="text-slate-700">{resolveTaxLabel(taxConfig.label, invoiceData.tax_rate)}</span>
                   <span className="font-medium text-slate-900">
                     {fmtDoc(taxAmount)}
                   </span>
@@ -960,17 +986,26 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor={paymentTermsId} className="block text-xs font-medium text-slate-700">
-                    Payment Terms
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowTermsTemplates(!showTermsTemplates)}
-                    className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1"
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    Quick Add
-                  </button>
+                  <span className="block text-xs font-medium text-slate-700">
+                    Invoice Terms
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowTermsTemplates(!showTermsTemplates)}
+                      className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      Terms & Templates
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingTerms((v) => !v)}
+                      className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1"
+                    >
+                      {editingTerms ? 'Done' : 'Edit'}
+                    </button>
+                  </div>
                 </div>
                 {showTermsTemplates && (
                   <div className="mb-2 p-2 bg-slate-50 rounded-lg border border-slate-200 max-h-32 overflow-y-auto">
@@ -978,7 +1013,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                       {termsLoading ? (
                         <div className="text-center py-2 text-xs text-slate-500">Loading...</div>
                       ) : termsTemplates.length === 0 ? (
-                        <div className="text-center py-2 text-xs text-slate-500">No templates found</div>
+                        <div className="text-center py-2 text-xs text-slate-500">No saved terms yet</div>
                       ) : (
                         termsTemplates.map((template) => (
                           <button
@@ -1001,16 +1036,23 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                     </div>
                   </div>
                 )}
-                <textarea
-                  id={paymentTermsId}
-                  value={invoiceData.terms_and_conditions}
-                  onChange={(e) =>
-                    setInvoiceData({ ...invoiceData, terms_and_conditions: e.target.value })
-                  }
-                  rows={4}
-                  className="w-full px-2.5 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                  placeholder="When payment is due (e.g., Net 30, Due on receipt)"
-                />
+                {editingTerms ? (
+                  <RichTextEditor
+                    value={invoiceData.terms_and_conditions}
+                    onChange={(html) => setInvoiceData({ ...invoiceData, terms_and_conditions: html })}
+                    minHeight="160px"
+                    placeholder="Payment terms (e.g., Net 30, Due on receipt)"
+                  />
+                ) : invoiceData.terms_and_conditions ? (
+                  <div
+                    className="prose prose-sm max-w-none border border-slate-200 rounded-lg bg-slate-50 p-3 text-sm text-slate-700"
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(invoiceData.terms_and_conditions) }}
+                  />
+                ) : (
+                  <p className="border border-dashed border-slate-300 rounded-lg p-3 text-sm text-slate-400">
+                    No invoice terms yet. Use Terms & Templates or Edit.
+                  </p>
+                )}
               </div>
             </div>
           </div>

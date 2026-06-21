@@ -1,5 +1,27 @@
 import { supabase } from './supabaseClient';
 import { baseAmount } from './financialMath';
+import { getBaseCurrency } from './currencyService';
+
+/** D8 — sum bank balances in base currency. A balance is a live position, so the
+ *  *_base column is an "indicative base" snapshot, not a frozen committed value.
+ *  Falls back to the raw balance for rows that predate the base columns. */
+export function sumBankBalanceBase(
+  rows: Array<Record<string, unknown>>, field: 'current_balance' | 'opening_balance',
+): number {
+  return (rows || []).reduce((sum, a) => {
+    const v = a[`${field}_base`] ?? a[field];
+    return sum + (typeof v === 'number' ? v : 0);
+  }, 0);
+}
+
+/** D8 — a bank closing balance summed across currencies is an INDICATIVE base
+ *  figure (live positions converted at the snapshot rate), not a committed value.
+ *  True when any account holds a non-base currency, so the UI can label it. */
+export function closingBalanceIsIndicative(
+  rows: Array<{ currency?: string | null }>, baseCurrency: string,
+): boolean {
+  return (rows || []).some((r) => !!r.currency && r.currency !== baseCurrency);
+}
 
 export interface ProfitLossData {
   revenue: {
@@ -45,6 +67,9 @@ export interface CashFlowData {
   netCashFlow: number;
   openingBalance: number;
   closingBalance: number;
+  /** D8 — closing balance is an indicative base rollup when any bank account
+   *  holds a non-base currency (summed at the snapshot rate, not committed). */
+  closingBalanceIsIndicative?: boolean;
 }
 
 export interface InvoiceSummaryData {
@@ -189,10 +214,15 @@ export const generateAgedReceivablesReport = async (): Promise<AgedReceivablesDa
   });
 
   const totals = {
+    // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- amount is already base (accumulated via baseAmount above)
     current: buckets.current.reduce((sum, c) => sum + c.amount, 0),
+    // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- amount is already base (accumulated via baseAmount above)
     thirtyDays: buckets.thirtyDays.reduce((sum, c) => sum + c.amount, 0),
+    // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- amount is already base (accumulated via baseAmount above)
     sixtyDays: buckets.sixtyDays.reduce((sum, c) => sum + c.amount, 0),
+    // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- amount is already base (accumulated via baseAmount above)
     ninetyDays: buckets.ninetyDays.reduce((sum, c) => sum + c.amount, 0),
+    // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- amount is already base (accumulated via baseAmount above)
     overNinetyDays: buckets.overNinetyDays.reduce((sum, c) => sum + c.amount, 0),
     total: 0,
   };
@@ -223,15 +253,17 @@ export const generateCashFlowReport = async (
       .in('status', ['approved', 'paid']),
     supabase
       .from('bank_accounts')
-      .select('current_balance, opening_balance')
+      .select('current_balance, current_balance_base, opening_balance, opening_balance_base, currency')
       .eq('is_active', true),
   ]);
 
   const receipts = (paymentsResult.data || []).reduce((sum, p) => sum + baseAmount(p, 'amount'), 0);
   const payments = (expensesResult.data || []).reduce((sum, e) => sum + baseAmount(e, 'amount'), 0);
 
-  const totalCurrentBalance = (bankAccountsResult.data || []).reduce((sum, a) => sum + (a.current_balance || 0), 0);
-  const totalOpeningBalance = (bankAccountsResult.data || []).reduce((sum, a) => sum + (a.opening_balance || 0), 0);
+  const bankRows = bankAccountsResult.data || [];
+  const totalCurrentBalance = sumBankBalanceBase(bankRows, 'current_balance');
+  const totalOpeningBalance = sumBankBalanceBase(bankRows, 'opening_balance');
+  const baseCurrency = await getBaseCurrency();
 
   return {
     operatingActivities: {
@@ -247,6 +279,7 @@ export const generateCashFlowReport = async (
     netCashFlow: receipts - payments,
     openingBalance: totalOpeningBalance,
     closingBalance: totalCurrentBalance,
+    closingBalanceIsIndicative: closingBalanceIsIndicative(bankRows, baseCurrency),
   };
 };
 
@@ -503,10 +536,15 @@ export const generateAgedPayablesReport = async (): Promise<AgedPayablesData> =>
   });
 
   const totals = {
+    // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- amount is already base (accumulated via baseAmount above)
     current: buckets.current.reduce((sum, c) => sum + c.amount, 0),
+    // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- amount is already base (accumulated via baseAmount above)
     thirtyDays: buckets.thirtyDays.reduce((sum, c) => sum + c.amount, 0),
+    // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- amount is already base (accumulated via baseAmount above)
     sixtyDays: buckets.sixtyDays.reduce((sum, c) => sum + c.amount, 0),
+    // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- amount is already base (accumulated via baseAmount above)
     ninetyDays: buckets.ninetyDays.reduce((sum, c) => sum + c.amount, 0),
+    // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- amount is already base (accumulated via baseAmount above)
     overNinetyDays: buckets.overNinetyDays.reduce((sum, c) => sum + c.amount, 0),
     total: 0,
   };

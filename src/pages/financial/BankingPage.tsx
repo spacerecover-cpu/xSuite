@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bankingService, BankAccount, PaymentReceipt, AccountTransfer } from '../../lib/bankingService';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
-import { useAccountingLocale } from '../../hooks/useAccountingLocale';
+import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
+import { formatCurrencyWithConfig, renderCurrencyToken } from '../../lib/format';
 import { useToast } from '../../hooks/useToast';
 import { AccountFormModal } from '../../components/banking/AccountFormModal';
 import { RecordReceiptModal } from '../../components/banking/RecordReceiptModal';
 import { TransferFundsModal } from '../../components/banking/TransferFundsModal';
+import { VirtualizedTableBody } from '../../components/ui/VirtualizedTableBody';
 import {
   Plus,
   Landmark,
@@ -30,7 +33,8 @@ import {
 } from 'lucide-react';
 
 export const BankingPage: React.FC = () => {
-  const { formatCurrencyValue, locale, getCurrencySymbol, getCurrencyCode } = useAccountingLocale();
+  const currencyConfig = useCurrencyConfig();
+  const formatCurrencyValue = (amount: number) => formatCurrencyWithConfig(amount, currencyConfig);
   const queryClient = useQueryClient();
   const toast = useToast();
 
@@ -93,6 +97,8 @@ export const BankingPage: React.FC = () => {
     },
     enabled: !!selectedAccount,
   });
+
+  const transactionsScrollRef = useRef<HTMLDivElement>(null);
 
   const createAccountMutation = useMutation({
     mutationFn: (data: Partial<BankAccount>) => bankingService.createAccount(data),
@@ -199,10 +205,18 @@ export const BankingPage: React.FC = () => {
 
   if (accountsLoading || summaryLoading) {
     return (
-      <div className="p-8 max-w-[1800px] mx-auto">
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 mt-4">Loading banking data...</p>
+      <div className="p-8 max-w-[1800px] mx-auto space-y-6">
+        <Skeleton className="h-28 w-full rounded-2xl" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+          ))}
+        </div>
+        <Skeleton className="h-20 w-full rounded-2xl" />
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full rounded-lg" />
+          ))}
         </div>
       </div>
     );
@@ -219,11 +233,9 @@ export const BankingPage: React.FC = () => {
             <h1 className="text-xl font-bold text-slate-900 mb-2">Banking & Cash Management</h1>
             <p className="text-slate-600 text-base">
               Manage accounts, track payments, and reconcile transactions
-              {locale && (
-                <span className="ml-2 text-sm text-slate-500">
-                  • Currency: {getCurrencyCode()} ({getCurrencySymbol()})
-                </span>
-              )}
+              <span className="ml-2 text-sm text-slate-500">
+                • Currency: {renderCurrencyToken(currencyConfig)}
+              </span>
             </p>
             <div className="flex gap-4 mt-3">
               <div className="flex items-center gap-2 text-sm">
@@ -580,7 +592,9 @@ export const BankingPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="overflow-x-auto" style={{ maxHeight: '500px' }}>
+              {/* transactionsScrollRef is the vertical scroll viewport VirtualizedTableBody
+                  measures — keep overflow-y scrollable (do not change to overflow-y-hidden). */}
+              <div ref={transactionsScrollRef} className="overflow-x-auto overflow-y-auto" style={{ maxHeight: '500px' }}>
                 {activeTab === 'accounts' && (
                   <table className="w-full">
                     <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
@@ -602,54 +616,60 @@ export const BankingPage: React.FC = () => {
                           </td>
                         </tr>
                       ) : (
-                        bankTransactions.map((transaction) => {
-                          // bank_transactions has amount+type, not separate debit/credit columns.
-                          const isDebit = transaction.type === 'debit' || transaction.type === 'expense' || transaction.type === 'withdrawal';
-                          const isCredit = transaction.type === 'credit' || transaction.type === 'income' || transaction.type === 'deposit';
-                          return (
-                          <tr key={transaction.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="py-2 px-4 text-xs text-slate-600">
-                              {new Date(transaction.transaction_date).toLocaleDateString()}
-                            </td>
-                            <td className="py-2 px-4">
-                              <p className="text-xs font-medium text-slate-900">{transaction.description ?? ''}</p>
-                              {transaction.reference && (
-                                <p className="text-xs text-slate-500">{transaction.reference}</p>
-                              )}
-                            </td>
-                            <td className="py-2 px-4 text-right">
-                              {isDebit && transaction.amount > 0 ? (
-                                <span className="text-xs font-semibold text-danger flex items-center justify-end gap-1">
-                                  <TrendingDown className="w-3 h-3" />
-                                  {formatCurrencyValue(transaction.amount)}
-                                </span>
-                              ) : (
-                                <span className="text-xs text-slate-400">-</span>
-                              )}
-                            </td>
-                            <td className="py-2 px-4 text-right">
-                              {isCredit && transaction.amount > 0 ? (
-                                <span className="text-xs font-semibold text-success flex items-center justify-end gap-1">
-                                  <TrendingUp className="w-3 h-3" />
-                                  {formatCurrencyValue(transaction.amount)}
-                                </span>
-                              ) : (
-                                <span className="text-xs text-slate-400">-</span>
-                              )}
-                            </td>
-                            <td className="py-2 px-4 text-right text-xs font-semibold text-slate-900">
-                              -
-                            </td>
-                            <td className="py-2 px-4 text-center">
-                              {transaction.is_reconciled ? (
-                                <CheckCircle2 className="w-4 h-4 text-success mx-auto" />
-                              ) : (
-                                <Clock className="w-4 h-4 text-warning mx-auto" />
-                              )}
-                            </td>
-                          </tr>
-                          );
-                        })
+                        <VirtualizedTableBody
+                          items={bankTransactions}
+                          scrollRef={transactionsScrollRef}
+                          colSpan={6}
+                          estimateRowHeight={44}
+                          renderRow={(transaction) => {
+                            // bank_transactions has amount+type, not separate debit/credit columns.
+                            const isDebit = transaction.type === 'debit' || transaction.type === 'expense' || transaction.type === 'withdrawal';
+                            const isCredit = transaction.type === 'credit' || transaction.type === 'income' || transaction.type === 'deposit';
+                            return (
+                            <tr key={transaction.id} className="hover:bg-slate-50 transition-colors">
+                              <td className="py-2 px-4 text-xs text-slate-600">
+                                {new Date(transaction.transaction_date).toLocaleDateString()}
+                              </td>
+                              <td className="py-2 px-4">
+                                <p className="text-xs font-medium text-slate-900">{transaction.description ?? ''}</p>
+                                {transaction.reference && (
+                                  <p className="text-xs text-slate-500">{transaction.reference}</p>
+                                )}
+                              </td>
+                              <td className="py-2 px-4 text-right">
+                                {isDebit && transaction.amount > 0 ? (
+                                  <span className="text-xs font-semibold text-danger flex items-center justify-end gap-1">
+                                    <TrendingDown className="w-3 h-3" />
+                                    {formatCurrencyValue(transaction.amount)}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-slate-400">-</span>
+                                )}
+                              </td>
+                              <td className="py-2 px-4 text-right">
+                                {isCredit && transaction.amount > 0 ? (
+                                  <span className="text-xs font-semibold text-success flex items-center justify-end gap-1">
+                                    <TrendingUp className="w-3 h-3" />
+                                    {formatCurrencyValue(transaction.amount)}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-slate-400">-</span>
+                                )}
+                              </td>
+                              <td className="py-2 px-4 text-right text-xs font-semibold text-slate-900">
+                                -
+                              </td>
+                              <td className="py-2 px-4 text-center">
+                                {transaction.is_reconciled ? (
+                                  <CheckCircle2 className="w-4 h-4 text-success mx-auto" />
+                                ) : (
+                                  <Clock className="w-4 h-4 text-warning mx-auto" />
+                                )}
+                              </td>
+                            </tr>
+                            );
+                          }}
+                        />
                       )}
                     </tbody>
                   </table>

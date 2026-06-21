@@ -5,11 +5,13 @@ import { Calendar, DollarSign, Users, Eye } from 'lucide-react';
 import { payrollService } from '../../lib/payrollService';
 import { payrollKeys } from '../../lib/queryKeys';
 import { Button } from '../../components/ui/Button';
-import { PageHeader } from '../../components/shared/PageHeader';
-import { formatCurrency } from '../../lib/format';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
+import { useCurrency } from '../../hooks/useCurrency';
 import { format } from 'date-fns';
 
 export default function PayrollHistoryPage() {
+  const { formatCurrency } = useCurrency();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -26,10 +28,16 @@ export default function PayrollHistoryPage() {
 
   return (
     <div className="p-8 max-w-[1800px] mx-auto">
-      <PageHeader
+      <PageHeaderSlot
         title="Payroll History"
-        description="View and manage all payroll periods"
-        icon={Calendar}
+        actions={
+          <Link to="/payroll/process">
+            <Button>
+              <Calendar className="w-4 h-4 mr-2" />
+              Process New Payroll
+            </Button>
+          </Link>
+        }
       />
 
       <div className="mb-6 flex flex-wrap gap-4">
@@ -61,22 +69,14 @@ export default function PayrollHistoryPage() {
             <option value="cancelled">Cancelled</option>
           </select>
         </div>
-
-        <div className="ml-auto">
-          <Link to="/payroll/process">
-            <Button>
-              <Calendar className="w-4 h-4 mr-2" />
-              Process New Payroll
-            </Button>
-          </Link>
-        </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
         {isLoading ? (
-          <div className="p-12 text-center">
-            <div className="inline-block w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-            <p className="text-slate-600 mt-4">Loading payroll periods...</p>
+          <div className="p-6 space-y-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full rounded-lg" />
+            ))}
           </div>
         ) : filteredPeriods && filteredPeriods.length > 0 ? (
           <div className="overflow-x-auto">

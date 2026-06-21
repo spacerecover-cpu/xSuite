@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Table } from '../../components/ui/Table';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { Plus, Edit2, Trash2, ChevronLeft, Sparkles, Search, X, Star, ToggleLeft, ToggleRight } from 'lucide-react';
 import { SETTINGS_CATEGORIES, MasterDataTable, TABLE_LABELS, isTenantScopedTable, hasDeletedAt } from '../../config/settingsCategories';
 import { settingsKeys } from '../../lib/queryKeys';
@@ -18,6 +19,8 @@ import {
 } from '../../lib/seedService';
 import { SeedingResultsDisplay } from '../../components/settings/SeedingResultsDisplay';
 import { logger } from '../../lib/logger';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
 
 interface MasterDataItem {
   id: number;
@@ -42,6 +45,8 @@ export const CategoryDetail: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
 
   const category = SETTINGS_CATEGORIES.find((c) => c.id === categoryId);
   const [activeTable, setActiveTable] = useState<MasterDataTable>(
@@ -212,6 +217,14 @@ export const CategoryDetail: React.FC = () => {
       setIsModalOpen(false);
       setFormValue('');
     },
+    onError: (error: Error) => {
+      logger.error('Create master data error:', error);
+      toast.error(
+        isTenantScopedTable(activeTable)
+          ? `Could not save: ${error.message}`
+          : `Could not save: ${error.message}. This category type is managed by the platform, not your tenant.`
+      );
+    },
   });
 
   const updateMutation = useMutation({
@@ -227,6 +240,14 @@ export const CategoryDetail: React.FC = () => {
       setIsModalOpen(false);
       setEditingItem(null);
       setFormValue('');
+    },
+    onError: (error: Error) => {
+      logger.error('Update master data error:', error);
+      toast.error(
+        isTenantScopedTable(activeTable)
+          ? `Could not save: ${error.message}`
+          : `Could not save: ${error.message}. This category type is managed by the platform, not your tenant.`
+      );
     },
   });
 
@@ -249,6 +270,14 @@ export const CategoryDetail: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: settingsKeys.masterData(activeTable) });
       queryClient.invalidateQueries({ queryKey: ['settings', 'category-count'] });
+    },
+    onError: (error: Error) => {
+      logger.error('Delete master data error:', error);
+      toast.error(
+        isTenantScopedTable(activeTable)
+          ? `Could not delete: ${error.message}`
+          : `Could not delete: ${error.message}. This category type is managed by the platform, not your tenant.`
+      );
     },
   });
 
@@ -310,15 +339,27 @@ export const CategoryDetail: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm('Are you sure you want to delete this item?')) {
+  const handleDelete = async (id: number) => {
+    const ok = await confirm({
+      title: 'Delete Item',
+      message: 'Are you sure you want to delete this item?',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (ok) {
       deleteMutation.mutate(id);
     }
   };
 
-  const handleSetDefaultCountry = (countryId: string) => {
+  const handleSetDefaultCountry = async (countryId: string) => {
     const country = allItems.find((item) => item.id.toString() === countryId);
-    if (confirm(`Set "${country?.name}" as the default country?`)) {
+    const ok = await confirm({
+      title: 'Set Default Country',
+      message: `Set "${country?.name}" as the default country?`,
+      confirmLabel: 'Set Default',
+      tone: 'default',
+    });
+    if (ok) {
       setDefaultCountryMutation.mutate(countryId);
     }
   };
@@ -340,7 +381,13 @@ export const CategoryDetail: React.FC = () => {
 
     const confirmMessage = confirmMessages[category.id] || 'This will populate tables with default data. This action cannot be undone. Continue?';
 
-    if (!confirm(confirmMessage)) {
+    const ok = await confirm({
+      title: 'Seed Default Data',
+      message: confirmMessage,
+      confirmLabel: 'Continue',
+      tone: 'danger',
+    });
+    if (!ok) {
       return;
     }
 
@@ -373,11 +420,11 @@ export const CategoryDetail: React.FC = () => {
         queryClient.invalidateQueries({ queryKey: ['settings', 'seed-status'] });
         queryClient.invalidateQueries({ queryKey: ['settings', 'category-count'] });
       } else {
-        alert(result.error || result.message);
+        toast.error(result.error || result.message);
       }
     } catch (error) {
       logger.error('Seeding error:', error);
-      alert('An unexpected error occurred during seeding');
+      toast.error('An unexpected error occurred during seeding');
     } finally {
       setIsSeeding(false);
     }
@@ -623,9 +670,11 @@ export const CategoryDetail: React.FC = () => {
           </div>
 
           {isLoading ? (
-            <div className="text-center py-16">
-              <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-              <p className="text-slate-500 mt-4">Loading...</p>
+            <div className="space-y-2">
+              <Skeleton className="h-11 w-full" />
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
             </div>
           ) : items.length === 0 && searchQuery ? (
             <div className="text-center py-16 bg-slate-50 rounded-lg border-2 border-dashed border-slate-200">

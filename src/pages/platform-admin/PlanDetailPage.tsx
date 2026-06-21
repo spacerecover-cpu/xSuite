@@ -11,7 +11,8 @@ import {
 } from '../../lib/billingService';
 import { platformAdminKeys } from '../../lib/queryKeys';
 import { PlanFeatureFormModal } from '../../components/platform-admin/plans/PlanFeatureFormModal';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
 import type { Database } from '../../types/database.types';
 
 type PlanUpdate = Database['public']['Tables']['subscription_plans']['Update'];
@@ -134,6 +135,7 @@ export const PlanDetailPage: React.FC = () => {
 
 const PlanDetailsForm: React.FC<{ plan: Database['public']['Tables']['subscription_plans']['Row'] }> = ({ plan }) => {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [formData, setFormData] = useState<PlanUpdate>({
     name: plan.name,
     code: plan.code,
@@ -421,6 +423,8 @@ const PlanFeaturesTab: React.FC<{
   onEditFeature: (feature: PlanFeature) => void;
 }> = ({ planId, features, onAddFeature, onEditFeature }) => {
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const confirm = useConfirm();
 
   const deleteMutation = useMutation({
     mutationFn: softDeletePlanFeature,
@@ -508,8 +512,15 @@ const PlanFeaturesTab: React.FC<{
                         <Pencil className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (confirm('Remove this feature?')) deleteMutation.mutate(feature.id);
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: 'Remove feature',
+                            message: 'Remove this feature?',
+                            confirmLabel: 'Remove',
+                            tone: 'danger',
+                          });
+                          if (!ok) return;
+                          deleteMutation.mutate(feature.id);
                         }}
                         className="p-1.5 text-slate-400 hover:text-danger hover:bg-danger-muted rounded-lg transition-colors"
                       >

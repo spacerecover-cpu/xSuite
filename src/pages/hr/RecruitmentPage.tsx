@@ -18,7 +18,9 @@ import {
 } from '../../lib/recruitmentService';
 import { JobFormModal } from '../../components/recruitment/JobFormModal';
 import { CandidateFormModal } from '../../components/recruitment/CandidateFormModal';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 const stageLabels: Record<string, string> = {
   applied: 'Applied',
@@ -163,6 +165,8 @@ function CandidateCard({
 
 export const RecruitmentPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<'jobs' | 'pipeline'>('jobs');
   const [searchTerm, setSearchTerm] = useState('');
   const [pipelineJob, setPipelineJob] = useState<JobWithDetails | null>(null);
@@ -304,8 +308,10 @@ export const RecruitmentPage: React.FC = () => {
           </div>
 
           {jobsLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-48 rounded-2xl" />
+              ))}
             </div>
           ) : filteredJobs.length === 0 ? (
             <div className="text-center py-16">
@@ -390,8 +396,14 @@ export const RecruitmentPage: React.FC = () => {
                         <MoreHorizontal className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (confirm('Delete this job and all its candidates?')) {
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: 'Delete Job',
+                            message: 'Delete this job and all its candidates?',
+                            confirmLabel: 'Delete',
+                            tone: 'danger',
+                          });
+                          if (ok) {
                             deleteJobMutation.mutate(job.id);
                           }
                         }}
@@ -439,8 +451,10 @@ export const RecruitmentPage: React.FC = () => {
           </div>
 
           {candidatesLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-40 rounded-xl" />
+              ))}
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 overflow-x-auto">
@@ -463,8 +477,14 @@ export const RecruitmentPage: React.FC = () => {
                           const job = jobs.find(j => j.id === c.job_id) || pipelineJob || jobs[0];
                           if (job) openCandidateModal(job, c);
                         }}
-                        onDelete={id => {
-                          if (confirm('Remove this candidate?')) {
+                        onDelete={async id => {
+                          const ok = await confirm({
+                            title: 'Remove Candidate',
+                            message: 'Remove this candidate?',
+                            confirmLabel: 'Remove',
+                            tone: 'danger',
+                          });
+                          if (ok) {
                             deleteCandidateMutation.mutate(id);
                           }
                         }}

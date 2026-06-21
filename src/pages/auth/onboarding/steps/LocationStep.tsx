@@ -1,19 +1,19 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin } from 'lucide-react';
+import { MapPin, Languages } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import { supabase } from '../../../../lib/supabaseClient';
+import type { OnboardableCountry } from '../../../../lib/geoCountryService';
+import { resolveUiLanguageDefault, shouldShowJurisdictionStep, validateTaxNumber } from '../onboardingValidation';
+import { JurisdictionStep } from './JurisdictionStep';
 import type { OnboardingFormData } from '../constants';
 
-interface GeoCountry {
-  id: string;
-  code: string;
-  name: string;
-  currency_code: string | null;
-  currency_symbol: string | null;
-  tax_system: string | null;
-  tax_label: string | null;
-}
+type GeoCountry = OnboardableCountry;
+
+const LANGUAGE_OPTIONS: { value: 'en' | 'ar'; label: string }[] = [
+  { value: 'en', label: 'English' },
+  { value: 'ar', label: 'العربية' },
+];
 
 interface LocationStepProps {
   formData: OnboardingFormData;
@@ -51,8 +51,24 @@ export const LocationStep = ({
   const handleCountryChange = (id: string) => {
     const c = countries.find((x) => x.id === id);
     updateField('countryId', id);
-    updateField('baseCurrencyCode', c?.currency_code ?? 'USD');
+    // No 'USD' fabrication (fail-loud, D2): the country list is currency-filtered,
+    // so a selected country always carries a real currency.
+    updateField('baseCurrencyCode', c?.currency_code ?? '');
+    // Country-driven defaults for the language + jurisdiction fields.
+    updateField('uiLanguage', resolveUiLanguageDefault(c?.language_code));
+    updateField('fiscalYearStart', c?.fiscal_year_start ?? '');
+    updateField('timezone', c?.timezone ?? '');
   };
+
+  const activeLanguage = formData.uiLanguage || resolveUiLanguageDefault(selectedCountry?.language_code);
+
+  // When the jurisdiction block is shown, require entity type + a tax number that
+  // passes the country's format (soft if no reference format). Otherwise always complete.
+  const showJurisdiction = !!selectedCountry && shouldShowJurisdictionStep(selectedCountry.tax_system);
+  const jurisdictionComplete =
+    !showJurisdiction ||
+    (formData.legalEntityType.trim().length > 0 &&
+      validateTaxNumber(selectedCountry?.tax_number_format ?? null, formData.taxNumber).ok);
 
   return (
     <div className="space-y-5">
@@ -119,6 +135,55 @@ export const LocationStep = ({
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {selectedCountry && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+          >
+            <label className="block text-sm font-medium text-slate-300 font-body mb-2">
+              <span className="inline-flex items-center gap-1.5">
+                <Languages className="w-4 h-4 text-slate-500" /> Interface language
+              </span>
+            </label>
+            <div className="grid grid-cols-2 gap-2" role="group" aria-label="Interface language">
+              {LANGUAGE_OPTIONS.map((opt) => {
+                const active = activeLanguage === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => updateField('uiLanguage', opt.value)}
+                    className={`py-3 rounded-xl border font-body text-sm transition-all ${
+                      active
+                        ? 'border-primary bg-primary/15 text-white'
+                        : 'border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-300'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-slate-500 font-body mt-1">
+              Defaulted from {selectedCountry.name}. You can change this anytime.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedCountry && showJurisdiction && (
+          <JurisdictionStep
+            formData={formData}
+            country={selectedCountry}
+            updateField={updateField}
+          />
+        )}
+      </AnimatePresence>
+
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -164,7 +229,7 @@ export const LocationStep = ({
         </button>
         <Button
           onClick={onNext}
-          disabled={!formData.countryId}
+          disabled={!formData.countryId || !jurisdictionComplete}
           className="flex-1 !bg-primary hover:!bg-primary/90 !text-primary-foreground !rounded-xl !py-3 !font-body disabled:!opacity-40"
         >
           Continue

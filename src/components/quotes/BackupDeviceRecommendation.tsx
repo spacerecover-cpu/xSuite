@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { HardDrive, ChevronDown, ChevronUp, CheckSquare, Square, Package } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { Skeleton } from '../ui/Skeleton';
 import { getRecommendedDevices } from '../../lib/stockService';
 import { useCurrency } from '../../hooks/useCurrency';
 
@@ -74,8 +75,10 @@ export const BackupDeviceRecommendation: React.FC<BackupDeviceRecommendationProp
       {isExpanded && (
         <div className="p-4 space-y-3">
           {isLoading ? (
-            <div className="flex items-center justify-center py-6">
-              <div className="w-6 h-6 border-3 border-slate-200 border-t-primary rounded-full animate-spin" />
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-14 w-full rounded-lg" />
+              ))}
             </div>
           ) : items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-6 text-slate-400">

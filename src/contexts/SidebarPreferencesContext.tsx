@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import { logger } from '../lib/logger';
@@ -50,6 +50,11 @@ export const SidebarPreferencesProvider: React.FC<{ children: React.ReactNode }>
   const [position, setPositionState] = useState<SidebarPosition>(readPositionHint);
   const [isCollapsed, setIsCollapsedState] = useState<boolean>(readCollapsedHint);
   const [expandedSection, setExpandedSectionState] = useState<string | null>(null);
+  // True once the user changes any preference this session. The DB row loads
+  // asynchronously after mount; without this flag a slow SELECT landing after
+  // a user toggle snapped sections open/closed under the cursor (and stomped
+  // the newer, already-persisted intent with pre-change data).
+  const userInteractedRef = useRef(false);
 
   // Persist a partial patch for the current user. tenant_id is stamped by the
   // set_user_sidebar_preferences_tenant_and_audit trigger; a PostgREST upsert
@@ -79,6 +84,10 @@ export const SidebarPreferencesProvider: React.FC<{ children: React.ReactNode }>
         .eq('user_id', userId)
         .maybeSingle();
       if (cancelled) return;
+      if (userInteractedRef.current) {
+        setLoading(false);
+        return;
+      }
       if (!error && data) {
         const pos: SidebarPosition = data.sidebar_position === 'right' ? 'right' : 'left';
         setPositionState(pos);
@@ -103,6 +112,7 @@ export const SidebarPreferencesProvider: React.FC<{ children: React.ReactNode }>
 
   const setPosition = useCallback(
     (next: SidebarPosition) => {
+      userInteractedRef.current = true;
       setPositionState(next);
       localStorage.setItem(POSITION_HINT_KEY, next);
       void persist({ sidebar_position: next });
@@ -111,6 +121,7 @@ export const SidebarPreferencesProvider: React.FC<{ children: React.ReactNode }>
   );
 
   const toggleCollapsed = useCallback(() => {
+    userInteractedRef.current = true;
     setIsCollapsedState((prev) => {
       const next = !prev;
       localStorage.setItem(COLLAPSED_HINT_KEY, String(next));
@@ -121,16 +132,23 @@ export const SidebarPreferencesProvider: React.FC<{ children: React.ReactNode }>
 
   const setExpandedSection = useCallback(
     (section: string | null) => {
+      userInteractedRef.current = true;
       setExpandedSectionState(section);
       void persist({ collapsed_sections: PERSISTED_SECTIONS.filter((s) => s !== section) });
     },
     [persist],
   );
 
+  // Memoized: the provider sits inside AppLayout, which re-renders on every
+  // navigation (useLocation); an unstable value re-rendered the whole sidebar
+  // tree on each route change.
+  const value = useMemo(
+    () => ({ loading, position, isCollapsed, expandedSection, setPosition, toggleCollapsed, setExpandedSection }),
+    [loading, position, isCollapsed, expandedSection, setPosition, toggleCollapsed, setExpandedSection],
+  );
+
   return (
-    <SidebarPreferencesContext.Provider
-      value={{ loading, position, isCollapsed, expandedSection, setPosition, toggleCollapsed, setExpandedSection }}
-    >
+    <SidebarPreferencesContext.Provider value={value}>
       {children}
     </SidebarPreferencesContext.Provider>
   );

@@ -5,6 +5,10 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { supabase, resolveTenantId } from '../../lib/supabaseClient';
 import { useToast } from '../../hooks/useToast';
+import { useCurrency } from '../../hooks/useCurrency';
+import { useTaxConfig } from '../../contexts/TenantConfigContext';
+import { resolveRateContext } from '../../lib/currencyService';
+import { buildPoBaseColumns } from '../../lib/purchaseOrderBase';
 import { logger } from '../../lib/logger';
 
 interface LineItem {
@@ -39,6 +43,8 @@ interface PurchaseOrderFormModalProps {
 
 export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, purchaseOrder, supplierId }: PurchaseOrderFormModalProps) {
   const toast = useToast();
+  const { formatCurrency } = useCurrency();
+  const taxConfig = useTaxConfig();
   const [loading, setLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string; supplier_number: string | null }>>([]);
   const [statuses, setStatuses] = useState<Array<{ id: string; name: string; sort_order?: number | null; is_active?: boolean }>>([]);
@@ -136,7 +142,8 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
 
   const calculateTotals = () => {
     const subtotal = lineItems.reduce((sum, item) => sum + item.total, 0);
-    const tax = subtotal * 0.15;
+    // Fail-loud: tenant/country tax rate (percent), never a hardcoded 15%.
+    const tax = subtotal * (taxConfig.defaultRate / 100);
     const total = subtotal + tax;
     return { subtotal, tax, total };
   };
@@ -156,6 +163,11 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
       if (!user) throw new Error('Not authenticated');
 
       const totals = calculateTotals();
+      // Multi-currency closure (D7): freeze currency + rate + *_base shadows on the
+      // PO row. No currency selector yet, so resolveRateContext defaults to the
+      // tenant base currency (rate 1) — which also overrides the legacy 'USD'
+      // column default that would otherwise mislabel base-currency amounts.
+      const rc = await resolveRateContext(undefined, formData.order_date, null);
 
       // Only persist columns that exist on purchase_orders. UI-only fields
       // (shipping_method, internal_notes) and child rows (line_items)
@@ -171,6 +183,10 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
         subtotal: totals.subtotal,
         tax_amount: totals.tax,
         total_amount: totals.total,
+        ...buildPoBaseColumns(
+          { subtotal: totals.subtotal, tax_amount: totals.tax, discount_amount: 0, shipping_cost: 0, total_amount: totals.total },
+          rc,
+        ),
         updated_by: user.id,
         updated_at: new Date().toISOString(),
       };
@@ -367,7 +383,7 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
                 </div>
                 <div className="w-32">
                   <Input
-                    value={item.total.toFixed(2)}
+                    value={formatCurrency(item.total)}
                     disabled
                     placeholder="Total"
                   />
@@ -391,15 +407,15 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
             <div className="flex flex-col items-end space-y-2">
               <div className="flex justify-between w-64">
                 <span className="text-gray-600">Subtotal:</span>
-                <span className="font-semibold">${totals.subtotal.toFixed(2)}</span>
+                <span className="font-semibold">{formatCurrency(totals.subtotal)}</span>
               </div>
               <div className="flex justify-between w-64">
-                <span className="text-gray-600">Tax (15%):</span>
-                <span className="font-semibold">${totals.tax.toFixed(2)}</span>
+                <span className="text-gray-600">{taxConfig.label} ({taxConfig.defaultRate}%):</span>
+                <span className="font-semibold">{formatCurrency(totals.tax)}</span>
               </div>
               <div className="flex justify-between w-64 text-lg border-t pt-2">
                 <span className="font-bold">Total:</span>
-                <span className="font-bold text-primary">${totals.total.toFixed(2)}</span>
+                <span className="font-bold text-primary">{formatCurrency(totals.total)}</span>
               </div>
             </div>
           </div>

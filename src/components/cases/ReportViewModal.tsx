@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Download, Edit, FileText, CheckCircle, Send, AlertCircle, Mail, Printer } from 'lucide-react';
+import { Download, Edit, FileText, CheckCircle, Send, AlertCircle, Mail, Printer, ClipboardCheck } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -16,6 +16,9 @@ import {
 import { format } from 'date-fns';
 import { EmailDocumentModal } from './EmailDocumentModal';
 import { logger } from '../../lib/logger';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
+import { Skeleton } from '../ui/Skeleton';
 
 interface ReportViewModalProps {
   isOpen: boolean;
@@ -36,6 +39,8 @@ export default function ReportViewModal({
   onApprove,
   onSend,
 }: ReportViewModalProps) {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [report, setReport] = useState<Report | null>(null);
   const [, setSections] = useState<ReportSectionData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,7 +119,7 @@ export default function ReportViewModal({
       await reportPDFService.downloadReportPDF(reportId);
     } catch (error) {
       logger.error('Error downloading PDF:', error);
-      alert('Failed to download PDF. Please try again.');
+      toast.error('Failed to download PDF. Please try again.');
     } finally {
       setDownloadingPDF(false);
     }
@@ -123,13 +128,39 @@ export default function ReportViewModal({
   const handleApprove = async () => {
     if (!report) return;
 
-    if (confirm('Are you sure you want to approve this report?')) {
+    const ok = await confirm({
+      title: 'Approve Report',
+      message: 'Are you sure you want to approve this report?',
+      confirmLabel: 'Approve',
+      tone: 'danger',
+    });
+    if (ok) {
       try {
         await onApprove?.(report.id);
         await loadReport();
       } catch (error) {
         logger.error('Error approving report:', error);
-        alert('Failed to approve report');
+        toast.error('Failed to approve report');
+      }
+    }
+  };
+
+  const handleSubmitForReview = async () => {
+    if (!report) return;
+
+    const ok = await confirm({
+      title: 'Submit for Review',
+      message: 'Submit this report for review? It can no longer be edited while in review.',
+      confirmLabel: 'Submit',
+    });
+    if (ok) {
+      try {
+        await reportsService.submitForReview(report.id);
+        await loadReport();
+        toast.success('Report submitted for review');
+      } catch (error) {
+        logger.error('Error submitting report for review:', error);
+        toast.error('Failed to submit report for review');
       }
     }
   };
@@ -138,17 +169,28 @@ export default function ReportViewModal({
     if (!report) return;
 
     if (report.status !== 'approved') {
-      alert('Report must be approved before sending to customer');
+      toast.warning('Report must be approved before sending to customer');
       return;
     }
 
-    if (confirm('Send this report to the customer?')) {
+    const ok = await confirm({
+      title: 'Send to Customer',
+      message:
+        'Send this report to the customer? The exact PDF being released is archived as the delivery record.',
+      confirmLabel: 'Send',
+      tone: 'danger',
+    });
+    if (ok) {
       try {
+        // Persist the released artifact BEFORE flipping the status — if the
+        // archive write fails the report stays unsent (provability gate).
+        const { reportPDFService } = await import('../../lib/reportPDFService');
+        await reportPDFService.persistReportPDF(report.id);
         await onSend?.(report.id);
         await loadReport();
       } catch (error) {
         logger.error('Error sending report:', error);
-        alert('Failed to send report');
+        toast.error('Failed to send report (the delivery PDF could not be archived)');
       }
     }
   };
@@ -243,6 +285,18 @@ export default function ReportViewModal({
             <span className="text-slate-400">
               {format(new Date(report.created_at), 'MMM dd, yyyy HH:mm')}
             </span>
+            {report.reviewed_at && (
+              <>
+                <span className="mx-2 text-slate-300">|</span>
+                <span className="text-slate-500">Reviewed By</span>
+                <span className="mx-2 font-medium text-slate-900">
+                  {report.reviewed_by_profile?.full_name || 'Unknown'}
+                </span>
+                <span className="text-slate-400">
+                  {format(new Date(report.reviewed_at), 'MMM dd, yyyy HH:mm')}
+                </span>
+              </>
+            )}
           </div>
 
           {/* Version Notes */}
@@ -269,11 +323,17 @@ export default function ReportViewModal({
           )}
 
           {!pdfError && !pdfBlobUrl && (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-sm text-gray-600">Generating PDF preview...</p>
+            <div className="h-full border border-gray-300 rounded-lg p-8 space-y-4">
+              <Skeleton className="h-8 w-1/2 mx-auto" />
+              <Skeleton className="h-4 w-3/4 mx-auto" />
+              <div className="space-y-3 pt-6">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
               </div>
+              <p className="text-sm text-gray-600 text-center pt-4">Generating PDF preview...</p>
             </div>
           )}
 
@@ -294,6 +354,12 @@ export default function ReportViewModal({
               <Button variant="ghost" onClick={onEdit}>
                 <Edit className="w-4 h-4 mr-2" />
                 Edit
+              </Button>
+            )}
+            {report.status === 'draft' && (
+              <Button variant="secondary" onClick={handleSubmitForReview}>
+                <ClipboardCheck className="w-4 h-4 mr-2" />
+                Submit for Review
               </Button>
             )}
             {report.is_latest_version && onNewVersion && (

@@ -8,6 +8,7 @@ import {
 } from '../styles';
 import { formatDate, buildCompanyAddress, safeString } from '../utils';
 import { getGeneralIconSvg } from '../../deviceIconMapper';
+import { buildLogoNode } from '../brandingImage';
 
 export function buildInvoiceDocument(
   data: InvoiceDocumentData,
@@ -35,14 +36,11 @@ export function buildInvoiceDocument(
 
   const headerContent: Content[] = [];
 
-  if (logoBase64) {
+  const invoiceLogoNode = buildLogoNode(logoBase64, { width: 130, margin: [0, 0, 0, 5] });
+  if (invoiceLogoNode) {
     headerContent.push({
       columns: [
-        {
-          image: logoBase64,
-          width: 130,
-          margin: [0, 0, 0, 5],
-        },
+        invoiceLogoNode,
         {
           stack: [
             { text: legalName, fontSize: 14, bold: true, color: PDF_COLORS.text, alignment: 'right' },
@@ -328,21 +326,31 @@ export function buildInvoiceDocument(
             {
               table: {
                 headerRows: 1,
-                widths: ['auto', '*', 'auto', 'auto', 'auto'],
+                widths: ['auto', 'auto', 'auto', '*', 'auto', 'auto', 'auto'],
                 body: [
                   [
-                    { text: 'Date', fontSize: 8, bold: true, color: PDF_COLORS.textLight },
-                    { text: 'Method', fontSize: 8, bold: true, color: PDF_COLORS.textLight },
-                    { text: 'Reference', fontSize: 8, bold: true, color: PDF_COLORS.textLight },
-                    { text: 'Recorded By', fontSize: 8, bold: true, color: PDF_COLORS.textLight },
-                    { text: 'Amount', fontSize: 8, bold: true, color: PDF_COLORS.textLight, alignment: 'right' },
+                    { text: t('phDate', 'Date'), fontSize: 8, bold: true, color: PDF_COLORS.textLight },
+                    { text: t('phDocument', 'Document'), fontSize: 8, bold: true, color: PDF_COLORS.textLight },
+                    { text: t('phMethod', 'Method'), fontSize: 8, bold: true, color: PDF_COLORS.textLight },
+                    { text: t('phReference', 'Reference'), fontSize: 8, bold: true, color: PDF_COLORS.textLight },
+                    { text: t('phRecordedBy', 'Recorded By'), fontSize: 8, bold: true, color: PDF_COLORS.textLight },
+                    { text: t('phAmount', 'Amount'), fontSize: 8, bold: true, color: PDF_COLORS.textLight, alignment: 'right' },
+                    { text: t('phBalance', 'Balance'), fontSize: 8, bold: true, color: PDF_COLORS.textLight, alignment: 'right' },
                   ],
                   ...paymentHistory.map((p): TableCell[] => [
                     { text: p.payment_date ? formatDate(p.payment_date) : '-', fontSize: 8, color: PDF_COLORS.text },
+                    { text: p.doc_number || '-', fontSize: 8, color: PDF_COLORS.text },
                     { text: p.method || '-', fontSize: 8, color: PDF_COLORS.text },
                     { text: p.reference || '-', fontSize: 8, color: PDF_COLORS.text },
                     { text: p.recorded_by || '-', fontSize: 8, color: PDF_COLORS.text },
-                    { text: formatCurrency(p.amount), fontSize: 8, color: PDF_COLORS.text, alignment: 'right' },
+                    { text: formatCurrency(p.amount), fontSize: 8, color: PDF_COLORS.success, alignment: 'right' },
+                    {
+                      text: p.running_balance !== undefined ? formatCurrency(p.running_balance) : '-',
+                      fontSize: 8,
+                      bold: true,
+                      color: PDF_COLORS.text,
+                      alignment: 'right',
+                    },
                   ]),
                 ],
               },

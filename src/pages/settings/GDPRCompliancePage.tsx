@@ -8,7 +8,9 @@ import { gdprService } from '../../lib/gdprService';
 import { gdprKeys } from '../../lib/queryKeys';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabaseClient';
-import toast from 'react-hot-toast';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
+import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../hooks/useConfirm';
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; icon: React.ReactNode }> = {
   pending: { bg: 'bg-warning-muted border-warning/30', text: 'text-warning', icon: <Clock className="w-4 h-4" /> },
@@ -18,6 +20,8 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; icon: React.Reac
 };
 
 export const GDPRCompliancePage: React.FC = () => {
+  const toast = useToast();
+  const confirm = useConfirm();
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const [showNewRequest, setShowNewRequest] = useState(false);
@@ -77,7 +81,13 @@ export const GDPRCompliancePage: React.FC = () => {
       toast.error('Please search and select a customer first');
       return;
     }
-    if (!confirm('This will permanently anonymize all personal data for this customer. This cannot be undone. Continue?')) return;
+    const ok = await confirm({
+      title: 'Anonymize Customer Data',
+      message: 'This will permanently anonymize all personal data for this customer. This cannot be undone. Continue?',
+      confirmLabel: 'Anonymize',
+      tone: 'danger',
+    });
+    if (!ok) return;
     try {
       await gdprService.updateRequestStatus(requestId, 'processing', user!.id);
       await gdprService.anonymizeCustomerData(selectedCustomerId);
@@ -94,7 +104,7 @@ export const GDPRCompliancePage: React.FC = () => {
     const { data } = await supabase
       .from('customers_enhanced')
       .select('id, customer_name, email')
-      .or(`email.ilike.%${customerSearch}%,customer_name.ilike.%${customerSearch}%`)
+      .or(`email.ilike.%${sanitizeFilterValue(customerSearch)}%,customer_name.ilike.%${sanitizeFilterValue(customerSearch)}%`)
       .is('deleted_at', null)
       .limit(1)
       .maybeSingle();

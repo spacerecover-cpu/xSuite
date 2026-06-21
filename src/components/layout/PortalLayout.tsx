@@ -1,5 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { ContentLoadingFallback } from '../shared/ContentLoadingFallback';
 import { usePortalAuth } from '../../contexts/PortalAuthContext';
 import { useTenantFeature } from '../../contexts/TenantConfigContext';
 import { CustomerAvatar } from '../ui/CustomerAvatar';
@@ -15,6 +17,7 @@ interface PortalBranding {
 }
 
 export const PortalLayout: React.FC = () => {
+  const { t } = useTranslation();
   const { customer, logout } = usePortalAuth();
   const portalEnabled = useTenantFeature('portal.customer');
   const navigate = useNavigate();
@@ -73,7 +76,8 @@ export const PortalLayout: React.FC = () => {
   const handleLogout = () => {
     setMenuOpen(false);
     logout();
-    navigate('/portal/login');
+    // replace so the back button can't return to a now-protected portal page (L7).
+    navigate('/portal/login', { replace: true });
   };
 
   const handleOpenSettings = () => {
@@ -86,24 +90,23 @@ export const PortalLayout: React.FC = () => {
   }
 
   const navItems = [
-    { path: '/portal/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/portal/cases', label: 'My Cases', icon: FileText },
-    { path: '/portal/quotes', label: 'Quotes', icon: DollarSign },
-    { path: '/portal/reports', label: 'Reports', icon: FileBarChart },
-    { path: '/portal/purchases', label: 'My Purchases', icon: ShoppingBag },
-    { path: '/portal/payments', label: 'Payments', icon: Receipt },
-    { path: '/portal/communications', label: 'Messages', icon: MessageSquare },
-    { path: '/portal/settings', label: 'Settings', icon: Settings },
+    { path: '/portal/dashboard', label: t('portal.nav.dashboard'), icon: LayoutDashboard },
+    { path: '/portal/cases', label: t('portal.nav.myCases'), icon: FileText },
+    { path: '/portal/quotes', label: t('portal.nav.quotes'), icon: DollarSign },
+    { path: '/portal/reports', label: t('portal.nav.reports'), icon: FileBarChart },
+    { path: '/portal/purchases', label: t('portal.nav.myPurchases'), icon: ShoppingBag },
+    { path: '/portal/payments', label: t('portal.nav.payments'), icon: Receipt },
+    { path: '/portal/communications', label: t('portal.nav.messages'), icon: MessageSquare },
+    { path: '/portal/settings', label: t('portal.nav.settings'), icon: Settings },
   ];
 
   if (!portalEnabled) {
     return (
       <div className="min-h-dvh flex items-center justify-center bg-slate-50 p-6">
         <div className="max-w-md rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-          <h1 className="text-lg font-semibold text-slate-900">Portal unavailable</h1>
+          <h1 className="text-lg font-semibold text-slate-900">{t('portal.common.portalUnavailable')}</h1>
           <p className="mt-2 text-sm text-slate-600">
-            The customer portal is not currently enabled for this account. Please contact us
-            directly for updates on your case.
+            {t('portal.common.portalUnavailableBody')}
           </p>
         </div>
       </div>
@@ -120,11 +123,11 @@ export const PortalLayout: React.FC = () => {
               {branding.logoUrl ? (
                 <img
                   src={branding.logoUrl}
-                  alt="Portal logo"
+                  alt={t('portal.common.logoAlt')}
                   className="h-10 w-auto max-w-[200px] object-contain"
                 />
               ) : (
-                <h1 className="text-xl font-bold text-slate-900">Customer Portal</h1>
+                <h1 className="text-xl font-bold text-slate-900">{t('portal.common.customerPortal')}</h1>
               )}
               <nav className="hidden md:flex items-center gap-1">
                 {navItems.map((item) => {
@@ -155,7 +158,7 @@ export const PortalLayout: React.FC = () => {
                 onClick={() => setMenuOpen((v) => !v)}
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
-                aria-label="Open account menu"
+                aria-label={t('portal.common.openAccountMenu')}
                 className="flex items-center gap-2 rounded-full p-1 pr-2 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors"
               >
                 <CustomerAvatar
@@ -173,7 +176,7 @@ export const PortalLayout: React.FC = () => {
               {menuOpen && (
                 <div
                   role="menu"
-                  aria-label="Account menu"
+                  aria-label={t('portal.common.openAccountMenu')}
                   className="absolute right-0 mt-2 w-56 rounded-lg bg-white shadow-lg border border-slate-200 py-2 z-50"
                 >
                   <div className="px-3 py-2 border-b border-slate-100">
@@ -189,7 +192,7 @@ export const PortalLayout: React.FC = () => {
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                   >
                     <Settings className="w-4 h-4" aria-hidden="true" />
-                    Settings
+                    {t('portal.common.menuSettings')}
                   </button>
                   <button
                     type="button"
@@ -198,7 +201,7 @@ export const PortalLayout: React.FC = () => {
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                   >
                     <LogOut className="w-4 h-4" aria-hidden="true" />
-                    Logout
+                    {t('portal.common.menuLogout')}
                   </button>
                 </div>
               )}
@@ -230,12 +233,14 @@ export const PortalLayout: React.FC = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Outlet />
+        <Suspense fallback={<ContentLoadingFallback />}>
+          <Outlet />
+        </Suspense>
       </main>
 
       <footer className="bg-white border-t border-slate-200 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-2 text-center text-sm text-slate-500">
-          <p>Need assistance? Contact our support team for help.</p>
+          <p>{t('portal.common.footerHelp')}</p>
           {(branding.supportEmail || branding.supportPhone) && (
             <p className="text-xs">
               {branding.supportEmail && (

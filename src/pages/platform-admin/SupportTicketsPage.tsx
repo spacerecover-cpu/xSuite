@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Ticket, Search } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
-import { StatsCard } from '../../components/ui/StatsCard';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { StatCard } from '../../components/shared/StatCard';
 import { Table } from '../../components/ui/Table';
 import { Input } from '../../components/ui/Input';
 import { TicketStatusBadge } from '../../components/platform-admin/tickets/TicketStatusBadge';
@@ -127,23 +128,23 @@ export const SupportTicketsPage: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatsCard
-          title="Open"
+        <StatCard
+          label="Open"
           value={statsLoading ? '—' : String(stats?.open ?? 0)}
           icon={Ticket}
         />
-        <StatsCard
-          title="In Progress"
+        <StatCard
+          label="In Progress"
           value={statsLoading ? '—' : String(stats?.inProgress ?? 0)}
           icon={Ticket}
         />
-        <StatsCard
-          title="Waiting on Customer"
+        <StatCard
+          label="Waiting on Customer"
           value={statsLoading ? '—' : String(stats?.waitingCustomer ?? 0)}
           icon={Ticket}
         />
-        <StatsCard
-          title="Resolved Today"
+        <StatCard
+          label="Resolved Today"
           value={statsLoading ? '—' : String(stats?.resolvedToday ?? 0)}
           icon={Ticket}
         />
@@ -241,8 +242,11 @@ export const SupportTicketsPage: React.FC = () => {
 
       <Card>
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          <div className="p-4 space-y-3">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
           </div>
         ) : tickets.length === 0 ? (
           <div className="p-12 text-center">

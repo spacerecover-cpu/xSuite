@@ -15,6 +15,20 @@ interface Device {
   // which silently rendered blank S/N text because CaseDetail.tsx casts via
   // `as unknown` before passing devices into this modal.
   serial_number: string | null;
+  /** Per-device checkout state — non-null when this device was already collected. */
+  checked_out_at?: string | null;
+}
+
+type CollectorRelationship = 'self' | 'authorized_agent' | 'company_rep' | 'courier';
+
+/** Compact "Returned · 20 Jun 2026" badge date for an already-collected device. */
+function formatReturned(iso: string | null | undefined): string {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+  } catch {
+    return '';
+  }
 }
 
 interface DeviceCheckoutModalProps {
@@ -45,6 +59,7 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
   const [collectorMobile, setCollectorMobile] = useState(customerMobileNumber || '');
   const [collectorId, setCollectorId] = useState('');
   const [recoveryOutcome, setRecoveryOutcome] = useState<string>('full');
+  const [relationship, setRelationship] = useState<CollectorRelationship>('self');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const firstFieldRef = useRef<HTMLInputElement>(null);
@@ -52,6 +67,7 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
   const collectorMobileId = useId();
   const collectorIdId = useId();
   const recoveryOutcomeId = useId();
+  const relationshipId = useId();
 
   const handleDeviceToggle = (deviceId: string) => {
     setSelectedDevices((prev) =>
@@ -59,6 +75,19 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
         ? prev.filter((id) => id !== deviceId)
         : [...prev, deviceId]
     );
+  };
+
+  const handleRelationshipChange = (rel: CollectorRelationship) => {
+    setRelationship(rel);
+    if (rel === 'self') {
+      setCollectorName(customerName);
+      setCollectorMobile(customerMobileNumber || '');
+    } else {
+      // Collecting on behalf of the customer — clear the customer prefill so the
+      // collector's OWN details are entered (a National ID becomes required below).
+      setCollectorName((prev) => (prev === customerName ? '' : prev));
+      setCollectorMobile((prev) => (prev === (customerMobileNumber || '') ? '' : prev));
+    }
   };
 
   const handleSubmit = async () => {
@@ -72,23 +101,23 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
       return;
     }
 
+    if (relationship !== 'self' && !collectorId.trim()) {
+      setError('A National ID / passport is required when someone collects on behalf of the customer.');
+      return;
+    }
+
     setIsSubmitting(true);
     setError('');
 
     try {
-      // log_case_checkout exists in the DB but is missing from the generated
-      // types. Cast via unknown to bypass the literal-union check on the rpc name.
-      const rpc = supabase.rpc as unknown as (
-        name: string,
-        params: Record<string, unknown>
-      ) => Promise<{ error: unknown }>;
-      const { error: dbError } = await rpc('log_case_checkout', {
+      const { error: dbError } = await supabase.rpc('log_case_checkout', {
         p_case_id: caseId,
         p_collector_name: collectorName.trim(),
         p_collector_mobile: collectorMobile.trim(),
-        p_collector_id: collectorId.trim() || null,
+        p_collector_id: collectorId.trim() || undefined,
         p_recovery_outcome: recoveryOutcome,
         p_device_ids: selectedDevices,
+        p_collector_relationship: relationship,
       });
 
       if (dbError) throw dbError;
@@ -123,6 +152,7 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
       setCollectorMobile(customerMobileNumber || '');
       setCollectorId('');
       setRecoveryOutcome('full');
+      setRelationship('self');
       setError('');
       onClose();
     }
@@ -143,35 +173,49 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
             <span>Select Devices to Checkout</span>
           </div>
           <div className="space-y-2">
-            {devices.map((device, index) => (
-              <label
-                key={device.id}
-                className="flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-lg cursor-pointer hover:border-primary/60 transition-colors"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedDevices.includes(device.id)}
-                  onChange={() => handleDeviceToggle(device.id)}
-                  className="mt-1 w-4 h-4 text-primary"
-                />
-                <div className="flex-1">
-                  <div className="font-semibold text-slate-900">
-                    {device.device_type?.name || 'Unknown Device'}{' '}
-                    {device.brand?.name && `- ${device.brand.name}`}
-                    {index === 0 && (
-                      <span className="ml-2 text-xs bg-danger-muted text-danger px-2 py-0.5 rounded">
-                        Patient
-                      </span>
-                    )}
+            {devices.map((device, index) => {
+              const returned = !!device.checked_out_at;
+              return (
+                <label
+                  key={device.id}
+                  className={[
+                    'flex items-start gap-3 p-3 bg-white border rounded-lg transition-colors',
+                    returned
+                      ? 'border-slate-200 opacity-60 cursor-not-allowed'
+                      : 'border-slate-200 cursor-pointer hover:border-primary/60',
+                  ].join(' ')}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedDevices.includes(device.id)}
+                    onChange={() => handleDeviceToggle(device.id)}
+                    disabled={returned}
+                    className="mt-1 w-4 h-4 text-primary disabled:cursor-not-allowed"
+                  />
+                  <div className="flex-1">
+                    <div className="font-semibold text-slate-900">
+                      {device.device_type?.name || 'Unknown Device'}{' '}
+                      {device.brand?.name && `- ${device.brand.name}`}
+                      {index === 0 && (
+                        <span className="ml-2 text-xs bg-danger-muted text-danger px-2 py-0.5 rounded">
+                          Patient
+                        </span>
+                      )}
+                      {returned && (
+                        <span className="ml-2 text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded">
+                          Returned · {formatReturned(device.checked_out_at)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm text-slate-600">
+                      {device.serial_number && (
+                        <span className="font-mono">S/N: {device.serial_number}</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-sm text-slate-600">
-                    {device.serial_number && (
-                      <span className="font-mono">S/N: {device.serial_number}</span>
-                    )}
-                  </div>
-                </div>
-              </label>
-            ))}
+                </label>
+              );
+            })}
           </div>
         </div>
 
@@ -181,6 +225,22 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
             <span>Collector Information</span>
           </div>
           <div className="space-y-4">
+            <div>
+              <label htmlFor={relationshipId} className="block text-sm font-medium text-slate-700 mb-1">
+                Who is collecting?
+              </label>
+              <select
+                id={relationshipId}
+                value={relationship}
+                onChange={(e) => handleRelationshipChange(e.target.value as CollectorRelationship)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-success focus:border-success"
+              >
+                <option value="self">The customer (in person)</option>
+                <option value="authorized_agent">Authorized agent (on behalf of the customer)</option>
+                <option value="company_rep">Company representative</option>
+                <option value="courier">Courier</option>
+              </select>
+            </div>
             <div>
               <label htmlFor={collectorNameId} className="block text-sm font-medium text-slate-700 mb-1">
                 <User className="w-4 h-4 inline mr-1" />
@@ -211,13 +271,13 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
             <div>
               <label htmlFor={collectorIdId} className="block text-sm font-medium text-slate-700 mb-1">
                 <CreditCard className="w-4 h-4 inline mr-1" />
-                National ID, Passport, etc. (Optional)
+                National ID / Passport {relationship === 'self' ? '(Optional)' : '*'}
               </label>
               <Input
                 id={collectorIdId}
                 value={collectorId}
                 onChange={(e) => setCollectorId(e.target.value)}
-                placeholder="Enter ID number (optional)"
+                placeholder={relationship === 'self' ? 'Enter ID number (optional)' : 'Required when collecting on behalf of the customer'}
                 className="w-full"
               />
             </div>

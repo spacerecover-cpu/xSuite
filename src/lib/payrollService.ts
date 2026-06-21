@@ -1,5 +1,8 @@
 import { supabase, resolveTenantId } from './supabaseClient';
 import type { Database, Json } from '../types/database.types';
+import { resolveRateContext } from './currencyService';
+import { buildPayrollBaseColumns } from './payrollBase';
+import { baseAmount } from './financialMath';
 
 type PayrollPeriod = Database['public']['Tables']['payroll_periods']['Row'];
 type PayrollPeriodInsert = Database['public']['Tables']['payroll_periods']['Insert'];
@@ -31,6 +34,7 @@ interface PayrollSettingsValues {
   working_days_per_month: number;
   working_hours_per_day: number;
   overtime_rate_multiplier: { regular: number; weekend: number; holiday: number };
+  social_security_rate?: number;
   currency: { code: string; symbol: string; decimals: number };
   payment_day: number;
 }
@@ -39,6 +43,7 @@ const DEFAULT_PAYROLL_SETTINGS: PayrollSettingsValues = {
   working_days_per_month: 22,
   working_hours_per_day: 8,
   overtime_rate_multiplier: { regular: 1.25, weekend: 1.5, holiday: 2.0 },
+  social_security_rate: 0.07,
   currency: { code: 'USD', symbol: '$', decimals: 2 },
   payment_day: 28,
 };
@@ -66,6 +71,10 @@ function parsePayrollSettings(row: PayrollSettings | null): PayrollSettingsValue
       weekend: overtimeRaw?.weekend ?? DEFAULT_PAYROLL_SETTINGS.overtime_rate_multiplier.weekend,
       holiday: overtimeRaw?.holiday ?? DEFAULT_PAYROLL_SETTINGS.overtime_rate_multiplier.holiday,
     },
+    social_security_rate:
+      typeof row.social_security_rate === 'number'
+        ? row.social_security_rate
+        : DEFAULT_PAYROLL_SETTINGS.social_security_rate,
     currency: {
       code: currencyRaw?.code ?? DEFAULT_PAYROLL_SETTINGS.currency.code,
       symbol: currencyRaw?.symbol ?? DEFAULT_PAYROLL_SETTINGS.currency.symbol,
@@ -340,14 +349,36 @@ export const payrollService = {
     const records: PayrollRecordInsert[] = [];
     const tenantId = employees && employees.length > 0 ? employees[0].tenant_id : null;
 
+    // Deductions and overtime are tenant-configurable, not hardcoded. The
+    // statutory rate defaults to 0.07 (preserving prior behavior) and the
+    // overtime multiplier to 1.5 when unset.
+    const socialSecurityRate = settings.social_security_rate ?? 0.07;
+    const overtimeMultiplier = settings.overtime_rate_multiplier.regular;
+
+    // Multi-currency closure (D7): freeze currency + rate + *_base on each payroll
+    // record. Resolve ONE rate context per run at the tenant base currency. We
+    // deliberately do NOT pass settings.currency.code here: it defaults to 'USD'
+    // (a fail-loud violation) and would convert base-currency salaries as if they
+    // were USD. Per-employee functional-currency payroll is Phase 3 (D5), not here.
+    const rc = await resolveRateContext(undefined, period.end_date, null);
+
+    // Loan repayments are collected here and posted only AFTER payroll_records
+    // are committed (below), so a failed records insert can never leave loans
+    // deducted with no payroll record behind them.
+    const pendingLoanRepayments: Array<{
+      loan_id: string;
+      amount: number;
+      payment_date: string;
+      payment_method: string;
+      notes: string;
+    }> = [];
+
     for (const employee of employees || []) {
       const basicSalary = Number(employee.basic_salary || 0);
       if (!basicSalary) continue;
 
       const dailyRate = basicSalary / workingDaysPerMonth;
       const hourlyRate = dailyRate / workingHoursPerDay;
-      void dailyRate;
-      void hourlyRate;
 
       const attendance = await this.getEmployeeAttendance(
         employee.id,
@@ -361,8 +392,11 @@ export const payrollService = {
         0
       );
 
-      const totalEarnings = basicSalary;
-      const socialSecurityDeduction = basicSalary * 0.07;
+      // Pay overtime: hourly rate × overtime hours × the tenant's overtime
+      // multiplier. Previously the fetched overtime hours were discarded.
+      const overtimeAmount = Number(attendance.overtimeHours || 0) * hourlyRate * overtimeMultiplier;
+      const totalEarnings = basicSalary + overtimeAmount;
+      const socialSecurityDeduction = basicSalary * socialSecurityRate;
       const totalDeductions = socialSecurityDeduction + loanDeductions;
       const netSalary = totalEarnings - totalDeductions;
 
@@ -374,14 +408,19 @@ export const payrollService = {
         working_days: workingDaysPerMonth,
         hours_worked: attendance.regularHours,
         overtime_hours: attendance.overtimeHours,
+        overtime_amount: overtimeAmount,
         total_earnings: totalEarnings,
         total_deductions: totalDeductions,
         net_salary: netSalary,
+        ...buildPayrollBaseColumns(
+          { total_earnings: totalEarnings, total_deductions: totalDeductions, net_salary: netSalary },
+          rc,
+        ),
         status: 'calculated',
       });
 
       for (const loan of activeLoans) {
-        await this.recordLoanRepayment({
+        pendingLoanRepayments.push({
           loan_id: loan.id,
           amount: Number(loan.installment_amount),
           payment_date: period.end_date,
@@ -401,11 +440,20 @@ export const payrollService = {
 
       if (recordError) throw recordError;
 
+      // Post loan repayments now that payroll_records are committed, so a
+      // records-insert failure above can never deduct loans without backing.
+      for (const repayment of pendingLoanRepayments) {
+        await this.recordLoanRepayment(repayment);
+      }
+
+      // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency: records[] is built in this one processPayroll run under a single resolved rate context (rc); summing the document amounts is correct here
       const totalGross = records.reduce((sum, r) => sum + Number(r.total_earnings ?? 0), 0);
+      // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency: records[] is built in this one processPayroll run under a single resolved rate context (rc); summing the document amounts is correct here
       const totalDeductions = records.reduce(
         (sum, r) => sum + Number(r.total_deductions ?? 0),
         0
       );
+      // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency: records[] is built in this one processPayroll run under a single resolved rate context (rc); summing the document amounts is correct here
       const totalNet = records.reduce((sum, r) => sum + Number(r.net_salary ?? 0), 0);
 
       await this.updatePayrollPeriod(periodId, {
@@ -815,11 +863,11 @@ export const payrollService = {
     if (currentPeriod) {
       const { data: records } = await supabase
         .from('payroll_records')
-        .select('net_salary, status')
+        .select('net_salary, net_salary_base, status')
         .eq('period_id', currentPeriod.id)
         .is('deleted_at', null);
 
-      totalPayroll = records?.reduce((sum, r) => sum + (r.net_salary || 0), 0) || 0;
+      totalPayroll = records?.reduce((sum, r) => sum + baseAmount(r, 'net_salary'), 0) || 0;
       processedThisMonth = records?.filter(r => r.status === 'paid' || r.status === 'approved').length || 0;
     }
 

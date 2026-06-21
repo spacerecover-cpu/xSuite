@@ -1,18 +1,20 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Package, DollarSign, Clock, CheckCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Search } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { PageHeader } from '../../components/shared/PageHeader';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Button } from '../../components/ui/Button';
 import { DataTable, type Column } from '../../components/shared/DataTable';
 import { ExportButton } from '../../components/shared/ExportButton';
 import { Badge } from '../../components/ui/Badge';
-import { StatsCard } from '../../components/ui/StatsCard';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
+import { KpiRow } from '../../components/templates/KpiRow';
 import { Input } from '../../components/ui/Input';
 import PurchaseOrderFormModal from '../../components/suppliers/PurchaseOrderFormModal';
 import { supabase } from '../../lib/supabaseClient';
-import { useToast } from '../../hooks/useToast';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
+import { useCurrency } from '../../hooks/useCurrency';
 import { format } from 'date-fns';
-import { logger } from '../../lib/logger';
+import { baseAmount } from '../../lib/financialMath';
 import type { Database } from '../../types/database.types';
 
 type PurchaseOrderRow = Database['public']['Tables']['purchase_orders']['Row'];
@@ -33,23 +35,33 @@ type PurchaseOrderWithJoins = PurchaseOrderRow & {
   status: StatusSummary | null;
 };
 
+const PAGE_SIZE = 50;
+
+// Pending/Approved KPIs are status-NAME based (the dropdown stores status_id), so
+// the global counts resolve these names → ids, matching the original in-memory rule.
+const PENDING_STATUS_NAMES = ['Draft', 'Ordered'];
+const APPROVED_STATUS_NAMES = ['Approved', 'Received'];
+
 export default function PurchaseOrdersListPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const toast = useToast();
-  const [orders, setOrders] = useState<PurchaseOrderWithJoins[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { formatCurrency } = useCurrency();
+  const queryClient = useQueryClient();
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrderWithJoins | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [statuses, setStatuses] = useState<StatusRow[]>([]);
-  const [stats, setStats] = useState({
-    total: 0,
-    pending: 0,
-    approved: 0,
-    totalValue: 0,
-  });
+  const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, statusFilter]);
 
   // Command-palette deep-link: /purchase-orders?new=1 opens the create modal.
   useEffect(() => {
@@ -61,84 +73,109 @@ export default function PurchaseOrdersListPage() {
     }
   }, [searchParams, setSearchParams]);
 
-  useEffect(() => {
-    void loadOrders();
-    void loadStatuses();
-  }, []);
-
-  const filteredOrders = useMemo(() => {
-    let filtered = [...orders];
-
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (order) =>
-          order.po_number?.toLowerCase().includes(query) ||
-          order.supplier?.name?.toLowerCase().includes(query) ||
-          order.supplier?.supplier_number?.toLowerCase().includes(query)
-      );
-    }
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((order) => order.status_id === statusFilter);
-    }
-
-    return filtered;
-  }, [orders, searchQuery, statusFilter]);
-
-  const loadOrders = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
+  const { data: ordersPage, isLoading: loading } = useQuery({
+    queryKey: ['purchase_orders', debouncedSearch, statusFilter, page],
+    queryFn: async () => {
+      let query = supabase
         .from('purchase_orders')
-        .select(`
+        .select(
+          `
           *,
           supplier:suppliers(name, supplier_number),
           status:master_purchase_order_statuses(name, color)
-        `)
+        `,
+          { count: 'exact' },
+        )
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
+      if (debouncedSearch) {
+        const s = sanitizeFilterValue(debouncedSearch);
+        // Supplier name/number live on a joined table; resolve matching supplier
+        // ids first so they can be OR-ed with the base po_number column.
+        const { data: supMatches } = await supabase
+          .from('suppliers')
+          .select('id')
+          .is('deleted_at', null)
+          .or(`name.ilike.%${s}%,supplier_number.ilike.%${s}%`);
+        const supIds = (supMatches ?? []).map((row) => row.id);
+        const orParts = [`po_number.ilike.%${s}%`];
+        if (supIds.length) orParts.push(`supplier_id.in.(${supIds.join(',')})`);
+        query = query.or(orParts.join(','));
+      }
+      if (statusFilter !== 'all') query = query.eq('status_id', statusFilter);
+
+      const { data, error, count } = await query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
       if (error) throw error;
+      return { rows: (data ?? []) as unknown as PurchaseOrderWithJoins[], total: count ?? 0 };
+    },
+    placeholderData: keepPreviousData,
+  });
+  const orders = ordersPage?.rows ?? [];
+  const totalOrders = ordersPage?.total ?? 0;
 
-      const rows = (data ?? []) as unknown as PurchaseOrderWithJoins[];
-      setOrders(rows);
-      calculateStats(rows);
-    } catch (err: unknown) {
-      logger.error('Error loading purchase orders:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to load purchase orders');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadStatuses = async () => {
-    try {
+  const { data: statuses = [] } = useQuery({
+    queryKey: ['purchase_order_statuses'],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('master_purchase_order_statuses')
         .select('*')
         .eq('is_active', true)
         .order('sort_order');
-
       if (error) throw error;
-      setStatuses(data ?? []);
-    } catch (err) {
-      logger.error('Error loading statuses:', err);
-    }
-  };
+      return (data ?? []) as StatusRow[];
+    },
+  });
 
-  const calculateStats = (orderData: PurchaseOrderWithJoins[]) => {
-    const pending = orderData.filter((o) => o.status?.name === 'Draft' || o.status?.name === 'Ordered');
-    const approved = orderData.filter((o) => o.status?.name === 'Approved' || o.status?.name === 'Received');
-    const totalValue = orderData.reduce((sum, o) => sum + (o.total_amount ?? 0), 0);
+  // Global KPIs: counts via head-only queries and a base-currency value sum across
+  // ALL non-deleted POs — never a reduction over the current page. Cross-document
+  // money MUST use total_amount_base (baseAmount), or a multi-currency tenant adds
+  // foreign amounts under one symbol.
+  const { data: stats } = useQuery({
+    queryKey: ['purchase_order_stats'],
+    queryFn: async () => {
+      const { data: statusRows } = await supabase
+        .from('master_purchase_order_statuses')
+        .select('id, name');
+      const idsFor = (names: string[]) =>
+        (statusRows ?? []).filter((s) => names.includes(s.name)).map((s) => s.id);
+      const pendingIds = idsFor(PENDING_STATUS_NAMES);
+      const approvedIds = idsFor(APPROVED_STATUS_NAMES);
 
-    setStats({
-      total: orderData.length,
-      pending: pending.length,
-      approved: approved.length,
-      totalValue,
-    });
-  };
+      const base = () =>
+        supabase
+          .from('purchase_orders')
+          .select('*', { count: 'exact', head: true })
+          .is('deleted_at', null);
+      const countIn = async (ids: string[]): Promise<number> => {
+        if (ids.length === 0) return 0;
+        const { count } = await base().in('status_id', ids);
+        return count ?? 0;
+      };
+
+      const [totalRes, pending, approved, moneyRes] = await Promise.all([
+        base(),
+        countIn(pendingIds),
+        countIn(approvedIds),
+        supabase
+          .from('purchase_orders')
+          .select('total_amount, total_amount_base')
+          .is('deleted_at', null),
+      ]);
+
+      const totalValue = (moneyRes.data ?? []).reduce(
+        (sum, o) => sum + baseAmount(o, 'total_amount'),
+        0,
+      );
+
+      return {
+        total: totalRes.count ?? 0,
+        pending,
+        approved,
+        totalValue,
+      };
+    },
+  });
 
   const handleModalClose = () => {
     setShowAddModal(false);
@@ -146,7 +183,8 @@ export default function PurchaseOrdersListPage() {
   };
 
   const handleModalSuccess = () => {
-    void loadOrders();
+    queryClient.invalidateQueries({ queryKey: ['purchase_orders'] });
+    queryClient.invalidateQueries({ queryKey: ['purchase_order_stats'] });
   };
 
   const columns: Column<PurchaseOrderWithJoins>[] = [
@@ -189,10 +227,7 @@ export default function PurchaseOrdersListPage() {
       header: 'Total Amount',
       render: (order) => (
         <span className="font-semibold">
-          ${(order.total_amount ?? 0).toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}
+          {formatCurrency(order.total_amount ?? 0)}
         </span>
       ),
     },
@@ -213,123 +248,106 @@ export default function PurchaseOrdersListPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Purchase Orders"
-        description="Manage purchase orders and track deliveries"
-        actions={
-          <Button onClick={() => setShowAddModal(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Create Purchase Order
-          </Button>
-        }
-      />
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatsCard
-          title="Total Orders"
-          value={stats.total.toString()}
-          icon={Package}
+    <ListPageTemplate
+      title="Purchase Orders"
+      headerActions={
+        <Button onClick={() => setShowAddModal(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Create Purchase Order
+        </Button>
+      }
+      kpis={
+        <KpiRow
+          stats={[
+            { label: 'Total Orders', value: (stats?.total ?? 0).toString() },
+            { label: 'Pending Orders', value: (stats?.pending ?? 0).toString(), tone: 'warning' },
+            { label: 'Approved/Received', value: (stats?.approved ?? 0).toString(), tone: 'success' },
+            { label: 'Total Value', value: formatCurrency(stats?.totalValue ?? 0), tone: 'info' },
+          ]}
         />
-        <StatsCard
-          title="Pending Orders"
-          value={stats.pending.toString()}
-          icon={Clock}
-          color="orange"
-        />
-        <StatsCard
-          title="Approved/Received"
-          value={stats.approved.toString()}
-          icon={CheckCircle}
-          color="green"
-        />
-        <StatsCard
-          title="Total Value"
-          value={`$${stats.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          icon={DollarSign}
-          color="blue"
-        />
-      </div>
-
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <Input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by PO number, supplier..."
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
-              >
-                <option value="all">All Statuses</option>
-                {statuses.map((status) => (
-                  <option key={status.id} value={status.id}>
-                    {status.name}
-                  </option>
-                ))}
-              </select>
-
-              <ExportButton
-                filename="purchase-orders"
-                columns={[
-                  { key: 'po_number', label: 'PO #' },
-                  { key: 'order_date', label: 'Order Date' },
-                  { key: 'expected_delivery_date', label: 'Expected' },
-                  { key: 'received_at', label: 'Received' },
-                  {
-                    key: (r) => (r.suppliers as { name?: string } | null)?.name,
-                    label: 'Supplier',
-                  },
-                  { key: 'currency', label: 'Currency' },
-                  { key: 'subtotal', label: 'Subtotal' },
-                  { key: 'tax_amount', label: 'Tax' },
-                  { key: 'shipping_cost', label: 'Shipping' },
-                  { key: 'total_amount', label: 'Total' },
-                  {
-                    key: (r) => (r.master_purchase_order_statuses as { name?: string } | null)?.name,
-                    label: 'Status',
-                  },
-                ]}
-                getRows={async () => {
-                  let q = supabase
-                    .from('purchase_orders')
-                    .select('po_number, order_date, expected_delivery_date, received_at, currency, subtotal, tax_amount, shipping_cost, total_amount, suppliers:supplier_id(name), master_purchase_order_statuses:status_id(name)')
-                    .is('deleted_at', null);
-                  if (searchQuery) {
-                    q = q.ilike('po_number', `%${searchQuery}%`);
-                  }
-                  if (statusFilter !== 'all') q = q.eq('status_id', statusFilter);
-                  const { data, error } = await q.order('order_date', { ascending: false, nullsFirst: false });
-                  if (error) throw error;
-                  return data ?? [];
-                }}
+      }
+      toolbar={
+        <div className="mb-4 flex flex-col md:flex-row gap-4">
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by PO number, supplier..."
+                className="pl-10"
               />
             </div>
           </div>
+
+          <div className="flex gap-2">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+            >
+              <option value="all">All Statuses</option>
+              {statuses.map((status) => (
+                <option key={status.id} value={status.id}>
+                  {status.name}
+                </option>
+              ))}
+            </select>
+
+            <ExportButton
+              filename="purchase-orders"
+              columns={[
+                { key: 'po_number', label: 'PO #' },
+                { key: 'order_date', label: 'Order Date' },
+                { key: 'expected_delivery_date', label: 'Expected' },
+                { key: 'received_at', label: 'Received' },
+                {
+                  key: (r) => (r.suppliers as { name?: string } | null)?.name,
+                  label: 'Supplier',
+                },
+                { key: 'currency', label: 'Currency' },
+                { key: 'subtotal', label: 'Subtotal' },
+                { key: 'tax_amount', label: 'Tax' },
+                { key: 'shipping_cost', label: 'Shipping' },
+                { key: 'total_amount', label: 'Total' },
+                {
+                  key: (r) => (r.master_purchase_order_statuses as { name?: string } | null)?.name,
+                  label: 'Status',
+                },
+              ]}
+              getRows={async () => {
+                let q = supabase
+                  .from('purchase_orders')
+                  .select('po_number, order_date, expected_delivery_date, received_at, currency, subtotal, tax_amount, shipping_cost, total_amount, suppliers:supplier_id(name), master_purchase_order_statuses:status_id(name)')
+                  .is('deleted_at', null);
+                if (searchQuery) {
+                  q = q.ilike('po_number', `%${searchQuery}%`);
+                }
+                if (statusFilter !== 'all') q = q.eq('status_id', statusFilter);
+                const { data, error } = await q.order('order_date', { ascending: false, nullsFirst: false });
+                if (error) throw error;
+                return data ?? [];
+              }}
+            />
+          </div>
         </div>
-
-        {loading ? (
-          <div className="p-12 text-center text-gray-500">Loading purchase orders…</div>
-        ) : (
-          <DataTable<PurchaseOrderWithJoins>
-            columns={columns}
-            data={filteredOrders}
-            emptyMessage="No purchase orders found"
-          />
-        )}
-      </div>
-
+      }
+      loading={loading}
+      table={
+        <DataTable<PurchaseOrderWithJoins>
+          columns={columns}
+          data={orders}
+          emptyMessage="No purchase orders found"
+        />
+      }
+      pager={{
+        page,
+        pageSize: PAGE_SIZE,
+        total: totalOrders,
+        onPageChange: setPage,
+        itemNoun: 'purchase orders',
+      }}
+    >
       {showAddModal && (
         <PurchaseOrderFormModal
           isOpen={showAddModal}
@@ -351,6 +369,6 @@ export default function PurchaseOrdersListPage() {
           }
         />
       )}
-    </div>
+    </ListPageTemplate>
   );
 }

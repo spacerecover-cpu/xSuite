@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import { Card } from '../../components/ui/Card';
-import { StatsCard } from '../../components/ui/StatsCard';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { StatCard } from '../../components/shared/StatCard';
 import {
   Users,
   Activity,
@@ -155,10 +156,12 @@ export const AdminPanel: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="inline-block w-12 h-12 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-600 mt-4">Loading admin panel...</p>
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-32 w-full rounded-lg" />
+          ))}
         </div>
       </div>
     );
@@ -172,23 +175,23 @@ export const AdminPanel: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatsCard
-          title="Total Users"
+        <StatCard
+          label="Total Users"
           value={String(stats.totalUsers)}
           icon={Users}
         />
-        <StatsCard
-          title="Active Sessions"
+        <StatCard
+          label="Active Sessions"
           value={String(stats.activeUsers)}
           icon={Activity}
         />
-        <StatsCard
-          title="System Logs"
+        <StatCard
+          label="System Logs"
           value={String(stats.totalLogs)}
           icon={FileText}
         />
-        <StatsCard
-          title="Recent Errors"
+        <StatCard
+          label="Recent Errors"
           value={String(stats.recentErrors)}
           icon={AlertTriangle}
         />

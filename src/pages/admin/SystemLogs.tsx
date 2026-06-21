@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
+import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
+import type { BadgeVariant } from '../../lib/ui/variants';
 import { Search, Download, AlertCircle, AlertTriangle, Info, Bug } from 'lucide-react';
 import { format } from 'date-fns';
 import { logger } from '../../lib/logger';
@@ -18,30 +22,40 @@ interface SystemLog {
   created_at: string;
 }
 
+const PAGE_SIZE = 50;
+
 export const SystemLogs: React.FC = () => {
-  const [logs, setLogs] = useState<SystemLog[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [levelFilter, setLevelFilter] = useState<string>('all');
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
-    fetchLogs();
-  }, [levelFilter]);
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-  const fetchLogs = async () => {
-    setLoading(true);
-    try {
+  useEffect(() => {
+    setPage(0);
+  }, [levelFilter, debouncedSearch]);
+
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ['system_logs', levelFilter, debouncedSearch, page],
+    queryFn: async () => {
       let query = supabase
         .from('system_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false });
 
       if (levelFilter !== 'all') {
         query = query.eq('level', levelFilter);
       }
+      if (debouncedSearch) {
+        const s = sanitizeFilterValue(debouncedSearch);
+        query = query.or(`message.ilike.%${s}%,category.ilike.%${s}%`);
+      }
 
-      const { data, error } = await query;
+      const { data, error, count } = await query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
       if (error) throw error;
       const normalized: SystemLog[] = (data || []).map((row) => ({
         id: row.id,
@@ -59,21 +73,13 @@ export const SystemLogs: React.FC = () => {
             : String(row.ip_address),
         created_at: row.created_at,
       }));
-      setLogs(normalized);
-    } catch (error) {
-      logger.error('Error fetching logs:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredLogs = logs.filter((log) => {
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      log.message.toLowerCase().includes(searchLower) ||
-      (log.category?.toLowerCase().includes(searchLower) ?? false)
-    );
+      return { rows: normalized, total: count ?? 0 };
+    },
+    placeholderData: keepPreviousData,
   });
+
+  const logs = data?.rows ?? [];
+  const total = data?.total ?? 0;
 
   const getLevelIcon = (level: string) => {
     switch (level) {
@@ -90,31 +96,54 @@ export const SystemLogs: React.FC = () => {
     }
   };
 
-  const getLevelColor = (level: string) => {
-    switch (level) {
-      case 'error':
-        return 'red';
-      case 'warning':
-        return 'orange';
-      case 'info':
-        return 'blue';
-      case 'debug':
-        return 'gray';
-      default:
-        return 'gray';
-    }
+  // Static, JIT-safe class strings keyed by level. Tailwind purges interpolated
+  // classes (e.g. `bg-${color}-100`), so literal token classes are required.
+  const LEVEL_CHIP_CLASS: Record<string, string> = {
+    error: 'bg-danger-muted text-danger',
+    warning: 'bg-warning-muted text-warning',
+    info: 'bg-info-muted text-info',
+    debug: 'bg-slate-100 text-slate-600',
   };
 
-  const exportLogs = () => {
+  const LEVEL_BADGE_VARIANT: Record<string, BadgeVariant> = {
+    error: 'danger',
+    warning: 'warning',
+    info: 'info',
+    debug: 'secondary',
+  };
+
+  const getLevelChipClass = (level: string) =>
+    LEVEL_CHIP_CLASS[level] ?? 'bg-slate-100 text-slate-600';
+
+  const getLevelBadgeVariant = (level: string): BadgeVariant =>
+    LEVEL_BADGE_VARIANT[level] ?? 'secondary';
+
+  const exportLogs = async () => {
+    let query = supabase
+      .from('system_logs')
+      .select('created_at, level, category, message, ip_address')
+      .order('created_at', { ascending: false });
+    if (levelFilter !== 'all') {
+      query = query.eq('level', levelFilter);
+    }
+    if (debouncedSearch) {
+      const s = sanitizeFilterValue(debouncedSearch);
+      query = query.or(`message.ilike.%${s}%,category.ilike.%${s}%`);
+    }
+    const { data, error } = await query;
+    if (error) {
+      logger.error('Error exporting logs:', error);
+      return;
+    }
     const csv = [
       ['Timestamp', 'Level', 'Category', 'Message', 'IP Address'].join(','),
-      ...filteredLogs.map((log) =>
+      ...(data || []).map((log) =>
         [
           format(new Date(log.created_at), 'yyyy-MM-dd HH:mm:ss'),
           log.level,
           log.category ?? '',
-          `"${log.message.replace(/"/g, '""')}"`,
-          log.ip_address || '',
+          `"${String(log.message ?? '').replace(/"/g, '""')}"`,
+          log.ip_address == null ? '' : String(log.ip_address),
         ].join(',')
       ),
     ].join('\n');
@@ -128,20 +157,16 @@ export const SystemLogs: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">System Logs</h1>
-            <p className="text-slate-600 mt-1">Application logs and events</p>
-          </div>
-          <Button onClick={exportLogs} className="gap-2" variant="secondary">
-            <Download className="w-4 h-4" />
-            Export CSV
-          </Button>
-        </div>
-
-        <div className="flex gap-4 items-center">
+    <ListPageTemplate
+      title="System Logs"
+      headerActions={
+        <Button onClick={exportLogs} className="gap-2" variant="secondary">
+          <Download className="w-4 h-4" />
+          Export CSV
+        </Button>
+      }
+      toolbar={
+        <div className="flex gap-4 items-center mb-6">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <Input
@@ -184,19 +209,26 @@ export const SystemLogs: React.FC = () => {
             </Button>
           </div>
         </div>
-      </div>
-
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200">
+      }
+      loading={loading}
+      isEmpty={!loading && logs.length === 0}
+      empty={
+        <div className="bg-white rounded-xl border border-slate-200 text-center py-12">
+          <p className="text-slate-500">No logs found</p>
+        </div>
+      }
+      pager={{ page, pageSize: PAGE_SIZE, total, onPageChange: setPage, itemNoun: 'logs' }}
+      table={
         <div className="divide-y divide-slate-200">
-          {filteredLogs.map((log) => (
+          {logs.map((log) => (
             <div key={log.id} className="p-4 hover:bg-slate-50 transition-colors">
               <div className="flex items-start gap-3">
-                <div className={`mt-1 p-2 rounded-lg bg-${getLevelColor(log.level)}-100`}>
+                <div className={`mt-1 p-2 rounded-lg ${getLevelChipClass(log.level)}`}>
                   {getLevelIcon(log.level)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <Badge color={getLevelColor(log.level)}>{log.level}</Badge>
+                    <Badge variant={getLevelBadgeVariant(log.level)}>{log.level}</Badge>
                     {log.category && (
                       <span className="text-sm font-medium text-slate-900">{log.category}</span>
                     )}
@@ -213,19 +245,7 @@ export const SystemLogs: React.FC = () => {
             </div>
           ))}
         </div>
-
-        {loading && (
-          <div className="text-center py-12">
-            <div className="inline-block w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-          </div>
-        )}
-
-        {!loading && filteredLogs.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-slate-500">No logs found</p>
-          </div>
-        )}
-      </div>
-    </div>
+      }
+    />
   );
 };

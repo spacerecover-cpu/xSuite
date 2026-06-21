@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { Button } from '../ui/Button';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
 import { downloadCSV, type ExportColumn } from '../../lib/csvExport';
 
 interface ExportButtonProps<T> {
@@ -27,6 +27,7 @@ export function ExportButton<T>({
   label = 'Export CSV',
 }: ExportButtonProps<T>) {
   const [loading, setLoading] = useState(false);
+  const toast = useToast();
 
   const handleClick = async () => {
     if (loading) return;

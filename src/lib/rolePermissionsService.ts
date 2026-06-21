@@ -1,5 +1,10 @@
-import { supabase } from './supabaseClient';
+import { supabase, getTenantId } from './supabaseClient';
 import { logger } from './logger';
+
+// Roles whose module access is resolved from role_module_permissions. owner/admin
+// are short-circuited to full access; manager/viewer are configurable and resolve
+// to nothing until an admin grants modules (M3 — previously hardcoded to empty).
+export type ManageableRole = 'owner' | 'admin' | 'manager' | 'technician' | 'sales' | 'accounts' | 'hr' | 'viewer';
 
 export interface Module {
   id: string;
@@ -15,7 +20,7 @@ export interface Module {
 
 export interface RoleModulePermission {
   id: string;
-  role: 'owner' | 'admin' | 'technician' | 'sales' | 'accounts' | 'hr';
+  role: ManageableRole;
   module_id: string;
   can_access: boolean;
   module?: Module;
@@ -26,7 +31,7 @@ export interface ModulesByCategory {
 }
 
 export interface RolePermissions {
-  role: 'owner' | 'admin' | 'technician' | 'sales' | 'accounts' | 'hr';
+  role: ManageableRole;
   accessibleModules: Set<string>;
 }
 
@@ -73,7 +78,7 @@ class RolePermissionsService {
     return grouped;
   }
 
-  async getAccessibleModules(role: 'owner' | 'admin' | 'technician' | 'sales' | 'accounts' | 'hr'): Promise<Module[]> {
+  async getAccessibleModules(role: ManageableRole): Promise<Module[]> {
     if (role === 'owner' || role === 'admin') {
       return this.getAllModules();
     }
@@ -98,8 +103,12 @@ class RolePermissionsService {
     }));
   }
 
-  async getRolePermissions(role: 'owner' | 'admin' | 'technician' | 'sales' | 'accounts' | 'hr'): Promise<RolePermissions> {
-    const cacheKey = role;
+  async getRolePermissions(role: ManageableRole): Promise<RolePermissions> {
+    // Accessible modules are resolved per-tenant (via get_accessible_modules),
+    // so the cache must be keyed by tenant too — a role-only key let one
+    // tenant's cached module set leak to a same-role user of another tenant on
+    // a shared device within the TTL.
+    const cacheKey = `${getTenantId() ?? 'none'}:${role}`;
     const cached = this.permissionsCache.get(cacheKey);
 
     if (cached && Date.now() - this.cacheTimestamp < this.CACHE_DURATION) {
@@ -119,7 +128,7 @@ class RolePermissionsService {
   }
 
   async checkModuleAccess(
-    role: 'owner' | 'admin' | 'technician' | 'sales' | 'accounts' | 'hr',
+    role: ManageableRole,
     moduleKey: string
   ): Promise<boolean> {
     if (role === 'owner' || role === 'admin') {
@@ -165,7 +174,7 @@ class RolePermissionsService {
   }
 
   async getRolePermissionsWithModules(
-    role: 'owner' | 'admin' | 'technician' | 'sales' | 'accounts' | 'hr'
+    role: ManageableRole
   ): Promise<Map<string, boolean>> {
     if (role === 'owner' || role === 'admin') {
       const modules = await this.getAllModules();
@@ -195,7 +204,7 @@ class RolePermissionsService {
   }
 
   async updateRolePermissions(
-    role: 'owner' | 'admin' | 'technician' | 'sales' | 'accounts' | 'hr',
+    role: ManageableRole,
     permissions: { moduleId: string; canAccess: boolean }[]
   ): Promise<{ success: boolean; error?: string }> {
     try {
@@ -238,7 +247,7 @@ class RolePermissionsService {
   }
 
   async bulkUpdateRolePermissions(
-    role: 'owner' | 'admin' | 'technician' | 'sales' | 'accounts' | 'hr',
+    role: ManageableRole,
     moduleIds: string[],
     canAccess: boolean
   ): Promise<{ success: boolean; error?: string }> {

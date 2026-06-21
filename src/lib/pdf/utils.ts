@@ -1,4 +1,6 @@
 import { format } from 'date-fns';
+import { logger } from '../logger';
+import type { CurrencyConfig } from '../../types/tenantConfig';
 import type { CompanySettingsData, TranslationContext } from './types';
 
 export function formatDate(date: string | Date | null | undefined, formatStr: string = 'dd/MM/yyyy'): string {
@@ -17,27 +19,58 @@ export function formatDateTime(date: string | Date | null | undefined): string {
 
 export function formatCurrency(
   amount: number | null | undefined,
-  currencyCode: string = 'USD',
-  locale: string = 'en-US'
+  // Pass the tenant's resolved CurrencyConfig: it carries symbol/code/position,
+  // separators, decimalPlaces, displayMode and negativeFormat. Honors
+  // config.decimalPlaces (OMR 3 / JPY 0), the tenant separators and currency
+  // position — NOT a hardcoded 2dp / en-US. The logic mirrors
+  // formatCurrencyWithConfig (lib/format) but is inlined so this PDF leaf stays
+  // free of the supabaseClient import chain that lib/format pulls in.
+  config: CurrencyConfig
 ): string {
   if (amount === null || amount === undefined) return '-';
-  try {
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: currencyCode,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `${currencyCode} ${amount.toFixed(2)}`;
-  }
+
+  const code = typeof config.code === 'string' ? config.code : '';
+  const symbol = config.symbol || code;
+  const token =
+    config.displayMode === 'iso_code'
+      ? code || symbol
+      : config.displayMode === 'symbol_code'
+        ? code && config.symbol && config.symbol !== code
+          ? `${config.symbol} ${code}`
+          : code || symbol
+        : symbol;
+
+  const useParens = config.negativeFormat === 'parentheses' && amount < 0;
+  const magnitude = useParens ? Math.abs(amount) : amount;
+
+  const parts = magnitude.toFixed(config.decimalPlaces).split('.');
+  const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, config.thousandsSeparator);
+  const decimalPart = parts[1];
+  const formattedNumber =
+    config.decimalPlaces > 0
+      ? `${integerPart}${config.decimalSeparator}${decimalPart}`
+      : integerPart;
+
+  const body =
+    config.position === 'before'
+      ? `${token}${formattedNumber}`
+      : `${formattedNumber} ${token}`;
+  return useParens ? `(${body})` : body;
 }
 
 export function formatCapacity(capacity: string | null | undefined): string {
   if (!capacity) return '-';
-  const num = parseFloat(capacity);
-  if (isNaN(num)) return capacity;
+  const trimmed = capacity.trim();
+  if (!trimmed) return '-';
+  // Capacity comes from catalog_device_capacities.name — a label that already
+  // carries a unit (e.g. "2TB", "500 GB"). Return it as-is. parseFloat would
+  // strip the unit ("2TB" -> 2) and the value would be wrongly re-labelled
+  // "2 GB" on the receipt/checkout PDFs.
+  if (/[a-zA-Z]/.test(trimmed)) return trimmed;
 
+  // Legacy fallback: a bare number is interpreted as a GB count.
+  const num = parseFloat(trimmed);
+  if (isNaN(num)) return trimmed;
   if (num >= 1000) {
     return `${(num / 1000).toFixed(1)} TB`;
   }
@@ -129,19 +162,23 @@ export async function loadImageAsBase64(url: string): Promise<string | null> {
 
   try {
     const response = await fetch(url);
-    if (!response.ok) return null;
+    if (!response.ok) {
+      logger.warn(`[pdf] image fetch failed (${response.status}) for ${url}`);
+      return null;
+    }
 
     const blob = await response.blob();
     return new Promise((resolve) => {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        resolve(result);
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => {
+        logger.warn(`[pdf] image decode failed for ${url}`);
+        resolve(null);
       };
-      reader.onerror = () => resolve(null);
       reader.readAsDataURL(blob);
     });
-  } catch {
+  } catch (err) {
+    logger.warn(`[pdf] image load error for ${url}:`, err);
     return null;
   }
 }

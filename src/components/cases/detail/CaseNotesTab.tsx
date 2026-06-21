@@ -5,7 +5,8 @@ import { Button } from '../../ui/Button';
 import { Badge } from '../../ui/Badge';
 import { Card } from '../../ui/Card';
 import { supabase } from '@/lib/supabaseClient';
-import { formatDate } from '@/lib/format';
+import { formatDateTimeWithConfig } from '@/lib/format';
+import { useDateTimeConfig } from '@/contexts/TenantConfigContext';
 
 interface CaseNote {
   id: string;
@@ -14,6 +15,7 @@ interface CaseNote {
   created_at: string;
   updated_at?: string | null;
   created_by?: string | null;
+  updated_by?: string | null;
   author?: {
     full_name: string;
   };
@@ -41,9 +43,13 @@ export const CaseNotesTab: React.FC<CaseNotesTabProps> = ({
   const [editingContent, setEditingContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const dateTimeConfig = useDateTimeConfig();
 
   const authorIds = useMemo(
-    () => Array.from(new Set(notes.map((n) => n.created_by).filter((v): v is string => !!v))),
+    () =>
+      Array.from(
+        new Set(notes.flatMap((n) => [n.created_by, n.updated_by]).filter((v): v is string => !!v)),
+      ),
     [notes],
   );
 
@@ -143,6 +149,7 @@ export const CaseNotesTab: React.FC<CaseNotesTabProps> = ({
                 (note.created_by ? authorMap.get(note.created_by) : undefined) ??
                 note.author?.full_name ??
                 'Unknown';
+              const editorName = note.updated_by ? authorMap.get(note.updated_by) : undefined;
               const isEditing = editingNoteId === note.id;
               const edited = wasEdited(note);
 
@@ -155,10 +162,13 @@ export const CaseNotesTab: React.FC<CaseNotesTabProps> = ({
                       </div>
                       <div>
                         <p className="font-medium text-slate-900 text-sm">{authorName}</p>
-                        <p className="text-xs text-slate-500">{formatDate(note.created_at)}</p>
+                        <p className="text-xs text-slate-500" title={`UTC: ${note.created_at}`}>
+                          {formatDateTimeWithConfig(note.created_at, dateTimeConfig)}
+                        </p>
                         {edited && note.updated_at && (
-                          <p className="text-xs text-slate-400 italic">
-                            Edited {formatDate(note.updated_at)}
+                          <p className="text-xs text-slate-400 italic" title={`UTC: ${note.updated_at}`}>
+                            Edited {formatDateTimeWithConfig(note.updated_at, dateTimeConfig)}
+                            {editorName ? ` by ${editorName}` : ''}
                           </p>
                         )}
                       </div>

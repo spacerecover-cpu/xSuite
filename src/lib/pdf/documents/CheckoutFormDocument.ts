@@ -10,13 +10,17 @@ import {
 } from '../styles';
 import { formatDate, formatCapacity, buildCompanyAddress, safeString } from '../utils';
 import { getDeviceIconSvg, getGeneralIconSvg } from '../../deviceIconMapper';
+import { buildLogoNode, classifyLogo } from '../brandingImage';
 
 export function buildCheckoutFormDocument(
   data: ReceiptData,
   ctx: TranslationContext,
   logoBase64?: string | null,
   qrCodeBase64?: string | null,
-  qrCodeCaption?: string | null
+  qrCodeCaption?: string | null,
+  stampImage?: import('../brandingImage').BrandingImage | string | null,
+  signatureImage?: import('../brandingImage').BrandingImage | string | null,
+  signatureImages?: import('../templateConfig').SignatureImagesConfig,
 ): TDocumentDefinitions {
   const { caseData, devices, companySettings } = data;
   const { t, isBilingual, fontFamily } = ctx;
@@ -37,14 +41,11 @@ export function buildCheckoutFormDocument(
 
   const headerContent: Content[] = [];
 
-  if (logoBase64) {
+  const checkoutFormLogoNode = buildLogoNode(logoBase64, { width: 130, margin: [0, 0, 0, 5] });
+  if (checkoutFormLogoNode) {
     headerContent.push({
       columns: [
-        {
-          image: logoBase64,
-          width: 130,
-          margin: [0, 0, 0, 5],
-        },
+        checkoutFormLogoNode,
         {
           stack: [
             { text: legalName, fontSize: 14, bold: true, color: PDF_COLORS.text, alignment: 'right' },
@@ -335,7 +336,25 @@ export function buildCheckoutFormDocument(
 
   const checkoutDateFormatted = formatDate(caseData.checkout_date || new Date().toISOString(), 'dd MMM yyyy, HH:mm');
 
-  const signatureSection: Content = {
+  const stampNode =
+    signatureImages?.stamp?.show && classifyLogo(stampImage).kind !== 'none'
+      ? buildLogoNode(stampImage, {
+          width: signatureImages.stamp.width ?? 110,
+          alignment: signatureImages.stamp.placement ?? 'right',
+          opacity: signatureImages.stamp.opacity,
+          margin: [0, 0, 0, 4],
+        })
+      : null;
+  const signatureNode =
+    signatureImages?.signature?.show && classifyLogo(signatureImage).kind !== 'none'
+      ? buildLogoNode(signatureImage, {
+          width: signatureImages.signature.width ?? 140,
+          alignment: 'center',
+          margin: [0, 0, 0, 2],
+        })
+      : null;
+
+  const signatureColumns: Content = {
     columns: [
       {
         width: '50%',
@@ -369,6 +388,9 @@ export function buildCheckoutFormDocument(
                 alignment: 'center',
                 margin: [0, 0, 0, 4],
               },
+          // The signature image reads as signed: it sits just above the
+          // customer/collector signature line.
+          ...(signatureNode ? [signatureNode as Content] : []),
           {
             canvas: [
               {
@@ -449,6 +471,11 @@ export function buildCheckoutFormDocument(
     ],
     margin: [0, 16, 0, 8],
   };
+
+  // The stamp seal floats above the signature band, aligned per placement.
+  const signatureSection: Content = stampNode
+    ? { stack: [stampNode as Content, signatureColumns] }
+    : signatureColumns;
 
   const creatorName = caseData.created_by_profile?.full_name || caseData.created_by_profile?.email || 'System';
   const registeredBySection: Content = {

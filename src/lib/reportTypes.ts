@@ -6,6 +6,7 @@ import {
   Scale,
   Trash2,
   AlertTriangle,
+  Files,
   LucideIcon,
 } from 'lucide-react';
 
@@ -16,7 +17,8 @@ export type ReportType =
   | 'malware'
   | 'forensic'
   | 'data_destruction'
-  | 'prevention';
+  | 'prevention'
+  | 'recovered_files';
 
 export type ReportStatus = 'draft' | 'review' | 'approved' | 'sent';
 
@@ -86,6 +88,14 @@ export const REPORT_TYPES: Record<ReportType, ReportTypeConfig> = {
     color: '#f59e0b', // amber
     badgeColor: '#f59e0b',
   },
+  recovered_files: {
+    key: 'recovered_files',
+    name: 'Recovered Files Report',
+    description: 'Recovered-file manifest summary for customer delivery',
+    icon: Files,
+    color: '#0d9488', // teal (darker)
+    badgeColor: '#0d9488',
+  },
 };
 
 export const REPORT_STATUS_CONFIG: Record<
@@ -140,6 +150,8 @@ export interface ReportTemplate {
   };
   is_active: boolean;
   is_default: boolean;
+  /** NULL = shared system template; non-NULL = tenant override (clone-to-edit). */
+  tenant_id?: string | null;
   created_at: string;
   updated_at: string;
 }
