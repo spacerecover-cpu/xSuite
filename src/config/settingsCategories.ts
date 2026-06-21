@@ -185,13 +185,13 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   },
   {
     id: 'templates',
-    title: 'Templates',
+    title: 'Terms & Templates',
     icon: FileText,
     backgroundColor: '#ec4899',
     borderColor: '#ec4899',
     tables: [],
     actionLabel: 'Manage Categories',
-    description: 'Email templates, document templates, and print layouts',
+    description: 'Quote/invoice terms, email and document templates, and print layouts',
   },
   {
     id: 'documents',

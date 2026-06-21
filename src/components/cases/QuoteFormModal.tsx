@@ -773,7 +773,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-medium text-slate-700">
-                    Terms & Conditions
+                    Quote Terms
                   </label>
                   <button
                     type="button"
@@ -781,7 +781,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                     className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1"
                   >
                     <FileText className="w-3.5 h-3.5" />
-                    Terms Library
+                    Terms & Templates
                   </button>
                 </div>
                 {showTermsTemplates && (

@@ -215,8 +215,8 @@ export const TemplatesDashboard: React.FC = () => {
       </div>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Templates</h1>
-          <p className="mt-1 text-slate-600">Manage document and communication templates</p>
+          <h1 className="text-3xl font-bold text-slate-900">Terms & Templates</h1>
+          <p className="mt-1 text-slate-600">Manage quote/invoice terms, document, and communication templates</p>
         </div>
         <div className="flex gap-3">
           {!isSeeded && (

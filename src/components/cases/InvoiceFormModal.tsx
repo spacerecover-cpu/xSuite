@@ -987,7 +987,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="block text-xs font-medium text-slate-700">
-                    Payment Terms
+                    Invoice Terms
                   </span>
                   <div className="flex items-center gap-3">
                     <button
@@ -996,7 +996,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                       className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1"
                     >
                       <FileText className="w-3.5 h-3.5" />
-                      Terms Library
+                      Terms & Templates
                     </button>
                     <button
                       type="button"
@@ -1050,7 +1050,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                   />
                 ) : (
                   <p className="border border-dashed border-slate-300 rounded-lg p-3 text-sm text-slate-400">
-                    No payment terms yet. Use Terms Library or Edit.
+                    No invoice terms yet. Use Terms & Templates or Edit.
                   </p>
                 )}
               </div>
