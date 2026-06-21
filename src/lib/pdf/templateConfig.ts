@@ -589,6 +589,10 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
     paper: A4_PORTRAIT,
     branding: NEUTRAL_BRANDING,
     language: ENGLISH_ONLY,
+    // Comfortable default font size (~+20%): the hardcoded section sizes (7pt body)
+    // are too small to read. Tenants adjust this in the Studio (Font size). Physical
+    // labels opt out below (their tight layouts can't absorb a bump).
+    typography: { baseScale: 1.2 },
   };
 
   switch (docType) {
@@ -665,6 +669,7 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
       return {
         ...base,
         paper: LABEL_PAPER,
+        typography: { baseScale: 1 }, // physical label: keep native sizes (no +20%)
         sections: [
           // Header is OPTIONAL on a compact label (off by default): the label
           // body (large case number + priority + received date + device summary)
@@ -680,6 +685,7 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
       return {
         ...base,
         paper: STOCK_LABEL_PAPER,
+        typography: { baseScale: 1 }, // physical label: keep native sizes (no +20%)
         sections: [
           section('header', 0, { visible: false }),
           section('stockLabel', 1),

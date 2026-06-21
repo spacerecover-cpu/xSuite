@@ -126,7 +126,9 @@ describe('renderTemplate — colors group', () => {
 
 describe('renderTemplate — typography group', () => {
   it('keeps the tenant font + built-in sizes when no typography group is set (parity)', () => {
-    const def = renderTemplate(BUILT_IN_TEMPLATE_CONFIGS.invoice, makeData(), englishCtx, null, null);
+    // Built-ins now ship a default font scale; strip it to exercise the no-typography path.
+    const noTypo = { ...BUILT_IN_TEMPLATE_CONFIGS.invoice, typography: undefined };
+    const def = renderTemplate(noTypo, makeData(), englishCtx, null, null);
     expect((def.defaultStyle as { font?: string }).font).toBe('Roboto');
     expect(styleSize(def, 'tableCell')).toBe((PDF_STYLES.tableCell as { fontSize?: number }).fontSize);
   });
@@ -209,15 +211,17 @@ describe('renderTemplate — watermark settings', () => {
 describe('renderTemplate — page fitting / density', () => {
   const baseMargins = BUILT_IN_TEMPLATE_CONFIGS.invoice.paper.margins;
   const baseCell = (PDF_STYLES.tableCell as { fontSize?: number }).fontSize ?? 0;
+  // Density is independent of the default font scale, so strip typography to test it in isolation.
+  const invoiceNoTypo = { ...BUILT_IN_TEMPLATE_CONFIGS.invoice, typography: undefined };
 
   it('does not change margins or sizes by default (parity)', () => {
-    const def = renderTemplate(BUILT_IN_TEMPLATE_CONFIGS.invoice, makeData(), englishCtx, null, null);
+    const def = renderTemplate(invoiceNoTypo, makeData(), englishCtx, null, null);
     expect(def.pageMargins).toEqual(baseMargins);
     expect(styleSize(def, 'tableCell')).toBe(baseCell);
   });
 
   it('comfortable density is a no-op', () => {
-    const config = resolveTemplateConfig(BUILT_IN_TEMPLATE_CONFIGS.invoice, undefined, {
+    const config = resolveTemplateConfig(invoiceNoTypo, undefined, {
       pageFitting: { density: 'comfortable' },
     });
     const def = renderTemplate(config, makeData(), englishCtx, null, null);
@@ -226,7 +230,7 @@ describe('renderTemplate — page fitting / density', () => {
   });
 
   it('compact density tightens margins and shrinks fonts', () => {
-    const config = resolveTemplateConfig(BUILT_IN_TEMPLATE_CONFIGS.invoice, undefined, {
+    const config = resolveTemplateConfig(invoiceNoTypo, undefined, {
       pageFitting: { density: 'compact' },
     });
     const def = renderTemplate(config, makeData(), englishCtx, null, null);

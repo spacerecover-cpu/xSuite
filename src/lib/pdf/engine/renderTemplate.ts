@@ -62,6 +62,22 @@ function formatPageNumber(format: string, page: number, pages: number): string {
   return format.replace(/\{page\}/g, String(page)).replace(/\{pages\}/g, String(pages));
 }
 
+/**
+ * Multiply every inline `fontSize` in a content tree by `factor` (rounded to
+ * 1dp). Section renderers hardcode inline sizes, so this is what makes the
+ * document font scale reach the whole page — not just the named styles.
+ */
+function scaleFontSizes(node: unknown, factor: number): void {
+  if (Array.isArray(node)) {
+    for (const n of node) scaleFontSizes(n, factor);
+    return;
+  }
+  if (!node || typeof node !== 'object') return;
+  const o = node as Record<string, unknown>;
+  if (typeof o.fontSize === 'number') o.fontSize = Math.round(o.fontSize * factor * 10) / 10;
+  for (const v of Object.values(o)) scaleFontSizes(v, factor);
+}
+
 export function renderTemplate(
   config: DocumentTemplateConfig,
   data: EngineDocData,
@@ -207,10 +223,12 @@ export function renderTemplate(
   // auto-fit applies an extra reduction (never below the legibility floor) to
   // keep the document on one page. Absent `pageFitting` (or comfortable with no
   // auto-fit) → scale 1 → no change (parity).
+  let densityFontScale = 1;
   if (config.pageFitting) {
     const fitting = resolvePageFitting(config);
     const densityScale = DENSITY_SCALE[fitting.density];
     const scale = fitting.autoFitOnePage ? Math.max(fitting.minScale, densityScale * 0.9) : densityScale;
+    densityFontScale = scale;
     if (scale !== 1) {
       const m = config.paper.margins;
       pageMargins = [
@@ -252,6 +270,23 @@ export function renderTemplate(
     };
   } else if (baseFooter) {
     footer = baseFooter;
+  }
+
+  // 7b. Apply the document font scale to the assembled content + page footer.
+  // The named styles were already rescaled above, but section renderers use
+  // inline `fontSize`, so this pass is what makes the Studio font-size control
+  // (and density) affect the WHOLE document, not just table/named styles.
+  const contentFontScale = typography.scale * densityFontScale;
+  if (Math.abs(contentFontScale - 1) > 1e-9) {
+    scaleFontSizes(content, contentFontScale);
+    if (footer) {
+      const baseFn = footer;
+      footer = (currentPage, pageCount, currentPageSize) => {
+        const node = baseFn(currentPage, pageCount, currentPageSize);
+        scaleFontSizes(node, contentFontScale);
+        return node;
+      };
+    }
   }
 
   // 8. Optional watermark. Absent → no key (default = none). The legacy

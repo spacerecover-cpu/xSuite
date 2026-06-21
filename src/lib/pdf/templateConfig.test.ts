@@ -213,7 +213,9 @@ describe('resolveTemplateConfig — premium control groups', () => {
   it('leaves every premium group absent when no override sets it (parity)', () => {
     const resolved = resolveTemplateConfig(base);
     expect(resolved.colors).toBeUndefined();
-    expect(resolved.typography).toBeUndefined();
+    // Typography (the document font size) is a BASE default, not a premium opt-in:
+    // built-ins ship a comfortable scale so the default PDF is readable.
+    expect(resolved.typography).toEqual({ baseScale: 1.2 });
     expect(resolved.header).toBeUndefined();
     expect(resolved.footer).toBeUndefined();
     expect(resolved.pageNumbers).toBeUndefined();

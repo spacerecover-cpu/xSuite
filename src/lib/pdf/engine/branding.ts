@@ -151,6 +151,8 @@ export function resolveColors(config: {
 
 export interface ResolvedTypography {
   fontFamily: string;
+  /** The clamped base font scale (1 when absent) — applied to inline content too. */
+  scale: number;
   sizeFor(key: TypographyStyleKey): number;
 }
 
@@ -176,6 +178,7 @@ export function resolveTypography(
   const sizes = typography?.sizes;
   return {
     fontFamily: typography?.fontFamily ?? fallbackFont,
+    scale,
     sizeFor(key) {
       const override = sizes?.[key];
       if (typeof override === 'number' && override > 0) return override;

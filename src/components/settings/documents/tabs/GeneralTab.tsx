@@ -21,6 +21,28 @@ const SIZE_KEYS: { key: 'documentTitle' | 'sectionTitle' | 'tableHeader' | 'tabl
   { key: 'tableCell', label: 'Table cells' },
 ];
 
+// Document font-size presets → base scale (1.0 = the native, dense sizes).
+const SCALE_PRESETS: Record<string, number> = { compact: 1.0, standard: 1.2, large: 1.4, xlarge: 1.6 };
+const SCALE_PRESET_OPTIONS: { value: string; label: string }[] = [
+  { value: 'compact', label: 'Compact' },
+  { value: 'standard', label: 'Standard' },
+  { value: 'large', label: 'Large' },
+  { value: 'xlarge', label: 'Extra Large' },
+];
+/** The preset whose scale is closest to the current value (for highlighting). */
+function nearestScalePreset(scale: number): string {
+  let best = 'standard';
+  let bestDiff = Infinity;
+  for (const key of Object.keys(SCALE_PRESETS)) {
+    const diff = Math.abs(SCALE_PRESETS[key] - scale);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = key;
+    }
+  }
+  return best;
+}
+
 export const GeneralTab: React.FC<{ api: StudioApi }> = ({ api }) => {
   const { resolved } = api;
   const colors = resolved.colors;
@@ -68,23 +90,34 @@ export const GeneralTab: React.FC<{ api: StudioApi }> = ({ api }) => {
         </div>
       </FieldGroup>
 
-      <FieldGroup title="Typography" description="Font family and a base size scale; fine-tune per section.">
+      <FieldGroup title="Typography" description="Font family and document font size; fine-tune per section if needed.">
+        <Select
+          label="Font"
+          value={typo?.fontFamily ?? 'Roboto'}
+          onChange={(e) => api.setTypography({ fontFamily: e.target.value as PdfFontFamily })}
+          options={FONT_OPTIONS}
+        />
+        <SegmentedControl
+          label="Font size"
+          columns={4}
+          value={nearestScalePreset(typo?.baseScale ?? 1.2)}
+          onChange={(v) => api.setTypography({ baseScale: SCALE_PRESETS[v] })}
+          options={SCALE_PRESET_OPTIONS}
+        />
         <div className="grid grid-cols-2 gap-3">
-          <Select
-            label="Font"
-            value={typo?.fontFamily ?? 'Roboto'}
-            onChange={(e) => api.setTypography({ fontFamily: e.target.value as PdfFontFamily })}
-            options={FONT_OPTIONS}
-          />
           <NumberField
-            label="Base size scale"
-            value={typo?.baseScale ?? 1}
-            min={0.85}
-            max={1.3}
+            label="Fine-tune scale"
+            value={typo?.baseScale ?? 1.2}
+            min={0.8}
+            max={1.75}
             step={0.05}
             onChange={(v) => api.setTypography({ baseScale: v })}
           />
         </div>
+        <p className="text-xs text-slate-500">
+          Font size scales the whole document. The per-section sizes below override the scaled default for one section
+          — leave at 0 to follow the document size.
+        </p>
         <div className="grid grid-cols-2 gap-2">
           {SIZE_KEYS.map(({ key, label }) => (
             <NumberField
@@ -98,7 +131,6 @@ export const GeneralTab: React.FC<{ api: StudioApi }> = ({ api }) => {
             />
           ))}
         </div>
-        <p className="text-xs text-slate-500">Leave a per-section size at 0 to use the scaled default.</p>
       </FieldGroup>
 
       <FieldGroup
