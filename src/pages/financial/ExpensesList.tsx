@@ -74,6 +74,7 @@ type ExpenseRow = Pick<
   | 'approved_at'
   | 'notes'
   | 'rejection_reason'
+  | 'updated_at'
 > & {
   category: { id: string; name: string } | null;
   case: { case_no: string | null; title: string | null } | null;
@@ -211,8 +212,8 @@ export const ExpensesList: React.FC = () => {
   });
 
   const updateExpenseMutation = useMutation({
-    mutationFn: ({ id, expense }: { id: string; expense: Partial<Expense> }) =>
-      updateExpense(id, expense),
+    mutationFn: ({ id, expense, expectedUpdatedAt }: { id: string; expense: Partial<Expense>; expectedUpdatedAt?: string }) =>
+      updateExpense(id, expense, expectedUpdatedAt),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       queryClient.invalidateQueries({ queryKey: ['expense_stats'] });
@@ -653,7 +654,7 @@ export const ExpensesList: React.FC = () => {
                             </button>
                           </>
                         )}
-                        {(expense.status === 'draft' || expense.status === 'pending') && (
+                        {(expense.status === 'draft' || expense.status === 'pending' || expense.status === 'rejected') && (
                           <button
                             onClick={(e) => handleEdit(expense, e)}
                             className="p-1.5 text-warning hover:bg-warning-muted rounded transition-colors"
@@ -722,6 +723,7 @@ export const ExpensesList: React.FC = () => {
             await updateExpenseMutation.mutateAsync({
               id: editingExpense.id,
               expense,
+              expectedUpdatedAt: editingExpense.updated_at,
             });
           } else {
             await createExpenseMutation.mutateAsync(expense);
