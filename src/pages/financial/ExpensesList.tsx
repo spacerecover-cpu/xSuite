@@ -12,6 +12,7 @@ import { baseAmount } from '../../lib/financialMath';
 import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
 import { KpiRow } from '../../components/templates/KpiRow';
 import { ExpenseFormModal } from '../../components/financial/ExpenseFormModal';
+import { ExpenseDetailModal } from '../../components/financial/ExpenseDetailModal';
 import { useCurrency } from '../../hooks/useCurrency';
 import {
   createExpense,
@@ -19,7 +20,10 @@ import {
   approveExpense,
   rejectExpense,
   getExpenseStats,
+  fetchExpenseById,
+  EXPENSE_LIST_COLUMNS,
   Expense,
+  ExpenseAttachment,
 } from '../../lib/expensesService';
 import { useAuth } from '../../contexts/AuthContext';
 import { EmptyState } from '../../components/shared/EmptyState';
@@ -62,6 +66,7 @@ type ExpenseRow = Pick<
   | 'vendor'
   | 'status'
   | 'case_id'
+  | 'category_id'
   | 'created_by'
   | 'approved_by'
   | 'approved_at'
@@ -88,7 +93,7 @@ export const ExpensesList: React.FC = () => {
   const [page, setPage] = useState(0);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState<any>(null);
-  const [, setSelectedExpense] = useState<ExpenseRow | null>(null);
+  const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [expenseToReject, setExpenseToReject] = useState<string | null>(null);
@@ -117,23 +122,8 @@ export const ExpensesList: React.FC = () => {
       try {
         let query = supabase
           .from('expenses')
-          .select(`
-            id,
-            expense_number,
-            expense_date,
-            amount,
-            amount_base,
-            description,
-            vendor,
-            status,
-            case_id,
-            created_by,
-            approved_by,
-            approved_at,
-            notes,
-            category:master_expense_categories(id, name),
-            case:cases(case_no, title)
-          `, { count: 'exact' })
+          .select(EXPENSE_LIST_COLUMNS, { count: 'exact' })
+          .is('deleted_at', null)
           .order('expense_date', { ascending: false });
 
         if (searchTerm) {
@@ -163,6 +153,23 @@ export const ExpensesList: React.FC = () => {
     queryFn: () => getExpenseStats(),
   });
 
+  const { data: expenseDetail, isLoading: detailLoading } = useQuery({
+    queryKey: ['expense_detail', selectedExpenseId],
+    queryFn: () => fetchExpenseById(selectedExpenseId as string),
+    enabled: !!selectedExpenseId,
+  });
+
+  const handleDownloadAttachment = async (attachment: ExpenseAttachment) => {
+    const { data, error: signError } = await supabase.storage
+      .from('expense-receipts')
+      .createSignedUrl(attachment.file_url, 3600);
+    if (signError || !data?.signedUrl) {
+      toast.error('Could not open this attachment');
+      return;
+    }
+    window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+  };
+
   const createExpenseMutation = useMutation({
     mutationFn: (expense: Omit<Expense, 'id' | 'expense_number' | 'created_at' | 'updated_at'>) =>
       createExpense({ ...expense, created_by: profile?.id }),
@@ -172,6 +179,7 @@ export const ExpensesList: React.FC = () => {
       setShowExpenseModal(false);
       setEditingExpense(null);
     },
+    onError: (e) => toast.error((e as Error).message || 'Failed to save expense'),
   });
 
   const updateExpenseMutation = useMutation({
@@ -183,6 +191,7 @@ export const ExpensesList: React.FC = () => {
       setShowExpenseModal(false);
       setEditingExpense(null);
     },
+    onError: (e) => toast.error((e as Error).message || 'Failed to save expense'),
   });
 
   const approveExpenseMutation = useMutation({
@@ -193,6 +202,7 @@ export const ExpensesList: React.FC = () => {
       setShowApproveModal(false);
       setExpenseToApprove(null);
     },
+    onError: (e) => toast.error((e as Error).message || 'Failed to approve expense'),
   });
 
   const rejectExpenseMutation = useMutation({
@@ -205,6 +215,7 @@ export const ExpensesList: React.FC = () => {
       setExpenseToReject(null);
       setRejectionReason('');
     },
+    onError: (e) => toast.error((e as Error).message || 'Failed to reject expense'),
   });
 
   const handleApprove = (expenseId: string, e: React.MouseEvent) => {
@@ -624,15 +635,18 @@ export const ExpensesList: React.FC = () => {
                           </button>
                         )}
                         <button
-                          onClick={() => setSelectedExpense(expense)}
+                          onClick={() => setSelectedExpenseId(expense.id)}
                           className="p-1.5 text-primary hover:bg-info-muted rounded transition-colors"
                           title="View"
+                          aria-label={`View expense ${expense.expense_number ?? ''}`.trim()}
                         >
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
+                          onClick={() => setSelectedExpenseId(expense.id)}
                           className="p-1.5 text-slate-600 hover:bg-slate-100 rounded transition-colors"
                           title="Attachments"
+                          aria-label={`View attachments for expense ${expense.expense_number ?? ''}`.trim()}
                         >
                           <FileText className="w-4 h-4" />
                         </button>
@@ -771,6 +785,14 @@ export const ExpensesList: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      <ExpenseDetailModal
+        isOpen={!!selectedExpenseId}
+        onClose={() => setSelectedExpenseId(null)}
+        expense={expenseDetail ?? null}
+        isLoading={detailLoading}
+        onDownloadAttachment={handleDownloadAttachment}
+      />
     </ListPageTemplate>
   );
 };

@@ -12,7 +12,7 @@ vi.mock('./currencyService', () => ({
   getCurrencyDecimals: vi.fn(),
 }));
 
-import { getExpensesByCategory } from './expensesService';
+import { getExpensesByCategory, EXPENSE_LIST_COLUMNS } from './expensesService';
 
 /** Thenable query builder: select/in/gte/lte are chainable; awaiting yields {data}. */
 function makeQuery(rows: Array<Record<string, unknown>>) {
@@ -54,5 +54,23 @@ describe('getExpensesByCategory (cross-document totals must be base currency)', 
     const result = await getExpensesByCategory();
 
     expect(result).toEqual([{ id: 'ops', name: 'Operations', amount: 70 }]);
+  });
+});
+
+describe('EXPENSE_LIST_COLUMNS (the edit form must be able to pre-select the saved category)', () => {
+  it('selects the scalar category_id — the missing column behind the "edit blanks Category" bug', () => {
+    // The list previously selected only the joined category object, so the edit
+    // modal read initialData.category_id === undefined and reset the dropdown to "".
+    expect(EXPENSE_LIST_COLUMNS).toContain('category_id');
+  });
+
+  it('still selects the columns the list rows + base-currency totals depend on', () => {
+    for (const col of ['id', 'expense_number', 'expense_date', 'amount', 'amount_base', 'status', 'notes', 'vendor', 'description', 'case_id']) {
+      expect(EXPENSE_LIST_COLUMNS).toContain(col);
+    }
+  });
+
+  it('does not reference a payment_method_id column (no such column exists on expenses)', () => {
+    expect(EXPENSE_LIST_COLUMNS).not.toContain('payment_method_id');
   });
 });

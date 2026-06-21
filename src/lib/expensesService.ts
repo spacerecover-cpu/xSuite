@@ -28,7 +28,6 @@ export interface Expense {
   vendor?: string;
   category_id?: string | null;
   case_id?: string | null;
-  payment_method_id?: string | null;
   status: ExpenseStatus;
   created_by?: string;
   approved_by?: string | null;
@@ -60,6 +59,31 @@ export interface ExpenseWithDetails extends Expense {
 }
 
 export type ExpenseAttachment = ExpenseAttachmentRow;
+
+/**
+ * Columns selected for the expenses list/table. Includes the scalar `category_id`
+ * (NOT only the joined `category` object) so the edit form can pre-select the
+ * saved category — omitting it was the root cause of "Edit blanks Category".
+ * There is intentionally no `payment_method_id` (no such column on `expenses`).
+ */
+export const EXPENSE_LIST_COLUMNS = `
+  id,
+  expense_number,
+  expense_date,
+  amount,
+  amount_base,
+  description,
+  vendor,
+  status,
+  category_id,
+  case_id,
+  created_by,
+  approved_by,
+  approved_at,
+  notes,
+  category:master_expense_categories(id, name),
+  case:cases(case_no, title)
+`;
 
 export const getNextExpenseNumber = async (): Promise<string> => {
   const { data, error } = await supabase.rpc('get_next_number', {

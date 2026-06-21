@@ -6,7 +6,6 @@ import { Input } from '../ui/Input';
 import { UsageLimitGuard } from '../shared/UsageLimitGuard';
 import { supabase } from '../../lib/supabaseClient';
 import { getExpenseCategories, Expense } from '../../lib/expensesService';
-import { getPaymentMethods } from '../../lib/paymentsService';
 import {
   DollarSign,
   Calendar,
@@ -42,7 +41,6 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
   const [vendorName, setVendorName] = useState('');
   const [categoryId, setCategoryId] = useState<string>('');
   const [caseId, setCaseId] = useState<string>(preselectedCaseId || '');
-  const [paymentMethodId, setPaymentMethodId] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [amountError, setAmountError] = useState<string | null>(null);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
@@ -51,11 +49,6 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
   const { data: categories = [] } = useQuery({
     queryKey: ['expense_categories'],
     queryFn: getExpenseCategories,
-  });
-
-  const { data: paymentMethods = [] } = useQuery({
-    queryKey: ['payment_methods'],
-    queryFn: getPaymentMethods,
   });
 
   const { data: cases = [] } = useQuery({
@@ -87,7 +80,6 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
       setVendorName(initialData.vendor || '');
       setCategoryId(initialData.category_id || '');
       setCaseId(initialData.case_id || preselectedCaseId || '');
-      setPaymentMethodId(initialData.payment_method_id || '');
       setNotes(initialData.notes || '');
     } else {
       resetForm();
@@ -101,7 +93,6 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
     setVendorName('');
     setCategoryId('');
     setCaseId(preselectedCaseId || '');
-    setPaymentMethodId('');
     setNotes('');
   };
 
@@ -254,43 +245,22 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="expense-case" className="block text-sm font-medium text-slate-700 mb-1">
-              Link to Case (Optional)
-            </label>
-            <div className="relative">
-              <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
-              <select
-                id="expense-case"
-                value={caseId}
-                onChange={(e) => setCaseId(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-              >
-                <option value="">No Case</option>
-                {cases.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.case_no} - {c.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="expense-payment-method" className="block text-sm font-medium text-slate-700 mb-1">
-              Payment Method
-            </label>
+        <div>
+          <label htmlFor="expense-case" className="block text-sm font-medium text-slate-700 mb-1">
+            Link to Case (Optional)
+          </label>
+          <div className="relative">
+            <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
             <select
-              id="expense-payment-method"
-              value={paymentMethodId}
-              onChange={(e) => setPaymentMethodId(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              id="expense-case"
+              value={caseId}
+              onChange={(e) => setCaseId(e.target.value)}
+              className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             >
-              <option value="">Select Method</option>
-              {paymentMethods.map((method) => (
-                <option key={method.id} value={method.id}>
-                  {method.name}
+              <option value="">No Case</option>
+              {cases.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.case_no} - {c.title}
                 </option>
               ))}
             </select>
