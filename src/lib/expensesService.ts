@@ -425,7 +425,10 @@ export const approveExpense = async (id: string, approvedBy: string) => {
   if (taxAmount > 0) {
     await createExpenseVATRecord({
       recordId: id,
-      vatAmount: Number(expense.tax_amount_base ?? taxAmount),
+      // Store the DOCUMENT-currency tax to match the sale/purchase writers
+      // (createVATRecordFromInvoice/Purchase) so calculateVATForPeriod's
+      // SUM(sale) - SUM(purchase) stays on one consistent basis.
+      vatAmount: taxAmount,
       netAmount: Number(expense.amount ?? 0),
       taxAmount,
       expenseDate: expense.expense_date ?? null,
