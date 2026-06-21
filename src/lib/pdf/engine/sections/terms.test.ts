@@ -17,6 +17,27 @@ function collectText(node: unknown, out: string[]): void {
   Object.values(o).forEach((v) => collectText(v, out));
 }
 
+/** Find the fontSize of the first text node whose text contains `needle`. */
+function fontSizeOf(node: unknown, needle: string): number | undefined {
+  if (node == null || typeof node !== 'object') return undefined;
+  if (Array.isArray(node)) {
+    for (const c of node) {
+      const r = fontSizeOf(c, needle);
+      if (r !== undefined) return r;
+    }
+    return undefined;
+  }
+  const o = node as Record<string, unknown>;
+  if (typeof o.text === 'string' && o.text.includes(needle) && typeof o.fontSize === 'number') {
+    return o.fontSize;
+  }
+  for (const v of Object.values(o)) {
+    const r = fontSizeOf(v, needle);
+    if (r !== undefined) return r;
+  }
+  return undefined;
+}
+
 /** Document data carrying a bank block (no longer rendered by the terms sections). */
 const BANK = {
   bank: {
@@ -123,6 +144,23 @@ describe('renderTerms — standard Terms & Conditions (Studio only)', () => {
     const texts: string[] = [];
     collectText(out, texts);
     expect(texts.some((t) => t.includes('Future Space LLC'))).toBe(false);
+  });
+});
+
+describe('terms readability — body renders at the 9pt body tier', () => {
+  // Terms content was 7pt (the smallest text on the page); a uniform document
+  // scale kept it the smallest. Lift the base to the 9pt body size so it reads
+  // as content, then scales from there.
+  it('renders the standard Studio terms body at 9pt', () => {
+    expect(fontSizeOf(renderTerms(engine({ termsContent: { terms: { en: TERMS_EN } } }), NO_DATA), TERMS_EN)).toBe(9);
+  });
+
+  it('renders the per-record terms body at 9pt', () => {
+    const out = renderRecordTerms(
+      engine({}),
+      withRecordTerms([{ title: { en: 'Quote Terms' }, body: 'No data, no fee. Valid 30 days.' }]),
+    );
+    expect(fontSizeOf(out, 'No data, no fee')).toBe(9);
   });
 });
 

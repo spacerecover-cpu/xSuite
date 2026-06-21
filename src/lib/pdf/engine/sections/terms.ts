@@ -63,7 +63,7 @@ function languageColumn(blocks: TermsBlock[], lang: 'en' | 'ar'): Content[] {
     const heading = right ? ar(b.heading) ?? en(b.heading) : en(b.heading);
     stack.push(
       { text: heading, fontSize: 9, bold: true, color: PDF_COLORS.text, alignment: align, margin: [0, 0, 0, 3] as [number, number, number, number] },
-      { text: body, fontSize: 7, color: PDF_COLORS.textLight, lineHeight: 1.3, alignment: align },
+      { text: body, fontSize: 9, color: PDF_COLORS.textLight, lineHeight: 1.3, alignment: align },
     );
   }
   return stack;
@@ -153,11 +153,11 @@ function perRecordColumn(blocks: TermsTextBlock[]): Content[] {
     if (b.format === 'html') {
       const rich = htmlToPdfmake(stripLeadingHeadingHtml(raw, title));
       if (rich.length === 0) continue;
-      bodyNode = { stack: rich, fontSize: 7, color: PDF_COLORS.textLight, lineHeight: 1.3 };
+      bodyNode = { stack: rich, fontSize: 9, color: PDF_COLORS.textLight, lineHeight: 1.3 };
     } else {
       const text = stripLeadingTitleLine(decodeHtmlEntities(raw), title).trim();
       if (!text) continue;
-      bodyNode = { text, fontSize: 7, color: PDF_COLORS.textLight, lineHeight: 1.3 };
+      bodyNode = { text, fontSize: 9, color: PDF_COLORS.textLight, lineHeight: 1.3 };
     }
     if (stack.length > 0) stack.push({ text: '', margin: [0, 4, 0, 0] as [number, number, number, number] });
     stack.push(

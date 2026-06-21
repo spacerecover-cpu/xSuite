@@ -11,6 +11,27 @@ function collectText(node: unknown, out: string[]): void {
   Object.values(o).forEach((v) => collectText(v, out));
 }
 
+/** Find the fontSize of the first text node whose text contains `needle`. */
+function fontSizeOf(node: unknown, needle: string): number | undefined {
+  if (node == null || typeof node !== 'object') return undefined;
+  if (Array.isArray(node)) {
+    for (const c of node) {
+      const r = fontSizeOf(c, needle);
+      if (r !== undefined) return r;
+    }
+    return undefined;
+  }
+  const o = node as Record<string, unknown>;
+  if (typeof o.text === 'string' && o.text.includes(needle) && typeof o.fontSize === 'number') {
+    return o.fontSize;
+  }
+  for (const v of Object.values(o)) {
+    const r = fontSizeOf(v, needle);
+    if (r !== undefined) return r;
+  }
+  return undefined;
+}
+
 const BANK_DATA = {
   bank: {
     title: { en: 'Bank Account', ar: 'تفاصيل البنك' },
@@ -83,6 +104,23 @@ describe('renderBank — display style', () => {
     expect(joined).toContain('IBAN: OM99');
     expect(joined).not.toContain('Account No:');
     expect(joined).not.toContain('Bank:');
+  });
+});
+
+describe('renderBank — readability', () => {
+  // Account details are customer-facing info, not fine print: they render at the
+  // document body size (9pt), not the old 7pt tier that read as the smallest text
+  // on the page even after the document font scale was applied.
+  it('renders the account rows at the 9pt body size (boxed)', () => {
+    expect(fontSizeOf(renderBank(engine(), BANK_DATA), 'Account No:')).toBe(9);
+  });
+
+  it('renders the account line at the 9pt body size (inline)', () => {
+    expect(fontSizeOf(renderBank(engine('inline'), BANK_DATA), 'Account No:')).toBe(9);
+  });
+
+  it('renders the bank title at 9pt (>= body, bold)', () => {
+    expect(fontSizeOf(renderBank(engine(), BANK_DATA), 'Bank Account')).toBe(9);
   });
 });
 

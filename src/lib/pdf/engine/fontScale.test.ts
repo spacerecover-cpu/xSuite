@@ -51,7 +51,7 @@ describe('document font scale — applies to inline section text', () => {
     const def = renderTemplate(config, data, CTX, null, null) as { content: unknown };
     const sizes: number[] = [];
     collectFontSizes(def.content, sizes);
-    // A known inline size from the bank/terms area (7pt body) survives unscaled.
-    expect(sizes).toContain(7);
+    // A known inline body size (9pt) survives unscaled at scale 1.0.
+    expect(sizes).toContain(9);
   });
 });

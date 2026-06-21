@@ -50,7 +50,7 @@ function buildBankInline(bank: BankBlock): Content {
   });
   return {
     text: `${title}: ${segments.join('  |  ')}`,
-    fontSize: 7,
+    fontSize: 9,
     color: PDF_COLORS.text,
     margin: [0, 0, 0, 0],
   } as Content;
@@ -71,27 +71,27 @@ export function buildBankBox(bank: BankBlock, engine: EngineContext): Content {
   let headerCell: Content;
   if (fullWidth) {
     const headerColumns: object[] = [
-      { text: en(bank.title, 'Bank Account'), fontSize: 8, bold: true, color: PDF_COLORS.text, width: 'auto' },
+      { text: en(bank.title, 'Bank Account'), fontSize: 9, bold: true, color: PDF_COLORS.text, width: 'auto' },
       { text: '', width: '*' },
     ];
     if (bilingual) {
       headerColumns.push({
         text: ar(bank.title) ?? 'تفاصيل البنك',
-        fontSize: 8, bold: true, color: PDF_COLORS.text, alignment: 'right', width: 'auto',
+        fontSize: 9, bold: true, color: PDF_COLORS.text, alignment: 'right', width: 'auto',
       });
     }
     headerCell = { columns: headerColumns, columnGap: 6, fillColor: PDF_COLORS.background, margin: [6, 3, 6, 3] } as Content;
   } else {
     headerCell = {
       text: en(bank.title, 'Bank Account'),
-      fontSize: 8, bold: true, color: PDF_COLORS.text, fillColor: PDF_COLORS.background, margin: [6, 3, 6, 3],
+      fontSize: 9, bold: true, color: PDF_COLORS.text, fillColor: PDF_COLORS.background, margin: [6, 3, 6, 3],
     } as Content;
   }
 
   const bodyCell: Content = {
     stack: bank.rows.map((r) => ({
       text: `${en(r.label)} ${safeString(r.value)}`,
-      fontSize: 7,
+      fontSize: 9,
       color: PDF_COLORS.text,
       margin: [0, 0.5, 0, 0.5] as [number, number, number, number],
     })),
