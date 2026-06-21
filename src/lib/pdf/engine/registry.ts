@@ -40,7 +40,7 @@ import { renderStockLabel } from './sections/stockLabel';
 import { renderLineItems } from './sections/lineItemTable';
 import { renderTotals } from './sections/totals';
 import { renderPaymentHistory } from './sections/paymentHistory';
-import { renderTerms } from './sections/terms';
+import { renderTerms, renderRecordTerms } from './sections/terms';
 import { renderBank } from './sections/bank';
 import { renderSignature } from './sections/signature';
 import { renderQr } from './sections/qr';
@@ -72,6 +72,7 @@ export const SECTION_REGISTRY: Record<string, SectionRenderer> = {
   totals: renderTotals,
   paymentHistory: renderPaymentHistory,
   terms: renderTerms,
+  recordTerms: renderRecordTerms,
   bank: renderBank,
   signature: renderSignature,
   qr: renderQr,

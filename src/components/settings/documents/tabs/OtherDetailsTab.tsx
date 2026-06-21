@@ -22,9 +22,11 @@ const DATA_DEPENDENT_HINTS: Record<string, string> = {
  */
 const GUIDANCE_HINTS: Record<string, string> = {
   terms:
-    'Set the Terms & Conditions and Notes content (English + Arabic) in the Terms & Conditions section above. It is specific to this document type, and the Arabic shows alongside the English on bilingual documents.',
+    'The STANDARD Terms & Conditions for this document type — set the content (English + Arabic) in the Terms & Conditions section above. Printed only when you fill it in; it never falls back to the per-record terms.',
+  recordTerms:
+    'The terms entered on each quote/invoice (from Terms & Templates). The content comes from the record — position, rename, or hide the section here. Omitted automatically when a record has no terms.',
   bank:
-    'Shown inside the Terms section by default. Enable it here to place the bank-account details as their own movable, reorderable section.',
+    'The bank-account box renders as its own section — reorder or hide it like any other, and pick Boxed or Single line below.',
 };
 
 const SECTION_LABELS: Record<string, string> = {
@@ -37,7 +39,8 @@ const SECTION_LABELS: Record<string, string> = {
   lineItems: 'Line items table',
   totals: 'Totals',
   paymentHistory: 'Payment history',
-  terms: 'Terms & notes',
+  terms: 'Terms & Conditions',
+  recordTerms: 'Quote / Invoice Terms',
   legalTerms: 'Consent / T&C',
   bank: 'Bank details',
   signature: 'Signature block',
@@ -78,6 +81,14 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
     api.patchSection(section.key, { visible: next });
     if (section.key === 'taxBar') api.setTaxBar({ enabled: next });
   };
+
+  // The per-record terms section is named for the document it lives on.
+  const recordTermsLabel =
+    api.docType === 'invoice' ? 'Invoice Terms'
+    : api.docType === 'quote' ? 'Quote Terms'
+    : 'Document Terms';
+  const displayLabel = (key: string): string =>
+    key === 'recordTerms' ? recordTermsLabel : sectionLabel(key);
 
   return (
     <div className="space-y-7">
@@ -190,7 +201,7 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
                 <div className="flex items-center gap-2">
                   <div className="flex flex-col">
                     <button
-                      aria-label={`Move ${sectionLabel(section.key)} up`}
+                      aria-label={`Move ${displayLabel(section.key)} up`}
                       disabled={index === 0}
                       onClick={() => api.moveSection(section.key, -1)}
                       className="text-slate-400 hover:text-slate-700 disabled:opacity-30"
@@ -198,7 +209,7 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
                       <ChevronUp className="h-4 w-4" />
                     </button>
                     <button
-                      aria-label={`Move ${sectionLabel(section.key)} down`}
+                      aria-label={`Move ${displayLabel(section.key)} down`}
                       disabled={index === ordered.length - 1}
                       onClick={() => api.moveSection(section.key, 1)}
                       className="text-slate-400 hover:text-slate-700 disabled:opacity-30"
@@ -206,11 +217,11 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
                       <ChevronDown className="h-4 w-4" />
                     </button>
                   </div>
-                  <span className="flex-1 text-sm font-medium text-slate-800">{sectionLabel(section.key)}</span>
+                  <span className="flex-1 text-sm font-medium text-slate-800">{displayLabel(section.key)}</span>
                   <button
                     onClick={() => toggleSection(section)}
                     aria-pressed={section.visible}
-                    aria-label={`${section.visible ? 'Hide' : 'Show'} ${sectionLabel(section.key)}`}
+                    aria-label={`${section.visible ? 'Hide' : 'Show'} ${displayLabel(section.key)}`}
                     className={[
                       'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
                       section.visible ? 'bg-success-muted text-success' : 'bg-slate-100 text-slate-500',
@@ -243,10 +254,10 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
                     </p>
                   </div>
                 )}
-                {label && (
+                {(label || section.key === 'recordTerms') && (
                   <div className="mt-3 grid grid-cols-2 gap-2">
-                    <Input aria-label={`${sectionLabel(section.key)} heading (English)`} placeholder="Heading (EN)" value={label.en} onChange={(e) => api.setSectionLabel(section.key, 'en', e.target.value)} />
-                    <Input aria-label={`${sectionLabel(section.key)} heading (Arabic)`} placeholder="العنوان (AR)" dir="rtl" value={label.ar ?? ''} onChange={(e) => api.setSectionLabel(section.key, 'ar', e.target.value)} />
+                    <Input aria-label={`${displayLabel(section.key)} heading (English)`} placeholder={section.key === 'recordTerms' ? `Heading (EN) — ${recordTermsLabel}` : 'Heading (EN)'} value={label?.en ?? ''} onChange={(e) => api.setSectionLabel(section.key, 'en', e.target.value)} />
+                    <Input aria-label={`${displayLabel(section.key)} heading (Arabic)`} placeholder="العنوان (AR)" dir="rtl" value={label?.ar ?? ''} onChange={(e) => api.setSectionLabel(section.key, 'ar', e.target.value)} />
                   </div>
                 )}
               </li>

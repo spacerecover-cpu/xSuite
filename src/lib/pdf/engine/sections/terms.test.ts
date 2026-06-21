@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { renderTerms } from './terms';
+import { renderTerms, renderRecordTerms } from './terms';
 import type { EngineContext, EngineDocData } from '../types';
 import type {
   DocumentTemplateConfig,
@@ -17,7 +17,7 @@ function collectText(node: unknown, out: string[]): void {
   Object.values(o).forEach((v) => collectText(v, out));
 }
 
-/** Document data carrying a bank block (terms content now comes from the config). */
+/** Document data carrying a bank block (no longer rendered by the terms sections). */
 const BANK = {
   bank: {
     title: { en: 'Bank Account', ar: 'تفاصيل البنك' },
@@ -46,11 +46,17 @@ function engine(opts: {
   } as EngineContext;
 }
 
+function withRecordTerms(
+  blocks: Array<{ title: LabelText; body: string; format?: 'html' | 'text' }>,
+): EngineDocData {
+  return { terms: { title: { en: 'Quote Terms', ar: 'شروط العرض' }, blocks } } as unknown as EngineDocData;
+}
+
 const TERMS_EN = 'Valid 30 days. 50% advance to begin.';
 const TERMS_AR = 'صالح لمدة ٣٠ يومًا. دفعة مقدمة ٥٠٪ للبدء.';
 
-describe('renderTerms — per-document-type Terms & Conditions', () => {
-  it('renders the template Terms (English) from the config', () => {
+describe('renderTerms — standard Terms & Conditions (Studio only)', () => {
+  it('renders the Studio Terms (English) from the config', () => {
     const out = renderTerms(engine({ termsContent: { terms: { en: TERMS_EN } } }), NO_DATA);
     const texts: string[] = [];
     collectText(out, texts);
@@ -79,7 +85,7 @@ describe('renderTerms — per-document-type Terms & Conditions', () => {
     expect(texts.some((t) => t.includes(TERMS_AR))).toBe(false);
   });
 
-  it('renders the Notes block when set', () => {
+  it('renders the Studio Notes block when set', () => {
     const out = renderTerms(
       engine({ termsContent: { notes: { en: 'Diagnostics are non-destructive.' } } }),
       NO_DATA,
@@ -89,8 +95,34 @@ describe('renderTerms — per-document-type Terms & Conditions', () => {
     expect(texts.some((t) => t.includes('Diagnostics are non-destructive.'))).toBe(true);
   });
 
-  it('returns null when there is no terms content and no inline bank', () => {
+  it('returns null when the Studio terms and notes are both empty', () => {
     expect(renderTerms(engine({}), NO_DATA)).toBeNull();
+  });
+
+  it('NEVER falls back to per-record terms — returns null when the Studio content is blank', () => {
+    const out = renderTerms(
+      engine({}),
+      withRecordTerms([{ title: { en: 'Quote Terms' }, body: 'PER-RECORD CONTENT' }]),
+    );
+    expect(out).toBeNull();
+  });
+
+  it('renders only the Studio terms, never the per-record terms (independent)', () => {
+    const out = renderTerms(
+      engine({ termsContent: { terms: { en: 'STUDIO STANDARD' } } }),
+      withRecordTerms([{ title: { en: 'Quote Terms' }, body: 'PER-RECORD CONTENT' }]),
+    );
+    const texts: string[] = [];
+    collectText(out, texts);
+    expect(texts.some((t) => t.includes('STUDIO STANDARD'))).toBe(true);
+    expect(texts.some((t) => t.includes('PER-RECORD CONTENT'))).toBe(false);
+  });
+
+  it('does not render the bank box (bank is its own section now)', () => {
+    const out = renderTerms(engine({ termsContent: { terms: { en: TERMS_EN } } }), BANK);
+    const texts: string[] = [];
+    collectText(out, texts);
+    expect(texts.some((t) => t.includes('Future Space LLC'))).toBe(false);
   });
 });
 
@@ -104,7 +136,7 @@ describe('renderTerms — centre-split box layout', () => {
       NO_DATA,
     );
     const box = firstBox(out);
-    expect(box.table?.widths).toHaveLength(2); // two columns = centre split
+    expect(box.table?.widths).toHaveLength(2);
     const row = box.table?.body?.[0] ?? [];
     const enText: string[] = [];
     const arText: string[] = [];
@@ -124,110 +156,68 @@ describe('renderTerms — centre-split box layout', () => {
   });
 });
 
-describe('renderTerms — movable bank section coordination', () => {
-  it('renders the bank box inline when the standalone bank section is hidden (default layout)', () => {
-    const out = renderTerms(
-      engine({
-        termsContent: { terms: { en: TERMS_EN } },
-        sections: [
-          { key: 'terms', visible: true, order: 7 },
-          { key: 'bank', visible: false, order: 8 },
-        ],
-      }),
-      BANK,
-    );
-    const texts: string[] = [];
-    collectText(out, texts);
-    expect(texts.some((t) => t.includes('Future Space LLC'))).toBe(true);
-  });
-
-  it('omits the inline bank box when the standalone bank section is visible (no double-render)', () => {
-    const out = renderTerms(
-      engine({
-        termsContent: { terms: { en: TERMS_EN } },
-        sections: [
-          { key: 'terms', visible: true, order: 7 },
-          { key: 'bank', visible: true, order: 8 },
-        ],
-      }),
-      BANK,
-    );
-    const texts: string[] = [];
-    collectText(out, texts);
-    expect(texts.some((t) => t.includes('Future Space LLC'))).toBe(false);
-    // Terms still render — only the bank moved out.
-    expect(texts.some((t) => t.includes(TERMS_EN))).toBe(true);
-  });
-
-  it('renders the inline bank box with English-only field labels (no translated labels)', () => {
-    const out = renderTerms(
-      engine({
-        termsContent: { terms: { en: TERMS_EN } },
-        language: BILINGUAL,
-        sections: [
-          { key: 'terms', visible: true, order: 7 },
-          { key: 'bank', visible: false, order: 8 },
-        ],
-      }),
-      BANK,
-    );
-    const texts: string[] = [];
-    collectText(out, texts);
-    expect(texts.some((t) => t.includes('Account Name:'))).toBe(true); // English field label
-    expect(texts.some((t) => t.includes('اسم الحساب:'))).toBe(false); // translated field label omitted
-    expect(texts.some((t) => t.includes('Future Space LLC'))).toBe(true); // value present
-  });
-});
-
-describe('renderTerms — per-record terms (from the edited quote/invoice)', () => {
+describe('renderRecordTerms — per-record Quote/Invoice Terms', () => {
   const RECORD_TERMS = 'No data, no fee. Quote valid 30 days. 50% deposit to begin.';
 
-  function withRecordTerms(blocks: Array<{ title: LabelText; body: string; format?: 'html' | 'text' }>): EngineDocData {
-    return { terms: { title: { en: 'Terms & Conditions', ar: 'الشروط والأحكام' }, blocks } } as unknown as EngineDocData;
-  }
-
-  it('renders the per-record plain-text terms even when the template has no termsContent', () => {
-    const out = renderTerms(
+  it('renders the per-record plain-text terms', () => {
+    const out = renderRecordTerms(
       engine({}),
-      withRecordTerms([{ title: { en: 'Terms & Conditions', ar: 'الشروط والأحكام' }, body: RECORD_TERMS }]),
+      withRecordTerms([{ title: { en: 'Quote Terms' }, body: RECORD_TERMS }]),
     );
     const texts: string[] = [];
     collectText(out, texts);
     expect(texts.some((t) => t.includes(RECORD_TERMS))).toBe(true);
   });
 
-  it('lets the per-record terms take precedence over the template termsContent', () => {
-    const out = renderTerms(
-      engine({ termsContent: { terms: { en: 'TEMPLATE TERMS' } } }),
-      withRecordTerms([{ title: { en: 'Terms & Conditions' }, body: 'RECORD TERMS' }]),
+  it('returns null when the record carries no terms', () => {
+    expect(renderRecordTerms(engine({}), withRecordTerms([]))).toBeNull();
+  });
+
+  it('returns null when data.terms is absent', () => {
+    expect(renderRecordTerms(engine({}), NO_DATA)).toBeNull();
+  });
+
+  it('renders the per-record terms heading ("Quote Terms")', () => {
+    const out = renderRecordTerms(
+      engine({}),
+      withRecordTerms([{ title: { en: 'Quote Terms' }, body: RECORD_TERMS }]),
     );
     const texts: string[] = [];
     collectText(out, texts);
-    expect(texts.some((t) => t.includes('RECORD TERMS'))).toBe(true);
-    expect(texts.some((t) => t.includes('TEMPLATE TERMS'))).toBe(false);
+    expect(texts.some((t) => t === 'Quote Terms')).toBe(true);
   });
 
-  it('renders both the per-record Payment Terms and Notes blocks', () => {
-    const out = renderTerms(
+  it('uses the configured section label as the heading when renamed in the Studio', () => {
+    const out = renderRecordTerms(
+      engine({ labels: { recordTerms: { en: 'Special Terms' } } }),
+      withRecordTerms([{ title: { en: 'Quote Terms' }, body: RECORD_TERMS }]),
+    );
+    const texts: string[] = [];
+    collectText(out, texts);
+    expect(texts.some((t) => t === 'Special Terms')).toBe(true);
+    expect(texts.some((t) => t === 'Quote Terms')).toBe(false);
+  });
+
+  it('renders both the per-record terms and notes blocks', () => {
+    const out = renderRecordTerms(
       engine({}),
       withRecordTerms([
-        { title: { en: 'Payment Terms' }, body: 'Net 30 from invoice date.' },
+        { title: { en: 'Quote Terms' }, body: 'Net 30 from invoice date.' },
         { title: { en: 'Notes' }, body: 'Handle the donor drive with care.' },
       ]),
     );
     const texts: string[] = [];
     collectText(out, texts);
-    expect(texts.some((t) => t.includes('Payment Terms'))).toBe(true);
     expect(texts.some((t) => t.includes('Net 30 from invoice date.'))).toBe(true);
-    expect(texts.some((t) => t.includes('Notes'))).toBe(true);
+    expect(texts.some((t) => t === 'Notes')).toBe(true);
     expect(texts.some((t) => t.includes('Handle the donor drive with care.'))).toBe(true);
   });
 
-  it('renders a per-record HTML terms body as structured content (rich invoice editor)', () => {
-    const out = renderTerms(
+  it('renders a per-record HTML body as structured content (rich invoice editor)', () => {
+    const out = renderRecordTerms(
       engine({}),
       withRecordTerms([
-        { title: { en: 'Payment Terms' }, body: '<div><p>Pay <strong>50%</strong> upfront</p></div>', format: 'html' },
+        { title: { en: 'Invoice Terms' }, body: '<div><p>Pay <strong>50%</strong> upfront</p></div>', format: 'html' },
       ]),
     );
     const texts: string[] = [];
@@ -237,33 +227,11 @@ describe('renderTerms — per-record terms (from the edited quote/invoice)', () 
     expect(texts.some((t) => t.includes('upfront'))).toBe(true);
   });
 
-  it('shows per-record terms (English) alongside the template Arabic terms on a bilingual document', () => {
-    const out = renderTerms(
-      engine({ termsContent: { terms: { en: 'IGNORED EN', ar: TERMS_AR } }, language: BILINGUAL }),
-      withRecordTerms([{ title: { en: 'Terms & Conditions', ar: 'الشروط والأحكام' }, body: 'RECORD EN TERMS' }]),
-    );
-    const texts: string[] = [];
-    collectText(out, texts);
-    expect(texts.some((t) => t.includes('RECORD EN TERMS'))).toBe(true);
-    expect(texts.some((t) => t.includes(TERMS_AR))).toBe(true);
-    expect(texts.some((t) => t.includes('IGNORED EN'))).toBe(false);
-  });
-
-  it('returns null when there is neither per-record nor template terms and no bank', () => {
-    expect(renderTerms(engine({}), withRecordTerms([]))).toBeNull();
-  });
-});
-
-describe('renderTerms — entity decoding & duplicate-heading suppression', () => {
-  function withRecordTerms(blocks: Array<{ title: LabelText; body: string; format?: 'html' | 'text' }>): EngineDocData {
-    return { terms: { title: { en: 'Terms & Conditions', ar: 'الشروط والأحكام' }, blocks } } as unknown as EngineDocData;
-  }
-
   it('decodes HTML entities in plain-text per-record terms (&amp; → &)', () => {
-    const out = renderTerms(
+    const out = renderRecordTerms(
       engine({}),
       withRecordTerms([
-        { title: { en: 'Terms & Conditions' }, body: 'Accepted Payments: Cash, Card, Cheque &amp; Bank Transfer.' },
+        { title: { en: 'Quote Terms' }, body: 'Accepted Payments: Cash, Card, Cheque &amp; Bank Transfer.' },
       ]),
     );
     const texts: string[] = [];
@@ -273,57 +241,36 @@ describe('renderTerms — entity decoding & duplicate-heading suppression', () =
     expect(joined).not.toContain('&amp;');
   });
 
-  it('decodes numeric and named entities (&#39; &nbsp; &lt;) in plain-text terms', () => {
-    const out = renderTerms(
+  it('drops a leading heading line that duplicates the section heading', () => {
+    const out = renderRecordTerms(
       engine({}),
-      withRecordTerms([
-        { title: { en: 'Notes' }, body: 'It&#39;s 50%&nbsp;advance &lt; balance.' },
-      ]),
+      withRecordTerms([{ title: { en: 'Quote Terms' }, body: 'Quote Terms\nNo data, no fee.' }]),
+    );
+    const texts: string[] = [];
+    collectText(out, texts);
+    expect(texts.filter((t) => t.includes('Quote Terms')).length).toBe(1);
+    expect(texts.join('\n')).toContain('No data, no fee.');
+  });
+
+  it('drops a leading STANDARD heading even when the section heading differs (snippet "Terms & Conditions" under a Quote Terms section)', () => {
+    const out = renderRecordTerms(
+      engine({}),
+      withRecordTerms([{ title: { en: 'Quote Terms' }, body: 'Terms & Conditions\nNo data, no fee.' }]),
     );
     const texts: string[] = [];
     collectText(out, texts);
     const joined = texts.join('\n');
-    expect(joined).toContain("It's 50%");
-    expect(joined).toContain('< balance.');
-    expect(joined).not.toContain('&#39;');
-    expect(joined).not.toContain('&nbsp;');
+    expect(joined).not.toContain('Terms & Conditions');
+    expect(joined).toContain('No data, no fee.');
+    expect(texts.some((t) => t === 'Quote Terms')).toBe(true);
   });
 
-  it('drops a leading heading line that duplicates the section title (plain text)', () => {
-    const out = renderTerms(
-      engine({}),
-      withRecordTerms([
-        { title: { en: 'Terms & Conditions' }, body: 'Terms & Conditions\nNo data, no fee. 50% deposit to begin.' },
-      ]),
-    );
-    const texts: string[] = [];
-    collectText(out, texts);
-    // The section prints the heading itself, so it must appear exactly once.
-    expect(texts.filter((t) => t.includes('Terms & Conditions')).length).toBe(1);
-    expect(texts.join('\n')).toContain('No data, no fee. 50% deposit to begin.');
-  });
-
-  it('keeps a leading line that is NOT the section title (real content, e.g. "No Data – No Fee")', () => {
-    const out = renderTerms(
-      engine({}),
-      withRecordTerms([
-        { title: { en: 'Terms & Conditions' }, body: 'No Data – No Fee: You only pay if recovery is successful.\nPayment: 50% advance.' },
-      ]),
-    );
-    const texts: string[] = [];
-    collectText(out, texts);
-    const joined = texts.join('\n');
-    expect(joined).toContain('No Data – No Fee: You only pay if recovery is successful.');
-    // The section heading still renders exactly once (the content is not a heading).
-    expect(texts.filter((t) => t === 'Terms & Conditions').length).toBe(1);
-  });
-
-  it('drops a leading heading ELEMENT that duplicates the section title (rich HTML invoice terms)', () => {
-    const out = renderTerms(
+  it('drops a leading standard heading ELEMENT in rich HTML (e.g. <h3>Payment Terms</h3>)', () => {
+    const out = renderRecordTerms(
       engine({}),
       withRecordTerms([
         {
-          title: { en: 'Payment Terms' },
+          title: { en: 'Invoice Terms' },
           body: '<div class="payment-terms"><h3>Payment Terms</h3><p>Net 30 from invoice date.</p></div>',
           format: 'html',
         },
@@ -331,25 +278,30 @@ describe('renderTerms — entity decoding & duplicate-heading suppression', () =
     );
     const texts: string[] = [];
     collectText(out, texts);
-    expect(texts.filter((t) => t.includes('Payment Terms')).length).toBe(1);
+    expect(texts.some((t) => t.includes('Payment Terms'))).toBe(false);
     expect(texts.join('\n')).toContain('Net 30 from invoice date.');
+    expect(texts.some((t) => t === 'Invoice Terms')).toBe(true);
   });
 
-  it('keeps a rich HTML heading that does NOT match the section title', () => {
-    const out = renderTerms(
+  it('keeps a leading line that is NOT a terms heading (real content)', () => {
+    const out = renderRecordTerms(
       engine({}),
       withRecordTerms([
-        {
-          title: { en: 'Terms & Conditions' },
-          body: '<h3>No Data – No Fee</h3><p>You only pay if recovery is successful.</p>',
-          format: 'html',
-        },
+        { title: { en: 'Quote Terms' }, body: 'No Data – No Fee: You only pay if recovery is successful.\nPayment: 50% advance.' },
       ]),
     );
     const texts: string[] = [];
     collectText(out, texts);
-    const joined = texts.join('\n');
-    expect(joined).toContain('No Data – No Fee');
-    expect(joined).toContain('You only pay if recovery is successful.');
+    expect(texts.join('\n')).toContain('No Data – No Fee: You only pay if recovery is successful.');
+  });
+
+  it('does not render the bank box', () => {
+    const out = renderRecordTerms(
+      engine({}),
+      { ...withRecordTerms([{ title: { en: 'Quote Terms' }, body: RECORD_TERMS }]), bank: BANK.bank } as unknown as EngineDocData,
+    );
+    const texts: string[] = [];
+    collectText(out, texts);
+    expect(texts.some((t) => t.includes('Future Space LLC'))).toBe(false);
   });
 });

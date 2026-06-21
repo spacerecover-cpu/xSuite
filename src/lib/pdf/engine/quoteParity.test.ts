@@ -256,30 +256,32 @@ describe('quote parity — engine output matches the legacy builder', () => {
     expect(engine).toContain('13 Jul 2026');
   });
 
-  it('renders the per-record Terms + Notes (overriding the template) and the bank box', () => {
+  it('renders the per-record Quote Terms + Notes as their own section, alongside the standard template terms and the bank box', () => {
     const data = makeQuoteData();
-    // Per-record terms — what the user typed on the quote — take precedence over
-    // the template's termsContent: the record's terms render and the template's do NOT.
+    // Standard (Studio) terms and per-record terms are now INDEPENDENT sections:
+    // both render — the per-record terms no longer override the template.
     const config = {
       ...BUILT_IN_TEMPLATE_CONFIGS.quote,
       termsContent: {
-        terms: { en: 'TEMPLATE TERMS — SHOULD NOT APPEAR' },
-        notes: { en: 'TEMPLATE NOTES — SHOULD NOT APPEAR' },
+        terms: { en: 'TEMPLATE STANDARD TERMS' },
+        notes: { en: 'TEMPLATE STANDARD NOTES' },
       },
     };
     const engineData = toEngineData(data, config);
     const engine = allTexts(renderTemplate(config, engineData, englishCtx, null, TINY_PNG));
 
+    // Per-record "Quote Terms" section (from the edited quote).
     for (const probe of [
+      'Quote Terms',
       'Quote valid for 30 days. 50% advance required to begin.',
       'Diagnostics are non-destructive.',
     ]) {
       expect(engine.some((t) => t.includes(probe))).toBe(true);
     }
-    // The template terms are suppressed because the record carries its own.
-    expect(engine.some((t) => t.includes('TEMPLATE TERMS — SHOULD NOT APPEAR'))).toBe(false);
-    expect(engine.some((t) => t.includes('TEMPLATE NOTES — SHOULD NOT APPEAR'))).toBe(false);
-    // Bank box detail rows (folded into the terms row) — still parity with legacy.
+    // The standard Terms & Conditions section renders the template content independently.
+    expect(engine.some((t) => t.includes('TEMPLATE STANDARD TERMS'))).toBe(true);
+    expect(engine.some((t) => t.includes('TEMPLATE STANDARD NOTES'))).toBe(true);
+    // Bank box detail rows — its own section now.
     for (const probe of ['Acme Data Recovery LLC', 'First National Bank', 'AE12 0000 0000 0123 4567 89', 'FNBKAEXX']) {
       expect(engine.some((t) => t.includes(probe))).toBe(true);
     }

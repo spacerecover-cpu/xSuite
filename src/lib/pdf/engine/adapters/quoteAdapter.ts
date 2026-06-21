@@ -175,14 +175,14 @@ export function toEngineData(
   // section.
   const termsBlocks: NonNullable<NonNullable<EngineDocData['terms']>['blocks']> = [];
   if (quoteData.terms_and_conditions) {
-    termsBlocks.push({ title: { en: 'Terms & Conditions', ar: 'الشروط والأحكام' }, body: quoteData.terms_and_conditions });
+    termsBlocks.push({ title: { en: 'Quote Terms', ar: 'شروط العرض' }, body: quoteData.terms_and_conditions });
   }
   if (quoteData.notes) {
     termsBlocks.push({ title: { en: 'Notes', ar: 'ملاحظات' }, body: quoteData.notes });
   }
   const terms: EngineDocData['terms'] =
     termsBlocks.length > 0
-      ? { title: { en: 'Terms & Conditions', ar: 'الشروط والأحكام' }, blocks: termsBlocks }
+      ? { title: { en: 'Quote Terms', ar: 'شروط العرض' }, blocks: termsBlocks }
       : null;
 
   // ---- Bank ----------------------------------------------------------------

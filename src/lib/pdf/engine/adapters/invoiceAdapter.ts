@@ -194,14 +194,14 @@ export function toEngineData(
   if (invoiceData.payment_terms) {
     // Invoice Payment Terms come from the rich-text editor, so the body is HTML —
     // flag it so the renderer runs it through htmlToPdfmake instead of printing tags.
-    termsBlocks.push({ title: { en: 'Payment Terms', ar: 'شروط الدفع' }, body: invoiceData.payment_terms, format: 'html' });
+    termsBlocks.push({ title: { en: 'Invoice Terms', ar: 'شروط الفاتورة' }, body: invoiceData.payment_terms, format: 'html' });
   }
   if (invoiceData.notes) {
     termsBlocks.push({ title: { en: 'Notes', ar: 'ملاحظات' }, body: invoiceData.notes });
   }
   const terms: EngineDocData['terms'] =
     termsBlocks.length > 0
-      ? { title: { en: 'Payment Terms', ar: 'شروط الدفع' }, blocks: termsBlocks }
+      ? { title: { en: 'Invoice Terms', ar: 'شروط الفاتورة' }, blocks: termsBlocks }
       : null;
 
   // ---- Bank ----------------------------------------------------------------

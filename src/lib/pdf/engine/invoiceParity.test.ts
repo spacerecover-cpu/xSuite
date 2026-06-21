@@ -279,27 +279,28 @@ describe('invoice parity — engine output matches the legacy builder', () => {
     expect(engine.some((t) => t.includes('Balance Due:'))).toBe(false);
   });
 
-  it('renders the per-record Payment Terms + Notes (overriding the template) and the bank box', () => {
+  it('renders the per-record Invoice Terms + Notes as their own section, alongside the standard template terms and the bank box', () => {
     const data = makeInvoiceData();
-    // Per-record terms — what the user typed on the invoice — take precedence over
-    // the template's termsContent: the record's terms render and the template's do NOT.
+    // Standard (Studio) terms and per-record terms are now INDEPENDENT sections:
+    // both render — the per-record terms no longer override the template.
     const config = {
       ...BUILT_IN_TEMPLATE_CONFIGS.invoice,
       termsContent: {
-        terms: { en: 'TEMPLATE TERMS — SHOULD NOT APPEAR' },
-        notes: { en: 'TEMPLATE NOTES — SHOULD NOT APPEAR' },
+        terms: { en: 'TEMPLATE STANDARD TERMS' },
+        notes: { en: 'TEMPLATE STANDARD NOTES' },
       },
     };
     const engineData = toEngineData(data, config);
     const engine = allTexts(renderTemplate(config, engineData, englishCtx, null, TINY_PNG));
 
-    for (const probe of ['Payment Terms', 'Notes', 'Net 14 days from the invoice date.', 'Thank you for trusting our lab with your data recovery.']) {
+    // Per-record "Invoice Terms" section (from the edited invoice).
+    for (const probe of ['Invoice Terms', 'Net 14 days from the invoice date.', 'Thank you for trusting our lab with your data recovery.']) {
       expect(engine.some((t) => t.includes(probe))).toBe(true);
     }
-    // The template terms are suppressed because the record carries its own.
-    expect(engine.some((t) => t.includes('TEMPLATE TERMS — SHOULD NOT APPEAR'))).toBe(false);
-    expect(engine.some((t) => t.includes('TEMPLATE NOTES — SHOULD NOT APPEAR'))).toBe(false);
-    // Bank box detail rows (folded into the terms row) — still parity with legacy.
+    // The standard Terms & Conditions section renders the template content independently.
+    expect(engine.some((t) => t.includes('TEMPLATE STANDARD TERMS'))).toBe(true);
+    expect(engine.some((t) => t.includes('TEMPLATE STANDARD NOTES'))).toBe(true);
+    // Bank box detail rows — its own section now.
     for (const probe of ['Acme Data Recovery LLC', 'First National Bank', 'AE12 0000 0000 0123 4567 89', 'FNBKAEXX']) {
       expect(engine.some((t) => t.includes(probe))).toBe(true);
     }

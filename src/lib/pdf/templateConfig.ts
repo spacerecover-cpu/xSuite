@@ -540,15 +540,19 @@ function financialSections(): SectionConfig[] {
     // the legacy InvoiceDocument layout. Returns null on docs with no history
     // (proforma, quotes), so it is harmless on the shared financial base.
     section('paymentHistory', 6),
+    // Standard Terms & Conditions (Studio content only; omitted when blank).
     section('terms', 7),
-    // Bank account as its own movable section — hidden by default so existing
-    // layouts are unchanged (the terms section keeps rendering the bank box
-    // inline). Enabling it in the Studio moves the bank here, where it can be
-    // shown/hidden and reordered like any other section.
-    section('bank', 8, { visible: false, bankStyle: 'boxed' }),
-    section('signature', 9, { visible: false }),
-    section('qr', 10),
-    section('footer', 11),
+    // Per-record "Quote Terms" / "Invoice Terms" — the terms entered on the
+    // record (from Terms & Templates). Its own positionable section; omitted when
+    // the record carries none.
+    section('recordTerms', 8),
+    // Bank account as its own movable section — visible by default and rendered
+    // here (no longer inline in terms). Reorder / show-hide like any section, with
+    // a Boxed | Single line display style.
+    section('bank', 9, { bankStyle: 'boxed' }),
+    section('signature', 10, { visible: false }),
+    section('qr', 11),
+    section('footer', 12),
   ];
 }
 
@@ -604,12 +608,14 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
           section('parties', 1),
           section('meta', 2),
           section('totals', 3, { lines: { amountReceived: true, amountInWords: false } }),
-          // Terms is visible: the payment-receipt adapter routes notes (and the
-          // bank box) through the terms section's structured-blocks layout. It
-          // returns null when there are no notes/bank, so it is harmless when empty.
+          // Standard Terms & Conditions (Studio content only; omitted when blank).
           section('terms', 4),
-          section('qr', 5),
-          section('footer', 6),
+          // Per-record notes entered on the receipt (returns null when empty).
+          section('recordTerms', 5),
+          // Bank account as its own visible section.
+          section('bank', 6, { bankStyle: 'boxed' }),
+          section('qr', 7),
+          section('footer', 8),
         ],
         labels: { documentTitle: { en: 'PAYMENT RECEIPT', ar: 'إيصال دفع' } },
         layout: { partiesMetaSideBySide: true },

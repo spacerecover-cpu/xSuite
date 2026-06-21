@@ -222,19 +222,20 @@ describe('payment receipt parity — engine output matches the legacy builder', 
     }
   });
 
-  it('renders the per-record notes (overriding the template) + bank box', () => {
+  it('renders the per-record notes as their own section, alongside the standard template notes + bank box', () => {
     const data = makeReceiptData();
-    // Per-record notes — what the user typed on the receipt — take precedence over
-    // the template's termsContent.notes: the record's notes render and the template's do NOT.
+    // Standard (Studio) notes and per-record notes are now INDEPENDENT sections:
+    // both render — the per-record notes no longer override the template.
     const config = {
       ...BUILT_IN_TEMPLATE_CONFIGS.payment_receipt,
-      termsContent: { notes: { en: 'TEMPLATE NOTES — SHOULD NOT APPEAR' } },
+      termsContent: { notes: { en: 'TEMPLATE STANDARD NOTES' } },
     };
     const engineData = toEngineData(data, config);
     const engine = allTexts(renderTemplate(config, engineData, englishCtx, null, TINY_PNG));
 
     expect(engine.some((t) => t.includes('Partial payment received with thanks.'))).toBe(true);
-    expect(engine.some((t) => t.includes('TEMPLATE NOTES — SHOULD NOT APPEAR'))).toBe(false);
+    // The standard Terms & Conditions section renders the template notes independently.
+    expect(engine.some((t) => t.includes('TEMPLATE STANDARD NOTES'))).toBe(true);
 
     for (const probe of ['Acme Data Recovery LLC', 'First National Bank', 'AE12 0000 0000 0123 4567 89', 'FNBKAEXX']) {
       expect(engine.some((t) => t.includes(probe))).toBe(true);
