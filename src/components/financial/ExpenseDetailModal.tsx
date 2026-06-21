@@ -4,6 +4,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { useCurrency } from '../../hooks/useCurrency';
+import { baseAmount } from '../../lib/financialMath';
 import { formatDate } from '../../lib/format';
 import type { ExpenseWithDetails, ExpenseAttachment } from '../../lib/expensesService';
 import { Receipt, FileText, Download } from 'lucide-react';
@@ -66,7 +67,13 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Date">{expense.expense_date ? formatDate(expense.expense_date) : '—'}</Field>
-            <Field label="Amount">{formatCurrency(expense.amount ?? 0)}</Field>
+            {/* Show the BASE-currency value (matching the list row) so the amount
+                an approver reviews is never the raw document figure under the
+                wrong currency symbol. baseAmount falls back to the raw amount
+                only for pre-base-snapshot rows. */}
+            <Field label="Amount">
+              {formatCurrency(baseAmount(expense as unknown as Record<string, unknown>, 'amount'))}
+            </Field>
             <Field label="Vendor">{expense.vendor || '—'}</Field>
             <Field label="Category">{expense.category?.name || '—'}</Field>
             <Field label="Case" className="sm:col-span-2">

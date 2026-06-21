@@ -74,4 +74,19 @@ describe('ExpenseDetailModal (the previously-dead "View" / preview surface)', ()
     render(<ExpenseDetailModal isOpen onClose={() => {}} expense={null} isLoading />);
     expect(screen.getByText(/loading/i)).toBeInTheDocument();
   });
+
+  it('shows the base-currency amount (not the raw document figure) so View agrees with the list row', () => {
+    // A foreign-currency expense: 250 document units, 275 in base. The list row
+    // shows the base value; the preview must not print the raw 250 under the base
+    // symbol (that mislabels the money on an approver-facing screen).
+    render(
+      <ExpenseDetailModal
+        isOpen
+        onClose={() => {}}
+        expense={{ ...baseExpense, amount: 250, amount_base: 275 } as never}
+      />,
+    );
+    expect(screen.getByText('$275.00')).toBeInTheDocument();
+    expect(screen.queryByText('$250.00')).toBeNull();
+  });
 });
