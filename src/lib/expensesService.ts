@@ -503,15 +503,9 @@ export const uploadExpenseAttachment = async (
   expenseId: string,
   file: File
 ): Promise<ExpenseAttachment> => {
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${expenseId}/${Date.now()}.${fileExt}`;
-
-  const { data: uploadData, error: uploadError } = await supabase.storage
-    .from('expense-receipts')
-    .upload(fileName, file);
-
-  if (uploadError) throw uploadError;
-
+  // Resolve the tenant first so the storage path can be tenant-prefixed: the
+  // expense-receipts RLS isolates on folder[1] = tenant_id, so a flat
+  // `${expenseId}/` path would be cross-tenant readable (EXP-052/053).
   const { data: tenantRow, error: tenantError } = await supabase
     .from('expenses')
     .select('tenant_id')
@@ -522,6 +516,15 @@ export const uploadExpenseAttachment = async (
   if (!tenantRow) {
     throw new Error(`Expense ${expenseId} not found`);
   }
+
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${tenantRow.tenant_id}/${expenseId}/${Date.now()}.${fileExt}`;
+
+  const { data: uploadData, error: uploadError } = await supabase.storage
+    .from('expense-receipts')
+    .upload(fileName, file);
+
+  if (uploadError) throw uploadError;
 
   const insertPayload: Database['public']['Tables']['expense_attachments']['Insert'] = {
     expense_id: expenseId,

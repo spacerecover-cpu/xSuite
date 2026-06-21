@@ -7,7 +7,7 @@ import { useCurrency } from '../../hooks/useCurrency';
 import { baseAmount } from '../../lib/financialMath';
 import { formatDate } from '../../lib/format';
 import type { ExpenseWithDetails, ExpenseAttachment } from '../../lib/expensesService';
-import { Receipt, FileText, Download } from 'lucide-react';
+import { Receipt, FileText, Download, Upload, Trash2 } from 'lucide-react';
 
 interface ExpenseDetailModalProps {
   isOpen: boolean;
@@ -18,6 +18,12 @@ interface ExpenseDetailModalProps {
   isLoading?: boolean;
   /** Invoked when the user clicks Download on an attachment. */
   onDownloadAttachment?: (attachment: ExpenseAttachment) => void;
+  /** Invoked with a chosen file to upload as a new receipt. */
+  onUploadAttachment?: (file: File) => void;
+  /** Invoked when the user removes an attachment. */
+  onDeleteAttachment?: (attachment: ExpenseAttachment) => void;
+  /** True while an upload is in flight. */
+  isUploading?: boolean;
 }
 
 const Field: React.FC<{ label: string; className?: string; children: React.ReactNode }> = ({
@@ -42,6 +48,9 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
   expense,
   isLoading,
   onDownloadAttachment,
+  onUploadAttachment,
+  onDeleteAttachment,
+  isUploading,
 }) => {
   const { formatCurrency } = useCurrency();
 
@@ -98,7 +107,25 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
           ) : null}
 
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-2">Attachments</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Attachments</p>
+              {onUploadAttachment && (
+                <label className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline cursor-pointer">
+                  <Upload className="w-4 h-4" />
+                  {isUploading ? 'Uploading…' : 'Upload receipt'}
+                  <input
+                    type="file"
+                    className="sr-only"
+                    disabled={isUploading}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) onUploadAttachment(file);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+              )}
+            </div>
             {expense.attachments && expense.attachments.length > 0 ? (
               <ul className="space-y-2">
                 {expense.attachments.map((att) => (
@@ -110,16 +137,28 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                       <FileText className="w-4 h-4 text-slate-400 flex-shrink-0" />
                       <span className="truncate">{att.file_name}</span>
                     </span>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => onDownloadAttachment?.(att)}
-                      className="flex items-center gap-1.5 flex-shrink-0"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download
-                    </Button>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => onDownloadAttachment?.(att)}
+                        className="flex items-center gap-1.5"
+                      >
+                        <Download className="w-4 h-4" />
+                        Download
+                      </Button>
+                      {onDeleteAttachment && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteAttachment(att)}
+                          className="p-1.5 text-danger hover:bg-danger-muted rounded transition-colors"
+                          aria-label={`Remove ${att.file_name}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>

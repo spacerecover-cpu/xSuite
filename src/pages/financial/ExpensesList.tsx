@@ -21,6 +21,8 @@ import {
   rejectExpense,
   getExpenseStats,
   fetchExpenseById,
+  uploadExpenseAttachment,
+  deleteExpenseAttachment,
   EXPENSE_LIST_COLUMNS,
   Expense,
   ExpenseAttachment,
@@ -89,6 +91,7 @@ export const ExpensesList: React.FC = () => {
   const selection = useBulkSelection();
   const canBulkArchive = profile?.role === 'owner' || profile?.role === 'admin';
   const [isArchiving, setIsArchiving] = useState(false);
+  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [page, setPage] = useState(0);
@@ -169,6 +172,30 @@ export const ExpensesList: React.FC = () => {
       return;
     }
     window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleUploadReceipt = async (file: File) => {
+    if (!selectedExpenseId) return;
+    setIsUploadingReceipt(true);
+    try {
+      await uploadExpenseAttachment(selectedExpenseId, file);
+      await queryClient.invalidateQueries({ queryKey: ['expense_detail', selectedExpenseId] });
+      toast.success('Receipt uploaded');
+    } catch (err) {
+      toast.error((err as Error).message || 'Failed to upload receipt');
+    } finally {
+      setIsUploadingReceipt(false);
+    }
+  };
+
+  const handleDeleteAttachment = async (attachment: ExpenseAttachment) => {
+    try {
+      await deleteExpenseAttachment(attachment.id);
+      await queryClient.invalidateQueries({ queryKey: ['expense_detail', selectedExpenseId] });
+      toast.success('Receipt removed');
+    } catch (err) {
+      toast.error((err as Error).message || 'Failed to remove receipt');
+    }
   };
 
   const createExpenseMutation = useMutation({
@@ -793,6 +820,9 @@ export const ExpensesList: React.FC = () => {
         expense={expenseDetail ?? null}
         isLoading={detailLoading}
         onDownloadAttachment={handleDownloadAttachment}
+        onUploadAttachment={handleUploadReceipt}
+        onDeleteAttachment={handleDeleteAttachment}
+        isUploading={isUploadingReceipt}
       />
     </ListPageTemplate>
   );
