@@ -57,6 +57,20 @@ describe('buildCaseStatusOptions', () => {
     expect(opts.find((o) => o.value === 'Cancelled by Client')?.group).toBe('cancel');
   });
 
+  it('does not treat null-phase statuses as same-phase laterals', () => {
+    // The DB `type` (phase) column is nullable; two statuses with a null phase are
+    // NOT siblings, so the second must not be offered as a lateral move.
+    const current: StatusLite = { id: 'a', name: 'A', type: null };
+    const sibling: StatusLite = { id: 'b', name: 'B', type: null };
+    const opts = buildCaseStatusOptions({
+      current,
+      allActiveStatuses: [current, sibling],
+      allowedTransitions: [],
+    });
+    expect(opts.map((o) => o.value)).toEqual(['A']);
+    expect(opts.find((o) => o.value === 'B')).toBeUndefined();
+  });
+
   it('flags reopen edges as reopen', () => {
     const opts = buildCaseStatusOptions({
       current: DELIVERED,
