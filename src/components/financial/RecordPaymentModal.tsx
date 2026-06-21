@@ -293,13 +293,17 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   );
 
   const totalAllocated = allocations.reduce((sum, a) => sum + a.allocation_amount, 0);
+  // What the listed invoices will still owe once this payment is applied.
+  // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency rollup: a payment allocates across one customer's invoices, all in the tenant currency
+  const totalDue = allocations.reduce((sum, a) => sum + a.balance_due, 0);
+  const remainingBalance = Math.max(0, totalDue - totalAllocated);
   // record_payment rejects any difference (money conservation) — block the
   // submit client-side and explain, instead of surfacing a server 400.
   const allocationMismatch = allocations.length > 0 && Math.abs(totalAllocated - totalAmount) > 1e-6;
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Record Payment" size="lg" closeOnBackdrop={false}>
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="payment-case" className="block text-sm font-medium text-slate-700 mb-1">
             Case <span className="text-danger">*</span>
@@ -329,19 +333,13 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         </div>
 
         {selectedCase?.customer && (
-          <div className="bg-slate-50 rounded-lg p-3 flex items-center gap-3">
-            <User className="w-5 h-5 text-slate-400" />
-            <div>
-              <p className="text-xs text-slate-500">Customer</p>
-              <p className="text-sm font-medium text-slate-900">
-                {selectedCase.customer.customer_name}
-                {selectedCase.customer.email && (
-                  <span className="text-slate-500 font-normal ml-2">
-                    ({selectedCase.customer.email})
-                  </span>
-                )}
-              </p>
-            </div>
+          <div className="bg-slate-50 rounded-lg px-3 py-2 flex items-center gap-2 text-sm">
+            <User className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            <span className="text-slate-500">Customer:</span>
+            <span className="font-medium text-slate-900">{selectedCase.customer.customer_name}</span>
+            {selectedCase.customer.email && (
+              <span className="text-slate-500 truncate">({selectedCase.customer.email})</span>
+            )}
           </div>
         )}
 
@@ -414,7 +412,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
           <div>
             <label htmlFor="payment-bank-account" className="block text-sm font-medium text-slate-700 mb-1">
-              Bank Account
+              Deposit To
             </label>
             <select
               id="payment-bank-account"
@@ -474,17 +472,17 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
               <table className="w-full">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="text-left py-2 px-3 text-xs font-semibold text-slate-600">Invoice</th>
-                    <th className="text-right py-2 px-3 text-xs font-semibold text-slate-600">Invoice Total</th>
-                    <th className="text-right py-2 px-3 text-xs font-semibold text-slate-600">Due</th>
-                    <th className="text-right py-2 px-3 text-xs font-semibold text-slate-600">Allocate</th>
+                    <th className="text-left py-1.5 px-3 text-xs font-semibold text-slate-600">Invoice</th>
+                    <th className="text-right py-1.5 px-3 text-xs font-semibold text-slate-600">Invoice Total</th>
+                    <th className="text-right py-1.5 px-3 text-xs font-semibold text-slate-600">Due</th>
+                    <th className="text-right py-1.5 px-3 text-xs font-semibold text-slate-600">Allocate</th>
                     <th className="w-10"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {allocations.map((alloc) => (
                     <tr key={alloc.invoice_id}>
-                      <td className="py-2 px-3">
+                      <td className="py-1.5 px-3">
                         <div className="flex items-center gap-2">
                           <FileText className="w-4 h-4 text-slate-400" />
                           <div className="flex items-center gap-2">
@@ -499,13 +497,13 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                           </div>
                         </div>
                       </td>
-                      <td className="py-2 px-3 text-right text-sm text-slate-600 tabular-nums">
+                      <td className="py-1.5 px-3 text-right text-sm text-slate-600 tabular-nums">
                         {formatCurrency(alloc.total_amount)}
                       </td>
-                      <td className="py-2 px-3 text-right text-sm font-semibold text-slate-900 tabular-nums">
+                      <td className="py-1.5 px-3 text-right text-sm font-semibold text-slate-900 tabular-nums">
                         {formatCurrency(alloc.balance_due)}
                       </td>
-                      <td className="py-2 px-3">
+                      <td className="py-1.5 px-3">
                         <Input
                           type="number"
                           step="0.01"
@@ -521,7 +519,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                           className="w-28 text-right text-sm"
                         />
                       </td>
-                      <td className="py-2 px-3">
+                      <td className="py-1.5 px-3">
                         <button
                           type="button"
                           onClick={() => handleRemoveAllocation(alloc.invoice_id)}
@@ -535,16 +533,29 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 </tbody>
                 <tfoot className="bg-slate-50">
                   <tr>
-                    <td colSpan={3} className="py-2 px-3 text-right text-sm font-semibold text-slate-700">
+                    <td colSpan={3} className="py-1.5 px-3 text-right text-sm font-semibold text-slate-700">
                       Total Allocated:
                     </td>
-                    <td className="py-2 px-3 text-right text-sm font-bold text-primary tabular-nums">
+                    <td className="py-1.5 px-3 text-right text-sm font-bold text-primary tabular-nums">
                       {formatCurrency(totalAllocated)}
                     </td>
                     <td></td>
                   </tr>
+                  <tr>
+                    <td colSpan={3} className="py-1.5 px-3 text-right text-sm font-medium text-slate-600">
+                      Remaining Balance:
+                    </td>
+                    <td
+                      className={`py-1.5 px-3 text-right text-sm font-bold tabular-nums ${
+                        remainingBalance === 0 ? 'text-success' : 'text-slate-900'
+                      }`}
+                    >
+                      {formatCurrency(remainingBalance)}
+                    </td>
+                    <td></td>
+                  </tr>
                   <tr className={allocationMismatch ? 'bg-warning-muted' : 'bg-success-muted/50'}>
-                    <td colSpan={5} className="py-2 px-3">
+                    <td colSpan={5} className="py-1.5 px-3">
                       {allocationMismatch ? (
                         <p className="flex items-center gap-1.5 text-sm font-medium text-warning" role="alert">
                           <AlertTriangle className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
@@ -591,7 +602,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           />
         </div>
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+        <div className="flex justify-end gap-3 pt-3 border-t border-slate-200">
           <Button type="button" variant="secondary" onClick={handleClose}>
             Cancel
           </Button>
