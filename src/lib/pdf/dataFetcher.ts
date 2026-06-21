@@ -607,6 +607,9 @@ export function toInvoiceData(
     total_amount: invoiceRow.total_amount ?? 0,
     amount_paid: invoiceRow.amount_paid ?? 0,
     balance_due: invoiceRow.balance_due ?? 0,
+    // The DB column is `terms`; the document layer reads `payment_terms`. Surface
+    // it so the per-record invoice terms reach the engine's terms section.
+    payment_terms: optStr(invoiceRow.terms),
     notes: invoiceRow.notes ?? undefined,
     created_at: invoiceRow.created_at ?? '',
     created_by: invoiceRow.created_by ?? undefined,

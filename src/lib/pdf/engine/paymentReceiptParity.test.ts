@@ -222,18 +222,19 @@ describe('payment receipt parity — engine output matches the legacy builder', 
     }
   });
 
-  it('renders config notes + bank box (notes are per-template, not per-record)', () => {
+  it('renders the per-record notes (overriding the template) + bank box', () => {
     const data = makeReceiptData();
-    // Notes are now OWNED BY THE TEMPLATE (config.termsContent.notes), a deliberate
-    // divergence from the legacy builder's per-record receipt notes.
+    // Per-record notes — what the user typed on the receipt — take precedence over
+    // the template's termsContent.notes: the record's notes render and the template's do NOT.
     const config = {
       ...BUILT_IN_TEMPLATE_CONFIGS.payment_receipt,
-      termsContent: { notes: { en: 'Partial payment received with thanks.' } },
+      termsContent: { notes: { en: 'TEMPLATE NOTES — SHOULD NOT APPEAR' } },
     };
     const engineData = toEngineData(data, config);
     const engine = allTexts(renderTemplate(config, engineData, englishCtx, null, TINY_PNG));
 
     expect(engine.some((t) => t.includes('Partial payment received with thanks.'))).toBe(true);
+    expect(engine.some((t) => t.includes('TEMPLATE NOTES — SHOULD NOT APPEAR'))).toBe(false);
 
     for (const probe of ['Acme Data Recovery LLC', 'First National Bank', 'AE12 0000 0000 0123 4567 89', 'FNBKAEXX']) {
       expect(engine.some((t) => t.includes(probe))).toBe(true);

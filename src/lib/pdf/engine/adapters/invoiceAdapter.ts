@@ -192,7 +192,9 @@ export function toEngineData(
   // the right column of the same row via the terms section.
   const termsBlocks: NonNullable<NonNullable<EngineDocData['terms']>['blocks']> = [];
   if (invoiceData.payment_terms) {
-    termsBlocks.push({ title: { en: 'Payment Terms', ar: 'شروط الدفع' }, body: invoiceData.payment_terms });
+    // Invoice Payment Terms come from the rich-text editor, so the body is HTML —
+    // flag it so the renderer runs it through htmlToPdfmake instead of printing tags.
+    termsBlocks.push({ title: { en: 'Payment Terms', ar: 'شروط الدفع' }, body: invoiceData.payment_terms, format: 'html' });
   }
   if (invoiceData.notes) {
     termsBlocks.push({ title: { en: 'Notes', ar: 'ملاحظات' }, body: invoiceData.notes });

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import { renderTerms } from './terms';
 import type { EngineContext, EngineDocData } from '../types';
@@ -175,5 +176,80 @@ describe('renderTerms — movable bank section coordination', () => {
     expect(texts.some((t) => t.includes('Account Name:'))).toBe(true); // English field label
     expect(texts.some((t) => t.includes('اسم الحساب:'))).toBe(false); // translated field label omitted
     expect(texts.some((t) => t.includes('Future Space LLC'))).toBe(true); // value present
+  });
+});
+
+describe('renderTerms — per-record terms (from the edited quote/invoice)', () => {
+  const RECORD_TERMS = 'No data, no fee. Quote valid 30 days. 50% deposit to begin.';
+
+  function withRecordTerms(blocks: Array<{ title: LabelText; body: string; format?: 'html' | 'text' }>): EngineDocData {
+    return { terms: { title: { en: 'Terms & Conditions', ar: 'الشروط والأحكام' }, blocks } } as unknown as EngineDocData;
+  }
+
+  it('renders the per-record plain-text terms even when the template has no termsContent', () => {
+    const out = renderTerms(
+      engine({}),
+      withRecordTerms([{ title: { en: 'Terms & Conditions', ar: 'الشروط والأحكام' }, body: RECORD_TERMS }]),
+    );
+    const texts: string[] = [];
+    collectText(out, texts);
+    expect(texts.some((t) => t.includes(RECORD_TERMS))).toBe(true);
+  });
+
+  it('lets the per-record terms take precedence over the template termsContent', () => {
+    const out = renderTerms(
+      engine({ termsContent: { terms: { en: 'TEMPLATE TERMS' } } }),
+      withRecordTerms([{ title: { en: 'Terms & Conditions' }, body: 'RECORD TERMS' }]),
+    );
+    const texts: string[] = [];
+    collectText(out, texts);
+    expect(texts.some((t) => t.includes('RECORD TERMS'))).toBe(true);
+    expect(texts.some((t) => t.includes('TEMPLATE TERMS'))).toBe(false);
+  });
+
+  it('renders both the per-record Payment Terms and Notes blocks', () => {
+    const out = renderTerms(
+      engine({}),
+      withRecordTerms([
+        { title: { en: 'Payment Terms' }, body: 'Net 30 from invoice date.' },
+        { title: { en: 'Notes' }, body: 'Handle the donor drive with care.' },
+      ]),
+    );
+    const texts: string[] = [];
+    collectText(out, texts);
+    expect(texts.some((t) => t.includes('Payment Terms'))).toBe(true);
+    expect(texts.some((t) => t.includes('Net 30 from invoice date.'))).toBe(true);
+    expect(texts.some((t) => t.includes('Notes'))).toBe(true);
+    expect(texts.some((t) => t.includes('Handle the donor drive with care.'))).toBe(true);
+  });
+
+  it('renders a per-record HTML terms body as structured content (rich invoice editor)', () => {
+    const out = renderTerms(
+      engine({}),
+      withRecordTerms([
+        { title: { en: 'Payment Terms' }, body: '<div><p>Pay <strong>50%</strong> upfront</p></div>', format: 'html' },
+      ]),
+    );
+    const texts: string[] = [];
+    collectText(out, texts);
+    expect(texts.some((t) => t.includes('Pay '))).toBe(true);
+    expect(texts.some((t) => t.includes('50%'))).toBe(true);
+    expect(texts.some((t) => t.includes('upfront'))).toBe(true);
+  });
+
+  it('shows per-record terms (English) alongside the template Arabic terms on a bilingual document', () => {
+    const out = renderTerms(
+      engine({ termsContent: { terms: { en: 'IGNORED EN', ar: TERMS_AR } }, language: BILINGUAL }),
+      withRecordTerms([{ title: { en: 'Terms & Conditions', ar: 'الشروط والأحكام' }, body: 'RECORD EN TERMS' }]),
+    );
+    const texts: string[] = [];
+    collectText(out, texts);
+    expect(texts.some((t) => t.includes('RECORD EN TERMS'))).toBe(true);
+    expect(texts.some((t) => t.includes(TERMS_AR))).toBe(true);
+    expect(texts.some((t) => t.includes('IGNORED EN'))).toBe(false);
+  });
+
+  it('returns null when there is neither per-record nor template terms and no bank', () => {
+    expect(renderTerms(engine({}), withRecordTerms([]))).toBeNull();
   });
 });

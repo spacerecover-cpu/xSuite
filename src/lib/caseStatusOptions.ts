@@ -21,11 +21,12 @@ export interface CaseStatusOption {
   group: StatusOptionGroup;
 }
 
-/** Just the fields the picker reads off a master_case_statuses row. */
+/** Just the fields the picker reads off a master_case_statuses row. The DB
+ *  `type` (phase) column is nullable, so this mirrors it. */
 export interface StatusLite {
   id: string;
   name: string;
-  type: string;
+  type: string | null;
 }
 
 export interface BuildCaseStatusOptionsParams {
@@ -52,8 +53,9 @@ export function buildCaseStatusOptions({
     push(current.name, current.name, 'current');
 
     // Same-phase siblings — intra-phase lateral moves, now accepted by the DB.
+    // A null phase is not a real phase, so null-phase statuses are never siblings.
     for (const s of allActiveStatuses) {
-      if (s.type === current.type && s.id !== current.id) {
+      if (current.type != null && s.type === current.type && s.id !== current.id) {
         push(s.name, s.name, 'lateral');
       }
     }

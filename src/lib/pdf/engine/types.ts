@@ -77,6 +77,12 @@ export interface TermsTextBlock {
   title: LabelText;
   /** Body prose. Already-resolved by the adapter. */
   body: string;
+  /**
+   * How `body` should be rendered. `'html'` runs it through `htmlToPdfmake`
+   * (the rich-text editor's output, e.g. invoice Payment Terms); `'text'` (the
+   * default) renders it as plain prose, preserving newlines.
+   */
+  format?: 'html' | 'text';
 }
 
 /**

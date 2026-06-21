@@ -256,15 +256,15 @@ describe('quote parity — engine output matches the legacy builder', () => {
     expect(engine).toContain('13 Jul 2026');
   });
 
-  it('renders config Terms + Notes and the bank box (terms are per-template, not per-record)', () => {
+  it('renders the per-record Terms + Notes (overriding the template) and the bank box', () => {
     const data = makeQuoteData();
-    // T&C is now OWNED BY THE TEMPLATE (config.termsContent), a deliberate
-    // divergence from the legacy builder's per-record quote.terms_and_conditions.
+    // Per-record terms — what the user typed on the quote — take precedence over
+    // the template's termsContent: the record's terms render and the template's do NOT.
     const config = {
       ...BUILT_IN_TEMPLATE_CONFIGS.quote,
       termsContent: {
-        terms: { en: 'Quote valid for 30 days. 50% advance required to begin.' },
-        notes: { en: 'Diagnostics are non-destructive.' },
+        terms: { en: 'TEMPLATE TERMS — SHOULD NOT APPEAR' },
+        notes: { en: 'TEMPLATE NOTES — SHOULD NOT APPEAR' },
       },
     };
     const engineData = toEngineData(data, config);
@@ -276,6 +276,9 @@ describe('quote parity — engine output matches the legacy builder', () => {
     ]) {
       expect(engine.some((t) => t.includes(probe))).toBe(true);
     }
+    // The template terms are suppressed because the record carries its own.
+    expect(engine.some((t) => t.includes('TEMPLATE TERMS — SHOULD NOT APPEAR'))).toBe(false);
+    expect(engine.some((t) => t.includes('TEMPLATE NOTES — SHOULD NOT APPEAR'))).toBe(false);
     // Bank box detail rows (folded into the terms row) — still parity with legacy.
     for (const probe of ['Acme Data Recovery LLC', 'First National Bank', 'AE12 0000 0000 0123 4567 89', 'FNBKAEXX']) {
       expect(engine.some((t) => t.includes(probe))).toBe(true);

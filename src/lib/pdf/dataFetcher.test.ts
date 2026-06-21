@@ -51,6 +51,7 @@ const INVOICE_ROW = {
   amount_paid: 0,
   balance_due: 105,
   created_at: '2026-01-01',
+  terms: 'Net 30 — payment due on receipt.',
   cases: { id: 'c1', case_no: 'CASE-9' },
   bank_accounts: {
     id: 'b1',
@@ -184,6 +185,11 @@ describe('toInvoiceData — customer/company/bank contract', () => {
   it('maps the case reference from the invoice row', () => {
     const result = toInvoiceData(INVOICE_ROW, { currency: OMR });
     expect(result.cases?.case_no).toBe('CASE-9');
+  });
+
+  it('surfaces the DB `terms` column as payment_terms (so per-record terms reach the PDF)', () => {
+    const result = toInvoiceData(INVOICE_ROW, { currency: OMR });
+    expect(result.payment_terms).toBe('Net 30 — payment due on receipt.');
   });
 
   it('sources the currency block from the resolved CurrencyConfig (never USD)', () => {

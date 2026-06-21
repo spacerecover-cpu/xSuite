@@ -3,10 +3,12 @@
  * bordered box, split at the centre on bilingual documents (English | Arabic),
  * plus the optional bank box.
  *
- * T&C content is OWNED BY THE TEMPLATE (`config.termsContent`), edited in the
- * Studio per document type — a Quotation's terms differ from an Invoice's. The
- * tenant-wide `legal_compliance.standard_terms_*` and per-record document terms
- * are NOT read — the template is the single source.
+ * Source precedence: the PER-RECORD terms the user entered on the quote/invoice
+ * (resolved by the adapter into `data.terms.blocks`) take precedence; when a
+ * record has none, the per-document-type template `config.termsContent` (edited
+ * in the Studio) is the fallback. Per-record terms are captured in one language,
+ * so on a bilingual document they fill the English column while the template
+ * terms fill the Arabic column.
  *
  * Layout (mirrors the header info-boxes): on a bilingual document the box puts
  * English content in the left half and Arabic content (right-aligned) in the
@@ -17,9 +19,10 @@
 
 import type { Content } from 'pdfmake/interfaces';
 import { PDF_COLORS } from '../../styles';
+import { htmlToPdfmake } from '../../htmlToPdfmake';
 import { isBilingualMode, en, ar } from '../labels';
 import { buildBankBox } from './bank';
-import type { EngineContext, EngineDocData, LabelText, SectionRenderer } from '../types';
+import type { EngineContext, EngineDocData, LabelText, SectionRenderer, TermsTextBlock } from '../types';
 
 interface TermsBlock {
   heading: LabelText;
@@ -51,6 +54,36 @@ function languageColumn(blocks: TermsBlock[], lang: 'en' | 'ar'): Content[] {
   return stack;
 }
 
+/**
+ * The English column built from the PER-RECORD terms blocks the adapter resolved
+ * from the edited quote/invoice (Payment Terms / Terms & Conditions, then Notes).
+ * Each block's body renders as rich content when the adapter marks it
+ * `format: 'html'` (rich-text editor output) and as plain prose otherwise. Blocks
+ * whose body is empty — or whose HTML produces nothing — are skipped, so an empty
+ * record falls back to the template terms.
+ */
+function perRecordColumn(blocks: TermsTextBlock[]): Content[] {
+  const stack: Content[] = [];
+  for (const b of blocks) {
+    const body = (b.body ?? '').trim();
+    if (!body) continue;
+    let bodyNode: Content;
+    if (b.format === 'html') {
+      const rich = htmlToPdfmake(body);
+      if (rich.length === 0) continue;
+      bodyNode = { stack: rich, fontSize: 7, color: PDF_COLORS.textLight, lineHeight: 1.3 };
+    } else {
+      bodyNode = { text: body, fontSize: 7, color: PDF_COLORS.textLight, lineHeight: 1.3 };
+    }
+    if (stack.length > 0) stack.push({ text: '', margin: [0, 4, 0, 0] as [number, number, number, number] });
+    stack.push(
+      { text: en(b.title), fontSize: 9, bold: true, color: PDF_COLORS.text, alignment: 'left', margin: [0, 0, 0, 3] as [number, number, number, number] },
+      bodyNode,
+    );
+  }
+  return stack;
+}
+
 export const renderTerms: SectionRenderer = (
   engine: EngineContext,
   data: EngineDocData,
@@ -69,7 +102,10 @@ export const renderTerms: SectionRenderer = (
     { heading: engine.config.labels.notes ?? { en: 'Notes', ar: 'ملاحظات' }, body: tc?.notes ?? {} },
   ];
 
-  const enCol = languageColumn(blocks, 'en');
+  // Per-record terms take precedence over the template; fall back to the template
+  // terms when the record carries none (or its blocks render to nothing).
+  const perRecord = perRecordColumn(data.terms?.blocks ?? []);
+  const enCol = perRecord.length > 0 ? perRecord : languageColumn(blocks, 'en');
   const arCol = bilingual ? languageColumn(blocks, 'ar') : [];
 
   const parts: Content[] = [];
