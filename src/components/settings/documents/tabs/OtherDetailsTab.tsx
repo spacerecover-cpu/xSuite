@@ -55,6 +55,25 @@ const SECTION_LABELS: Record<string, string> = {
 const sectionLabel = (key: string): string =>
   SECTION_LABELS[key] ?? key.replace(/([a-z])([A-Z])/g, '$1 $2');
 
+/**
+ * The per-block translation toggles offered under "Custom — choose per block",
+ * each paired with the document SECTION it governs and its UI label. A block is
+ * offered only when that section is present on the current document type — so
+ * Collector shows on the checkout form but never on an invoice. `payslip`
+ * governs the `payslipInfo` section (the only non-1:1 mapping).
+ */
+const TRANSLATION_BLOCKS: ReadonlyArray<
+  readonly [keyof NonNullable<TranslationPolicyConfig['groups']>, string, string]
+> = [
+  ['parties', 'parties', 'Customer / party details'],
+  ['meta', 'meta', 'Document details'],
+  ['caseInfo', 'caseInfo', 'Case information'],
+  ['collector', 'collector', 'Collector'],
+  ['payslip', 'payslipInfo', 'Payslip'],
+  ['diagnostics', 'diagnostics', 'Diagnostics'],
+  ['paymentHistory', 'paymentHistory', 'Payment history'],
+];
+
 export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
   const ordered = useMemo(
     () => [...api.resolved.sections].sort((a, b) => a.order - b.order),
@@ -70,6 +89,13 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
       ordered.some((s) => s.key === 'meta' || s.key === 'caseInfo'),
     [ordered],
   );
+
+  // Only offer per-block translation toggles for blocks whose section actually
+  // exists on this document type (so e.g. Collector never shows on an invoice).
+  const customBlocks = useMemo(() => {
+    const present = new Set(api.resolved.sections.map((s) => s.key));
+    return TRANSLATION_BLOCKS.filter(([, sectionKey]) => present.has(sectionKey));
+  }, [api.resolved.sections]);
 
   /**
    * Toggle a section's visibility. The VAT/GST bar is gated by BOTH section
@@ -120,25 +146,21 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
             { value: 'custom', label: 'Custom — choose per block' },
           ]}
         />
-        {api.resolved.translationPolicy?.mode === 'custom' && (
-          <div className="space-y-2">
-            {([
-              ['parties', 'Customer / party details'],
-              ['meta', 'Document details'],
-              ['caseInfo', 'Case information'],
-              ['collector', 'Collector'],
-              ['payslip', 'Payslip'],
-              ['diagnostics', 'Diagnostics'],
-            ] as const).map(([group, label]) => (
-              <ToggleRow
-                key={group}
-                label={`Translate ${label} labels`}
-                checked={api.resolved.translationPolicy?.groups?.[group] ?? true}
-                onChange={(v) => api.setTranslationGroup(group, v)}
-              />
-            ))}
-          </div>
-        )}
+        {api.resolved.translationPolicy?.mode === 'custom' &&
+          (customBlocks.length > 0 ? (
+            <div className="space-y-2">
+              {customBlocks.map(([group, , label]) => (
+                <ToggleRow
+                  key={group}
+                  label={`Translate ${label} labels`}
+                  checked={api.resolved.translationPolicy?.groups?.[group] ?? true}
+                  onChange={(v) => api.setTranslationGroup(group, v)}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500">No translatable blocks on this document type.</p>
+          ))}
       </FieldGroup>
 
       {hasPartiesAndDetails && (
