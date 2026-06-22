@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // getExpensesByCategory wraps a supabase query; mock the client (env-throwing on
 // import) and feed mixed-currency rows so the assertion proves base-currency summation.
-const { from } = vi.hoisted(() => ({ from: vi.fn() }));
-vi.mock('./supabaseClient', () => ({ supabase: { from } }));
+const { from, rpc } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }));
+vi.mock('./supabaseClient', () => ({ supabase: { from, rpc } }));
 vi.mock('./logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 vi.mock('./financialService', () => ({ createFinancialTransaction: vi.fn() }));
 vi.mock('./currencyService', () => ({
@@ -12,7 +12,7 @@ vi.mock('./currencyService', () => ({
   getCurrencyDecimals: vi.fn(),
 }));
 
-import { getExpensesByCategory, EXPENSE_LIST_COLUMNS } from './expensesService';
+import { getExpensesByCategory, EXPENSE_LIST_COLUMNS, recordExpenseDisbursement } from './expensesService';
 
 /** Thenable query builder: select/in/gte/lte are chainable; awaiting yields {data}. */
 function makeQuery(rows: Array<Record<string, unknown>>) {
@@ -28,7 +28,10 @@ function makeQuery(rows: Array<Record<string, unknown>>) {
   return builder;
 }
 
-beforeEach(() => from.mockReset());
+beforeEach(() => {
+  from.mockReset();
+  rpc.mockReset();
+});
 
 describe('getExpensesByCategory (cross-document totals must be base currency)', () => {
   it('sums amount_base across mixed-currency expenses, never the raw native amount', async () => {
@@ -73,5 +76,41 @@ describe('EXPENSE_LIST_COLUMNS (the edit form must be able to pre-select the sav
 
   it('does not reference a payment_method_id column (no such column exists on expenses)', () => {
     expect(EXPENSE_LIST_COLUMNS).not.toContain('payment_method_id');
+  });
+});
+
+describe('recordExpenseDisbursement (EXP-017 — atomic Mark-as-Paid)', () => {
+  it('calls the atomic RPC with the disbursement args (reference included only when given)', async () => {
+    rpc.mockResolvedValueOnce({ data: { id: 'e1', status: 'paid' }, error: null });
+
+    const res = await recordExpenseDisbursement('e1', 'acct-1', '2026-06-22', 'REF-9');
+
+    expect(rpc).toHaveBeenCalledWith('record_expense_disbursement', {
+      p_expense_id: 'e1',
+      p_bank_account_id: 'acct-1',
+      p_paid_at: '2026-06-22',
+      p_reference: 'REF-9',
+    });
+    expect(res).toEqual({ id: 'e1', status: 'paid' });
+  });
+
+  it('omits p_reference when no reference is supplied', async () => {
+    rpc.mockResolvedValueOnce({ data: { id: 'e1', status: 'paid' }, error: null });
+
+    await recordExpenseDisbursement('e1', 'acct-1', '2026-06-22');
+
+    expect(rpc).toHaveBeenCalledWith('record_expense_disbursement', {
+      p_expense_id: 'e1',
+      p_bank_account_id: 'acct-1',
+      p_paid_at: '2026-06-22',
+    });
+  });
+
+  it('surfaces the RPC guard error (e.g. insufficient funds) to the caller', async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'Insufficient funds in Operations (balance 10, required 200)' } });
+
+    await expect(recordExpenseDisbursement('e1', 'acct-1', '2026-06-22')).rejects.toMatchObject({
+      message: expect.stringContaining('Insufficient funds'),
+    });
   });
 });

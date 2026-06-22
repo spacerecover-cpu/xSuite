@@ -79,6 +79,7 @@ export const EXPENSE_LIST_COLUMNS = `
   expense_number,
   expense_date,
   amount,
+  currency,
   amount_base,
   description,
   vendor,
@@ -516,6 +517,32 @@ export const markExpenseAsPaid = async (id: string) => {
   return data;
 };
 
+/**
+ * EXP-017 — record the cash/bank side of paying an approved expense, atomically.
+ * The accrual GL entry already posted at approval (expense_date, EXP-024); this RPC
+ * creates the payment_disbursement + bank_transaction, debits the account balance
+ * (blocking on insufficient funds; account currency must match the expense), and
+ * stamps the expense paid. The approved→paid state guard inside the RPC is the
+ * idempotency: a second call sees 'paid' and throws.
+ */
+export const recordExpenseDisbursement = async (
+  expenseId: string,
+  bankAccountId: string,
+  paidAt: string,
+  reference?: string,
+) => {
+  const params: Database['public']['Functions']['record_expense_disbursement']['Args'] = {
+    p_expense_id: expenseId,
+    p_bank_account_id: bankAccountId,
+    p_paid_at: paidAt,
+  };
+  if (reference) params.p_reference = reference;
+
+  const { data, error } = await supabase.rpc('record_expense_disbursement', params);
+  if (error) throw error;
+  return data;
+};
+
 export const uploadExpenseAttachment = async (
   expenseId: string,
   file: File
@@ -760,6 +787,7 @@ export const expensesService = {
   approveExpense,
   rejectExpense,
   markExpenseAsPaid,
+  recordExpenseDisbursement,
   uploadExpenseAttachment,
   deleteExpenseAttachment,
   getExpenseCategories,

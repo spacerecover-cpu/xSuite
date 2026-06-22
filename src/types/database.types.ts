@@ -10406,6 +10406,7 @@ export type Database = {
           deleted_at: string | null
           disbursement_date: string | null
           disbursement_number: string | null
+          expense_id: string | null
           id: string
           notes: string | null
           payee_name: string | null
@@ -10423,6 +10424,7 @@ export type Database = {
           deleted_at?: string | null
           disbursement_date?: string | null
           disbursement_number?: string | null
+          expense_id?: string | null
           id?: string
           notes?: string | null
           payee_name?: string | null
@@ -10440,6 +10442,7 @@ export type Database = {
           deleted_at?: string | null
           disbursement_date?: string | null
           disbursement_number?: string | null
+          expense_id?: string | null
           id?: string
           notes?: string | null
           payee_name?: string | null
@@ -10455,6 +10458,13 @@ export type Database = {
             columns: ["bank_account_id"]
             isOneToOne: false
             referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_disbursements_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "expenses"
             referencedColumns: ["id"]
           },
           {
@@ -17209,6 +17219,56 @@ export type Database = {
       promote_device_to_primary: {
         Args: { p_case_id: string; p_device_id: string }
         Returns: undefined
+      }
+      record_expense_disbursement: {
+        Args: {
+          p_bank_account_id: string
+          p_expense_id: string
+          p_paid_at?: string
+          p_reference?: string
+        }
+        Returns: {
+          amount: number
+          amount_base: number | null
+          approved_at: string | null
+          approved_by: string | null
+          bank_account_id: string | null
+          case_id: string | null
+          category_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          deleted_at: string | null
+          description: string | null
+          exchange_rate: number
+          expense_date: string | null
+          expense_number: string | null
+          id: string
+          is_billable: boolean | null
+          notes: string | null
+          paid_at: string | null
+          rate_source: string
+          receipt_url: string | null
+          reference: string | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string | null
+          status: string | null
+          submitted_at: string | null
+          submitted_by: string | null
+          tax_amount: number | null
+          tax_amount_base: number | null
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+          vendor: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "expenses"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       record_payment: {
         Args: { p_allocations: Json; p_payment: Json }

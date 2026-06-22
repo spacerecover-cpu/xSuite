@@ -13,12 +13,14 @@ import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
 import { KpiRow } from '../../components/templates/KpiRow';
 import { ExpenseFormModal } from '../../components/financial/ExpenseFormModal';
 import { ExpenseDetailModal } from '../../components/financial/ExpenseDetailModal';
+import { ExpensePaymentModal, type ExpensePaymentTarget } from '../../components/financial/ExpensePaymentModal';
 import { useCurrency } from '../../hooks/useCurrency';
 import {
   createExpense,
   updateExpense,
   approveExpense,
   rejectExpense,
+  recordExpenseDisbursement,
   getExpenseStats,
   fetchExpenseById,
   uploadExpenseAttachment,
@@ -64,6 +66,7 @@ type ExpenseRow = Pick<
   | 'expense_date'
   | 'amount'
   | 'amount_base'
+  | 'currency'
   | 'description'
   | 'vendor'
   | 'status'
@@ -104,6 +107,7 @@ export const ExpensesList: React.FC = () => {
   const [expenseToReject, setExpenseToReject] = useState<string | null>(null);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [expenseToApprove, setExpenseToApprove] = useState<string | null>(null);
+  const [expenseToPay, setExpenseToPay] = useState<ExpensePaymentTarget | null>(null);
 
   // Command-palette deep-link: /expenses?new=1 opens the create modal.
   useEffect(() => {
@@ -246,6 +250,38 @@ export const ExpensesList: React.FC = () => {
     },
     onError: (e) => toast.error((e as Error).message || 'Failed to reject expense'),
   });
+
+  const recordDisbursementMutation = useMutation({
+    mutationFn: ({
+      expenseId,
+      bankAccountId,
+      paidAt,
+      reference,
+    }: {
+      expenseId: string;
+      bankAccountId: string;
+      paidAt: string;
+      reference?: string;
+    }) => recordExpenseDisbursement(expenseId, bankAccountId, paidAt, reference),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['expense_stats'] });
+      queryClient.invalidateQueries({ queryKey: ['bank_accounts'] });
+      setExpenseToPay(null);
+      toast.success('Expense paid and disbursement recorded');
+    },
+    onError: (e) => toast.error((e as Error).message || 'Failed to record payment'),
+  });
+
+  const handlePay = (expense: ExpenseRow, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpenseToPay({
+      id: expense.id,
+      amount: expense.amount ?? 0,
+      currency: expense.currency,
+      expense_number: expense.expense_number,
+    });
+  };
 
   const handleApprove = (expenseId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -654,6 +690,15 @@ export const ExpensesList: React.FC = () => {
                             </button>
                           </>
                         )}
+                        {expense.status === 'approved' && isAccountsRole && (
+                          <button
+                            onClick={(e) => handlePay(expense, e)}
+                            className="p-1.5 text-success hover:bg-success-muted rounded transition-colors"
+                            title="Mark as Paid"
+                          >
+                            <Wallet className="w-4 h-4" />
+                          </button>
+                        )}
                         {(expense.status === 'draft' || expense.status === 'pending' || expense.status === 'rejected') && (
                           <button
                             onClick={(e) => handleEdit(expense, e)}
@@ -815,6 +860,22 @@ export const ExpensesList: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      <ExpensePaymentModal
+        isOpen={!!expenseToPay}
+        onClose={() => setExpenseToPay(null)}
+        expense={expenseToPay}
+        isSubmitting={recordDisbursementMutation.isPending}
+        onConfirm={async ({ bankAccountId, paidAt, reference }) => {
+          if (!expenseToPay) return;
+          await recordDisbursementMutation.mutateAsync({
+            expenseId: expenseToPay.id,
+            bankAccountId,
+            paidAt,
+            reference,
+          });
+        }}
+      />
 
       <ExpenseDetailModal
         isOpen={!!selectedExpenseId}
