@@ -602,7 +602,7 @@ export const ImportWizard: React.FC<ImportWizardProps> = ({ entityType, onClose 
                         </optgroup>
                       </>
                     ) : (
-                      [...config.requiredFields, ...config.uniqueFields, ...Object.keys(config.referenceFields), ...config.dateFields, ...config.numberFields, ...config.booleanFields]
+                      [...config.requiredFields, ...config.uniqueFields, ...Object.keys(config.referenceFields), ...config.dateFields, ...config.numberFields, ...(config.stringFields ?? []), ...config.booleanFields]
                         .filter((v, i, a) => a.indexOf(v) === i)
                         .map((field) => (
                           <option key={field} value={field}>

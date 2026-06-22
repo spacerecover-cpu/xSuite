@@ -101,6 +101,8 @@ export interface EntityInfo {
   uniqueFields: string[];
   dateFields: string[];
   numberFields: string[];
+  /** Free-text columns importable beyond the required/reference set (e.g. currency). */
+  stringFields?: string[];
   booleanFields: string[];
   referenceFields: Record<string, { table: string; field: string }>;
 }
@@ -166,8 +168,9 @@ export const ENTITY_CONFIGS: Record<EntityType, EntityInfo> = {
     requiredFields: ['expense_number', 'expense_date', 'amount', 'description'],
     uniqueFields: ['expense_number'],
     dateFields: ['expense_date', 'approved_at', 'paid_at'],
-    numberFields: ['amount'],
-    booleanFields: [],
+    numberFields: ['amount', 'tax_amount', 'exchange_rate'],
+    stringFields: ['currency', 'vendor', 'reference', 'notes'],
+    booleanFields: ['is_billable'],
     referenceFields: {
       category_id: { table: 'master_expense_categories', field: 'id' },
       case_id: { table: 'cases', field: 'id' },
