@@ -12,7 +12,7 @@ vi.mock('./currencyService', () => ({
   getCurrencyDecimals: vi.fn(),
 }));
 
-import { getExpensesByCategory, EXPENSE_LIST_COLUMNS, recordExpenseDisbursement } from './expensesService';
+import { getExpensesByCategory, EXPENSE_LIST_COLUMNS, recordExpenseDisbursement, rejectExpense } from './expensesService';
 
 /** Thenable query builder: select/in/gte/lte are chainable; awaiting yields {data}. */
 function makeQuery(rows: Array<Record<string, unknown>>) {
@@ -69,7 +69,7 @@ describe('EXPENSE_LIST_COLUMNS (the edit form must be able to pre-select the sav
   });
 
   it('still selects the columns the list rows + base-currency totals depend on', () => {
-    for (const col of ['id', 'expense_number', 'expense_date', 'amount', 'amount_base', 'status', 'notes', 'vendor', 'description', 'case_id']) {
+    for (const col of ['id', 'expense_number', 'expense_date', 'amount', 'amount_base', 'status', 'notes', 'vendor', 'description', 'case_id', 'rejection_reason']) {
       expect(EXPENSE_LIST_COLUMNS).toContain(col);
     }
   });
@@ -112,5 +112,52 @@ describe('recordExpenseDisbursement (EXP-017 — atomic Mark-as-Paid)', () => {
     await expect(recordExpenseDisbursement('e1', 'acct-1', '2026-06-22')).rejects.toMatchObject({
       message: expect.stringContaining('Insufficient funds'),
     });
+  });
+});
+
+describe('rejectExpense (EXP-007 — reason to its own column, notes preserved)', () => {
+  // rejectExpense issues TWO .from('expenses') calls: a status read, then the update.
+  const statusReader = (status: string | null) => {
+    const b: Record<string, unknown> = {
+      select: vi.fn(() => b),
+      eq: vi.fn(() => b),
+      maybeSingle: vi.fn().mockResolvedValue({ data: status === null ? null : { status }, error: null }),
+    };
+    return b;
+  };
+  const updateCapture = (captured: { payload?: Record<string, unknown> }) => {
+    const b: Record<string, unknown> = {
+      update: vi.fn((p: Record<string, unknown>) => { captured.payload = p; return b; }),
+      eq: vi.fn(() => b),
+      select: vi.fn(() => b),
+      maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'e1', status: 'rejected' }, error: null }),
+    };
+    return b;
+  };
+
+  it('writes rejection_reason + rejected_by and never touches notes or approved_by', async () => {
+    const captured: { payload?: Record<string, unknown> } = {};
+    from.mockReturnValueOnce(statusReader('pending')).mockReturnValueOnce(updateCapture(captured));
+
+    await rejectExpense('e1', 'mgr-9', 'Missing VAT receipt');
+
+    expect(captured.payload).toMatchObject({ status: 'rejected', rejection_reason: 'Missing VAT receipt', rejected_by: 'mgr-9' });
+    expect(captured.payload).not.toHaveProperty('notes');       // submitter's notes preserved
+    expect(captured.payload).not.toHaveProperty('approved_by'); // no approved_by collision
+    expect(typeof captured.payload!.rejected_at).toBe('string');
+  });
+
+  it('refuses to reject a non-pending expense (state guard)', async () => {
+    const captured: { payload?: Record<string, unknown> } = {};
+    const upd = updateCapture(captured);
+    from.mockReturnValueOnce(statusReader('approved')).mockReturnValueOnce(upd);
+
+    await expect(rejectExpense('e1', 'mgr-9', 'x')).rejects.toThrow(/pending/i);
+    expect(upd.update).not.toHaveBeenCalled();
+  });
+
+  it('throws when the expense does not exist', async () => {
+    from.mockReturnValueOnce(statusReader(null));
+    await expect(rejectExpense('e1', 'mgr-9', 'x')).rejects.toThrow(/not found/i);
   });
 });
