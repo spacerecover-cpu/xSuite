@@ -102,6 +102,7 @@ export const generateProfitLossReport = async (
         status,
         category:master_expense_categories(name)
       `)
+      .is('deleted_at', null)
       .gte('expense_date', dateFrom)
       .lte('expense_date', dateTo)
       .in('status', ['approved', 'paid']),
@@ -248,6 +249,7 @@ export const generateCashFlowReport = async (
     supabase
       .from('expenses')
       .select('amount, amount_base, status')
+      .is('deleted_at', null)
       .gte('expense_date', dateFrom)
       .lte('expense_date', dateTo)
       .in('status', ['approved', 'paid']),
@@ -411,6 +413,7 @@ export const generateRevenueByCaseReport = async (
       case_id,
       cases(id, case_no, title)
     `)
+    .is('deleted_at', null)
     .gte('expense_date', dateFrom)
     .lte('expense_date', dateTo)
     .not('case_id', 'is', null)

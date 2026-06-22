@@ -6147,14 +6147,21 @@ export type Database = {
           id: string
           is_billable: boolean | null
           notes: string | null
+          paid_at: string | null
           rate_source: string
           receipt_url: string | null
           reference: string | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string | null
           status: string | null
+          submitted_at: string | null
+          submitted_by: string | null
           tax_amount: number | null
           tax_amount_base: number | null
           tenant_id: string
           updated_at: string
+          updated_by: string | null
           vendor: string | null
         }
         Insert: {
@@ -6176,14 +6183,21 @@ export type Database = {
           id?: string
           is_billable?: boolean | null
           notes?: string | null
+          paid_at?: string | null
           rate_source?: string
           receipt_url?: string | null
           reference?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
           status?: string | null
+          submitted_at?: string | null
+          submitted_by?: string | null
           tax_amount?: number | null
           tax_amount_base?: number | null
           tenant_id: string
           updated_at?: string
+          updated_by?: string | null
           vendor?: string | null
         }
         Update: {
@@ -6205,14 +6219,21 @@ export type Database = {
           id?: string
           is_billable?: boolean | null
           notes?: string | null
+          paid_at?: string | null
           rate_source?: string
           receipt_url?: string | null
           reference?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
           status?: string | null
+          submitted_at?: string | null
+          submitted_by?: string | null
           tax_amount?: number | null
           tax_amount_base?: number | null
           tenant_id?: string
           updated_at?: string
+          updated_by?: string | null
           vendor?: string | null
         }
         Relationships: [

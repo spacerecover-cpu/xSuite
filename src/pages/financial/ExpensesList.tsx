@@ -21,6 +21,8 @@ import {
   rejectExpense,
   getExpenseStats,
   fetchExpenseById,
+  uploadExpenseAttachment,
+  deleteExpenseAttachment,
   EXPENSE_LIST_COLUMNS,
   Expense,
   ExpenseAttachment,
@@ -71,6 +73,8 @@ type ExpenseRow = Pick<
   | 'approved_by'
   | 'approved_at'
   | 'notes'
+  | 'rejection_reason'
+  | 'updated_at'
 > & {
   category: { id: string; name: string } | null;
   case: { case_no: string | null; title: string | null } | null;
@@ -88,6 +92,7 @@ export const ExpensesList: React.FC = () => {
   const selection = useBulkSelection();
   const canBulkArchive = profile?.role === 'owner' || profile?.role === 'admin';
   const [isArchiving, setIsArchiving] = useState(false);
+  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [page, setPage] = useState(0);
@@ -170,6 +175,30 @@ export const ExpensesList: React.FC = () => {
     window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
   };
 
+  const handleUploadReceipt = async (file: File) => {
+    if (!selectedExpenseId) return;
+    setIsUploadingReceipt(true);
+    try {
+      await uploadExpenseAttachment(selectedExpenseId, file);
+      await queryClient.invalidateQueries({ queryKey: ['expense_detail', selectedExpenseId] });
+      toast.success('Receipt uploaded');
+    } catch (err) {
+      toast.error((err as Error).message || 'Failed to upload receipt');
+    } finally {
+      setIsUploadingReceipt(false);
+    }
+  };
+
+  const handleDeleteAttachment = async (attachment: ExpenseAttachment) => {
+    try {
+      await deleteExpenseAttachment(attachment.id);
+      await queryClient.invalidateQueries({ queryKey: ['expense_detail', selectedExpenseId] });
+      toast.success('Receipt removed');
+    } catch (err) {
+      toast.error((err as Error).message || 'Failed to remove receipt');
+    }
+  };
+
   const createExpenseMutation = useMutation({
     mutationFn: (expense: Omit<Expense, 'id' | 'expense_number' | 'created_at' | 'updated_at'>) =>
       createExpense({ ...expense, created_by: profile?.id }),
@@ -183,8 +212,8 @@ export const ExpensesList: React.FC = () => {
   });
 
   const updateExpenseMutation = useMutation({
-    mutationFn: ({ id, expense }: { id: string; expense: Partial<Expense> }) =>
-      updateExpense(id, expense),
+    mutationFn: ({ id, expense, expectedUpdatedAt }: { id: string; expense: Partial<Expense>; expectedUpdatedAt?: string }) =>
+      updateExpense(id, expense, expectedUpdatedAt),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       queryClient.invalidateQueries({ queryKey: ['expense_stats'] });
@@ -599,9 +628,9 @@ export const ExpensesList: React.FC = () => {
                         {getStatusIcon(expense.status ?? '')}
                         {expense.status ?? '-'}
                       </Badge>
-                      {expense.status === 'rejected' && expense.notes && (
-                        <p className="text-xs text-danger mt-1 max-w-[150px] truncate" title={expense.notes}>
-                          {expense.notes}
+                      {expense.status === 'rejected' && expense.rejection_reason && (
+                        <p className="text-xs text-danger mt-1 max-w-[150px] truncate" title={expense.rejection_reason}>
+                          {expense.rejection_reason}
                         </p>
                       )}
                     </td>
@@ -625,7 +654,7 @@ export const ExpensesList: React.FC = () => {
                             </button>
                           </>
                         )}
-                        {(expense.status === 'draft' || expense.status === 'pending') && (
+                        {(expense.status === 'draft' || expense.status === 'pending' || expense.status === 'rejected') && (
                           <button
                             onClick={(e) => handleEdit(expense, e)}
                             className="p-1.5 text-warning hover:bg-warning-muted rounded transition-colors"
@@ -694,6 +723,7 @@ export const ExpensesList: React.FC = () => {
             await updateExpenseMutation.mutateAsync({
               id: editingExpense.id,
               expense,
+              expectedUpdatedAt: editingExpense.updated_at,
             });
           } else {
             await createExpenseMutation.mutateAsync(expense);
@@ -792,6 +822,9 @@ export const ExpensesList: React.FC = () => {
         expense={expenseDetail ?? null}
         isLoading={detailLoading}
         onDownloadAttachment={handleDownloadAttachment}
+        onUploadAttachment={handleUploadReceipt}
+        onDeleteAttachment={handleDeleteAttachment}
+        isUploading={isUploadingReceipt}
       />
     </ListPageTemplate>
   );

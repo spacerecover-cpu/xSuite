@@ -33,6 +33,14 @@ export interface Expense {
   approved_by?: string | null;
   approved_at?: string | null;
   notes?: string;
+  rejection_reason?: string | null;
+  rejected_at?: string | null;
+  paid_at?: string | null;
+  is_billable?: boolean | null;
+  bank_account_id?: string | null;
+  reference?: string | null;
+  amount_base?: number | null;
+  tax_amount_base?: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -81,6 +89,8 @@ export const EXPENSE_LIST_COLUMNS = `
   approved_by,
   approved_at,
   notes,
+  rejection_reason,
+  updated_at,
   category:master_expense_categories(id, name),
   case:cases(case_no, title)
 `;
@@ -214,9 +224,30 @@ export const createExpense = async (
 
 export const updateExpense = async (
   id: string,
-  expense: Partial<Expense>
+  expense: Partial<Expense>,
+  expectedUpdatedAt?: string
 ) => {
+  // Block edits once money has posted to the ledger — otherwise expenses.amount and
+  // the frozen, append-only ledger row diverge (EXP-006 / EXP-011). Void & reissue instead.
+  const { data: current, error: statusError } = await supabase
+    .from('expenses')
+    .select('status')
+    .eq('id', id)
+    .maybeSingle();
+  if (statusError) throw statusError;
+  if (current && ['approved', 'paid', 'voided'].includes(current.status ?? '')) {
+    throw new Error(`A ${current.status} expense cannot be edited; void and reissue instead.`);
+  }
+
   const updatePayload = { ...expense } as unknown as Database['public']['Tables']['expenses']['Update'];
+
+  // Resubmitting a draft/rejected expense (status -> pending) clears stale rejection
+  // metadata so the next review starts clean (EXP-016).
+  if (expense.status === 'pending') {
+    updatePayload.rejection_reason = null;
+    updatePayload.rejected_by = null;
+    updatePayload.rejected_at = null;
+  }
 
   // Re-snapshot base amounts when the money or currency changes, reusing the
   // expense's frozen rate unless the caller changes currency / overrides the rate.
@@ -262,18 +293,55 @@ export const updateExpense = async (
     if (docCurrency != null) updatePayload.currency = docCurrency;
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('expenses')
     .update(updatePayload)
-    .eq('id', id)
-    .select()
-    .maybeSingle();
+    .eq('id', id);
+  // Optimistic lock: only write if the row has not changed since it was loaded, so
+  // two concurrent editors can't silently overwrite each other (EXP-019).
+  if (expectedUpdatedAt) {
+    query = query.eq('updated_at', expectedUpdatedAt);
+  }
+  const { data, error } = await query.select().maybeSingle();
 
   if (error) throw error;
+  if (expectedUpdatedAt && !data) {
+    throw new Error('This expense was changed by someone else since you opened it. Please reload and try again.');
+  }
   return data;
 };
 
 export const deleteExpense = async (id: string) => {
+  // If this expense posted to the ledger, reverse it with a compensating entry
+  // (the ledger is append-only) and retire its VAT row, so reports stop counting
+  // deleted spend and no orphan ledger entry survives (EXP-006).
+  const { data: existing } = await supabase
+    .from('expenses')
+    .select('status')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (existing && (existing.status === 'approved' || existing.status === 'paid')) {
+    const { data: ledgerRows } = await supabase
+      .from('financial_transactions')
+      .select('id')
+      .eq('reference_type', 'expense')
+      .eq('reference_id', id)
+      .is('deleted_at', null);
+    for (const row of ledgerRows ?? []) {
+      await supabase.rpc('reverse_financial_transaction', {
+        p_transaction_id: row.id,
+        p_reason: 'Expense deleted',
+      });
+    }
+    await supabase
+      .from('vat_records')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('record_id', id)
+      .in('record_type', ['purchase', 'expense'])
+      .is('deleted_at', null);
+  }
+
   await supabase
     .from('expense_attachments')
     .update({ deleted_at: new Date().toISOString() })
@@ -281,20 +349,28 @@ export const deleteExpense = async (id: string) => {
 
   const { error } = await supabase
     .from('expenses')
-    .update({ deleted_at: new Date().toISOString() })
+    .update({ deleted_at: new Date().toISOString(), status: 'voided' })
     .eq('id', id);
 
   if (error) throw error;
 };
 
 export const submitExpense = async (id: string, submittedBy: string) => {
+  // Submit (or resubmit a rejected draft) WITHOUT ever overwriting created_by —
+  // the old code clobbered authorship (EXP-009). Stamp submitted_* and clear any
+  // prior rejection metadata so a resubmission starts clean.
   const { data, error } = await supabase
     .from('expenses')
     .update({
       status: 'pending',
-      created_by: submittedBy,
+      submitted_by: submittedBy,
+      submitted_at: new Date().toISOString(),
+      rejection_reason: null,
+      rejected_by: null,
+      rejected_at: null,
     })
     .eq('id', id)
+    .in('status', ['draft', 'rejected'])
     .select()
     .maybeSingle();
 
@@ -305,13 +381,26 @@ export const submitExpense = async (id: string, submittedBy: string) => {
 export const approveExpense = async (id: string, approvedBy: string) => {
   const { data: expense, error: fetchError } = await supabase
     .from('expenses')
-    .select('amount, description, case_id, currency, exchange_rate, rate_source, amount_base')
+    .select('amount, description, currency, exchange_rate, rate_source, amount_base, status, created_by, expense_date, tax_amount, tax_amount_base')
     .eq('id', id)
     .maybeSingle();
 
   if (fetchError) throw fetchError;
   if (!expense) {
     throw new Error(`Expense ${id} not found`);
+  }
+
+  // State-machine guard: only a pending expense is approvable. Together with the
+  // partial unique index on financial_transactions(reference_type, reference_id)
+  // this makes the EXP-001 double-post impossible — a re-approval aborts here, and
+  // even a race that slips through cannot insert a second ledger row.
+  if (expense.status !== 'pending') {
+    throw new Error(`Only a pending expense can be approved (current status: ${expense.status ?? 'unknown'}).`);
+  }
+
+  // Segregation of duties: the approver must not be the creator (EXP-008).
+  if (expense.created_by && expense.created_by === approvedBy) {
+    throw new Error('You cannot approve an expense you created.');
   }
 
   const { data, error } = await supabase
@@ -322,13 +411,19 @@ export const approveExpense = async (id: string, approvedBy: string) => {
       approved_at: new Date().toISOString(),
     })
     .eq('id', id)
+    .eq('status', 'pending')
     .select()
     .maybeSingle();
 
   if (error) throw error;
+  if (!data) {
+    throw new Error('Expense was no longer pending; approval aborted.');
+  }
 
+  // Post the ledger entry at the EXPENSE date (not the approval date) so every
+  // period report buckets it consistently (EXP-024).
   await createFinancialTransaction({
-    transaction_date: new Date().toISOString().split('T')[0],
+    transaction_date: (expense.expense_date ?? new Date().toISOString()).slice(0, 10),
     amount: expense.amount,
     transaction_type: 'expense',
     description: `Expense approved: ${expense.description ?? ''}`,
@@ -340,12 +435,20 @@ export const approveExpense = async (id: string, approvedBy: string) => {
     amount_base: expense.amount_base ?? undefined,
   });
 
-  if (expense.case_id) {
-    await createVATRecord({
-      record_type: 'expense',
-      record_id: id,
-      vat_amount: 0,
-      vat_rate: 0,
+  // Input VAT: write a 'purchase' VAT row (the type the VAT engine reads) with the
+  // real tax amount + economic period, regardless of case linkage (EXP-027/EXP-032).
+  // No-op until the form captures tax_amount (EXP-005), but correct once it does.
+  const taxAmount = Number(expense.tax_amount ?? 0);
+  if (taxAmount > 0) {
+    await createExpenseVATRecord({
+      recordId: id,
+      // Store the DOCUMENT-currency tax to match the sale/purchase writers
+      // (createVATRecordFromInvoice/Purchase) so calculateVATForPeriod's
+      // SUM(sale) - SUM(purchase) stays on one consistent basis.
+      vatAmount: taxAmount,
+      netAmount: Number(expense.amount ?? 0),
+      taxAmount,
+      expenseDate: expense.expense_date ?? null,
     });
   }
 
@@ -357,15 +460,29 @@ export const rejectExpense = async (
   rejectedBy: string,
   reason: string
 ) => {
+  const { data: existing, error: fetchError } = await supabase
+    .from('expenses')
+    .select('status')
+    .eq('id', id)
+    .maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!existing) throw new Error(`Expense ${id} not found`);
+  if (existing.status !== 'pending') {
+    throw new Error(`Only a pending expense can be rejected (current status: ${existing.status ?? 'unknown'}).`);
+  }
+
+  // Write the reason to its own column and stamp the rejector separately — never
+  // clobber the submitter's notes or reuse approved_by (EXP-007 / EXP-009).
   const { data, error } = await supabase
     .from('expenses')
     .update({
       status: 'rejected',
-      approved_by: rejectedBy,
-      approved_at: new Date().toISOString(),
-      notes: reason,
+      rejection_reason: reason,
+      rejected_by: rejectedBy,
+      rejected_at: new Date().toISOString(),
     })
     .eq('id', id)
+    .eq('status', 'pending')
     .select()
     .maybeSingle();
 
@@ -374,10 +491,24 @@ export const rejectExpense = async (
 };
 
 export const markExpenseAsPaid = async (id: string) => {
+  // Only an approved expense can be paid (EXP-009). Records paid_at; the full
+  // disbursement (bank_transaction + balance debit) is tracked as EXP-017.
+  const { data: existing, error: fetchError } = await supabase
+    .from('expenses')
+    .select('status')
+    .eq('id', id)
+    .maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!existing) throw new Error(`Expense ${id} not found`);
+  if (existing.status !== 'approved') {
+    throw new Error(`Only an approved expense can be marked paid (current status: ${existing.status ?? 'unknown'}).`);
+  }
+
   const { data, error } = await supabase
     .from('expenses')
-    .update({ status: 'paid' })
+    .update({ status: 'paid', paid_at: new Date().toISOString() })
     .eq('id', id)
+    .eq('status', 'approved')
     .select()
     .maybeSingle();
 
@@ -389,15 +520,9 @@ export const uploadExpenseAttachment = async (
   expenseId: string,
   file: File
 ): Promise<ExpenseAttachment> => {
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${expenseId}/${Date.now()}.${fileExt}`;
-
-  const { data: uploadData, error: uploadError } = await supabase.storage
-    .from('expense-receipts')
-    .upload(fileName, file);
-
-  if (uploadError) throw uploadError;
-
+  // Resolve the tenant first so the storage path can be tenant-prefixed: the
+  // expense-receipts RLS isolates on folder[1] = tenant_id, so a flat
+  // `${expenseId}/` path would be cross-tenant readable (EXP-052/053).
   const { data: tenantRow, error: tenantError } = await supabase
     .from('expenses')
     .select('tenant_id')
@@ -408,6 +533,15 @@ export const uploadExpenseAttachment = async (
   if (!tenantRow) {
     throw new Error(`Expense ${expenseId} not found`);
   }
+
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${tenantRow.tenant_id}/${expenseId}/${Date.now()}.${fileExt}`;
+
+  const { data: uploadData, error: uploadError } = await supabase.storage
+    .from('expense-receipts')
+    .upload(fileName, file);
+
+  if (uploadError) throw uploadError;
 
   const insertPayload: Database['public']['Tables']['expense_attachments']['Insert'] = {
     expense_id: expenseId,
@@ -474,6 +608,7 @@ export const getExpensesByCase = async (caseId: string) => {
       category:master_expense_categories(id, name)
     `)
     .eq('case_id', caseId)
+    .is('deleted_at', null)
     .order('expense_date', { ascending: false });
 
   if (error) throw error;
@@ -541,7 +676,8 @@ export const getExpensesByCategory = async (filters?: {
       exchange_rate,
       category:master_expense_categories(id, name)
     `)
-    .in('status', ['approved', 'paid']);
+    .in('status', ['approved', 'paid'])
+    .is('deleted_at', null);
 
   if (filters?.dateFrom) {
     query = query.gte('expense_date', filters.dateFrom);
@@ -581,17 +717,27 @@ export const getExpensesByCategory = async (filters?: {
 // a failed ledger write throws so approveExpense aborts instead of silently
 // leaving the books out of balance.
 
-const createVATRecord = async (record: {
-  record_type: string;
-  record_id: string;
-  vat_amount: number;
-  vat_rate: number;
+/**
+ * Records input VAT for an approved expense as a 'purchase' row — the record_type
+ * the VAT engine actually reads (calculateVATForPeriod sums sale/purchase only) —
+ * with the real tax amount and economic period, so input-VAT reclaim works
+ * (EXP-027 / EXP-032). Replaces the old always-zero, case-gated 'expense' stub.
+ */
+const createExpenseVATRecord = async (args: {
+  recordId: string;
+  vatAmount: number;
+  netAmount: number;
+  taxAmount: number;
+  expenseDate: string | null;
 }) => {
+  const vatRate = args.netAmount > 0 ? Math.round((args.taxAmount / args.netAmount) * 10000) / 100 : 0;
+  const taxPeriod = (args.expenseDate ?? new Date().toISOString()).slice(0, 7); // YYYY-MM
   const payload = {
-    record_type: record.record_type,
-    record_id: record.record_id,
-    vat_amount: record.vat_amount,
-    vat_rate: record.vat_rate,
+    record_type: 'purchase',
+    record_id: args.recordId,
+    vat_amount: args.vatAmount,
+    vat_rate: vatRate,
+    tax_period: taxPeriod,
   } as Database['public']['Tables']['vat_records']['Insert'];
 
   const { error } = await supabase
@@ -599,7 +745,7 @@ const createVATRecord = async (record: {
     .insert([payload]);
 
   if (error) {
-    logger.error('Error creating VAT record:', error);
+    logger.error('Error creating expense VAT record:', error);
   }
 };
 

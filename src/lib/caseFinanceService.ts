@@ -51,7 +51,7 @@ export async function getCaseFinancialSummary(caseId: string): Promise<CaseFinan
       .is('deleted_at', null),
     supabase
       .from('expenses')
-      .select('id, amount, amount_base, status')
+      .select('id, amount, amount_base, is_billable, status')
       .eq('case_id', caseId)
       .is('deleted_at', null)
       .in('status', ['approved', 'paid']),
@@ -77,9 +77,18 @@ export async function getCaseFinancialSummary(caseId: string): Promise<CaseFinan
   const totalInvoiced = billableInvoices.reduce((sum, inv) => sum + baseAmount(inv, 'total_amount'), 0);
   const totalPaid = billableInvoices.reduce((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
   const totalExpenses = expenses.reduce((sum, exp) => sum + baseAmount(exp, 'amount'), 0);
+  // Billable (rebillable) expenses are recovered from the customer via the invoice,
+  // so they are margin-neutral pass-throughs. Net them out of BOTH the cost and the
+  // revenue base, or margin is understated (EXP-014). netRevenue is unchanged (the
+  // two cancel); only the margin base drops the recovered recharge — matching the
+  // audit's worked example ($200 billable + $500 labor, paid $700 → 500/500 = 100%).
+  const billableExpenses = expenses
+    .filter((exp) => exp.is_billable)
+    .reduce((sum, exp) => sum + baseAmount(exp, 'amount'), 0);
   const outstandingBalance = totalInvoiced - totalPaid;
   const netRevenue = totalPaid - totalExpenses;
-  const profitMargin = totalPaid > 0 ? (netRevenue / totalPaid) * 100 : 0;
+  const ownRevenueBase = totalPaid - billableExpenses;
+  const profitMargin = ownRevenueBase > 0 ? (netRevenue / ownRevenueBase) * 100 : 0;
 
   return {
     caseId,
@@ -110,6 +119,7 @@ export async function getCaseExpenses(caseId: string): Promise<CaseExpense[]> {
       category:master_expense_categories(name)
     `)
     .eq('case_id', caseId)
+    .is('deleted_at', null)
     .order('expense_date', { ascending: false });
 
   if (error) throw error;

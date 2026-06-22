@@ -19,6 +19,7 @@ function makeQuery(rows: Array<Record<string, unknown>>) {
   const builder: Record<string, unknown> = {
     select: vi.fn(() => builder),
     in: vi.fn(() => builder),
+    is: vi.fn(() => builder),
     gte: vi.fn(() => builder),
     lte: vi.fn(() => builder),
     then: (resolve: (v: { data: unknown; error: null }) => void) =>

@@ -12,11 +12,14 @@ import {
   Tag,
   FileText,
   Briefcase,
+  Percent,
+  Hash,
   Save,
   Upload,
 } from 'lucide-react';
 import { logger } from '../../lib/logger';
 import { useToast } from '../../hooks/useToast';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface ExpenseFormModalProps {
   isOpen: boolean;
@@ -34,6 +37,7 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
   preselectedCaseId,
 }) => {
   const toast = useToast();
+  const { currencyFormat } = useCurrency();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
   const [amount, setAmount] = useState<number>(0);
@@ -42,6 +46,10 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
   const [categoryId, setCategoryId] = useState<string>('');
   const [caseId, setCaseId] = useState<string>(preselectedCaseId || '');
   const [notes, setNotes] = useState('');
+  const [taxAmount, setTaxAmount] = useState<number>(0);
+  const [currency, setCurrency] = useState<string>('');
+  const [isBillable, setIsBillable] = useState<boolean>(false);
+  const [reference, setReference] = useState('');
   const [amountError, setAmountError] = useState<string | null>(null);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
   const firstFieldRef = useRef<HTMLInputElement>(null);
@@ -72,19 +80,42 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
     },
   });
 
+  const { data: currencyCodes = [] } = useQuery({
+    queryKey: ['active_currency_codes'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('master_currency_codes')
+        .select('code, name')
+        .eq('is_active', true)
+        .order('code');
+      return data || [];
+    },
+  });
+
   useEffect(() => {
     if (initialData) {
-      setExpenseDate(initialData.expense_date || new Date().toISOString().split('T')[0]);
+      // expense_date is a timestamptz, so it arrives as a full ISO string; an
+      // <input type="date"> only accepts YYYY-MM-DD, so slice the date portion or
+      // the saved date renders blank on edit.
+      setExpenseDate(
+        initialData.expense_date
+          ? initialData.expense_date.slice(0, 10)
+          : new Date().toISOString().split('T')[0],
+      );
       setAmount(initialData.amount || 0);
       setDescription(initialData.description || '');
       setVendorName(initialData.vendor || '');
       setCategoryId(initialData.category_id || '');
       setCaseId(initialData.case_id || preselectedCaseId || '');
       setNotes(initialData.notes || '');
+      setTaxAmount(initialData.tax_amount || 0);
+      setCurrency(initialData.currency || currencyFormat.currencyCode || '');
+      setIsBillable(initialData.is_billable ?? false);
+      setReference(initialData.reference || '');
     } else {
       resetForm();
     }
-  }, [initialData, preselectedCaseId]);
+  }, [initialData, preselectedCaseId, currencyFormat.currencyCode]);
 
   const resetForm = () => {
     setExpenseDate(new Date().toISOString().split('T')[0]);
@@ -94,6 +125,10 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
     setCategoryId('');
     setCaseId(preselectedCaseId || '');
     setNotes('');
+    setTaxAmount(0);
+    setCurrency(currencyFormat.currencyCode || '');
+    setIsBillable(false);
+    setReference('');
   };
 
   const handleSubmit = async (e: React.FormEvent, submitForApproval: boolean = false) => {
@@ -118,6 +153,10 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
         case_id: caseId || null,
         status: submitForApproval ? 'pending' : 'draft',
         notes: notes.trim() || undefined,
+        tax_amount: taxAmount || 0,
+        currency: currency || undefined,
+        is_billable: isBillable,
+        reference: reference.trim() || undefined,
       });
       handleClose();
     } catch (error) {
@@ -182,6 +221,50 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
             {amountError && (
               <p className="mt-1 text-sm text-danger">{amountError}</p>
             )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="expense-currency" className="block text-sm font-medium text-slate-700 mb-1">
+              Currency
+            </label>
+            <div className="relative">
+              <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+              <select
+                id="expense-currency"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                {currency && !currencyCodes.some((c) => c.code === currency) && (
+                  <option value={currency}>{currency}</option>
+                )}
+                {currencyCodes.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code}{c.name ? ` — ${c.name}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Tax Amount
+            </label>
+            <div className="relative">
+              <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={taxAmount}
+                onChange={(e) => setTaxAmount(parseFloat(e.target.value) || 0)}
+                className="pl-10"
+                placeholder="0.00"
+              />
+            </div>
           </div>
         </div>
 
@@ -264,6 +347,37 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
                 </option>
               ))}
             </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="expense-reference" className="block text-sm font-medium text-slate-700 mb-1">
+              Reference (Optional)
+            </label>
+            <div className="relative">
+              <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <Input
+                id="expense-reference"
+                type="text"
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                className="pl-10"
+                placeholder="Receipt / invoice no."
+              />
+            </div>
+          </div>
+
+          <div className="flex items-end">
+            <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isBillable}
+                onChange={(e) => setIsBillable(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary"
+              />
+              Billable to linked case
+            </label>
           </div>
         </div>
 

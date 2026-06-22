@@ -235,6 +235,7 @@ export const ReportsDashboard: React.FC = () => {
         supabase
           .from('expenses')
           .select('amount, amount_base, status, expense_date')
+          .is('deleted_at', null)
           .gte('expense_date', start)
           .lte('expense_date', end)
           .in('status', ['approved', 'paid']),
@@ -292,6 +293,7 @@ export const ReportsDashboard: React.FC = () => {
       const { data, error } = await supabase
         .from('expenses')
         .select('amount, amount_base, category:master_expense_categories(name)')
+        .is('deleted_at', null)
         .gte('expense_date', start)
         .lte('expense_date', end)
         .in('status', ['approved', 'paid']);
