@@ -30,6 +30,7 @@ import {
   ExpenseAttachment,
 } from '../../lib/expensesService';
 import { useAuth } from '../../contexts/AuthContext';
+import { canManageExpenses } from '../../lib/roleGates';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { ExportButton } from '../../components/shared/ExportButton';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
@@ -123,7 +124,10 @@ export const ExpensesList: React.FC = () => {
     setPage(0);
   }, [searchTerm, statusFilter]);
 
-  const isAccountsRole = profile?.role === 'admin' || profile?.role === 'accounts';
+  // Mirror the server has_role('accounts') set (owner/admin/manager/accounts) so the
+  // Approve/Reject/Mark-as-Paid affordances match what RLS+service actually permit (EXP-012).
+  // SoD (creator≠approver) is still enforced server-side in approveExpense.
+  const canManage = canManageExpenses(profile?.role);
 
   const { data: expensesPage, isLoading, error, refetch } = useQuery({
     queryKey: ['expenses', searchTerm, statusFilter, page],
@@ -672,7 +676,7 @@ export const ExpensesList: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                        {expense.status === 'pending' && isAccountsRole && (
+                        {expense.status === 'pending' && canManage && (
                           <>
                             <button
                               onClick={(e) => handleApprove(expense.id, e)}
@@ -690,7 +694,7 @@ export const ExpensesList: React.FC = () => {
                             </button>
                           </>
                         )}
-                        {expense.status === 'approved' && isAccountsRole && (
+                        {expense.status === 'approved' && canManage && (
                           <button
                             onClick={(e) => handlePay(expense, e)}
                             className="p-1.5 text-success hover:bg-success-muted rounded transition-colors"
@@ -782,7 +786,7 @@ export const ExpensesList: React.FC = () => {
           setShowApproveModal(false);
           setExpenseToApprove(null);
         }}
-        title=""
+        title="Approve Expense"
         size="xs"
       >
         <div className="text-center py-2">
