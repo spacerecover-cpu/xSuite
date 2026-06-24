@@ -501,7 +501,7 @@ export const ExpensesList: React.FC = () => {
         <KpiRow
           stats={[
             {
-              tone: 'warning',
+              tone: 'success',
               label: 'Total Approved',
               value: formatCurrency(stats?.totalAmount ?? 0),
             },
@@ -516,7 +516,7 @@ export const ExpensesList: React.FC = () => {
               value: formatCurrency(stats?.thisMonthAmount || 0),
             },
             {
-              tone: 'warning',
+              tone: 'cat-5',
               label: 'Pending Count',
               value: stats?.pending ?? 0,
             },

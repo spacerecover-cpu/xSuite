@@ -175,7 +175,7 @@ export const RevenueDashboard: React.FC = () => {
         <StatCard
           label="Total Revenue"
           value={formatCurrency(totalRevenue)}
-          tone="success"
+          tone="primary"
         />
         <StatCard
           label="This Month"
@@ -190,7 +190,7 @@ export const RevenueDashboard: React.FC = () => {
         <StatCard
           label="Revenue Streams"
           value={revenueData.length}
-          tone="neutral"
+          tone="cat-5"
         />
       </div>
 

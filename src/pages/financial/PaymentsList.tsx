@@ -349,7 +349,7 @@ export const PaymentsList: React.FC = () => {
   const kpis = (
     <KpiRow
       stats={[
-        { label: 'Total Received', value: formatCurrency(stats?.totalAmount || 0), tone: 'success' },
+        { label: 'Total Received', value: formatCurrency(stats?.totalAmount || 0), tone: 'primary' },
         { label: 'This Month', value: formatCurrency(stats?.thisMonthAmount || 0), tone: 'info' },
         { label: 'Completed', value: stats?.completed ?? 0, tone: 'success' },
         { label: 'Total Count', value: stats?.total ?? 0, tone: 'neutral' },

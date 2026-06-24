@@ -8,8 +8,9 @@ import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/ui/Badge';
 import { SearchableSelect } from '../../components/ui/SearchableSelect';
-import { Plus, Search, Filter, Mail, Phone, Building2, MapPin, Users, UserCheck, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Filter, Mail, Phone, Building2, MapPin, Users, UserCheck, Clock, ChevronLeft, ChevronRight, Layers } from 'lucide-react';
 import { formatDate } from '../../lib/format';
+import { KpiRow } from '../../components/templates/KpiRow';
 import { useAuth } from '../../contexts/AuthContext';
 import { logger } from '../../lib/logger';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -343,55 +344,16 @@ export const CompaniesListPage: React.FC = () => {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-info-muted rounded-xl p-4 border border-info/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-info uppercase tracking-wide">Total Companies</p>
-              <p className="text-2xl font-bold text-info mt-1">{companies.length}</p>
-            </div>
-            <div className="w-10 h-10 bg-info rounded-lg flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-info-foreground" />
-            </div>
-          </div>
-        </div>
+      <KpiRow
+        cols="grid-cols-2 lg:grid-cols-4"
+        stats={[
+          { label: 'Total Companies', value: companies.length, tone: 'info', icon: Building2 },
+          { label: 'Active', value: companies.filter((c) => c.is_active).length, tone: 'success', icon: UserCheck },
+          { label: 'Recent (30d)', value: recentCompanies.length, tone: 'cat-5', icon: Clock },
+          { label: 'Industries', value: industries.length, tone: 'cat-2', icon: Layers },
+        ]}
+      />
 
-        <div className="bg-success-muted rounded-xl p-4 border border-success/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-success uppercase tracking-wide">Active</p>
-              <p className="text-2xl font-bold text-success mt-1">{companies.filter((c) => c.is_active).length}</p>
-            </div>
-            <div className="w-10 h-10 bg-success rounded-lg flex items-center justify-center">
-              <UserCheck className="w-5 h-5 text-success-foreground" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-accent/10 rounded-xl p-4 border border-accent/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-accent-foreground uppercase tracking-wide">Recent (30d)</p>
-              <p className="text-2xl font-bold text-accent-foreground mt-1">{recentCompanies.length}</p>
-            </div>
-            <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center">
-              <Clock className="w-5 h-5 text-accent-foreground" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-warning-muted rounded-xl p-4 border border-warning/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-warning uppercase tracking-wide">Industries</p>
-              <p className="text-2xl font-bold text-warning mt-1">{industries.length}</p>
-            </div>
-            <div className="w-10 h-10 bg-warning rounded-lg flex items-center justify-center">
-              <Users className="w-5 h-5 text-warning-foreground" />
-            </div>
-          </div>
-        </div>
-      </div>
 
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
         <div className="p-6">

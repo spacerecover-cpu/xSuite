@@ -85,7 +85,7 @@ export const PayrollDashboard = () => {
           value={isLoading ? '...' : formatCurrency(stats?.totalPayroll || 0)}
           icon={DollarSign}
           sub={stats?.totalPayroll ? '+0%' : undefined}
-          tone="success"
+          tone="primary"
         />
 
         <StatCard

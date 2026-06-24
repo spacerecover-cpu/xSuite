@@ -12,6 +12,7 @@ import { AccountFormModal } from '../../components/banking/AccountFormModal';
 import { RecordReceiptModal } from '../../components/banking/RecordReceiptModal';
 import { TransferFundsModal } from '../../components/banking/TransferFundsModal';
 import { VirtualizedTableBody } from '../../components/ui/VirtualizedTableBody';
+import { KpiRow } from '../../components/templates/KpiRow';
 import {
   Plus,
   Landmark,
@@ -303,71 +304,43 @@ export const BankingPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-gradient-to-br from-info-muted to-info-muted rounded-xl p-4 border border-info/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-info uppercase tracking-wide">Bank Balance</p>
-              <p className="text-2xl font-bold text-info mt-1">
-                {formatCurrencyValue(balanceSummary?.totalBankBalance || 0)}
-              </p>
-              <p className="text-xs text-info mt-1">{bankAccounts.length} accounts</p>
-            </div>
-            <div className="w-10 h-10 bg-info rounded-lg flex items-center justify-center">
-              <Building className="w-5 h-5 text-white" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-success-muted to-success-muted rounded-xl p-4 border border-success/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-success uppercase tracking-wide">Cash on Hand</p>
-              <p className="text-2xl font-bold text-success mt-1">
-                {formatCurrencyValue(balanceSummary?.totalCashBalance || 0)}
-              </p>
-              <p className="text-xs text-success mt-1">{cashAccounts.length} accounts</p>
-            </div>
-            <div className="w-10 h-10 bg-success rounded-lg flex items-center justify-center">
-              <Wallet className="w-5 h-5 text-white" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-cat-5/10 to-cat-5/10 rounded-xl p-4 border border-cat-5/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-cat-5 uppercase tracking-wide">Mobile Balance</p>
-              <p className="text-2xl font-bold text-cat-5 mt-1">
-                {formatCurrencyValue(balanceSummary?.totalMobileBalance || 0)}
-              </p>
-              <p className="text-xs text-cat-5 mt-1">{mobileAccounts.length} accounts</p>
-            </div>
-            <div className="w-10 h-10 bg-cat-5 rounded-lg flex items-center justify-center">
-              <Smartphone className="w-5 h-5 text-white" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-4 border border-slate-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Total Balance</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">
-                {formatCurrencyValue(
-                  (balanceSummary?.totalBankBalance || 0) +
-                  (balanceSummary?.totalCashBalance || 0) +
-                  (balanceSummary?.totalMobileBalance || 0)
-                )}
-              </p>
-              <p className="text-xs text-slate-700 mt-1">{activeAccounts.length} total accounts</p>
-            </div>
-            <div className="w-10 h-10 bg-slate-500 rounded-lg flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-white" />
-            </div>
-          </div>
-        </div>
-      </div>
+      <KpiRow
+        cols="grid-cols-1 md:grid-cols-4"
+        stats={[
+          {
+            tone: 'info',
+            label: 'Bank Balance',
+            value: formatCurrencyValue(balanceSummary?.totalBankBalance || 0),
+            sub: `${bankAccounts.length} accounts`,
+            icon: Building,
+          },
+          {
+            tone: 'cat-2',
+            label: 'Cash on Hand',
+            value: formatCurrencyValue(balanceSummary?.totalCashBalance || 0),
+            sub: `${cashAccounts.length} accounts`,
+            icon: Wallet,
+          },
+          {
+            tone: 'cat-5',
+            label: 'Mobile Balance',
+            value: formatCurrencyValue(balanceSummary?.totalMobileBalance || 0),
+            sub: `${mobileAccounts.length} accounts`,
+            icon: Smartphone,
+          },
+          {
+            tone: 'primary',
+            label: 'Total Balance',
+            value: formatCurrencyValue(
+              (balanceSummary?.totalBankBalance || 0) +
+              (balanceSummary?.totalCashBalance || 0) +
+              (balanceSummary?.totalMobileBalance || 0)
+            ),
+            sub: `${activeAccounts.length} total accounts`,
+            icon: DollarSign,
+          },
+        ]}
+      />
 
       <div className="mb-6 bg-white rounded-2xl shadow-lg border border-slate-200 p-4">
         <div className="flex items-center justify-between gap-4">

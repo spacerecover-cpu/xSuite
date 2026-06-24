@@ -31,6 +31,7 @@ import {
   type StockFilters,
 } from '../../lib/stockService';
 import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
+import { StatCard } from '../../components/shared/StatCard';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { StockItemsTable } from '../../components/stock/StockItemsTable';
@@ -296,58 +297,35 @@ export const StockListPage: React.FC = () => {
       }
       kpis={
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-start gap-4">
-              <div className="p-2.5 rounded-lg bg-info-muted">
-                <Boxes className="w-5 h-5 text-info" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500 font-medium">Total Items</p>
-                <p className="text-2xl font-bold text-slate-900 mt-0.5 tabular-nums">
-                  {stats?.totalItems ?? 0}
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-start gap-4">
-              <div className="p-2.5 rounded-lg bg-success-muted">
-                <DollarSign className="w-5 h-5 text-success" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500 font-medium">Stock Value</p>
-                <p className="text-2xl font-bold text-slate-900 mt-0.5 tabular-nums">
-                  {formatCurrency(stats?.stockValue ?? 0)}
-                </p>
-              </div>
-            </div>
-
-            <Link
-              to="/resources/stock?filter=low-stock"
-              className="bg-white rounded-xl border border-warning/30 p-5 flex items-start gap-4 hover:bg-warning-muted transition-colors group"
-              onClick={() => setActiveTab('low_stock')}
-            >
-              <div className="p-2.5 rounded-lg bg-warning-muted group-hover:bg-warning-muted/80 transition-colors">
-                <TrendingDown className="w-5 h-5 text-warning" />
-              </div>
-              <div>
-                <p className="text-sm text-warning font-medium">Low Stock</p>
-                <p className="text-2xl font-bold text-warning mt-0.5 tabular-nums">
-                  {stats?.lowStockCount ?? 0}
-                </p>
-              </div>
-            </Link>
-
-            <div className="bg-white rounded-xl border border-danger/30 p-5 flex items-start gap-4">
-              <div className="p-2.5 rounded-lg bg-danger-muted">
-                <AlertCircle className="w-5 h-5 text-danger" />
-              </div>
-              <div>
-                <p className="text-sm text-danger font-medium">Out of Stock</p>
-                <p className="text-2xl font-bold text-danger mt-0.5 tabular-nums">
-                  {stats?.outOfStockCount ?? 0}
-                </p>
-              </div>
-            </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            <StatCard
+              label="Total Items"
+              value={stats?.totalItems ?? 0}
+              tone="primary"
+              icon={Boxes}
+            />
+            <StatCard
+              label="Stock Value"
+              value={formatCurrency(stats?.stockValue ?? 0)}
+              tone="info"
+              icon={DollarSign}
+            />
+            <StatCard
+              label="Low Stock"
+              value={stats?.lowStockCount ?? 0}
+              tone="warning"
+              icon={TrendingDown}
+              onClick={() => {
+                setActiveTab('low_stock');
+                navigate('/resources/stock?filter=low-stock');
+              }}
+            />
+            <StatCard
+              label="Out of Stock"
+              value={stats?.outOfStockCount ?? 0}
+              tone="danger"
+              icon={AlertCircle}
+            />
           </div>
 
           {!alertDismissed && (stats?.lowStockCount ?? 0) > 0 && (

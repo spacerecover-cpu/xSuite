@@ -210,7 +210,7 @@ export const TransactionsList: React.FC = () => {
           stats={[
             { label: 'Total Income', value: formatCurrency(stats?.totalIncome ?? 0), tone: 'success' },
             { label: 'Total Expenses', value: formatCurrency(stats?.totalExpenses ?? 0), tone: 'danger' },
-            { label: 'Net Cash Flow', value: formatCurrency(netCashFlow), tone: netCashFlow >= 0 ? 'success' : 'danger' },
+            { label: 'Net Cash Flow', value: formatCurrency(netCashFlow), tone: 'primary' },
             { label: 'Reconciled', value: stats?.reconciled || 0, tone: 'info' },
           ]}
         />

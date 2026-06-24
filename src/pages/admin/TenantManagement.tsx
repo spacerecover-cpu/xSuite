@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Building2, Users, FileText, DollarSign, AlertCircle, CheckCircle, XCircle, Pause } from 'lucide-react';
 import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
+import { KpiRow } from '../../components/templates/KpiRow';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -199,49 +200,15 @@ export const TenantManagement = () => {
     <div className="space-y-6">
       <PageHeaderSlot title="Tenant Management" />
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Total Tenants</p>
-              <p className="text-3xl font-bold text-gray-900 mt-1">{totalTenants}</p>
-            </div>
-            <Building2 className="w-10 h-10 text-primary" />
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Active</p>
-              <p className="text-3xl font-bold text-success mt-1">{activeTenants}</p>
-            </div>
-            <CheckCircle className="w-10 h-10 text-success" />
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Trial</p>
-              <p className="text-3xl font-bold text-info mt-1">{trialTenants}</p>
-            </div>
-            <AlertCircle className="w-10 h-10 text-info" />
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">MRR</p>
-              <p className="text-3xl font-bold text-gray-900 mt-1">
-                ${totalRevenue.toFixed(0)}
-              </p>
-            </div>
-            <DollarSign className="w-10 h-10 text-success" />
-          </div>
-        </Card>
-      </div>
+      <KpiRow
+        cols="grid-cols-1 md:grid-cols-4"
+        stats={[
+          { label: 'Total Tenants', value: totalTenants, tone: 'primary', icon: Building2, loading },
+          { label: 'Active', value: activeTenants, tone: 'success', icon: CheckCircle, loading },
+          { label: 'Trial', value: trialTenants, tone: 'info', icon: AlertCircle, loading },
+          { label: 'MRR', value: `$${totalRevenue.toFixed(0)}`, tone: 'cat-2', icon: DollarSign, loading },
+        ]}
+      />
 
       <Card>
         {loading ? (

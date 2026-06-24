@@ -10,6 +10,7 @@ import { useConfirm } from '../../hooks/useConfirm';
 import { useTaxConfig } from '../../contexts/TenantConfigContext';
 import { Input } from '../../components/ui/Input';
 import { VATReturnModal } from '../../components/financial/VATReturnModal';
+import { KpiRow } from '../../components/templates/KpiRow';
 import {
   createVATReturn,
   updateVATReturnStatus,
@@ -287,67 +288,37 @@ export const VATAuditPage: React.FC = () => {
 
       {activeTab === 'vat' && (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-gradient-to-br from-success-muted to-success-muted rounded-xl p-4 border border-success/30">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-medium text-success uppercase tracking-wide">VAT Collected</p>
-                      <p className="text-2xl font-bold text-success mt-1">
-                        {formatCurrency(totalVATCollected)}
-                      </p>
-                    </div>
-                    <div className="w-10 h-10 bg-success rounded-lg flex items-center justify-center">
-                      <TrendingUp className="w-5 h-5 text-white" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-gradient-to-br from-danger-muted to-danger-muted rounded-xl p-4 border border-danger/30">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-medium text-danger uppercase tracking-wide">VAT Paid</p>
-                      <p className="text-2xl font-bold text-danger mt-1">
-                        {formatCurrency(totalVATPaid)}
-                      </p>
-                    </div>
-                    <div className="w-10 h-10 bg-danger rounded-lg flex items-center justify-center">
-                      <TrendingDown className="w-5 h-5 text-white" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-gradient-to-br from-info-muted to-info-muted rounded-xl p-4 border border-info/30">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-medium text-info uppercase tracking-wide">Net VAT Position</p>
-                      <p className="text-2xl font-bold text-info mt-1">
-                        {formatCurrency(Math.abs(netVATPosition))}
-                      </p>
-                      <p className="text-xs text-info mt-1 font-medium">
-                        {netVATPosition >= 0 ? 'Payable' : 'Reclaimable'}
-                      </p>
-                    </div>
-                    <div className="w-10 h-10 bg-info rounded-lg flex items-center justify-center">
-                      <Calculator className="w-5 h-5 text-white" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-4 border border-slate-200">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Tax Rate</p>
-                      <p className="text-2xl font-bold text-slate-900 mt-1">
-                        {(taxConfig.defaultRate * 100).toFixed(2)}%
-                      </p>
-                      <p className="text-xs text-slate-600 mt-1 font-medium">{taxConfig.label || 'VAT'}</p>
-                    </div>
-                    <div className="w-10 h-10 bg-slate-500 rounded-lg flex items-center justify-center">
-                      <FileCheck className="w-5 h-5 text-white" />
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <KpiRow
+                cols="grid-cols-1 md:grid-cols-4"
+                stats={[
+                  {
+                    tone: 'success',
+                    label: 'VAT Collected',
+                    value: formatCurrency(totalVATCollected),
+                    icon: TrendingUp,
+                  },
+                  {
+                    tone: 'danger',
+                    label: 'VAT Paid',
+                    value: formatCurrency(totalVATPaid),
+                    icon: TrendingDown,
+                  },
+                  {
+                    tone: 'info',
+                    label: 'Net VAT Position',
+                    value: formatCurrency(Math.abs(netVATPosition)),
+                    sub: netVATPosition >= 0 ? 'Payable' : 'Reclaimable',
+                    icon: Calculator,
+                  },
+                  {
+                    tone: 'neutral',
+                    label: 'Tax Rate',
+                    value: `${(taxConfig.defaultRate * 100).toFixed(2)}%`,
+                    sub: taxConfig.label || 'VAT',
+                    icon: FileCheck,
+                  },
+                ]}
+              />
 
               <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden mb-6">
                 <div className="p-6 border-b border-slate-200">

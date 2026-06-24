@@ -13,8 +13,9 @@ import { Badge } from '../../components/ui/Badge';
 import { PhoneInput } from '../../components/ui/PhoneInput';
 import { SearchableSelect } from '../../components/ui/SearchableSelect';
 import { CustomerAvatar } from '../../components/ui/CustomerAvatar';
-import { Plus, Search, Filter, Mail, Phone, Building2, MapPin, Users, UserCheck, Clock, Archive, Download } from 'lucide-react';
+import { Plus, Search, Filter, Mail, Phone, Building2, MapPin, Users, UserCheck, Clock, Archive, Download, ShieldCheck } from 'lucide-react';
 import { ExportButton } from '../../components/shared/ExportButton';
+import { KpiRow } from '../../components/templates/KpiRow';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { downloadCSV } from '../../lib/csvExport';
@@ -460,55 +461,15 @@ export const CustomersListPage: React.FC = () => {
   };
 
   const kpis = (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-info-muted rounded-xl p-4 border border-info/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-info uppercase tracking-wide">Total Customers</p>
-              <p className="text-2xl font-bold text-info mt-1">{customerStats?.total ?? 0}</p>
-            </div>
-            <div className="w-10 h-10 bg-info rounded-lg flex items-center justify-center">
-              <Users className="w-5 h-5 text-info-foreground" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-success-muted rounded-xl p-4 border border-success/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-success uppercase tracking-wide">Portal Enabled</p>
-              <p className="text-2xl font-bold text-success mt-1">{customerStats?.portalEnabled ?? 0}</p>
-            </div>
-            <div className="w-10 h-10 bg-success rounded-lg flex items-center justify-center">
-              <UserCheck className="w-5 h-5 text-success-foreground" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-accent/10 rounded-xl p-4 border border-accent/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-accent-foreground uppercase tracking-wide">Recent (30d)</p>
-              <p className="text-2xl font-bold text-accent-foreground mt-1">{customerStats?.recent30d ?? 0}</p>
-            </div>
-            <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center">
-              <Clock className="w-5 h-5 text-accent-foreground" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-success-muted rounded-xl p-4 border border-success/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-success uppercase tracking-wide">Active</p>
-              <p className="text-2xl font-bold text-success mt-1">{customerStats?.active ?? 0}</p>
-            </div>
-            <div className="w-10 h-10 bg-success rounded-lg flex items-center justify-center">
-              <UserCheck className="w-5 h-5 text-success-foreground" />
-            </div>
-          </div>
-        </div>
-      </div>
+    <KpiRow
+      cols="grid-cols-2 lg:grid-cols-4"
+      stats={[
+        { label: 'Total Customers', value: customerStats?.total ?? 0, tone: 'info', icon: Users },
+        { label: 'Portal Enabled', value: customerStats?.portalEnabled ?? 0, tone: 'cat-2', icon: ShieldCheck },
+        { label: 'Recent (30d)', value: customerStats?.recent30d ?? 0, tone: 'cat-5', icon: Clock },
+        { label: 'Active', value: customerStats?.active ?? 0, tone: 'success', icon: UserCheck },
+      ]}
+    />
   );
 
   const toolbar = (

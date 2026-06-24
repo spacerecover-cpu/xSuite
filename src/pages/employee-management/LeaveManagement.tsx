@@ -8,6 +8,7 @@ import { leaveKeys } from '../../lib/queryKeys';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { KpiRow } from '../../components/templates/KpiRow';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
 import type { Database } from '../../types/database.types';
@@ -726,55 +727,16 @@ export const LeaveManagement: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-warning-muted rounded-xl p-4 border border-warning/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-warning uppercase tracking-wide">Pending</p>
-              <p className="text-2xl font-bold text-warning mt-1">{statsLoading ? '...' : stats?.pendingApprovals ?? 0}</p>
-            </div>
-            <div className="w-10 h-10 bg-warning rounded-lg flex items-center justify-center">
-              <Clock className="w-5 h-5 text-warning-foreground" />
-            </div>
-          </div>
-        </div>
+      <KpiRow
+        cols="grid-cols-2 md:grid-cols-4"
+        stats={[
+          { label: 'Pending', value: stats?.pendingApprovals ?? 0, tone: 'warning', icon: Clock, loading: statsLoading },
+          { label: 'Approved This Month', value: stats?.approvedThisMonth ?? 0, tone: 'success', icon: CalendarCheck, loading: statsLoading },
+          { label: 'Rejected This Month', value: stats?.rejectedThisMonth ?? 0, tone: 'danger', icon: CalendarX, loading: statsLoading },
+          { label: 'On Leave Today', value: stats?.employeesOnLeaveToday ?? 0, tone: 'info', icon: Users, loading: statsLoading },
+        ]}
+      />
 
-        <div className="bg-success-muted rounded-xl p-4 border border-success/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-success uppercase tracking-wide">Approved This Month</p>
-              <p className="text-2xl font-bold text-success mt-1">{statsLoading ? '...' : stats?.approvedThisMonth ?? 0}</p>
-            </div>
-            <div className="w-10 h-10 bg-success rounded-lg flex items-center justify-center">
-              <CalendarCheck className="w-5 h-5 text-success-foreground" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-danger-muted rounded-xl p-4 border border-danger/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-danger uppercase tracking-wide">Rejected This Month</p>
-              <p className="text-2xl font-bold text-danger mt-1">{statsLoading ? '...' : stats?.rejectedThisMonth ?? 0}</p>
-            </div>
-            <div className="w-10 h-10 bg-danger rounded-lg flex items-center justify-center">
-              <CalendarX className="w-5 h-5 text-danger-foreground" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-info-muted rounded-xl p-4 border border-info/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-info uppercase tracking-wide">On Leave Today</p>
-              <p className="text-2xl font-bold text-info mt-1">{statsLoading ? '...' : stats?.employeesOnLeaveToday ?? 0}</p>
-            </div>
-            <div className="w-10 h-10 bg-info rounded-lg flex items-center justify-center">
-              <Users className="w-5 h-5 text-info-foreground" />
-            </div>
-          </div>
-        </div>
-      </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="border-b border-slate-200">

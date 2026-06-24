@@ -27,6 +27,7 @@ import {
   InvoiceVsExpenseData,
 } from '../../lib/financialReportsService';
 import { logger } from '../../lib/logger';
+import { KpiRow } from '../../components/templates/KpiRow';
 import {
   BarChart3,
   TrendingUp,
@@ -471,73 +472,39 @@ export const ReportsDashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-gradient-to-br from-success-muted to-success-muted rounded-xl p-4 border border-success/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-success uppercase tracking-wide">Total Revenue</p>
-              <p className="text-2xl font-bold text-success mt-1">
-                {formatCurrency(reportData?.totalRevenue || 0)}
-              </p>
-              <p className="text-xs text-success mt-1 font-medium">
-                {reportData?.invoiceCount || 0} invoices
-              </p>
-            </div>
-            <div className="w-10 h-10 bg-success rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-white" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-danger-muted to-danger-muted rounded-xl p-4 border border-danger/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-danger uppercase tracking-wide">Total Expenses</p>
-              <p className="text-2xl font-bold text-danger mt-1">
-                {formatCurrency(reportData?.totalExpenses || 0)}
-              </p>
-              <p className="text-xs text-danger mt-1 font-medium">
-                {reportData?.expenseCount || 0} expenses
-              </p>
-            </div>
-            <div className="w-10 h-10 bg-danger rounded-lg flex items-center justify-center">
-              <TrendingDown className="w-5 h-5 text-white" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-info-muted to-info-muted rounded-xl p-4 border border-info/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-info uppercase tracking-wide">Net Profit</p>
-              <p className="text-2xl font-bold text-info mt-1">
-                {formatCurrency(reportData?.netProfit || 0)}
-              </p>
-              <p className="text-xs text-info mt-1 font-medium">
-                {(reportData?.netProfit || 0) >= 0 ? 'Profit' : 'Loss'}
-              </p>
-            </div>
-            <div className="w-10 h-10 bg-info rounded-lg flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-white" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-4 border border-slate-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Profit Margin</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">
-                {(reportData?.profitMargin || 0).toFixed(2)}%
-              </p>
-              <p className="text-xs text-slate-600 mt-1 font-medium">Net margin</p>
-            </div>
-            <div className="w-10 h-10 bg-slate-500 rounded-lg flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-white" />
-            </div>
-          </div>
-        </div>
-      </div>
+      <KpiRow
+        cols="grid-cols-1 md:grid-cols-4"
+        stats={[
+          {
+            tone: 'success',
+            label: 'Total Revenue',
+            value: formatCurrency(reportData?.totalRevenue || 0),
+            sub: `${reportData?.invoiceCount || 0} invoices`,
+            icon: TrendingUp,
+          },
+          {
+            tone: 'danger',
+            label: 'Total Expenses',
+            value: formatCurrency(reportData?.totalExpenses || 0),
+            sub: `${reportData?.expenseCount || 0} expenses`,
+            icon: TrendingDown,
+          },
+          {
+            tone: 'info',
+            label: 'Net Profit',
+            value: formatCurrency(reportData?.netProfit || 0),
+            sub: (reportData?.netProfit || 0) >= 0 ? 'Profit' : 'Loss',
+            icon: DollarSign,
+          },
+          {
+            tone: 'neutral',
+            label: 'Profit Margin',
+            value: `${(reportData?.profitMargin || 0).toFixed(2)}%`,
+            sub: 'Net margin',
+            icon: BarChart3,
+          },
+        ]}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">

@@ -280,8 +280,8 @@ export const CloneDrivesList: React.FC = () => {
             { label: 'Available', value: stats.available, tone: 'success' },
             { label: 'In Use', value: stats.inUse, tone: 'info' },
             { label: 'Needs Attention', value: stats.needsAttention, tone: 'warning' },
-            { label: 'Total Capacity', value: formatCapacity(stats.totalCapacity), tone: 'neutral' },
-            { label: 'Available Capacity', value: formatCapacity(stats.availableCapacity), tone: 'success' },
+            { label: 'Total Capacity', value: formatCapacity(stats.totalCapacity), tone: 'cat-1' },
+            { label: 'Available Capacity', value: formatCapacity(stats.availableCapacity), tone: 'cat-2' },
           ]}
         />
       }

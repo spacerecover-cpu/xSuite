@@ -96,13 +96,13 @@ export const PlatformDashboard: React.FC = () => {
           label="Monthly Recurring Revenue"
           value={formatCurrency(stats?.mrr || 0)}
           icon={DollarSign}
-          tone="success"
+          tone="primary"
         />
         <StatCard
           label="Annual Recurring Revenue"
           value={formatCurrency(stats?.arr || 0)}
           icon={TrendingUp}
-          tone="info"
+          tone="cat-2"
         />
       </div>
 

@@ -3,6 +3,7 @@ import { Calendar, Users, Clock, AlertCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { KpiRow } from '../../components/templates/KpiRow';
 import { format } from 'date-fns';
 import { logger } from '../../lib/logger';
 
@@ -84,55 +85,16 @@ export const AttendanceDashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-success-muted rounded-xl p-4 border border-success/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-success uppercase tracking-wide">Present</p>
-              <p className="text-2xl font-bold text-success mt-1">{loading ? '...' : stats.present}</p>
-            </div>
-            <div className="w-10 h-10 bg-success rounded-lg flex items-center justify-center">
-              <Users className="w-5 h-5 text-success-foreground" />
-            </div>
-          </div>
-        </div>
+      <KpiRow
+        cols="grid-cols-1 md:grid-cols-4"
+        stats={[
+          { label: 'Present', value: stats.present, tone: 'success', icon: Users, loading },
+          { label: 'Absent', value: stats.absent, tone: 'danger', icon: AlertCircle, loading },
+          { label: 'Late', value: stats.late, tone: 'warning', icon: Clock, loading },
+          { label: 'On Leave', value: stats.onLeave, tone: 'info', icon: Calendar, loading },
+        ]}
+      />
 
-        <div className="bg-danger-muted rounded-xl p-4 border border-danger/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-danger uppercase tracking-wide">Absent</p>
-              <p className="text-2xl font-bold text-danger mt-1">{loading ? '...' : stats.absent}</p>
-            </div>
-            <div className="w-10 h-10 bg-danger rounded-lg flex items-center justify-center">
-              <AlertCircle className="w-5 h-5 text-danger-foreground" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-warning-muted rounded-xl p-4 border border-warning/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-warning uppercase tracking-wide">Late</p>
-              <p className="text-2xl font-bold text-warning mt-1">{loading ? '...' : stats.late}</p>
-            </div>
-            <div className="w-10 h-10 bg-warning rounded-lg flex items-center justify-center">
-              <Clock className="w-5 h-5 text-warning-foreground" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-info-muted rounded-xl p-4 border border-info/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-info uppercase tracking-wide">On Leave</p>
-              <p className="text-2xl font-bold text-info mt-1">{loading ? '...' : stats.onLeave}</p>
-            </div>
-            <div className="w-10 h-10 bg-info rounded-lg flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-info-foreground" />
-            </div>
-          </div>
-        </div>
-      </div>
 
       <div className="grid grid-cols-1 gap-6">
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">

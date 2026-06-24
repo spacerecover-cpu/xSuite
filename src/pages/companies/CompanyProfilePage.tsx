@@ -18,6 +18,7 @@ import { updateCompany } from '../../lib/companyService';
 import { CustomerCasesTab } from '../../components/customers/CustomerCasesTab';
 import { CustomerFinancialTab } from '../../components/customers/CustomerFinancialTab';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { KpiRow } from '../../components/templates/KpiRow';
 
 interface Company {
   id: string;
@@ -540,72 +541,39 @@ export const CompanyProfilePage: React.FC = () => {
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-        <Card className="p-4 bg-success-muted border-success/20">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-success flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-success-foreground" />
-            </div>
-            <p className="text-sm font-semibold text-success">Total Revenue</p>
-          </div>
-          <p className="text-2xl font-bold text-success">
-            ${companyInsights?.totalRevenue?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
-          </p>
-          <p className="text-xs text-success mt-1">
-            From approved quotes
-          </p>
-        </Card>
-
-        <Card className="p-4 bg-info-muted border-info/20">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-info flex items-center justify-center">
-              <Briefcase className="w-5 h-5 text-info-foreground" />
-            </div>
-            <p className="text-sm font-semibold text-info">Total Cases</p>
-          </div>
-          <p className="text-2xl font-bold text-info">
-            {companyInsights?.totalCases || 0}
-          </p>
-          <div className="flex items-center gap-3 mt-1 text-xs">
-            <span className="text-success font-medium">
-              ✓ {companyInsights?.completedCases || 0} Done
-            </span>
-            <span className="text-warning font-medium">
-              ⏳ {companyInsights?.pendingCases || 0} Pending
-            </span>
-          </div>
-        </Card>
-
-        <Card className="p-4 bg-accent/10 border-accent/20">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center">
-              <FileText className="w-5 h-5 text-accent-foreground" />
-            </div>
-            <p className="text-sm font-semibold text-accent-foreground">Quotes</p>
-          </div>
-          <p className="text-2xl font-bold text-accent-foreground">
-            {companyInsights?.totalQuotes || 0}
-          </p>
-          <p className="text-xs text-accent-foreground/80 mt-1">
-            {companyInsights?.approvedQuotes || 0} approved
-          </p>
-        </Card>
-
-        <Card className="p-4 bg-gradient-to-br from-slate-50 to-gray-50 border-slate-200">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-slate-500 flex items-center justify-center">
-              <Users className="w-5 h-5 text-white" />
-            </div>
-            <p className="text-sm font-semibold text-slate-700">Contacts</p>
-          </div>
-          <p className="text-2xl font-bold text-slate-900">
-            {contacts.length}
-          </p>
-          <p className="text-xs text-slate-600 mt-1">
-            {contacts.filter(c => c.customers_enhanced?.portal_enabled).length} with portal access
-          </p>
-        </Card>
-      </div>
+      <KpiRow
+        cols="grid-cols-2 lg:grid-cols-4"
+        stats={[
+          {
+            label: 'Total Revenue',
+            value: `$${companyInsights?.totalRevenue?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`,
+            tone: 'success',
+            icon: DollarSign,
+            sub: 'From approved quotes',
+          },
+          {
+            label: 'Total Cases',
+            value: companyInsights?.totalCases || 0,
+            tone: 'info',
+            icon: Briefcase,
+            sub: `${companyInsights?.completedCases || 0} done · ${companyInsights?.pendingCases || 0} pending`,
+          },
+          {
+            label: 'Quotes',
+            value: companyInsights?.totalQuotes || 0,
+            tone: 'cat-2',
+            icon: FileText,
+            sub: `${companyInsights?.approvedQuotes || 0} approved`,
+          },
+          {
+            label: 'Contacts',
+            value: contacts.length,
+            tone: 'primary',
+            icon: Users,
+            sub: `${contacts.filter(c => c.customers_enhanced?.portal_enabled).length} with portal access`,
+          },
+        ]}
+      />
 
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
         <div className="border-b border-slate-200">

@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
+import { KpiRow } from '../../components/templates/KpiRow';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
@@ -136,53 +137,26 @@ export const DatabaseManagement: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card>
-          <div className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600 mb-1">Total Backups</p>
-                <p className="text-2xl font-bold text-slate-900">{backups.length}</p>
-              </div>
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Database className="w-6 h-6 text-primary" />
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <Card>
-          <div className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600 mb-1">Successful</p>
-                <p className="text-2xl font-bold text-success">
-                  {backups.filter((b) => b.status === 'completed').length}
-                </p>
-              </div>
-              <div className="w-12 h-12 rounded-lg bg-success-muted flex items-center justify-center">
-                <CheckCircle className="w-6 h-6 text-success" />
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <Card>
-          <div className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600 mb-1">Failed</p>
-                <p className="text-2xl font-bold text-danger">
-                  {backups.filter((b) => b.status === 'failed').length}
-                </p>
-              </div>
-              <div className="w-12 h-12 rounded-lg bg-danger-muted flex items-center justify-center">
-                <XCircle className="w-6 h-6 text-danger" />
-              </div>
-            </div>
-          </div>
-        </Card>
-      </div>
+      <KpiRow
+        cols="grid-cols-1 md:grid-cols-3"
+        stats={[
+          { label: 'Total Backups', value: backups.length, tone: 'primary', icon: Database, loading },
+          {
+            label: 'Successful',
+            value: backups.filter((b) => b.status === 'completed').length,
+            tone: 'success',
+            icon: CheckCircle,
+            loading,
+          },
+          {
+            label: 'Failed',
+            value: backups.filter((b) => b.status === 'failed').length,
+            tone: 'danger',
+            icon: XCircle,
+            loading,
+          },
+        ]}
+      />
 
       <Card>
         <div className="p-6">
