@@ -3,7 +3,7 @@ import { Briefcase, FilePlus2, AlertCircle, Microscope, CheckCircle2, PackageChe
 import { cn } from '../../lib/utils';
 import { CASE_PERIOD_OPTIONS, type CasePeriod } from '../../lib/casePeriods';
 import type { CaseCommandStats } from '../../hooks/useCaseCommandStats';
-import { GradientStatCard } from './GradientStatCard';
+import { GradientStatCard } from '../shared/GradientStatCard';
 
 interface CasesCommandCenterProps {
   period: CasePeriod;

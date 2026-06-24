@@ -10,15 +10,24 @@ describe('StatCard', () => {
     expect(screen.getByText('4 paid')).toBeInTheDocument();
   });
 
-  it('applies the tone surface + foreground classes', () => {
+  it('renders a tone gradient with white ink on dark tiles', () => {
     const { container } = render(<StatCard tone="danger" label="Overdue" value={0} />);
-    expect((container.firstChild as HTMLElement).className).toContain('bg-danger-muted');
-    expect(screen.getByText('Overdue').className).toContain('text-danger');
+    const card = container.firstChild as HTMLElement;
+    expect(card.className).toContain('from-danger');
+    expect(card.className).toContain('bg-gradient-to-br');
+    expect(card.className).toContain('text-white');
   });
 
-  it('maps a cat-* tone to the identity palette classes', () => {
+  it('flips light tones (warning) to a dark foreground for contrast', () => {
+    const { container } = render(<StatCard tone="warning" label="Pending" value={3} />);
+    const card = container.firstChild as HTMLElement;
+    expect(card.className).toContain('from-warning');
+    expect(card.className).toContain('text-slate-900');
+  });
+
+  it('maps a cat-* tone to its gradient', () => {
     const { container } = render(<StatCard tone="cat-2" label="X" value={1} />);
-    expect((container.firstChild as HTMLElement).className).toContain('bg-cat-2/10');
+    expect((container.firstChild as HTMLElement).className).toContain('from-cat-2');
   });
 
   it('shows a skeleton (not the value/sub) while loading', () => {
@@ -28,8 +37,8 @@ describe('StatCard', () => {
     expect(screen.getByText('Total')).toBeInTheDocument();
   });
 
-  it('defaults to the neutral tone', () => {
+  it('defaults to the neutral (slate) gradient', () => {
     const { container } = render(<StatCard label="Count" value={5} />);
-    expect((container.firstChild as HTMLElement).className).toContain('bg-slate-50');
+    expect((container.firstChild as HTMLElement).className).toContain('from-slate-600');
   });
 });
