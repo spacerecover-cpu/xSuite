@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Button } from '../../components/ui/Button';
-import { Plus, Search, Filter, Briefcase, AlertCircle, CheckCircle, RefreshCw, ChevronLeft, ChevronRight, Archive, Download } from 'lucide-react';
+import { Plus, Search, Filter, Briefcase, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Archive, Download } from 'lucide-react';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { ExportButton } from '../../components/shared/ExportButton';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
@@ -23,6 +23,9 @@ import { canPerformAction } from '../../lib/featureGateService';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { CasesCommandCenter } from '../../components/cases/CasesCommandCenter';
+import { useCaseCommandStats, CASE_COMMAND_STATS_KEY } from '../../hooks/useCaseCommandStats';
+import type { CasePeriod } from '../../lib/casePeriods';
 
 interface Case {
   id: string;
@@ -96,6 +99,7 @@ export const CasesList: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [period, setPeriod] = useState<CasePeriod>('month');
   const [currentPage, setCurrentPage] = useState(1);
   const CASES_PER_PAGE = 7;
 
@@ -237,47 +241,10 @@ export const CasesList: React.FC = () => {
     },
   });
 
-  // Dashboard counters as head-only COUNT queries instead of pulling every
-  // case row to the client (the previous select grew linearly with tenant
-  // case volume). Status-name lists come from master_case_statuses, so this
-  // waits for them and re-keys when they change. "Active" is derived as
-  // (cases with a status) - (cases in a terminal status) because terminal
-  // names can contain PostgREST control characters that .in() quotes safely
-  // but a NOT-IN DSL string would not.
-  const { data: caseStats } = useQuery({
-    queryKey: ['cases_stats', caseStatuses.map((s) => s.id).join(',')],
-    enabled: caseStatuses.length > 0,
-    queryFn: async () => {
-      const namesOfTypes = (types: string[]) =>
-        caseStatuses
-          .filter((s) => s.type !== null && types.includes(s.type))
-          .map((s) => s.name);
-      const terminal = namesOfTypes(['completed', 'delivered', 'cancelled']);
-      const diagnosis = namesOfTypes(['diagnosis']);
-      const ready = namesOfTypes(['ready']);
-
-      const base = () =>
-        supabase.from('cases').select('id', { count: 'exact', head: true }).is('deleted_at', null);
-      const none = { count: 0 as number | null, error: null };
-
-      const [withStatus, inTerminal, urgent, inDiagnosis, inReady] = await Promise.all([
-        base().not('status', 'is', null),
-        terminal.length ? base().in('status', terminal) : Promise.resolve(none),
-        base().eq('priority', 'urgent'),
-        diagnosis.length ? base().in('status', diagnosis) : Promise.resolve(none),
-        ready.length ? base().in('status', ready) : Promise.resolve(none),
-      ]);
-      for (const r of [withStatus, inTerminal, urgent, inDiagnosis, inReady]) {
-        if (r.error) throw r.error;
-      }
-      return {
-        active: Math.max(0, (withStatus.count ?? 0) - (inTerminal.count ?? 0)),
-        urgent: urgent.count ?? 0,
-        diagnosis: inDiagnosis.count ?? 0,
-        ready: inReady.count ?? 0,
-      };
-    },
-  });
+  // Command-center KPIs (snapshot counts + period flow + trends) as head-only
+  // COUNT queries — see useCaseCommandStats. Reuses the same status-type logic
+  // the old inline counters used, so the snapshot numbers are unchanged.
+  const { data: commandStats, isLoading: statsLoading } = useCaseCommandStats(period, caseStatuses);
 
   const { data: casePriorities = [] } = useQuery({
     queryKey: ['case_priorities'],
@@ -295,6 +262,11 @@ export const CasesList: React.FC = () => {
   const handleWizardSuccess = () => {
     setIsWizardOpen(false);
     refetch();
+  };
+
+  const handleRefresh = () => {
+    refetch();
+    queryClient.invalidateQueries({ queryKey: [CASE_COMMAND_STATS_KEY] });
   };
 
   const totalPages = Math.ceil((totalCountData || 0) / CASES_PER_PAGE);
@@ -444,39 +416,34 @@ export const CasesList: React.FC = () => {
 
   return (
     <div className="p-6 max-w-[1800px] 2xl:max-w-[2400px] mx-auto">
-      <div className="mb-6 flex items-start justify-between">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg bg-primary">
-            <Briefcase className="w-6 h-6 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-1">Cases</h1>
-            <p className="text-slate-600 text-base">
-              Data recovery case management
-              {caseUsage && caseUsage.limit && (
-                <span className="ml-2 text-slate-500">
-                  ({caseUsage.current}/{caseUsage.limit} this month)
-                </span>
-              )}
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={() => refetch()}
-            variant="secondary"
-            disabled={isFetching}
-            title="Refresh cases list"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
-            {isFetching ? 'Refreshing...' : 'Refresh'}
-          </Button>
-          <Button onClick={handleCreateCase}>
-            <Plus className="w-4 h-4 mr-2" />
-            Create Case
-          </Button>
-        </div>
-      </div>
+      <CasesCommandCenter
+        period={period}
+        onPeriodChange={setPeriod}
+        stats={commandStats}
+        loading={statsLoading || caseStatuses.length === 0}
+        note={
+          caseUsage && caseUsage.limit
+            ? `${caseUsage.current}/${caseUsage.limit} this month`
+            : undefined
+        }
+        actions={
+          <>
+            <Button
+              onClick={handleRefresh}
+              variant="secondary"
+              disabled={isFetching}
+              title="Refresh cases list"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+              {isFetching ? 'Refreshing...' : 'Refresh'}
+            </Button>
+            <Button onClick={handleCreateCase}>
+              <Plus className="w-4 h-4 mr-2" />
+              Create Case
+            </Button>
+          </>
+        }
+      />
 
       {caseUsage && caseUsage.percentage >= 80 && caseUsage.percentage < 100 && (
         <div className="mb-4 bg-warning-muted border border-warning/30 rounded-lg p-4 flex items-center gap-3">
@@ -487,56 +454,6 @@ export const CasesList: React.FC = () => {
           </span>
         </div>
       )}
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-info-muted rounded-xl p-4 border border-info/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-info uppercase tracking-wide">Active Cases</p>
-              <p className="text-2xl font-bold text-info mt-1">{caseStats?.active ?? 0}</p>
-            </div>
-            <div className="w-10 h-10 bg-info rounded-lg flex items-center justify-center">
-              <Briefcase className="w-5 h-5 text-info-foreground" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-danger-muted rounded-xl p-4 border border-danger/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-danger uppercase tracking-wide">Urgent</p>
-              <p className="text-2xl font-bold text-danger mt-1">{caseStats?.urgent ?? 0}</p>
-            </div>
-            <div className="w-10 h-10 bg-danger rounded-lg flex items-center justify-center">
-              <AlertCircle className="w-5 h-5 text-danger-foreground" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-warning-muted rounded-xl p-4 border border-warning/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-warning uppercase tracking-wide">In Diagnosis</p>
-              <p className="text-2xl font-bold text-warning mt-1">{caseStats?.diagnosis ?? 0}</p>
-            </div>
-            <div className="w-10 h-10 bg-warning rounded-lg flex items-center justify-center">
-              <Search className="w-5 h-5 text-warning-foreground" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-success-muted rounded-xl p-4 border border-success/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-success uppercase tracking-wide">Ready</p>
-              <p className="text-2xl font-bold text-success mt-1">{caseStats?.ready ?? 0}</p>
-            </div>
-            <div className="w-10 h-10 bg-success rounded-lg flex items-center justify-center">
-              <CheckCircle className="w-5 h-5 text-success-foreground" />
-            </div>
-          </div>
-        </div>
-      </div>
 
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
         <div className="p-6">
