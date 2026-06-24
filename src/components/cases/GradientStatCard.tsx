@@ -26,6 +26,26 @@ const TREND_ICON: Record<Trend['direction'], LucideIcon> = {
   flat: Minus,
 };
 
+/**
+ * Subtle white decorative background for a gradient tile, echoing the
+ * "command center" reference: a soft light-source glow, an oversized ghost
+ * icon bleeding off the corner, a faint orbital ring (a nod to a disk platter),
+ * and a small dot scatter. Everything is white-on-gradient at low opacity,
+ * purely decorative (aria-hidden, pointer-events-none) and clipped by the
+ * tile's overflow-hidden — so it reads as texture, never competing with the
+ * value. White-only keeps it token-safe across every tenant theme.
+ */
+const TileDecor: React.FC<{ icon: LucideIcon }> = ({ icon: Icon }) => (
+  <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+    <div className="absolute -top-7 -right-6 h-20 w-20 rounded-full bg-white/15 blur-2xl" />
+    <div className="absolute -bottom-9 -right-8 h-28 w-28 rounded-full border border-white/[0.10]" />
+    <Icon className="absolute -bottom-2.5 -right-2 h-14 w-14 text-white/10" strokeWidth={1.5} />
+    <span className="absolute right-3 top-2.5 h-1.5 w-1.5 rounded-full bg-white/25" />
+    <span className="absolute right-7 top-4 h-1 w-1 rounded-full bg-white/20" />
+    <span className="absolute right-2 top-6 h-1 w-1 rounded-full bg-white/[0.15]" />
+  </div>
+);
+
 interface GradientStatCardProps {
   label: string;
   value: string | number;
@@ -42,10 +62,11 @@ interface GradientStatCardProps {
 
 /**
  * Compact gradient KPI tile (~76px) for the Cases stat ribbon. A single tight
- * stack: label + icon, a big tabular value with either an inline trend pill
- * (flow metrics) or a "/total" denominator (snapshot metrics), and a thin
+ * stack: label, a big tabular value with either an inline trend pill (flow
+ * metrics) or a "/total" denominator (snapshot metrics), and a thin
  * share-of-total bar that doubles as a baseline so every tile is the same
- * height. Built to pack six metrics into roughly half the old height.
+ * height. The icon lives in the decorative layer (TileDecor) as a ghost.
+ * Built to pack six metrics into roughly half the old height.
  */
 export const GradientStatCard: React.FC<GradientStatCardProps> = ({
   label,
@@ -89,14 +110,10 @@ export const GradientStatCard: React.FC<GradientStatCardProps> = ({
         className,
       )}
     >
-      <div
-        className="pointer-events-none absolute -top-6 -right-5 h-16 w-16 rounded-full bg-white/15 blur-xl"
-        aria-hidden="true"
-      />
+      <TileDecor icon={Icon} />
 
-      <div className="relative flex items-center justify-between gap-2">
+      <div className="relative">
         <p className="truncate text-xxs font-semibold uppercase tracking-wider text-white/90">{label}</p>
-        <Icon className="h-4 w-4 shrink-0 text-white/80" aria-hidden="true" />
       </div>
 
       <div className="relative mt-1.5 flex items-end justify-between gap-2">
