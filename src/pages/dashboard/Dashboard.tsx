@@ -15,30 +15,7 @@ import { UpgradeBanner } from '../../components/shared/UpgradeBanner';
 import { useFeature } from '../../hooks/useFeatureGate';
 import { getCurrentPlanCode } from '../../lib/featureGateService';
 import { useTenantFeatures } from '../../contexts/TenantConfigContext';
-
-interface QuickStatProps {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  color: string;
-  bgColor: string;
-  onClick?: () => void;
-}
-
-const QuickStat: React.FC<QuickStatProps> = ({ label, value, icon: Icon, color, bgColor, onClick }) => (
-  <div
-    onClick={onClick}
-    className={`bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex items-center gap-4 ${onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
-  >
-    <div className={`w-12 h-12 rounded-xl ${bgColor} flex items-center justify-center flex-shrink-0`}>
-      <Icon className={`w-6 h-6 ${color}`} />
-    </div>
-    <div>
-      <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{label}</p>
-      <p className="text-2xl font-bold text-slate-900 leading-tight">{value}</p>
-    </div>
-  </div>
-);
+import { StatCard } from '../../components/shared/StatCard';
 
 export const Dashboard: React.FC = () => {
   const { profile } = useAuth();
@@ -119,36 +96,32 @@ export const Dashboard: React.FC = () => {
       <div>
         <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Cases Overview</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <QuickStat
+          <StatCard
             label="Active Cases"
             value={caseStats?.active ?? '—'}
+            tone="info"
             icon={Briefcase}
-            color="text-primary"
-            bgColor="bg-primary/10"
             onClick={() => navigate('/cases')}
           />
-          <QuickStat
+          <StatCard
             label="New Today"
             value={caseStats?.today ?? '—'}
+            tone="success"
             icon={TrendingUp}
-            color="text-success"
-            bgColor="bg-success-muted"
             onClick={() => navigate('/cases')}
           />
-          <QuickStat
+          <StatCard
             label="Pending"
             value={caseStats?.pending ?? '—'}
+            tone="warning"
             icon={Clock}
-            color="text-warning"
-            bgColor="bg-warning-muted"
             onClick={() => navigate('/cases')}
           />
-          <QuickStat
+          <StatCard
             label="Customers"
             value={customerCount ?? '—'}
+            tone="neutral"
             icon={Users}
-            color="text-slate-600"
-            bgColor="bg-slate-50"
             onClick={() => navigate('/customers')}
           />
         </div>
