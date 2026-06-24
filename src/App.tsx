@@ -20,6 +20,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { FeatureRoute } from './components/FeatureRoute';
 import { ProtectedPortalRoute } from './components/ProtectedPortalRoute';
 import { ProtectedPlatformAdminRoute } from './components/ProtectedPlatformAdminRoute';
+import { RequireTenantWorkspace } from './components/RequireTenantWorkspace';
 import { AppLayout } from './components/layout/AppLayout';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { RouteErrorFallback } from './components/RouteErrorFallback';
@@ -109,12 +110,14 @@ const router = createBrowserRouter(
       <Route path="/portal/login" lazy={page(() => import('./pages/portal/PortalLogin'), 'PortalLogin')} />
 
       <Route element={<ProtectedRoute />}>
-        <Route path="/onboarding" lazy={page(() => import('./pages/onboarding/OnboardingPage'), 'OnboardingPage')} />
-        <Route path="/print/receipt/:caseId" lazy={page(() => import('./pages/print/PrintReceiptPage'), 'PrintReceiptPage')} />
-        <Route path="/print/label/:caseId" lazy={page(() => import('./pages/print/PrintLabelPage'), 'PrintLabelPage')} />
-        <Route path="/print/customer-copy/:caseId" lazy={page(() => import('./pages/print/PrintCustomerCopyPage'), 'PrintCustomerCopyPage')} />
-        <Route path="/print/checkout/:caseId" lazy={page(() => import('./pages/print/PrintCheckoutPage'), 'PrintCheckoutPage')} />
-        <Route path="/print/payment-receipt/:paymentId" lazy={page(() => import('./pages/print/PrintPaymentReceiptPage'), 'PrintPaymentReceiptPage')} />
+        <Route element={<RequireTenantWorkspace />}>
+          <Route path="/onboarding" lazy={page(() => import('./pages/onboarding/OnboardingPage'), 'OnboardingPage')} />
+          <Route path="/print/receipt/:caseId" lazy={page(() => import('./pages/print/PrintReceiptPage'), 'PrintReceiptPage')} />
+          <Route path="/print/label/:caseId" lazy={page(() => import('./pages/print/PrintLabelPage'), 'PrintLabelPage')} />
+          <Route path="/print/customer-copy/:caseId" lazy={page(() => import('./pages/print/PrintCustomerCopyPage'), 'PrintCustomerCopyPage')} />
+          <Route path="/print/checkout/:caseId" lazy={page(() => import('./pages/print/PrintCheckoutPage'), 'PrintCheckoutPage')} />
+          <Route path="/print/payment-receipt/:paymentId" lazy={page(() => import('./pages/print/PrintPaymentReceiptPage'), 'PrintPaymentReceiptPage')} />
+        </Route>
       </Route>
 
       <Route
@@ -142,9 +145,11 @@ const router = createBrowserRouter(
         path="/"
         element={
           <ProtectedRoute>
-            <ErrorBoundary>
-              <AppLayout />
-            </ErrorBoundary>
+            <RequireTenantWorkspace>
+              <ErrorBoundary>
+                <AppLayout />
+              </ErrorBoundary>
+            </RequireTenantWorkspace>
           </ProtectedRoute>
         }
       >
