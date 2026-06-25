@@ -20,6 +20,9 @@ export interface DeviceDiagnostics {
   pcb_notes?: string;
   motor_status?: string;
   surface_status?: string;
+  preamp_status?: string;
+  service_area_status?: string;
+  storage_chip_status?: string;
   sa_access?: boolean;
   platter_condition?: string;
 
@@ -57,6 +60,9 @@ const RESULT_FIELDS = [
   'pcb_notes',
   'motor_status',
   'surface_status',
+  'preamp_status',
+  'service_area_status',
+  'storage_chip_status',
   'sa_access',
   'platter_condition',
   'controller_status',
