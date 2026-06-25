@@ -115,7 +115,7 @@ export const BulkInventoryImportModal: React.FC<BulkInventoryImportModalProps> =
       'model',
       'capacity_id',
       'serial_number',
-      'inventory_code',
+      'item_number',
       'status_type_id',
       'condition_type_id',
       'item_type',
@@ -307,7 +307,7 @@ export const BulkInventoryImportModal: React.FC<BulkInventoryImportModalProps> =
                       <option value="model">model</option>
                       <option value="serial_number">serial_number</option>
                       <option value="sku_code">sku_code</option>
-                      <option value="inventory_code">inventory_code</option>
+                      <option value="item_number">item_number</option>
                     </optgroup>
                     <optgroup label="Reference Fields (Use Names)">
                       <option value="brand_id">brand_id (e.g., "Seagate")</option>

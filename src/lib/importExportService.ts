@@ -768,7 +768,7 @@ export function suggestFieldMapping(
   // Inventory-specific field name variations
   if (entityType === 'inventory') {
     Object.assign(synonyms, {
-      inventory_code: ['inv_code', 'item_code', 'code', 'inv_no', 'item_no'],
+      item_number: ['inv_code', 'item_code', 'inv_no', 'item_no', 'inventory_code'],
       sku_code: ['sku', 'part_code', 'product_code', 'item_sku'],
       serial_number: ['serial', 'sn', 'serial_no', 'serial_num', 'device_serial'],
       barcode: ['bar_code', 'upc', 'ean', 'barcode_number'],
@@ -1021,7 +1021,7 @@ export function generateTemplate(entityType: EntityType): string {
       'category_id',
 
       // Identification
-      'inventory_code',
+      'item_number',
       'serial_number',
 
       // Device Specifications
@@ -1450,7 +1450,7 @@ export function generateNameBasedTemplate(): string {
     'category_name',
 
     // Identification
-    'inventory_code',
+    'item_number',
     'serial_number',
 
     // Device Specifications (Name-Based)

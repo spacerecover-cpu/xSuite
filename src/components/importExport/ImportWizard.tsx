@@ -523,7 +523,7 @@ export const ImportWizard: React.FC<ImportWizardProps> = ({ entityType, onClose 
                           <option value="category_id">category_id (Category)</option>
                         </optgroup>
                         <optgroup label="Identification">
-                          <option value="inventory_code">inventory_code</option>
+                          <option value="item_number">item_number</option>
                           <option value="sku_code">sku_code</option>
                           <option value="barcode">barcode</option>
                           <option value="serial_number">serial_number</option>

@@ -19,3 +19,10 @@ describe('suggestFieldMapping — inventory alias disambiguation (B4)', () => {
     expect(r['device_type']?.target).toBe('device_type_id');
   });
 });
+
+describe('suggestFieldMapping — inventory_code header maps to item_number (F1)', () => {
+  it("maps an 'inventory_code' / 'inv_code' column to item_number", () => {
+    expect(suggestFieldMapping(['inventory_code'], 'inventory')['inventory_code']?.target).toBe('item_number');
+    expect(suggestFieldMapping(['inv_code'], 'inventory')['inv_code']?.target).toBe('item_number');
+  });
+});
