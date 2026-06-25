@@ -255,6 +255,9 @@ export const DEVICE_MEDIA_SEED_DATA = {
     'Parts',
     'Supplies',
     'Other',
+    'Donor Drives',
+    'Head Assemblies',
+    'Motors',
   ],
 };
 
