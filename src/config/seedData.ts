@@ -1020,7 +1020,7 @@ Reply YES to approve or call us with any questions.
 <p><strong>Date Received:</strong> {{case.received_date}}</p>
 <p><strong>Device:</strong> {{device.brand}} {{device.type}}</p>
 <p><strong>Serial Number:</strong> {{device.serial}}</p>
-<p><strong>Physical Condition:</strong> {{device.condition}}</p>
+<p><strong>Condition:</strong> {{device.condition}}</p>
 </div>
 
 <div class="problem-analysis">
@@ -1064,11 +1064,11 @@ Reply YES to approve or call us with any questions.
     { category: 'case', key: 'case.received_date', name: 'Date Received', sample: '15/11/2025' },
 
     { category: 'device', key: 'device.type', name: 'Device Type', sample: '2.5" HDD' },
-    { category: 'device', key: 'device.brand', name: 'Device Brand', sample: 'Seagate' },
-    { category: 'device', key: 'device.model', name: 'Device Model', sample: 'ST1000LM035' },
+    { category: 'device', key: 'device.brand', name: 'Brand', sample: 'Seagate' },
+    { category: 'device', key: 'device.model', name: 'Model', sample: 'ST1000LM035' },
     { category: 'device', key: 'device.serial', name: 'Serial Number', sample: 'ABC123456' },
     { category: 'device', key: 'device.capacity', name: 'Capacity', sample: '1TB' },
-    { category: 'device', key: 'device.condition', name: 'Physical Condition', sample: 'Good - No Visible Damage' },
+    { category: 'device', key: 'device.condition', name: 'Condition', sample: 'Good - No Visible Damage' },
 
     { category: 'quote', key: 'quote.number', name: 'Quote Number', sample: 'QT-2025-00001' },
     { category: 'quote', key: 'quote.total', name: 'Quote Total', sample: '250.000' },
