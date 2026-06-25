@@ -1546,10 +1546,12 @@ export type Database = {
           created_at: string
           created_by: string | null
           data_recovered_size: string | null
+          dcm: string | null
           deleted_at: string | null
           device_role_id: number | null
           device_type_id: string | null
           diagnosis: string | null
+          dom: string | null
           encryption_id: string | null
           firmware_version: string | null
           form_factor_id: string | null
@@ -1560,6 +1562,7 @@ export type Database = {
           made_in_id: string | null
           model: string | null
           notes: string | null
+          part_number: string | null
           password: string | null
           pcb_number: string | null
           photos: string[] | null
@@ -1570,6 +1573,7 @@ export type Database = {
           serial_number: string | null
           storage_location: string | null
           symptoms: string | null
+          technical_details: Json
           tenant_id: string
           updated_at: string
           updated_by: string | null
@@ -1591,10 +1595,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data_recovered_size?: string | null
+          dcm?: string | null
           deleted_at?: string | null
           device_role_id?: number | null
           device_type_id?: string | null
           diagnosis?: string | null
+          dom?: string | null
           encryption_id?: string | null
           firmware_version?: string | null
           form_factor_id?: string | null
@@ -1605,6 +1611,7 @@ export type Database = {
           made_in_id?: string | null
           model?: string | null
           notes?: string | null
+          part_number?: string | null
           password?: string | null
           pcb_number?: string | null
           photos?: string[] | null
@@ -1615,6 +1622,7 @@ export type Database = {
           serial_number?: string | null
           storage_location?: string | null
           symptoms?: string | null
+          technical_details?: Json
           tenant_id: string
           updated_at?: string
           updated_by?: string | null
@@ -1636,10 +1644,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data_recovered_size?: string | null
+          dcm?: string | null
           deleted_at?: string | null
           device_role_id?: number | null
           device_type_id?: string | null
           diagnosis?: string | null
+          dom?: string | null
           encryption_id?: string | null
           firmware_version?: string | null
           form_factor_id?: string | null
@@ -1650,6 +1660,7 @@ export type Database = {
           made_in_id?: string | null
           model?: string | null
           notes?: string | null
+          part_number?: string | null
           password?: string | null
           pcb_number?: string | null
           photos?: string[] | null
@@ -1660,6 +1671,7 @@ export type Database = {
           serial_number?: string | null
           storage_location?: string | null
           symptoms?: string | null
+          technical_details?: Json
           tenant_id?: string
           updated_at?: string
           updated_by?: string | null
@@ -17007,10 +17019,12 @@ export type Database = {
           created_at: string
           created_by: string | null
           data_recovered_size: string | null
+          dcm: string | null
           deleted_at: string | null
           device_role_id: number | null
           device_type_id: string | null
           diagnosis: string | null
+          dom: string | null
           encryption_id: string | null
           firmware_version: string | null
           form_factor_id: string | null
@@ -17021,6 +17035,7 @@ export type Database = {
           made_in_id: string | null
           model: string | null
           notes: string | null
+          part_number: string | null
           password: string | null
           pcb_number: string | null
           photos: string[] | null
@@ -17031,6 +17046,7 @@ export type Database = {
           serial_number: string | null
           storage_location: string | null
           symptoms: string | null
+          technical_details: Json
           tenant_id: string
           updated_at: string
           updated_by: string | null
