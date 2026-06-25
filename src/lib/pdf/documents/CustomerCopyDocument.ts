@@ -177,7 +177,7 @@ export function buildCustomerCopyDocument(
 
   const devicesTableBody: TableCell[][] = [
     [
-      { text: isBilingual ? t('type', 'Type') : 'Type', style: 'tableHeader', fillColor: PDF_COLORS.headerBg, color: PDF_COLORS.text, alignment: 'left' },
+      { text: isBilingual ? t('type', 'Device Type') : 'Device Type', style: 'tableHeader', fillColor: PDF_COLORS.headerBg, color: PDF_COLORS.text, alignment: 'left' },
       { text: isBilingual ? t('brand', 'Brand') : 'Brand', style: 'tableHeader', fillColor: PDF_COLORS.headerBg, color: PDF_COLORS.text, alignment: 'left' },
       { text: isBilingual ? t('capacity', 'Capacity') : 'Capacity', style: 'tableHeader', fillColor: PDF_COLORS.headerBg, color: PDF_COLORS.text, alignment: 'left' },
       { text: isBilingual ? t('serialNumber', 'Serial Number') : 'Serial Number', style: 'tableHeader', fillColor: PDF_COLORS.headerBg, color: PDF_COLORS.text, alignment: 'left' },

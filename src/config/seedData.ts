@@ -979,7 +979,7 @@ Reply YES to approve or call us with any questions.
 <div class="device-info">
 <h3>Device Information</h3>
 <table>
-<tr><td>Type:</td><td>{{device.type}}</td></tr>
+<tr><td>Device Type:</td><td>{{device.type}}</td></tr>
 <tr><td>Brand:</td><td>{{device.brand}}</td></tr>
 <tr><td>Model:</td><td>{{device.model}}</td></tr>
 <tr><td>Serial Number:</td><td>{{device.serial}}</td></tr>

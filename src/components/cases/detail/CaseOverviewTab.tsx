@@ -518,7 +518,7 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
                   onChange={(e) => handleDeviceFieldChange('device_type_id', e.target.value || null)}
                   className="text-sm px-2 py-1 border border-success/40 rounded bg-white focus:outline-none focus:ring-2 focus:ring-success max-w-[200px]"
                 >
-                  <option value="">Select type...</option>
+                  <option value="">Select device type...</option>
                   {deviceTypes.map((type) => (
                     <option key={type.id} value={type.id}>{type.name}</option>
                   ))}

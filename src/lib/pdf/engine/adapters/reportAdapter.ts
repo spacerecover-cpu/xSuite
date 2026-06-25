@@ -118,7 +118,7 @@ function buildDiagnostics(
   if (!device) return null;
 
   const rows: DiagnosticsBlock['rows'] = [];
-  if (device.device_type) rows.push({ label: { en: 'Type', ar: 'النوع' }, value: safeString(device.device_type) });
+  if (device.device_type) rows.push({ label: { en: 'Device Type', ar: 'النوع' }, value: safeString(device.device_type) });
   if (device.model) rows.push({ label: { en: 'Model', ar: 'الطراز' }, value: safeString(device.model) });
   if (device.capacity) rows.push({ label: { en: 'Capacity', ar: 'السعة' }, value: safeString(device.capacity) });
   if (device.serial_number) rows.push({ label: { en: 'Serial No', ar: 'الرقم التسلسلي' }, value: safeString(device.serial_number) });

@@ -304,7 +304,7 @@ export function buildReportDocument(
     const hardDriveIconSvg = getGeneralIconSvg('fileText');
     const mediaDetailsHeader: Content = createBilingualSectionHeader(mediaDetailsTitle, null, hardDriveIconSvg) as Content;
 
-    const typeLabel = isBilingual ? (t('type', '').split(' | ')[1] ? `Type | ${t('type', '').split(' | ')[1]}` : 'Type') : 'Type';
+    const typeLabel = isBilingual ? (t('type', '').split(' | ')[1] ? `Device Type | ${t('type', '').split(' | ')[1]}` : 'Device Type') : 'Device Type';
     const modelLabel = isBilingual ? (t('model', '').split(' | ')[1] ? `Model | ${t('model', '').split(' | ')[1]}` : 'Model') : 'Model';
     const capacityLabel = isBilingual ? (t('capacity', '').split(' | ')[1] ? `Capacity | ${t('capacity', '').split(' | ')[1]}` : 'Capacity') : 'Capacity';
     const serialLabel = isBilingual ? (t('serialNumber', '').split(' | ')[1] ? `Serial No | ${t('serialNumber', '').split(' | ')[1]}` : 'Serial No') : 'Serial No';

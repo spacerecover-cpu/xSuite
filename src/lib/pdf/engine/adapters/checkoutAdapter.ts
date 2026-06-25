@@ -38,7 +38,7 @@ import type {
  */
 function checkoutDeviceColumns(): ResolvedColumn[] {
   return [
-    { key: 'type', visible: true, label: { en: 'Type', ar: 'النوع' }, width: 100, align: 'left' },
+    { key: 'type', visible: true, label: { en: 'Device Type', ar: 'النوع' }, width: 100, align: 'left' },
     { key: 'brand', visible: true, label: { en: 'Brand', ar: 'الماركة' }, width: 75, align: 'left' },
     { key: 'capacity', visible: true, label: { en: 'Capacity', ar: 'السعة' }, width: 85, align: 'left' },
     { key: 'serial', visible: true, label: { en: 'Serial Number', ar: 'الرقم التسلسلي' }, width: 125, align: 'left' },

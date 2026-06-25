@@ -2387,7 +2387,7 @@ exports[`PDF builder characterization (golden snapshots) > buildOfficeReceiptDoc
                   "color": "#1e293b",
                   "fillColor": "#F1F5F9",
                   "style": "tableHeader",
-                  "text": "Type",
+                  "text": "Device Type",
                 },
                 {
                   "alignment": "left",

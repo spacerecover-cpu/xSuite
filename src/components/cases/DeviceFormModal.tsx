@@ -613,7 +613,7 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
             {!isDonorRole && (
               <>
                 <SearchableSelect
-                  label="Media Type"
+                  label="Device Type"
                   value={formData.device_type_id}
                   onChange={(value) => setFormData({ ...formData, device_type_id: value })}
                   options={deviceTypes.map(dt => ({ id: dt.id, name: dt.name }))}
