@@ -469,7 +469,7 @@ export interface ReportSectionsBlock {
 }
 
 /**
- * The device DIAGNOSTICS info box for a case REPORT — the "Media Details" /
+ * The device DIAGNOSTICS info box for a case REPORT — the "Device Details" /
  * "Component Diagnostics" block rendered as bilingual label/value rows (the
  * report counterpart to {@link CaseInfoBlock}). The adapter pre-formats every
  * value and chooses the field set by device kind: HDD diagnostics (heads / PCB /
@@ -478,7 +478,7 @@ export interface ReportSectionsBlock {
  * serial / physical-damage notes). The renderer stays dumb — it only lays the
  * supplied rows out; the HDD-vs-SSD branching lives entirely in the adapter.
  *
- * Generalized from the Media-Details + Component-Diagnostics block hand-written
+ * Generalized from the Device-Details + Component-Diagnostics block hand-written
  * in `documents/ReportDocument.ts` (lines ~300-400), where the HDD branch reads
  * `heads_status` / `pcb_status` / `motor_status` / `surface_status` and the SSD
  * branch reads `controller_status` / `memory_chips_status` / `controller_model`
@@ -486,7 +486,7 @@ export interface ReportSectionsBlock {
  * no rows are supplied.
  */
 export interface DiagnosticsBlock {
-  /** Box heading (e.g. "Media Details" / "تفاصيل الوسائط"). */
+  /** Box heading (e.g. "Device Details" / "تفاصيل الوسائط"). */
   title: LabelText;
   /** Labelled rows: type/model/capacity/serial + the kind-specific diagnostics. */
   rows: Array<{ label: LabelText; value: string }>;
@@ -593,7 +593,7 @@ export interface EngineDocData {
    */
   digitalSignatures?: DigitalSignaturesBlock | null;
   /**
-   * Device diagnostics info box for a case REPORT (Media Details / Component
+   * Device diagnostics info box for a case REPORT (Device Details / Component
    * Diagnostics — type/model/capacity/serial plus the HDD- or SSD-specific
    * component-status rows the adapter selected), or absent on non-report docs.
    */

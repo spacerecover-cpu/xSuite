@@ -1,11 +1,11 @@
 /**
  * Report-diagnostics section — the device DIAGNOSTICS info box for a case REPORT
- * (the "Media Details" / "Component Diagnostics" block), rendered as a single
+ * (the "Device Details" / "Component Diagnostics" block), rendered as a single
  * bilingual info box of label/value rows. The device-level counterpart to
  * {@link renderCaseInfo}, reusing the same `createBilingualInfoBox` + label/value
  * row pattern.
  *
- * Generalized from the Media-Details + Component-Diagnostics block hand-written
+ * Generalized from the Device-Details + Component-Diagnostics block hand-written
  * in `documents/ReportDocument.ts` (lines ~300-400). There the HDD branch reads
  * `heads_status` / `pcb_status` / `motor_status` / `surface_status` and the SSD
  * branch reads `controller_status` / `memory_chips_status` / `controller_model`
@@ -45,7 +45,7 @@ function infoRow(
 }
 
 /**
- * Report-diagnostics renderer: the device diagnostics (Media Details / Component
+ * Report-diagnostics renderer: the device diagnostics (Device Details / Component
  * Diagnostics) as label/value rows in one bilingual info box. The adapter has
  * already chosen the HDD- or SSD-specific rows; this renderer only lays them out.
  * Returns null when there is nothing to show.
@@ -66,7 +66,7 @@ export const renderDiagnostics: SectionRenderer = (
   const rows: object[] = diagnostics.rows.map((r) => infoRow(r.label, r.value, labelLang, labelWidth));
 
   const box = createBilingualInfoBox(
-    en(diagnostics.title, 'Media Details'),
+    en(diagnostics.title, 'Device Details'),
     bilingual ? ar(diagnostics.title) : null,
     rows,
     mediaIcon,

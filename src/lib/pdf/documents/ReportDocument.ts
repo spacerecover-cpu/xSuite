@@ -295,14 +295,14 @@ export function buildReportDocument(
 
   const bodyContent: Content[] = [infoBoxesSection];
 
-  // Media Details Section (if device data exists)
+  // Device Details Section (if device data exists)
   if (deviceData) {
-    const mediaDetailsTitle = isBilingual
-      ? `Media Details | ${t('mediaDetails', '').split(' | ')[1] || 'تفاصيل الوسائط'}`
-      : 'Media Details';
+    const deviceDetailsTitle = isBilingual
+      ? `Device Details | ${t('deviceDetails', '').split(' | ')[1] || 'تفاصيل الوسائط'}`
+      : 'Device Details';
 
     const hardDriveIconSvg = getGeneralIconSvg('fileText');
-    const mediaDetailsHeader: Content = createBilingualSectionHeader(mediaDetailsTitle, null, hardDriveIconSvg) as Content;
+    const deviceDetailsHeader: Content = createBilingualSectionHeader(deviceDetailsTitle, null, hardDriveIconSvg) as Content;
 
     const typeLabel = isBilingual ? (t('type', '').split(' | ')[1] ? `Device Type | ${t('type', '').split(' | ')[1]}` : 'Device Type') : 'Device Type';
     const modelLabel = isBilingual ? (t('model', '').split(' | ')[1] ? `Model | ${t('model', '').split(' | ')[1]}` : 'Model') : 'Model';
@@ -317,8 +317,8 @@ export function buildReportDocument(
 
     const deviceInfoText = deviceInfoParts.join(' | ');
 
-    const mediaDetailsContent: Content[] = [
-      mediaDetailsHeader,
+    const deviceDetailsContent: Content[] = [
+      deviceDetailsHeader,
       {
         text: deviceInfoText,
         fontSize: 8,
@@ -333,7 +333,7 @@ export function buildReportDocument(
         ? `Component Diagnostics | تشخيص المكونات`
         : 'Component Diagnostics';
 
-      mediaDetailsContent.push(
+      deviceDetailsContent.push(
         { text: diagnosticsTitle, fontSize: 9, bold: true, color: PDF_COLORS.text, margin: [0, 6, 0, 3] }
       );
 
@@ -351,7 +351,7 @@ export function buildReportDocument(
       }
 
       if (diagnosticsParts.length > 0) {
-        mediaDetailsContent.push({
+        deviceDetailsContent.push({
           text: diagnosticsParts.join(' | '),
           fontSize: 8,
           color: PDF_COLORS.text,
@@ -365,7 +365,7 @@ export function buildReportDocument(
               ? `Physical Damage Notes | ${t('physicalDamageNotesLabel', '').split(' | ')[1].replace(/:$/, '')}`
               : 'Physical Damage Notes')
           : 'Physical Damage Notes';
-        mediaDetailsContent.push({
+        deviceDetailsContent.push({
           text: `${physicalDamageLabel}: ${diagnosticsData.physical_damage_notes}`,
           fontSize: 8,
           color: PDF_COLORS.text,
@@ -380,7 +380,7 @@ export function buildReportDocument(
         body: [
           [
             {
-              stack: mediaDetailsContent,
+              stack: deviceDetailsContent,
               fillColor: PDF_COLORS.background,
               margin: [6, 5, 6, 6],
             },

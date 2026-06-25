@@ -8,7 +8,7 @@
  * A case report is a NON-financial document: there is no money, no line items,
  * no party `from`/`to` blocks. It carries a `caseInfo` header (case + customer +
  * report meta in one info box, generalized from the legacy two info boxes), a
- * `diagnostics` info box (HDD- vs SSD-aware Media Details / Component
+ * `diagnostics` info box (HDD- vs SSD-aware Device Details / Component
  * Diagnostics), the ordered `reportSections` prose blocks, and — when the report
  * is forensic and has custody events — a `custodyLog` timeline reusing the
  * shared {@link CustodyLogBlock} (exactly as the legacy builder special-cases the
@@ -21,7 +21,7 @@
  * stringification. The section renderers stay dumb.
  *
  * Parity reference: `documents/ReportDocument.ts` (title map ~643-662, info
- * boxes ~248-296, Media Details + Component Diagnostics ~300-400, report
+ * boxes ~248-296, Device Details + Component Diagnostics ~300-400, report
  * sections loop ~402-495, chain-of-custody special case ~414-456).
  */
 
@@ -105,7 +105,7 @@ function stripHtmlTags(html: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Diagnostics — HDD vs SSD field-set selection. The legacy "Media Details" box
+// Diagnostics — HDD vs SSD field-set selection. The legacy "Device Details" box
 // shows shared rows (type / model / capacity / serial), then a Component
 // Diagnostics block whose rows depend on `device_type_category` (hdd vs ssd),
 // then physical-damage notes. The HDD/SSD branching lives ENTIRELY here.
@@ -145,7 +145,7 @@ function buildDiagnostics(
   if (rows.length === 0) return null;
 
   return {
-    title: { en: 'Media Details', ar: 'تفاصيل الوسائط' },
+    title: { en: 'Device Details', ar: 'تفاصيل الوسائط' },
     rows,
     ...(deviceKind ? { deviceKind } : {}),
   };
@@ -265,7 +265,7 @@ export function toEngineData(
     ],
   };
 
-  // ---- Diagnostics (HDD/SSD-aware Media Details / Component Diagnostics) ----
+  // ---- Diagnostics (HDD/SSD-aware Device Details / Component Diagnostics) ----
   const diagnostics = buildDiagnostics(deviceData, diagnosticsData);
 
   // ---- Custody timeline (forensic reports with custody events) -------------

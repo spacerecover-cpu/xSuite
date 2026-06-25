@@ -760,7 +760,7 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
           section('header', 0),
           // caseInfo = customer + report meta in one bilingual info box
           // (generalized from the legacy Customer Information + Report Details
-          // boxes). diagnostics = the HDD/SSD-aware Media Details / Component
+          // boxes). diagnostics = the HDD/SSD-aware Device Details / Component
           // Diagnostics box. reportSections = the ordered DB-driven prose
           // sections.
           section('caseInfo', 1),
