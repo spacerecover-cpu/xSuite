@@ -45,6 +45,7 @@ export function Tabs({ tabs, activeId, onChange, className }: TabsProps): React.
     else if (e.key === 'End') next = enabled.length - 1;
     else return;
     e.preventDefault();
+    ref.current?.querySelector<HTMLElement>(`[id="tab-${enabled[next].id}"]`)?.focus();
     onChange(enabled[next].id);
   };
 
@@ -66,7 +67,7 @@ export function Tabs({ tabs, activeId, onChange, className }: TabsProps): React.
             id={`tab-${t.id}`}
             disabled={t.disabled}
             tabIndex={active ? 0 : -1}
-            onClick={() => !t.disabled && onChange(t.id)}
+            onClick={() => onChange(t.id)}
             className={cn(
               'inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
               t.disabled && 'opacity-40 cursor-not-allowed',

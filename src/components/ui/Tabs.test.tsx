@@ -34,5 +34,6 @@ describe('Tabs', () => {
     screen.getByRole('tab', { name: /Alpha/ }).focus();
     await user.keyboard('{ArrowRight}');
     expect(onChange).toHaveBeenCalledWith('b');
+    expect(screen.getByRole('tab', { name: /Beta/ })).toHaveFocus();
   });
 });
