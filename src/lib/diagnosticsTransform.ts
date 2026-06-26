@@ -42,6 +42,11 @@ export interface DeviceDiagnostics {
   physical_damage_notes?: string;
   technical_notes?: string;
 
+  symptoms?: string;
+  diagnostic_status?: string;
+  recovery_chance?: string;
+  diagnostic_notes?: string;
+
   created_at?: string;
   updated_at?: string;
 }
@@ -78,6 +83,10 @@ const RESULT_FIELDS = [
   'imaging_stats',
   'physical_damage_notes',
   'technical_notes',
+  'symptoms',
+  'diagnostic_status',
+  'recovery_chance',
+  'diagnostic_notes',
 ] as const;
 
 /** Collect the non-column inspection fields into the `result` jsonb payload. */
