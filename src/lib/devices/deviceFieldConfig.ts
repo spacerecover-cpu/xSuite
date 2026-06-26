@@ -7,7 +7,7 @@ export type FieldControl =
 export type CatalogKey =
   | 'device_types' | 'brands' | 'capacities' | 'conditions' | 'accessories'
   | 'encryption' | 'interfaces' | 'made_in' | 'head_counts' | 'platter_counts'
-  | 'component_statuses';
+  | 'component_statuses' | 'service_problems';
 
 export type FieldStorage =
   | { table: 'case_devices'; kind: 'column'; column: string }
@@ -21,8 +21,9 @@ export interface DeviceFieldDef {
   control: FieldControl;
   storage: FieldStorage;
   optionsSource?: CatalogKey;
+  staticOptions?: { id: string; name: string }[];
   componentKey?: string;          // for control:'component-status'
-  colSpan?: 1 | 2;
+  colSpan?: 1 | 2 | 3;
   required?: boolean;
   /** Load-only fallback: read this device_diagnostics.result key if the primary store is empty. */
   legacyResultKey?: string;
@@ -52,6 +53,29 @@ function comp(componentKey: string, label: string): DeviceFieldDef {
     control: 'component-status', storage: dj(`${componentKey}_status`), optionsSource: 'component_statuses', componentKey,
   };
 }
+
+const opt = (...names: string[]) => names.map(n => ({ id: n, name: n }));
+
+export const DIAGNOSTIC_FIELDS: DeviceFieldDef[] = [
+  { key: 'device_problem', labelKey: 'devices.field.device_problem', labelFallback: 'Device Problem',
+    control: 'select', storage: col('symptoms'), optionsSource: 'service_problems' },
+  { key: 'symptoms_detail', labelKey: 'devices.field.symptoms_detail', labelFallback: 'Symptoms',
+    control: 'textarea', storage: dj('symptoms'), colSpan: 2 },
+  { key: 'recovery_requirement', labelKey: 'devices.field.recovery_requirement', labelFallback: 'Recovery Requirement',
+    control: 'textarea', storage: col('notes'), colSpan: 2 },
+  { key: 'initial_diagnosis', labelKey: 'devices.field.initial_diagnosis', labelFallback: 'Initial Diagnosis',
+    control: 'textarea', storage: col('diagnosis'), colSpan: 2 },
+  { key: 'evaluation_result', labelKey: 'devices.field.evaluation_result', labelFallback: 'Evaluation Result',
+    control: 'text', storage: col('recovery_result') },
+  { key: 'diagnostic_status', labelKey: 'devices.field.diagnostic_status', labelFallback: 'Diagnostic Status',
+    control: 'select', storage: dj('diagnostic_status'),
+    staticOptions: opt('Pending', 'In Progress', 'Completed', 'Inconclusive') },
+  { key: 'recovery_chance', labelKey: 'devices.field.recovery_chance', labelFallback: 'Estimated Recovery Chance',
+    control: 'select', storage: dj('recovery_chance'),
+    staticOptions: opt('High', 'Medium', 'Low', 'None') },
+  { key: 'diagnostic_notes', labelKey: 'devices.field.diagnostic_notes', labelFallback: 'Diagnostic Notes',
+    control: 'textarea', storage: dj('diagnostic_notes'), colSpan: 3 },
+];
 
 // --- Basic (shared, always visible) -----------------------------------------
 export const BASIC_FIELDS: DeviceFieldDef[] = [
@@ -141,6 +165,7 @@ export const ALL_FIELD_DEFS: DeviceFieldDef[] = (() => {
   const seen = new Map<string, DeviceFieldDef>();
   const push = (f: DeviceFieldDef) => { if (!seen.has(f.key)) seen.set(f.key, f); };
   BASIC_FIELDS.forEach(push);
+  DIAGNOSTIC_FIELDS.forEach(push);
   (Object.keys(REGISTRY) as DeviceFamily[]).forEach(fam => {
     REGISTRY[fam].technical.forEach(push);
     REGISTRY[fam].components.forEach(push);

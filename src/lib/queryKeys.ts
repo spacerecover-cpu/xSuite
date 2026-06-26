@@ -192,6 +192,7 @@ export const masterDataKeys = {
   deviceHeadCounts: () => ['master', 'device-head-counts'] as const,
   devicePlatterCounts: () => ['master', 'device-platter-counts'] as const,
   deviceComponentStatuses: () => ['master', 'device-component-statuses'] as const,
+  deviceServiceProblems: () => ['master', 'device-service-problems'] as const,
   countries: () => ['master', 'countries'] as const,
   currencies: () => ['master', 'currencies'] as const,
   services: () => ['master', 'services'] as const,

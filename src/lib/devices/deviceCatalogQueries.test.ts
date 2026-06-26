@@ -23,9 +23,16 @@ describe('CATALOG_SOURCES', () => {
   });
 
   it('all other catalog sources do NOT set valueField to "name" (they use id)', () => {
-    const others = (Object.keys(CATALOG_SOURCES) as CatalogKey[]).filter(k => k !== 'component_statuses');
+    const nameValued = new Set<CatalogKey>(['component_statuses', 'service_problems']);
+    const others = (Object.keys(CATALOG_SOURCES) as CatalogKey[]).filter(k => !nameValued.has(k));
     for (const key of others) {
       expect(CATALOG_SOURCES[key].valueField, `${key} should not use name as value`).not.toBe('name');
     }
+  });
+
+  it('service_problems source exists with valueField "name" and correct table', () => {
+    expect(CATALOG_SOURCES.service_problems).toBeTruthy();
+    expect(CATALOG_SOURCES.service_problems.table).toBe('catalog_service_problems');
+    expect(CATALOG_SOURCES.service_problems.valueField).toBe('name');
   });
 });

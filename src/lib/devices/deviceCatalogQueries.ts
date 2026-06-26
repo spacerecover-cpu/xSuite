@@ -18,6 +18,7 @@ export const CATALOG_SOURCES: Record<CatalogKey, { table: string; orderBy: strin
   head_counts:        { table: 'catalog_device_head_counts',        orderBy: 'sort_order', queryKey: masterDataKeys.deviceHeadCounts() },
   platter_counts:     { table: 'catalog_device_platter_counts',     orderBy: 'sort_order', queryKey: masterDataKeys.devicePlatterCounts() },
   component_statuses: { table: 'catalog_device_component_statuses', orderBy: 'sort_order', queryKey: masterDataKeys.deviceComponentStatuses(), valueField: 'name' },
+  service_problems:   { table: 'catalog_service_problems',           orderBy: 'name',       queryKey: masterDataKeys.deviceServiceProblems(),    valueField: 'name' },
 };
 
 const KEYS = Object.keys(CATALOG_SOURCES) as CatalogKey[];

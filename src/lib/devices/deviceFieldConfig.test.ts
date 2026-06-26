@@ -1,10 +1,15 @@
 // src/lib/devices/deviceFieldConfig.test.ts
 import { describe, it, expect } from 'vitest';
 import {
-  BASIC_FIELDS, getDeviceFamilyConfig, ALL_FIELD_DEFS,
+  BASIC_FIELDS, DIAGNOSTIC_FIELDS, getDeviceFamilyConfig, ALL_FIELD_DEFS, type DeviceFieldDef,
 } from './deviceFieldConfig';
 
 const FAMILIES = ['hdd','ssd','usb_flash','memory_card','mobile','raid','nas','other'] as const;
+
+const everyField = (): DeviceFieldDef[] => [
+  ...BASIC_FIELDS, ...DIAGNOSTIC_FIELDS,
+  ...FAMILIES.flatMap(f => { const c = getDeviceFamilyConfig(f); return [...c.technical, ...c.components]; }),
+];
 
 describe('deviceFieldConfig', () => {
   it('BASIC_FIELDS has the 7 basic fields', () => {
@@ -32,13 +37,10 @@ describe('deviceFieldConfig', () => {
     }
   });
 
-  it('select/multiselect/component-status fields declare an optionsSource', () => {
-    const all = [...BASIC_FIELDS, ...FAMILIES.flatMap(f => {
-      const c = getDeviceFamilyConfig(f); return [...c.technical, ...c.components];
-    })];
-    for (const f of all) {
+  it('select/multiselect/component-status fields declare optionsSource or staticOptions', () => {
+    for (const f of everyField()) {
       if (['select','multiselect','component-status'].includes(f.control)) {
-        expect(f.optionsSource, `${f.key} needs optionsSource`).toBeTruthy();
+        expect(Boolean(f.optionsSource) || Boolean(f.staticOptions), `${f.key} needs optionsSource or staticOptions`).toBe(true);
       }
     }
   });
@@ -71,5 +73,40 @@ describe('deviceFieldConfig', () => {
     expect(new Set(keys).size).toBe(keys.length);
     expect(keys).toContain('pcb_number');
     expect(keys).toContain('heads_status');
+  });
+
+  it('DIAGNOSTIC_FIELDS has the 8 diagnostic keys', () => {
+    expect(DIAGNOSTIC_FIELDS.map(f => f.key)).toEqual([
+      'device_problem','symptoms_detail','recovery_requirement','initial_diagnosis',
+      'evaluation_result','diagnostic_status','recovery_chance','diagnostic_notes',
+    ]);
+  });
+
+  it('DIAGNOSTIC_FIELDS are in ALL_FIELD_DEFS', () => {
+    for (const k of ['device_problem','diagnostic_status','diagnostic_notes'])
+      expect(ALL_FIELD_DEFS.map(f => f.key)).toContain(k);
+  });
+
+  it('select fields declare optionsSource OR staticOptions', () => {
+    for (const f of everyField()) {
+      if (f.control === 'select' || f.control === 'multiselect' || f.control === 'component-status')
+        expect(Boolean(f.optionsSource) || Boolean(f.staticOptions), `${f.key}`).toBe(true);
+    }
+  });
+
+  it('no two distinct field keys share a storage target', () => {
+    const seen = new Map<string, string>();
+    for (const f of everyField()) {
+      const sig = JSON.stringify(f.storage);
+      if (seen.has(sig)) expect(seen.get(sig), `storage clash on ${sig}`).toBe(f.key);
+      else seen.set(sig, f.key);
+    }
+  });
+
+  it('diagnostic_status and recovery_chance carry staticOptions', () => {
+    for (const k of ['diagnostic_status','recovery_chance']) {
+      const f = DIAGNOSTIC_FIELDS.find(x => x.key === k)!;
+      expect(f.staticOptions && f.staticOptions.length).toBeTruthy();
+    }
   });
 });
