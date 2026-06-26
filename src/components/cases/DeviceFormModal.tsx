@@ -284,20 +284,27 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
         role_notes: formData.role_notes || null,
       };
 
-      // Donor role sources Basic identity from the selected inventory item; this
-      // override wins over the dynamic-form values (preserves existing behavior).
-      let devicePayload: Record<string, unknown> = { ...structural, ...devicePatch };
-      if (submitIsDonorRole && selectedDonorInventoryId) {
-        const donor = donorInventory.find(d => d.id === selectedDonorInventoryId);
-        if (donor) {
-          devicePayload = {
-            ...devicePayload,
-            brand_id: donor.brand_id ?? null,
-            model: donor.model ?? null,
-            serial_number: donor.serial_number ?? null,
-            capacity_id: donor.capacity_id ?? null,
-          };
+      // Donor role: write ONLY structural + identity from the selected inventory
+      // item — never spread devicePatch (technical columns, technical_details jsonb,
+      // symptoms/notes/diagnosis/recovery_result must NOT be written for donors).
+      // Non-donor: full devicePatch as before.
+      let devicePayload: Record<string, unknown>;
+      if (submitIsDonorRole) {
+        devicePayload = { ...structural };
+        if (selectedDonorInventoryId) {
+          const donor = donorInventory.find(d => d.id === selectedDonorInventoryId);
+          if (donor) {
+            devicePayload = {
+              ...devicePayload,
+              brand_id: donor.brand_id ?? null,
+              model: donor.model ?? null,
+              serial_number: donor.serial_number ?? null,
+              capacity_id: donor.capacity_id ?? null,
+            };
+          }
         }
+      } else {
+        devicePayload = { ...structural, ...devicePatch };
       }
 
       let deviceId: string | undefined = deviceData?.id;
@@ -348,10 +355,10 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
         }
       }
 
-      // Persist component diagnostics for ANY role (patient-only gate removed). The
-      // serializer reports whether any inspection field carries a value; the legacy
-      // 4-value category is computed fresh from the current device type at save.
-      if (deviceId && hasDiagnostics) {
+      // Persist component diagnostics for non-donor roles only. Donors have no
+      // diagnostic workup — skip the upsert entirely to prevent a phantom
+      // device_diagnostics row from being minted for a donor device.
+      if (deviceId && hasDiagnostics && !submitIsDonorRole) {
         try {
           const category = diagnosticsService.determineDeviceCategory(typeName);
           await diagnosticsService.upsertDeviceDiagnostics({
