@@ -7,9 +7,7 @@ import { useFieldA11y } from '../../hooks/useFieldA11y';
 import { useAnchoredPosition } from '../../hooks/useAnchoredPosition';
 import { useListboxKeyboard } from '../../hooks/useListboxKeyboard';
 
-const multiSelectSizeClasses = { sm: 'px-3 py-1.5 text-sm', md: 'px-3 py-2', lg: 'px-4 py-2.5 text-[15px]' } as const;
-const multiSelectMinH = { sm: 'min-h-[42px]', md: 'min-h-[42px]', lg: 'min-h-[52px]' } as const;
-const labelSizeClasses = { sm: 'text-sm mb-1', md: 'text-sm mb-1', lg: 'text-[15px] mb-2' } as const;
+const multiSelectSizeClasses = { sm: 'px-3 py-1.5 text-sm', md: 'px-3 py-2' } as const;
 
 interface Option {
   id: string;
@@ -29,7 +27,7 @@ interface MultiSelectDropdownProps {
   hint?: string;
   name?: string;
   disabled?: boolean;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md';
 }
 
 export const MultiSelectDropdown = React.forwardRef<HTMLDivElement, MultiSelectDropdownProps>(
@@ -255,7 +253,7 @@ export const MultiSelectDropdown = React.forwardRef<HTMLDivElement, MultiSelectD
     return (
       <div className="relative" ref={containerRef}>
         {label !== '' && (
-          <label {...labelProps} className={cn('block font-medium text-slate-700', labelSizeClasses[size])}>
+          <label {...labelProps} className="block text-sm font-medium text-slate-700 mb-1">
             {label}
             {required && (
               <span aria-hidden="true" className="text-danger ms-1">
@@ -294,8 +292,7 @@ export const MultiSelectDropdown = React.forwardRef<HTMLDivElement, MultiSelectD
             onKeyDown(e);
           }}
           className={cn(
-            'w-full border rounded-lg bg-surface transition-all',
-            multiSelectMinH[size],
+            'w-full min-h-[42px] border rounded-lg bg-surface transition-all',
             multiSelectSizeClasses[size],
             disabled
               ? 'bg-slate-100 border-slate-300 cursor-not-allowed'

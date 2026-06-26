@@ -102,12 +102,12 @@ export function Tabs({ tabs, activeId, onChange, className, variant = 'underline
             className={cn(
               'inline-flex items-center justify-center transition-all duration-150',
               isPills
-                ? 'h-[52px] px-6 rounded-[10px] gap-2 text-[15px] font-semibold'
+                ? 'h-11 px-5 rounded-[10px] gap-2 text-sm font-semibold'
                 : 'gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px',
               stateClass,
             )}
           >
-            {Icon && <Icon className={isPills ? 'w-[18px] h-[18px]' : 'w-4 h-4'} />}
+            {Icon && <Icon className="w-4 h-4" />}
             <span>{t.label}</span>
             {t.hasError && (
               <span className={cn('ml-1 w-1.5 h-1.5 rounded-full', isPills ? 'bg-white' : 'bg-danger')} aria-hidden="true" />
