@@ -2,7 +2,7 @@ import React from 'react';
 import { cn } from '../../lib/utils';
 import { useFieldA11y } from '../../hooks/useFieldA11y';
 
-const textareaSizeClasses = { sm: 'px-3 py-1.5', md: 'px-3 py-2' } as const;
+const textareaSizeClasses = { sm: 'px-3 py-1.5 text-sm', md: 'px-3 py-2' } as const;
 
 interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;

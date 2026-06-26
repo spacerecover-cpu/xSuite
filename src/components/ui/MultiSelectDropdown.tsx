@@ -7,7 +7,7 @@ import { useFieldA11y } from '../../hooks/useFieldA11y';
 import { useAnchoredPosition } from '../../hooks/useAnchoredPosition';
 import { useListboxKeyboard } from '../../hooks/useListboxKeyboard';
 
-const multiSelectSizeClasses = { sm: 'px-3 py-1.5', md: 'px-3 py-2' } as const;
+const multiSelectSizeClasses = { sm: 'px-3 py-1.5 text-sm', md: 'px-3 py-2' } as const;
 
 interface Option {
   id: string;

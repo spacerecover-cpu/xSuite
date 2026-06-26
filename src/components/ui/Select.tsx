@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useFieldA11y } from '../../hooks/useFieldA11y';
 
-const selectSizeClasses = { sm: 'px-3 py-1.5', md: 'px-3 py-2' } as const;
+const selectSizeClasses = { sm: 'px-3 py-1.5 text-sm', md: 'px-3 py-2' } as const;
 
 export interface SelectOption {
   value: string;

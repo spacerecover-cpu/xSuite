@@ -102,9 +102,11 @@ describe('Input', () => {
   });
 
   describe('size variant', () => {
-    it('size="sm" applies dense control padding', () => {
+    it('size="sm" applies dense control padding and text-sm', () => {
       render(<Input aria-label="f" size="sm" />);
-      expect(screen.getByLabelText('f').className).toMatch(/py-1\.5/);
+      const el = screen.getByLabelText('f');
+      expect(el.className).toMatch(/py-1\.5/);
+      expect(el.className).toMatch(/text-sm/);
     });
 
     it('default size keeps the standard control padding (no regression)', () => {
