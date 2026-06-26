@@ -39,8 +39,12 @@ export default {
         'cat-8': 'rgb(var(--color-cat-8) / <alpha-value>)',
       },
       fontFamily: {
-        display: ['"DM Serif Display"', 'serif'],
-        body: ['"DM Sans"', 'sans-serif'],
+        // App-wide typeface: Inter. `sans` is set so Tailwind Preflight applies
+        // it to <html>, making Inter the global default; `body`/`display` resolve
+        // to Inter too so existing font-body/font-display usages follow suit.
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        body: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['Inter', 'system-ui', 'sans-serif'],
       },
       spacing: {
         '4.5': '1.125rem',

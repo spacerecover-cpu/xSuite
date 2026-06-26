@@ -32,12 +32,11 @@
 - **Theming:** Three tenant-selectable themes share one structure and one neutral/status layer — only the brand hue changes. See **Color → Themes**.
 
 ## Typography
-Fonts load via Google Fonts in `index.html` (CSP allows `fonts.googleapis.com` / `fonts.gstatic.com`). Family tokens are defined in `tailwind.config.js` (`fontFamily`).
+Fonts load via Google Fonts in `index.html` (CSP allows `fonts.googleapis.com` / `fonts.gstatic.com`). Family tokens are defined in `tailwind.config.js` (`fontFamily`); the default `sans` is set to Inter so unclassed elements inherit it via Tailwind Preflight (`html`).
 
-- **Display / Hero:** `DM Serif Display` — Tailwind `font-display`. Use sparingly for marketing/auth hero and large brand moments, not for app chrome.
-- **Body / UI / Labels / Data:** `DM Sans` — Tailwind `font-body`. The workhorse for all app surfaces, tables, and forms.
+- **All UI (Display / Body / Labels / Data):** `Inter` — the single app-wide typeface. Tailwind `font-sans` (default), `font-body`, and `font-display` all resolve to Inter, so the whole app is consistent and the existing `font-body`/`font-display` usages need no changes.
 - **Code:** none defined. Do not introduce a mono font without updating this doc.
-- **Arabic / RTL (PDF only):** Noto Sans Arabic + Tajawal, in `public/fonts/` (see `src/lib/pdf/fontLoader.ts`). Screen RTL uses the same DM families.
+- **Arabic / RTL (PDF only):** Noto Sans Arabic + Tajawal, in `public/fonts/` (see `src/lib/pdf/fontLoader.ts`). On-screen Arabic falls back to the system Arabic face (Inter ships no Arabic glyphs); PDFs are unaffected.
 - **Custom sizes:** `text-xxs` = `0.625rem` (10px) for ultra-dense table metadata. Everything else uses the default Tailwind type scale — do not add sizes ad hoc.
 
 ## Color
