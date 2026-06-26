@@ -55,6 +55,10 @@ export function DeviceFieldRenderer({ def, value, onChange, options, error }: Pr
         <Input type="date" label={label} value={str} required={def.required} error={error}
           onChange={(e) => onChange(def.key, e.target.value)} size="sm" />
       );
+    case 'json':
+      // Opaque object fields (e.g. component_meta) are managed by bespoke forms;
+      // the generic renderer has no control for them.
+      return null;
     case 'text':
     default:
       return (

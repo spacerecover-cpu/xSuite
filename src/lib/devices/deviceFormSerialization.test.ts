@@ -48,6 +48,31 @@ describe('deviceFormSerialization', () => {
     expect(devicePatch.model).toBeNull();
   });
 
+  it('hydrates the component_meta json field to an object (default {})', () => {
+    const withMeta = hydrateDeviceForm({ device: {}, diagnostics: { component_meta: { heads: { notes: 'ok' } } } });
+    expect(withMeta.component_meta).toEqual({ heads: { notes: 'ok' } });
+    const empty = hydrateDeviceForm({ device: {}, diagnostics: null });
+    expect(empty.component_meta).toEqual({});
+  });
+
+  it('serializes a non-empty component_meta object and flags hasDiagnostics', () => {
+    const { diagnosticsPatch, hasDiagnostics } = serializeDeviceForm(
+      { component_meta: { heads: { notes: 'All good' } } },
+      { device: {}, diagnostics: null },
+    );
+    expect(diagnosticsPatch.component_meta).toEqual({ heads: { notes: 'All good' } });
+    expect(hasDiagnostics).toBe(true);
+  });
+
+  it('treats an empty component_meta object as empty (no phantom diagnostics row)', () => {
+    const { diagnosticsPatch, hasDiagnostics } = serializeDeviceForm(
+      { component_meta: {} },
+      { device: {}, diagnostics: null },
+    );
+    expect(diagnosticsPatch.component_meta).toBeNull();
+    expect(hasDiagnostics).toBe(false);
+  });
+
   it('validate flags required visible fields only', () => {
     const visible = [...BASIC_FIELDS, ...getDeviceFamilyConfig('hdd').technical];
     const res = validateDeviceForm({ device_type_id: '' }, visible);

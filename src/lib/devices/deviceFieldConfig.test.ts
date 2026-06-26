@@ -90,6 +90,12 @@ describe('deviceFieldConfig', () => {
     ]);
   });
 
+  it('ALL_FIELD_DEFS includes the component_meta json field', () => {
+    const f = ALL_FIELD_DEFS.find(x => x.key === 'component_meta');
+    expect(f?.control).toBe('json');
+    expect(f?.storage).toEqual({ table: 'device_diagnostics', kind: 'json', jsonKey: 'component_meta' });
+  });
+
   it('DIAGNOSTIC_FIELDS are in ALL_FIELD_DEFS', () => {
     for (const k of ['device_problem','diagnostic_status','diagnostic_notes'])
       expect(ALL_FIELD_DEFS.map(f => f.key)).toContain(k);
