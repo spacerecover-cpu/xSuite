@@ -11,6 +11,12 @@
 > deviates from it. The authoritative values live in the source files cited
 > in each section — this doc mirrors them; if they ever disagree, the source
 > file wins and this doc must be corrected.
+>
+> **Exception — forward standards.** A few sections are marked **"Status —
+> leads the code"**: these are owner-approved targets the code is actively
+> migrating toward, so there the doc intentionally leads the source. Each such
+> gap is tracked in **Known Deviations** until the code catches up. Everywhere
+> else, the source file wins.
 
 ## Product Context
 - **What this is:** ERP/CRM-grade SaaS for data recovery / forensic labs — cases, devices, chain of custody, finance, inventory, HR.
@@ -116,6 +122,102 @@ These read from constants, never from CSS variables. This is by design so output
   - **Detail pages** use `DetailPageHeader` (`src/components/shared/DetailPageHeader.tsx`): breadcrumb-led, the final crumb is the `<h1 aria-current="page">`; `badges` / `actions` / `meta` slots; gutter-neutral.
   - **`PageHeader`** (`src/components/shared/PageHeader.tsx`) remains **only** for shells with no global bar (portal, platform-admin).
 
+## Overlays (modals, drawers, sheets)
+The platform-standard overlay is a **three-region modal**: a pinned header, a single scrolling body, and a pinned footer. **Only the body scrolls** — the title, tab bar, and actions never leave the viewport.
+
+> **Status — this standard leads the code.** The three-region primitives exist and are the canonical surface (`Modal` / `Dialog` / `CommandPalette`), but two rules below are forward targets the code is migrating toward: the **colored-pill tab bar** (the shipped reference still renders underline tabs) and the **`bg-slate-900/40` scrim** (the shipped `Dialog` default is still `bg-black/50`). Both gaps are tracked in **Known Deviations** (#8–#9). Treat them as the standard for *new and edited* surfaces; rollout to the existing ~90 modals is tracked, not assumed.
+
+- **Primitives:** `ui/Modal.tsx` wraps `ui/Dialog.tsx` and is the canonical surface for header-pinned forms — it passes `flex flex-col overflow-hidden` to the panel and renders children in a `p-4 overflow-y-auto flex-1` body, so the header stays pinned (`Modal.tsx:71`/`:104`). `ui/Dialog.tsx` is the low-level container: React portal to `document.body`, `useFocusTrap` (focus trap + restore), and a **ref-counted** body scroll-lock so stacked dialogs don't unlock early (`Dialog.tsx:20-64`). **The pinned behavior is not a property of `Dialog` itself** — `Dialog`'s own panel is a single whole-panel scroller (`max-h-[90vh] overflow-y-auto`, `Dialog.tsx:101`). The three-region layout comes from the *consumer* layering `flex flex-col overflow-hidden` on the panel and splitting children into intrinsic-height header/footer + a `flex-1 overflow-y-auto` body. **Do not render plain children straight into `Dialog`** — that whole-panel scroll lets the header and actions scroll away (retired for forms). `Modal` pins the header but **has no footer slot today**, so a form that needs a pinned footer composes `Dialog` directly with the three-region flex-column pattern — exactly as `shared/CommandPalette.tsx` (pinned header **and** footer) and `cases/DeviceFormModal.tsx` do. Mirror them.
+- **Anatomy:**
+  1. **Pinned header** — title + optional icon/badges + close button.
+  2. **Optional pinned sub-header** — the tab bar and/or a fixed control row (e.g. the Device Role select + "Mark as Primary" checkbox in `DeviceFormModal`). Stays put with the header.
+  3. **Scrolling body** — the *only* scroll region (`flex-1 overflow-y-auto`).
+  4. **Pinned footer** — destructive action left (e.g. Delete), Cancel + primary action right, separated by a `border-t`. Pinned via flex `shrink-0`, **not** CSS `sticky`/`position`.
+- **Height:** cap the panel at `max-h-[90vh]`, but the **body** carries the scroll, never the panel. The header, sub-header, and footer never scroll.
+- **Size tiers** (semantic names over `Modal`'s raw `size`/`maxWidth` props; verified mappings in `Modal.tsx:24-40`):
+
+  | Tier | `Modal` size | max-width | Use for |
+  |---|---|---|---|
+  | Confirm | `xs` / `sm` | sm / md | confirmations, single-action prompts (`ConfirmDialog`) |
+  | Standard | `md` (default) | lg | ≤ 8 fields, single column |
+  | Wide | `lg` | 2xl | 9–16 fields, 2 columns |
+  | Form | `xl` / `large` | 4xl | 17–30 fields, 3 columns |
+  | Workspace | `2xl` (or `maxWidth` `6xl`/`7xl`) | 6xl–7xl | 30+ fields, tabbed, or dynamic line-items (Device, Invoice, Quote) |
+
+  `Modal` also exposes `maxWidth` `3xl`/`4xl`/`5xl` for in-between widths; `maxWidth` wins over `size` when both are set. *(The reference Workspace modal `DeviceFormModal` currently sits at `max-w-5xl` — between Form and Workspace; new Workspace forms target `6xl`–`7xl`.)*
+- **Modal vs route vs drawer:** ≤ 30 fields → modal (tier per field count). > 30 fields, dynamic line-items, or an embedded rich-text editor → a **tabbed Workspace modal** (split the fields across tabs) or a full route. A reusable side **Drawer** primitive does not exist yet — `Drawer.tsx` is absent; the only drawer-like file is `layout/MobileNavDrawer.tsx`, a purpose-built nav off-canvas. When a `Drawer` primitive is added it must follow this same three-region contract.
+- **Responsive:** below the `sm` breakpoint a modal should become **full-screen** (or a bottom-sheet filling most of the viewport), **not** a fixed-width centered card — reuse `layout/MobileNavDrawer.tsx`'s slide + scroll-lock + focus-trap mechanics. The desktop multi-column grid collapses to one column. *(Today `Dialog`/`Modal` stay fixed-width from 320px→1920px; this is a forward target — the weakest mobile surface in an otherwise mobile-aware app.)*
+- **Backdrop:** one token-driven scrim — **`bg-slate-900/40`** is the standard. The shipped `Dialog` default is `bg-black/50` (`Dialog.tsx:90`, inherited by ~90 modals); migrating that single line is the canonical move (tracked, Known Deviations #8). `backdrop-blur-sm` is allowed on Workspace-tier and full-screen media overlays only (today: `CommandPalette`, `PhotoViewerModal`). The deliberate dark media overrides — `EmailDocumentModal` `bg-black/70`, `PhotoViewerModal` `bg-black/90` — stay as-is.
+- **Required behaviors** (all provided by `Dialog` — do not reimplement): focus trap + focus restore on close, ref-counted body scroll-lock, ESC + backdrop close (each opt-out via `closeOnEscape` / `closeOnBackdrop`, both default-on).
+
+### Tabbed form modal — reference: `cases/DeviceFormModal.tsx`
+Large, multi-section records use a **tabbed Workspace modal**: a pinned tab bar splits the record into ≤ 4 tabs; each tab's fields render in the responsive grid below (see **Forms & Field Layout**). Reference: the Edit Device modal (tabs: Device Details, Diagnostic, Components, History / Activity).
+
+> **Status — leads the code.** `DeviceFormModal` already ships the three-region shell — pinned header + a fixed Device Role / "Mark as Primary" control row, a `flex-1` scrolling body, and a pinned `shrink-0` footer (Delete left, Cancel + Save right) — built on `Dialog` with the flex-column pattern (`DeviceFormModal.tsx:475-619`). The **tab bar is the forward delta**: it currently renders *underline* tabs via shared `ui/Tabs` (active `border-cat-N text-cat-N`; mapping cat-1/cat-2/cat-3/cat-4; History tab disabled "coming soon"). The standard below is the **colored-pill** target; `DeviceFormModal` and shared `ui/Tabs` are tracked for refactor to match (Known Deviations #9).
+
+- **Tab bar = colored pills**, one **`cat-*` identity tone per tab** — identity color, not status, so it re-uses the sanctioned palette and stays lint-green:
+
+  | Tab | Tone | Hue | Note |
+  |---|---|---|---|
+  | Device Details | `primary` | brand (re-themes per tenant) | the home/default tab |
+  | Diagnostic | `cat-5` | orange | matches the mockup |
+  | Components | `cat-2` | teal | closest lint-safe "green"; `cat-3` lime if you want it greener (→ slate-900 ink). **Never `success`** — that falsely signals status |
+  | History / Activity | `cat-6` | pink | the mockup's literal purple is banned; `cat-8` slate for a calmer, archival read |
+
+- **Active vs inactive:** ACTIVE = `bg-{tone} text-{tone}-foreground shadow-sm`; INACTIVE = `bg-{tone}/10 text-{tone} hover:bg-{tone}/15`. The active tab must be unmistakable — **do not render all tabs at full fill** (the mockup did; that leaves no active affordance).
+- **Light tones** (`cat-3` lime, `cat-4` yellow) use **slate-900 ink**, not white (mirrors the KPI-tile contrast rule).
+- **Banned:** `purple` / `indigo` / `violet` (lint `error`) — the mockup's purple History tab maps to `cat-6` or `cat-8`. *(The shipped underline tabs are already lint-clean — cat tokens resolve to cyan/teal/lime/yellow, no banned hues — so this is a styling refactor, not a compliance fix.)*
+
+### Reusable scaffold (do not hand-roll per modal)
+Extract the scaffold so the next form inherits it: a `TabBar` component (`tabs[]`, `active`, tone-per-tab) and a `TabbedFormModal` that composes `Modal` — extended with a **`footer` slot** (which `Modal` lacks today) + the responsive full-screen/bottom-sheet mode — plus `TabBar`. `DeviceFormModal` becomes the first consumer; `InvoiceFormModal` / `QuoteFormModal` adopt it next (they are the recon's #1 scroll offenders). Until that scaffold lands, pinned-footer forms compose `Dialog` directly with the three-region pattern (as `DeviceFormModal` / `CommandPalette` do).
+
+**Coverage gap this section closes** (recon): overlay size scale, scroll discipline (pinned vs whole-panel), z-index (see below), overlay elevation/shadow, backdrop opacity/blur, and the drawer/side-panel pattern — all previously undocumented.
+
+## Z-Index Scale
+> **Status — leads the code.** The named scale below does **not exist yet** — `src/lib/ui/zIndex.ts` is absent and `tailwind.config.js` has no `zIndex` extension. Today stacking is ad-hoc: `z-50` is saturated (the `Dialog` overlay, menus, popovers, and Select listboxes all share it) and surfaces bump past it by hand (`z-[60]` lightbox/tooltip/email; `z-[100]` `NavigationProgress`; `z-[9999]` an `EngineerSelector` dropdown). Creating the scale and migrating the magic numbers is tracked (Known Deviations #10).
+
+Define named layers in **`src/lib/ui/zIndex.ts`** and mirror them as Tailwind `theme.extend.zIndex` tokens; migrate the magic numbers onto them.
+
+| Layer | Token | Value | Members (current raw value → target token) |
+|---|---|---|---|
+| base | — | 0–10 | page content; `Dialog` panel (`z-10` *within* its overlay container) |
+| sticky | `z-sticky` | 20 | sticky table headers (reserve; pinned modal regions use flex, not z) |
+| dropdown | `z-dropdown` | 30 | page/table-level menus that open over page content and never inside a modal: `RowActionsMenu` (menu z-50 / backdrop z-40), `ColumnPickerPopover` (z-50 / z-40) |
+| overlay | `z-overlay` | 40 | modal backdrop, `BulkActionsBar` (`shared/BulkActionsBar.tsx`, z-40) |
+| modal | `z-modal` | 50 | `Dialog` / `Modal` overlay layer (`Dialog.tsx:87`) |
+| popover | `z-popover` | 60 | tooltip, lightbox (`PhotoViewerModal` z-[60]), `EmailDocumentModal` (z-[60]), portaled **field listboxes** that can open inside a modal (`SearchableSelect`, `MultiSelectDropdown`, `Select`, `EngineerSelector` — today z-50 / z-[9999]), any popover that must sit above a modal |
+| toast | `z-toast` | 70 | toasts — always top |
+
+- Popovers that must clear a modal use `z-popover`, **not** a hand-typed `z-[60]`.
+- **Field listboxes** (`SearchableSelect` / `MultiSelectDropdown` / `Select` / `EngineerSelector`) portal to `document.body` and routinely open *inside* modals (e.g. the Device Role select in `DeviceFormModal`), so they resolve to `z-popover` (60) to clear the modal panel — **not** `z-dropdown` (30). Page/table menus that never open inside a modal (`RowActionsMenu`, `ColumnPickerPopover`) stay at `z-dropdown`.
+- Toasts are always the top layer. **Caveat:** toasts render via `react-hot-toast`; the `Toaster` in `App.tsx` sets no `zIndex`, so toast stacking currently uses the library's inline default (~9999), not an app token. Wiring `z-toast` means setting it through the Toaster's `containerStyle`. *(Separately, migrating the popover layer is what updates the `z-[60]` assertions in `Dialog.test.tsx` / `PhotoViewerModal.test.tsx`.)*
+
+## Elevation
+Depth currently leans heavily on **borders** — on the order of ~2000 border-utility usages across ~318 files versus ~400 box-shadow usages total (~5:1). The custom shadow scale in `tailwind.config.js:51-55` (`inner-sm`, `glow-primary`, `glow-primary-lg`) is effectively dead — one usage total (a decorative onboarding tile, `StepContainer.tsx:51`). The live elevation vocabulary is Tailwind's default `shadow-sm`/`-md`/`-lg`, with `-xl` reserved for overlay panels and `-2xl` near-zero.
+
+Keep **border-led separation *inside* surfaces** (table rows, fields, list items — do **not** shadow these) and reserve **shadow for elevation *off* the surface**:
+
+| Level | Utility | Use |
+|---|---|---|
+| flat | none | in-surface structure (table rows, fields) — separate with `border` / `surface-muted` |
+| resting | `shadow-sm` | cards at rest (`Card.tsx` default = `shadow-sm border-t-4`) |
+| raised | `shadow-md` | hover, KPI tiles, on-surface popovers |
+| floating | `shadow-lg` | dropdowns, menus, toasts |
+| overlay | `shadow-xl` | modal / dialog panels (`Dialog.tsx:101`) |
+
+This is a ladder, not a license to shadow everything — shadow signals *elevation*, the border signals *grouping*. The dead `inner-sm` / `glow-primary*` config tokens should be removed or deliberately revived (Known Deviations #11); they are not part of the live vocabulary.
+
+## Forms & Field Layout
+Documents the field-grouping the redesign introduces, plus the existing `FormField` conventions DESIGN.md never captured.
+
+> **Status — partly leads the code.** The `FormField` + `ui/` field primitives below exist and are the standard for labels/errors/a11y. The **4-column Workspace grid** and **uppercase section-header dividers** are **net-new prescriptions** — no form uses them yet (the closest shipped grid is `DeviceDetailsForm`'s `sm:grid-cols-2 lg:grid-cols-4`; tab bodies vary at `lg:grid-cols-3`). Apply them to new and edited Workspace forms; existing forms are tracked, not assumed.
+
+- **Grid:** Workspace-tier forms use a responsive 4-column grid — `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-5`. Wide = 2 columns, Standard = 1 column. **The multi-column grid is the primary scroll-reducer:** ~35 fields in 4 columns is ~9 rows versus ~18 in two. *(Shipped device-form bodies currently break at `sm:` rather than `md:` and some use 3 columns; converge new work on the 4-column `md:`/`lg:` grid.)*
+- **Section headers:** group related fields under uppercase labelled dividers — `text-xs font-semibold uppercase tracking-wide text-primary` + a `border-b border-border` rule, spaced above (e.g. "BASIC INFORMATION", "TECHNICAL INFORMATION"). A flat wall of fields is not acceptable for 15+ field forms.
+- **Full-width fields:** long or multi-value controls (chip/multi-select Accessories, Device Password, Role-Specific Notes, rich-text terms) span all columns (`col-span-full`).
+- **Primitives:** use `ui/FormField.tsx` (owns label / required `*` / error / hint + a11y via `useFieldA11y`, `src/hooks/useFieldA11y.ts`) with the `ui/` field primitives (`Input`, `Select`, `SearchableSelect`, `Textarea`, `Checkbox`, `ChipInput`, `PhoneInput`, `RichTextEditor`). Verified `FormField` classes: label `block text-sm font-medium text-slate-700`; error `<p>` `text-xs text-danger flex items-center gap-1` with `role="alert"` on the `<p>` (via `useFieldA11y`) and a decorative `aria-hidden` `AlertCircle` (`w-3 h-3 shrink-0`); hint `text-xs text-slate-500`. **This is a presentational standard — it does not require rewriting a form's state model.** Three form patterns coexist today (plain `useState`; `react-hook-form` + `register`; `FormField` render-prop); converge *new and edited* forms on `FormField` for consistent labels and error rendering, without a forced migration.
+- **Density:** comfortable, not bloated. Tune row gap so more of a tab is visible per viewport — the goal is **fewer scroll events**, not maximum whitespace.
+
 ## Motion
 `tailwind.config.js` `animation` / `keyframes`. Keep motion functional and short.
 
@@ -134,7 +236,7 @@ The platform-standard KPI/stat tile is a **token-gradient card with a subtle dec
 - **Decoration is white/dark-only**, low opacity, `aria-hidden` — it adds depth, never meaning.
 
 ## Known Deviations (drift register — fix toward the standard, do not propagate)
-Captured 2026-06-01 from a code audit; drifts #1–#3 resolved 2026-06-02. **A 2026-06-04 UI audit reopened the register** with #4–#7 (contrast + theming), all resolved in the same change set (see Decisions Log).
+Captured 2026-06-01 from a code audit; drifts #1–#3 resolved 2026-06-02. **A 2026-06-04 UI audit reopened the register** with #4–#7 (contrast + theming), all resolved in the same change set (see Decisions Log). **2026-06-26 added #8–#11** (overlay-system standardization: scrim, tab pills, z-index scale, dead shadow tokens) as *tracked, not-yet-resolved* forward gaps — the first ⏳ entries here, because the Overlays and Z-Index standards lead the code (the Elevation ladder mostly mirrors live usage, flagging only the dead config in #11) (see those sections' "Status — leads the code" notes).
 
 | # | Where | Issue | Resolution |
 |---|---|---|---|
@@ -145,6 +247,10 @@ Captured 2026-06-01 from a code audit; drifts #1–#3 resolved 2026-06-02. **A 2
 | 5 | `Button.tsx`, `Badge.tsx` + ~26 call-sites | No `accent` variant, so call-sites hand-rolled `bg-accent`/`color="rgb(var(--color-accent))"` with light foregrounds → invisible (~1.2:1). | ✅ Added `accent` variant (`bg-accent` + `text-accent-foreground`); migrated call-sites; `text-accent`/`border-accent` foregrounds → `text-accent-foreground`. |
 | 6 | `CaseDetail.tsx` action bar + inline-hex controls | Action colors hand-rolled via inline `style` hex (incl. **banned violet `#7c3aed`**), bypassing tokens, theming, and lint. | ✅ Mapped to Button variants / `cat-*` identity; violet removed; WhatsApp green kept as a documented exception. |
 | 7 | `eslint-rules/` | `no-raw-tailwind-colors` only inspects class names, so inline-`style` hex escaped enforcement. | ✅ Added `no-raw-style-colors` (`error`; tests + app-shell neutral chrome baselined per-file) covering inline `style`/color props. |
+| 8 | `ui/Dialog.tsx:90` | Default modal scrim is `bg-black/50` (inherited by ~90 modals); the **Overlays** standard is now `bg-slate-900/40` (softer, token-consistent). | ⏳ Tracked — migrate the single `Dialog` default line (re-skins every modal); reconcile `CommandPalette`'s overlay double-tint. The deliberate media overrides (`bg-black/70` Email, `bg-black/90` PhotoViewer) stay. |
+| 9 | `cases/DeviceFormModal.tsx`, `ui/Tabs.tsx` | Tabbed-modal tab bar ships *underline* tabs (`border-cat-N text-cat-N`, mapping cat-1/2/3/4); the **Tabbed form modal** standard is colored *pills* (`primary`/`cat-5`/`cat-2`/`cat-6`, active solid fill). | ⏳ Tracked — refactor `DeviceFormModal` + shared `ui/Tabs` to the pill scheme. No banned hues today, so this is a styling, not a compliance, migration. |
+| 10 | `src/lib/ui/zIndex.ts` (absent), `tailwind.config.js` | No named z-index scale; `z-50` saturated with ad-hoc `z-[60]` / `z-[100]` / `z-[9999]` overrides. | ⏳ Tracked — create `zIndex.ts` + Tailwind `zIndex` tokens (dropdown 30 / overlay 40 / modal 50 / popover 60 / toast 70); migrate magic numbers; wire `z-toast` through the `react-hot-toast` `Toaster`; update the `z-[60]` test assertions. |
+| 11 | `tailwind.config.js:51-55` | Custom `boxShadow` tokens `inner-sm` / `glow-primary` / `glow-primary-lg` are effectively dead (1 usage total). | ⏳ Tracked — remove (or deliberately revive) the dead tokens; the live **Elevation** ladder is Tailwind `shadow-sm`→`-xl`. |
 
 ## Decisions Log
 | Date | Decision | Rationale |
@@ -164,3 +270,7 @@ Captured 2026-06-01 from a code audit; drifts #1–#3 resolved 2026-06-02. **A 2
 | 2026-06-24 | **Lifted the "no decorative gradients" rule** — token-driven gradients are now sanctioned platform-wide for emphasis (KPI tiles, hero bands, command strips), not just the Cases exception above. Same day, compacted the Cases KPI band from six tall gradient cards into a denser stat ribbon (compact ~76px tiles + inline trend pills + share-of-total bars), reclaiming ~100px above the table. | The owner adopted the bold gradient look as house style and asked for a higher density-to-value ratio. Gradients stay token-only (no purple/indigo, no raw hex), so per-tenant theming + the `no-raw-*-colors` guards are unaffected — this is a permissive rule change plus a density pass, not a new color surface. |
 | 2026-06-24 | **Rolled the gradient KPI tile out platform-wide.** Generalized the Cases tile into one shared primitive (`components/shared/GradientStatCard`) and routed `StatCard` + `KpiRow` through it, so every KPI surface (financial, HR, payroll, suppliers, quotes, customers, resources, platform-admin, settings, dashboards) now renders the gradient tile; migrated the Dashboard's bespoke `QuickStat`. Added per-tone foregrounds (slate-900 ink on amber/lime/yellow) for AA contrast and value truncation+tooltip for long currency. **Supersedes** the "every other list page keeps the restrained `StatCard`/`KpiRow`" note in the row above. | Owner asked to match the Cases design everywhere. One shared primitive keeps it DRY: upgrading it once restyled ~40 pages with zero call-site churn (`StatCard`/`KpiRow` APIs unchanged). Still token-only, so theming + colour guards hold. See **KPI Cards**. |
 | 2026-06-24 | **KPI consistency pass** (post-rollout screenshot audit). Migrated the remaining **hand-rolled** KPI cards onto the shared `KpiRow`/`StatCard` tile — Customers, Companies, Company-profile, Banking, VAT & Audit, Financial Reports, HR / Attendance / Leave, Stock, and Tenant/Database admin — and **re-toned every KPI row so no tone repeats** (Payments, Expenses, Transactions, Revenue, Payroll, Platform, Clone-drives). | The audit found two gaps the shared-component rollout couldn't reach: (a) pages that hand-rolled their own muted cards never got the gradient; (b) rows reused a tone (2× green, 3× amber) which reads as monotonous on saturated tiles. Status tones are now reserved for genuine status; magnitudes use the documented brand/identity pick-order. See **KPI Cards → "One tone per card in a row"**. |
+| 2026-06-26 | Added an **Overlays** standard: three-region modal (pinned header + scrolling body + pinned footer), semantic size tiers (verified against `Modal.tsx`), `max-h-[90vh]` **body**-scroll cap, responsive full-screen/bottom-sheet below `sm`, scrim standardized on `bg-slate-900/40`, focus-trap + ref-counted scroll-lock required. Canonicalizes the `Modal`/`CommandPalette` pinned pattern and retires whole-panel scroll (plain children in `Dialog`) for forms. | The recon found two scroll patterns coexisting and modals hitting `max-h-[90vh]` with no responsive fallback. Pinning the three regions keeps the Save button and tab bar always visible; the wide grid + tabs cut vertical height. **This section leads the code** — the `Modal`/`Dialog`/`CommandPalette` primitives exist and `DeviceFormModal` is the reference shell, but the `bg-slate-900/40` scrim migration (`Dialog.tsx:90`) and the remaining ~90 modals are tracked (Known Deviations #8). Note: `Modal` has no footer slot yet, so pinned-footer forms compose `Dialog` directly with the flex-column pattern until a `TabbedFormModal`/footer-slot scaffold lands. |
+| 2026-06-26 | **Tabbed form modal** pattern + colored-pill tab bar mapped to `cat-*` identity tones (Device Details `primary`, Diagnostic `cat-5`, Components `cat-2`, History `cat-6`); ACTIVE = solid tone, INACTIVE = `bg-tone/10 text-tone`. Codified as the **target** (leads the code) over the shipped underline tabs, per owner decision. | Owner mockup uses vivid per-tab color; routing it through the sanctioned `cat-*` palette keeps `no-raw-tailwind-colors` / `no-raw-style-colors` green and re-uses blessed hues — the mockup's literal purple is banned, so History → `cat-6`/`cat-8`. Adds the active-state affordance the mockup lacked (it filled all four tabs identically). The shipped reference (`DeviceFormModal` via `ui/Tabs`) currently renders underline tabs (cat-1/2/3/4) built on `Dialog`; the doc codifies the pill target and the refactor is tracked (Known Deviations #9). |
+| 2026-06-26 | Added a **Z-Index Scale** (`src/lib/ui/zIndex.ts` + Tailwind tokens: dropdown 30 / overlay 40 / modal 50 / popover 60 / toast 70) and an **Elevation** ladder (resting `shadow-sm` → overlay `shadow-xl`). The z-index scale leads the code (it does not exist yet); the elevation ladder documents the live `shadow-*` vocabulary and flags the dead custom tokens for removal. | The recon found `z-50` saturated with ad-hoc `z-[60]`/`z-[100]`/`z-[9999]` overrides and no governance, and the custom shadow scale unused (1 usage) with depth leaning ~5:1 on borders (~2000 vs ~400). Both are now named layers/levels so overlays stack predictably and depth is intentional; the scale file + token migration and the dead-shadow cleanup are tracked (Known Deviations #10–#11). Toast layering is governed by `react-hot-toast`'s default today, not an app token — flagged in the Z-Index section. |
+| 2026-06-26 | Added a **Forms & Field Layout** section: responsive 4-column grid for Workspace forms, uppercase section-header dividers, `col-span-full` for long fields, `ui/FormField` + `ui/` primitives as the presentational standard. | Documents the field-grouping the redesign introduces and the existing `FormField` conventions (verified at `ui/FormField.tsx`, not `shared/`) the doc never captured. The 4-column grid is the main scroll-reducer (≈ ¼ the rows of a single column). The grid + dividers are net-new prescriptions (no form uses them yet), applied to new/edited work; field state-model migration is not forced. |
