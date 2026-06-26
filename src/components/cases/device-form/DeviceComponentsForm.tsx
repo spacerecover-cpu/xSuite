@@ -235,8 +235,6 @@ export function DeviceComponentsForm({
             const cm = meta[ck] ?? {};
             const bucket = statusBucket(str(state[selectedDef.key]));
             const findings = Array.isArray(cm.findings) ? cm.findings : [];
-            const measurements = Array.isArray(cm.measurements) ? cm.measurements : [];
-            const isHeads = ck === 'heads';
 
             const addFinding = () => {
               const v = newFinding.trim();
@@ -355,92 +353,6 @@ export function DeviceComponentsForm({
                     </button>
                   </div>
                 </div>
-
-                {/* Measurements — Heads only */}
-                {isHeads && (
-                  <div>
-                    <MetaLabel>{t('devices.components.measurements', { defaultValue: 'Measurements' })}</MetaLabel>
-                    {measurements.length > 0 && (
-                      <div className="overflow-hidden rounded-lg border border-border mb-2">
-                        <table className="w-full text-sm">
-                          <thead className="bg-surface-muted text-[11px] uppercase tracking-wide text-slate-500">
-                            <tr>
-                              <th className="text-start font-semibold px-3 py-2">{t('devices.components.head', { defaultValue: 'Head' })}</th>
-                              <th className="text-start font-semibold px-3 py-2">{t('devices.components.resistance', { defaultValue: 'Resistance (Ω)' })}</th>
-                              <th className="text-start font-semibold px-3 py-2">{t('devices.components.signal', { defaultValue: 'Signal' })}</th>
-                              <th className="px-3 py-2"><span className="sr-only">{t('common.remove', { defaultValue: 'Remove' })}</span></th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-border">
-                            {measurements.map((m, i) => {
-                              const update = (patch: Partial<typeof m>) => {
-                                const nextRows = measurements.map((r, j) => (j === i ? { ...r, ...patch } : r));
-                                updateMeta(ck, { measurements: nextRows });
-                              };
-                              const signal = Math.max(0, Math.min(100, Number(m.signal) || 0));
-                              return (
-                                <tr key={i}>
-                                  <td className="px-3 py-1.5">
-                                    <input
-                                      value={m.label}
-                                      onChange={(e) => update({ label: e.target.value })}
-                                      className="w-20 bg-transparent text-sm outline-none border-b border-transparent focus:border-cat-2"
-                                      aria-label={t('devices.components.head', { defaultValue: 'Head' })}
-                                    />
-                                  </td>
-                                  <td className="px-3 py-1.5">
-                                    <input
-                                      value={m.resistance}
-                                      onChange={(e) => update({ resistance: e.target.value })}
-                                      className="w-20 bg-transparent text-sm outline-none border-b border-transparent focus:border-cat-2"
-                                      aria-label={t('devices.components.resistance', { defaultValue: 'Resistance (Ω)' })}
-                                    />
-                                  </td>
-                                  <td className="px-3 py-1.5">
-                                    <div className="flex items-center gap-2">
-                                      <div className="h-1.5 w-20 rounded-full bg-slate-200 overflow-hidden">
-                                        <div className="h-full rounded-full bg-success" style={{ width: `${signal}%` }} />
-                                      </div>
-                                      <input
-                                        type="number"
-                                        min={0}
-                                        max={100}
-                                        value={String(m.signal ?? '')}
-                                        onChange={(e) => update({ signal: Number(e.target.value) })}
-                                        className="w-14 bg-transparent text-sm outline-none border-b border-transparent focus:border-cat-2"
-                                        aria-label={t('devices.components.signal', { defaultValue: 'Signal' })}
-                                      />
-                                    </div>
-                                  </td>
-                                  <td className="px-3 py-1.5 text-end">
-                                    <button
-                                      type="button"
-                                      onClick={() => updateMeta(ck, { measurements: measurements.filter((_, j) => j !== i) })}
-                                      className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                                      aria-label={t('common.remove', { defaultValue: 'Remove' })}
-                                    >
-                                      <X className="w-3.5 h-3.5" />
-                                    </button>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => updateMeta(ck, {
-                        measurements: [...measurements, { label: `Head ${measurements.length}`, resistance: '', signal: 0, status: '' }],
-                      })}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-border text-sm font-medium text-slate-700 hover:bg-surface-muted"
-                    >
-                      <Plus className="w-4 h-4" aria-hidden="true" />
-                      {t('devices.components.addHead', { defaultValue: 'Add head' })}
-                    </button>
-                  </div>
-                )}
 
                 {/* Last updated */}
                 {(lastUpdatedAt || updatedByName) && (

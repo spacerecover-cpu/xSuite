@@ -7,7 +7,6 @@ export interface ComponentMeta {
   result?: string;
   tested_at?: string;
   findings?: string[];
-  measurements?: Array<{ label: string; resistance: string; signal: number; status: string }>;
 }
 
 /**

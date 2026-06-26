@@ -55,7 +55,8 @@ describe('DeviceComponentsForm', () => {
     expect(screen.getAllByText('Heads').length).toBeGreaterThan(0);
     expect(screen.getByText('PCB')).toBeInTheDocument();
     expect(screen.getByText('Motor')).toBeInTheDocument();
-    expect(screen.getByText('Pre-Amp')).toBeInTheDocument();
+    expect(screen.getByText('Service Area (SA)')).toBeInTheDocument();
+    expect(screen.queryByText('Pre-Amp')).not.toBeInTheDocument();
   });
 
   it('shows the detail panel for the first component by default', () => {

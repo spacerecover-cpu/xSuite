@@ -4,7 +4,7 @@
 // catalog_device_component_statuses name; these helpers normalize that free-text
 // status into a small bucket the overview/list/badges render against.
 import {
-  AudioLines, CircuitBoard, Fan, Zap, Disc3, DatabaseZap, Cpu, MemoryStick, Component,
+  AudioLines, CircuitBoard, Fan, Disc3, DatabaseZap, Cpu, MemoryStick, Component,
   CheckCircle2, AlertTriangle, XCircle, CircleDashed, type LucideIcon,
 } from 'lucide-react';
 import type { BadgeVariant } from '../ui/variants';
@@ -21,7 +21,6 @@ export const COMPONENT_CATALOG: Record<string, ComponentCatalogEntry> = {
   heads: { icon: AudioLines, subtitle: 'Read/Write Heads Assembly', description: 'Responsible for reading and writing data on disk platters' },
   pcb: { icon: CircuitBoard, subtitle: 'Printed Circuit Board', description: 'Controls power delivery and data flow to the drive' },
   motor: { icon: Fan, subtitle: 'Spindle Motor', description: 'Spins the platters up to operating speed' },
-  preamp: { icon: Zap, subtitle: 'Pre-Amplifier', description: 'Amplifies the low-level signal coming from the heads' },
   surface: { icon: Disc3, subtitle: 'Read/Write Surface', description: 'Magnetic platter surface where data is stored' },
   service_area: { icon: DatabaseZap, subtitle: 'Service Area (SA)', description: 'Firmware modules and adaptive data held on the platters' },
   controller: { icon: Cpu, subtitle: 'Controller', description: 'Manages flash memory and host communication' },
