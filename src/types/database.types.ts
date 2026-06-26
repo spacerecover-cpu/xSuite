@@ -1528,6 +1528,85 @@ export type Database = {
           },
         ]
       }
+      case_device_activity: {
+        Row: {
+          activity_type: string
+          case_id: string
+          component_key: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          description: string | null
+          device_id: string
+          id: string
+          metadata: Json
+          new_value: string | null
+          old_value: string | null
+          status: string | null
+          tenant_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          activity_type: string
+          case_id: string
+          component_key?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          device_id: string
+          id?: string
+          metadata?: Json
+          new_value?: string | null
+          old_value?: string | null
+          status?: string | null
+          tenant_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          activity_type?: string
+          case_id?: string
+          component_key?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          device_id?: string
+          id?: string
+          metadata?: Json
+          new_value?: string | null
+          old_value?: string | null
+          status?: string | null
+          tenant_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_device_activity_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_device_activity_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "case_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_device_activity_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_devices: {
         Row: {
           accessories: string[] | null

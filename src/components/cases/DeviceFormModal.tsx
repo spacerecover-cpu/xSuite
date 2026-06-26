@@ -16,6 +16,9 @@ import type { Database } from '../../types/database.types';
 import { DeviceDetailsForm } from './device-form/DeviceDetailsForm';
 import { DeviceDiagnosticForm } from './device-form/DeviceDiagnosticForm';
 import { DeviceComponentsForm } from './device-form/DeviceComponentsForm';
+import { DeviceHistoryForm } from './device-form/DeviceHistoryForm';
+import { buildDeviceActivityEvents } from '../../lib/devices/deviceActivityDiff';
+import { logDeviceActivities } from '../../lib/devices/deviceActivityService';
 import { useDeviceFormCatalogs } from '../../lib/devices/deviceCatalogQueries';
 import {
   hydrateDeviceForm,
@@ -402,6 +405,31 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
         }
       }
 
+      // Record discrete device-activity events for the History tab. Best-effort:
+      // a logging failure must never fail the save (donors have no workup).
+      if (deviceId && !submitIsDonorRole) {
+        try {
+          const componentDefs = getDeviceFamilyConfig(family).components.filter(
+            (d) => d.control === 'component-status',
+          );
+          const events = buildDeviceActivityEvents({
+            before: loadedRef,
+            afterState: detailState,
+            componentDefs,
+            isNewDevice: !isEditMode,
+          });
+          await logDeviceActivities({
+            caseId,
+            deviceId,
+            tenantId: profile?.tenant_id ?? '',
+            actorId: profile?.id ?? null,
+            drafts: events,
+          });
+        } catch (error) {
+          logger.error('Error logging device activity:', error);
+        }
+      }
+
       onSuccess();
       onClose();
     } catch (error: unknown) {
@@ -422,7 +450,7 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
     { id: 'details', label: t('devices.tab.details', { defaultValue: 'Device Details' }), icon: HardDrive, colorToken: 'primary', hasError: detailErrors.device_type_id != null },
     { id: 'diagnostic', label: t('devices.tab.diagnostic', { defaultValue: 'Diagnostic' }), icon: Stethoscope, colorToken: 'cat-5', disabled: isDonorRole },
     { id: 'components', label: t('devices.tab.components', { defaultValue: 'Components' }), icon: Cpu, colorToken: 'cat-2', disabled: isDonorRole },
-    { id: 'history', label: t('devices.tab.history', { defaultValue: 'History / Activity' }), icon: History, colorToken: 'cat-6', disabled: true },
+    { id: 'history', label: t('devices.tab.history', { defaultValue: 'History / Activity' }), icon: History, colorToken: 'cat-6', disabled: !isEditMode },
   ];
 
   return (
@@ -485,6 +513,9 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
             lastUpdatedAt={diagnosticsAudit.at}
             lastUpdatedById={diagnosticsAudit.byId}
           />
+        ) : activeTab === 'history' && deviceData?.id ? (
+          // The History tab is a full-width master-detail activity log.
+          <DeviceHistoryForm caseId={caseId} deviceId={deviceData.id} />
         ) : (
           <div className="rounded-2xl border border-border bg-surface p-4 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
             {activeTab === 'details' && (
