@@ -55,8 +55,11 @@ export function serializeDeviceForm(
     } else if (def.storage.table === 'case_devices' && def.storage.kind === 'json') {
       technicalDetails[def.storage.jsonKey] = isEmpty(raw) ? null : raw;
     } else {
-      diagnosticsPatch[def.storage.jsonKey] = isEmpty(raw) ? null : raw;
-      if (!isEmpty(raw)) hasDiagnostics = true;
+      // Treat empty arrays (e.g. an untouched symptoms multi-select) as empty so
+      // they neither store [] nor force a phantom device_diagnostics row.
+      const empty = isEmpty(raw) || (Array.isArray(raw) && raw.length === 0);
+      diagnosticsPatch[def.storage.jsonKey] = empty ? null : raw;
+      if (!empty) hasDiagnostics = true;
     }
   }
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import { DeviceFormModal } from './DeviceFormModal';
 
 // --- Mocks ------------------------------------------------------------------
@@ -40,7 +41,9 @@ function renderModal() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <DeviceFormModal isOpen onClose={vi.fn()} caseId="case-1" onSuccess={vi.fn()} />
+      <MemoryRouter>
+        <DeviceFormModal isOpen onClose={vi.fn()} caseId="case-1" onSuccess={vi.fn()} />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }

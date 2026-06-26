@@ -56,24 +56,52 @@ function comp(componentKey: string, label: string): DeviceFieldDef {
 
 const opt = (...names: string[]) => names.map(n => ({ id: n, name: n }));
 
+// Static option sets for the Diagnostic tab — exported so the bespoke
+// DeviceDiagnosticForm renders the same vocabulary that the field defs persist.
+// The four diagnostic-status stages drive the sidebar status stepper.
+export const FAILURE_TYPE_OPTIONS = opt('Logical', 'Physical', 'Electronic', 'Firmware');
+export const SEVERITY_OPTIONS = opt('Low', 'Medium', 'High', 'Critical');
+export const DIAGNOSTIC_STATUS_OPTIONS = opt('Received', 'Under Diagnosis', 'Evaluation', 'Completed');
+export const NEXT_STEP_OPTIONS = opt('Surface Scan', 'Imaging', 'Head Swap', 'PCB Repair', 'Firmware Repair', 'Donor Required', 'Cleanroom');
+export const TOOLS_SOFTWARE_OPTIONS = opt('PC-3000 Express', 'PC-3000 SSD', 'DeepSpar DDI', 'ddrescue', 'R-Studio', 'Atola');
+export const EVALUATION_RESULT_OPTIONS = opt('Pending', 'Recoverable', 'Partially Recoverable', 'Unrecoverable');
+export const RECOVERY_CHANCE_OPTIONS = opt('High', 'Medium', 'Low', 'None');
+export const RECOMMENDATION_OPTIONS = opt('Attempt Recovery', 'Quote Required', 'Return Device', 'Unrecoverable', 'Awaiting Approval');
+
+// Diagnostic fields stay the storage source of truth (serialize/hydrate walk
+// these defs). Every new key below stores into device_diagnostics.result jsonb
+// (additive — no migration). `symptoms` (string) is the report-read notes field;
+// the multi-chip symptom list uses a distinct `symptoms_list` key.
 export const DIAGNOSTIC_FIELDS: DeviceFieldDef[] = [
   { key: 'device_problem', labelKey: 'devices.field.device_problem', labelFallback: 'Device Problem',
-    control: 'select', storage: col('symptoms'), optionsSource: 'service_problems' },
-  { key: 'symptoms_detail', labelKey: 'devices.field.symptoms_detail', labelFallback: 'Symptoms',
-    control: 'textarea', storage: dj('symptoms'), colSpan: 2 },
-  { key: 'recovery_requirement', labelKey: 'devices.field.recovery_requirement', labelFallback: 'Recovery Requirement',
-    control: 'textarea', storage: col('notes'), colSpan: 2 },
+    control: 'select', storage: col('symptoms'), optionsSource: 'service_problems', required: true },
+  { key: 'failure_type', labelKey: 'devices.field.failure_type', labelFallback: 'Failure Type',
+    control: 'select', storage: dj('failure_type'), staticOptions: FAILURE_TYPE_OPTIONS },
+  { key: 'severity', labelKey: 'devices.field.severity', labelFallback: 'Severity',
+    control: 'select', storage: dj('severity'), staticOptions: SEVERITY_OPTIONS },
+  { key: 'symptoms_list', labelKey: 'devices.field.symptoms_list', labelFallback: 'Symptoms',
+    control: 'multiselect', storage: dj('symptoms_list') },
+  { key: 'symptoms_detail', labelKey: 'devices.field.symptoms_detail', labelFallback: 'Notes / Symptoms',
+    control: 'textarea', storage: dj('symptoms') },
   { key: 'initial_diagnosis', labelKey: 'devices.field.initial_diagnosis', labelFallback: 'Initial Diagnosis',
-    control: 'textarea', storage: col('diagnosis'), colSpan: 2 },
+    control: 'textarea', storage: col('diagnosis') },
+  { key: 'diagnostic_status', labelKey: 'devices.field.diagnostic_status', labelFallback: 'Current Status',
+    control: 'select', storage: dj('diagnostic_status'), staticOptions: DIAGNOSTIC_STATUS_OPTIONS },
+  { key: 'next_step', labelKey: 'devices.field.next_step', labelFallback: 'Next Step',
+    control: 'select', storage: dj('next_step'), staticOptions: NEXT_STEP_OPTIONS },
+  { key: 'tools_software', labelKey: 'devices.field.tools_software', labelFallback: 'Tools / Software',
+    control: 'select', storage: dj('tools_software'), staticOptions: TOOLS_SOFTWARE_OPTIONS },
+  { key: 'engineer_id', labelKey: 'devices.field.engineer', labelFallback: 'Engineer',
+    control: 'select', storage: dj('engineer_id') },
+  { key: 'est_time', labelKey: 'devices.field.est_time', labelFallback: 'Est. Time',
+    control: 'text', storage: dj('est_time') },
   { key: 'evaluation_result', labelKey: 'devices.field.evaluation_result', labelFallback: 'Evaluation Result',
-    control: 'text', storage: col('recovery_result') },
-  { key: 'diagnostic_status', labelKey: 'devices.field.diagnostic_status', labelFallback: 'Diagnostic Status',
-    control: 'select', storage: dj('diagnostic_status'),
-    staticOptions: opt('Pending', 'In Progress', 'Completed', 'Inconclusive') },
-  { key: 'recovery_chance', labelKey: 'devices.field.recovery_chance', labelFallback: 'Estimated Recovery Chance',
-    control: 'select', storage: dj('recovery_chance'),
-    staticOptions: opt('High', 'Medium', 'Low', 'None') },
-  { key: 'diagnostic_notes', labelKey: 'devices.field.diagnostic_notes', labelFallback: 'Diagnostic Notes',
+    control: 'select', storage: col('recovery_result'), staticOptions: EVALUATION_RESULT_OPTIONS },
+  { key: 'recovery_chance', labelKey: 'devices.field.recovery_chance', labelFallback: 'Recovery Chance',
+    control: 'select', storage: dj('recovery_chance'), staticOptions: RECOVERY_CHANCE_OPTIONS },
+  { key: 'recommendation', labelKey: 'devices.field.recommendation', labelFallback: 'Recommendation',
+    control: 'select', storage: dj('recommendation'), staticOptions: RECOMMENDATION_OPTIONS },
+  { key: 'diagnostic_notes', labelKey: 'devices.field.diagnostic_notes', labelFallback: 'Engineer Notes',
     control: 'textarea', storage: dj('diagnostic_notes'), colSpan: 3 },
 ];
 

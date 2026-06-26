@@ -47,6 +47,16 @@ export interface DeviceDiagnostics {
   recovery_chance?: string;
   diagnostic_notes?: string;
 
+  // Diagnostic-tab inputs (all stored in `result` jsonb — additive, no migration).
+  failure_type?: string;
+  severity?: string;
+  symptoms_list?: string[];
+  next_step?: string;
+  tools_software?: string;
+  engineer_id?: string;
+  est_time?: string;
+  recommendation?: string;
+
   created_at?: string;
   updated_at?: string;
 }
@@ -87,6 +97,14 @@ const RESULT_FIELDS = [
   'diagnostic_status',
   'recovery_chance',
   'diagnostic_notes',
+  'failure_type',
+  'severity',
+  'symptoms_list',
+  'next_step',
+  'tools_software',
+  'engineer_id',
+  'est_time',
+  'recommendation',
 ] as const;
 
 /** Collect the non-column inspection fields into the `result` jsonb payload. */

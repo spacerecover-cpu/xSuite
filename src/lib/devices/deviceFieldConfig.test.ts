@@ -11,6 +11,12 @@ const everyField = (): DeviceFieldDef[] => [
   ...FAMILIES.flatMap(f => { const c = getDeviceFamilyConfig(f); return [...c.technical, ...c.components]; }),
 ];
 
+// Diagnostic-tab fields rendered by the bespoke DeviceDiagnosticForm (not the
+// generic DeviceFieldRenderer): engineer_id gets its option list at runtime, and
+// symptoms_list is a free-typed tag input. They legitimately carry no
+// optionsSource/staticOptions, so they are exempt from the options invariants.
+const BESPOKE_DYNAMIC = new Set(['engineer_id', 'symptoms_list']);
+
 describe('deviceFieldConfig', () => {
   it('BASIC_FIELDS has the 8 basic fields, with interface_id between capacity and condition', () => {
     expect(BASIC_FIELDS.map(f => f.key)).toEqual([
@@ -39,6 +45,7 @@ describe('deviceFieldConfig', () => {
 
   it('select/multiselect/component-status fields declare optionsSource or staticOptions', () => {
     for (const f of everyField()) {
+      if (BESPOKE_DYNAMIC.has(f.key)) continue;
       if (['select','multiselect','component-status'].includes(f.control)) {
         expect(Boolean(f.optionsSource) || Boolean(f.staticOptions), `${f.key} needs optionsSource or staticOptions`).toBe(true);
       }
@@ -75,10 +82,11 @@ describe('deviceFieldConfig', () => {
     expect(keys).toContain('heads_status');
   });
 
-  it('DIAGNOSTIC_FIELDS has the 8 diagnostic keys', () => {
+  it('DIAGNOSTIC_FIELDS has the redesigned diagnostic keys in render order', () => {
     expect(DIAGNOSTIC_FIELDS.map(f => f.key)).toEqual([
-      'device_problem','symptoms_detail','recovery_requirement','initial_diagnosis',
-      'evaluation_result','diagnostic_status','recovery_chance','diagnostic_notes',
+      'device_problem','failure_type','severity','symptoms_list','symptoms_detail',
+      'initial_diagnosis','diagnostic_status','next_step','tools_software','engineer_id',
+      'est_time','evaluation_result','recovery_chance','recommendation','diagnostic_notes',
     ]);
   });
 
@@ -89,6 +97,7 @@ describe('deviceFieldConfig', () => {
 
   it('select fields declare optionsSource OR staticOptions', () => {
     for (const f of everyField()) {
+      if (BESPOKE_DYNAMIC.has(f.key)) continue;
       if (f.control === 'select' || f.control === 'multiselect' || f.control === 'component-status')
         expect(Boolean(f.optionsSource) || Boolean(f.staticOptions), `${f.key}`).toBe(true);
     }

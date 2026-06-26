@@ -118,6 +118,23 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
     },
   });
 
+  // Engineers available for diagnostic assignment (active technicians) — shaped
+  // as CatalogOption[] for the Diagnostic tab's Engineer select.
+  const { data: engineerOptions = [] } = useQuery({
+    queryKey: ['device_form_engineers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('role', 'technician')
+        .eq('is_active', true)
+        .order('full_name');
+      if (error) throw error;
+      return (data ?? []).map((p) => ({ id: p.id, name: p.full_name ?? 'Unknown' }));
+    },
+    enabled: isOpen,
+  });
+
   const { data: donorInventory = [] } = useQuery({
     queryKey: ['donor_inventory'],
     queryFn: async () => {
@@ -403,7 +420,7 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
       onClose={onClose}
       labelledBy={titleId}
       closeOnBackdrop={false}
-      className="w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col rounded-2xl bg-surface border border-border shadow-[0_12px_40px_rgba(15,23,42,0.12)]"
+      className="w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col rounded-2xl bg-surface border border-border shadow-[0_12px_40px_rgba(15,23,42,0.12)]"
     >
       {/* Fixed header: title + close, thin divider underneath */}
       <div className="shrink-0 flex items-center justify-between px-6 h-12 border-b border-border">
@@ -434,58 +451,63 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
         role="tabpanel"
         aria-labelledby={`tab-${activeTab}`}
       >
-        <div className="rounded-2xl border border-border bg-surface p-4 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
-          {activeTab === 'details' && (
-            isDonorRole ? (
-              <div className="space-y-3">
-                <SearchableSelect
-                  label={t('devices.field.donorFromInventory', { defaultValue: 'Select Donor from Inventory' })}
-                  size="sm"
-                  value={selectedDonorInventoryId}
-                  onChange={setSelectedDonorInventoryId}
-                  options={donorInventory.map(d => ({
-                    id: d.id,
-                    name: `${d.name}${d.model ? ` - ${d.model}` : ''}${d.serial_number ? ` (S/N: ${d.serial_number})` : ''} - Available: ${d.quantity}`,
-                  }))}
-                  placeholder={t('devices.field.donorPlaceholder', { defaultValue: 'Select donor device from inventory...' })}
-                  required
-                  clearable={false}
+        {activeTab === 'diagnostic' ? (
+          // The Diagnostic tab is a two-column layout that brings its own cards
+          // (form + context sidebar), so it renders full-width — not inside the
+          // single centered card used by the other tabs.
+          <DeviceDiagnosticForm
+            state={detailState}
+            onChange={onDetailChange}
+            options={deviceCatalogs}
+            errors={detailErrors}
+            caseId={caseId}
+            engineerOptions={engineerOptions}
+          />
+        ) : (
+          <div className="rounded-2xl border border-border bg-surface p-4 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
+            {activeTab === 'details' && (
+              isDonorRole ? (
+                <div className="space-y-3">
+                  <SearchableSelect
+                    label={t('devices.field.donorFromInventory', { defaultValue: 'Select Donor from Inventory' })}
+                    size="sm"
+                    value={selectedDonorInventoryId}
+                    onChange={setSelectedDonorInventoryId}
+                    options={donorInventory.map(d => ({
+                      id: d.id,
+                      name: `${d.name}${d.model ? ` - ${d.model}` : ''}${d.serial_number ? ` (S/N: ${d.serial_number})` : ''} - Available: ${d.quantity}`,
+                    }))}
+                    placeholder={t('devices.field.donorPlaceholder', { defaultValue: 'Select donor device from inventory...' })}
+                    required
+                    clearable={false}
+                  />
+                </div>
+              ) : (
+                <DeviceDetailsForm
+                  state={detailState}
+                  onChange={onDetailChange}
+                  options={deviceCatalogs}
+                  errors={detailErrors}
                 />
-              </div>
-            ) : (
-              <DeviceDetailsForm
+              )
+            )}
+
+            {activeTab === 'components' && (
+              <DeviceComponentsForm
                 state={detailState}
                 onChange={onDetailChange}
                 options={deviceCatalogs}
                 errors={detailErrors}
               />
-            )
-          )}
+            )}
 
-          {activeTab === 'diagnostic' && (
-            <DeviceDiagnosticForm
-              state={detailState}
-              onChange={onDetailChange}
-              options={deviceCatalogs}
-              errors={detailErrors}
-            />
-          )}
-
-          {activeTab === 'components' && (
-            <DeviceComponentsForm
-              state={detailState}
-              onChange={onDetailChange}
-              options={deviceCatalogs}
-              errors={detailErrors}
-            />
-          )}
-
-          {activeTab === 'history' && (
-            <div className="text-sm text-slate-500 py-8 text-center">
-              {t('devices.tab.historySoon', { defaultValue: 'Device history & activity — coming soon.' })}
-            </div>
-          )}
-        </div>
+            {activeTab === 'history' && (
+              <div className="text-sm text-slate-500 py-8 text-center">
+                {t('devices.tab.historySoon', { defaultValue: 'Device history & activity — coming soon.' })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Sticky footer */}
