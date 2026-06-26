@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DeviceFormModal } from './DeviceFormModal';
 
@@ -45,22 +45,29 @@ function renderModal() {
   );
 }
 
-describe('DeviceFormModal — add mode wiring', () => {
-  it('mounts the structural controls and the dynamic per-family device form', async () => {
+describe('DeviceFormModal — tabbed shell', () => {
+  it('renders the four tabs, a Save action, and switches to the Diagnostic tab', async () => {
     renderModal();
 
-    // Structural controls owned by the modal.
-    expect(await screen.findByText('Add New Device to Case')).toBeInTheDocument();
-    expect(screen.getByText('Device Role')).toBeInTheDocument();
+    // The four tabs render in the fixed header.
+    expect(await screen.findByRole('tab', { name: /Device Details/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Diagnostic/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Components/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /History/i })).toBeInTheDocument();
 
-    // The dynamic <DeviceDetailsForm> is wired in (Basic + Technical sections
-    // render even before a device type is chosen).
+    // Footer Save action is present (add mode → "Add Device"), gated until a
+    // device type is selected (device_type_id required for non-donor).
+    const save = screen.getByRole('button', { name: /Add Device/i });
+    expect(save).toBeInTheDocument();
+    expect(save).toBeDisabled();
+
+    // Details tab is active first: a Basic field is rendered in the body.
+    expect(screen.getByText('Device Type')).toBeInTheDocument();
+
+    // Switching to the Diagnostic tab surfaces a diagnostic-only field.
+    fireEvent.click(screen.getByRole('tab', { name: /Diagnostic/i }));
     await waitFor(() => {
-      expect(screen.getByText('Basic Information')).toBeInTheDocument();
+      expect(screen.getByText('Initial Diagnosis')).toBeInTheDocument();
     });
-    expect(screen.getByText('Technical Information')).toBeInTheDocument();
-
-    // Save is gated until a device type is selected (device_type_id required for non-donor).
-    expect(screen.getByRole('button', { name: /Add Device/i })).toBeDisabled();
   });
 });

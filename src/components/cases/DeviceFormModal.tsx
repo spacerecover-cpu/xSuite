@@ -1,17 +1,24 @@
 import React, { useState, useEffect, useId } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
+import { Dialog } from '../ui/Dialog';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
 import { SearchableSelect } from '../ui/SearchableSelect';
-import { HardDrive, Eye, EyeOff, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Tabs, type TabDef } from '../ui/Tabs';
+import { HardDrive, Stethoscope, Cpu, History, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { diagnosticsService } from '../../lib/diagnosticsService';
 import { setPrimaryDevice } from '../../lib/deviceService';
 import { logger } from '../../lib/logger';
 import type { Database } from '../../types/database.types';
 import { DeviceDetailsForm } from './device-form/DeviceDetailsForm';
+import { DeviceDiagnosticForm } from './device-form/DeviceDiagnosticForm';
+import { DeviceComponentsForm } from './device-form/DeviceComponentsForm';
 import { useDeviceFormCatalogs } from '../../lib/devices/deviceCatalogQueries';
 import {
   hydrateDeviceForm,
@@ -55,6 +62,8 @@ interface DeviceFormModalProps {
   onSuccess: () => void;
 }
 
+type DeviceTabId = 'details' | 'diagnostic' | 'components' | 'history';
+
 export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
   isOpen,
   onClose,
@@ -63,20 +72,19 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
   onSuccess,
 }) => {
   const isEditMode = !!deviceData;
+  const { t } = useTranslation();
   const { profile } = useAuth();
   const toast = useToast();
+  const titleId = useId();
   const passwordId = useId();
-  const symptomsId = useId();
-  const recoveryNotesId = useId();
   const roleNotesId = useId();
 
-  // Structural fields owned by this modal (role gate, donor sourcing, custody/
-  // recovery context). Device identity + technical/diagnostic fields are owned by
-  // <DeviceDetailsForm> and live in `detailState`.
+  // Structural fields owned by this modal: the role gate, custody secret
+  // (password) and role-specific notes. Device identity, technical and
+  // diagnostic config fields are owned by the dynamic forms and live in
+  // `detailState` (Device Problem / Recovery Requirement now ride there too).
   const [formData, setFormData] = useState({
     device_role_id: '',
-    symptoms: '',
-    recovery_notes: '',
     password: '',
     is_primary: false,
     role_notes: '',
@@ -85,8 +93,8 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [selectedDonorInventoryId, setSelectedDonorInventoryId] = useState('');
+  const [activeTab, setActiveTab] = useState<DeviceTabId>('details');
 
   // Dynamic per-family device form state. `detailState` is ALWAYS derived via
   // hydrateDeviceForm (loads every ALL_FIELD_DEFS key) so serialize never NULLs a
@@ -147,6 +155,7 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
   // part_number/dcm hydrate; on add we start from an empty hydrated state.
   useEffect(() => {
     let cancelled = false;
+    setActiveTab('details');
 
     async function load() {
       if (deviceData?.id) {
@@ -178,8 +187,6 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
         const src = (fullRow ?? deviceData) as DeviceFormDeviceData;
         setFormData({
           device_role_id: src.device_role_id != null ? src.device_role_id.toString() : '',
-          symptoms: src.symptoms ?? '',
-          recovery_notes: src.notes ?? '',
           password: src.password ?? '',
           is_primary: src.is_primary ?? false,
           role_notes: src.role_notes ?? '',
@@ -192,8 +199,6 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
         setDetailErrors({});
         setFormData({
           device_role_id: '',
-          symptoms: '',
-          recovery_notes: '',
           password: '',
           is_primary: false,
           role_notes: '',
@@ -220,13 +225,24 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
     }
   }, [deviceData, deviceRoles]);
 
+  const selectedRole = deviceRoles.find(r => r.id != null && r.id.toString() === formData.device_role_id);
+  const roleName = selectedRole?.name.toLowerCase() || '';
+  const isPatientRole = roleName === 'patient';
+  const isDonorRole = roleName === 'donor';
+
+  // Donor devices source identity from inventory and have no diagnostic/component
+  // workups, so those tabs are disabled — bounce the user back to Details if they
+  // were viewing one when the role flipped to donor.
+  useEffect(() => {
+    if (isDonorRole && (activeTab === 'diagnostic' || activeTab === 'components')) {
+      setActiveTab('details');
+    }
+  }, [isDonorRole, activeTab]);
+
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      const selectedRole = deviceRoles.find(
-        r => r.id != null && r.id.toString() === formData.device_role_id,
-      );
-      const submitIsDonorRole = selectedRole?.name.toLowerCase() === 'donor';
+      const submitIsDonorRole = isDonorRole;
 
       const typeName =
         deviceCatalogs.device_types?.find(o => o.id === detailState.device_type_id)?.name ?? '';
@@ -240,6 +256,9 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
         const { ok, errors } = validateDeviceForm(detailState, visible);
         setDetailErrors(errors);
         if (!ok) {
+          // Surface the missing Device Type by switching to the Details tab, where
+          // the field (and the error dot on the tab) is visible.
+          if (errors.device_type_id) setActiveTab('details');
           setIsSubmitting(false);
           return;
         }
@@ -249,6 +268,8 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
 
       // Serialize from the hydrated state + the row we hydrated from (loadedRef) so
       // hidden-family technical_details/result keys are preserved, never NULLed.
+      // Device Problem (→symptoms) and Recovery Requirement (→notes) are written
+      // here by devicePatch — the modal no longer writes them structurally.
       const { devicePatch, diagnosticsPatch, hasDiagnostics } = serializeDeviceForm(
         detailState,
         loadedRef,
@@ -261,8 +282,6 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
         device_role_id: formData.device_role_id ? Number(formData.device_role_id) : null,
         password: formData.password || null,
         role_notes: formData.role_notes || null,
-        symptoms: formData.symptoms || null,
-        notes: formData.recovery_notes || null,
       };
 
       // Donor role sources Basic identity from the selected inventory item; this
@@ -385,11 +404,6 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
     }
   };
 
-  const selectedRole = deviceRoles.find(r => r.id != null && r.id.toString() === formData.device_role_id);
-  const roleName = selectedRole?.name.toLowerCase() || '';
-  const isPatientRole = roleName === 'patient';
-  const isDonorRole = roleName === 'donor';
-
   const availableDeviceRoles = deviceRoles.filter(r => r.name.toLowerCase() !== 'clone');
 
   const isFormValid = !!formData.device_role_id && (
@@ -398,67 +412,157 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
       : !!detailState.device_type_id
   );
 
+  const tabDefs: TabDef[] = [
+    { id: 'details', label: t('devices.tab.details', { defaultValue: 'Device Details' }), icon: HardDrive, colorToken: 'cat-1', hasError: detailErrors.device_type_id != null },
+    { id: 'diagnostic', label: t('devices.tab.diagnostic', { defaultValue: 'Diagnostic' }), icon: Stethoscope, colorToken: 'cat-2', disabled: isDonorRole },
+    { id: 'components', label: t('devices.tab.components', { defaultValue: 'Components' }), icon: Cpu, colorToken: 'cat-3', disabled: isDonorRole },
+    { id: 'history', label: t('devices.tab.history', { defaultValue: 'History / Activity' }), icon: History, colorToken: 'cat-4', disabled: true },
+  ];
+
+  // Custody secret + role notes — relocated from "Advanced Options" into the
+  // Details tab footer. Shown for every role (donor included).
+  const passwordAndRoleNotes = (
+    <div className="space-y-3 pt-3 border-t border-border">
+      <div>
+        <label htmlFor={passwordId} className="block text-sm font-medium text-slate-700 mb-1">
+          {t('devices.field.password', { defaultValue: 'Device Password' })}
+        </label>
+        <div className="flex items-start gap-2">
+          <Input
+            id={passwordId}
+            type={showPassword ? 'text' : 'password'}
+            size="sm"
+            value={formData.password}
+            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+            placeholder={t('devices.field.passwordPlaceholder', { defaultValue: 'Enter device password if applicable...' })}
+            autoComplete="off"
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => setShowPassword(!showPassword)}
+            aria-label={showPassword
+              ? t('devices.field.hidePassword', { defaultValue: 'Hide password' })
+              : t('devices.field.showPassword', { defaultValue: 'Show password' })}
+          >
+            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </Button>
+        </div>
+      </div>
+
+      <Textarea
+        id={roleNotesId}
+        label={t('devices.field.role_notes', { defaultValue: 'Role-Specific Notes' })}
+        size="sm"
+        rows={2}
+        value={formData.role_notes}
+        onChange={(e) => setFormData({ ...formData, role_notes: e.target.value })}
+        placeholder={t('devices.field.roleNotesPlaceholder', { defaultValue: 'Additional notes specific to this device role...' })}
+      />
+    </div>
+  );
+
   return (
     <>
-      <Modal isOpen={isOpen} onClose={onClose} title={isEditMode ? 'Edit Device' : 'Add Device'} maxWidth="4xl" closeOnBackdrop={false}>
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 mb-4 p-4 bg-slate-50 rounded-lg">
-            <HardDrive className="w-5 h-5 text-warning" />
-            <div>
-              <h3 className="font-semibold text-slate-900">
-                {isEditMode ? 'Update Device Information' : 'Add New Device to Case'}
-              </h3>
-              <p className="text-sm text-slate-600">
-                {isEditMode ? 'Modify the device details below' : 'Fill in the device details to add it to this case'}
-              </p>
-            </div>
+      <Dialog
+        open={isOpen}
+        onClose={onClose}
+        labelledBy={titleId}
+        closeOnBackdrop={false}
+        className="w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col rounded-xl bg-surface shadow-xl"
+      >
+        {/* Fixed header: title + role/primary context row + tabs */}
+        <div className="shrink-0 border-b border-border px-4 py-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 id={titleId} className="text-lg font-semibold text-slate-900">
+              {isEditMode
+                ? t('devices.action.editTitle', { defaultValue: 'Edit Device' })
+                : t('devices.action.addTitle', { defaultValue: 'Add Device' })}
+            </h2>
           </div>
 
-          <SearchableSelect
-            label="Device Role"
-            value={formData.device_role_id}
-            onChange={(value) => {
-              const role = deviceRoles.find(r => r.id != null && r.id.toString() === value);
-              const newRoleName = role?.name.toLowerCase() || '';
-
-              setFormData({
-                ...formData,
-                device_role_id: value,
-                is_primary: newRoleName === 'patient' ? formData.is_primary : false,
-                symptoms: newRoleName === 'backup' ? '' : formData.symptoms,
-                recovery_notes: newRoleName === 'backup' ? '' : formData.recovery_notes,
-              });
-
-              if (newRoleName === 'donor') {
-                setSelectedDonorInventoryId('');
-              }
-            }}
-            options={availableDeviceRoles.map(r => ({ id: r.id.toString(), name: r.name }))}
-            placeholder="Select device role..."
-            required
-            clearable={false}
-          />
-
-          {isDonorRole && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
             <SearchableSelect
-              label="Select Donor from Inventory"
-              value={selectedDonorInventoryId}
-              onChange={setSelectedDonorInventoryId}
-              options={donorInventory.map(d => ({
-                id: d.id,
-                name: `${d.name}${d.model ? ` - ${d.model}` : ''}${d.serial_number ? ` (S/N: ${d.serial_number})` : ''} - Available: ${d.quantity}`,
-              }))}
-              placeholder="Select donor device from inventory..."
+              label={t('devices.field.device_role', { defaultValue: 'Device Role' })}
+              size="sm"
+              value={formData.device_role_id}
+              onChange={(value) => {
+                const role = deviceRoles.find(r => r.id != null && r.id.toString() === value);
+                const newRoleName = role?.name.toLowerCase() || '';
+
+                setFormData(prev => ({
+                  ...prev,
+                  device_role_id: value,
+                  is_primary: newRoleName === 'patient' ? prev.is_primary : false,
+                }));
+
+                if (newRoleName === 'donor') {
+                  setSelectedDonorInventoryId('');
+                }
+              }}
+              options={availableDeviceRoles.map(r => ({ id: r.id.toString(), name: r.name }))}
+              placeholder={t('devices.field.deviceRolePlaceholder', { defaultValue: 'Select device role...' })}
               required
               clearable={false}
             />
+
+            {isPatientRole && (
+              <label className="flex items-center gap-2 pb-1.5">
+                <input
+                  type="checkbox"
+                  checked={formData.is_primary}
+                  onChange={(e) => setFormData({ ...formData, is_primary: e.target.checked })}
+                  className="rounded border-slate-300 text-primary focus:ring-primary"
+                />
+                <span className="text-sm font-medium text-slate-700">
+                  {t('devices.field.markPrimary', { defaultValue: 'Mark as Primary Device' })}
+                </span>
+              </label>
+            )}
+          </div>
+
+          <Tabs tabs={tabDefs} activeId={activeTab} onChange={(id) => setActiveTab(id as DeviceTabId)} />
+        </div>
+
+        {/* Scrolling body */}
+        <div
+          className="flex-1 overflow-y-auto px-4 py-3"
+          id={`panel-${activeTab}`}
+          role="tabpanel"
+          aria-labelledby={`tab-${activeTab}`}
+        >
+          {activeTab === 'details' && (
+            isDonorRole ? (
+              <div className="space-y-3">
+                <SearchableSelect
+                  label={t('devices.field.donorFromInventory', { defaultValue: 'Select Donor from Inventory' })}
+                  size="sm"
+                  value={selectedDonorInventoryId}
+                  onChange={setSelectedDonorInventoryId}
+                  options={donorInventory.map(d => ({
+                    id: d.id,
+                    name: `${d.name}${d.model ? ` - ${d.model}` : ''}${d.serial_number ? ` (S/N: ${d.serial_number})` : ''} - Available: ${d.quantity}`,
+                  }))}
+                  placeholder={t('devices.field.donorPlaceholder', { defaultValue: 'Select donor device from inventory...' })}
+                  required
+                  clearable={false}
+                />
+                {passwordAndRoleNotes}
+              </div>
+            ) : (
+              <DeviceDetailsForm
+                state={detailState}
+                onChange={onDetailChange}
+                options={deviceCatalogs}
+                errors={detailErrors}
+                extraFooter={passwordAndRoleNotes}
+              />
+            )
           )}
 
-          {/* Dynamic per-family device details (identity + technical + component
-              diagnostics). Donor devices source identity from inventory above and
-              therefore do not show the dynamic form (preserves prior behavior). */}
-          {!isDonorRole && (
-            <DeviceDetailsForm
+          {activeTab === 'diagnostic' && (
+            <DeviceDiagnosticForm
               state={detailState}
               onChange={onDetailChange}
               options={deviceCatalogs}
@@ -466,155 +570,68 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
             />
           )}
 
-          {isPatientRole && (
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={formData.is_primary}
-                onChange={(e) => setFormData({ ...formData, is_primary: e.target.checked })}
-                className="rounded border-slate-300 text-primary focus:ring-primary"
-              />
-              <span className="text-sm font-medium text-slate-700">
-                Mark as Primary Device
-              </span>
-            </label>
+          {activeTab === 'components' && (
+            <DeviceComponentsForm
+              state={detailState}
+              onChange={onDetailChange}
+              options={deviceCatalogs}
+              errors={detailErrors}
+            />
           )}
 
+          {activeTab === 'history' && (
+            <div className="text-sm text-slate-500 py-8 text-center">
+              {t('devices.tab.historySoon', { defaultValue: 'Device history & activity — coming soon.' })}
+            </div>
+          )}
+        </div>
+
+        {/* Sticky footer */}
+        <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-t border-border bg-surface-muted">
           <div>
-            <button
-              type="button"
-              onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-              className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
-            >
-              {showAdvancedOptions ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              Advanced Options
-            </button>
+            {isEditMode && (
+              <Button variant="danger" size="sm" onClick={() => setShowDeleteConfirm(true)} disabled={isSubmitting}>
+                <Trash2 className="w-4 h-4 me-1.5" />
+                {t('common.delete', { defaultValue: 'Delete' })}
+              </Button>
+            )}
           </div>
-
-          {showAdvancedOptions && (
-            <div className="space-y-4">
-              <div>
-                <label htmlFor={passwordId} className="block text-sm font-medium text-slate-700 mb-2">
-                  Device Password
-                </label>
-                <div className="flex items-center gap-2">
-                  <form className="contents" onSubmit={(e) => e.preventDefault()}>
-                    <input
-                      id={passwordId}
-                      type={showPassword ? 'text' : 'password'}
-                      value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      placeholder="Enter device password if applicable..."
-                      autoComplete="off"
-                      className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </form>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </Button>
-                </div>
-              </div>
-
-              {isPatientRole && (
-                <>
-                  <div>
-                    <label htmlFor={symptomsId} className="block text-sm font-medium text-slate-700 mb-2">
-                      Device Problem
-                    </label>
-                    <textarea
-                      id={symptomsId}
-                      value={formData.symptoms}
-                      onChange={(e) => setFormData({ ...formData, symptoms: e.target.value })}
-                      placeholder="Describe the device problem or symptoms..."
-                      rows={2}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor={recoveryNotesId} className="block text-sm font-medium text-slate-700 mb-2">
-                      Recovery Requirements
-                    </label>
-                    <textarea
-                      id={recoveryNotesId}
-                      value={formData.recovery_notes}
-                      onChange={(e) => setFormData({ ...formData, recovery_notes: e.target.value })}
-                      placeholder="Specify what data needs to be recovered..."
-                      rows={2}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-                </>
-              )}
-
-              <div>
-                <label htmlFor={roleNotesId} className="block text-sm font-medium text-slate-700 mb-2">
-                  Role-Specific Notes
-                </label>
-                <textarea
-                  id={roleNotesId}
-                  value={formData.role_notes}
-                  onChange={(e) => setFormData({ ...formData, role_notes: e.target.value })}
-                  placeholder="Additional notes specific to this device role..."
-                  rows={2}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-200">
-            <div>
-              {isEditMode && (
-                <Button
-                  variant="secondary"
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="bg-danger-muted text-danger hover:bg-danger/15"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete Device
-                </Button>
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                disabled={!isFormValid || isSubmitting}
-                style={{ backgroundColor: 'rgb(var(--color-success))' }}
-              >
-                {isSubmitting ? 'Saving...' : isEditMode ? 'Update Device' : 'Add Device'}
-              </Button>
-            </div>
+          <div className="flex items-center gap-3">
+            <Button variant="secondary" size="sm" onClick={onClose} disabled={isSubmitting}>
+              {t('common.cancel', { defaultValue: 'Cancel' })}
+            </Button>
+            <Button size="sm" onClick={handleSubmit} disabled={!isFormValid || isSubmitting}>
+              {isSubmitting
+                ? t('common.saving', { defaultValue: 'Saving...' })
+                : isEditMode
+                  ? t('devices.action.save', { defaultValue: 'Save Changes' })
+                  : t('devices.action.add', { defaultValue: 'Add Device' })}
+            </Button>
           </div>
         </div>
-      </Modal>
+      </Dialog>
 
       <Modal
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
-        title="Delete Device"
+        title={t('devices.action.deleteTitle', { defaultValue: 'Delete Device' })}
       >
         <div className="space-y-4">
           <p className="text-slate-700">
-            Are you sure you want to delete this device? This action cannot be undone.
+            {t('devices.action.deleteConfirm', { defaultValue: 'Are you sure you want to delete this device? This action cannot be undone.' })}
           </p>
           <div className="flex items-center justify-end gap-3">
             <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)} disabled={isSubmitting}>
-              Cancel
+              {t('common.cancel', { defaultValue: 'Cancel' })}
             </Button>
             <Button
+              variant="danger"
               onClick={handleDelete}
               disabled={isSubmitting}
-              className="bg-danger hover:bg-danger/90 text-danger-foreground"
             >
-              {isSubmitting ? 'Deleting...' : 'Delete Device'}
+              {isSubmitting
+                ? t('common.deleting', { defaultValue: 'Deleting...' })
+                : t('devices.action.deleteTitle', { defaultValue: 'Delete Device' })}
             </Button>
           </div>
         </div>
