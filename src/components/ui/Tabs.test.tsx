@@ -62,11 +62,15 @@ describe('Tabs', () => {
     expect(inactive.className).toContain('hover:bg-cat-5/15');
   });
 
-  it('pills variant uses slate-900 ink for light cat tones', () => {
-    const lightTabs: TabDef[] = [{ id: 'a', label: 'Lime', colorToken: 'cat-3' }];
-    render(<Tabs tabs={lightTabs} activeId="a" variant="pills" onChange={() => {}} />);
-    const tab = screen.getByRole('tab', { name: /Lime/ });
-    expect(tab.className).toContain('text-slate-900');
-    expect(tab.className).not.toContain('text-white');
+  it('pills variant uses slate-900 ink on light/mid cat tones for AA on small labels', () => {
+    // cat-5 (orange-600) active: white ink is ~3.56:1 (sub-AA), so it must use slate-900.
+    const tones: TabDef[] = [
+      { id: 'a', label: 'Orange', colorToken: 'cat-5' },
+      { id: 'b', label: 'Lime', colorToken: 'cat-3' },
+    ];
+    render(<Tabs tabs={tones} activeId="a" variant="pills" onChange={() => {}} />);
+    const active = screen.getByRole('tab', { name: /Orange/ });
+    expect(active.className).toContain('text-slate-900');
+    expect(active.className).not.toContain('text-white');
   });
 });

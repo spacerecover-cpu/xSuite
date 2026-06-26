@@ -153,7 +153,7 @@ The platform-standard overlay is a **three-region modal**: a pinned header, a si
 ### Tabbed form modal — reference: `cases/DeviceFormModal.tsx`
 Large, multi-section records use a **tabbed Workspace modal**: a pinned tab bar splits the record into ≤ 4 tabs; each tab's fields render in the responsive grid below (see **Forms & Field Layout**). Reference: the Edit Device modal (tabs: Device Details, Diagnostic, Components, History / Activity).
 
-> **Status — shipped.** `DeviceFormModal` is the reference tabbed Workspace modal: pinned header + a fixed Device Role / "Mark as Primary" control row, a `flex-1` scrolling body, and a pinned `shrink-0` footer (Delete left, Cancel + Save right), built on `Dialog` with the flex-column pattern (`DeviceFormModal.tsx:475-619`); the tab bar renders the **colored pills** below via shared `ui/Tabs` `variant="pills"` (tones primary/cat-5/cat-2/cat-6; History / Activity disabled). The `pills` variant is **opt-in** — `ui/Tabs` still defaults to underline for its other uses.
+> **Status — shipped.** `DeviceFormModal` is the reference tabbed Workspace modal: pinned header + a fixed Device Role / "Mark as Primary" control row, a `flex-1` scrolling body, and a pinned `shrink-0` footer (Delete left, Cancel + Save right), built on `Dialog` with the flex-column pattern (`DeviceFormModal.tsx:475-619`); the tab bar renders the **colored pills** below via shared `ui/Tabs` `variant="pills"` (tones primary/cat-5/cat-2/cat-6; History / Activity disabled). The `pills` variant is **opt-in**: `ui/Tabs` defaults to underline (`DeviceFormModal` is currently its only consumer), so the default path is preserved for future tab bars.
 
 - **Tab bar = colored pills**, one **`cat-*` identity tone per tab** — identity color, not status, so it re-uses the sanctioned palette and stays lint-green:
 
@@ -164,8 +164,8 @@ Large, multi-section records use a **tabbed Workspace modal**: a pinned tab bar 
   | Components | `cat-2` | teal | closest lint-safe "green"; `cat-3` lime if you want it greener (→ slate-900 ink). **Never `success`** — that falsely signals status |
   | History / Activity | `cat-6` | pink | the mockup's literal purple is banned; `cat-8` slate for a calmer, archival read |
 
-- **Active vs inactive:** ACTIVE = `bg-{tone} text-{tone}-foreground shadow-sm`; INACTIVE = `bg-{tone}/10 text-{tone} hover:bg-{tone}/15`. The active tab must be unmistakable — **do not render all tabs at full fill** (the mockup did; that leaves no active affordance).
-- **Light tones** (`cat-3` lime, `cat-4` yellow) use **slate-900 ink**, not white (mirrors the KPI-tile contrast rule).
+- **Active vs inactive:** ACTIVE = `bg-{tone}` + per-tone ink (below) + `shadow-sm`; INACTIVE = `bg-{tone}/10 text-{tone} hover:bg-{tone}/15`. The active tab must be unmistakable — **do not render all tabs at full fill** (the mockup did; that leaves no active affordance).
+- **Active ink (AA on 14px labels, since `cat-*` has no `-foreground` token):** `primary` → `text-primary-foreground` (white); the lighter/mid cat tones `cat-1`–`cat-5` → **`text-slate-900`** (white is sub-AA on them — e.g. orange `cat-5` ≈ 3.6:1, slate-900 ≈ 5.0:1); the dark cat tones `cat-6`/`cat-7`/`cat-8` → `text-white`. *(Inactive labels are the identity tone `text-cat-N` on a 10% tint; for the mid tones that runs ≈ 3.6–3.8:1 — an accepted identity tradeoff, consistent with how the app already uses `text-cat-*`, pending a palette-contrast pass.)*
 - **Banned:** `purple` / `indigo` / `violet` (lint `error`) — the mockup's purple History tab maps to `cat-6` or `cat-8`. *(All shipped tones resolve to sanctioned `primary`/`cat-*` hues — no banned colors.)*
 
 ### Reusable scaffold (do not hand-roll per modal)
@@ -182,14 +182,14 @@ Layers are defined in **`src/lib/ui/zIndex.ts`** (the `Z` constants, for JS/`sty
 |---|---|---|---|
 | base | — | 0–10 | page content; `Dialog`/`Modal` panel + close buttons (`z-10` *within* the overlay's own stacking context) |
 | sticky | `z-sticky` | 20 | in-page fixed/sticky save bars (`FeaturesSettings`, `AccountingLocales`); reserve for sticky table headers |
-| dropdown | `z-dropdown` | 30 | lightweight inline menus with **no** backdrop — `VariableInsertMenu`, legacy inline row menus (`PaymentsList`, `AnnouncementCard`) |
+| dropdown | `z-dropdown` | 30 | lightweight trigger-attached inline menus — `VariableInsertMenu`, and legacy inline row menus (`PaymentsList`, `AnnouncementCard`, `InventoryListPage`, `ChainOfCustodyTab`) whose dismiss layer is a base-layer `z-10` transparent click-catcher, not an elevated backdrop |
 | overlay | `z-overlay` | 40 | page-popover backdrops / click-catchers (`RowActionsMenu`, `ColumnPickerPopover`), `BulkActionsBar` |
 | modal | `z-modal` | 50 | `Dialog`/`Modal` overlay; page menus **with** a backdrop (`RowActionsMenu`, `ColumnPickerPopover`); `MobileNavDrawer`; app-chrome dropdowns (`NotificationBell`, `StockAlertsDropdown`, `PortalLayout` header + user menu); skip-link; print toolbar |
-| popover | `z-popover` | 60 | tooltip, lightbox (`PhotoViewerModal`), `EmailDocumentModal`, portaled **field listboxes** that open inside a modal (`SearchableSelect`, `MultiSelectDropdown`, `EngineerSelector`, via `useAnchoredPosition`) |
+| popover | `z-popover` | 60 | tooltip, lightbox (`PhotoViewerModal`), `EmailDocumentModal`, **field listboxes** that open inside a modal — `SearchableSelect`/`MultiSelectDropdown` (portaled to `document.body` via `useAnchoredPosition`) and `EngineerSelector` (in-tree `absolute`) |
 | toast | `z-toast` | 70 | toasts (`react-hot-toast` `containerStyle`), the `NavigationProgress` route bar — always top |
 
 - Popovers that must clear a modal use `z-popover`, **not** a hand-typed `z-[60]`.
-- **Field listboxes** (`SearchableSelect` / `MultiSelectDropdown` / `EngineerSelector`) portal to `document.body` and routinely open *inside* modals (e.g. the Device Role select in `DeviceFormModal`), so they resolve to `z-popover` (60) to clear the modal panel. (`ui/Select` is a native `<select>` — no z-index.)
+- **Field listboxes** resolve to `z-popover` (60) so they clear the modal panel. `SearchableSelect` / `MultiSelectDropdown` portal to `document.body` via `useAnchoredPosition` (immune to ancestor clipping); `EngineerSelector` is an in-tree `absolute` listbox — its z-value is right, but as a non-portaled child it can still be clipped by an `overflow-hidden` modal panel, so keep it on page-level surfaces. (`ui/Select` is a native `<select>` — no z-index.)
 - **Page menus with a backdrop** (`RowActionsMenu`, `ColumnPickerPopover`) sit at `z-modal` (50), **not** `z-dropdown` (30): on a selectable table they coexist with the `BulkActionsBar` at `z-overlay` (40) and must stay above it. Only lightweight inline menus with no backdrop use `z-dropdown`.
 - Toasts + the route-progress bar are the top layer (`z-toast` 70). The `react-hot-toast` `Toaster` (`App.tsx`) has no className hook, so it carries `zIndex: Z.toast` via `containerStyle` (from `src/lib/ui/zIndex.ts`); 70 still clears modal (50) and popover (60).
 

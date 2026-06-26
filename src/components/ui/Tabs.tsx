@@ -35,15 +35,16 @@ const ACTIVE_CLASSES: Record<string, string> = {
 
 // Pill variant — solid tone fill when active, 10% tint when inactive. Full
 // literal strings so Tailwind JIT emits them. cat-* tokens have no -foreground
-// variant, so dark tones use white ink and the light tones (cat-3 lime, cat-4
-// yellow) use slate-900, mirroring the KPI-tile contrast rule.
+// variant, so the active ink is picked per tone for WCAG AA on small (14px)
+// labels: the lighter/mid tones (cat-1..cat-5) take slate-900 ink (white fails
+// 4.5:1 on them), the dark tones (primary, cat-6..cat-8) take white.
 const PILL_ACTIVE: Record<string, string> = {
   primary: 'bg-primary text-primary-foreground shadow-sm',
-  'cat-1': 'bg-cat-1 text-white shadow-sm',
-  'cat-2': 'bg-cat-2 text-white shadow-sm',
+  'cat-1': 'bg-cat-1 text-slate-900 shadow-sm',
+  'cat-2': 'bg-cat-2 text-slate-900 shadow-sm',
   'cat-3': 'bg-cat-3 text-slate-900 shadow-sm',
   'cat-4': 'bg-cat-4 text-slate-900 shadow-sm',
-  'cat-5': 'bg-cat-5 text-white shadow-sm',
+  'cat-5': 'bg-cat-5 text-slate-900 shadow-sm',
   'cat-6': 'bg-cat-6 text-white shadow-sm',
   'cat-7': 'bg-cat-7 text-white shadow-sm',
   'cat-8': 'bg-cat-8 text-white shadow-sm',

@@ -611,7 +611,7 @@ export default function InventoryListPage() {
                           </span>
 
                           {editingStatusId === item.id && (
-                            <div className="absolute z-10 mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg">
+                            <div className="absolute z-dropdown mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg">
                               <div className="py-1 max-h-60 overflow-y-auto">
                                 {statusTypes.map((status) => (
                                   <button
