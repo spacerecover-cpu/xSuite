@@ -49,9 +49,10 @@ export default {
         'xxs': '0.625rem',
       },
       boxShadow: {
-        'inner-sm': 'inset 0 1px 2px 0 rgb(0 0 0 / 0.05)',
+        // Retained, deliberately: a themed decorative glow for the onboarding
+        // step-icon tile (StepContainer). NOT part of the Elevation ladder
+        // (shadow-sm..xl); see DESIGN.md Known Deviations #11.
         'glow-primary': '0 0 20px rgb(var(--color-primary) / 0.3)',
-        'glow-primary-lg': '0 0 40px rgb(var(--color-primary) / 0.2)',
       },
       animation: {
         'slide-in': 'slideIn 0.2s ease-out',
