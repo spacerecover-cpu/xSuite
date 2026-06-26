@@ -2,7 +2,11 @@
 import type { DeviceFamily } from './deviceFamily';
 
 export type FieldControl =
-  | 'text' | 'number' | 'date' | 'select' | 'multiselect' | 'textarea' | 'component-status';
+  | 'text' | 'number' | 'date' | 'select' | 'multiselect' | 'textarea' | 'component-status'
+  // 'json' fields carry an opaque object through serialize/hydrate (e.g. the
+  // Components tab's per-component metadata). They are rendered by bespoke forms,
+  // never by the generic DeviceFieldRenderer.
+  | 'json';
 
 export type CatalogKey =
   | 'device_types' | 'brands' | 'capacities' | 'conditions' | 'accessories'
@@ -191,12 +195,21 @@ export function getDeviceFamilyConfig(family: DeviceFamily): DeviceFamilyConfig 
   return { family, technical: entry.technical, components: entry.components };
 }
 
+// Non-rendered fields that still flow through serialize/hydrate. `component_meta`
+// holds the Components tab's per-component metadata (notes/test method/result/
+// findings/measurements) as one additive object in device_diagnostics.result.
+export const META_FIELDS: DeviceFieldDef[] = [
+  { key: 'component_meta', labelKey: 'devices.field.component_meta', labelFallback: 'Component Metadata',
+    control: 'json', storage: dj('component_meta') },
+];
+
 /** Every field across Basic + all families, deduped by key — drives serialization. */
 export const ALL_FIELD_DEFS: DeviceFieldDef[] = (() => {
   const seen = new Map<string, DeviceFieldDef>();
   const push = (f: DeviceFieldDef) => { if (!seen.has(f.key)) seen.set(f.key, f); };
   BASIC_FIELDS.forEach(push);
   DIAGNOSTIC_FIELDS.forEach(push);
+  META_FIELDS.forEach(push);
   (Object.keys(REGISTRY) as DeviceFamily[]).forEach(fam => {
     REGISTRY[fam].technical.forEach(push);
     REGISTRY[fam].components.forEach(push);

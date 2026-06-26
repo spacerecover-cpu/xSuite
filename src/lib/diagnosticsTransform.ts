@@ -1,5 +1,15 @@
 import type { Database, Json } from '../types/database.types';
 
+/** Per-component diagnostic metadata captured on the Components tab. */
+export interface ComponentMeta {
+  notes?: string;
+  test_method?: string;
+  result?: string;
+  tested_at?: string;
+  findings?: string[];
+  measurements?: Array<{ label: string; resistance: string; signal: number; status: string }>;
+}
+
 /**
  * Rich inspection/diagnosis shape used by the UI. Only `device_id`,
  * `performed_by`, `diagnostic_type`, `tool_used` and `notes` are real columns on
@@ -57,6 +67,9 @@ export interface DeviceDiagnostics {
   est_time?: string;
   recommendation?: string;
 
+  // Per-component metadata keyed by componentKey (heads, pcb, …).
+  component_meta?: Record<string, ComponentMeta>;
+
   created_at?: string;
   updated_at?: string;
 }
@@ -105,6 +118,7 @@ const RESULT_FIELDS = [
   'engineer_id',
   'est_time',
   'recommendation',
+  'component_meta',
 ] as const;
 
 /** Collect the non-column inspection fields into the `result` jsonb payload. */

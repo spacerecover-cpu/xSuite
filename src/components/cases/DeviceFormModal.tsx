@@ -103,6 +103,12 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
   );
   const [detailErrors, setDetailErrors] = useState<Record<string, string>>({});
   const [loadedRef, setLoadedRef] = useState<LoadedDevice>({ device: {}, diagnostics: null });
+  // Audit of the last device_diagnostics write, surfaced as "Last Updated" on the
+  // Components tab. Captured from the loaded diagnostics row.
+  const [diagnosticsAudit, setDiagnosticsAudit] = useState<{ at: string | null; byId: string | null }>({
+    at: null,
+    byId: null,
+  });
   const onDetailChange = (key: string, value: unknown) =>
     setDetailState(prev => ({ ...prev, [key]: value }));
 
@@ -196,6 +202,10 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
         setLoadedRef(loaded);
         setDetailState(hydrateDeviceForm(loaded));
         setDetailErrors({});
+        setDiagnosticsAudit({
+          at: diagnosticsRow?.updated_at ?? null,
+          byId: diagnosticsRow?.performed_by ?? null,
+        });
 
         const src = (fullRow ?? deviceData) as DeviceFormDeviceData;
         setFormData({
@@ -210,6 +220,7 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
         setLoadedRef(loaded);
         setDetailState(hydrateDeviceForm(loaded));
         setDetailErrors({});
+        setDiagnosticsAudit({ at: null, byId: null });
         setFormData({
           device_role_id: '',
           password: '',
@@ -463,6 +474,17 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
             caseId={caseId}
             engineerOptions={engineerOptions}
           />
+        ) : activeTab === 'components' ? (
+          // The Components tab is also a full-width master-detail layout with its
+          // own cards.
+          <DeviceComponentsForm
+            state={detailState}
+            onChange={onDetailChange}
+            options={deviceCatalogs}
+            errors={detailErrors}
+            lastUpdatedAt={diagnosticsAudit.at}
+            lastUpdatedById={diagnosticsAudit.byId}
+          />
         ) : (
           <div className="rounded-2xl border border-border bg-surface p-4 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
             {activeTab === 'details' && (
@@ -490,15 +512,6 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
                   errors={detailErrors}
                 />
               )
-            )}
-
-            {activeTab === 'components' && (
-              <DeviceComponentsForm
-                state={detailState}
-                onChange={onDetailChange}
-                options={deviceCatalogs}
-                errors={detailErrors}
-              />
             )}
 
             {activeTab === 'history' && (

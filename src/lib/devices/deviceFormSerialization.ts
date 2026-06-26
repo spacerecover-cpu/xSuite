@@ -29,6 +29,8 @@ export function hydrateDeviceForm(loaded: LoadedDevice, defs: DeviceFieldDef[] =
       val = (loaded.diagnostics ?? {})[def.legacyResultKey];
     }
     if (def.control === 'multiselect') state[def.key] = Array.isArray(val) ? val : [];
+    else if (def.control === 'json')
+      state[def.key] = val && typeof val === 'object' && !Array.isArray(val) ? val : {};
     else state[def.key] = val ?? '';
   }
   return state;
@@ -55,9 +57,13 @@ export function serializeDeviceForm(
     } else if (def.storage.table === 'case_devices' && def.storage.kind === 'json') {
       technicalDetails[def.storage.jsonKey] = isEmpty(raw) ? null : raw;
     } else {
-      // Treat empty arrays (e.g. an untouched symptoms multi-select) as empty so
-      // they neither store [] nor force a phantom device_diagnostics row.
-      const empty = isEmpty(raw) || (Array.isArray(raw) && raw.length === 0);
+      // Treat empty arrays (untouched multi-select) and empty objects (untouched
+      // component metadata) as empty so they neither store []/{} nor force a
+      // phantom device_diagnostics row.
+      const empty =
+        isEmpty(raw) ||
+        (Array.isArray(raw) && raw.length === 0) ||
+        (!!raw && typeof raw === 'object' && !Array.isArray(raw) && Object.keys(raw).length === 0);
       diagnosticsPatch[def.storage.jsonKey] = empty ? null : raw;
       if (!empty) hasDiagnostics = true;
     }
