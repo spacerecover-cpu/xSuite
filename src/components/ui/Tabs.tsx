@@ -102,7 +102,7 @@ export function Tabs({ tabs, activeId, onChange, className, variant = 'underline
             className={cn(
               'inline-flex items-center justify-center transition-all duration-150',
               isPills
-                ? 'h-11 px-5 rounded-[10px] gap-2 text-sm font-semibold'
+                ? 'h-10 px-5 rounded-[10px] gap-2 text-sm font-semibold'
                 : 'gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px',
               stateClass,
             )}

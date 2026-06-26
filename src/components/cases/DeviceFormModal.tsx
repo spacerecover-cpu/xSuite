@@ -406,8 +406,8 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
       className="w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col rounded-2xl bg-surface border border-border shadow-[0_12px_40px_rgba(15,23,42,0.12)]"
     >
       {/* Fixed header: title + close, thin divider underneath */}
-      <div className="shrink-0 flex items-center justify-between px-6 h-14 border-b border-border">
-        <h2 id={titleId} className="text-xl font-bold tracking-tight text-slate-900">
+      <div className="shrink-0 flex items-center justify-between px-6 h-12 border-b border-border">
+        <h2 id={titleId} className="text-lg font-bold tracking-tight text-slate-900">
           {isEditMode
             ? t('devices.action.editTitle', { defaultValue: 'Edit Device' })
             : t('devices.action.addTitle', { defaultValue: 'Add Device' })}
@@ -423,24 +423,24 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
       </div>
 
       {/* Fixed tab navigation (colored pills) */}
-      <div className="shrink-0 px-6 pt-4 pb-2">
+      <div className="shrink-0 px-6 pt-3 pb-2">
         <Tabs tabs={tabDefs} activeId={activeTab} variant="pills" onChange={(id) => setActiveTab(id as DeviceTabId)} />
       </div>
 
       {/* Scrolling body — light backdrop with a white form card */}
       <div
-        className="flex-1 overflow-y-auto bg-surface-muted px-5 pb-5 pt-1"
+        className="flex-1 overflow-y-auto bg-surface-muted px-4 pb-4 pt-1"
         id={`panel-${activeTab}`}
         role="tabpanel"
         aria-labelledby={`tab-${activeTab}`}
       >
-        <div className="rounded-2xl border border-border bg-surface p-6 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
+        <div className="rounded-2xl border border-border bg-surface p-4 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
           {activeTab === 'details' && (
             isDonorRole ? (
               <div className="space-y-3">
                 <SearchableSelect
                   label={t('devices.field.donorFromInventory', { defaultValue: 'Select Donor from Inventory' })}
-                  size="md"
+                  size="sm"
                   value={selectedDonorInventoryId}
                   onChange={setSelectedDonorInventoryId}
                   options={donorInventory.map(d => ({
@@ -489,7 +489,7 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
       </div>
 
       {/* Sticky footer */}
-      <div className="shrink-0 flex items-center justify-end gap-3 px-6 h-16 border-t border-border bg-surface">
+      <div className="shrink-0 flex items-center justify-end gap-3 px-6 h-14 border-t border-border bg-surface">
         <Button variant="secondary" size="md" onClick={onClose} disabled={isSubmitting} className="h-10 rounded-[10px] px-5">
           {t('common.cancel', { defaultValue: 'Cancel' })}
         </Button>

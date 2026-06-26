@@ -14,8 +14,8 @@ interface Props {
   extraFooter?: ReactNode;
 }
 
-const SECTION_HEADING = 'text-base font-bold uppercase tracking-[0.04em] text-primary';
-const FIELD_GRID = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-4';
+const SECTION_HEADING = 'text-sm font-bold uppercase tracking-[0.04em] text-primary';
+const FIELD_GRID = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-3';
 
 export function DeviceDetailsForm({ state, onChange, options, errors, extraFooter }: Props) {
   const { t } = useTranslation();
@@ -36,8 +36,8 @@ export function DeviceDetailsForm({ state, onChange, options, errors, extraFoote
   );
 
   return (
-    <div className="space-y-6">
-      <section className="space-y-4">
+    <div className="space-y-5">
+      <section className="space-y-3">
         <h3 className={SECTION_HEADING}>
           {t('devices.section.basic', { defaultValue: 'Basic Information' })}
         </h3>
@@ -47,7 +47,7 @@ export function DeviceDetailsForm({ state, onChange, options, errors, extraFoote
       </section>
 
       {cfg.technical.length > 0 && (
-        <section className="space-y-4 border-t border-border pt-6">
+        <section className="space-y-3 border-t border-border pt-5">
           <h3 className={SECTION_HEADING}>
             {t('devices.section.technical', { defaultValue: 'Technical Information' })}
           </h3>
