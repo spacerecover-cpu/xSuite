@@ -1,15 +1,19 @@
 import React from 'react';
+import { cn } from '../../lib/utils';
 import { useFieldA11y } from '../../hooks/useFieldA11y';
 
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+const inputSizeClasses = { sm: 'px-3 py-1.5', md: 'px-3 py-2' } as const;
+
+interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
   label?: string;
   error?: string;
   hint?: string;
   leftIcon?: React.ReactNode;
+  size?: 'sm' | 'md';
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, hint, leftIcon, className = '', ...props }, ref) => {
+  ({ label, error, hint, leftIcon, className = '', size = 'md', ...props }, ref) => {
     const { labelProps, controlProps, errorProps, hintProps } = useFieldA11y({
       id: props.id,
       hasError: !!error,
@@ -39,9 +43,13 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             {...controlProps}
             {...props}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-              error ? 'border-danger' : 'border-slate-300'
-            } ${leftIcon ? 'ps-9' : ''} ${className}`}
+            className={cn(
+              'w-full border rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              inputSizeClasses[size],
+              error ? 'border-danger' : 'border-slate-300',
+              leftIcon ? 'ps-9' : '',
+              className
+            )}
           />
         </div>
         {error && (

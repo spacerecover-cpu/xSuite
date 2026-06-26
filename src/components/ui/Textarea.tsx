@@ -1,14 +1,18 @@
 import React from 'react';
+import { cn } from '../../lib/utils';
 import { useFieldA11y } from '../../hooks/useFieldA11y';
+
+const textareaSizeClasses = { sm: 'px-3 py-1.5', md: 'px-3 py-2' } as const;
 
 interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   error?: string;
   hint?: string;
+  size?: 'sm' | 'md';
 }
 
 export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ label, error, hint, className = '', rows = 4, ...props }, ref) => {
+  ({ label, error, hint, className = '', size = 'md', rows = 4, ...props }, ref) => {
     const { labelProps, controlProps, errorProps, hintProps } = useFieldA11y({
       id: props.id,
       hasError: !!error,
@@ -33,9 +37,12 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           rows={rows}
           {...controlProps}
           {...props}
-          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-            error ? 'border-danger' : 'border-slate-300'
-          } ${className}`}
+          className={cn(
+            'w-full border rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+            textareaSizeClasses[size],
+            error ? 'border-danger' : 'border-slate-300',
+            className
+          )}
         />
         {error && (
           <p {...errorProps} className="mt-1 text-sm text-danger">

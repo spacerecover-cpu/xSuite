@@ -2,9 +2,12 @@ import React, { useState, useRef, useEffect, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, Search, X } from 'lucide-react';
+import { cn } from '../../lib/utils';
 import { useFieldA11y } from '../../hooks/useFieldA11y';
 import { useAnchoredPosition } from '../../hooks/useAnchoredPosition';
 import { useListboxKeyboard } from '../../hooks/useListboxKeyboard';
+
+const triggerSizeClasses = { sm: 'px-3 py-1.5', md: 'px-3 py-2' } as const;
 
 interface Option {
   id: string;
@@ -30,6 +33,7 @@ interface SearchableSelectProps {
   hint?: string;
   name?: string;
   className?: string;
+  size?: 'sm' | 'md';
 }
 
 export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelectProps>(
@@ -52,6 +56,7 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
       hint,
       name,
       className,
+      size = 'md',
     },
     ref
   ) => {
@@ -294,7 +299,9 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
           {...controlProps}
           {...(label ? {} : { 'aria-label': resolvedPlaceholder })}
           data-name={name}
-          className={`relative w-full px-3 py-2 border rounded-lg cursor-pointer transition-all ${
+          className={cn(
+            'relative w-full border rounded-lg cursor-pointer transition-all',
+            triggerSizeClasses[size],
             disabled
               ? 'bg-slate-100 border-slate-300 cursor-not-allowed'
               : error
@@ -302,7 +309,7 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
               : isOpen
               ? 'border-primary ring-2 ring-primary/20'
               : 'border-slate-300 hover:border-slate-400'
-          }`}
+          )}
           onClick={() => !disabled && setIsOpen(!isOpen)}
           onKeyDown={onKeyDown}
           tabIndex={disabled ? -1 : 0}

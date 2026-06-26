@@ -1,6 +1,9 @@
 import React from 'react';
 import { ChevronDown } from 'lucide-react';
+import { cn } from '../../lib/utils';
 import { useFieldA11y } from '../../hooks/useFieldA11y';
+
+const selectSizeClasses = { sm: 'px-3 py-1.5', md: 'px-3 py-2' } as const;
 
 export interface SelectOption {
   value: string;
@@ -8,7 +11,7 @@ export interface SelectOption {
   disabled?: boolean;
 }
 
-interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
   label?: string;
   error?: string;
   hint?: string;
@@ -16,10 +19,11 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   options?: SelectOption[];
   /** Placeholder rendered as a disabled, empty-value leading option. */
   placeholder?: string;
+  size?: 'sm' | 'md';
 }
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, error, hint, options, placeholder, className = '', children, ...props }, ref) => {
+  ({ label, error, hint, options, placeholder, className = '', size = 'md', children, ...props }, ref) => {
     const { labelProps, controlProps, errorProps, hintProps } = useFieldA11y({
       id: props.id,
       hasError: !!error,
@@ -44,9 +48,12 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             ref={ref}
             {...controlProps}
             {...props}
-            className={`w-full appearance-none px-3 py-2 pe-9 border rounded-md bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-              error ? 'border-danger' : 'border-slate-300'
-            } ${className}`}
+            className={cn(
+              'w-full appearance-none pe-9 border rounded-md bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              selectSizeClasses[size],
+              error ? 'border-danger' : 'border-slate-300',
+              className
+            )}
           >
             {placeholder && (
               <option value="" disabled>
