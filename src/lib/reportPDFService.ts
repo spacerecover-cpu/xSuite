@@ -3,7 +3,7 @@ import { initializePDFFonts, createPdfWithFonts } from './pdf/fonts';
 import { buildReportDocument, type ReportData } from './pdf/documents/ReportDocument';
 import { loadImageAsBase64 } from './pdf/utils';
 import { logPDFGeneration } from './pdf/loggingService';
-import { withTimeout, createTranslationContext } from './pdf/translationContext';
+import { withTimeout, createTranslationContext, ctxFromLanguageConfig } from './pdf/translationContext';
 import { logger } from './logger';
 import type { Database, Json } from '../types/database.types';
 import { type LanguageCode } from './documentTranslations';
@@ -19,6 +19,7 @@ import {
 } from './pdf/engine/adapters/reportAdapter';
 import {
   resolveTemplateConfig,
+  resolveSecondary,
   type DocumentTemplateConfig,
   type TemplateConfigOverride,
 } from './pdf/templateConfig';
@@ -177,7 +178,7 @@ class ReportPDFService {
    */
   private async buildReportDocViaEngine(
     data: ReportData,
-    ctx: TranslationContext,
+    _ctx: TranslationContext,
     logoBase64: string | null,
     qrCodeBase64: string | null,
   ): Promise<TDocumentDefinitions> {
@@ -210,9 +211,15 @@ class ReportPDFService {
     // the engine renders bilingual/RTL when the tenant is configured for it.
     const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
 
-    const engineData = toReportEngineData(data, languageAwareConfig, ctx);
+    // Derive the translation context from the RESOLVED config so the per-template
+    // language drives BOTH layout (config.language) AND translation (ctx) — and
+    // load the resolved secondary's font (idempotent; degrades to Roboto safely).
+    const engineCtx = ctxFromLanguageConfig(languageAwareConfig.language);
+    await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
+
+    const engineData = toReportEngineData(data, languageAwareConfig, engineCtx);
     const qr = await resolveQrImage(qrCodeBase64, engineData.zatcaPayload ?? engineData.qrPayload);
-    return renderTemplate(languageAwareConfig, engineData, ctx, logoBase64, qr);
+    return renderTemplate(languageAwareConfig, engineData, engineCtx, logoBase64, qr);
   }
 
   /**

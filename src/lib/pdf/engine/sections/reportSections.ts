@@ -68,7 +68,7 @@ function editorialSection(
   const bilingual = isBilingualMode(language);
   const tone = resolvePdfTone(section.tone);
   const titleEn = en(section.title);
-  const titleAr = bilingual ? ar(section.title) : null;
+  const titleAr = bilingual ? ar(section.title, language) : null;
 
   // Title row: a small coloured accent block, the EN title, then (bilingual) the
   // RTL Arabic title pushed to the trailing edge.

@@ -61,7 +61,7 @@ export const renderCollector: SectionRenderer = (
 
   const box = createBilingualInfoBox(
     en(collector.title, 'Collection Information'),
-    bilingual ? ar(collector.title) : null,
+    bilingual ? ar(collector.title, language) : null,
     rows,
     userIcon,
   ) as Content;

@@ -63,7 +63,7 @@ export const renderCustodySummary: SectionRenderer = (
 
   const box = createBilingualInfoBox(
     en(summary.title, 'Summary'),
-    bilingual ? ar(summary.title) : null,
+    bilingual ? ar(summary.title, language) : null,
     rows,
     summaryIcon,
   ) as Content;

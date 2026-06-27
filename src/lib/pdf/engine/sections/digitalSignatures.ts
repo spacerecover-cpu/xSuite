@@ -53,7 +53,7 @@ export const renderDigitalSignatures: SectionRenderer = (
 
   const heading = createBilingualSectionHeader(
     en(block.title, 'Digital Signatures'),
-    bilingual ? ar(block.title) : null,
+    bilingual ? ar(block.title, language) : null,
   ) as Content;
 
   const headerRow: TableCell[] = columns.map((col) => ({

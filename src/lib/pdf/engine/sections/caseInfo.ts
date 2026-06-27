@@ -62,7 +62,7 @@ export const renderCaseInfo: SectionRenderer = (
 
   const box = createBilingualInfoBox(
     en(caseInfo.title, 'Case Details'),
-    bilingual ? ar(caseInfo.title) : null,
+    bilingual ? ar(caseInfo.title, language) : null,
     rows,
     fileIcon,
   ) as Content;

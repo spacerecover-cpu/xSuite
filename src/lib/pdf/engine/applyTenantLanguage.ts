@@ -33,6 +33,7 @@
  */
 
 import { isRTLLanguage } from '../../locale';
+import type { LanguageCode } from '../../documentTranslations';
 import type { CompanySettingsData } from '../types';
 import type { DocumentTemplateConfig, LanguageConfig } from '../templateConfig';
 
@@ -61,8 +62,12 @@ export function resolveTenantLanguageConfig(
 
   // Arabic (or any future RTL secondary) leads → RTL document. A non-RTL
   // secondary (French, German, …) keeps English in the lead, secondary alongside.
-  const primary: LanguageConfig['primary'] = isRTLLanguage(secondary) ? 'ar' : 'en';
-  return { mode: DEFAULT_BILINGUAL_MODE, primary };
+  // Carry the chosen secondary (any of the 13) on the config so the render path
+  // resolves the correct language; `primary: 'ar'` (legacy "secondary leads")
+  // only when that secondary is actually RTL.
+  const rtl = isRTLLanguage(secondary);
+  const primary: LanguageConfig['primary'] = rtl ? 'ar' : 'en';
+  return { mode: DEFAULT_BILINGUAL_MODE, primary, secondary: secondary as LanguageCode };
 }
 
 /**

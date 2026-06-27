@@ -21,6 +21,7 @@ import { PDF_COLORS, createBilingualInfoBox } from '../../styles';
 import { htmlToPdfmake } from '../../htmlToPdfmake';
 import { decodeHtmlEntities } from '../../../sanitizeHtml';
 import { isBilingualMode, en, ar } from '../labels';
+import type { LanguageConfig } from '../../templateConfig';
 import type { EngineContext, EngineDocData, LabelText, SectionRenderer, TermsTextBlock } from '../types';
 
 interface TermsBlock {
@@ -52,7 +53,7 @@ function termsBox(enCol: Content[], arCol: Content[]): Content | null {
 }
 
 /** One language column of the standard terms box: heading + prose per non-empty block. */
-function languageColumn(blocks: TermsBlock[], lang: 'en' | 'ar'): Content[] {
+function languageColumn(blocks: TermsBlock[], lang: 'en' | 'ar', language: LanguageConfig): Content[] {
   const right = lang === 'ar';
   const align: 'left' | 'right' = right ? 'right' : 'left';
   const stack: Content[] = [];
@@ -60,7 +61,7 @@ function languageColumn(blocks: TermsBlock[], lang: 'en' | 'ar'): Content[] {
     const body = (right ? b.body.ar : b.body.en)?.trim();
     if (!body) continue;
     if (stack.length > 0) stack.push({ text: '', margin: [0, 4, 0, 0] as [number, number, number, number] });
-    const heading = right ? ar(b.heading) ?? en(b.heading) : en(b.heading);
+    const heading = right ? ar(b.heading, language) ?? en(b.heading) : en(b.heading);
     stack.push(
       { text: heading, fontSize: 9, bold: true, color: PDF_COLORS.text, alignment: align, margin: [0, 0, 0, 3] as [number, number, number, number] },
       { text: body, fontSize: 9, color: PDF_COLORS.textLight, lineHeight: 1.3, alignment: align },
@@ -161,14 +162,15 @@ function recordBodyNode(b: TermsTextBlock): object | null {
  * reads per-record terms, never falls back; omitted when the Studio content is blank.
  */
 export const renderTerms: SectionRenderer = (engine: EngineContext): Content | null => {
-  const bilingual = isBilingualMode(engine.config.language);
+  const { language } = engine.config;
+  const bilingual = isBilingualMode(language);
   const tc = engine.config.termsContent;
   const blocks: TermsBlock[] = [
     { heading: engine.config.labels.terms ?? { en: 'Terms & Conditions', ar: 'الشروط والأحكام' }, body: tc?.terms ?? {} },
     { heading: engine.config.labels.notes ?? { en: 'Notes', ar: 'ملاحظات' }, body: tc?.notes ?? {} },
   ];
-  const enCol = languageColumn(blocks, 'en');
-  const arCol = bilingual ? languageColumn(blocks, 'ar') : [];
+  const enCol = languageColumn(blocks, 'en', language);
+  const arCol = bilingual ? languageColumn(blocks, 'ar', language) : [];
   return termsBox(enCol, arCol);
 };
 
@@ -184,7 +186,8 @@ export const renderRecordTerms: SectionRenderer = (
 ): Content | null => {
   const recordLabel = engine.config.labels.recordTerms;
   const notesLabel = engine.config.labels.notes ?? { en: 'Notes', ar: 'ملاحظات' };
-  const bilingual = isBilingualMode(engine.config.language);
+  const { language } = engine.config;
+  const bilingual = isBilingualMode(language);
   const rawBlocks = data.terms?.blocks ?? [];
   // A Studio rename overrides the per-record terms heading (but not the Notes block).
   const blocks = recordLabel
@@ -200,7 +203,7 @@ export const renderRecordTerms: SectionRenderer = (
     const body = recordBodyNode(b);
     if (!body) continue;
     if (boxes.length > 0) boxes.push({ text: '', margin: [0, 4, 0, 0] as [number, number, number, number] });
-    boxes.push(createBilingualInfoBox(en(b.title), bilingual ? ar(b.title) ?? null : null, [body]) as Content);
+    boxes.push(createBilingualInfoBox(en(b.title), bilingual ? ar(b.title, language) ?? null : null, [body]) as Content);
   }
   if (boxes.length === 0) return null;
   return { stack: boxes, margin: [0, 8, 0, 0] as [number, number, number, number] };

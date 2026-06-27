@@ -14,6 +14,7 @@ import type { Content } from 'pdfmake/interfaces';
 import { PDF_COLORS } from '../../styles';
 import { safeString } from '../../utils';
 import { isBilingualMode, en, ar } from '../labels';
+import { resolveSecondary } from '../../templateConfig';
 import type { BankBlock, EngineContext, EngineDocData, SectionRenderer } from '../types';
 
 /** ~half of the 525pt content width — the fixed column for the `'half'` width. */
@@ -63,7 +64,8 @@ export function buildBankBox(bank: BankBlock, engine: EngineContext): Content {
   const disp = bankDisplay(engine);
   if (disp.style === 'inline') return buildBankInline(bank);
 
-  const bilingual = isBilingualMode(engine.config.language);
+  const { language } = engine.config;
+  const bilingual = isBilingualMode(language);
   const fullWidth = disp.width === 'full';
 
   // Header band — the same shaded, bilingual treatment as the other section
@@ -75,8 +77,13 @@ export function buildBankBox(bank: BankBlock, engine: EngineContext): Content {
     { text: '', width: '*' },
   ];
   if (bilingual) {
+    // Arabic keeps its legacy literal fallback; a non-Arabic secondary degrades
+    // to the English title rather than leaking Arabic text.
+    const secondaryTitle =
+      ar(bank.title, language) ??
+      (resolveSecondary(language) === 'ar' ? 'تفاصيل البنك' : en(bank.title, 'Bank Account'));
     headerColumns.push({
-      text: ar(bank.title) ?? 'تفاصيل البنك',
+      text: secondaryTitle,
       style: 'bilingualHeader',
       alignment: 'right',
       width: 'auto',

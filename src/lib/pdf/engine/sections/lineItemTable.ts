@@ -46,7 +46,7 @@ export const renderLineItems: SectionRenderer = (
   const headingLabel = engine.config.labels.lineItems ?? { en: 'Line Items', ar: 'البنود' };
   const heading = createBilingualSectionHeader(
     en(headingLabel, 'Line Items'),
-    bilingual ? ar(headingLabel) : null,
+    bilingual ? ar(headingLabel, language) : null,
   ) as Content;
 
   // Table styling. `headerBackground` defaults to the legacy `PDF_COLORS.headerBg`,

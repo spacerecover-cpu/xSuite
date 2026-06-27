@@ -295,6 +295,16 @@ export async function preloadAllFonts(): Promise<void> {
   if (!loadedFontFamilies.has('NotoSansArabic')) {
     await loadAndCacheFonts('arabic', 'NotoSansArabic');
   }
+  // Non-Latin secondary scripts the engine can now select for ANY of the 13
+  // languages (ko → NotoSansKR, th → NotoSansThai). Preload them so a non-Arabic
+  // bilingual preview renders its glyphs; failures are non-fatal (loadAndCacheFonts
+  // swallows errors) and degrade to the base font — the preview never hangs.
+  if (!loadedFontFamilies.has('NotoSansKR')) {
+    await loadAndCacheFonts('korean', 'NotoSansKR');
+  }
+  if (!loadedFontFamilies.has('NotoSansThai')) {
+    await loadAndCacheFonts('thai', 'NotoSansThai');
+  }
   initVFSWithBaseFont();
 }
 

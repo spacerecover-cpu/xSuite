@@ -67,7 +67,7 @@ export const renderDiagnostics: SectionRenderer = (
 
   const box = createBilingualInfoBox(
     en(diagnostics.title, 'Device Details'),
-    bilingual ? ar(diagnostics.title) : null,
+    bilingual ? ar(diagnostics.title, language) : null,
     rows,
     mediaIcon,
   ) as Content;

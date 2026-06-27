@@ -119,7 +119,7 @@ export const renderCustodyLog: SectionRenderer = (
 
   const heading = createBilingualSectionHeader(
     en(log.title, 'Chain of Custody Entries'),
-    bilingual ? ar(log.title) : null,
+    bilingual ? ar(log.title, language) : null,
   ) as Content;
 
   // Header row: one cell per visible column, label resolved by language mode.

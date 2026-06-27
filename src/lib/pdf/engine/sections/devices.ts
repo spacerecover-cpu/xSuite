@@ -99,7 +99,7 @@ export const renderDevices: SectionRenderer = (
   // when the mode asks for it.
   const heading = createBilingualSectionHeader(
     en(dev.title, 'Devices'),
-    bilingual ? ar(dev.title) : null,
+    bilingual ? ar(dev.title, language) : null,
   ) as Content;
 
   // Header row: one cell per visible column, label resolved by language mode.

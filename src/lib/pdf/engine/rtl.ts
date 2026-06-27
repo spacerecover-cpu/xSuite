@@ -30,12 +30,35 @@
  */
 
 import { getFontFamily } from '../fonts';
-import type { LanguageConfig, LabelText } from '../templateConfig';
+import { isRTLLanguage, type LanguageCode } from '../../documentTranslations';
+import { resolveSecondary, secondaryText, type LanguageConfig, type LabelText } from '../templateConfig';
 
 export type LayoutDirection = 'ltr' | 'rtl';
 
 /** The Arabic font family the engine tags Arabic runs with. */
 const ARABIC_FONT = 'Tajawal';
+
+/**
+ * The pdfmake font family that SHAPES a given secondary language's script.
+ * Non-Latin scripts need their own family (Arabic→Tajawal, Korean→NotoSansKR,
+ * Thai→NotoSansThai); Cyrillic (ru/uk) and Latin (pl/cs/tr/fr/de/it/es/pt) all
+ * shape in the base Latin family (Roboto), so they return `null` (= "use the
+ * base font"). The actual binaries are resolved from pdfmake's VFS at render
+ * time; the engine only needs the deterministic family NAME in the definition.
+ */
+function secondaryFontFamily(secondary: LanguageCode | null): string | null {
+  switch (secondary) {
+    case 'ar':
+      return ARABIC_FONT;
+    case 'ko':
+      return 'NotoSansKR';
+    case 'th':
+      return 'NotoSansThai';
+    default:
+      // Cyrillic (ru, uk) + Latin (pl, cs, tr, fr, de, it, es, pt) → base/Roboto.
+      return null;
+  }
+}
 
 /** A pdfmake inline text run, optionally pinned to a specific font family. */
 export interface FontRun {
@@ -47,39 +70,49 @@ export interface FontRun {
 export type HAlign = 'left' | 'center' | 'right';
 
 /**
- * The reading direction implied by a language config. RTL exactly when Arabic
- * is the leading language (single `ar`, or a bilingual mode with `primary: 'ar'`).
+ * The reading direction implied by a language config. RTL exactly when an RTL
+ * secondary LEADS the document — i.e. the resolved secondary is RTL (Arabic
+ * today) AND it is the leading language (single secondary mode `'ar'`, or a
+ * bilingual mode with `primary: 'ar'`). For a legacy config (no `secondary`),
+ * `resolveSecondary` returns `'ar'`, so this is byte-identical to before; a
+ * config with a non-RTL secondary (French, Korean, …) stays LTR.
  */
 export function engineLayoutDirection(language: LanguageConfig): LayoutDirection {
-  const arabicLeads =
+  const secondary = resolveSecondary(language);
+  const secondaryLeads =
     language.mode === 'ar' ||
     ((language.mode === 'bilingual_stacked' || language.mode === 'bilingual_sidebyside') &&
       language.primary === 'ar');
-  return arabicLeads ? 'rtl' : 'ltr';
+  return secondaryLeads && isRTLLanguage(secondary) ? 'rtl' : 'ltr';
 }
 
 /**
  * The document `defaultStyle.font` for a language config. ANY document that
- * includes Arabic — single Arabic (`ar`) OR either bilingual mode (even with
- * English leading) — needs the Arabic family so Arabic glyphs shape. Tajawal
- * covers Latin too, so the English half of a bilingual document still renders
- * correctly. Only pure English keeps the tenant/base font.
+ * includes a NON-LATIN secondary script — Arabic (`ar`→Tajawal), Korean
+ * (`ko`→NotoSansKR), Thai (`th`→NotoSansThai) — needs that script's family so
+ * its glyphs shape; those families cover Latin too, so the English half still
+ * renders. Cyrillic (ru/uk) and Latin (pl/cs/tr/fr/de/it/es/pt) secondaries —
+ * and pure English — keep the tenant/base font. For a legacy config (no
+ * `secondary`), `resolveSecondary` returns `'ar'`, so this is byte-identical to
+ * the previous Arabic-only behavior.
  *
  * pdfmake resolves the family name from its VFS at render time (callers preload
- * fonts via `preloadAllFonts()` / `initializePDFFonts('ar')`). We ask
- * `getFontFamily('ar')` first so a loaded Tajawal is used, and fall back to the
- * literal Arabic family name so the doc-definition is deterministic even before
- * fonts have loaded (the engine must produce a stable definition; font binaries
- * are resolved later).
+ * fonts via `preloadAllFonts()` / `initializePDFFonts(secondary)`). We return
+ * the literal family name so the doc-definition is deterministic even before
+ * fonts have loaded (binaries are resolved later); a font that fails to load
+ * degrades to the base font at rasterization without throwing.
  */
 export function engineDefaultFont(language: LanguageConfig, baseFont: string): string {
   if (language.mode === 'en') return baseFont;
-  // `getFontFamily('ar')` returns 'Tajawal' only when the family is already
-  // loaded into pdfmake's VFS, else 'Roboto'. For an Arabic-containing document
-  // we always want the Arabic family in the definition (binaries are resolved at
-  // render time by the caller's font preload), so coerce to it explicitly.
-  const arabicFamily = getFontFamily('ar');
-  return arabicFamily === 'Tajawal' ? arabicFamily : 'Tajawal';
+  const secondary = resolveSecondary(language);
+  const family = secondaryFontFamily(secondary);
+  // Touch the loader so a loaded family is preferred when present; the literal
+  // family name is still returned for determinism (see doc comment).
+  if (family) {
+    const loaded = getFontFamily(secondary);
+    return loaded === family ? loaded : family;
+  }
+  return baseFont;
 }
 
 /**
@@ -110,22 +143,29 @@ export function bilingualLabelRuns(
   baseFont: string,
 ): FontRun[] {
   const english = label.en ?? '';
-  const arabic = label.ar ?? null;
+  const secondaryCode = resolveSecondary(language);
+  const secondary = secondaryText(label, secondaryCode) ?? null;
+  // The secondary run's font: its non-Latin script family (Arabic/Korean/Thai),
+  // or the base font for Latin/Cyrillic secondaries.
+  const secondaryFont = secondaryFontFamily(secondaryCode) ?? baseFont;
 
   if (language.mode === 'en') return [{ text: english }];
   if (language.mode === 'ar') {
-    // Arabic-only: a single Arabic run in the Arabic family (falls back to the
-    // English text when no Arabic string was supplied).
-    return arabic ? [{ text: arabic, font: ARABIC_FONT }] : [{ text: english, font: baseFont }];
+    // Secondary-only: a single secondary run in the secondary family (falls back
+    // to the English text when no secondary string was supplied).
+    return secondary
+      ? [{ text: secondary, font: secondaryFont }]
+      : [{ text: english, font: baseFont }];
   }
 
   // Bilingual: both runs, primary first, separated by " | ". Each run is pinned
-  // to its own font so the Arabic shapes regardless of the document default.
+  // to its own font so a non-Latin secondary shapes regardless of the document
+  // default.
   const englishRun: FontRun = { text: english, font: baseFont };
-  if (!arabic) return [englishRun];
-  const arabicRun: FontRun = { text: arabic, font: ARABIC_FONT };
+  if (!secondary) return [englishRun];
+  const secondaryRun: FontRun = { text: secondary, font: secondaryFont };
   const sep: FontRun = { text: ' | ', font: baseFont };
-  return language.primary === 'ar' ? [arabicRun, sep, englishRun] : [englishRun, sep, arabicRun];
+  return language.primary === 'ar' ? [secondaryRun, sep, englishRun] : [englishRun, sep, secondaryRun];
 }
 
 /** Swap left↔right (center is unchanged) — used when mirroring table cells. */

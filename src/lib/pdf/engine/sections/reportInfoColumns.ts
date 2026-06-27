@@ -58,7 +58,7 @@ function columnBox(
   const rows = col.rows.map((r) => infoRow(r.label, r.value, language, labelWidth));
   return createBilingualInfoBox(
     en(col.title, fallbackTitle),
-    bilingual ? ar(col.title) : null,
+    bilingual ? ar(col.title, language) : null,
     rows,
     iconSvg,
   ) as Content;

@@ -60,7 +60,7 @@ export const renderPayslipInfo: SectionRenderer = (
 
   const box = createBilingualInfoBox(
     en(info.title, 'Employee Information'),
-    bilingual ? ar(info.title) : null,
+    bilingual ? ar(info.title, language) : null,
     rows,
     userIcon,
   ) as Content;

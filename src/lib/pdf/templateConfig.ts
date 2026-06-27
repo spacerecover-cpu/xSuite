@@ -13,24 +13,94 @@
  * doc-type template → per-instance override. See {@link resolveTemplateConfig}.
  */
 
-/** Bilingual label. `en` is mandatory; `ar` is optional (Arabic/RTL). */
+import type { LanguageCode } from '../documentTranslations';
+
+/**
+ * Bilingual label. `en` is mandatory. A secondary translation can be supplied
+ * for ANY of the 13 supported languages via `i18n` (the generalized field).
+ *
+ * `ar` is the LEGACY Arabic-only secondary slot. It is kept for backward
+ * compatibility — deployed templates + `company_settings` store the old
+ * `{ en, ar }` shape — but is DEPRECATED in favor of `i18n.ar`. Read secondary
+ * text through {@link secondaryText}, which treats a legacy `.ar` as `i18n.ar`,
+ * so existing configs keep rendering byte-identically with no data migration.
+ */
 export interface LabelText {
   en: string;
+  /**
+   * @deprecated Use `i18n.ar`. Retained so legacy `{ en, ar }` configs render
+   * unchanged; {@link secondaryText} reads it as the Arabic secondary.
+   */
   ar?: string;
+  /** Generalized per-language secondary translations (any of the 13). */
+  i18n?: Partial<Record<LanguageCode, string>>;
+}
+
+/**
+ * Resolve the secondary-language string for a label, generalizing the legacy
+ * Arabic-only `LabelText.ar` to all 13 languages:
+ *
+ *   `label.i18n?.[lang] ?? (lang === 'ar' ? label.ar : undefined)`
+ *
+ * A label authored the new way (`{ en, i18n: { fr } }`) returns its French text
+ * for `lang === 'fr'`; a legacy label (`{ en, ar }`) still returns its Arabic
+ * text for `lang === 'ar'`. Returns `undefined` when no secondary is selected or
+ * none is authored for the requested language (callers degrade to English).
+ */
+export function secondaryText(
+  label: LabelText | undefined,
+  lang: LanguageCode | null,
+): string | undefined {
+  if (!label || !lang) return undefined;
+  return label.i18n?.[lang] ?? (lang === 'ar' ? label.ar : undefined);
 }
 
 /**
  * Per-document language behavior.
- * - `en` / `ar`: single language.
- * - `bilingual_stacked`: EN then AR stacked vertically.
- * - `bilingual_sidebyside`: EN and AR mirrored side-by-side (RTL-aware).
+ * - `en`: single (English only).
+ * - `ar`: SECONDARY-only (single secondary language; legacy name = Arabic-only).
+ * - `bilingual_stacked`: English + secondary stacked vertically.
+ * - `bilingual_sidebyside`: English + secondary mirrored side-by-side (RTL-aware).
+ *
+ * NOTE: the `'ar'` literal is kept for backward-compat (many files switch on it);
+ * its SEMANTICS are "secondary-only", with the secondary chosen by
+ * {@link resolveSecondary} (Arabic when none is set).
  */
 export type LanguageMode = 'en' | 'ar' | 'bilingual_stacked' | 'bilingual_sidebyside';
 
 export interface LanguageConfig {
   mode: LanguageMode;
-  /** Which language leads when both are shown. */
+  /**
+   * Which language leads when both are shown. `'ar'` is the legacy "secondary
+   * leads" value; the union is intentionally unchanged for back-compat.
+   */
   primary: 'en' | 'ar';
+  /**
+   * Which of the 13 languages is the secondary. Undefined ⇒ Arabic (legacy
+   * behavior), resolved via {@link resolveSecondary}. A config with no
+   * `secondary` therefore behaves EXACTLY as today; `secondary: 'fr'` renders
+   * English + French.
+   */
+  secondary?: LanguageCode;
+}
+
+/**
+ * The effective secondary language for a config, generalizing the legacy
+ * Arabic-only model. Explicit `secondary` wins; otherwise any bilingual /
+ * secondary-only / Arabic-primary config falls back to Arabic (today's
+ * behavior); a pure-English config has no secondary (`null`).
+ */
+export function resolveSecondary(language: LanguageConfig): LanguageCode | null {
+  if (language.secondary) return language.secondary;
+  if (
+    language.mode === 'ar' ||
+    language.mode === 'bilingual_stacked' ||
+    language.mode === 'bilingual_sidebyside' ||
+    language.primary === 'ar'
+  ) {
+    return 'ar';
+  }
+  return null;
 }
 
 /**
@@ -866,7 +936,11 @@ function mergeColumns(
       byKey.set(ov.key, {
         key: ov.key,
         visible: ov.visible ?? true,
-        label: { en: ov.label?.en ?? ov.key, ...(ov.label?.ar ? { ar: ov.label.ar } : {}) },
+        label: {
+          en: ov.label?.en ?? ov.key,
+          ...(ov.label?.ar ? { ar: ov.label.ar } : {}),
+          ...(ov.label?.i18n ? { i18n: ov.label.i18n } : {}),
+        },
         ...(ov.width !== undefined ? { width: ov.width } : {}),
       });
     }

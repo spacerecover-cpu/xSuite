@@ -31,13 +31,14 @@ export const renderLegalTerms: SectionRenderer = (
   const legal = data.legalTerms;
   if (!legal || !en(legal.body)) return null;
 
-  const bilingual = isBilingualMode(engine.config.language);
+  const { language } = engine.config;
+  const bilingual = isBilingualMode(language);
 
   return createTermsBox(
     en(legal.title, 'Terms & Conditions'),
-    bilingual ? ar(legal.title) : null,
+    bilingual ? ar(legal.title, language) : null,
     en(legal.body),
-    bilingual ? ar(legal.body) : null,
+    bilingual ? ar(legal.body, language) : null,
     legal.policyUrl ?? null,
   ) as Content;
 };

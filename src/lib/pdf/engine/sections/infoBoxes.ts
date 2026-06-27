@@ -75,7 +75,7 @@ function partyBox(
   // `labelLang` so the policy can suppress the per-row Arabic labels.
   return createBilingualInfoBox(
     en(party.title),
-    bilingual ? ar(party.title) : null,
+    bilingual ? ar(party.title, language) : null,
     partyRows(party, labelLang),
     iconSvg,
   ) as Content;
@@ -107,11 +107,12 @@ function metaRows(engine: EngineContext, data: EngineDocData): object[] {
 /** Build the meta (document-details) info box, or null when there is nothing to show. */
 function buildMetaBox(engine: EngineContext, data: EngineDocData): Content | null {
   if (!data.meta || data.meta.length === 0) return null;
-  const bilingual = isBilingualMode(engine.config.language);
+  const { language } = engine.config;
+  const bilingual = isBilingualMode(language);
   const metaTitle = metaTitleLabel(engine);
   return createBilingualInfoBox(
     en(metaTitle),
-    bilingual ? ar(metaTitle) : null,
+    bilingual ? ar(metaTitle, language) : null,
     metaRows(engine, data),
     getGeneralIconSvg('fileText'),
   ) as Content;
@@ -244,7 +245,7 @@ export function renderPartiesMeta(
       stack: [
         createBilingualInfoBox(
           en(details!.title),
-          bilingual ? ar(details!.title) : null,
+          bilingual ? ar(details!.title, language) : null,
           details!.rows,
           getGeneralIconSvg('fileText'),
         ) as Content,
@@ -257,12 +258,12 @@ export function renderPartiesMeta(
   const band = PDF_COLORS.background;
 
   const partyHeaderCell = {
-    ...bandHeaderColumns(partyIcon, en(party.title), bilingual ? ar(party.title) : null),
+    ...bandHeaderColumns(partyIcon, en(party.title), bilingual ? ar(party.title, language) : null),
     fillColor: band,
     margin: [6, 4, 6, 4],
   };
   const detailsHeaderCell = {
-    ...bandHeaderColumns(getGeneralIconSvg('fileText'), en(details.title), bilingual ? ar(details.title) : null),
+    ...bandHeaderColumns(getGeneralIconSvg('fileText'), en(details.title), bilingual ? ar(details.title, language) : null),
     fillColor: band,
     margin: [6, 4, 6, 4],
   };
