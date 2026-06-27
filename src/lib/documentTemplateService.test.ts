@@ -276,7 +276,15 @@ describe('seedTemplateLanguage', () => {
 
   it('seeds a new template language from a bilingual-Arabic tenant default', () => {
     const out = seedTemplateLanguage({}, tenant('bilingual', 'ar'));
-    expect(out.language).toEqual({ mode: 'bilingual_stacked', primary: 'ar' });
+    // The seed now carries the chosen secondary (generalized to any of the 13);
+    // for an RTL secondary it also leads (primary 'ar'). Arabic stays byte-identical.
+    expect(out.language).toEqual({ mode: 'bilingual_stacked', primary: 'ar', secondary: 'ar' });
+  });
+
+  it('seeds a non-Arabic secondary (French) from a bilingual tenant default', () => {
+    const out = seedTemplateLanguage({}, tenant('bilingual', 'fr'));
+    // A non-RTL secondary keeps English in the lead, carrying the chosen language.
+    expect(out.language).toEqual({ mode: 'bilingual_stacked', primary: 'en', secondary: 'fr' });
   });
 
   it('seeds explicit English from an english_only tenant (was implicit default)', () => {

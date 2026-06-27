@@ -18,9 +18,9 @@ import { toEngineData as toQuoteEngineData } from './engine/adapters/quoteAdapte
 import { toEngineData as toPaymentReceiptEngineData } from './engine/adapters/paymentReceiptAdapter';
 import { renderTemplate } from './engine/renderTemplate';
 import { applyTenantLanguage } from './engine/applyTenantLanguage';
-import { buildTenantPreviewContext } from './engine/tenantPreviewContext';
-import { createPdfWithFonts } from './fonts';
-import { withTimeout } from './translationContext';
+import { createPdfWithFonts, initializePDFFonts } from './fonts';
+import { ctxFromLanguageConfig, withTimeout } from './translationContext';
+import { resolveSecondary } from './templateConfig';
 import { loadImageAsBase64 } from './utils';
 import { resolveBrandingImage, brandingImageWarning, type BrandingImage } from './brandingImage';
 import type { PreviewResult } from './engine/previewTemplate';
@@ -144,10 +144,23 @@ export async function previewDocumentForRecord(
   }
 
   // Mirror the generator's language path so the preview's language matches the
-  // real PDF: derive the config's `language` and the translation context from the
-  // tenant's document-language settings (not the hard-coded English default).
+  // real PDF: resolve the config's `language` (per-template Studio picker wins,
+  // tenant setting fills in only when the template is English-default), then build
+  // the translation context FROM that resolved language so the chosen secondary
+  // (any of the 13) drives both layout and translation.
   const langConfig = companySettings ? applyTenantLanguage(config, companySettings) : config;
-  const ctx = companySettings ? buildTenantPreviewContext(companySettings) : PREVIEW_CTX_EN;
+  const ctx = companySettings ? ctxFromLanguageConfig(langConfig.language) : PREVIEW_CTX_EN;
+  // Preload the chosen secondary's font so a non-Latin script shapes; non-fatal
+  // (createPdfWithFonts also remaps an unresolved family to Roboto), so a missing
+  // font degrades to Latin instead of crashing the preview.
+  const secondary = resolveSecondary(langConfig.language);
+  if (secondary) {
+    try {
+      await initializePDFFonts(secondary);
+    } catch {
+      /* non-fatal: render proceeds with the base font */
+    }
+  }
   const docDefinition = renderTemplate(langConfig, engineData, ctx, logo, qr, stamp, signature);
   const warning = brandingImageWarning(logo);
   const warnings = warning ? [warning] : [];

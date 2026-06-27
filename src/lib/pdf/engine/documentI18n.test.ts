@@ -10,7 +10,8 @@ import {
 } from '../templateConfig';
 import { ctxFromLanguageConfig } from '../translationContext';
 import { renderTemplate } from './renderTemplate';
-import type { EngineDocData } from './types';
+import { renderTerms } from './sections/terms';
+import type { EngineContext, EngineDocData } from './types';
 
 // ---------------------------------------------------------------------------
 // 13-language generalization (additive). These tests assert the new resolvers
@@ -159,5 +160,55 @@ describe('renderTemplate — non-Arabic (French) bilingual secondary', () => {
     const defaultStyle = def.defaultStyle as { font?: string; alignment?: string };
     expect(defaultStyle.font).not.toBe('Tajawal');
     expect(defaultStyle.alignment).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Terms & Conditions (TermsBodyText) — generalized body i18n + legacy compat.
+// ---------------------------------------------------------------------------
+
+function termsEngine(language: LanguageConfig, termsContent: DocumentTemplateConfig['termsContent']): EngineContext {
+  const config = resolveTemplateConfig(BUILT_IN_TEMPLATE_CONFIGS.invoice, undefined, {
+    language,
+    termsContent,
+  });
+  return { config, ctx: ctxFromLanguageConfig(config.language) } as EngineContext;
+}
+
+describe('renderTerms — generalized TermsContentConfig body', () => {
+  it('renders the French secondary body from i18n alongside the English body', () => {
+    const engine = termsEngine(
+      { mode: 'bilingual_stacked', primary: 'en', secondary: 'fr' },
+      { terms: { en: 'Valid for 30 days.', i18n: { fr: 'Valable 30 jours.' } } },
+    );
+    const node = renderTerms(engine, {} as EngineDocData);
+    const texts: string[] = [];
+    collectText(node, texts);
+    expect(texts.some((t) => t.includes('Valid for 30 days.'))).toBe(true);
+    expect(texts.some((t) => t.includes('Valable 30 jours.'))).toBe(true);
+  });
+
+  it('still renders a legacy {en, ar} body for an Arabic secondary (back-compat)', () => {
+    const engine = termsEngine(
+      { mode: 'bilingual_stacked', primary: 'ar', secondary: 'ar' },
+      { terms: { en: 'Valid for 30 days.', ar: 'صالح لمدة 30 يومًا.' } },
+    );
+    const node = renderTerms(engine, {} as EngineDocData);
+    const texts: string[] = [];
+    collectText(node, texts);
+    expect(texts.some((t) => t.includes('Valid for 30 days.'))).toBe(true);
+    expect(texts.some((t) => t.includes('صالح لمدة 30 يومًا.'))).toBe(true);
+  });
+
+  it('omits the secondary column for an English-only document', () => {
+    const engine = termsEngine(
+      { mode: 'en', primary: 'en' },
+      { terms: { en: 'Valid for 30 days.', i18n: { fr: 'Valable 30 jours.' } } },
+    );
+    const node = renderTerms(engine, {} as EngineDocData);
+    const texts: string[] = [];
+    collectText(node, texts);
+    expect(texts.some((t) => t.includes('Valid for 30 days.'))).toBe(true);
+    expect(texts.some((t) => t.includes('Valable 30 jours.'))).toBe(false);
   });
 });

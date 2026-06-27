@@ -23,9 +23,9 @@ import type { DocumentTemplateConfig, TemplateDocumentType } from '../templateCo
 import type { CompanySettingsData, TranslationContext } from '../types';
 import { renderTemplate } from './renderTemplate';
 import { applyTenantLanguage } from './applyTenantLanguage';
-import { buildTenantPreviewContext } from './tenantPreviewContext';
-import { createPdfWithFonts } from '../fonts';
-import { withTimeout } from '../translationContext';
+import { createPdfWithFonts, initializePDFFonts } from '../fonts';
+import { ctxFromLanguageConfig, withTimeout } from '../translationContext';
+import { resolveSecondary } from '../templateConfig';
 import { buildPreviewEngineData, sampleInvoiceData } from './sampleData';
 import { resolveQrImage } from '../qrImage';
 import { brandingImageWarning, placeholderLogoSvg, type BrandingImage } from '../brandingImage';
@@ -104,12 +104,28 @@ export async function previewTemplate(
 ): Promise<PreviewResult> {
   // When the tenant's company settings are supplied, render the way the generator
   // does: the tenant's real company replaces the sample company, and the config
-  // `language` + translation context follow the tenant's document-language
-  // settings — so the preview predicts the generated PDF instead of a neutral
-  // bilingual sample. Without it, the legacy sample-company + English-context
-  // behavior is preserved (callers/tests that pass no tenant settings).
+  // `language` follows the per-template Studio picker (falling back to the
+  // tenant's document-language setting only when the template is English-default).
+  // Without it, the legacy sample-company + caller-supplied-context behavior is
+  // preserved (callers/tests that pass no tenant settings).
   const effectiveConfig = companySettings ? applyTenantLanguage(config, companySettings) : config;
-  const effectiveCtx = companySettings ? buildTenantPreviewContext(companySettings) : ctx;
+  // Derive the translation context from the RESOLVED per-template language so the
+  // Studio's secondary-language choice drives BOTH layout (config.language) AND
+  // translation (ctx) — any of the 13 languages, not just the tenant-wide Arabic.
+  // When no company settings are passed, honour the caller-supplied ctx (tests).
+  const effectiveCtx = companySettings ? ctxFromLanguageConfig(effectiveConfig.language) : ctx;
+  // Preload the chosen secondary's font so a non-Latin script (Arabic/Korean/Thai)
+  // shapes in the preview. Non-fatal: initializePDFFonts swallows load failures
+  // and degrades to the base font (createPdfWithFonts also remaps any unresolved
+  // family to Roboto), so a CSP-blocked CDN font can never crash the preview.
+  const secondary = resolveSecondary(effectiveConfig.language);
+  if (secondary) {
+    try {
+      await initializePDFFonts(secondary);
+    } catch {
+      /* non-fatal: render proceeds with the base font */
+    }
+  }
   const engineData = buildPreviewEngineData(docType, effectiveConfig, companySettings);
   // Draw the real logo when resolved, else a labeled placeholder box. The QR is
   // auto-generated from the document's verification payload as a PNG image —

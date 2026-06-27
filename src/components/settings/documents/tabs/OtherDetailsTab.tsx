@@ -4,7 +4,16 @@ import { Input } from '../../../ui/Input';
 import { Select } from '../../../ui/Select';
 import { Textarea } from '../../../ui/Textarea';
 import { FieldGroup, SegmentedControl, ToggleRow } from '../controls';
-import type { LanguageMode, SectionConfig, TranslationPolicyConfig } from '../../../../lib/pdf/templateConfig';
+import { resolveSecondary, secondaryText, type SectionConfig, type TranslationPolicyConfig } from '../../../../lib/pdf/templateConfig';
+import { isRTLLanguage, type LanguageCode } from '../../../../lib/documentTranslations';
+import {
+  SECONDARY_LANGUAGE_OPTIONS,
+  languageName,
+  layoutOptions,
+  patchForLayout,
+  patchForSecondary,
+  type StudioLayoutMode,
+} from '../languageOptions';
 import type { StudioApi } from '../TemplateStudio';
 
 /** Sections whose content depends on record data — a hint avoids "I toggled it but nothing showed". */
@@ -22,7 +31,7 @@ const DATA_DEPENDENT_HINTS: Record<string, string> = {
  */
 const GUIDANCE_HINTS: Record<string, string> = {
   terms:
-    'The STANDARD Terms & Conditions for this document type — set the content (English + Arabic) in the Terms & Conditions section above. Printed only when you fill it in; it never falls back to the per-record terms.',
+    'The STANDARD Terms & Conditions for this document type — set the content in the Terms & Conditions section above. Printed only when you fill it in; it never falls back to the per-record terms.',
   recordTerms:
     'The terms entered on each quote/invoice (from Terms & Templates). The content comes from the record — position, rename, or hide the section here. Omitted automatically when a record has no terms.',
   bank:
@@ -80,6 +89,13 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
     [api.resolved.sections],
   );
 
+  const language = api.resolved.language;
+  // The effective secondary language for the current config (any of the 13, or
+  // null for English-only). Drives every authored-content secondary field below.
+  const secondary: LanguageCode | null = language.mode === 'en' ? null : resolveSecondary(language);
+  const secondaryName = languageName(secondary);
+  const secondaryRTL = secondary ? isRTLLanguage(secondary) : false;
+
   // The side-by-side layout only makes sense when the document has both a
   // customer/party block and a document-details block — the financial "meta" box
   // or, on intake/checkout docs, the "case information" box.
@@ -118,18 +134,23 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
 
   return (
     <div className="space-y-7">
-      <FieldGroup title="Language" description="Single language or bilingual (English + Arabic, RTL-aware).">
+      <FieldGroup title="Language" description="Add a secondary language (any of 13) and choose how the two languages are laid out. Reading direction (RTL) is set automatically.">
         <Select
-          label="Document language"
-          value={api.resolved.language.mode}
-          onChange={(e) => api.setLanguage(e.target.value as LanguageMode)}
-          options={[
-            { value: 'en', label: 'English only' },
-            { value: 'ar', label: 'Arabic only' },
-            { value: 'bilingual_stacked', label: 'Bilingual — stacked (English over Arabic)' },
-            { value: 'bilingual_sidebyside', label: 'Bilingual — side by side (English | Arabic)' },
-          ]}
+          label="Secondary language"
+          value={secondary ?? ''}
+          onChange={(e) =>
+            api.setLanguage(patchForSecondary((e.target.value || null) as LanguageCode | null, language.mode))
+          }
+          options={SECONDARY_LANGUAGE_OPTIONS}
         />
+        {secondary && (
+          <Select
+            label="Layout"
+            value={language.mode === 'en' ? 'bilingual_stacked' : (language.mode as StudioLayoutMode)}
+            onChange={(e) => api.setLanguage(patchForLayout(e.target.value as StudioLayoutMode, secondary))}
+            options={layoutOptions(secondary)}
+          />
+        )}
       </FieldGroup>
 
       <FieldGroup title="Translation" description="Which labels render bilingually. Only affects bilingual documents; data values always stay as entered.">
@@ -176,7 +197,11 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
 
       <FieldGroup
         title="Terms & Conditions"
-        description="Printed on this document type — a Quotation's terms differ from an Invoice's, so each template has its own. Fill in the Arabic to show terms in both languages on bilingual documents."
+        description={
+          secondary
+            ? `Printed on this document type — a Quotation's terms differ from an Invoice's, so each template has its own. Fill in the ${secondaryName} text to show terms in both languages on bilingual documents.`
+            : "Printed on this document type — a Quotation's terms differ from an Invoice's, so each template has its own."
+        }
       >
         <div className="space-y-4">
           <Textarea
@@ -186,15 +211,17 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
             rows={4}
             placeholder="e.g. This quotation is valid for 30 days. 50% advance required to begin."
           />
-          <Textarea
-            label="Terms & Conditions (Arabic)"
-            value={api.resolved.termsContent?.terms?.ar ?? ''}
-            onChange={(e) => api.setTermsContent({ terms: { ar: e.target.value } })}
-            rows={4}
-            dir="rtl"
-            className="text-right"
-            placeholder="الترجمة العربية للشروط والأحكام…"
-          />
+          {secondary && (
+            <Textarea
+              label={`Terms & Conditions (${secondaryName})`}
+              value={secondaryText(api.resolved.termsContent?.terms, secondary) ?? ''}
+              onChange={(e) => api.setTermsContent({ terms: { i18n: { [secondary]: e.target.value } } })}
+              rows={4}
+              dir={secondaryRTL ? 'rtl' : undefined}
+              className={secondaryRTL ? 'text-right' : undefined}
+              placeholder={`${secondaryName} translation of the terms…`}
+            />
+          )}
           <Textarea
             label="Notes (English)"
             value={api.resolved.termsContent?.notes?.en ?? ''}
@@ -202,15 +229,17 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
             rows={3}
             placeholder="Optional — shown beneath the terms."
           />
-          <Textarea
-            label="Notes (Arabic)"
-            value={api.resolved.termsContent?.notes?.ar ?? ''}
-            onChange={(e) => api.setTermsContent({ notes: { ar: e.target.value } })}
-            rows={3}
-            dir="rtl"
-            className="text-right"
-            placeholder="ملاحظات اختيارية…"
-          />
+          {secondary && (
+            <Textarea
+              label={`Notes (${secondaryName})`}
+              value={secondaryText(api.resolved.termsContent?.notes, secondary) ?? ''}
+              onChange={(e) => api.setTermsContent({ notes: { i18n: { [secondary]: e.target.value } } })}
+              rows={3}
+              dir={secondaryRTL ? 'rtl' : undefined}
+              className={secondaryRTL ? 'text-right' : undefined}
+              placeholder={`${secondaryName} notes…`}
+            />
+          )}
         </div>
       </FieldGroup>
 
@@ -306,9 +335,17 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
                   </div>
                 )}
                 {(label || section.key === 'recordTerms') && (
-                  <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className={`mt-3 grid gap-2 ${secondary ? 'grid-cols-2' : 'grid-cols-1'}`}>
                     <Input aria-label={`${displayLabel(section.key)} heading (English)`} placeholder={section.key === 'recordTerms' ? `Heading (EN) — ${recordTermsLabel}` : 'Heading (EN)'} value={label?.en ?? ''} onChange={(e) => api.setSectionLabel(section.key, 'en', e.target.value)} />
-                    <Input aria-label={`${displayLabel(section.key)} heading (Arabic)`} placeholder="العنوان (AR)" dir="rtl" value={label?.ar ?? ''} onChange={(e) => api.setSectionLabel(section.key, 'ar', e.target.value)} />
+                    {secondary && (
+                      <Input
+                        aria-label={`${displayLabel(section.key)} heading (${secondaryName})`}
+                        placeholder={`Heading (${secondaryName})`}
+                        dir={secondaryRTL ? 'rtl' : undefined}
+                        value={secondaryText(label, secondary) ?? ''}
+                        onChange={(e) => api.setSectionLabel(section.key, secondary, e.target.value)}
+                      />
+                    )}
                   </div>
                 )}
               </li>

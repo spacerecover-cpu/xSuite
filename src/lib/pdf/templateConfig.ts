@@ -48,11 +48,24 @@ export interface LabelText {
  * none is authored for the requested language (callers degrade to English).
  */
 export function secondaryText(
-  label: LabelText | undefined,
+  label: SecondaryTextSource | undefined,
   lang: LanguageCode | null,
 ): string | undefined {
   if (!label || !lang) return undefined;
   return label.i18n?.[lang] ?? (lang === 'ar' ? label.ar : undefined);
+}
+
+/**
+ * The minimal shape {@link secondaryText} reads — a legacy `.ar` slot plus the
+ * generalized `i18n` map. Both {@link LabelText} (heading: `en` required) and
+ * {@link TermsBodyText} (body: `en` optional) satisfy it, so the same resolver
+ * serves headings and prose bodies alike.
+ */
+export interface SecondaryTextSource {
+  /** Present on {@link LabelText} (required there) / {@link TermsBodyText}; not read here. */
+  en?: string;
+  ar?: string;
+  i18n?: Partial<Record<LanguageCode, string>>;
 }
 
 /**
@@ -426,6 +439,22 @@ export interface LocaleConfig {
 }
 
 /**
+ * A Terms/Notes body: mandatory(-ish) English text plus per-language secondary
+ * translations. Generalized from the legacy Arabic-only `{ en, ar }` shape to all
+ * 13 languages via `i18n` (same model as {@link LabelText}). `en` is optional
+ * here because a tenant may author only the secondary side, or leave a body
+ * blank; read the secondary through {@link secondaryText}, which treats a legacy
+ * `.ar` as `i18n.ar` so deployed `{ en, ar }` content keeps rendering unchanged.
+ */
+export interface TermsBodyText {
+  en?: string;
+  /** @deprecated Use `i18n.ar`. Retained for legacy `{ en, ar }` compatibility. */
+  ar?: string;
+  /** Generalized per-language secondary translations (any of the 13). */
+  i18n?: Partial<Record<LanguageCode, string>>;
+}
+
+/**
  * Per-document-type Terms & Conditions content (Studio-edited, bilingual).
  * Each document type's template carries its own — a Quote's terms differ from
  * an Invoice's. Rendered by the `terms` section; headings come from
@@ -433,8 +462,8 @@ export interface LocaleConfig {
  * (no tenant-wide or per-record override).
  */
 export interface TermsContentConfig {
-  terms?: { en?: string; ar?: string };
-  notes?: { en?: string; ar?: string };
+  terms?: TermsBodyText;
+  notes?: TermsBodyText;
 }
 
 /** The resolved, render-ready template configuration for one document. */
@@ -1086,15 +1115,27 @@ function mergeTranslationPolicy(
   return { ...base, ...override, ...(groups ? { groups } : {}) };
 }
 
-/** Merge T&C content, deep-merging the `terms` and `notes` EN/AR bodies by key. */
+/** Merge one Terms/Notes body, deep-merging the per-language `i18n` map by key
+ *  (so a layer can add a French translation without dropping an existing Arabic). */
+function mergeTermsBody(
+  base: TermsBodyText | undefined,
+  override: TermsBodyText | undefined,
+): TermsBodyText | undefined {
+  if (!base) return override;
+  if (!override) return base;
+  const i18n = mergeGroup(base.i18n, override.i18n);
+  return { ...base, ...override, ...(i18n ? { i18n } : {}) };
+}
+
+/** Merge T&C content, deep-merging the `terms` and `notes` bodies (incl. i18n) by key. */
 function mergeTermsContent(
   base: TermsContentConfig | undefined,
   override: TermsContentConfig | undefined,
 ): TermsContentConfig | undefined {
   if (!base) return override;
   if (!override) return base;
-  const terms = mergeGroup(base.terms, override.terms);
-  const notes = mergeGroup(base.notes, override.notes);
+  const terms = mergeTermsBody(base.terms, override.terms);
+  const notes = mergeTermsBody(base.notes, override.notes);
   return { ...(terms ? { terms } : {}), ...(notes ? { notes } : {}) };
 }
 
