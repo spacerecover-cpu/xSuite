@@ -464,8 +464,93 @@ export interface ReportSectionsBlock {
    * The ordered dynamic sections. Each is a bilingual header + plain-text body.
    * `order` is optional; when present the renderer sorts ascending by it (ties
    * keep input order), otherwise input order is preserved.
+   *
+   * Option B fields (all optional; absent = the legacy neutral boxed prose
+   * section, so non-report callers and any un-toned section are unchanged):
+   * - `tone` paints a fixed-hex left accent rule + tinted title (status
+   *   semantics, theme-invariant — see `PDF_TONES`).
+   * - `kind` selects a special block layout instead of plain prose:
+   *   `'destruction_certificate'` renders the prose THEN operator + witness
+   *   signature slots; `'prose'` (default) is the editorial left-accent prose.
+   *   The chain-of-custody timeline is NOT a kind here — it reuses
+   *   {@link CustodyLogBlock} exactly as before.
    */
-  sections: Array<{ title: LabelText; content: string; order?: number }>;
+  sections: Array<{
+    title: LabelText;
+    content: string;
+    order?: number;
+    tone?: import('../templateConfig').SectionTone;
+    kind?: 'prose' | 'destruction_certificate';
+  }>;
+}
+
+/**
+ * The Option B navy HEADER BAND for a data-recovery REPORT — a full-width band in
+ * the fixed Royal navy (`PDF_COLORS.primary`) with the company short identity
+ * reversed-out (white) on the leading edge and the report title (EN + AR) + the
+ * "Job <case_no>" line on the trailing edge. Report-only; the shared `header`
+ * renderer is untouched, so every OTHER document type keeps its classic
+ * letterhead. The adapter pre-formats every string; the renderer only lays the
+ * band out (RTL-aware via the engine layout direction). The logo image is read
+ * from {@link EngineContext.logo}.
+ */
+export interface ReportHeaderBlock {
+  /** Company short name shown reversed-out in the band (e.g. legal/company name). */
+  companyName: string;
+  /** Optional one-line company identity under the name (address / contact). */
+  companyTagline?: string;
+  /** The report title (EN + Arabic) shown large on the trailing edge of the band. */
+  title: LabelText;
+  /** Pre-formatted "Job <case_no>" / case-number line; omitted to hide it. */
+  jobLine?: string;
+}
+
+/**
+ * One compact SUMMARY TILE in the Option B report tile row. Each tile is a small
+ * tinted card with a bilingual caption and a single value. The adapter decides
+ * which tiles exist (only tiles with data are emitted) and picks each tile's
+ * tone — the Recoverability tile uses the category tone (warning), the rest are
+ * neutral. The renderer lays the supplied tiles out side by side, wrapping when
+ * they don't fit; an empty list renders nothing.
+ */
+export interface ReportSummaryTile {
+  /** Bilingual caption (e.g. "Device" / "الجهاز"). */
+  caption: LabelText;
+  /** Pre-formatted single-line value (e.g. "HDD · Seagate"). */
+  value: string;
+  /** Tile tone (default neutral). The recoverability tile is `warning`. */
+  tone?: import('../templateConfig').SectionTone;
+}
+
+/** The Option B summary-tile row (up to 4 tiles). Report-only. */
+export interface ReportSummaryBlock {
+  tiles: ReportSummaryTile[];
+}
+
+/**
+ * The Option B TWO-COLUMN info region for a report: a *General* column
+ * (customer + report meta) beside a *Device* column (device details). Each column
+ * is a titled block (bilingual title) of `Label : value` rows. The Device column
+ * is omitted (`device` undefined) for subtypes without device data (prevention,
+ * recovered_files) — the General column then spans full width. The adapter
+ * pre-formats every value; the renderer only lays the two columns out (RTL-aware).
+ */
+export interface ReportInfoColumnsBlock {
+  general: { title: LabelText; rows: Array<{ label: LabelText; value: string }> };
+  device?: { title: LabelText; rows: Array<{ label: LabelText; value: string }> } | null;
+}
+
+/**
+ * The Option B report FOOTER content — confidentiality line (italic), the
+ * copyright "© {year} {tenant}", and the provability line
+ * "Report ID: {id} | Generated: {timestamp}". Report-only; rendered as the
+ * repeating page footer. The provable PDF hash is wired in a later phase. The
+ * adapter pre-formats every string.
+ */
+export interface ReportFooterBlock {
+  confidentiality: LabelText;
+  copyright: string;
+  reportLine: string;
 }
 
 /**
@@ -602,6 +687,26 @@ export interface EngineDocData {
    * timeline is NOT here — it reuses {@link custodyLog}.
    */
   reportSections?: ReportSectionsBlock | null;
+  /**
+   * The Option B navy header band for a data-recovery report, or absent on
+   * non-report documents (which keep the classic `header` letterhead).
+   */
+  reportHeader?: ReportHeaderBlock | null;
+  /**
+   * The Option B summary-tile row (Device / Fault / Recoverability / ETA), or
+   * absent. Only tiles with data are emitted by the adapter.
+   */
+  reportSummary?: ReportSummaryBlock | null;
+  /**
+   * The Option B two-column General | Device info region, or absent. The Device
+   * column is omitted for subtypes without device data.
+   */
+  reportInfoColumns?: ReportInfoColumnsBlock | null;
+  /**
+   * The Option B report footer (confidentiality + copyright + Report ID/Generated
+   * provability line), or absent.
+   */
+  reportFooter?: ReportFooterBlock | null;
   /**
    * Case-label body (large case number, priority badge, received date, device
    * summary), or absent on non-label documents.

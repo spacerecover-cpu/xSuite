@@ -13,9 +13,11 @@ import { isPdfEngineEnabled } from './pdf/engine/featureFlag';
 import { renderTemplate } from './pdf/engine/renderTemplate';
 import { resolveQrImage } from './pdf/qrImage';
 import { applyTenantLanguage } from './pdf/engine/applyTenantLanguage';
-import { toEngineData as toReportEngineData } from './pdf/engine/adapters/reportAdapter';
 import {
-  BUILT_IN_TEMPLATE_CONFIGS,
+  toEngineData as toReportEngineData,
+  reportConfigForSubtype,
+} from './pdf/engine/adapters/reportAdapter';
+import {
   resolveTemplateConfig,
   type DocumentTemplateConfig,
   type TemplateConfigOverride,
@@ -192,8 +194,13 @@ class ReportPDFService {
       logger.error('[Report PDF Service] Report engine: template resolution failed, using built-in default:', err);
     }
 
+    // Option B: the built-in base is the per-SUBTYPE report config (navy band,
+    // summary tiles, two-column info, the subtype's ordered toned prose sections,
+    // and the report footer). The tenant's deployed report template still
+    // cascades on top as the doc-type override.
+    const subtypeBase = reportConfigForSubtype(data.report.report_type);
     const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
-      BUILT_IN_TEMPLATE_CONFIGS.report,
+      subtypeBase,
       /* theme */ undefined,
       /* docType */ docTypeOverride,
       /* instance */ undefined,
@@ -508,6 +515,7 @@ class ReportPDFService {
       status: string | null;
       created_at: string;
       client_reference: string | null;
+      estimated_completion: string | null;
       customers_enhanced: CustomerEmbed;
       companies: CompanyEmbed;
       profiles: ProfileNameEmbed;
@@ -523,6 +531,7 @@ class ReportPDFService {
         status,
         created_at,
         client_reference,
+        estimated_completion,
         customers_enhanced!customer_id(customer_name, email, mobile_number),
         companies!company_id(company_name),
         profiles!assigned_engineer_id(full_name)
@@ -613,6 +622,19 @@ class ReportPDFService {
       .select('*')
       .maybeSingle();
 
+    // Latest case-level diagnostics — the Option B Recoverability summary tile
+    // shows the CATEGORY label only (never a percentage). Prose (findings /
+    // solution) still comes from case_report_sections, not from here.
+    const { data: latestDiagnostic } = await supabase
+      .from('case_diagnostics')
+      .select('recoverability_assessment, findings, recommendations')
+      .eq('case_id', reportRaw.case_id)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const recoverability = latestDiagnostic?.recoverability_assessment ?? null;
+
     let chainOfCustodyEvents: ReportData['chainOfCustodyEvents'] = [];
     if (mappedReport.report_type === 'forensic' && forensicChainOfCustodyId) {
       type ChainOfCustodyRowWithActor = ChainOfCustodyRow & {
@@ -683,6 +705,8 @@ class ReportPDFService {
           service_type: caseDataRaw.catalog_service_types?.name ?? undefined,
           assigned_engineer: caseDataRaw.profiles?.full_name ?? undefined,
           created_at: caseDataRaw.created_at,
+          priority: caseDataRaw.priority ?? undefined,
+          estimated_completion: caseDataRaw.estimated_completion ?? undefined,
         }
       : undefined;
 
@@ -723,6 +747,7 @@ class ReportPDFService {
       chainOfCustodyEvents,
       companySettings: mappedCompanySettings,
       preparedByName,
+      recoverability,
     };
   }
 

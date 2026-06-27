@@ -44,6 +44,10 @@ export interface ReportData {
     service_type?: string;
     assigned_engineer?: string;
     created_at: string;
+    /** Case priority (Option B General column + ETA tile fallback). */
+    priority?: string;
+    /** Estimated completion date (Option B ETA tile). */
+    estimated_completion?: string;
   };
   customerData?: {
     customer_name: string;
@@ -59,6 +63,11 @@ export interface ReportData {
     serial_number?: string;
     interface?: string;
     condition?: string;
+    /** Option B Device column extras (all optional; absent → row omitted). */
+    dom?: string;
+    encryption?: string;
+    head_count?: string;
+    platter_count?: string;
   };
   diagnosticsData?: {
     device_type_category?: string;
@@ -134,6 +143,13 @@ export interface ReportData {
     };
   };
   preparedByName?: string;
+  /**
+   * Latest `case_diagnostics.recoverability_assessment` for the case (Option B
+   * Recoverability summary tile — CATEGORY only, never a percentage). One of
+   * `fully_recoverable` | `partially_recoverable` | `unrecoverable` |
+   * `requires_donor` | `pending`, or absent/null to omit the tile.
+   */
+  recoverability?: string | null;
 }
 
 export function buildReportDocument(

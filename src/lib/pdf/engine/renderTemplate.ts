@@ -25,6 +25,7 @@ import type { EngineContext, EngineDocData } from './types';
 import { SECTION_REGISTRY } from './registry';
 import { renderPartiesMeta, partiesDetailsKey } from './sections/infoBoxes';
 import { buildPageFooter } from './sections/footer';
+import { buildReportPageFooter } from './sections/reportFooter';
 import { engineLayoutDirection, engineDefaultFont } from './rtl';
 import {
   resolveColors,
@@ -42,7 +43,7 @@ const DENSITY_SCALE: Record<'comfortable' | 'compact' | 'dense', number> = {
 };
 
 /** Section keys that can be promoted to the repeating page footer. */
-const PAGE_FOOTER_KEYS = new Set(['footer', 'qr']);
+const PAGE_FOOTER_KEYS = new Set(['footer', 'qr', 'reportFooter']);
 
 /** Named styles the typography group rescales when a tenant configures it. */
 const TYPOGRAPHY_STYLE_KEYS: TypographyStyleKey[] = [
@@ -126,7 +127,11 @@ export function renderTemplate(
     }
   }
   const trailingKeys = ordered.slice(trailingFrom).map((s) => s.key);
-  const promoteToPageFooter = trailingKeys.includes('footer');
+  // A report uses its own page footer (confidentiality + Report ID line); other
+  // documents use the identity footer. Either trailing key promotes the run to a
+  // repeating page footer.
+  const promoteReportFooter = trailingKeys.includes('reportFooter');
+  const promoteToPageFooter = trailingKeys.includes('footer') || promoteReportFooter;
 
   // 3. Flatten the in-body sections. When the trailing run is promoted to the
   // page footer it is excluded here and emitted via the `footer:` callback
@@ -261,7 +266,11 @@ export function renderTemplate(
   // nothing to render. Page numbers (opt-in) append a line driven by
   // `pageNumbers.format`; when disabled (default) the footer is exactly the base
   // footer — parity preserved.
-  const baseFooter = promoteToPageFooter ? buildPageFooter(engine, data) : null;
+  const baseFooter = promoteReportFooter
+    ? buildReportPageFooter(engine, data)
+    : promoteToPageFooter
+      ? buildPageFooter(engine, data)
+      : null;
   const pageNumbers = resolvePageNumbers(config);
   let footer: DynamicContent | undefined;
   if (pageNumbers.enabled) {

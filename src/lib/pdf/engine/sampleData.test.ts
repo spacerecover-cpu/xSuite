@@ -42,7 +42,7 @@ const MARKERS: Record<TemplateDocumentType, string> = {
   case_label: 'CASE-0007',
   stock_label: 'Samsung 870 EVO 500GB',
   chain_of_custody: 'Drive received at intake counter.',
-  report: 'Diagnostic Findings',
+  report: 'Recoverability',
   payslip: 'Basic Salary',
 };
 

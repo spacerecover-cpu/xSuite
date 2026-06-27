@@ -31,6 +31,10 @@ import { renderHashVerification } from './sections/hashVerification';
 import { renderDigitalSignatures } from './sections/digitalSignatures';
 import { renderDiagnostics } from './sections/reportDiagnostics';
 import { renderReportSections } from './sections/reportSections';
+import { renderReportHeader } from './sections/reportHeader';
+import { renderReportSummary } from './sections/reportSummary';
+import { renderReportInfoColumns } from './sections/reportInfoColumns';
+import { renderReportFooter } from './sections/reportFooter';
 import { renderCaseLabel } from './sections/caseLabel';
 import { renderPayslipInfo } from './sections/payslipInfo';
 import { renderEarnings } from './sections/earnings';
@@ -61,6 +65,10 @@ export const SECTION_REGISTRY: Record<string, SectionRenderer> = {
   digitalSignatures: renderDigitalSignatures,
   diagnostics: renderDiagnostics,
   reportSections: renderReportSections,
+  reportHeader: renderReportHeader,
+  reportSummary: renderReportSummary,
+  reportInfoColumns: renderReportInfoColumns,
+  reportFooter: renderReportFooter,
   caseLabel: renderCaseLabel,
   payslipInfo: renderPayslipInfo,
   earnings: renderEarnings,

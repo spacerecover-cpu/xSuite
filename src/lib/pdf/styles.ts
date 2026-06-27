@@ -31,6 +31,36 @@ export const PDF_COLORS = {
 
 export const DEFAULT_FONT = 'Roboto';
 
+/**
+ * Fixed status-tone palette for the Option B data-recovery REPORT design.
+ *
+ * These are theme-INVARIANT status semantics (info / success / warning / danger),
+ * NOT brand colors — so rendering a tinted section header / summary tile in these
+ * hexes respects "PDFs stay neutral across themes" (DESIGN.md → Non-Themed
+ * Surfaces): every tenant gets the same fixed hexes regardless of the live UI
+ * theme. The engine never reads the app theme tokens; it reads only these
+ * constants. Each tone carries an `accent` (the left-rule / emphasis color), a
+ * light `bg` fill, a readable `text` color for tinted surfaces, and a `border`.
+ *
+ * `neutral` reuses the fixed Royal navy so a neutral section reads as branded
+ * (matching the navy header band) without being themed.
+ */
+export const PDF_TONES = {
+  neutral: { accent: PDF_COLORS.primary, bg: '#F1F5F9', text: '#1e293b', border: '#CBD5E1' },
+  info:    { accent: '#2563EB', bg: '#EFF6FF', text: '#1E3A8A', border: '#BFDBFE' },
+  success: { accent: '#16A34A', bg: '#F0FDF4', text: '#166534', border: '#BBF7D0' },
+  warning: { accent: '#D97706', bg: '#FFFBEB', text: '#92400E', border: '#FDE68A' },
+  danger:  { accent: '#DC2626', bg: '#FEF2F2', text: '#991B1B', border: '#FECACA' },
+} as const;
+
+/** The report tone keys (mirrors `SectionConfig.tone`). */
+export type PdfTone = keyof typeof PDF_TONES;
+
+/** Resolve a tone (default `neutral`); an unknown/absent tone degrades to neutral. */
+export function resolvePdfTone(tone: string | null | undefined): (typeof PDF_TONES)[PdfTone] {
+  return PDF_TONES[(tone as PdfTone)] ?? PDF_TONES.neutral;
+}
+
 export const PDF_STYLES: StyleDictionary = {
   header: {
     font: DEFAULT_FONT,

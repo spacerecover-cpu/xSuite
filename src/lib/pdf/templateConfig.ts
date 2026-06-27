@@ -82,12 +82,30 @@ export interface ColumnConfig {
  * - `columns`: present on table-style sections (e.g. line items).
  * - `lines`: present on aggregate sections (e.g. totals) — per-line on/off toggles.
  */
+/**
+ * Status-tone for a section (Option B data-recovery REPORT design). Drives a
+ * fixed-hex tinted header bar / left accent rule per tone — theme-INVARIANT
+ * status semantics, never brand color (see `PDF_TONES` in `styles.ts`). Absent =
+ * `neutral`; sections without a `tone` behave exactly as today, so no other
+ * document type is affected.
+ */
+export type SectionTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
+
 export interface SectionConfig {
   key: string;
   visible: boolean;
   order: number;
   columns?: ColumnConfig[];
   lines?: Record<string, boolean>;
+  /** Status-tone (Option B reports only). Absent → neutral; no effect on other doc types. */
+  tone?: SectionTone;
+  /**
+   * Optional named condition gate evaluated by the adapter when building the
+   * report config — e.g. omit the device column for subtypes without device
+   * data. Purely advisory metadata for adapter-built configs; the assembler does
+   * not read it (visibility is the gate the assembler honours). Absent = always.
+   */
+  condition?: string;
   /** Bank section only: how the bank-account details render — a bordered box
    *  (`'boxed'`, default) or a single compact pipe-separated line (`'inline'`). */
   bankStyle?: 'boxed' | 'inline';
@@ -443,6 +461,8 @@ export interface SectionConfigOverride {
   bankStyle?: 'boxed' | 'inline';
   bankWidth?: 'auto' | 'half' | 'full';
   bankAlign?: 'left' | 'center' | 'right';
+  tone?: SectionTone;
+  condition?: string;
 }
 
 /** Partial column override; `key` identifies the target column. */
@@ -509,7 +529,7 @@ function lineItemColumns(): ColumnConfig[] {
 function section(
   key: string,
   order: number,
-  extra?: Pick<SectionConfig, 'columns' | 'lines' | 'bankStyle' | 'bankWidth' | 'bankAlign'> & { visible?: boolean },
+  extra?: Pick<SectionConfig, 'columns' | 'lines' | 'bankStyle' | 'bankWidth' | 'bankAlign' | 'tone' | 'condition'> & { visible?: boolean },
 ): SectionConfig {
   return {
     key,
@@ -520,6 +540,8 @@ function section(
     ...(extra?.bankStyle ? { bankStyle: extra.bankStyle } : {}),
     ...(extra?.bankWidth ? { bankWidth: extra.bankWidth } : {}),
     ...(extra?.bankAlign ? { bankAlign: extra.bankAlign } : {}),
+    ...(extra?.tone ? { tone: extra.tone } : {}),
+    ...(extra?.condition ? { condition: extra.condition } : {}),
   };
 }
 
@@ -754,17 +776,22 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
         labels: { documentTitle: { en: 'CHAIN OF CUSTODY', ar: 'سلسلة الحيازة' } },
       };
     case 'report':
+      // The report built-in is the Option B "Modern lab" UNIVERSAL SHELL (the
+      // evaluation default): a navy header band, the summary-tile row, the
+      // two-column General | Device info region, the toned editorial prose
+      // sections, an optional forensic custody timeline, and the provable report
+      // footer. The per-SUBTYPE config (title + visible sections + tones) is
+      // built by `reportConfigForSubtype` in the report adapter, which cascades
+      // over this base; the Studio preview and any caller resolving this built-in
+      // get the Option B layout by default.
       return {
         ...base,
         sections: [
-          section('header', 0),
-          // caseInfo = customer + report meta in one bilingual info box
-          // (generalized from the legacy Customer Information + Report Details
-          // boxes). diagnostics = the HDD/SSD-aware Device Details / Component
-          // Diagnostics box. reportSections = the ordered DB-driven prose
-          // sections.
-          section('caseInfo', 1),
-          section('diagnostics', 2),
+          section('reportHeader', 0),
+          section('reportSummary', 1),
+          section('reportInfoColumns', 2),
+          // reportSections = the ordered, tone-stamped editorial prose sections
+          // (the adapter selects + orders + tones them per subtype).
           section('reportSections', 3),
           // custodyLog is OPTIONAL: only forensic reports with custody events
           // populate it (the adapter returns no block otherwise, so the section
@@ -780,7 +807,7 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
               { key: 'occurredAt', visible: true, label: { en: 'Date/Time', ar: 'التاريخ/الوقت' }, width: 75 },
             ],
           }),
-          section('footer', 5),
+          section('reportFooter', 5),
         ],
         labels: { documentTitle: { en: 'CASE REPORT', ar: 'تقرير الحالة' } },
       };
@@ -877,6 +904,8 @@ function mergeSections(
         ...(ov.bankStyle !== undefined ? { bankStyle: ov.bankStyle } : {}),
         ...(ov.bankWidth !== undefined ? { bankWidth: ov.bankWidth } : {}),
         ...(ov.bankAlign !== undefined ? { bankAlign: ov.bankAlign } : {}),
+        ...(ov.tone !== undefined ? { tone: ov.tone } : {}),
+        ...(ov.condition !== undefined ? { condition: ov.condition } : {}),
       });
     } else {
       // New section introduced by an override layer.
@@ -889,6 +918,8 @@ function mergeSections(
         ...(ov.bankStyle !== undefined ? { bankStyle: ov.bankStyle } : {}),
         ...(ov.bankWidth !== undefined ? { bankWidth: ov.bankWidth } : {}),
         ...(ov.bankAlign !== undefined ? { bankAlign: ov.bankAlign } : {}),
+        ...(ov.tone !== undefined ? { tone: ov.tone } : {}),
+        ...(ov.condition !== undefined ? { condition: ov.condition } : {}),
       });
     }
   }

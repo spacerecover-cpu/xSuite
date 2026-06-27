@@ -268,6 +268,7 @@ export function sampleReportData(): ReportData {
     ],
     companySettings: { ...SAMPLE_COMPANY, branding: { ...SAMPLE_COMPANY.branding, qr_code_general_caption: 'Scan for more information' } },
     preparedByName: 'Lina Engineer',
+    recoverability: 'partially_recoverable',
   };
 }
 
