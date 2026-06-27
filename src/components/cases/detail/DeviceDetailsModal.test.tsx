@@ -14,9 +14,15 @@ vi.mock('@/lib/deviceIconMapper', () => ({
 // provider — the audit row is verified in its own suite.
 vi.mock('../../ui/AuditInfo', () => ({ AuditInfo: () => <div data-testid="audit" /> }));
 
-// The full-row fetch resolves via maybeSingle(); catalog list queries resolve via
-// the thenable chain to []. So technical_details flow through while selects stay
-// empty (json technical fields render as their raw value).
+vi.mock('../../../hooks/useToast', () => ({
+  useToast: () => ({ success: vi.fn(), error: vi.fn() }),
+}));
+
+vi.mock('../../../lib/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
+
+// The full-row fetch resolves via maybeSingle(); list queries resolve via the
+// thenable chain to []. So technical_details flow through while selects stay empty
+// (json technical fields render as their raw value).
 vi.mock('../../../lib/supabaseClient', () => {
   const fullRow = { id: 'd1', interface_id: null, technical_details: { pre_amp: '454515' } };
   const makeChain = () => {
@@ -31,7 +37,7 @@ vi.mock('../../../lib/supabaseClient', () => {
 
 import { DeviceDetailsModal } from './DeviceDetailsModal';
 
-function makeDevice(): CaseDeviceWithEmbeds {
+function makeDevice(overrides: Partial<CaseDeviceWithEmbeds> = {}): CaseDeviceWithEmbeds {
   return {
     id: 'd1',
     model: 'ST500DM030',
@@ -54,6 +60,7 @@ function makeDevice(): CaseDeviceWithEmbeds {
     encryption_type: null,
     device_role: { id: 1, name: 'patient' },
     created_by_profile: null,
+    ...overrides,
   };
 }
 
@@ -61,7 +68,7 @@ function renderModal(device: CaseDeviceWithEmbeds | null) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <DeviceDetailsModal device={device} deviceIndex={0} isOpen={!!device} onClose={vi.fn()} />
+      <DeviceDetailsModal device={device} deviceIndex={0} caseId="case-1" isOpen={!!device} onClose={vi.fn()} />
     </QueryClientProvider>,
   );
 }
@@ -93,6 +100,27 @@ describe('DeviceDetailsModal', () => {
 
     await waitFor(() => expect(screen.getByText('Pre-Amplifier')).toBeInTheDocument());
     expect(screen.getByText('454515')).toBeInTheDocument();
+  });
+
+  it('hides role actions on the primary device', () => {
+    renderModal(makeDevice({ is_primary: true }));
+
+    expect(screen.queryByRole('button', { name: /set as primary/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /mark as backup/i })).not.toBeInTheDocument();
+  });
+
+  it('offers both role actions on a secondary patient device', () => {
+    renderModal(makeDevice({ is_primary: false, device_role: { id: 1, name: 'patient' } }));
+
+    expect(screen.getByRole('button', { name: /set as primary/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /mark as backup/i })).toBeInTheDocument();
+  });
+
+  it('offers only "Set as Primary" on a backup device (cannot re-backup)', () => {
+    renderModal(makeDevice({ is_primary: false, device_role: { id: 2, name: 'backup' } }));
+
+    expect(screen.getByRole('button', { name: /set as primary/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /mark as backup/i })).not.toBeInTheDocument();
   });
 
   it('renders nothing when no device is provided', () => {

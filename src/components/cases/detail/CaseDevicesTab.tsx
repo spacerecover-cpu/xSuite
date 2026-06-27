@@ -38,12 +38,14 @@ export interface CaseDeviceWithEmbeds {
 
 interface CaseDevicesTabProps {
   caseData: Record<string, unknown>;
+  caseId: string;
   devices: CaseDeviceWithEmbeds[];
   onSetShowDeviceModal: (v: boolean) => void;
   onSetEditingDevice: (device: CaseDeviceWithEmbeds | null) => void;
 }
 
 export const CaseDevicesTab: React.FC<CaseDevicesTabProps> = ({
+  caseId,
   devices,
   onSetShowDeviceModal,
   onSetEditingDevice,
@@ -274,6 +276,7 @@ export const CaseDevicesTab: React.FC<CaseDevicesTabProps> = ({
         key={details?.device.id ?? 'none'}
         device={details?.device ?? null}
         deviceIndex={details?.index ?? 0}
+        caseId={caseId}
         isOpen={!!details}
         onClose={() => setDetails(null)}
       />

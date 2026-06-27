@@ -53,6 +53,7 @@ function renderTab(devices: CaseDeviceWithEmbeds[]) {
   return render(
     <CaseDevicesTab
       caseData={{}}
+      caseId="case-1"
       devices={devices}
       onSetShowDeviceModal={noop}
       onSetEditingDevice={noop}
