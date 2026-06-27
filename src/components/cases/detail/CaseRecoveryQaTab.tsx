@@ -1,18 +1,13 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FlaskConical, ShieldCheck, CheckCircle2, XCircle, Plus, Stethoscope } from 'lucide-react';
+import { FlaskConical, ShieldCheck, CheckCircle2, XCircle, Plus } from 'lucide-react';
 import { Card } from '../../ui/Card';
 import { Button } from '../../ui/Button';
 import { Badge } from '../../ui/Badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/useToast';
 import { formatDate } from '@/lib/format';
-import {
-  caseQualityService,
-  RECOVERABILITY_ASSESSMENTS,
-  RECOVERABILITY_LABEL,
-  type RecoverabilityAssessment,
-} from '@/lib/caseQualityService';
+import { caseQualityService } from '@/lib/caseQualityService';
 import {
   RECOVERY_RESULTS,
   QA_RESULTS,
@@ -63,41 +58,6 @@ export const CaseRecoveryQaTab: React.FC<{ caseId: string }> = ({ caseId }) => {
   });
 
   const readiness = evaluateReleaseReadiness({ recoveryAttempts: attempts, qaChecklists });
-
-  const { data: diagnoses = [] } = useQuery({
-    queryKey: ['case_diagnostics', caseId],
-    queryFn: () => caseQualityService.listDiagnostics(caseId),
-    enabled: !!caseId,
-  });
-
-  const [dxType, setDxType] = useState('');
-  const [dxTool, setDxTool] = useState('');
-  const [dxFindings, setDxFindings] = useState('');
-  const [dxRecommendations, setDxRecommendations] = useState('');
-  const [dxAssessment, setDxAssessment] = useState<RecoverabilityAssessment>('pending');
-
-  const recordDiagnosis = useMutation({
-    mutationFn: () => {
-      if (!profile?.tenant_id) throw new Error('No active session');
-      return caseQualityService.recordDiagnosis(caseId, profile.tenant_id, profile.id ?? null, {
-        diagnosticType: dxType.trim() || null,
-        toolUsed: dxTool.trim() || null,
-        findings: dxFindings.trim() || null,
-        recommendations: dxRecommendations.trim() || null,
-        recoverabilityAssessment: dxAssessment,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['case_diagnostics', caseId] });
-      setDxType('');
-      setDxTool('');
-      setDxFindings('');
-      setDxRecommendations('');
-      setDxAssessment('pending');
-      toast.success('Diagnosis recorded');
-    },
-    onError: (e: Error) => toast.error(`Failed to record diagnosis: ${e.message}`),
-  });
 
   const [method, setMethod] = useState('');
   const [toolUsed, setToolUsed] = useState('');
@@ -158,100 +118,6 @@ export const CaseRecoveryQaTab: React.FC<{ caseId: string }> = ({ caseId }) => {
           <div className="flex flex-wrap gap-3">
             <ReadinessPill ok={readiness.hasRecordedRecovery} label="Recovery outcome recorded" />
             <ReadinessPill ok={readiness.hasPassedQa} label="QA passed" />
-          </div>
-        </div>
-      </Card>
-
-      <Card>
-        <div className="p-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <Stethoscope className="w-5 h-5 text-primary" />
-            Diagnosis
-          </h3>
-          <p className="text-sm text-slate-500 mb-4">
-            The recoverability assessment, findings, and recommended solution recorded here auto-fill the
-            evaluation report.
-          </p>
-
-          <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 mb-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Diagnostic type</label>
-                <input className={inputClass} value={dxType} onChange={(e) => setDxType(e.target.value)} placeholder="e.g. Physical, firmware, logical" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Tool used</label>
-                <input className={inputClass} value={dxTool} onChange={(e) => setDxTool(e.target.value)} placeholder="e.g. PC-3000, MRT" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Recoverability</label>
-                <select className={inputClass} value={dxAssessment} onChange={(e) => setDxAssessment(e.target.value as RecoverabilityAssessment)}>
-                  {RECOVERABILITY_ASSESSMENTS.map((r) => (
-                    <option key={r} value={r}>{RECOVERABILITY_LABEL[r]}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-medium text-slate-600 mb-1">Diagnostic findings</label>
-                <textarea className={inputClass} rows={3} value={dxFindings} onChange={(e) => setDxFindings(e.target.value)} placeholder="What's wrong with the device..." />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-medium text-slate-600 mb-1">Proposed solution</label>
-                <textarea className={inputClass} rows={3} value={dxRecommendations} onChange={(e) => setDxRecommendations(e.target.value)} placeholder="Recommended recovery approach..." />
-              </div>
-            </div>
-            <div className="flex justify-end mt-3">
-              <Button onClick={() => recordDiagnosis.mutate()} disabled={recordDiagnosis.isPending}>
-                <Plus className="w-4 h-4 mr-1" />
-                {recordDiagnosis.isPending ? 'Recording...' : 'Record diagnosis'}
-              </Button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            {diagnoses.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-6">No diagnosis recorded yet.</p>
-            ) : (
-              diagnoses.map((d) => {
-                const a = d.recoverability_assessment as RecoverabilityAssessment | null;
-                const variant =
-                  a === 'fully_recoverable'
-                    ? 'success'
-                    : a === 'partially_recoverable'
-                      ? 'warning'
-                      : a === 'pending' || !a
-                        ? 'secondary'
-                        : 'danger';
-                return (
-                  <div key={d.id} className="bg-white rounded-lg p-3 border border-slate-200 text-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {a && (
-                          <Badge variant={variant} size="sm">
-                            {RECOVERABILITY_LABEL[a]}
-                          </Badge>
-                        )}
-                        {d.diagnostic_type && <span className="text-slate-700 font-medium">{d.diagnostic_type}</span>}
-                        {d.tool_used && <span className="text-slate-500">· {d.tool_used}</span>}
-                      </div>
-                      <span className="text-xs text-slate-400 flex-shrink-0 ml-3">{formatDate(d.created_at)}</span>
-                    </div>
-                    {d.findings && (
-                      <p className="text-slate-600 mt-1 whitespace-pre-wrap">
-                        <span className="text-slate-400">Findings: </span>
-                        {d.findings}
-                      </p>
-                    )}
-                    {d.recommendations && (
-                      <p className="text-slate-600 mt-1 whitespace-pre-wrap">
-                        <span className="text-slate-400">Solution: </span>
-                        {d.recommendations}
-                      </p>
-                    )}
-                  </div>
-                );
-              })
-            )}
           </div>
         </div>
       </Card>

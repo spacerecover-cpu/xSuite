@@ -217,7 +217,15 @@ export function reportConfigForSubtype(reportType: string): DocumentTemplateConf
 // Recoverability category → human label (CATEGORY only — never a percentage).
 // ---------------------------------------------------------------------------
 
+// Recoverability for the summary tile comes from the device Evaluation Result
+// (case_devices.recovery_result) set on the universal Edit Device -> Diagnostic
+// tab. That vocabulary is already display-ready; the map only normalizes legacy
+// values, and unknown values pass through as-is.
 const RECOVERABILITY_LABELS: Record<string, string> = {
+  Pending: 'Pending',
+  Recoverable: 'Recoverable',
+  'Partially Recoverable': 'Partially Recoverable',
+  Unrecoverable: 'Unrecoverable',
   fully_recoverable: 'Fully recoverable',
   partially_recoverable: 'Partial recovery',
   unrecoverable: 'Unrecoverable',
@@ -227,7 +235,7 @@ const RECOVERABILITY_LABELS: Record<string, string> = {
 
 function recoverabilityLabel(raw: string | null | undefined): string | null {
   if (!raw) return null;
-  return RECOVERABILITY_LABELS[raw] ?? null;
+  return RECOVERABILITY_LABELS[raw] ?? raw;
 }
 
 // ---------------------------------------------------------------------------

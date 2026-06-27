@@ -194,9 +194,15 @@ match-or-exceed it). Layout, top → bottom:
 - The footer "Report ID / Generated" binds to `document_instances.id` (or `document_number`) +
   `pdf_generated_at`; `pdf_sha256` upgrades the old Mongo-ObjectId fake into a provable artifact hash.
 - **Recoverability shows CATEGORY only — no percentage** (owner decision, 2026-06-27: a numeric % causes
-  customer confusion / disputes). The Option B indicator is a category state (Full / Partial / Requires
-  donor / Unrecoverable / Pending), not a numeric progress bar. `case_diagnostics.recoverability_pct`
-  remains in the schema (unused, harmless) but is not captured in the UI or rendered on the report.
+  customer confusion / disputes). The Option B indicator is a category state, not a numeric progress bar.
+- **Recoverability + diagnosis source = the universal device Diagnostic tab** (owner decision, 2026-06-27),
+  NOT `case_diagnostics` / the Recovery & QA tab (which isn't enabled for every tenant; the device
+  Diagnostic tab is). The report's recoverability tile reads `case_devices.recovery_result` (the device
+  "Evaluation Result": Recoverable / Partially Recoverable / Unrecoverable / Pending). Findings ←
+  `case_devices.diagnosis` (Initial Diagnosis); solution ← `device_diagnostics.result.recommendation` /
+  `diagnostic_notes` (the prose auto-fill lands in Phase 8). The `case_diagnostics.recoverability_*`
+  columns and the Recovery & QA "Diagnosis" card were reverted/unused — the column stays in the schema
+  (additive, harmless) but nothing reads it.
 
 ### Report type coverage — all 8 (grounded in the live templates)
 
@@ -207,7 +213,7 @@ prose sections show, and a few special blocks. Section sets below are the live
 
 | Report type (subtype) | Live sections | Auto-fill source | Special handling |
 |---|---|---|---|
-| evaluation | exec_summary · device · initial_assessment · findings · recommendations | case_diagnostics + recoverability category | milestone build |
+| evaluation | exec_summary · device · initial_assessment · findings · recommendations | device Diagnostic tab (case_devices.recovery_result + diagnosis; device_diagnostics.result) + case_report_sections | milestone build |
 | service | exec_summary · device · work_performed · recovery_results · recommendations | case_recovery_attempts | — |
 | server | exec_summary · device · initial_assessment · work_performed · recovery_results · recommendations | case_devices (RAID members) + recovery_attempts | multi-device/RAID rendering (adapter currently one patient device) |
 | malware | exec_summary · device · security_analysis · findings · recommendations | diagnosis + notes | — |

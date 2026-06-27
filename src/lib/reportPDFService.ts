@@ -560,6 +560,7 @@ class ReportPDFService {
       catalog_device_conditions: CatalogNameEmbed;
       device_role_id: number | null;
       is_primary: boolean | null;
+      recovery_result: string | null;
     };
 
     // Get device data - filter by Patient role
@@ -574,7 +575,8 @@ class ReportPDFService {
         serial_number,
         catalog_device_conditions!condition_id(name),
         device_role_id,
-        is_primary
+        is_primary,
+        recovery_result
       `)
       .eq('case_id', reportRaw.case_id);
 
@@ -593,6 +595,10 @@ class ReportPDFService {
 
     let deviceData: ReportData['deviceData'] = undefined;
     let diagnosticsData: ReportData['diagnosticsData'] = undefined;
+    // Recoverability for the Option B summary tile comes from the device's
+    // Evaluation Result (case_devices.recovery_result), set on the universal
+    // Edit Device -> Diagnostic tab. CATEGORY label only -- never a percentage.
+    let recoverability: string | null = null;
 
     if (devicesRaw && devicesRaw.length > 0) {
       const device = devicesRaw[0];
@@ -604,6 +610,7 @@ class ReportPDFService {
         serial_number: device.serial_number ?? undefined,
         condition: device.catalog_device_conditions?.name ?? undefined,
       };
+      recoverability = device.recovery_result ?? null;
 
       // Load diagnostics — device_diagnostics.device_id references case_devices.id
       const { data: diagnostics } = await supabase
@@ -621,19 +628,6 @@ class ReportPDFService {
       .from('company_settings')
       .select('*')
       .maybeSingle();
-
-    // Latest case-level diagnostics — the Option B Recoverability summary tile
-    // shows the CATEGORY label only (never a percentage). Prose (findings /
-    // solution) still comes from case_report_sections, not from here.
-    const { data: latestDiagnostic } = await supabase
-      .from('case_diagnostics')
-      .select('recoverability_assessment, findings, recommendations')
-      .eq('case_id', reportRaw.case_id)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const recoverability = latestDiagnostic?.recoverability_assessment ?? null;
 
     let chainOfCustodyEvents: ReportData['chainOfCustodyEvents'] = [];
     if (mappedReport.report_type === 'forensic' && forensicChainOfCustodyId) {
