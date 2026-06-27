@@ -5359,6 +5359,427 @@ export type Database = {
           },
         ]
       }
+      document_instance_sections: {
+        Row: {
+          content: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          document_instance_id: string
+          id: string
+          is_visible: boolean
+          section_key: string
+          sort_order: number
+          tenant_id: string
+          title: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          document_instance_id: string
+          id?: string
+          is_visible?: boolean
+          section_key: string
+          sort_order?: number
+          tenant_id: string
+          title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          document_instance_id?: string
+          id?: string
+          is_visible?: boolean
+          section_key?: string
+          sort_order?: number
+          tenant_id?: string
+          title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_instance_sections_document_instance_id_fkey"
+            columns: ["document_instance_id"]
+            isOneToOne: false
+            referencedRelation: "document_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_instance_sections_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_instances: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          case_id: string | null
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          customer_signoff_signature_id: string | null
+          deleted_at: string | null
+          delivered_at: string | null
+          device_id: string | null
+          doc_type: Database["public"]["Enums"]["document_instance_type"]
+          document_number: string | null
+          forensic_custody_id: string | null
+          generated_at: string | null
+          generated_by: string | null
+          id: string
+          instance_overrides: Json
+          invoice_id: string | null
+          is_latest: boolean
+          pdf_generated_at: string | null
+          pdf_sha256: string | null
+          pdf_storage_bucket: string | null
+          pdf_storage_path: string | null
+          quote_id: string | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string | null
+          report_subtype: string | null
+          resolved_data: Json
+          reviewed_at: string | null
+          reviewed_by: string | null
+          signed_off_by_customer_at: string | null
+          status: Database["public"]["Enums"]["document_instance_status"]
+          supersedes_id: string | null
+          template_version_id: string | null
+          tenant_id: string
+          title: string
+          updated_at: string
+          updated_by: string | null
+          version_number: number
+          visible_to_customer: boolean
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          case_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          customer_signoff_signature_id?: string | null
+          deleted_at?: string | null
+          delivered_at?: string | null
+          device_id?: string | null
+          doc_type: Database["public"]["Enums"]["document_instance_type"]
+          document_number?: string | null
+          forensic_custody_id?: string | null
+          generated_at?: string | null
+          generated_by?: string | null
+          id?: string
+          instance_overrides?: Json
+          invoice_id?: string | null
+          is_latest?: boolean
+          pdf_generated_at?: string | null
+          pdf_sha256?: string | null
+          pdf_storage_bucket?: string | null
+          pdf_storage_path?: string | null
+          quote_id?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
+          report_subtype?: string | null
+          resolved_data?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          signed_off_by_customer_at?: string | null
+          status?: Database["public"]["Enums"]["document_instance_status"]
+          supersedes_id?: string | null
+          template_version_id?: string | null
+          tenant_id: string
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+          version_number?: number
+          visible_to_customer?: boolean
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          case_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          customer_signoff_signature_id?: string | null
+          deleted_at?: string | null
+          delivered_at?: string | null
+          device_id?: string | null
+          doc_type?: Database["public"]["Enums"]["document_instance_type"]
+          document_number?: string | null
+          forensic_custody_id?: string | null
+          generated_at?: string | null
+          generated_by?: string | null
+          id?: string
+          instance_overrides?: Json
+          invoice_id?: string | null
+          is_latest?: boolean
+          pdf_generated_at?: string | null
+          pdf_sha256?: string | null
+          pdf_storage_bucket?: string | null
+          pdf_storage_path?: string | null
+          quote_id?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
+          report_subtype?: string | null
+          resolved_data?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          signed_off_by_customer_at?: string | null
+          status?: Database["public"]["Enums"]["document_instance_status"]
+          supersedes_id?: string | null
+          template_version_id?: string | null
+          tenant_id?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          version_number?: number
+          visible_to_customer?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "di_customer_signoff_sig_fkey"
+            columns: ["customer_signoff_signature_id"]
+            isOneToOne: false
+            referencedRelation: "document_signatures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_instances_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_instances_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_instances_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_enhanced"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_instances_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "case_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_instances_forensic_custody_id_fkey"
+            columns: ["forensic_custody_id"]
+            isOneToOne: false
+            referencedRelation: "chain_of_custody"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_instances_forensic_custody_id_fkey"
+            columns: ["forensic_custody_id"]
+            isOneToOne: false
+            referencedRelation: "v_chain_of_custody_timeline"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_instances_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_instances_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_instances_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "document_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_instances_template_version_id_fkey"
+            columns: ["template_version_id"]
+            isOneToOne: false
+            referencedRelation: "document_template_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_instances_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_signatures: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          document_instance_id: string
+          id: string
+          ip_address: unknown
+          method: Database["public"]["Enums"]["signature_method"]
+          signature_image_bucket: string | null
+          signature_image_path: string | null
+          signature_sha256: string | null
+          signed_at: string
+          signer_customer_id: string | null
+          signer_email: string | null
+          signer_name: string
+          signer_role: string | null
+          signer_user_id: string | null
+          slot: Database["public"]["Enums"]["signature_slot"]
+          tenant_id: string
+          typed_value: string | null
+          updated_at: string
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          document_instance_id: string
+          id?: string
+          ip_address?: unknown
+          method: Database["public"]["Enums"]["signature_method"]
+          signature_image_bucket?: string | null
+          signature_image_path?: string | null
+          signature_sha256?: string | null
+          signed_at?: string
+          signer_customer_id?: string | null
+          signer_email?: string | null
+          signer_name: string
+          signer_role?: string | null
+          signer_user_id?: string | null
+          slot: Database["public"]["Enums"]["signature_slot"]
+          tenant_id: string
+          typed_value?: string | null
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          document_instance_id?: string
+          id?: string
+          ip_address?: unknown
+          method?: Database["public"]["Enums"]["signature_method"]
+          signature_image_bucket?: string | null
+          signature_image_path?: string | null
+          signature_sha256?: string | null
+          signed_at?: string
+          signer_customer_id?: string | null
+          signer_email?: string | null
+          signer_name?: string
+          signer_role?: string | null
+          signer_user_id?: string | null
+          slot?: Database["public"]["Enums"]["signature_slot"]
+          tenant_id?: string
+          typed_value?: string | null
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_signatures_document_instance_id_fkey"
+            columns: ["document_instance_id"]
+            isOneToOne: false
+            referencedRelation: "document_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_signatures_signer_customer_id_fkey"
+            columns: ["signer_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_signatures_signer_customer_id_fkey"
+            columns: ["signer_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_enhanced"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_signatures_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_status_transitions: {
+        Row: {
+          allowed_roles: string[]
+          created_at: string
+          doc_type: Database["public"]["Enums"]["document_instance_type"] | null
+          from_status: Database["public"]["Enums"]["document_instance_status"]
+          id: string
+          is_active: boolean
+          requires: string[]
+          sort_order: number
+          to_status: Database["public"]["Enums"]["document_instance_status"]
+          updated_at: string
+        }
+        Insert: {
+          allowed_roles?: string[]
+          created_at?: string
+          doc_type?:
+            | Database["public"]["Enums"]["document_instance_type"]
+            | null
+          from_status: Database["public"]["Enums"]["document_instance_status"]
+          id?: string
+          is_active?: boolean
+          requires?: string[]
+          sort_order?: number
+          to_status: Database["public"]["Enums"]["document_instance_status"]
+          updated_at?: string
+        }
+        Update: {
+          allowed_roles?: string[]
+          created_at?: string
+          doc_type?:
+            | Database["public"]["Enums"]["document_instance_type"]
+            | null
+          from_status?: Database["public"]["Enums"]["document_instance_status"]
+          id?: string
+          is_active?: boolean
+          requires?: string[]
+          sort_order?: number
+          to_status?: Database["public"]["Enums"]["document_instance_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       document_template_versions: {
         Row: {
           business_unit_id: string | null
@@ -17303,6 +17724,19 @@ export type Database = {
       lookup_interface: { Args: { p_name: string }; Returns: string }
       lookup_status_type: { Args: { p_name: string }; Returns: string }
       lookup_storage_location: { Args: { p_name: string }; Returns: string }
+      portal_sign_off_document: {
+        Args: {
+          p_image_bucket?: string
+          p_image_path?: string
+          p_instance_id: string
+          p_ip?: unknown
+          p_method: Database["public"]["Enums"]["signature_method"]
+          p_signature_sha256?: string
+          p_typed_value?: string
+          p_user_agent?: string
+        }
+        Returns: Json
+      }
       post_manual_transaction: {
         Args: { p_txn: Json }
         Returns: {
@@ -17704,6 +18138,18 @@ export type Database = {
         Args: { p_customer_id: string; p_password_hash: string }
         Returns: undefined
       }
+      set_document_instance_artifact: {
+        Args: {
+          p_bucket: string
+          p_document_number?: string
+          p_instance_id: string
+          p_path: string
+          p_resolved_data?: Json
+          p_sha256: string
+          p_template_version_id?: string
+        }
+        Returns: Json
+      }
       set_portal_password: {
         Args: { p_customer_id: string; p_new_password: string }
         Returns: boolean
@@ -17732,6 +18178,15 @@ export type Database = {
           p_notes?: string
           p_reason?: string
           p_to_status_id: string
+        }
+        Returns: Json
+      }
+      transition_document_instance: {
+        Args: {
+          p_instance_id: string
+          p_reason?: string
+          p_signature_id?: string
+          p_to_status: Database["public"]["Enums"]["document_instance_status"]
         }
         Returns: Json
       }
@@ -17888,7 +18343,38 @@ export type Database = {
         | "accepted"
         | "rejected"
         | "cancelled"
+      document_instance_status:
+        | "draft"
+        | "in_review"
+        | "approved"
+        | "rejected"
+        | "issued"
+        | "delivered"
+        | "signed_off"
+        | "superseded"
+        | "void"
+      document_instance_type:
+        | "office_receipt"
+        | "customer_copy"
+        | "checkout_form"
+        | "case_label"
+        | "stock_label"
+        | "quote"
+        | "invoice"
+        | "payment_receipt"
+        | "payslip"
+        | "chain_of_custody"
+        | "report"
+        | "certificate_of_destruction"
       integrity_check_result: "passed" | "failed" | "warning" | "not_applicable"
+      signature_method: "typed" | "drawn" | "uploaded_image" | "click_to_accept"
+      signature_slot:
+        | "engineer"
+        | "qa_reviewer"
+        | "approver"
+        | "lab_manager"
+        | "customer"
+        | "witness"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -18041,7 +18527,41 @@ export const Constants = {
         "rejected",
         "cancelled",
       ],
+      document_instance_status: [
+        "draft",
+        "in_review",
+        "approved",
+        "rejected",
+        "issued",
+        "delivered",
+        "signed_off",
+        "superseded",
+        "void",
+      ],
+      document_instance_type: [
+        "office_receipt",
+        "customer_copy",
+        "checkout_form",
+        "case_label",
+        "stock_label",
+        "quote",
+        "invoice",
+        "payment_receipt",
+        "payslip",
+        "chain_of_custody",
+        "report",
+        "certificate_of_destruction",
+      ],
       integrity_check_result: ["passed", "failed", "warning", "not_applicable"],
+      signature_method: ["typed", "drawn", "uploaded_image", "click_to_accept"],
+      signature_slot: [
+        "engineer",
+        "qa_reviewer",
+        "approver",
+        "lab_manager",
+        "customer",
+        "witness",
+      ],
     },
   },
 } as const
