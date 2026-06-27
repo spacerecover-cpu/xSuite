@@ -193,3 +193,7 @@ match-or-exceed it). Layout, top → bottom:
   section renderers; the three toned prose cards map to `reportSections`.
 - The footer "Report ID / Generated" binds to `document_instances.id` (or `document_number`) +
   `pdf_generated_at`; `pdf_sha256` upgrades the old Mongo-ObjectId fake into a provable artifact hash.
+- **Recoverability shows CATEGORY only — no percentage** (owner decision, 2026-06-27: a numeric % causes
+  customer confusion / disputes). The Option B indicator is a category state (Full / Partial / Requires
+  donor / Unrecoverable / Pending), not a numeric progress bar. `case_diagnostics.recoverability_pct`
+  remains in the schema (unused, harmless) but is not captured in the UI or rendered on the report.

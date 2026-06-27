@@ -74,22 +74,16 @@ export const CaseRecoveryQaTab: React.FC<{ caseId: string }> = ({ caseId }) => {
   const [dxTool, setDxTool] = useState('');
   const [dxFindings, setDxFindings] = useState('');
   const [dxRecommendations, setDxRecommendations] = useState('');
-  const [dxRecoverabilityPct, setDxRecoverabilityPct] = useState('');
   const [dxAssessment, setDxAssessment] = useState<RecoverabilityAssessment>('pending');
 
   const recordDiagnosis = useMutation({
     mutationFn: () => {
       if (!profile?.tenant_id) throw new Error('No active session');
-      const pct =
-        dxRecoverabilityPct.trim() === ''
-          ? null
-          : Math.max(0, Math.min(100, Math.round(Number(dxRecoverabilityPct))));
       return caseQualityService.recordDiagnosis(caseId, profile.tenant_id, profile.id ?? null, {
         diagnosticType: dxType.trim() || null,
         toolUsed: dxTool.trim() || null,
         findings: dxFindings.trim() || null,
         recommendations: dxRecommendations.trim() || null,
-        recoverabilityPct: pct,
         recoverabilityAssessment: dxAssessment,
       });
     },
@@ -99,7 +93,6 @@ export const CaseRecoveryQaTab: React.FC<{ caseId: string }> = ({ caseId }) => {
       setDxTool('');
       setDxFindings('');
       setDxRecommendations('');
-      setDxRecoverabilityPct('');
       setDxAssessment('pending');
       toast.success('Diagnosis recorded');
     },
@@ -198,10 +191,6 @@ export const CaseRecoveryQaTab: React.FC<{ caseId: string }> = ({ caseId }) => {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Recoverability %</label>
-                <input type="number" min={0} max={100} className={inputClass} value={dxRecoverabilityPct} onChange={(e) => setDxRecoverabilityPct(e.target.value)} placeholder="0–100" />
-              </div>
               <div className="sm:col-span-2">
                 <label className="block text-xs font-medium text-slate-600 mb-1">Diagnostic findings</label>
                 <textarea className={inputClass} rows={3} value={dxFindings} onChange={(e) => setDxFindings(e.target.value)} placeholder="What's wrong with the device..." />
@@ -240,7 +229,6 @@ export const CaseRecoveryQaTab: React.FC<{ caseId: string }> = ({ caseId }) => {
                         {a && (
                           <Badge variant={variant} size="sm">
                             {RECOVERABILITY_LABEL[a]}
-                            {typeof d.recoverability_pct === 'number' ? ` · ${d.recoverability_pct}%` : ''}
                           </Badge>
                         )}
                         {d.diagnostic_type && <span className="text-slate-700 font-medium">{d.diagnostic_type}</span>}
