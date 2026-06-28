@@ -191,6 +191,21 @@ describe('assembleTypst — page / font / density / colours wired', () => {
   it('emits no footer arg by default (parity)', () => {
     expect(renderC({})).not.toContain('footer:');
   });
+
+  it('renders the tax bar when taxBar.enabled + section visible, with a number', () => {
+    const out = renderC({
+      sections: [{ key: 'taxBar', visible: true }],
+      taxBar: { enabled: true, source: 'manual', value: 'OM123', label: { en: 'VAT Reg. No.', ar: 'الرقم الضريبي' } },
+    });
+    expect(out).toContain('VAT Reg. No.: OM123');
+  });
+
+  it('renders standard Terms & Conditions from termsContent', () => {
+    const out = renderC({ termsContent: { terms: { en: 'Pay within 14 days.' }, notes: { en: 'Thanks.' } } });
+    expect(out).toContain('Pay within 14 days.');
+    expect(out).toContain('Terms & Conditions');
+    expect(out).toContain('Thanks.');
+  });
 });
 
 // The Typst header divider must honour config.header — style, colour, insets and

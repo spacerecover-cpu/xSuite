@@ -362,7 +362,8 @@ export function assembleTypst(
   const partyBox = data.parties?.to
     ? infobox('iconUser', data.parties.to.title, [...(data.parties.to.name ? [{ label: { en: 'Name:', ar: 'الاسم:' }, value: data.parties.to.name }] : []), ...data.parties.to.rows], 'parties')
     : '';
-  const metaBox = data.meta?.length ? infobox('iconDoc', { en: 'Details', ar: 'التفاصيل' }, data.meta, 'meta') : '';
+  const metaTitle = config.labels?.meta ?? config.labels?.details ?? { en: 'Details', ar: 'التفاصيل' };
+  const metaBox = data.meta?.length ? infobox('iconDoc', metaTitle, data.meta, 'meta') : '';
 
   const frag: Record<string, string> = {};
 
@@ -462,13 +463,66 @@ export function assembleTypst(
     frag.taxSummary = `${block}\n#v(8pt)`;
   }
 
-  // Terms / Notes (no icon).
-  if (data.terms?.blocks?.length) {
-    frag.terms = data.terms.blocks
-      .map((b) => `#infobox(iconNone, [${E(b.title)}], [${A(b.title)}], text(size: ${S.terms}pt, fill: rgb("${LABELC}"), [${htmlToTypst(b.body)}]))\n#v(6pt)`)
+  // Tax bar — full-width VAT/GST registration band, opt-in via config.taxBar,
+  // number from a manual value or the identity vat_number (mirrors taxBar.ts).
+  const tb = config.taxBar;
+  if (tb?.enabled) {
+    const taxNo = tb.source === 'manual' ? tb.value?.trim() : data.identity?.basic_info?.vat_number;
+    if (taxNo) {
+      const tbLabel = L(tb.label ?? { en: 'VAT Reg. No.', ar: 'الرقم الضريبي' });
+      frag.taxBar = `#block(width: 100%, fill: rgb("${TABLEHEAD}"), inset: (x: 6pt, y: 4pt), align(center, text(size: ${S.value}pt, weight: "bold", fill: rgb("${ACCENT}"), [${tbLabel}: ${V(taxNo)}])))\n#v(8pt)`;
+    }
+  }
+
+  // Standard Terms & Conditions (+ Notes) — the per-doc-type Studio content
+  // (config.termsContent), bilingual centre-split. Mirrors renderTerms; never
+  // reads the per-record terms (those are the separate recordTerms section below).
+  {
+    const tc = config.termsContent;
+    const secLang = resolveSecondary(language);
+    const plain = (s: string) => s.split(/\r?\n/).map((ln) => escapeTypst(ln)).join(' \\\n');
+    const termBlocks: { heading: LabelText; body: LabelText }[] = [
+      { heading: config.labels?.terms ?? { en: 'Terms & Conditions', ar: 'الشروط والأحكام' }, body: (tc?.terms ?? {}) as LabelText },
+      { heading: config.labels?.notes ?? { en: 'Notes', ar: 'ملاحظات' }, body: (tc?.notes ?? {}) as LabelText },
+    ];
+    const column = (which: 'en' | 'sec'): string[] =>
+      termBlocks
+        .map((b) => {
+          const raw = which === 'en' ? b.body.en : secondaryText(b.body, secLang);
+          const body = (raw ?? '').trim();
+          if (!body) return null;
+          const heading = which === 'en' ? E(b.heading) : A(b.heading);
+          return `[#text(weight: "bold", size: ${S.terms}pt, fill: rgb("${BODY}"), [${heading}]) #linebreak() #text(size: ${S.terms}pt, fill: rgb("${LABELC}"), [${plain(body)}])]`;
+        })
+        .filter((x): x is string => x !== null);
+    const enCol = column('en');
+    const secCol = secLang ? column('sec') : [];
+    if (enCol.length || secCol.length) {
+      const cell = (arr: string[]) => `block(inset: (x: 8pt, y: 6pt), stack(spacing: 4pt, ${(arr.length ? arr : ['[]']).join(', ')}))`;
+      frag.terms = secCol.length
+        ? `#block(width: 100%, stroke: 0.5pt + rgb("${BORDER}"), grid(columns: (1fr, 1fr), ${cell(enCol)}, ${cell(secCol)}))\n#v(6pt)`
+        : `#block(width: 100%, stroke: 0.5pt + rgb("${BORDER}"), ${cell(enCol)})\n#v(6pt)`;
+    }
+  }
+
+  // Per-record Quote/Invoice Terms (data.terms) — each a bilingual infobox; the
+  // heading is renamable via labels.recordTerms (mirrors renderRecordTerms).
+  {
+    const recordLabel = config.labels?.recordTerms;
+    const notesLabel = config.labels?.notes ?? { en: 'Notes', ar: 'ملاحظات' };
+    const norm = (s: string) => s.replace(/\s+/g, ' ').trim().replace(/[:：]\s*$/, '').toLowerCase();
+    const blocks = data.terms?.blocks?.length
+      ? data.terms.blocks
+      : data.terms?.body
+        ? [{ title: data.terms.title, body: data.terms.body }]
+        : [];
+    const out = blocks
+      .map((b) => {
+        const title = recordLabel && norm(en(b.title)) !== norm(en(notesLabel)) ? recordLabel : b.title;
+        return `#infobox(iconNone, [${E(title)}], [${A(title)}], text(size: ${S.terms}pt, fill: rgb("${LABELC}"), [${htmlToTypst(b.body)}]))\n#v(6pt)`;
+      })
       .join('\n');
-  } else if (data.terms?.body) {
-    frag.terms = `#infobox(iconNone, [${E(data.terms.title)}], [${A(data.terms.title)}], text(size: ${S.terms}pt, fill: rgb("${LABELC}"), [${htmlToTypst(data.terms.body)}]))\n#v(6pt)`;
+    if (out) frag.recordTerms = out;
   }
 
   // Bank account — honours the Studio display style (boxed vs single line), box
@@ -522,7 +576,7 @@ export function assembleTypst(
   const orderedKeys = [...sections].filter((s) => s.visible).sort((a, b) => a.order - b.order).map((s) => s.key);
   const keys = orderedKeys.length
     ? orderedKeys
-    : ['parties', 'meta', 'lineItems', 'totals', 'paymentHistory', 'terms', 'bank', 'signature', 'qr'];
+    : ['parties', 'meta', 'taxBar', 'lineItems', 'totals', 'taxSummary', 'paymentHistory', 'terms', 'recordTerms', 'bank', 'signature', 'qr'];
 
   for (const key of keys) {
     if (key === 'header') continue;

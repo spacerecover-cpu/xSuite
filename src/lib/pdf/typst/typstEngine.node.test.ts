@@ -94,6 +94,9 @@ describe('typst node render', () => {
       paper: { size: 'Letter', orientation: 'landscape', margins: [30, 30, 30, 30] },
       table: { zebra: true, rowNumbering: true },
       colors: { accent: '#0f766e' },
+      sections: [{ key: 'taxBar', visible: true }],
+      taxBar: { enabled: true, source: 'manual', value: 'OM1100110011', label: { en: 'VAT Reg. No.', ar: 'الرقم الضريبي' } },
+      termsContent: { terms: { en: 'Net 14 days.\nLate fees apply.', ar: 'صافي ١٤ يومًا.' }, notes: { en: 'Thank you for your business.' } },
     });
     const markup = assembleTypst(data, c, ctxFromLanguageConfig(c.language));
     const compiler = NodeCompiler.create({ fontArgs: [{ fontPaths: [path.resolve('public/fonts')] }] });
