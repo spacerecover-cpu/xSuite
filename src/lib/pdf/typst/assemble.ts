@@ -73,30 +73,33 @@ export function assembleTypst(
   const kvBody = (rows: Array<{ label: LabelText; value: string }>, group: TranslationGroup) =>
     rows.map((r) => `#kv([${fieldLbl(r.label, group)}], [${V(r.value)}])`).join(' ');
 
-  // Company identity letterhead — honour the template header config (logo
-  // placement, address zone, logo size) instead of centring everything, so the
-  // Typst output matches the pdfmake letterhead.
+  // Company identity letterhead — replicate the pdfmake "Classic" header: logo on
+  // the configured side, identity block (legal name bold + trading name + address
+  // + Tel/Email + VAT) on the other side, aligned toward the logo's opposite edge.
   const header = config.header ?? {};
   const placement = header.logoPlacement ?? 'left';
-  const addressZone = header.addressZone ?? 'right';
+  const logoLeft = placement !== 'right';
   const logoMaxH = header.logoMaxHeight && header.logoMaxHeight > 0 ? header.logoMaxHeight : 0;
-  const logoSizeArg = logoMaxH ? `height: ${logoMaxH}pt` : `width: ${header.logoWidth ?? 110}pt`;
+  const logoSizeArg = logoMaxH ? `height: ${logoMaxH}pt` : `width: ${header.logoWidth ?? 130}pt`;
   const logoImg = opts.logoPath ? `image("${opts.logoPath}", ${logoSizeArg})` : '[]';
 
+  const info = data.identity?.basic_info;
+  const legalName = info?.legal_name || info?.company_name;
   const idLines: string[] = [];
-  const idName = data.identity?.basic_info?.company_name;
-  if (idName) idLines.push(`text(size: 14pt, weight: "bold", fill: rgb("${NAVY}"), [${V(idName)}])`);
-  if (addressZone !== 'hidden') {
-    for (const line of buildCompanyAddressLines(data.identity?.location)) idLines.push(`muted([${V(line)}])`);
-    const contact = buildCompanyContactLine(data.identity?.contact_info);
-    if (contact) idLines.push(`muted([${V(contact)}])`);
-  }
-  const idBlock = `stack(spacing: 3pt, ${idLines.length ? idLines.join(', ') : '[]'})`;
+  if (legalName) idLines.push(`text(size: 14pt, weight: "bold", fill: rgb("#1e293b"), [${V(legalName)}])`);
+  if (info?.company_name && info.company_name !== legalName) idLines.push(`muted([${V(info.company_name)}])`);
+  for (const line of buildCompanyAddressLines(data.identity?.location)) idLines.push(`muted([${V(line)}])`);
+  const contact = buildCompanyContactLine(data.identity?.contact_info);
+  if (contact) idLines.push(`muted([${V(contact)}])`);
+  if (info?.vat_number) idLines.push(`muted([VAT: ${V(info.vat_number)}])`);
+
+  const idAlign = placement === 'center' ? 'center' : logoLeft ? 'right' : 'left';
+  const idBlock = `align(${idAlign}, stack(spacing: 2pt, ${idLines.length ? idLines.join(', ') : '[]'}))`;
 
   if (placement === 'center' || !opts.logoPath) {
     if (opts.logoPath) parts.push(`#align(center, ${logoImg})`, '#v(4pt)');
-    parts.push(`#align(center, ${idBlock})`);
-  } else if (placement === 'left') {
+    parts.push(`#${idBlock}`);
+  } else if (logoLeft) {
     parts.push(`#grid(columns: (auto, 1fr), column-gutter: 12pt, align: horizon, align(horizon, ${logoImg}), ${idBlock})`);
   } else {
     parts.push(`#grid(columns: (1fr, auto), column-gutter: 12pt, align: horizon, ${idBlock}, align(horizon, ${logoImg}))`);
@@ -107,9 +110,9 @@ export function assembleTypst(
   parts.push(`#align(center, text(size: 18pt, weight: "bold", fill: rgb("${NAVY}"), [${L(data.documentTitle)}]))`);
   parts.push(`#line(length: 100%, stroke: 0.5pt + rgb("${NAVY}"))`, '#v(8pt)');
 
-  // Parties (to) + meta side by side
+  // Parties (to) + meta side by side — Customer first (left), Details second
+  // (right), matching the pdfmake layout.
   const boxes: string[] = [];
-  if (data.meta?.length) boxes.push(`infobox(${band({ en: 'Details', ar: 'التفاصيل' })}, [${kvBody(data.meta, 'meta')}])`);
   if (data.parties?.to) {
     const p = data.parties.to;
     const rows = [
@@ -118,6 +121,7 @@ export function assembleTypst(
     ];
     boxes.push(`infobox(${band(p.title)}, [${kvBody(rows, 'parties')}])`);
   }
+  if (data.meta?.length) boxes.push(`infobox(${band({ en: 'Details', ar: 'التفاصيل' })}, [${kvBody(data.meta, 'meta')}])`);
   if (boxes.length) {
     parts.push(`#grid(columns: (${boxes.map(() => '1fr').join(', ')}), gutter: 10pt, ${boxes.join(', ')})`, '#v(8pt)');
   }
