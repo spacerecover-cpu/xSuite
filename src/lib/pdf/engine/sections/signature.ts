@@ -42,7 +42,7 @@ export const renderSignature: SectionRenderer = (
       : null;
   const sigNode =
     sig?.show && classifyLogo(engine.signatureImage).kind !== 'none'
-      ? buildLogoNode(engine.signatureImage, { width: sig.width ?? 140, alignment: 'left', margin: [0, 0, 0, 2] })
+      ? buildLogoNode(engine.signatureImage, { width: sig.width ?? 140, alignment: sig.placement ?? 'left', margin: [0, 0, 0, 2] })
       : null;
 
   // Parity: with no images, return the original single block unchanged.

@@ -906,7 +906,7 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
       return {
         ...base,
         sections: financialSections(),
-        labels: { documentTitle: { en: 'QUOTATION', ar: 'عرض سعر' } },
+        labels: { documentTitle: { en: 'QUOTATION', ar: 'عرض أسعار' } },
         layout: { partiesMetaSideBySide: true },
       };
     case 'payment_receipt':

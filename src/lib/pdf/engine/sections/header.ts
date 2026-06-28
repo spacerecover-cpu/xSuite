@@ -192,7 +192,7 @@ function buildLetterhead(
   switch (header.layout) {
     case 'modern':
       return {
-        stack: stackedLetterhead(buildLogoNode(logo, { width: header.logoWidth, height: h, alignment: 'center', margin: [0, 0, 0, 4] }), identityLines('center')),
+        stack: stackedLetterhead(buildLogoNode(logo, { width: header.logoWidth, height: h, maxHeight: header.logoMaxHeight, alignment: 'center', margin: [0, 0, 0, header.logoMarginBottom] }), identityLines('center')),
         alignment: 'center',
         margin,
       };
@@ -200,7 +200,7 @@ function buildLetterhead(
     case 'minimal':
       return {
         columns: [
-          buildLogoNode(logo, { width: Math.min(header.logoWidth, 90), height: h, margin: [0, 0, 10, 0] }) ?? { text: '', width: 'auto' },
+          buildLogoNode(logo, { width: Math.min(header.logoWidth, 90), height: h, maxHeight: header.logoMaxHeight, margin: [0, 0, 10, 0] }) ?? { text: '', width: 'auto' },
           { text: primaryName, fontSize: 13, bold: true, color: nameColor, alignment: 'left', margin: [0, 6, 0, 0], width: '*' },
         ],
         columnGap: 8,
@@ -211,7 +211,7 @@ function buildLetterhead(
       return {
         table: {
           widths: ['*'],
-          body: [[{ stack: stackedLetterhead(buildLogoNode(logo, { width: header.logoWidth, height: h, alignment: 'center', margin: [0, 0, 0, 4] }), identityLines('center')), alignment: 'center', margin: [8, 8, 8, 8] }]],
+          body: [[{ stack: stackedLetterhead(buildLogoNode(logo, { width: header.logoWidth, height: h, maxHeight: header.logoMaxHeight, alignment: 'center', margin: [0, 0, 0, header.logoMarginBottom] }), identityLines('center')), alignment: 'center', margin: [8, 8, 8, 8] }]],
         },
         layout: {
           hLineWidth: () => 0.5,
@@ -224,7 +224,7 @@ function buildLetterhead(
 
     case 'split': {
       const logoLeft = header.logoPlacement !== 'right';
-      const logoCol = buildLogoNode(logo, { width: header.logoWidth, height: h, alignment: (logoLeft ? 'left' : 'right') }) ?? { text: '', width: 'auto' as const };
+      const logoCol = buildLogoNode(logo, { width: header.logoWidth, height: h, maxHeight: header.logoMaxHeight, alignment: (logoLeft ? 'left' : 'right') }) ?? { text: '', width: 'auto' as const };
       const idCol = { stack: identityLines(logoLeft ? 'right' : 'left'), width: '*' as const };
       return { columns: logoLeft ? [logoCol, idCol] : [idCol, logoCol], columnGap: 12, margin };
     }
@@ -232,7 +232,7 @@ function buildLetterhead(
     case 'spreadsheet':
       return {
         columns: [
-          buildLogoNode(logo, { width: Math.min(header.logoWidth, 80), height: h }) ?? { text: '', width: 'auto' },
+          buildLogoNode(logo, { width: Math.min(header.logoWidth, 80), height: h, maxHeight: header.logoMaxHeight }) ?? { text: '', width: 'auto' },
           { stack: identityLines('right'), width: '*' },
         ],
         columnGap: 8,

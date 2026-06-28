@@ -81,9 +81,11 @@ export function toEngineData(
 
   // ---- Title ---------------------------------------------------------------
   const isProforma = invoiceData.invoice_type === 'proforma';
+  // Proforma stays data-driven; the standard title honours the Studio rename
+  // (config.labels.documentTitle defaults to the built-in "TAX INVOICE").
   const documentTitle: LabelText = isProforma
     ? { en: 'PROFORMA INVOICE', ar: 'فاتورة مبدئية' }
-    : { en: 'TAX INVOICE', ar: 'فاتورة ضريبية' };
+    : config.labels?.documentTitle ?? { en: 'TAX INVOICE', ar: 'فاتورة ضريبية' };
 
   // ---- Recipient (customer / company) party --------------------------------
   const customerName =
@@ -109,7 +111,7 @@ export function toEngineData(
   if (invoiceData.client_reference) toRows.push({ label: { en: 'Reference:', ar: 'المرجع:' }, value: invoiceData.client_reference });
 
   const to: PartyBlock = {
-    title: { en: 'Customer Information', ar: 'معلومات العميل' },
+    title: config.labels?.parties ?? { en: 'Customer Information', ar: 'معلومات العميل' },
     name: customerName,
     rows: toRows,
   };

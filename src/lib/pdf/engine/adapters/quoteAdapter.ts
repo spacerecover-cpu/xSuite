@@ -71,7 +71,7 @@ export function toEngineData(
     formatEngineMoney(amount, { symbol: currencySymbol, decimalPlaces, position: currencyPosition });
 
   // ---- Title ---------------------------------------------------------------
-  const documentTitle: LabelText = { en: 'QUOTATION', ar: 'عرض أسعار' };
+  const documentTitle: LabelText = config.labels?.documentTitle ?? { en: 'QUOTATION', ar: 'عرض أسعار' };
 
   // ---- Recipient (customer / company) party --------------------------------
   const customerName =
@@ -97,7 +97,7 @@ export function toEngineData(
   if (quoteData.client_reference) toRows.push({ label: { en: 'Reference:', ar: 'المرجع:' }, value: quoteData.client_reference });
 
   const to: PartyBlock = {
-    title: { en: 'Customer Information', ar: 'معلومات العميل' },
+    title: config.labels?.parties ?? { en: 'Customer Information', ar: 'معلومات العميل' },
     name: customerName,
     rows: toRows,
   };
