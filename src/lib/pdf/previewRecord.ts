@@ -18,6 +18,7 @@ import { toEngineData as toQuoteEngineData } from './engine/adapters/quoteAdapte
 import { toEngineData as toPaymentReceiptEngineData } from './engine/adapters/paymentReceiptAdapter';
 import { renderTemplate } from './engine/renderTemplate';
 import { applyTenantLanguage } from './engine/applyTenantLanguage';
+import { isTypstEngineEnabled } from './engine/featureFlag';
 import { createPdfWithFonts, initializePDFFonts } from './fonts';
 import { ctxFromLanguageConfig, withTimeout } from './translationContext';
 import { resolveSecondary } from './templateConfig';
@@ -156,6 +157,20 @@ export async function previewDocumentForRecord(
       /* non-fatal: render proceeds with the base font */
     }
   }
+  // Arabic documents render through Typst (correct shaping + bidi); the LTR
+  // languages keep the proven pdfmake path. Lazily imported so the WASM never
+  // enters the default bundle. Phase-1: text/tables (logo/QR images TBD).
+  if (isTypstEngineEnabled() && secondary === 'ar') {
+    const [{ assembleTypst }, { renderTypstPdf }] = await Promise.all([
+      import('./typst/assemble'),
+      import('./typst/typstEngine'),
+    ]);
+    const markup = assembleTypst(engineData, langConfig, ctx);
+    const blob = await withTimeout(renderTypstPdf(markup), PREVIEW_TIMEOUT_MS, 'Preview render timed out');
+    const w = brandingImageWarning(logo);
+    return { url: URL.createObjectURL(blob), warnings: w ? [w] : [] };
+  }
+
   const docDefinition = renderTemplate(langConfig, engineData, ctx, logo, qr, stamp, signature);
   const warning = brandingImageWarning(logo);
   const warnings = warning ? [warning] : [];

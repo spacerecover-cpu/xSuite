@@ -146,10 +146,12 @@ export async function previewTemplate(
   const { logo: previewLogo, warnings } = resolvePreviewLogo(logo);
   const qrImage = await resolveQrImage(null, engineData.zatcaPayload ?? engineData.qrPayload);
 
-  // Experimental Typst renderer (flag-gated, default off): correct Arabic/Thai/
-  // Korean via rustybuzz + Unicode bidi. Lazily imported so the WASM never enters
-  // the default bundle. Phase-1 slice: text/tables/totals (logo/QR images TBD).
-  if (isTypstEngineEnabled()) {
+  // Experimental Typst renderer (flag-gated, default off): correct Arabic via
+  // rustybuzz + Unicode bidi. Scoped to ARABIC documents only — the LTR
+  // languages already render cleanly through pdfmake, so they stay on it. Lazily
+  // imported so the WASM never enters the default bundle. Phase-1: text/tables
+  // (logo/QR images TBD).
+  if (isTypstEngineEnabled() && secondary === 'ar') {
     const [{ assembleTypst }, { renderTypstPdf }] = await Promise.all([
       import('../typst/assemble'),
       import('../typst/typstEngine'),
