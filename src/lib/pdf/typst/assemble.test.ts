@@ -206,6 +206,14 @@ describe('assembleTypst — page / font / density / colours wired', () => {
     expect(out).toContain('Terms & Conditions');
     expect(out).toContain('Thanks.');
   });
+
+  it('renders a rotated, faded watermark when watermark.text is set', () => {
+    const out = renderC({ watermark: { text: 'PAID', angle: -30, opacity: 0.2 } });
+    expect(out).toContain('background: align(center + horizon, rotate(-30deg');
+    expect(out).toContain('transparentize(80%)'); // (1 - 0.2) * 100
+    expect(out).toContain('[PAID]');
+    expect(renderC({})).not.toContain('background:');
+  });
 });
 
 // The Typst header divider must honour config.header — style, colour, insets and

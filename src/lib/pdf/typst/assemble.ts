@@ -24,6 +24,7 @@ import {
   resolveTable,
   resolveFooter,
   resolvePageNumbers,
+  resolveWatermarkSettings,
 } from '../engine/branding';
 import { buildCompanyAddress } from '../utils';
 import { resolveSecondary, secondaryText, type DocumentTemplateConfig, type LabelText, type TypographyStyleKey } from '../templateConfig';
@@ -232,7 +233,14 @@ export function assembleTypst(
   const footerArg = footerLines.length
     ? `, footer: context block(width: 100%, stack(spacing: 2pt, ${footerLines.join(', ')}))`
     : '';
-  const pageLine = `#set page(${pageGeom}, margin: (top: ${pm[0]}pt, right: ${pm[1]}pt, bottom: ${pm[2]}pt, left: ${pm[3]}pt)${footerArg})`;
+  // Watermark — a centred, rotated, faded text behind the page, honouring
+  // watermark.text/angle/opacity/fontSize (mirrors resolveWatermarkSettings).
+  const wm = resolveWatermarkSettings(config);
+  const bgArg =
+    wm?.text != null
+      ? `, background: align(center + horizon, rotate(${wm.angle}deg, text(size: ${wm.fontSize}pt, weight: "bold", fill: luma(150).transparentize(${Math.round((1 - wm.opacity) * 100)}%), [${escapeTypst(wm.text)}])))`
+      : '';
+  const pageLine = `#set page(${pageGeom}, margin: (top: ${pm[0]}pt, right: ${pm[1]}pt, bottom: ${pm[2]}pt, left: ${pm[3]}pt)${footerArg}${bgArg})`;
   // Font — the chosen family leads, with the Arabic-capable fallbacks behind it.
   const leadFont = FONT_TYPST[typo.fontFamily];
   const fonts = leadFont

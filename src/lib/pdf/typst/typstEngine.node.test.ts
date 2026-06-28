@@ -97,6 +97,7 @@ describe('typst node render', () => {
       sections: [{ key: 'taxBar', visible: true }],
       taxBar: { enabled: true, source: 'manual', value: 'OM1100110011', label: { en: 'VAT Reg. No.', ar: 'الرقم الضريبي' } },
       termsContent: { terms: { en: 'Net 14 days.\nLate fees apply.', ar: 'صافي ١٤ يومًا.' }, notes: { en: 'Thank you for your business.' } },
+      watermark: { text: 'DRAFT', angle: -45, opacity: 0.12 },
     });
     const markup = assembleTypst(data, c, ctxFromLanguageConfig(c.language));
     const compiler = NodeCompiler.create({ fontArgs: [{ fontPaths: [path.resolve('public/fonts')] }] });
