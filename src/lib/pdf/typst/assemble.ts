@@ -21,6 +21,7 @@ import { resolveSecondary, secondaryText, type DocumentTemplateConfig, type Labe
 import type { EngineDocData } from '../engine/types';
 import type { TranslationContext } from '../types';
 import { escapeTypst } from './escape';
+import { htmlToTypst } from './htmlToTypst';
 
 const FONTS = '("Tajawal", "Noto Sans Arabic", "Noto Sans Thai", "Noto Sans KR", "Roboto")';
 const NAVY = '#162660';
@@ -69,17 +70,35 @@ export function assembleTypst(
   const kvBody = (rows: Array<{ label: LabelText; value: string }>, group: TranslationGroup) =>
     rows.map((r) => `#kv([${fieldLbl(r.label, group)}], [${V(r.value)}])`).join(' ');
 
-  // Company identity header: logo (mapped into the compiler by the caller) +
-  // name + address + contact.
-  if (opts.logoPath) parts.push(`#align(center, image("${opts.logoPath}", height: 42pt))`, '#v(4pt)');
+  // Company identity letterhead — honour the template header config (logo
+  // placement, address zone, logo size) instead of centring everything, so the
+  // Typst output matches the pdfmake letterhead.
+  const header = config.header ?? {};
+  const placement = header.logoPlacement ?? 'left';
+  const addressZone = header.addressZone ?? 'right';
+  const logoMaxH = header.logoMaxHeight && header.logoMaxHeight > 0 ? header.logoMaxHeight : 0;
+  const logoSizeArg = logoMaxH ? `height: ${logoMaxH}pt` : `width: ${header.logoWidth ?? 110}pt`;
+  const logoImg = opts.logoPath ? `image("${opts.logoPath}", ${logoSizeArg})` : '[]';
+
+  const idLines: string[] = [];
   const idName = data.identity?.basic_info?.company_name;
-  if (idName) parts.push(`#align(center, text(size: 13pt, weight: "bold", [${V(idName)}]))`);
-  for (const line of buildCompanyAddressLines(data.identity?.location)) {
-    parts.push(`#align(center, muted([${V(line)}]))`);
+  if (idName) idLines.push(`text(size: 14pt, weight: "bold", fill: rgb("${NAVY}"), [${V(idName)}])`);
+  if (addressZone !== 'hidden') {
+    for (const line of buildCompanyAddressLines(data.identity?.location)) idLines.push(`muted([${V(line)}])`);
+    const contact = buildCompanyContactLine(data.identity?.contact_info);
+    if (contact) idLines.push(`muted([${V(contact)}])`);
   }
-  const contact = buildCompanyContactLine(data.identity?.contact_info);
-  if (contact) parts.push(`#align(center, muted([${V(contact)}]))`);
-  parts.push('#v(6pt)');
+  const idBlock = `stack(spacing: 3pt, ${idLines.length ? idLines.join(', ') : '[]'})`;
+
+  if (placement === 'center' || !opts.logoPath) {
+    if (opts.logoPath) parts.push(`#align(center, ${logoImg})`, '#v(4pt)');
+    parts.push(`#align(center, ${idBlock})`);
+  } else if (placement === 'left') {
+    parts.push(`#grid(columns: (auto, 1fr), column-gutter: 12pt, align: horizon, align(horizon, ${logoImg}), ${idBlock})`);
+  } else {
+    parts.push(`#grid(columns: (1fr, auto), column-gutter: 12pt, align: horizon, ${idBlock}, align(horizon, ${logoImg}))`);
+  }
+  parts.push('#v(8pt)');
 
   // Title
   parts.push(`#align(center, text(size: 18pt, weight: "bold", fill: rgb("${NAVY}"), [${L(data.documentTitle)}]))`);
@@ -126,10 +145,10 @@ export function assembleTypst(
   // Terms
   if (data.terms?.blocks?.length) {
     for (const b of data.terms.blocks) {
-      parts.push(`#infobox(${band(b.title)}, [${V(b.body)}])`, '#v(4pt)');
+      parts.push(`#infobox(${band(b.title)}, [${htmlToTypst(b.body)}])`, '#v(4pt)');
     }
   } else if (data.terms?.body) {
-    parts.push(`#infobox(${band(data.terms.title)}, [${V(data.terms.body)}])`, '#v(4pt)');
+    parts.push(`#infobox(${band(data.terms.title)}, [${htmlToTypst(data.terms.body)}])`, '#v(4pt)');
   }
 
   // Bank
