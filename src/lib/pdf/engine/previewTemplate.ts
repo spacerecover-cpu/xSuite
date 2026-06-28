@@ -23,9 +23,7 @@ import type { DocumentTemplateConfig, TemplateDocumentType } from '../templateCo
 import type { CompanySettingsData, TranslationContext } from '../types';
 import { renderTemplate } from './renderTemplate';
 import { applyTenantLanguage } from './applyTenantLanguage';
-import { engineLayoutDirection } from './rtl';
 import { createPdfWithFonts, initializePDFFonts } from '../fonts';
-import { shapeDocDefinitionArabic } from '../rtlShaping';
 import { ctxFromLanguageConfig, withTimeout } from '../translationContext';
 import { resolveSecondary } from '../templateConfig';
 import { buildPreviewEngineData, sampleInvoiceData } from './sampleData';
@@ -155,14 +153,6 @@ export async function previewTemplate(
     stampImage ?? null,
     signatureImage ?? null,
   );
-
-  // Arabic needs a real reshape + bidi pass (pdfmake has no bidi engine). Apply it
-  // to the assembled definition right before rasterization — the logical
-  // definition the engine tests assert stays untouched. Gated on an Arabic
-  // secondary; non-Arabic documents skip the walk entirely.
-  if (secondary === 'ar') {
-    shapeDocDefinitionArabic(docDefinition, engineLayoutDirection(effectiveConfig.language));
-  }
 
   // Wire pdfmake's error callback so a rasterization failure REJECTS (rather
   // than leaving the promise pending forever → infinite "Updating…" spinner),

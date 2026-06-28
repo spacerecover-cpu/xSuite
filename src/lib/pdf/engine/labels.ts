@@ -8,6 +8,8 @@
  */
 
 import { resolveSecondary, secondaryText, type LanguageConfig, type TranslationPolicyConfig } from '../templateConfig';
+import { reverseArabicText } from '../fonts';
+import { isRTLLanguage } from '../../documentTranslations';
 import type { LabelText } from './types';
 
 /** True when the document shows both languages (stacked or side-by-side). */
@@ -45,10 +47,15 @@ export function en(label: LabelText, fallback = ''): string {
  * `language` still works for Arabic.
  */
 export function ar(label: LabelText, language?: LanguageConfig): string | null {
-  // Returns the LOGICAL-order secondary string. Arabic reshaping + bidi reordering
-  // for display is applied once to the assembled doc-definition at render time
-  // (see src/lib/pdf/rtlShaping.ts), so resolvers stay logical and testable.
-  if (language) return secondaryText(label, resolveSecondary(language)) ?? null;
+  if (language) {
+    const code = resolveSecondary(language);
+    const s = secondaryText(label, code) ?? null;
+    // pdfmake has no bidi pass, so a multi-word RTL secondary (Arabic) in a header
+    // band renders with reversed words / collapsed spaces ('معلومات العميل' →
+    // 'العميلمعلومات'). Reverse the word order for RTL so pdfmake's LTR layout
+    // reads correctly; reverseArabicText no-ops on non-Arabic (Korean/Thai/Latin).
+    return s && code && isRTLLanguage(code) ? reverseArabicText(s) : s;
+  }
   return label.ar ?? null;
 }
 

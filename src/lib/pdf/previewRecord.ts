@@ -18,9 +18,7 @@ import { toEngineData as toQuoteEngineData } from './engine/adapters/quoteAdapte
 import { toEngineData as toPaymentReceiptEngineData } from './engine/adapters/paymentReceiptAdapter';
 import { renderTemplate } from './engine/renderTemplate';
 import { applyTenantLanguage } from './engine/applyTenantLanguage';
-import { engineLayoutDirection } from './engine/rtl';
 import { createPdfWithFonts, initializePDFFonts } from './fonts';
-import { shapeDocDefinitionArabic } from './rtlShaping';
 import { ctxFromLanguageConfig, withTimeout } from './translationContext';
 import { resolveSecondary } from './templateConfig';
 import { loadImageAsBase64 } from './utils';
@@ -159,11 +157,6 @@ export async function previewDocumentForRecord(
     }
   }
   const docDefinition = renderTemplate(langConfig, engineData, ctx, logo, qr, stamp, signature);
-  // Arabic reshape + bidi pass before rasterization (pdfmake has no bidi engine);
-  // the logical definition stays untouched. Gated on an Arabic secondary.
-  if (secondary === 'ar') {
-    shapeDocDefinitionArabic(docDefinition, engineLayoutDirection(langConfig.language));
-  }
   const warning = brandingImageWarning(logo);
   const warnings = warning ? [warning] : [];
   const render = new Promise<string>((resolve, reject) => {
