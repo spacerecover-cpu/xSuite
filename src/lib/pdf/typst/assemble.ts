@@ -15,6 +15,7 @@
  * Phase 1 scope: the financial (invoice/quote/receipt) sections.
  */
 import { en, resolveLabel, fieldLabelLanguage, type TranslationGroup } from '../engine/labels';
+import { resolveOrganization } from '../engine/branding';
 import { buildCompanyAddress } from '../utils';
 import { resolveSecondary, secondaryText, type DocumentTemplateConfig, type LabelText } from '../templateConfig';
 import type { EngineDocData } from '../engine/types';
@@ -94,33 +95,60 @@ export function assembleTypst(
     return `infobox(${icon}, [${E(title)}], [${A(title)}], ${grid})`;
   };
 
-  // ── Company letterhead — pdfmake "Classic": logo on the configured side,
-  // identity block (legal name + trading name + address + Tel/Email + VAT) toward
-  // the opposite edge. ───────────────────────────────────────────────────────
+  // ── Company letterhead — mirrors pdfmake's header.ts identityLines EXACTLY:
+  // honours the "Organization details" config (manual-vs-company_info source +
+  // per-line show toggles + manual overrides), not the raw company settings, so
+  // the Typst letterhead matches what the tenant configured in the Studio. Logo
+  // on the configured side; identity block toward the opposite edge. ──────────
   const header = config.header ?? {};
   const placement = header.logoPlacement ?? 'left';
   const logoLeft = placement !== 'right';
   const logoMaxH = header.logoMaxHeight && header.logoMaxHeight > 0 ? header.logoMaxHeight : 0;
   const logoSizeArg = logoMaxH ? `height: ${logoMaxH}pt` : `width: ${header.logoWidth ?? 130}pt`;
-  const logoImg = opts.logoPath ? `image("${opts.logoPath}", ${logoSizeArg})` : '[]';
 
   const info = data.identity?.basic_info;
   const contactInfo = data.identity?.contact_info;
-  const legalName = info?.legal_name || info?.company_name;
+  const companyName = info?.company_name || 'Company Name';
+  const legalNameFallback = info?.legal_name || companyName;
+  const companyAddress = buildCompanyAddress(data.identity?.location);
+  const org = config.organization ? resolveOrganization(config) : null;
+  const pick = (manual: string | undefined, fallback: string) => (org?.source === 'manual' ? manual ?? fallback : fallback);
+  const addrSize = org?.addressFontSize ?? 8;
+
+  const useLogo = !!opts.logoPath && (!org || org.show.logo);
+  const logoImg = useLogo ? `image("${opts.logoPath}", ${logoSizeArg})` : '[]';
+
   const idLines: string[] = [];
-  if (legalName) idLines.push(`text(size: 14pt, weight: "bold", fill: rgb("${TEXT}"), [${V(legalName)}])`);
-  if (info?.company_name && info.company_name !== legalName) idLines.push(`text(size: 9pt, fill: rgb("${MUTED}"), [${V(info.company_name)}])`);
-  const addr = buildCompanyAddress(data.identity?.location);
-  if (addr) idLines.push(`text(size: 8pt, fill: rgb("${MUTED}"), [${V(addr)}])`);
+  if (!org || org.show.legalName) {
+    const v = pick(org?.manual.legalName, legalNameFallback);
+    if (v) idLines.push(`text(size: 14pt, weight: "bold", fill: rgb("${TEXT}"), [${V(v)}])`);
+  }
+  if (org?.show.legalNameAr && org.manual.legalNameAr) {
+    idLines.push(`text(size: 12pt, weight: "bold", fill: rgb("${TEXT}"), [${V(org.manual.legalNameAr)}])`);
+  }
+  if (org?.show.name) {
+    const n = pick(org.manual.name, companyName);
+    if (n && n !== pick(org?.manual.legalName, legalNameFallback)) idLines.push(`text(size: 9pt, fill: rgb("${MUTED}"), [${V(n)}])`);
+  }
+  if (org?.show.nameAr && org.manual.nameAr) {
+    idLines.push(`text(size: 9pt, fill: rgb("${MUTED}"), [${V(org.manual.nameAr)}])`);
+  }
+  if (!org || org.show.address) {
+    const a = pick(org?.manual.address, companyAddress);
+    if (a) idLines.push(`text(size: ${addrSize}pt, fill: rgb("${MUTED}"), [${V(a)}])`);
+  }
   if (contactInfo?.phone_primary) idLines.push(`text(size: 8pt, fill: rgb("${MUTED}"), [Tel: ${V(contactInfo.phone_primary)}])`);
   if (contactInfo?.email_general) idLines.push(`text(size: 8pt, fill: rgb("${MUTED}"), [Email: ${V(contactInfo.email_general)}])`);
-  if (info?.vat_number) idLines.push(`text(size: 8pt, fill: rgb("${MUTED}"), [VAT: ${V(info.vat_number)}])`);
+  if (!org || org.show.taxId) {
+    const tax = org?.source === 'manual' ? org.manual.taxId : info?.vat_number;
+    if (tax) idLines.push(`text(size: 8pt, fill: rgb("${MUTED}"), [VAT: ${V(tax)}])`);
+  }
 
   const idAlign = placement === 'center' ? 'center' : logoLeft ? 'right' : 'left';
   const idBlock = `align(${idAlign}, stack(spacing: 2pt, ${idLines.length ? idLines.join(', ') : '[]'}))`;
 
-  if (placement === 'center' || !opts.logoPath) {
-    if (opts.logoPath) parts.push(`#align(center, ${logoImg})`, '#v(4pt)');
+  if (placement === 'center' || !useLogo) {
+    if (useLogo) parts.push(`#align(center, ${logoImg})`, '#v(4pt)');
     parts.push(`#${idBlock}`);
   } else if (logoLeft) {
     parts.push(`#grid(columns: (auto, 1fr), column-gutter: 12pt, align: horizon, align(horizon, ${logoImg}), ${idBlock})`);
