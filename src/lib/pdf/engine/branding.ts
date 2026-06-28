@@ -22,7 +22,6 @@
 
 import { PDF_COLORS, PDF_STYLES } from '../styles';
 import type {
-  AddressZone,
   BrandingConfig,
   ColorsConfig,
   DensityPreset,
@@ -231,7 +230,6 @@ export interface ResolvedHeader {
   logoHeight: number | null;
   logoMarginBottom: number;
   logoMaxHeight: number | null;
-  addressZone: AddressZone;
   divider: DividerStyle;
   /** Opt-in divider colour (validated hex), or `null` to follow the accent. */
   dividerColor: string | null;
@@ -249,7 +247,6 @@ export function resolveHeader(config: Pick<DocumentTemplateConfig, 'header'>): R
     logoHeight: typeof h?.logoHeight === 'number' && h.logoHeight > 0 ? h.logoHeight : null,
     logoMarginBottom: typeof h?.logoMarginBottom === 'number' && h.logoMarginBottom >= 0 ? h.logoMarginBottom : 5,
     logoMaxHeight: typeof h?.logoMaxHeight === 'number' && h.logoMaxHeight > 0 ? h.logoMaxHeight : null,
-    addressZone: h?.addressZone ?? 'right',
     divider: h?.divider ?? 'thin',
     dividerColor: normalizeHex(h?.dividerColor),
     // Clamp to safe bands so neither renderer can draw a backwards/overflowing
@@ -276,7 +273,6 @@ function clampDividerVertical(n: number): number {
 
 export interface ResolvedFooter {
   customText: string | null;
-  background: string | null;
   fontColor: string;
   fontSize: number;
   alignment: 'left' | 'center' | 'right';
@@ -289,7 +285,6 @@ export function resolveFooter(config: Pick<DocumentTemplateConfig, 'footer'>): R
     typeof f?.customText === 'string' && f.customText.trim() !== '' ? f.customText : null;
   return {
     customText,
-    background: normalizeHex(f?.background),
     fontColor: normalizeHex(f?.fontColor) ?? PDF_COLORS.textMuted,
     fontSize: typeof f?.fontSize === 'number' && f.fontSize > 0 ? f.fontSize : 8,
     alignment: f?.alignment ?? 'center',
@@ -329,7 +324,6 @@ export interface ResolvedOrganization {
     taxId: boolean;
   };
   addressFontSize: number;
-  columnWidth: 'auto' | number;
   manual: {
     name?: string;
     nameAr?: string;
@@ -362,7 +356,6 @@ export function resolveOrganization(
     },
     addressFontSize:
       typeof o?.addressFontSize === 'number' && o.addressFontSize > 0 ? o.addressFontSize : 8,
-    columnWidth: o?.columnWidth ?? 'auto',
     manual: o?.manual ?? {},
   };
 }
@@ -371,7 +364,6 @@ export interface ResolvedTable {
   headerBackground: string;
   rowNumbering: boolean;
   zebra: boolean;
-  sectionSubtotals: boolean;
 }
 
 /** Resolve table styling. Header fill precedence: table → colors → neutral. */
@@ -386,7 +378,6 @@ export function resolveTable(
       PDF_COLORS.headerBg,
     rowNumbering: t?.rowNumbering === true,
     zebra: t?.zebra === true,
-    sectionSubtotals: t?.sectionSubtotals === true,
   };
 }
 

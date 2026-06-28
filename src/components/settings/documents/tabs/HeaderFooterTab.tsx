@@ -3,7 +3,6 @@ import { Select } from '../../../ui/Select';
 import { ColorField, FieldGroup, NumberField, SegmentedControl, ToggleRow } from '../controls';
 import { PDF_COLORS } from '../../../../lib/pdf/styles';
 import type {
-  AddressZone,
   DividerStyle,
   HeaderLayout,
   LogoPlacement,
@@ -35,28 +34,16 @@ export const HeaderFooterTab: React.FC<{ api: StudioApi }> = ({ api }) => {
           options={LAYOUTS}
           columns={3}
         />
-        <div className="grid grid-cols-2 gap-3">
-          <SegmentedControl<LogoPlacement>
-            label="Logo placement"
-            value={header?.logoPlacement ?? 'left'}
-            onChange={(v) => api.setHeader({ logoPlacement: v })}
-            options={[
-              { value: 'left', label: 'Left' },
-              { value: 'center', label: 'Center' },
-              { value: 'right', label: 'Right' },
-            ]}
-          />
-          <SegmentedControl<AddressZone>
-            label="Address zone"
-            value={header?.addressZone ?? 'right'}
-            onChange={(v) => api.setHeader({ addressZone: v })}
-            options={[
-              { value: 'left', label: 'Left' },
-              { value: 'right', label: 'Right' },
-              { value: 'hidden', label: 'Hidden' },
-            ]}
-          />
-        </div>
+        <SegmentedControl<LogoPlacement>
+          label="Logo placement"
+          value={header?.logoPlacement ?? 'left'}
+          onChange={(v) => api.setHeader({ logoPlacement: v })}
+          options={[
+            { value: 'left', label: 'Left' },
+            { value: 'center', label: 'Center' },
+            { value: 'right', label: 'Right' },
+          ]}
+        />
         <div className="grid grid-cols-2 gap-3">
           <NumberField
             label="Logo width"

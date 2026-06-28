@@ -219,7 +219,6 @@ describe('resolveTemplateConfig — premium control groups', () => {
     expect(resolved.header).toBeUndefined();
     expect(resolved.footer).toBeUndefined();
     expect(resolved.pageNumbers).toBeUndefined();
-    expect(resolved.continuation).toBeUndefined();
     expect(resolved.organization).toBeUndefined();
     expect(resolved.taxBar).toBeUndefined();
     expect(resolved.table).toBeUndefined();

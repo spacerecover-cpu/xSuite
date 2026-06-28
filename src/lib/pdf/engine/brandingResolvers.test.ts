@@ -136,7 +136,6 @@ describe('resolveHeader', () => {
     expect(h.layout).toBe('classic');
     expect(h.logoPlacement).toBe('left');
     expect(h.logoWidth).toBe(130);
-    expect(h.addressZone).toBe('right');
     expect(h.divider).toBe('thin');
     expect(h.dividerColor).toBeNull(); // unset → follows the accent
     expect(h.dividerNudge).toEqual({ start: 0, end: 0, vertical: 0 });
@@ -166,7 +165,6 @@ describe('resolveFooter', () => {
   it('defaults to the neutral footer settings', () => {
     const f = resolveFooter({});
     expect(f.customText).toBeNull();
-    expect(f.background).toBeNull();
     expect(f.fontColor).toBe(PDF_COLORS.textMuted);
     expect(f.fontSize).toBe(8);
     expect(f.alignment).toBe('center');
@@ -205,7 +203,6 @@ describe('resolveOrganization', () => {
       legalNameAr: false, address: true, taxId: true,
     });
     expect(o.addressFontSize).toBe(8);
-    expect(o.columnWidth).toBe('auto');
   });
 
   it('deep-merges show toggles and reads manual source', () => {
@@ -226,7 +223,6 @@ describe('resolveTable', () => {
     expect(t.headerBackground).toBe(PDF_COLORS.headerBg);
     expect(t.rowNumbering).toBe(false);
     expect(t.zebra).toBe(false);
-    expect(t.sectionSubtotals).toBe(false);
   });
 
   it('table.headerBackground wins, then colors.headerBackground', () => {
@@ -234,11 +230,10 @@ describe('resolveTable', () => {
     expect(resolveTable({ colors: { headerBackground: '#222222' } }).headerBackground).toBe('#222222');
   });
 
-  it('enables row numbering / zebra / subtotals', () => {
-    const t = resolveTable({ table: { rowNumbering: true, zebra: true, sectionSubtotals: true } });
+  it('enables row numbering / zebra', () => {
+    const t = resolveTable({ table: { rowNumbering: true, zebra: true } });
     expect(t.rowNumbering).toBe(true);
     expect(t.zebra).toBe(true);
-    expect(t.sectionSubtotals).toBe(true);
   });
 });
 

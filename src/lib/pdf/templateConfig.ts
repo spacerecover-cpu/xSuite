@@ -357,7 +357,6 @@ export interface ColorsConfig {
 
 export type HeaderLayout = 'classic' | 'modern' | 'minimal' | 'boxed' | 'split' | 'spreadsheet';
 export type LogoPlacement = 'left' | 'center' | 'right';
-export type AddressZone = 'left' | 'center' | 'right' | 'hidden';
 export type DividerStyle = 'thin' | 'thick' | 'none';
 
 export interface HeaderConfig {
@@ -372,8 +371,6 @@ export interface HeaderConfig {
   logoMarginBottom?: number;
   /** Cap the logo height in points (aspect-preserving via pdfmake `fit`). 0/undefined = no cap. */
   logoMaxHeight?: number;
-  /** Address zone in the 3-zone layouts. Default `'right'`. */
-  addressZone?: AddressZone;
   /** Divider rule under the letterhead. Default `'thin'` (0.5pt today). */
   divider?: DividerStyle;
   /** Opt-in divider rule colour (hex). Unset → follows the accent (neutral navy by default). */
@@ -385,8 +382,6 @@ export interface HeaderConfig {
 export interface FooterConfig {
   /** Custom footer text; empty/omitted uses the identity tagline + website. */
   customText?: string;
-  /** Fill behind the footer; omitted = none. */
-  background?: string;
   /** Footer text color. Default `PDF_COLORS.textMuted`. */
   fontColor?: string;
   /** Footer font size. Default 8. */
@@ -404,11 +399,6 @@ export interface PageNumbersConfig {
   format?: string;
 }
 
-export interface ContinuationConfig {
-  /** Suppress the full letterhead on pages 2+. Default false. */
-  suppressLetterhead?: boolean;
-}
-
 export interface OrganizationConfig {
   /** Where the header identity is sourced. Default `'company_info'`. */
   source?: 'company_info' | 'manual';
@@ -424,8 +414,6 @@ export interface OrganizationConfig {
   };
   /** Address font size. Default 8. */
   addressFontSize?: number;
-  /** Header address column width. Default `'auto'`. */
-  columnWidth?: 'auto' | number;
   /** Literal values used when `source === 'manual'`. */
   manual?: {
     name?: string;
@@ -454,8 +442,6 @@ export interface TableConfig {
   rowNumbering?: boolean;
   /** Alternating row fill. Default false. */
   zebra?: boolean;
-  /** Grouped section subtotals. Default false. */
-  sectionSubtotals?: boolean;
 }
 
 export type DensityPreset = 'comfortable' | 'compact' | 'dense';
@@ -642,7 +628,6 @@ export interface DocumentTemplateConfig {
   header?: HeaderConfig;
   footer?: FooterConfig;
   pageNumbers?: PageNumbersConfig;
-  continuation?: ContinuationConfig;
   organization?: OrganizationConfig;
   taxBar?: TaxBarConfig;
   table?: TableConfig;
@@ -702,7 +687,6 @@ export interface TemplateConfigOverride {
   header?: HeaderConfig;
   footer?: FooterConfig;
   pageNumbers?: PageNumbersConfig;
-  continuation?: ContinuationConfig;
   organization?: OrganizationConfig;
   taxBar?: TaxBarConfig;
   table?: TableConfig;
@@ -1330,7 +1314,6 @@ function applyOverride(
     header: mergeHeader(base.header, override.header),
     footer: mergeGroup(base.footer, override.footer),
     pageNumbers: mergeGroup(base.pageNumbers, override.pageNumbers),
-    continuation: mergeGroup(base.continuation, override.continuation),
     organization: mergeOrganization(base.organization, override.organization),
     taxBar: mergeGroup(base.taxBar, override.taxBar),
     table: mergeGroup(base.table, override.table),

@@ -78,7 +78,7 @@ function toJson(config: TemplateConfigPayload): Json {
  */
 const STYLE_GROUPS = [
   'paper', 'colors', 'typography', 'header', 'footer', 'pageNumbers',
-  'continuation', 'watermark', 'branding', 'table', 'layout', 'organization',
+  'watermark', 'branding', 'table', 'layout', 'organization',
 ] as const;
 
 /**
