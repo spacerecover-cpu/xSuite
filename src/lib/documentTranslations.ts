@@ -30,6 +30,12 @@ export const SUPPORTED_LANGUAGES: LanguageOption[] = [
 
 export const DOCUMENT_TRANSLATIONS = {
   ar: {
+    // NEW (2026-06-28): financial-doc labels - pending native-speaker review
+    netAmount: 'صافي المبلغ:',
+    invoiceTerms: 'شروط الفاتورة',
+    quoteTerms: 'شروط العرض',
+    authorizedSignature: 'التوقيع المعتمد',
+    customerAcceptance: 'موافقة العميل',
     quotation: 'عرض سعر',
     taxInvoice: 'فاتورة ضريبية',
     proformaInvoice: 'فاتورة أولية',
@@ -301,6 +307,12 @@ export const DOCUMENT_TRANSLATIONS = {
     devicesReceivedHeader: 'الأجهزة المستلمة',
   },
   pl: {
+    // NEW (2026-06-28): financial-doc labels - pending native-speaker review
+    netAmount: 'Kwota netto:',
+    invoiceTerms: 'Warunki faktury',
+    quoteTerms: 'Warunki oferty',
+    authorizedSignature: 'Podpis upoważniony',
+    customerAcceptance: 'Akceptacja klienta',
     // NEW (2026-06-28): completed document labels - pending native-speaker review
     accountNameLabel: 'Nazwa konta:',
     accountNoLabel: 'Numer konta:',
@@ -573,6 +585,12 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'Podpisując jako upoważniony sygnatariusz, upoważniam do kontynuowania i potwierdzam, że Warunki mają zastosowanie do tego zlecenia. Papierowa kopia Warunków jest dostępna w recepcji na życzenie.',
   },
   ru: {
+    // NEW (2026-06-28): financial-doc labels - pending native-speaker review
+    netAmount: 'Сумма нетто:',
+    invoiceTerms: 'Условия счёта',
+    quoteTerms: 'Условия предложения',
+    authorizedSignature: 'Уполномоченная подпись',
+    customerAcceptance: 'Принятие клиентом',
     // NEW (2026-06-28): completed document labels - pending native-speaker review
     accountNameLabel: 'Имя счёта:',
     accountNoLabel: 'Номер счёта:',
@@ -845,6 +863,12 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'Подписывая как уполномоченный представитель, я разрешаю продолжить и подтверждаю, что Условия применяются к данному заказу. Печатная копия Условий доступна на стойке регистрации по запросу.',
   },
   fr: {
+    // NEW (2026-06-28): financial-doc labels - pending native-speaker review
+    netAmount: 'Montant net :',
+    invoiceTerms: 'Conditions de facture',
+    quoteTerms: 'Conditions du devis',
+    authorizedSignature: 'Signature autorisée',
+    customerAcceptance: 'Acceptation du client',
     // NEW (2026-06-28): completed document labels - pending native-speaker review
     accountNameLabel: 'Nom du compte :',
     accountNoLabel: 'Numéro de compte :',
@@ -1117,6 +1141,12 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'En signant en tant que signataire autorisé, j\'autorise à procéder et reconnais que les Conditions Générales s\'appliquent à cet engagement. Une copie papier des Conditions est disponible à la réception sur demande.',
   },
   de: {
+    // NEW (2026-06-28): financial-doc labels - pending native-speaker review
+    netAmount: 'Nettobetrag:',
+    invoiceTerms: 'Rechnungsbedingungen',
+    quoteTerms: 'Angebotsbedingungen',
+    authorizedSignature: 'Autorisierte Unterschrift',
+    customerAcceptance: 'Kundenakzeptanz',
     physicalDamage: 'Physischer Schaden',
     // NEW (2026-06-28): completed document labels - pending native-speaker review
     accountNameLabel: 'Kontoinhaber:',
@@ -1389,6 +1419,12 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'Durch meine Unterschrift als autorisierter Unterzeichner ermächtige ich zur Fortsetzung und bestätige, dass die AGB für diesen Auftrag gelten. Eine Papierkopie der AGB ist am Empfang auf Anfrage erhältlich.',
   },
   it: {
+    // NEW (2026-06-28): financial-doc labels - pending native-speaker review
+    netAmount: 'Importo netto:',
+    invoiceTerms: 'Condizioni di fattura',
+    quoteTerms: 'Condizioni del preventivo',
+    authorizedSignature: 'Firma autorizzata',
+    customerAcceptance: 'Accettazione del cliente',
     deviceDetails: 'Dettagli del Dispositivo',
     physicalDamage: 'Danno Fisico',
     // NEW (2026-06-28): completed document labels - pending native-speaker review
@@ -1661,6 +1697,12 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'Firmando come firmatario autorizzato, autorizzo a procedere e riconosco che i Termini e Condizioni si applicano a questo incarico. Una copia cartacea dei T&C è disponibile alla reception su richiesta.',
   },
   es: {
+    // NEW (2026-06-28): financial-doc labels - pending native-speaker review
+    netAmount: 'Importe neto:',
+    invoiceTerms: 'Condiciones de factura',
+    quoteTerms: 'Condiciones del presupuesto',
+    authorizedSignature: 'Firma autorizada',
+    customerAcceptance: 'Aceptación del cliente',
     good: 'Bueno',
     notTested: 'No Probado',
     partiallyFunctional: 'Parcialmente Funcional',
@@ -1933,6 +1975,12 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'Al firmar como signatario autorizado, autorizo a proceder y reconozco que los Términos y Condiciones aplican a este compromiso. Una copia impresa de los T&C está disponible en la recepción a solicitud.',
   },
   tr: {
+    // NEW (2026-06-28): financial-doc labels - pending native-speaker review
+    netAmount: 'Net Tutar:',
+    invoiceTerms: 'Fatura Koşulları',
+    quoteTerms: 'Teklif Koşulları',
+    authorizedSignature: 'Yetkili İmza',
+    customerAcceptance: 'Müşteri Onayı',
     good: 'İyi',
     headsStatus: 'Kafa Durumu',
     // NEW (2026-06-28): completed document labels - pending native-speaker review
@@ -2205,6 +2253,12 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'Yetkili imza sahibi olarak imzalayarak, devam etme yetkisi veriyorum ve Şartlar ve Koşulların bu iş için geçerli olduğunu kabul ediyorum. Şartlar ve Koşulların basılı bir kopyası talep üzerine resepsiyonda mevcuttur.',
   },
   ko: {
+    // NEW (2026-06-28): financial-doc labels - pending native-speaker review
+    netAmount: '순 금액:',
+    invoiceTerms: '청구서 약관',
+    quoteTerms: '견적 약관',
+    authorizedSignature: '승인된 서명',
+    customerAcceptance: '고객 수락',
     headsStatus: '헤드 상태',
     // NEW (2026-06-28): completed document labels - pending native-speaker review
     accountNameLabel: '계좌명:',
@@ -2477,6 +2531,12 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: '공인 서명자로서 서명함으로써 진행을 승인하고 약관이 이 업무에 적용됨을 인정합니다. 약관의 인쇄본은 요청 시 접수처에서 이용 가능합니다.',
   },
   pt: {
+    // NEW (2026-06-28): financial-doc labels - pending native-speaker review
+    netAmount: 'Valor líquido:',
+    invoiceTerms: 'Condições da fatura',
+    quoteTerms: 'Condições do orçamento',
+    authorizedSignature: 'Assinatura autorizada',
+    customerAcceptance: 'Aceitação do cliente',
     physicalDamage: 'Danos Físicos',
     // NEW (2026-06-28): completed document labels - pending native-speaker review
     accountNameLabel: 'Nome da Conta:',
@@ -2749,6 +2809,12 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'Ao assinar como signatário autorizado, autorizo a prosseguir e reconheço que os Termos e Condições se aplicam a este compromisso. Uma cópia impressa dos T&C está disponível na recepção mediante solicitação.',
   },
   uk: {
+    // NEW (2026-06-28): financial-doc labels - pending native-speaker review
+    netAmount: 'Сума нетто:',
+    invoiceTerms: 'Умови рахунку',
+    quoteTerms: 'Умови пропозиції',
+    authorizedSignature: 'Уповноважений підпис',
+    customerAcceptance: 'Прийняття клієнтом',
     // NEW (2026-06-28): completed document labels - pending native-speaker review
     accountNameLabel: 'Назва рахунку:',
     accountNoLabel: 'Номер рахунку:',
@@ -3021,6 +3087,12 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'Підписуючи як уповноважений представник, я дозволяю продовжити і визнаю, що Умови застосовуються до цього замовлення. Друкована копія Умов доступна на стійці реєстрації за запитом.',
   },
   cs: {
+    // NEW (2026-06-28): financial-doc labels - pending native-speaker review
+    netAmount: 'Čistá částka:',
+    invoiceTerms: 'Podmínky faktury',
+    quoteTerms: 'Podmínky nabídky',
+    authorizedSignature: 'Autorizovaný podpis',
+    customerAcceptance: 'Souhlas zákazníka',
     // NEW (2026-06-28): completed document labels - pending native-speaker review
     accountNameLabel: 'Název účtu:',
     accountNoLabel: 'Číslo účtu:',
@@ -3293,6 +3365,12 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'Podpisem jako oprávněný podepisující opravňuji k pokračování a potvrzuji, že se na tento závazek vztahují Obchodní podmínky. Papírová kopie OP je k dispozici na recepci na požádání.',
   },
   th: {
+    // NEW (2026-06-28): financial-doc labels - pending native-speaker review
+    netAmount: 'จำนวนเงินสุทธิ:',
+    invoiceTerms: 'เงื่อนไขใบแจ้งหนี้',
+    quoteTerms: 'เงื่อนไขใบเสนอราคา',
+    authorizedSignature: 'ลายเซ็นผู้มีอำนาจ',
+    customerAcceptance: 'การยอมรับของลูกค้า',
     good: 'ดี',
     // NEW (2026-06-28): completed document labels - pending native-speaker review
     accountNameLabel: 'ชื่อบัญชี:',

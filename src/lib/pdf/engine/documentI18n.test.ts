@@ -35,10 +35,19 @@ describe('secondaryText', () => {
     expect(secondaryText(label, 'ar')).toBe('جديد');
   });
 
-  it('returns undefined when the secondary is null / not present', () => {
+  it('returns undefined when the secondary is null or the Arabic is unknown', () => {
     expect(secondaryText({ en: 'Total', ar: 'الإجمالي' }, null)).toBeUndefined();
-    expect(secondaryText({ en: 'Total', ar: 'الإجمالي' }, 'fr')).toBeUndefined();
+    // An Arabic string absent from the central table cannot be joined → undefined.
+    expect(secondaryText({ en: 'Zilch', ar: 'سلسلةغيرموجودةنهائيا' }, 'fr')).toBeUndefined();
     expect(secondaryText(undefined, 'ar')).toBeUndefined();
+  });
+
+  it('joins a legacy {en,ar} label to the central table for a non-Arabic secondary', () => {
+    // Financial-adapter labels carry only Arabic; the reverse Arabic→key join lets
+    // them translate into any of the 13 (here 'الإجمالي' → key `total` → French),
+    // which is what makes invoice/quote/receipt render bilingually, not just Arabic.
+    expect(secondaryText({ en: 'Total:', ar: 'الإجمالي' }, 'fr')).toBeTruthy();
+    expect(secondaryText({ en: 'Total:', ar: 'الإجمالي' }, 'ar')).toBe('الإجمالي');
   });
 });
 

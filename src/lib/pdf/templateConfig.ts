@@ -13,7 +13,7 @@
  * doc-type template → per-instance override. See {@link resolveTemplateConfig}.
  */
 
-import type { LanguageCode } from '../documentTranslations';
+import { DOCUMENT_TRANSLATIONS, getTranslation, type LanguageCode, type TranslationKey } from '../documentTranslations';
 
 /**
  * Bilingual label. `en` is mandatory. A secondary translation can be supplied
@@ -47,12 +47,76 @@ export interface LabelText {
  * text for `lang === 'ar'`. Returns `undefined` when no secondary is selected or
  * none is authored for the requested language (callers degrade to English).
  */
+/**
+ * Reverse index: Arabic value → translation key, built once (lazily) from the
+ * central {@link DOCUMENT_TRANSLATIONS} Arabic block. This is what lets a LEGACY
+ * `{ en, ar }` label — the shape the financial adapters (invoice/quote/receipt/
+ * checkout) still emit, with NO `i18n` map — be translated into ANY of the 13
+ * languages: we join the label's Arabic string back to its key, then read the
+ * requested language from the same table. First key wins on duplicate Arabic
+ * values (synonym keys share a translation, so the collision is harmless).
+ */
+let _arabicToKey: Map<string, TranslationKey> | null = null;
+function arabicLabelKey(ar: string): TranslationKey | undefined {
+  if (_arabicToKey === null) {
+    _arabicToKey = new Map();
+    const arBlock = DOCUMENT_TRANSLATIONS.ar as Record<string, string>;
+    for (const key of Object.keys(arBlock)) {
+      const value = arBlock[key];
+      if (value && !_arabicToKey.has(value)) _arabicToKey.set(value, key as TranslationKey);
+    }
+  }
+  return _arabicToKey.get(ar);
+}
+
+/**
+ * Hand-authored Arabic in the financial adapters drifted from the central table
+ * (synonyms / colon variants), so the pure value-join misses. These map the
+ * adapter's EXACT Arabic to the right key — the keys already exist in all 13
+ * languages, so no new translations are needed; only the join is repaired.
+ */
+const ARABIC_ALIASES: Record<string, TranslationKey> = {
+  'البريد:': 'emailLabel', // adapter "Email:" vs table 'البريد الإلكتروني:'
+  'الآيبان:': 'ibanLabel', // adapter "IBAN:" vs table 'آيبان:'
+  'تفاصيل البنك': 'bankAccount', // adapter "Bank Account" vs 'تفاصيل الحساب البنكي'
+  'عرض أسعار': 'quotation', // adapter "QUOTATION" (plural) vs 'عرض سعر'
+  'الإجمالي:': 'total', // adapter "Total:" (colon) vs 'الإجمالي'
+  المجموع: 'total', // adapter line-item "Total" column vs 'الإجمالي'
+};
+
+function keyForArabic(ar: string): TranslationKey | undefined {
+  return arabicLabelKey(ar) ?? ARABIC_ALIASES[ar];
+}
+
 export function secondaryText(
   label: SecondaryTextSource | undefined,
   lang: LanguageCode | null,
 ): string | undefined {
   if (!label || !lang) return undefined;
-  return label.i18n?.[lang] ?? (lang === 'ar' ? label.ar : undefined);
+  const direct = label.i18n?.[lang] ?? (lang === 'ar' ? label.ar : undefined);
+  if (direct) return direct;
+  if (!label.ar || lang === 'ar') return undefined;
+  // Generalized fallback: a legacy `{ en, ar }` label carries only Arabic. Join
+  // that Arabic to the central translation table (direct value, then drift alias)
+  // so the chosen secondary (fr/it/…) resolves — this is what makes the invoice/
+  // quote/receipt/checkout adapters, which predate the i18n map, render
+  // bilingually in all 13 languages without a per-adapter rewrite.
+  const key = keyForArabic(label.ar);
+  if (key) {
+    const t = getTranslation(key, lang);
+    if (t) return t;
+  }
+  // Interpolated labels like "VAT 5%:" — translate the leading term and keep the
+  // trailing rate token (` 5%:`) verbatim, since digits/percent are language-neutral.
+  const m = label.ar.match(/^(.*?)(\s*\d+(?:[.,]\d+)?\s*%\s*:?)\s*$/);
+  if (m) {
+    const baseKey = keyForArabic(m[1].trim());
+    if (baseKey) {
+      const t = getTranslation(baseKey, lang);
+      if (t) return `${t}${m[2]}`;
+    }
+  }
+  return undefined;
 }
 
 /**
