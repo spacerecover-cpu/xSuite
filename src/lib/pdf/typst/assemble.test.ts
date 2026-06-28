@@ -156,6 +156,25 @@ describe('assembleTypst — page / font / density / colours wired', () => {
     expect(out).toContain('rgb("#111111")'); // body text
     expect(out).toContain('rgb("#00ff00")'); // table header fill
   });
+
+  it('adds an S/N column when table.rowNumbering', () => {
+    const out = renderC({ table: { rowNumbering: true } });
+    expect(out).toContain('columns: (24pt,'); // narrow serial column prepended
+    expect(out).toContain('[\\#]'); // the "#" header cell
+  });
+
+  it('applies zebra striping when table.zebra', () => {
+    expect(renderC({ table: { zebra: true } })).toContain('fill: (_, y) => { if y > 0 and calc.even(y)');
+    expect(renderC({})).not.toContain('calc.even(y)');
+  });
+
+  it('honours the labels.lineItems heading override', () => {
+    const out = renderC({
+      language: { mode: 'bilingual_stacked', primary: 'en', secondary: 'ar' } as LanguageConfig,
+      labels: { lineItems: { en: 'Services', ar: 'خدمات' } },
+    });
+    expect(out).toContain('#heading([Services], [خدمات])');
+  });
 });
 
 // The Typst header divider must honour config.header — style, colour, insets and

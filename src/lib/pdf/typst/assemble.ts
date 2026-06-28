@@ -155,7 +155,8 @@ export function assembleTypst(
   const ACCENT = C.accent;
   const BODY = C.text;
   const LABELC = C.label;
-  const TABLEHEAD = resolveTable(config).headerBackground;
+  const RT = resolveTable(config);
+  const TABLEHEAD = RT.headerBackground;
   const S = {
     legal: sz(14),
     legalAr: sz(12),
@@ -329,18 +330,30 @@ export function assembleTypst(
 
   const frag: Record<string, string> = {};
 
-  // Line items — bilingual heading + light-header table.
+  // Line items — bilingual heading + light-header table. Honours table.rowNumbering
+  // (S/N column), table.zebra (alternating body-row fill) and the labels.lineItems
+  // heading override, mirroring lineItemTable.ts.
   if (data.lineItems?.columns?.some((c) => c.visible)) {
     const cols = data.lineItems.columns.filter((c) => c.visible);
-    const colSpec = cols.map((c) => (c.width ? `${c.width}pt` : '1fr')).join(', ');
-    const aligns = cols.map((c) => toAlign(c.align)).join(', ');
-    const headerCells = cols
-      .map((c) => `table.cell(fill: rgb("${TABLEHEAD}"), text(weight: "bold", size: ${S.thead}pt, fill: rgb("${BODY}"), [${biLine(c.label)}]))`)
-      .join(', ');
-    const body = data.lineItems.rows
-      .map((row) => cols.map((c) => `text(size: ${S.tcell}pt, fill: rgb("${BODY}"), [${V(row[c.key])}])`).join(', '))
-      .join(',\n');
-    frag.lineItems = `#heading([Line Items], [البنود])\n#table(columns: (${colSpec}), align: (${aligns}), table.header(${headerCells}),\n${body})\n#v(6pt)`;
+    const widthSpecs = cols.map((c) => (c.width ? `${c.width}pt` : '1fr'));
+    const alignSpecs = cols.map((c) => toAlign(c.align));
+    const headerCellArr = cols.map(
+      (c) => `table.cell(fill: rgb("${TABLEHEAD}"), text(weight: "bold", size: ${S.thead}pt, fill: rgb("${BODY}"), [${biLine(c.label)}]))`,
+    );
+    const bodyRowArr = data.lineItems.rows.map((row, i) => {
+      const cells = cols.map((c) => `text(size: ${S.tcell}pt, fill: rgb("${BODY}"), [${V(row[c.key])}])`);
+      if (RT.rowNumbering) cells.unshift(`text(size: ${S.tcell}pt, fill: rgb("${BODY}"), [${i + 1}])`);
+      return cells.join(', ');
+    });
+    if (RT.rowNumbering) {
+      widthSpecs.unshift('24pt');
+      alignSpecs.unshift('center');
+      headerCellArr.unshift(`table.cell(fill: rgb("${TABLEHEAD}"), text(weight: "bold", size: ${S.thead}pt, fill: rgb("${BODY}"), [\\#]))`);
+    }
+    // Zebra: paint every other BODY row (header is y==0; header cells set own fill).
+    const zebraArg = RT.zebra ? `fill: (_, y) => { if y > 0 and calc.even(y) { rgb("${SHADE}") } else { none } }, ` : '';
+    const liLabel = config.labels?.lineItems ?? { en: 'Line Items', ar: 'البنود' };
+    frag.lineItems = `#heading([${E(liLabel)}], [${A(liLabel)}])\n#table(columns: (${widthSpecs.join(', ')}), align: (${alignSpecs.join(', ')}), ${zebraArg}table.header(${headerCellArr.join(', ')}),\n${bodyRowArr.join(',\n')})\n#v(6pt)`;
   }
 
   // Totals — muted label/value rows, a hairline rule before the grand total, and
