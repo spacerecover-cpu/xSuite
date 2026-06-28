@@ -43,6 +43,20 @@ describe('legacy {en,ar} financial labels resolve to all secondary languages', (
 
       const labels: LegacyLabel[] = [];
       collect(engineData, labels);
+      collect(config, labels); // also the resolved config (section/column/header labels)
+      // Hardcoded fallback labels emitted INSIDE the section renderers — not
+      // reachable via engineData/config, so assert them explicitly (enumerated
+      // from src/lib/pdf/engine/sections/*). These are what left "Details" /
+      // section headers English when their Arabic had no table entry.
+      labels.push(
+        { en: 'Details', ar: 'التفاصيل' },
+        { en: 'Line Items', ar: 'البنود' },
+        { en: 'Name:', ar: 'الاسم:' },
+        { en: 'Authorized Signature', ar: 'التوقيع المعتمد' },
+        { en: 'VAT Reg. No.', ar: 'الرقم الضريبي' },
+        { en: 'Terms & Conditions', ar: 'الشروط والأحكام' },
+        { en: 'Notes', ar: 'ملاحظات' },
+      );
       expect(labels.length).toBeGreaterThan(8); // sanity: labels were actually found
 
       const failures: string[] = [];

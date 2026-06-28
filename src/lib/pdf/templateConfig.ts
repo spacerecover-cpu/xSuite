@@ -817,7 +817,7 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
           section('qr', 7),
           section('footer', 8),
         ],
-        labels: { documentTitle: { en: 'PAYMENT RECEIPT', ar: 'إيصال دفع' } },
+        labels: { documentTitle: { en: 'PAYMENT RECEIPT', ar: 'إيصال الدفع' } },
         layout: { partiesMetaSideBySide: true },
       };
     case 'office_receipt':

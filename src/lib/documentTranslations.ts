@@ -30,6 +30,9 @@ export const SUPPORTED_LANGUAGES: LanguageOption[] = [
 
 export const DOCUMENT_TRANSLATIONS = {
   ar: {
+    // NEW (2026-06-28): renderer fallback labels - pending native-speaker review
+    details: 'التفاصيل',
+    vatRegNo: 'الرقم الضريبي',
     // NEW (2026-06-28): financial-doc labels - pending native-speaker review
     netAmount: 'صافي المبلغ:',
     invoiceTerms: 'شروط الفاتورة',
@@ -307,6 +310,9 @@ export const DOCUMENT_TRANSLATIONS = {
     devicesReceivedHeader: 'الأجهزة المستلمة',
   },
   pl: {
+    // NEW (2026-06-28): renderer fallback labels - pending native-speaker review
+    details: 'Szczegóły',
+    vatRegNo: 'Nr rej. VAT',
     // NEW (2026-06-28): financial-doc labels - pending native-speaker review
     netAmount: 'Kwota netto:',
     invoiceTerms: 'Warunki faktury',
@@ -585,6 +591,9 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'Podpisując jako upoważniony sygnatariusz, upoważniam do kontynuowania i potwierdzam, że Warunki mają zastosowanie do tego zlecenia. Papierowa kopia Warunków jest dostępna w recepcji na życzenie.',
   },
   ru: {
+    // NEW (2026-06-28): renderer fallback labels - pending native-speaker review
+    details: 'Детали',
+    vatRegNo: 'Рег. № НДС',
     // NEW (2026-06-28): financial-doc labels - pending native-speaker review
     netAmount: 'Сумма нетто:',
     invoiceTerms: 'Условия счёта',
@@ -863,6 +872,9 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'Подписывая как уполномоченный представитель, я разрешаю продолжить и подтверждаю, что Условия применяются к данному заказу. Печатная копия Условий доступна на стойке регистрации по запросу.',
   },
   fr: {
+    // NEW (2026-06-28): renderer fallback labels - pending native-speaker review
+    details: 'Détails',
+    vatRegNo: 'N° TVA',
     // NEW (2026-06-28): financial-doc labels - pending native-speaker review
     netAmount: 'Montant net :',
     invoiceTerms: 'Conditions de facture',
@@ -1141,6 +1153,9 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'En signant en tant que signataire autorisé, j\'autorise à procéder et reconnais que les Conditions Générales s\'appliquent à cet engagement. Une copie papier des Conditions est disponible à la réception sur demande.',
   },
   de: {
+    // NEW (2026-06-28): renderer fallback labels - pending native-speaker review
+    details: 'Details',
+    vatRegNo: 'USt-IdNr.',
     // NEW (2026-06-28): financial-doc labels - pending native-speaker review
     netAmount: 'Nettobetrag:',
     invoiceTerms: 'Rechnungsbedingungen',
@@ -1419,6 +1434,9 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'Durch meine Unterschrift als autorisierter Unterzeichner ermächtige ich zur Fortsetzung und bestätige, dass die AGB für diesen Auftrag gelten. Eine Papierkopie der AGB ist am Empfang auf Anfrage erhältlich.',
   },
   it: {
+    // NEW (2026-06-28): renderer fallback labels - pending native-speaker review
+    details: 'Dettagli',
+    vatRegNo: 'P. IVA',
     // NEW (2026-06-28): financial-doc labels - pending native-speaker review
     netAmount: 'Importo netto:',
     invoiceTerms: 'Condizioni di fattura',
@@ -1697,6 +1715,9 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'Firmando come firmatario autorizzato, autorizzo a procedere e riconosco che i Termini e Condizioni si applicano a questo incarico. Una copia cartacea dei T&C è disponibile alla reception su richiesta.',
   },
   es: {
+    // NEW (2026-06-28): renderer fallback labels - pending native-speaker review
+    details: 'Detalles',
+    vatRegNo: 'N.º IVA',
     // NEW (2026-06-28): financial-doc labels - pending native-speaker review
     netAmount: 'Importe neto:',
     invoiceTerms: 'Condiciones de factura',
@@ -1975,6 +1996,9 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'Al firmar como signatario autorizado, autorizo a proceder y reconozco que los Términos y Condiciones aplican a este compromiso. Una copia impresa de los T&C está disponible en la recepción a solicitud.',
   },
   tr: {
+    // NEW (2026-06-28): renderer fallback labels - pending native-speaker review
+    details: 'Ayrıntılar',
+    vatRegNo: 'KDV No',
     // NEW (2026-06-28): financial-doc labels - pending native-speaker review
     netAmount: 'Net Tutar:',
     invoiceTerms: 'Fatura Koşulları',
@@ -2253,6 +2277,9 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'Yetkili imza sahibi olarak imzalayarak, devam etme yetkisi veriyorum ve Şartlar ve Koşulların bu iş için geçerli olduğunu kabul ediyorum. Şartlar ve Koşulların basılı bir kopyası talep üzerine resepsiyonda mevcuttur.',
   },
   ko: {
+    // NEW (2026-06-28): renderer fallback labels - pending native-speaker review
+    details: '세부 정보',
+    vatRegNo: 'VAT 등록번호',
     // NEW (2026-06-28): financial-doc labels - pending native-speaker review
     netAmount: '순 금액:',
     invoiceTerms: '청구서 약관',
@@ -2531,6 +2558,9 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: '공인 서명자로서 서명함으로써 진행을 승인하고 약관이 이 업무에 적용됨을 인정합니다. 약관의 인쇄본은 요청 시 접수처에서 이용 가능합니다.',
   },
   pt: {
+    // NEW (2026-06-28): renderer fallback labels - pending native-speaker review
+    details: 'Detalhes',
+    vatRegNo: 'NIF/IVA',
     // NEW (2026-06-28): financial-doc labels - pending native-speaker review
     netAmount: 'Valor líquido:',
     invoiceTerms: 'Condições da fatura',
@@ -2809,6 +2839,9 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'Ao assinar como signatário autorizado, autorizo a prosseguir e reconheço que os Termos e Condições se aplicam a este compromisso. Uma cópia impressa dos T&C está disponível na recepção mediante solicitação.',
   },
   uk: {
+    // NEW (2026-06-28): renderer fallback labels - pending native-speaker review
+    details: 'Деталі',
+    vatRegNo: 'Рег. № ПДВ',
     // NEW (2026-06-28): financial-doc labels - pending native-speaker review
     netAmount: 'Сума нетто:',
     invoiceTerms: 'Умови рахунку',
@@ -3087,6 +3120,9 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'Підписуючи як уповноважений представник, я дозволяю продовжити і визнаю, що Умови застосовуються до цього замовлення. Друкована копія Умов доступна на стійці реєстрації за запитом.',
   },
   cs: {
+    // NEW (2026-06-28): renderer fallback labels - pending native-speaker review
+    details: 'Podrobnosti',
+    vatRegNo: 'DIČ',
     // NEW (2026-06-28): financial-doc labels - pending native-speaker review
     netAmount: 'Čistá částka:',
     invoiceTerms: 'Podmínky faktury',
@@ -3365,6 +3401,9 @@ export const DOCUMENT_TRANSLATIONS = {
     termsText: 'Podpisem jako oprávněný podepisující opravňuji k pokračování a potvrzuji, že se na tento závazek vztahují Obchodní podmínky. Papírová kopie OP je k dispozici na recepci na požádání.',
   },
   th: {
+    // NEW (2026-06-28): renderer fallback labels - pending native-speaker review
+    details: 'รายละเอียด',
+    vatRegNo: 'เลขทะเบียน VAT',
     // NEW (2026-06-28): financial-doc labels - pending native-speaker review
     netAmount: 'จำนวนเงินสุทธิ:',
     invoiceTerms: 'เงื่อนไขใบแจ้งหนี้',
