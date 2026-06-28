@@ -603,13 +603,20 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
                 ))}
               </div>
             )}
-            <div className="relative h-[calc(100vh-12rem)] min-h-[480px] bg-slate-100">
+            <div className="relative h-[calc(100vh-12rem)] min-h-[480px] bg-slate-200">
               {previewError ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
                   <p className="text-sm text-danger">{previewError}</p>
                 </div>
               ) : previewUrl ? (
-                <iframe src={previewUrl} title={`${DOC_TYPE_LABELS[docType]} preview`} className="h-full w-full border-0" />
+                // PDF open-parameters strip the native viewer's toolbar + thumbnail
+                // rail and fit the page to the pane width, so the preview shows the
+                // document large + clean instead of a small page inside dark chrome.
+                <iframe
+                  src={`${previewUrl}#toolbar=0&navpanes=0&statusbar=0&view=FitH`}
+                  title={`${DOC_TYPE_LABELS[docType]} preview`}
+                  className="h-full w-full border-0"
+                />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />

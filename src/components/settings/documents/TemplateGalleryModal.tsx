@@ -133,7 +133,11 @@ export const TemplateGalleryModal: React.FC<TemplateGalleryModalProps> = ({
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
             ) : (
-              <iframe src={previewUrl} title="Template preview" className="h-full w-full border-0" />
+              <iframe
+                src={`${previewUrl}#toolbar=0&navpanes=0&statusbar=0&view=FitH`}
+                title="Template preview"
+                className="h-full w-full border-0"
+              />
             )}
           </div>
           {selected && (
