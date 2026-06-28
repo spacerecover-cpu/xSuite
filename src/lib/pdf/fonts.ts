@@ -295,16 +295,15 @@ export async function preloadAllFonts(): Promise<void> {
   if (!loadedFontFamilies.has('NotoSansArabic')) {
     await loadAndCacheFonts('arabic', 'NotoSansArabic');
   }
-  // Non-Latin secondary scripts the engine can now select for ANY of the 13
-  // languages (ko → NotoSansKR, th → NotoSansThai). Preload them so a non-Arabic
-  // bilingual preview renders its glyphs; failures are non-fatal (loadAndCacheFonts
-  // swallows errors) and degrade to the base font — the preview never hangs.
-  if (!loadedFontFamilies.has('NotoSansKR')) {
-    await loadAndCacheFonts('korean', 'NotoSansKR');
-  }
-  if (!loadedFontFamilies.has('NotoSansThai')) {
-    await loadAndCacheFonts('thai', 'NotoSansThai');
-  }
+  // KO/TH (NotoSansKR / NotoSansThai) are intentionally NOT eager-loaded here.
+  // Their binaries are not bundled and the raw-TTF CDN URL 404s, so eager-loading
+  // them failed on EVERY preview render — flooding the console AND adding the
+  // latency of 4 doomed fetches (local→SPA-HTML, then CDN→404) to each re-render,
+  // which is what made non-Arabic previews feel broken/laggy. They now load
+  // on-demand (previewTemplate → initializePDFFonts) ONLY when ko/th is the
+  // selected secondary, and degrade to the base font if the binary is absent.
+  // The 11 other languages (8 Latin via Roboto, ru/uk Cyrillic via Roboto, ar via
+  // local Tajawal/NotoSansArabic) need nothing further and now render cleanly+fast.
   initVFSWithBaseFont();
 }
 
