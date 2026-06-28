@@ -4,29 +4,34 @@
  * RTL/shaping work, so — unlike the pdfmake renderer — this assembler carries no
  * `reverseArabicText`, no column mirroring, and no per-run font pinning.
  *
- * Parity with the pdfmake layout: section/box headers render as a two-column
- * BAND (English on the start edge, the secondary on the end edge — not an inline
- * "en | ar"); field-row labels honour the template's translation policy via
- * {@link fieldLabelLanguage} (so "System labels only" keeps them single-language);
- * totals/column labels use the inline bilingual `resolveLabel`. `start`/`end`
- * alignments make everything direction-aware from the document `dir`.
+ * The layout mirrors the pdfmake renderer 1:1 (resolved from styles.ts +
+ * engine/sections/* — see docs spec): the same letterhead, the centred title
+ * UNDER a navy divider, info-box bands (icon + English start / secondary end,
+ * light #f8fafc fill, navy heading), a light #F1F5F9 line-item header, a boxed
+ * grand-total row, and the same fonts/colours/spacing. Field-row labels honour
+ * the template's translation policy via {@link fieldLabelLanguage}; titles and
+ * column/total labels use the inline bilingual `resolveLabel`.
  *
- * Phase 1 scope: the financial (invoice/quote/receipt) sections. Logo image
- * embedding + other doc types are added in later phases.
+ * Phase 1 scope: the financial (invoice/quote/receipt) sections.
  */
 import { en, resolveLabel, fieldLabelLanguage, type TranslationGroup } from '../engine/labels';
-import { buildCompanyAddressLines, buildCompanyContactLine } from '../utils';
+import { buildCompanyAddress } from '../utils';
 import { resolveSecondary, secondaryText, type DocumentTemplateConfig, type LabelText } from '../templateConfig';
 import type { EngineDocData } from '../engine/types';
 import type { TranslationContext } from '../types';
 import { escapeTypst } from './escape';
 import { htmlToTypst } from './htmlToTypst';
+import { ICON_USER_SVG, ICON_DOC_SVG } from './icons';
 
 const FONTS = '("Tajawal", "Noto Sans Arabic", "Noto Sans Thai", "Noto Sans KR", "Roboto")';
-const NAVY = '#162660';
-const MUTED = '#64748b';
-const BORDER = '#d0d5dd';
-const SHADE = '#f8fafc';
+// PDF_COLORS (styles.ts) — kept literal; PDFs stay neutral across themes.
+const NAVY = '#162660'; // primary — band/heading accent, total value, divider
+const PRIMARYDARK = '#1E3A5F'; // document title
+const TEXT = '#1e293b'; // body text
+const MUTED = '#64748b'; // labels / textLight
+const BORDER = '#e2e8f0'; // borders
+const SHADE = '#f8fafc'; // info-box band fill / grand-total fill
+const HEADERBG = '#F1F5F9'; // table header fill
 
 function toAlign(a: 'left' | 'center' | 'right' | undefined): string {
   return a === 'right' ? 'end' : a === 'center' ? 'center' : 'start';
@@ -34,15 +39,19 @@ function toAlign(a: 'left' | 'center' | 'right' | undefined): string {
 
 function preamble(dir: string): string {
   return [
-    '#set page(paper: "a4", margin: (x: 15mm, y: 16mm))',
-    `#set text(font: ${FONTS}, size: 10pt, dir: ${dir})`,
-    `#set table(stroke: 0.5pt + rgb("${BORDER}"), inset: 5pt)`,
-    `#let muted(b) = text(fill: rgb("${MUTED}"), b)`,
-    `#let kv(k, v) = grid(columns: (auto, 1fr), gutter: 6pt, muted(k), v)`,
-    // Two-column shaded header band: primary (English) on the start edge, the
-    // secondary on the end edge — mirrors pdfmake's createBilingualInfoBox.
-    `#let band(a, b) = block(width: 100%, fill: rgb("${SHADE}"), inset: 6pt, grid(columns: (1fr, 1fr), text(weight: "bold", fill: rgb("${NAVY}"), a), align(end, text(weight: "bold", fill: rgb("${NAVY}"), b))))`,
-    `#let infobox(a, b, body) = block(width: 100%, stroke: 0.5pt + rgb("${BORDER}"), band(a, b) + block(inset: 6pt, body))`,
+    '#set page(paper: "a4", margin: 40pt)',
+    `#set text(font: ${FONTS}, size: 9pt, fill: rgb("${TEXT}"), dir: ${dir})`,
+    `#set table(stroke: 0.5pt + rgb("${BORDER}"), inset: (x: 5pt, y: 3.5pt))`,
+    `#let iconUser = box(image(bytes("${ICON_USER_SVG}"), format: "svg", width: 13pt))`,
+    `#let iconDoc = box(image(bytes("${ICON_DOC_SVG}"), format: "svg", width: 13pt))`,
+    `#let iconNone = box(width: 0pt)`,
+    `#let muted(b) = text(size: 8pt, fill: rgb("${MUTED}"), b)`,
+    // Info-box header band: [icon · English (start) · spacer · secondary (end)],
+    // light fill, navy heading, 0.5pt bottom rule — mirrors createBilingualInfoBox.
+    `#let band(icon, a, b) = block(width: 100%, fill: rgb("${SHADE}"), stroke: (bottom: 0.5pt + rgb("${BORDER}")), inset: (x: 6pt, y: 4pt), grid(columns: (auto, auto, 1fr, auto), column-gutter: 6pt, align: horizon, icon, text(weight: "bold", size: 9pt, fill: rgb("${NAVY}"), a), [], align(end, text(weight: "bold", size: 9pt, fill: rgb("${NAVY}"), b))))`,
+    `#let infobox(icon, a, b, body) = block(width: 100%, stroke: 0.5pt + rgb("${BORDER}"), band(icon, a, b) + block(width: 100%, inset: (x: 8pt, y: 6pt), body))`,
+    // Unboxed bilingual section heading (e.g. "Line Items") — no fill.
+    `#let heading(a, b) = block(width: 100%, inset: (top: 4pt, bottom: 5pt), grid(columns: (auto, 1fr, auto), column-gutter: 6pt, text(weight: "bold", size: 9pt, fill: rgb("${NAVY}"), a), [], align(end, text(weight: "bold", size: 9pt, fill: rgb("${NAVY}"), b))))`,
   ].join('\n');
 }
 
@@ -53,14 +62,13 @@ export function assembleTypst(
   opts: { logoPath?: string } = {},
 ): string {
   const language = config.language;
-  // Always LTR — the document must use the SAME left-to-right layout as the other
+  // Always LTR — the document uses the SAME left-to-right layout as the other
   // languages (logo placement, columns, alignment all unflipped). Typst still
   // applies the Unicode bidi algorithm + shaping WITHIN each run, so the Arabic
-  // text itself renders correctly (right-to-left letters) inside an LTR page.
+  // text renders correctly (right-to-left letters) inside an LTR page.
   const dir = 'ltr';
   const E = (l: LabelText) => escapeTypst(en(l));
-  // LOGICAL secondary (no reverseArabicText) — Typst does its own bidi, so feeding
-  // it the pdfmake-reversed form via ar() would double-reverse and mangle it.
+  // LOGICAL secondary (no reverseArabicText) — Typst does its own bidi.
   const A = (l: LabelText) => escapeTypst(secondaryText(l, resolveSecondary(language)) ?? '');
   const L = (l: LabelText) => escapeTypst(resolveLabel(l, language) ?? '');
   const V = (s: string | number | null | undefined) => escapeTypst(s == null ? '' : String(s));
@@ -69,13 +77,26 @@ export function assembleTypst(
   const fieldLbl = (l: LabelText, group: TranslationGroup) => escapeTypst(resolveLabel(l, fll(group)) ?? '');
 
   const parts: string[] = [preamble(dir), ''];
-  const band = (title: LabelText) => `[${E(title)}], [${A(title)}]`;
-  const kvBody = (rows: Array<{ label: LabelText; value: string }>, group: TranslationGroup) =>
-    rows.map((r) => `#kv([${fieldLbl(r.label, group)}], [${V(r.value)}])`).join(' ');
+  // An info-box: icon + bilingual band title + field-row grid (label/value).
+  const infobox = (
+    icon: 'iconUser' | 'iconDoc' | 'iconNone',
+    title: LabelText,
+    rows: Array<{ label: LabelText; value: string }>,
+    group: TranslationGroup,
+  ) => {
+    const cells = rows
+      .map(
+        (r) =>
+          `text(size: 8pt, fill: rgb("${MUTED}"), [${fieldLbl(r.label, group)}]), text(size: 9pt, fill: rgb("${TEXT}"), [${V(r.value)}])`,
+      )
+      .join(', ');
+    const grid = `grid(columns: (auto, 1fr), column-gutter: 10pt, row-gutter: 3pt, ${cells})`;
+    return `infobox(${icon}, [${E(title)}], [${A(title)}], ${grid})`;
+  };
 
-  // Company identity letterhead — replicate the pdfmake "Classic" header: logo on
-  // the configured side, identity block (legal name bold + trading name + address
-  // + Tel/Email + VAT) on the other side, aligned toward the logo's opposite edge.
+  // ── Company letterhead — pdfmake "Classic": logo on the configured side,
+  // identity block (legal name + trading name + address + Tel/Email + VAT) toward
+  // the opposite edge. ───────────────────────────────────────────────────────
   const header = config.header ?? {};
   const placement = header.logoPlacement ?? 'left';
   const logoLeft = placement !== 'right';
@@ -84,14 +105,16 @@ export function assembleTypst(
   const logoImg = opts.logoPath ? `image("${opts.logoPath}", ${logoSizeArg})` : '[]';
 
   const info = data.identity?.basic_info;
+  const contactInfo = data.identity?.contact_info;
   const legalName = info?.legal_name || info?.company_name;
   const idLines: string[] = [];
-  if (legalName) idLines.push(`text(size: 14pt, weight: "bold", fill: rgb("#1e293b"), [${V(legalName)}])`);
-  if (info?.company_name && info.company_name !== legalName) idLines.push(`muted([${V(info.company_name)}])`);
-  for (const line of buildCompanyAddressLines(data.identity?.location)) idLines.push(`muted([${V(line)}])`);
-  const contact = buildCompanyContactLine(data.identity?.contact_info);
-  if (contact) idLines.push(`muted([${V(contact)}])`);
-  if (info?.vat_number) idLines.push(`muted([VAT: ${V(info.vat_number)}])`);
+  if (legalName) idLines.push(`text(size: 14pt, weight: "bold", fill: rgb("${TEXT}"), [${V(legalName)}])`);
+  if (info?.company_name && info.company_name !== legalName) idLines.push(`text(size: 9pt, fill: rgb("${MUTED}"), [${V(info.company_name)}])`);
+  const addr = buildCompanyAddress(data.identity?.location);
+  if (addr) idLines.push(`text(size: 8pt, fill: rgb("${MUTED}"), [${V(addr)}])`);
+  if (contactInfo?.phone_primary) idLines.push(`text(size: 8pt, fill: rgb("${MUTED}"), [Tel: ${V(contactInfo.phone_primary)}])`);
+  if (contactInfo?.email_general) idLines.push(`text(size: 8pt, fill: rgb("${MUTED}"), [Email: ${V(contactInfo.email_general)}])`);
+  if (info?.vat_number) idLines.push(`text(size: 8pt, fill: rgb("${MUTED}"), [VAT: ${V(info.vat_number)}])`);
 
   const idAlign = placement === 'center' ? 'center' : logoLeft ? 'right' : 'left';
   const idBlock = `align(${idAlign}, stack(spacing: 2pt, ${idLines.length ? idLines.join(', ') : '[]'}))`;
@@ -104,77 +127,79 @@ export function assembleTypst(
   } else {
     parts.push(`#grid(columns: (1fr, auto), column-gutter: 12pt, align: horizon, ${idBlock}, align(horizon, ${logoImg}))`);
   }
-  parts.push('#v(8pt)');
 
-  // Title
-  parts.push(`#align(center, text(size: 18pt, weight: "bold", fill: rgb("${NAVY}"), [${L(data.documentTitle)}]))`);
-  parts.push(`#line(length: 100%, stroke: 0.5pt + rgb("${NAVY}"))`, '#v(8pt)');
+  // Divider rule UNDER the letterhead, then the centred title (pdfmake order).
+  parts.push('#v(10pt)', `#line(length: 100%, stroke: 0.5pt + rgb("${NAVY}"))`, '#v(8pt)');
+  parts.push(`#align(center, text(size: 16pt, weight: "bold", fill: rgb("${PRIMARYDARK}"), [${L(data.documentTitle)}]))`, '#v(8pt)');
 
-  // Parties (to) + meta side by side — Customer first (left), Details second
-  // (right), matching the pdfmake layout.
+  // ── Customer (parties) + Details (meta) side by side ─────────────────────
   const boxes: string[] = [];
   if (data.parties?.to) {
     const p = data.parties.to;
-    const rows = [
-      ...(p.name ? [{ label: { en: 'Name:', ar: 'الاسم:' }, value: p.name }] : []),
-      ...p.rows,
-    ];
-    boxes.push(`infobox(${band(p.title)}, [${kvBody(rows, 'parties')}])`);
+    const rows = [...(p.name ? [{ label: { en: 'Name:', ar: 'الاسم:' }, value: p.name }] : []), ...p.rows];
+    boxes.push(infobox('iconUser', p.title, rows, 'parties'));
   }
-  if (data.meta?.length) boxes.push(`infobox(${band({ en: 'Details', ar: 'التفاصيل' })}, [${kvBody(data.meta, 'meta')}])`);
+  if (data.meta?.length) boxes.push(infobox('iconDoc', { en: 'Details', ar: 'التفاصيل' }, data.meta, 'meta'));
   if (boxes.length) {
     parts.push(`#grid(columns: (${boxes.map(() => '1fr').join(', ')}), gutter: 10pt, ${boxes.join(', ')})`, '#v(8pt)');
   }
 
-  // Line items
+  // ── Line items — bilingual "Line Items" heading + light-header table ──────
   if (data.lineItems?.columns?.some((c) => c.visible)) {
     const cols = data.lineItems.columns.filter((c) => c.visible);
     const colSpec = cols.map((c) => (c.width ? `${c.width}pt` : '1fr')).join(', ');
     const aligns = cols.map((c) => toAlign(c.align)).join(', ');
-    const header = cols
-      .map((c) => `table.cell(fill: rgb("${NAVY}"), text(fill: white, weight: "bold", [${L(c.label)}]))`)
+    const headerCells = cols
+      .map((c) => `table.cell(fill: rgb("${HEADERBG}"), text(weight: "bold", size: 8pt, fill: rgb("${TEXT}"), [${L(c.label)}]))`)
       .join(', ');
-    const body = data.lineItems.rows.map((row) => cols.map((c) => `[${V(row[c.key])}]`).join(', ')).join(',\n');
-    parts.push(`#table(columns: (${colSpec}), align: (${aligns}), ${header},\n${body})`, '#v(6pt)');
+    const body = data.lineItems.rows
+      .map((row) => cols.map((c) => `text(size: 8pt, fill: rgb("${TEXT}"), [${V(row[c.key])}])`).join(', '))
+      .join(',\n');
+    parts.push(`#heading([Line Items], [البنود])`);
+    parts.push(`#table(columns: (${colSpec}), align: (${aligns}), table.header(${headerCells}),\n${body})`, '#v(6pt)');
   }
 
-  // Totals (trailing edge) — inline bilingual labels
+  // ── Totals — normal rows (muted label / bold value) + boxed grand total ───
   if (data.totals?.length) {
     const lines = data.totals
       .map((t) => {
-        const style = t.emphasis ? `weight: "bold", size: 12pt, fill: rgb("${NAVY}"), ` : '';
-        return `#grid(columns: (1fr, auto), gutter: 10pt, muted([${L(t.label)}]), text(${style}[${V(t.value)}]))`;
+        if (t.emphasis) {
+          return `block(width: 100%, fill: rgb("${SHADE}"), stroke: 0.5pt + rgb("${BORDER}"), inset: (x: 6pt, y: 3pt), grid(columns: (1fr, auto), column-gutter: 10pt, align(end + horizon, text(size: 10pt, weight: "bold", fill: rgb("${TEXT}"), [${L(t.label)}])), align(end + horizon, text(size: 11pt, weight: "bold", fill: rgb("${NAVY}"), [${V(t.value)}]))))`;
+        }
+        return `grid(columns: (1fr, auto), column-gutter: 10pt, align(end, text(size: 9pt, fill: rgb("${MUTED}"), [${L(t.label)}])), align(end, text(size: 9pt, weight: "bold", fill: rgb("${TEXT}"), [${V(t.value)}])))`;
       })
-      .join('\n');
-    parts.push(`#align(end, block(width: 55%, [${lines}]))`, '#v(8pt)');
+      .join(', ');
+    parts.push(`#align(end, block(width: 47%, stack(spacing: 4pt, ${lines})))`, '#v(8pt)');
   }
 
-  // Terms
+  // ── Terms / Notes (no icon) ──────────────────────────────────────────────
   if (data.terms?.blocks?.length) {
     for (const b of data.terms.blocks) {
-      parts.push(`#infobox(${band(b.title)}, [${htmlToTypst(b.body)}])`, '#v(4pt)');
+      parts.push(`#infobox(iconNone, [${E(b.title)}], [${A(b.title)}], text(size: 9pt, fill: rgb("${MUTED}"), [${htmlToTypst(b.body)}]))`, '#v(6pt)');
     }
   } else if (data.terms?.body) {
-    parts.push(`#infobox(${band(data.terms.title)}, [${htmlToTypst(data.terms.body)}])`, '#v(4pt)');
+    parts.push(`#infobox(iconNone, [${E(data.terms.title)}], [${A(data.terms.title)}], text(size: 9pt, fill: rgb("${MUTED}"), [${htmlToTypst(data.terms.body)}]))`, '#v(6pt)');
   }
 
-  // Bank
-  if (data.bank) parts.push(`#infobox(${band(data.bank.title)}, [${kvBody(data.bank.rows, 'parties')}])`, '#v(8pt)');
+  // ── Bank account (document icon) ─────────────────────────────────────────
+  if (data.bank) parts.push(`#${infobox('iconDoc', data.bank.title, data.bank.rows, 'parties')}`, '#v(8pt)');
 
-  // Payment history
+  // ── Payment history — heading + light-header table ───────────────────────
   if (data.paymentHistory?.rows?.length) {
     const ph = data.paymentHistory;
     const heads = [ph.columns.date, ph.columns.document, ph.columns.method, ph.columns.reference, ph.columns.recordedBy, ph.columns.amount, ph.columns.balance];
-    const header = heads.map((c) => `table.cell(fill: rgb("${NAVY}"), text(fill: white, weight: "bold", size: 8pt, [${L(c)}]))`).join(', ');
+    const headerCells = heads
+      .map((c) => `table.cell(fill: rgb("${HEADERBG}"), text(weight: "bold", size: 8pt, fill: rgb("${TEXT}"), [${L(c)}]))`)
+      .join(', ');
     const body = ph.rows
-      .map((r) => [r.date, r.document, r.method, r.reference, r.recordedBy, r.amount, r.runningBalance].map((v) => `text(size: 8pt, [${V(v)}])`).join(', '))
+      .map((r) => [r.date, r.document, r.method, r.reference, r.recordedBy, r.amount, r.runningBalance].map((v) => `text(size: 8pt, fill: rgb("${TEXT}"), [${V(v)}])`).join(', '))
       .join(',\n');
-    parts.push(`#text(weight: "bold", fill: rgb("${NAVY}"), [${L(ph.title)}])`, '#v(3pt)', `#table(columns: 7, ${header},\n${body})`, '#v(8pt)');
+    parts.push(`#heading([${E(ph.title)}], [${A(ph.title)}])`, `#table(columns: 7, table.header(${headerCells}),\n${body})`, '#v(8pt)');
   }
 
-  // Signatures
+  // ── Signatures ───────────────────────────────────────────────────────────
   if (data.signatures?.length) {
-    const cells = data.signatures.map((s) => `[#v(24pt) #line(length: 80%) #muted([${L(s)}])]`).join(', ');
+    const cells = data.signatures.map((s) => `[#v(24pt) #line(length: 80%, stroke: 0.5pt + rgb("${MUTED}")) #muted([${L(s)}])]`).join(', ');
     parts.push('#v(12pt)', `#grid(columns: (${data.signatures.map(() => '1fr').join(', ')}), gutter: 16pt, ${cells})`);
   }
 
