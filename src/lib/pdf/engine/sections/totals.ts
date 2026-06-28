@@ -32,8 +32,9 @@ export const renderTotals: SectionRenderer = (
   // the Arabic family by `bilingualLabelRuns`. The currency/number value stays a
   // SEPARATE run so it keeps LTR ordering within the RTL flow (never reversed).
   const baseFont = engine.ctx.fontFamily;
-  // Fixed value column so every amount right-aligns to the same edge.
-  const VALUE_W = 92;
+  // Value column auto-sizes (never wraps the larger grand-total figure); it is the
+  // LAST, right-aligned column, so every amount still aligns to the block's right
+  // edge regardless of length or currency.
   const rows: Content[] = [];
   let ruled = false;
 
@@ -53,7 +54,7 @@ export const renderTotals: SectionRenderer = (
       // value, slightly larger — reads as the document's headline figure.
       rows.push({
         table: {
-          widths: ['*', VALUE_W],
+          widths: ['*', 'auto'],
           body: [
             [
               { text: labelRuns, fontSize: 10.5, bold: true, color: PDF_COLORS.text, alignment: 'right', border: [false, false, false, false], margin: [0, 5, 8, 5] },
@@ -72,7 +73,7 @@ export const renderTotals: SectionRenderer = (
       rows.push({
         columns: [
           { text: labelRuns, fontSize: 9, color: PDF_COLORS.textLight, width: '*', alignment: 'right' },
-          { text: line.value, fontSize: 9, color: PDF_COLORS.text, width: VALUE_W, alignment: 'right' },
+          { text: line.value, fontSize: 9, color: PDF_COLORS.text, width: 'auto', alignment: 'right' },
         ],
         margin: [0, 2.5, 8, 2.5],
       });
