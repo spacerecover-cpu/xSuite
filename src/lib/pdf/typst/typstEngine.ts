@@ -6,7 +6,7 @@
  * caller gets a `Blob` it can object-URL into an iframe, hash, upload, or email —
  * the whole provability/delivery stack is unchanged.
  */
-import { $typst, preloadRemoteFonts } from '@myriaddreamin/typst.ts';
+import { $typst, preloadRemoteFonts, loadFonts } from '@myriaddreamin/typst.ts';
 import compilerWasmUrl from '@myriaddreamin/typst-ts-web-compiler/pkg/typst_ts_web_compiler_bg.wasm?url';
 import type { TypstAsset } from './assets';
 
@@ -32,7 +32,13 @@ function ensureInit(): void {
   if (initialized) return;
   $typst.setCompilerInitOptions({
     getModule: () => compilerWasmUrl,
-    beforeBuild: [preloadRemoteFonts(FONT_URLS)],
+    beforeBuild: [
+      // Disable typst.ts's default font fetch from the jsdelivr CDN — a forensic
+      // app must not depend on external egress (and the CSP blocks it). We supply
+      // only the local brand/script fonts below.
+      loadFonts([], { assets: false }),
+      preloadRemoteFonts(FONT_URLS),
+    ],
   });
   initialized = true;
 }
