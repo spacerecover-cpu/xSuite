@@ -20,4 +20,27 @@ describe('SignatureCaptureModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /apply signature/i }));
     expect(onCapture).toHaveBeenCalledWith(expect.objectContaining({ method: 'click_to_accept' }));
   });
+
+  it('resets to Typed method and empty inputs after close and re-open', () => {
+    const { rerender } = render(
+      <SignatureCaptureModal open onClose={vi.fn()} title="Approver signature" onCapture={vi.fn()} />,
+    );
+
+    // Switch to Accept and fill some state
+    fireEvent.click(screen.getByRole('button', { name: /accept/i }));
+    expect(screen.queryByLabelText(/type your name/i)).toBeNull(); // Accept panel is showing
+
+    // Close the modal
+    rerender(
+      <SignatureCaptureModal open={false} onClose={vi.fn()} title="Approver signature" onCapture={vi.fn()} />,
+    );
+
+    // Re-open — method should be reset to Typed, typed input should be present and empty
+    rerender(
+      <SignatureCaptureModal open onClose={vi.fn()} title="Approver signature" onCapture={vi.fn()} />,
+    );
+    const input = screen.getByLabelText(/type your name/i);
+    expect(input).toBeDefined();
+    expect((input as HTMLInputElement).value).toBe('');
+  });
 });

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 
@@ -45,6 +45,16 @@ export function SignatureCaptureModal({ open, onClose, title, onCapture }: Signa
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
   }
+
+  // Reset to initial state whenever the modal is closed so re-opening starts clean.
+  useEffect(() => {
+    if (!open) {
+      setMethod('typed');
+      resetState();
+    }
+  // resetState is stable (no deps) — intentionally excluded
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   function handleMethodChange(m: Method) {
     setMethod(m);

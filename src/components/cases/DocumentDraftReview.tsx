@@ -11,6 +11,9 @@ import {
   archiveDocumentInstance,
   transitionDocument,
 } from '../../lib/documentInstanceService';
+import { captureStaffSignature, listInstanceSignatures } from '../../lib/documentSignatureService';
+import type { CapturedSignature } from './SignatureCaptureModal';
+import { SignatureCaptureModal } from './SignatureCaptureModal';
 import { reportPDFService } from '../../lib/reportPDFService';
 import { supabase } from '../../lib/supabaseClient';
 import type { Database } from '../../types/database.types';
@@ -47,6 +50,14 @@ function toSectionState(s: DocumentInstanceSectionRow): SectionState {
   };
 }
 
+type SignatureSlot = Database['public']['Enums']['signature_slot'];
+
+interface PendingSlot {
+  slot: SignatureSlot;
+  title: string;
+  signerRole: string;
+}
+
 export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
   isOpen,
   onClose,
@@ -56,7 +67,7 @@ export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
   newTitle,
   onSaved,
 }) => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const toast = useToast();
   const [id, setId] = useState<string | null>(instanceId ?? null);
   const [instance, setInstance] = useState<DocumentInstanceRow | null>(null);
@@ -64,6 +75,14 @@ export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const createdRef = useRef(false);
+
+  // Signature capture state
+  const [signing, setSigning] = useState(false);
+  const [currentSlot, setCurrentSlot] = useState<PendingSlot | null>(null);
+  // Queue of slots to capture; after all queued slots → approve
+  const pendingSlots = useRef<PendingSlot[]>([]);
+  // Collected signatureIds from queued slots (keyed by slot name)
+  const capturedIds = useRef<Record<string, string>>({});
 
   // Reset all per-open state when the modal closes so re-opens start clean.
   useEffect(() => {
@@ -176,16 +195,94 @@ export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
     }
   }
 
-  async function runTransition(to: 'in_review' | 'approved') {
+  async function runSubmit() {
     if (!id) return;
     setBusy(true);
     try {
-      await transitionDocument(id, to);
-      toast.success(`Document ${to === 'in_review' ? 'submitted for review' : 'approved'}`);
+      await transitionDocument(id, 'in_review');
+      toast.success('Document submitted for review');
       onSaved();
       onClose();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Transition failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Opens the capture modal for the next slot in the queue. */
+  function startNextCapture() {
+    const next = pendingSlots.current[0];
+    if (next) {
+      setCurrentSlot(next);
+      setSigning(true);
+    }
+  }
+
+  /** Initiates the approve flow: builds the required-slot queue and starts it. */
+  async function initiateApprove() {
+    if (!id || !instance) return;
+    setBusy(true);
+    try {
+      const required: PendingSlot[] = [];
+      if (instance.report_subtype === 'data_destruction') {
+        // Need operator (engineer slot) + witness before approving.
+        const existing = await listInstanceSignatures(id);
+        const signedSlots = new Set(existing.map((s) => s.slot));
+        if (!signedSlots.has('engineer')) {
+          required.push({ slot: 'engineer', title: 'Operator signature', signerRole: 'Operator' });
+        }
+        if (!signedSlots.has('witness')) {
+          required.push({ slot: 'witness', title: 'Witness signature', signerRole: 'Witness' });
+        }
+      }
+      // Always end with the approver signature.
+      required.push({ slot: 'approver', title: 'Approver signature', signerRole: 'Approver' });
+
+      pendingSlots.current = required;
+      capturedIds.current = {};
+      startNextCapture();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to start approval');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Called when SignatureCaptureModal fires onCapture for the current slot. */
+  async function handleCapture(sig: CapturedSignature) {
+    if (!id || !currentSlot) return;
+    setSigning(false);
+    setBusy(true);
+    try {
+      const sigId = await captureStaffSignature({
+        instanceId: id,
+        slot: currentSlot.slot,
+        method: sig.method,
+        signerName: profile?.full_name ?? 'Staff',
+        signerRole: currentSlot.signerRole,
+        typedValue: sig.typedValue,
+        imageBlob: sig.imageBlob,
+      });
+      capturedIds.current[currentSlot.slot] = sigId;
+
+      // Pop the captured slot and check if more remain.
+      pendingSlots.current = pendingSlots.current.slice(1);
+      setCurrentSlot(null);
+
+      if (pendingSlots.current.length > 0) {
+        // More slots to capture — open the next one.
+        startNextCapture();
+      } else {
+        // All captured — transition to approved using the approver's sigId.
+        const approverSigId = capturedIds.current['approver'];
+        await transitionDocument(id, 'approved', { signatureId: approverSigId });
+        toast.success('Document approved');
+        onSaved();
+        onClose();
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Approval failed');
     } finally {
       setBusy(false);
     }
@@ -239,7 +336,7 @@ export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
               {status === 'draft' && (
                 <Button
                   size="sm"
-                  onClick={() => runTransition('in_review')}
+                  onClick={runSubmit}
                   disabled={busy}
                 >
                   Submit for Review
@@ -248,7 +345,7 @@ export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
               {status === 'in_review' && (
                 <Button
                   size="sm"
-                  onClick={() => runTransition('approved')}
+                  onClick={initiateApprove}
                   disabled={busy || isAuthor}
                   title={
                     isAuthor
@@ -283,6 +380,20 @@ export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
           </div>
         </div>
       </div>
+
+      {currentSlot && (
+        <SignatureCaptureModal
+          open={signing}
+          onClose={() => {
+            setSigning(false);
+            setCurrentSlot(null);
+            pendingSlots.current = [];
+            capturedIds.current = {};
+          }}
+          title={currentSlot.title}
+          onCapture={handleCapture}
+        />
+      )}
     </Dialog>
   );
 };
