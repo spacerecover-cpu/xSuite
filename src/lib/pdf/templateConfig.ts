@@ -220,7 +220,9 @@ export function resolveSecondary(language: LanguageConfig): LanguageCode | null 
 }
 
 /**
- * Page geometry. `margins` is pdfmake order: [top, right, bottom, left].
+ * Page geometry. `margins` is CSS order: [top, right, bottom, left] (matching the
+ * Studio inputs). renderTemplate reorders to pdfmake's [left, top, right, bottom];
+ * the Typst assembler maps each side by name.
  *
  * `size` is normally a predefined sheet (`'A4'` / `'Letter'`). For physical
  * LABELS (stock / case labels), set `size: 'custom'` and supply `dimensions`

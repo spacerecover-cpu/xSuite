@@ -103,7 +103,16 @@ export function renderTemplate(
     pageSize = config.paper.size === 'Letter' ? 'LETTER' : 'A4';
   }
   const pageOrientation: PageOrientation = config.paper.orientation;
-  let pageMargins: [number, number, number, number] = config.paper.margins;
+  // config.paper.margins is CSS order [top, right, bottom, left]; pdfmake's
+  // pageMargins is [left, top, right, bottom]. Reorder so each Studio input maps
+  // to its own side (without this, Top→Left, Right→Top, … rotate).
+  const cssMargins = config.paper.margins;
+  let pageMargins: [number, number, number, number] = [
+    cssMargins[3], // left
+    cssMargins[0], // top
+    cssMargins[1], // right
+    cssMargins[2], // bottom
+  ];
 
   // 2. Visible sections, ascending order, dispatched via the registry.
   const ordered = [...config.sections]
@@ -245,12 +254,12 @@ export function renderTemplate(
     const scale = fitting.autoFitOnePage ? Math.max(fitting.minScale, densityScale * 0.9) : densityScale;
     densityFontScale = scale;
     if (scale !== 1) {
-      const m = config.paper.margins;
+      // Scale the already-reordered pdfmake [left, top, right, bottom] tuple.
       pageMargins = [
-        Math.round(m[0] * scale),
-        Math.round(m[1] * scale),
-        Math.round(m[2] * scale),
-        Math.round(m[3] * scale),
+        Math.round(pageMargins[0] * scale),
+        Math.round(pageMargins[1] * scale),
+        Math.round(pageMargins[2] * scale),
+        Math.round(pageMargins[3] * scale),
       ];
       for (const key of Object.keys(styles)) {
         const style = styles[key] as { fontSize?: number };

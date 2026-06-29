@@ -140,6 +140,7 @@ function allTexts(def: TDocumentDefinitions): string[] {
 describe('renderTemplate — page geometry', () => {
   it('honors pageSize, orientation, and margins from config.paper', () => {
     const config = resolveTemplateConfig(BUILT_IN_TEMPLATE_CONFIGS.invoice, undefined, {
+      // CSS order [top, right, bottom, left].
       paper: { size: 'Letter', orientation: 'landscape', margins: [10, 20, 30, 40] },
     });
     const def = renderTemplate(config, makeData(), englishCtx, null, TINY_PNG);
@@ -147,7 +148,9 @@ describe('renderTemplate — page geometry', () => {
     // 'Letter' maps to pdfmake's uppercase 'LETTER'.
     expect(def.pageSize).toBe('LETTER');
     expect(def.pageOrientation).toBe('landscape');
-    expect(def.pageMargins).toEqual([10, 20, 30, 40]);
+    // Reordered to pdfmake's [left, top, right, bottom] — so each Studio input
+    // (top:10, right:20, bottom:30, left:40) lands on its own side.
+    expect(def.pageMargins).toEqual([40, 10, 20, 30]);
   });
 
   it('keeps A4 / portrait / built-in margins by default', () => {
