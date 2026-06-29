@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Package, Zap, Edit2, Trash2, RefreshCw, Filter, Upload } from 'lucide-react';
+import { Plus, Search, Package, Zap, Edit2, Trash2, RefreshCw, Filter, Upload, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../hooks/useToast';
 import { Button } from '../../components/ui/Button';
@@ -284,6 +284,13 @@ export default function InventoryListPage() {
       >
         <Zap className="w-4 h-4 mr-2" />
         Donor Search
+      </Button>
+      <Button
+        onClick={() => navigate('/inventory/locations')}
+        variant="secondary"
+      >
+        <MapPin className="w-4 h-4 mr-2" />
+        Locations
       </Button>
       <Button
         onClick={() => setIsBulkImportOpen(true)}

@@ -10,6 +10,8 @@ import { Table } from '../../components/ui/Table';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Plus, Edit2, Trash2, ChevronLeft, Sparkles, Search, X, Star, ToggleLeft, ToggleRight } from 'lucide-react';
 import { SETTINGS_CATEGORIES, MasterDataTable, TABLE_LABELS, isTenantScopedTable, hasDeletedAt } from '../../config/settingsCategories';
+import type { Database } from '../../types/database.types';
+import { HierarchicalLocationPicker } from '../../components/inventory/HierarchicalLocationPicker';
 import { settingsKeys } from '../../lib/queryKeys';
 import {
   checkIfSeeded,
@@ -60,6 +62,7 @@ export const CategoryDetail: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MasterDataItem | null>(null);
   const [formValue, setFormValue] = useState('');
+  const [formParentId, setFormParentId] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
   const [seedDetails, setSeedDetails] = useState<TableSeedResult[] | null>(null);
   const [seedMessage, setSeedMessage] = useState('');
@@ -175,6 +178,38 @@ export const CategoryDetail: React.FC = () => {
     return itemName.includes(searchLower);
   });
 
+  // inventory_locations is hierarchical (parent_id self-FK). When managing it we
+  // expose a Parent selector. The rows already include parent_id via select('*').
+  const isLocationsTable = activeTable === 'inventory_locations';
+  type InventoryLocationRow = Database['public']['Tables']['inventory_locations']['Row'];
+  const locationRows = (isLocationsTable
+    ? (allItems as unknown as InventoryLocationRow[])
+    : []);
+
+  // When editing a location, prevent picking itself or any descendant as parent
+  // (would create a cycle). Filter those out of the picker options.
+  const descendantIds = (() => {
+    if (!isLocationsTable || !editingItem) return new Set<string>();
+    const editingId = String(editingItem.id);
+    const childrenOf = new Map<string, string[]>();
+    for (const r of locationRows) {
+      const p = r.parent_id ?? '';
+      if (!childrenOf.has(p)) childrenOf.set(p, []);
+      childrenOf.get(p)!.push(r.id);
+    }
+    const out = new Set<string>([editingId]);
+    const stack = [editingId];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      for (const child of childrenOf.get(cur) ?? []) {
+        if (!out.has(child)) { out.add(child); stack.push(child); }
+      }
+    }
+    return out;
+  })();
+
+  const parentPickerRows = locationRows.filter(r => !descendantIds.has(r.id));
+
   const { data: isSeeded = false } = useQuery({
     queryKey: settingsKeys.seedStatus(category?.id || ''),
     queryFn: async () => {
@@ -190,9 +225,11 @@ export const CategoryDetail: React.FC = () => {
   const createMutation = useMutation({
     mutationFn: async (value: string) => {
       if (isTenantScopedTable(activeTable)) {
+        const insertPayload: Record<string, unknown> = { name: value, tenant_id: profile?.tenant_id };
+        if (isLocationsTable) insertPayload.parent_id = formParentId;
         const { error } = await supabase
           .from(activeTable)
-          .insert({ name: value, tenant_id: profile?.tenant_id } as any);
+          .insert(insertPayload as any);
         if (error) throw error;
       } else {
         const { data: maxOrderData } = await supabase
@@ -216,6 +253,7 @@ export const CategoryDetail: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['settings', 'category-count'] });
       setIsModalOpen(false);
       setFormValue('');
+      setFormParentId(null);
     },
     onError: (error: Error) => {
       logger.error('Create master data error:', error);
@@ -228,10 +266,12 @@ export const CategoryDetail: React.FC = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, value }: { id: number; value: string }) => {
+    mutationFn: async ({ id, value }: { id: number | string; value: string }) => {
+      const updatePayload: Record<string, unknown> = { name: value };
+      if (isLocationsTable) updatePayload.parent_id = formParentId;
       const { error } = await supabase
         .from(activeTable)
-        .update({ name: value })
+        .update(updatePayload as any)
         .eq('id', id);
       if (error) throw error;
     },
@@ -240,6 +280,7 @@ export const CategoryDetail: React.FC = () => {
       setIsModalOpen(false);
       setEditingItem(null);
       setFormValue('');
+      setFormParentId(null);
     },
     onError: (error: Error) => {
       logger.error('Update master data error:', error);
@@ -336,6 +377,18 @@ export const CategoryDetail: React.FC = () => {
   const handleEdit = (item: MasterDataItem) => {
     setEditingItem(item);
     setFormValue(item.name || '');
+    setFormParentId(
+      isLocationsTable
+        ? ((item as unknown as { parent_id?: string | null }).parent_id ?? null)
+        : null,
+    );
+    setIsModalOpen(true);
+  };
+
+  const handleAddNew = () => {
+    setEditingItem(null);
+    setFormValue('');
+    setFormParentId(null);
     setIsModalOpen(true);
   };
 
@@ -368,6 +421,7 @@ export const CategoryDetail: React.FC = () => {
     setIsModalOpen(false);
     setEditingItem(null);
     setFormValue('');
+    setFormParentId(null);
   };
 
   const handleSeedData = async () => {
@@ -659,7 +713,7 @@ export const CategoryDetail: React.FC = () => {
                 )}
               </div>
               <Button
-                onClick={() => setIsModalOpen(true)}
+                onClick={handleAddNew}
                 className="text-xs md:text-sm whitespace-nowrap"
                 style={{ backgroundColor: category.backgroundColor }}
               >
@@ -706,6 +760,23 @@ export const CategoryDetail: React.FC = () => {
             autoFocus
             placeholder="Enter name..."
           />
+
+          {isLocationsTable && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Parent location <span className="font-normal text-slate-400">(optional)</span>
+              </label>
+              <HierarchicalLocationPicker
+                value={formParentId}
+                onChange={setFormParentId}
+                locations={parentPickerRows}
+                placeholder="None — top-level location"
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                Nest this location under a Rack or Shelf to build the storage tree.
+              </p>
+            </div>
+          )}
 
           <div className="flex gap-3 justify-end pt-4 border-t">
             <Button type="button" variant="secondary" onClick={handleCloseModal}>

@@ -5,7 +5,7 @@
 // so technical fields appear dynamically per device type, identical to Case Intake.
 // Numbering via get_next_inventory_number(device_type_id) RPC.
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Package, Loader2, ChevronRight, Hash, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -43,6 +43,8 @@ import { getDonorParts } from '../../lib/inventory/donorParts';
 import { getItemDonorParts, setItemDonorParts } from '../../lib/inventory/donorPartsService';
 import type { DonorPartInput } from '../../lib/inventory/donorPartsService';
 import { Wrench } from 'lucide-react';
+import { HierarchicalLocationPicker } from './HierarchicalLocationPicker';
+import { getDeviceTypeSettings } from '../../lib/inventory/deviceTypeSettingsService';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -143,6 +145,8 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
   const [submitting, setSubmitting] = useState(false);
   const [itemNumber, setItemNumber] = useState<string>('');
   const [loadingNumber, setLoadingNumber] = useState(false);
+  const [autoLocationHint, setAutoLocationHint] = useState<string>('');
+  const locationUserChanged = useRef(false);
 
   // Donor parts state: maps part_type → { checked, quantity, condition_id }
   const [donorPartChecked, setDonorPartChecked] = useState<Record<string, boolean>>({});
@@ -154,6 +158,13 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
   const { data: deviceTypes, isLoading: dtLoading } = useInventoryDeviceTypes();
   const { data: locations = [] } = useInventoryLocations();
   const { data: suppliers = [] } = useInventorySuppliers();
+
+  // Device type default location settings (for auto-populate in create mode)
+  const { data: deviceTypeSettingsMap } = useQuery({
+    queryKey: ['deviceTypeSettings'],
+    queryFn: getDeviceTypeSettings,
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Status / condition types
   const { data: statusTypes = [] } = useQuery({
@@ -229,10 +240,10 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
   const handleDeviceTypeChange = useCallback((typeId: string) => {
     const dt = deviceTypes?.find(d => d.id === typeId);
     const defaultCat = dt?.default_category_id ?? '';
-    // Clear all previous technical fields when type changes
+    locationUserChanged.current = false;
+    setAutoLocationHint('');
     setForm(prev => ({
       ...EMPTY_FORM,
-      // Preserve identity/inventory fields
       category_id: defaultCat || prev.category_id,
       brand_id: prev.brand_id as string,
       model: prev.model as string,
@@ -244,17 +255,32 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
       supplier_id: prev.supplier_id as string,
       is_donor: prev.is_donor as boolean,
       notes: prev.notes as string,
-      location_id: prev.location_id as string,
+      location_id: '',
       device_type_id: typeId,
     }));
     setErrors({});
-    // Reset donor parts when device type changes
     setDonorPartChecked({});
     setDonorPartQty({});
     setDonorPartCondition({});
   }, [deviceTypes]);
 
+  // Auto-populate location from device type settings (create mode only)
+  useEffect(() => {
+    if (isEdit || locationUserChanged.current) return;
+    const typeId = form.device_type_id as string;
+    if (!typeId || !deviceTypeSettingsMap) return;
+    const defaultLocId = deviceTypeSettingsMap.get(typeId);
+    if (!defaultLocId) return;
+    const dt = deviceTypes?.find(d => d.id === typeId);
+    setForm(prev => ({ ...prev, location_id: defaultLocId }));
+    setAutoLocationHint(dt?.name ? `Default location for ${dt.name}` : 'Default location');
+  }, [form.device_type_id, deviceTypeSettingsMap, deviceTypes, isEdit]);
+
   const setField = useCallback((key: string, value: unknown) => {
+    if (key === 'location_id') {
+      locationUserChanged.current = true;
+      setAutoLocationHint('');
+    }
     setForm(prev => ({ ...prev, [key]: value }));
     if (errors[key]) setErrors(prev => { const e = { ...prev }; delete e[key]; return e; });
   }, [errors]);
@@ -328,6 +354,8 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
       setForm(EMPTY_FORM);
       setErrors({});
       setItemNumber('');
+      setAutoLocationHint('');
+      locationUserChanged.current = false;
       setDonorPartChecked({});
       setDonorPartQty({});
       setDonorPartCondition({});
@@ -762,19 +790,17 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                 <ChevronRight className="w-3.5 h-3.5 text-primary" />
                 <h3 className={SECTION_HEAD}>Location</h3>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
-                <div>
-                  <SearchableSelect
-                    label="Storage Location"
-                    value={form.location_id as string}
-                    onChange={v => setField('location_id', v)}
-                    options={locations}
-                    clearable={false}
-                    placeholder="Select location"
-                    size="sm"
-                    usePortal
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Storage Location</label>
+                <HierarchicalLocationPicker
+                  value={(form.location_id as string) || null}
+                  onChange={id => setField('location_id', id ?? '')}
+                  locations={locations}
+                  placeholder="Select location"
+                />
+                {autoLocationHint && (
+                  <p className="mt-1 text-xs text-primary/70">{autoLocationHint}</p>
+                )}
               </div>
             </div>
 

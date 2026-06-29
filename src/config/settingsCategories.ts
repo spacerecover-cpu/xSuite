@@ -1,5 +1,6 @@
 import {
   HardDrive,
+  Package,
   Settings as SettingsIcon,
   DollarSign,
   FileText,
@@ -117,6 +118,16 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     ],
     actionLabel: 'Manage Categories',
     description: 'Manage storage device specifications and inventory settings',
+  },
+  {
+    id: 'inventory-settings',
+    title: 'Inventory Defaults',
+    icon: Package,
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
+    tables: [],
+    actionLabel: 'Configure',
+    description: 'Set the default storage location pre-filled per device type when adding inventory items.',
   },
   {
     id: 'case-service',
@@ -284,7 +295,7 @@ export interface SettingsGroup {
 // a trailing "More" section so nothing silently disappears.
 export const SETTINGS_GROUPS: SettingsGroup[] = [
   { id: 'workspace', label: 'Workspace', categoryIds: ['appearance', 'table-columns', 'features', 'general-settings', 'notifications'] },
-  { id: 'operations', label: 'Operations', categoryIds: ['device-media', 'case-service', 'procurement'] },
+  { id: 'operations', label: 'Operations', categoryIds: ['device-media', 'inventory-settings', 'case-service', 'procurement'] },
   { id: 'finance', label: 'Client & Finance', categoryIds: ['client-financial', 'currencies', 'localization'] },
   { id: 'documents', label: 'Documents & Reports', categoryIds: ['templates', 'documents'] },
   { id: 'system', label: 'System & Data', categoryIds: ['system-numbers', 'import-export', 'client-portal'] },

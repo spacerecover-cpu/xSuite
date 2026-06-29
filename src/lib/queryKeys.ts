@@ -64,6 +64,8 @@ export const inventoryKeys = {
   list: (filters: Record<string, unknown>) => [...inventoryKeys.lists(), filters] as const,
   detail: (id: string) => [...inventoryKeys.all, 'detail', id] as const,
   categories: () => [...inventoryKeys.all, 'categories'] as const,
+  locations: () => [...inventoryKeys.all, 'locations'] as const,
+  deviceTypeSettings: () => ['deviceTypeSettings'] as const,
 };
 
 export const supplierKeys = {

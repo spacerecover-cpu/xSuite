@@ -178,6 +178,7 @@ const router = createBrowserRouter(
         <Route path="stock/locations" lazy={page(() => import('./pages/stock/StockLocationsPage'), 'default')} />
         <Route path="stock/:id" lazy={page(() => import('./pages/stock/StockItemDetail'), 'default')} />
         <Route path="inventory" lazy={page(() => import('./pages/inventory/InventoryListPage'), 'default')} />
+        <Route path="inventory/locations" lazy={page(() => import('./pages/inventory/InventoryLocationsPage'), 'default')} />
         <Route path="inventory/donor-search" lazy={page(() => import('./pages/inventory/DonorSearchPage'), 'default')} />
         <Route path="tools" lazy={page(() => import('./pages/inventory/InventoryListPage'), 'default')} />
         <Route path="clone-drives" lazy={page(() => import('./pages/resources/CloneDrivesList'), 'CloneDrivesList')} />
@@ -260,6 +261,7 @@ const router = createBrowserRouter(
             <Route path="documents" lazy={page(() => import('./pages/settings/DocumentTemplatesPage'), 'DocumentTemplatesPage')} />
             <Route path="security" lazy={page(() => import('./pages/settings/SecuritySettingsPage'), 'SecuritySettingsPage')} />
             <Route path="gdpr" lazy={page(() => import('./pages/settings/GDPRCompliancePage'), 'GDPRCompliancePage')} />
+            <Route path="inventory" lazy={page(() => import('./pages/settings/InventorySettingsPage'), 'default')} />
             <Route path=":categoryId" lazy={page(() => import('./pages/settings/CategoryDetail'), 'CategoryDetail')} />
           </Route>
           <Route element={<ProtectedRoute allowedRoles={FINANCE_ROLES} />}>

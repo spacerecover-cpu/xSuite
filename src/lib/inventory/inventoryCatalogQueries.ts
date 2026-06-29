@@ -20,6 +20,14 @@ export interface InventoryDeviceType {
 export interface InventoryLocation {
   id: string;
   name: string;
+  parent_id: string | null;
+  location_code: string | null;
+  description: string | null;
+  is_active: boolean | null;
+  tenant_id: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
 }
 
 export interface InventorySupplier {
@@ -49,8 +57,9 @@ export function useInventoryLocations() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('inventory_locations')
-        .select('id, name')
+        .select('id, name, parent_id, location_code, description, is_active, tenant_id, created_at, updated_at, deleted_at')
         .eq('is_active', true)
+        .is('deleted_at', null)
         .order('name');
       if (error) throw error;
       return (data ?? []) as InventoryLocation[];

@@ -111,6 +111,8 @@ export const SettingsDashboard: React.FC = () => {
       navigate('/settings/notifications');
     } else if (categoryId === 'currencies') {
       navigate('/settings/currencies');
+    } else if (categoryId === 'inventory-settings') {
+      navigate('/settings/inventory');
     } else {
       navigate(`/settings/${categoryId}`);
     }
