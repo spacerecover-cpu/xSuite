@@ -5,7 +5,7 @@ import { useToast } from '../../hooks/useToast';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
-import AddInventoryModal from '../../components/inventory/AddInventoryModal';
+import { InventoryItemWizard } from '../../components/inventory/InventoryItemWizard';
 import InventoryDetailModal from '../../components/inventory/InventoryDetailModal';
 import DeleteInventoryConfirmationModal from '../../components/inventory/DeleteInventoryConfirmationModal';
 import { InventoryInsightsHeader } from '../../components/inventory/InventoryInsightsHeader';
@@ -678,7 +678,7 @@ export default function InventoryListPage() {
       isEmpty={items.length === 0}
       loading={loading}
     >
-      <AddInventoryModal
+      <InventoryItemWizard
         isOpen={isAddModalOpen || !!editingItemId}
         onClose={() => {
           setIsAddModalOpen(false);

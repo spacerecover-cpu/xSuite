@@ -178,7 +178,6 @@ const router = createBrowserRouter(
         <Route path="stock/locations" lazy={page(() => import('./pages/stock/StockLocationsPage'), 'default')} />
         <Route path="stock/:id" lazy={page(() => import('./pages/stock/StockItemDetail'), 'default')} />
         <Route path="inventory" lazy={page(() => import('./pages/inventory/InventoryListPage'), 'default')} />
-        <Route path="inventory/new" lazy={page(() => import('./pages/inventory/InventoryFormPage'), 'default')} />
         <Route path="inventory/donor-search" lazy={page(() => import('./pages/inventory/DonorSearchPage'), 'default')} />
         <Route path="tools" lazy={page(() => import('./pages/inventory/InventoryListPage'), 'default')} />
         <Route path="clone-drives" lazy={page(() => import('./pages/resources/CloneDrivesList'), 'CloneDrivesList')} />

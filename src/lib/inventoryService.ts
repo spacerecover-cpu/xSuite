@@ -265,6 +265,18 @@ export async function deleteInventoryItem(id: string) {
   if (error) throw error;
 }
 
+/**
+ * Get next per-device-type inventory number via the `get_next_inventory_number` RPC.
+ * Returns a formatted string like "BIG-0001" ready to use as `item_number`.
+ */
+export async function getNextInventoryNumber(deviceTypeId: string): Promise<string> {
+  const { data, error } = await supabase.rpc('get_next_inventory_number', {
+    p_device_type_id: deviceTypeId,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
 type StatusTypeRef = { id: string; name: string | null; color_code: string | null };
 
 export async function getInventoryStatusHistory(itemId: string) {
