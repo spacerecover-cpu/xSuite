@@ -65,6 +65,21 @@ export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
   const [busy, setBusy] = useState(false);
   const createdRef = useRef(false);
 
+  // Reset all per-open state when the modal closes so re-opens start clean.
+  useEffect(() => {
+    if (isOpen) return;
+    setInstance(null);
+    setSections([]);
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPreviewUrl(null);
+    setId(instanceId ?? null);
+    createdRef.current = false;
+  // previewUrl intentionally omitted — we only want this on isOpen toggle
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
   // Create-once on open with a subtype, else load the given instance.
   useEffect(() => {
     if (!isOpen) return;

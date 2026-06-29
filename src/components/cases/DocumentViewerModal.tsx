@@ -23,19 +23,25 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
 }) => {
   const [instance, setInstance] = useState<DocumentInstanceRow | null>(null);
   const [url, setUrl] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen || !instanceId) return;
     let alive = true;
+    setLoadError(null);
     (async () => {
-      const inst = await getDocumentInstance(instanceId);
-      if (!alive) return;
-      setInstance(inst);
-      if (inst?.pdf_storage_path) {
-        const signed = await getDocumentPdfSignedUrl(inst);
-        if (alive) setUrl(signed);
-      } else {
-        setUrl(null);
+      try {
+        const inst = await getDocumentInstance(instanceId);
+        if (!alive) return;
+        setInstance(inst);
+        if (inst?.pdf_storage_path) {
+          const signed = await getDocumentPdfSignedUrl(inst);
+          if (alive) setUrl(signed);
+        } else {
+          setUrl(null);
+        }
+      } catch (e) {
+        if (alive) setLoadError(e instanceof Error ? e.message : 'Couldn\'t load this document.');
       }
     })();
     return () => {
@@ -68,7 +74,11 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
         </div>
 
         <div className="min-h-[480px] border border-slate-200 rounded-lg overflow-hidden bg-slate-50">
-          {url ? (
+          {loadError ? (
+            <div className="flex items-center justify-center h-full min-h-[480px] text-danger text-sm">
+              {loadError}
+            </div>
+          ) : url ? (
             <iframe
               title="Document PDF"
               src={url}

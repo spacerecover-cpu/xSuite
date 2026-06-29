@@ -58,3 +58,27 @@ it('creates a new instance once when opened with a subtype', async () => {
   await waitFor(() => expect(svc.createReportInstance).toHaveBeenCalledWith({ caseId: 'c1', reportSubtype: 'evaluation', title: 'Evaluation Report' }));
   expect(svc.createReportInstance).toHaveBeenCalledOnce();
 });
+
+it('creates a fresh instance when re-opened with a different subtype after close', async () => {
+  svc.createReportInstance.mockResolvedValueOnce({ id: 'eval-1' }).mockResolvedValueOnce({ id: 'svc-1' });
+  svc.getDocumentInstance
+    .mockResolvedValueOnce({ id: 'eval-1', title: 'Evaluation', status: 'draft', created_by: 'reviewer', report_subtype: 'evaluation', case_id: 'c1' })
+    .mockResolvedValueOnce({ id: 'svc-1', title: 'Service', status: 'draft', created_by: 'reviewer', report_subtype: 'service', case_id: 'c1' });
+
+  const { rerender } = render(
+    <DocumentDraftReview isOpen onClose={vi.fn()} caseId="c1" newSubtype="evaluation" onSaved={vi.fn()} />,
+  );
+  await waitFor(() => expect(svc.createReportInstance).toHaveBeenCalledWith({ caseId: 'c1', reportSubtype: 'evaluation', title: 'Report' }));
+
+  // Close the modal (simulate parent toggling isOpen off)
+  rerender(
+    <DocumentDraftReview isOpen={false} onClose={vi.fn()} caseId="c1" newSubtype="evaluation" onSaved={vi.fn()} />,
+  );
+
+  // Re-open with a different subtype
+  rerender(
+    <DocumentDraftReview isOpen onClose={vi.fn()} caseId="c1" newSubtype="service" onSaved={vi.fn()} />,
+  );
+  await waitFor(() => expect(svc.createReportInstance).toHaveBeenCalledWith({ caseId: 'c1', reportSubtype: 'service', title: 'Report' }));
+  expect(svc.createReportInstance).toHaveBeenCalledTimes(2);
+});
