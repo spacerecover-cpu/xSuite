@@ -175,6 +175,16 @@ const SUBTYPE_SECTIONS: Record<string, string[]> = {
 /** The default subtype when an unknown report_type is supplied. */
 const DEFAULT_SUBTYPE = 'evaluation';
 
+/**
+ * The ordered canonical prose-section descriptors for a report subtype — the seed
+ * list the Documents tab uses to create document_instance_sections. Mirrors the
+ * sections the adapter renders, so a freshly-seeded draft matches the PDF layout.
+ */
+export function reportSubtypeSections(subtype: string): Array<{ key: string; title: string }> {
+  const keys = SUBTYPE_SECTIONS[subtype] ?? SUBTYPE_SECTIONS[DEFAULT_SUBTYPE];
+  return keys.map((key) => ({ key, title: CANONICAL_SECTIONS[key]?.en ?? key }));
+}
+
 /** The ordered Option B prose-section keys for a subtype (device_information dropped). */
 function proseSectionKeysForSubtype(reportType: string): string[] {
   const set = SUBTYPE_SECTIONS[reportType] ?? SUBTYPE_SECTIONS[DEFAULT_SUBTYPE];
