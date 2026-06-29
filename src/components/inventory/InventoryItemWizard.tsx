@@ -39,6 +39,10 @@ import { inventoryKeys } from '../../lib/queryKeys';
 import { logger } from '../../lib/logger';
 import type { DeviceFamily } from '../../lib/devices/deviceFamily';
 import type { CatalogOption } from '../../lib/devices/deviceCatalogQueries';
+import { getDonorParts } from '../../lib/inventory/donorParts';
+import { getItemDonorParts, setItemDonorParts } from '../../lib/inventory/donorPartsService';
+import type { DonorPartInput } from '../../lib/inventory/donorPartsService';
+import { Wrench } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -140,6 +144,11 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
   const [itemNumber, setItemNumber] = useState<string>('');
   const [loadingNumber, setLoadingNumber] = useState(false);
 
+  // Donor parts state: maps part_type → { checked, quantity, condition_id }
+  const [donorPartChecked, setDonorPartChecked] = useState<Record<string, boolean>>({});
+  const [donorPartQty, setDonorPartQty] = useState<Record<string, number>>({});
+  const [donorPartCondition, setDonorPartCondition] = useState<Record<string, string>>({});
+
   // Catalogs
   const { options: deviceCatalogs, isLoading: catalogsLoading } = useDeviceFormCatalogs();
   const { data: deviceTypes, isLoading: dtLoading } = useInventoryDeviceTypes();
@@ -169,6 +178,20 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
         .select('id, name')
         .eq('is_active', true)
         .order('sort_order');
+      if (error) throw error;
+      return (data ?? []) as CatalogOption[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: conditionTypes = [] } = useQuery({
+    queryKey: ['master_inventory_condition_types'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('master_inventory_condition_types')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('rating', { ascending: false });
       if (error) throw error;
       return (data ?? []) as CatalogOption[];
     },
@@ -225,6 +248,10 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
       device_type_id: typeId,
     }));
     setErrors({});
+    // Reset donor parts when device type changes
+    setDonorPartChecked({});
+    setDonorPartQty({});
+    setDonorPartCondition({});
   }, [deviceTypes]);
 
   const setField = useCallback((key: string, value: unknown) => {
@@ -269,6 +296,26 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
           location_id: item.location_id ?? '',
           ...techForm,
         });
+
+        // Hydrate donor parts for edit mode
+        if (item.is_donor) {
+          try {
+            const existingParts = await getItemDonorParts(itemId);
+            const checkedMap: Record<string, boolean> = {};
+            const qtyMap: Record<string, number> = {};
+            const condMap: Record<string, string> = {};
+            for (const part of existingParts) {
+              checkedMap[part.part_type] = true;
+              qtyMap[part.part_type] = part.quantity;
+              condMap[part.part_type] = part.condition_id ?? '';
+            }
+            setDonorPartChecked(checkedMap);
+            setDonorPartQty(qtyMap);
+            setDonorPartCondition(condMap);
+          } catch (err) {
+            logger.error('InventoryItemWizard: error loading donor parts', err);
+          }
+        }
       } catch (err) {
         logger.error('InventoryItemWizard: error loading item', err);
       }
@@ -281,6 +328,9 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
       setForm(EMPTY_FORM);
       setErrors({});
       setItemNumber('');
+      setDonorPartChecked({});
+      setDonorPartQty({});
+      setDonorPartCondition({});
     }
   }, [isOpen, itemId]);
 
@@ -326,19 +376,39 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
         technical_details: technicalDetails,
       };
 
+      let savedItemId: string;
       if (isEdit && itemId) {
         await updateInventoryItem(itemId, basePayload);
+        savedItemId = itemId;
       } else {
         const tenantId = getTenantId();
         if (!tenantId) throw new Error('No tenant context. Please log in again.');
         // Fetch the real next number at submit time (the preview may be stale)
         const nextNumber = await getNextInventoryNumber(typeId);
-        await createInventoryItem({
+        const created = await createInventoryItem({
           ...basePayload,
           tenant_id: tenantId,
           item_number: nextNumber,
           qr_value: nextNumber,
         });
+        if (!created) throw new Error('Failed to create inventory item');
+        savedItemId = created.id;
+      }
+
+      // Persist donor parts when is_donor is checked
+      if (form.is_donor as boolean) {
+        const partsToSave: DonorPartInput[] = getDonorParts(family)
+          .filter(def => donorPartChecked[def.key])
+          .map(def => ({
+            part_type: def.key,
+            quantity: donorPartQty[def.key] ?? 1,
+            condition_id: donorPartCondition[def.key] || null,
+            notes: null,
+          }));
+        await setItemDonorParts(savedItemId, partsToSave);
+      } else if (isEdit && itemId) {
+        // If is_donor was unchecked on edit, clear all donor parts
+        await setItemDonorParts(savedItemId, []);
       }
 
       await queryClient.invalidateQueries({ queryKey: inventoryKeys.lists() });
@@ -584,6 +654,107 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                 </div>
               </div>
             </div>
+
+            {/* ── Section 3b: Donor Parts ──────────────────────── */}
+            {(form.is_donor as boolean) && getDonorParts(family).length > 0 && (
+              <div className="rounded-lg border border-border bg-surface-muted p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Wrench className="w-3.5 h-3.5 text-primary" />
+                  <h3 className={SECTION_HEAD}>Donor Parts Available</h3>
+                  <span className="text-xs text-slate-500 font-normal normal-case tracking-normal">
+                    — {family.toUpperCase()} parts
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+                  {getDonorParts(family).map(def => {
+                    const checked = donorPartChecked[def.key] ?? false;
+                    const qty = donorPartQty[def.key] ?? 1;
+                    const condId = donorPartCondition[def.key] ?? '';
+                    return (
+                      <div
+                        key={def.key}
+                        className={`rounded-md border p-3 transition-colors ${
+                          checked
+                            ? 'border-primary/40 bg-primary/5'
+                            : 'border-border bg-surface'
+                        }`}
+                      >
+                        {/* Part checkbox + label */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <input
+                            id={`donor-part-${def.key}`}
+                            type="checkbox"
+                            checked={checked}
+                            onChange={e => {
+                              setDonorPartChecked(prev => ({ ...prev, [def.key]: e.target.checked }));
+                            }}
+                            className="rounded border-border text-primary focus:ring-primary focus:ring-offset-0"
+                          />
+                          <label
+                            htmlFor={`donor-part-${def.key}`}
+                            className="text-sm font-medium text-slate-700 select-none cursor-pointer"
+                          >
+                            {def.label}
+                          </label>
+                        </div>
+                        {/* Quantity + condition (only when checked) */}
+                        {checked && (
+                          <div className="pl-5 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <label
+                                htmlFor={`donor-qty-${def.key}`}
+                                className="text-xs text-slate-500 w-14 shrink-0"
+                              >
+                                Qty
+                              </label>
+                              <input
+                                id={`donor-qty-${def.key}`}
+                                type="number"
+                                min="1"
+                                value={qty}
+                                onChange={e =>
+                                  setDonorPartQty(prev => ({
+                                    ...prev,
+                                    [def.key]: Math.max(1, parseInt(e.target.value) || 1),
+                                  }))
+                                }
+                                className="w-20 rounded border border-border bg-surface px-2 py-1 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary"
+                              />
+                            </div>
+                            {conditionTypes.length > 0 && (
+                              <div className="flex items-center gap-2">
+                                <label
+                                  htmlFor={`donor-cond-${def.key}`}
+                                  className="text-xs text-slate-500 w-14 shrink-0"
+                                >
+                                  Condition
+                                </label>
+                                <select
+                                  id={`donor-cond-${def.key}`}
+                                  value={condId}
+                                  onChange={e =>
+                                    setDonorPartCondition(prev => ({
+                                      ...prev,
+                                      [def.key]: e.target.value,
+                                    }))
+                                  }
+                                  className="flex-1 rounded border border-border bg-surface px-2 py-1 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary"
+                                >
+                                  <option value="">— optional —</option>
+                                  {conditionTypes.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* ── Section 4: Location ───────────────────────────── */}
             <div className="rounded-lg border border-border bg-surface-muted p-4 space-y-3">

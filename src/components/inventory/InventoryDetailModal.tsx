@@ -26,6 +26,12 @@ import { AssignToCaseModal } from './AssignToCaseModal';
 import { format } from 'date-fns';
 import { logger } from '../../lib/logger';
 import type { Database } from '../../types/database.types';
+import { getItemDonorParts } from '../../lib/inventory/donorPartsService';
+import { getDonorParts } from '../../lib/inventory/donorParts';
+import { resolveDeviceFamily } from '../../lib/devices/deviceFamily';
+import { useInventoryDeviceTypes } from '../../lib/inventory/inventoryCatalogQueries';
+import type { DonorPartRow } from '../../lib/inventory/donorPartsService';
+import { Wrench } from 'lucide-react';
 
 type InventoryItemRow = Database['public']['Tables']['inventory_items']['Row'];
 
@@ -58,6 +64,8 @@ export default function InventoryDetailModal({
   const [assignments, setAssignments] = useState<AssignmentWithDetails[]>([]);
   const [activeAssignment, setActiveAssignment] = useState<AssignmentWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  const [donorParts, setDonorParts] = useState<DonorPartRow[]>([]);
+  const { data: deviceTypes } = useInventoryDeviceTypes();
   const [showDefectiveModal, setShowDefectiveModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showAssignToCaseModal, setShowAssignToCaseModal] = useState(false);
@@ -110,6 +118,19 @@ export default function InventoryDetailModal({
       setActiveAssignment(activeAssignmentData);
       setCases(casesData || []);
       setAvailability(availabilityData);
+
+      // Load donor parts if this is a donor item
+      if (itemData.is_donor) {
+        try {
+          const parts = await getItemDonorParts(itemId);
+          setDonorParts(parts);
+        } catch (err) {
+          logger.error('Error loading donor parts:', err);
+          setDonorParts([]);
+        }
+      } else {
+        setDonorParts([]);
+      }
     } catch (error) {
       logger.error('Error loading inventory data:', error);
       setItem(null);
@@ -544,6 +565,36 @@ export default function InventoryDetailModal({
                   </div>
                 </dl>
               </Card>
+              {/* Donor Parts */}
+              {item.is_donor && donorParts.length > 0 && (() => {
+                const dt = deviceTypes?.find(d => d.id === item.device_type_id);
+                const family = resolveDeviceFamily(dt?.family ?? dt?.name ?? '');
+                const vocab = getDonorParts(family);
+                const labelByKey = new Map(vocab.map(p => [p.key, p.label]));
+                return (
+                  <Card className="p-4">
+                    <div className="flex items-center mb-3">
+                      <Wrench className="w-4 h-4 text-primary mr-2" />
+                      <h3 className="text-sm font-semibold text-slate-900">Donor Parts</h3>
+                      <span className="ml-2 text-xs text-slate-400">({donorParts.length})</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {donorParts.map(part => (
+                        <span
+                          key={part.id}
+                          title={part.quantity > 1 ? `Qty: ${part.quantity}` : undefined}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-xs font-medium text-primary"
+                        >
+                          {labelByKey.get(part.part_type) ?? part.part_type}
+                          {part.quantity > 1 && (
+                            <span className="text-primary/60">×{part.quantity}</span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  </Card>
+                );
+              })()}
           </div>
         </div>
       </Modal>
