@@ -145,6 +145,13 @@ const F = {
   raidLevel: text('raid_level', tj('raid_level'), 'RAID Level'),
   numDrives: num('num_drives', tj('num_drives'), 'Number of Drives'),
   fileSystem: text('file_system', tj('file_system'), 'File System'),
+  // New fields for NVMe / RAID / PCB / Head Stack
+  nandType: text('nand_type', tj('nand_type'), 'NAND Type'),
+  pcieGen: text('pcie_generation', tj('pcie_generation'), 'PCIe Generation'),
+  raidController: text('raid_controller', tj('raid_controller'), 'RAID Controller'),
+  pcbRevision: text('pcb_revision', tj('pcb_revision'), 'PCB Revision'),
+  compatibleModels: text('compatible_models', tj('compatible_models'), 'Compatible Models'),
+  firmwareFamily: text('firmware_family', tj('firmware_family'), 'Firmware Family'),
 };
 
 const REGISTRY: Record<DeviceFamily, { technical: DeviceFieldDef[]; components: DeviceFieldDef[] }> = {
@@ -153,7 +160,11 @@ const REGISTRY: Record<DeviceFamily, { technical: DeviceFieldDef[]; components: 
     components: [comp('heads', 'Heads'), comp('pcb', 'PCB'), comp('motor', 'Motor'), comp('surface', 'Read/Write Surface'), comp('service_area', 'Service Area (SA)')],
   },
   ssd: {
-    technical: [F.controller, F.firmware, F.dom, F.madeIn, F.pcb, F.encryption, F.chipset],
+    technical: [F.controller, F.firmware, F.nandType, F.pcb, F.chipset, F.encryption, F.dom, F.madeIn],
+    components: [comp('controller', 'Controller'), comp('memory_chips', 'NAND / Memory Chips'), comp('pcb', 'PCB')],
+  },
+  nvme: {
+    technical: [F.controller, F.pcieGen, F.firmware, F.nandType, F.pcb],
     components: [comp('controller', 'Controller'), comp('memory_chips', 'NAND / Memory Chips'), comp('pcb', 'PCB')],
   },
   usb_flash: {
@@ -169,7 +180,7 @@ const REGISTRY: Record<DeviceFamily, { technical: DeviceFieldDef[]; components: 
     components: [comp('pcb', 'Board / PCB'), comp('storage_chip', 'Storage Chip')],
   },
   raid: {
-    technical: [F.raidLevel, F.numDrives, F.controller, F.fileSystem, F.firmware],
+    technical: [F.raidLevel, F.raidController, F.numDrives, F.fileSystem, F.firmware],
     components: [comp('controller', 'Controller'),
       { key: 'technical_notes', labelKey: 'devices.field.technical_notes', labelFallback: 'Member Drive Notes', control: 'textarea', storage: dj('technical_notes'), colSpan: 2 }],
   },
@@ -177,6 +188,14 @@ const REGISTRY: Record<DeviceFamily, { technical: DeviceFieldDef[]; components: 
     technical: [F.raidLevel, F.numDrives, F.os, F.fileSystem, F.firmware],
     components: [comp('controller', 'Controller'),
       { key: 'technical_notes', labelKey: 'devices.field.technical_notes', labelFallback: 'Member Drive Notes', control: 'textarea', storage: dj('technical_notes'), colSpan: 2 }],
+  },
+  pcb: {
+    technical: [F.pcb, F.pcbRevision, F.compatibleModels, F.firmwareFamily],
+    components: [],
+  },
+  head_stack: {
+    technical: [F.headMap, F.heads, F.preAmp, F.compatibleModels],
+    components: [],
   },
   other: {
     technical: [F.madeIn, F.firmware, F.encryption, F.fileSystem],

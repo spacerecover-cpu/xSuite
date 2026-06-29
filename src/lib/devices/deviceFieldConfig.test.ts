@@ -4,7 +4,7 @@ import {
   BASIC_FIELDS, DIAGNOSTIC_FIELDS, getDeviceFamilyConfig, ALL_FIELD_DEFS, type DeviceFieldDef,
 } from './deviceFieldConfig';
 
-const FAMILIES = ['hdd','ssd','usb_flash','memory_card','mobile','raid','nas','other'] as const;
+const FAMILIES = ['hdd','ssd','nvme','usb_flash','memory_card','mobile','raid','nas','pcb','head_stack','other'] as const;
 
 const everyField = (): DeviceFieldDef[] => [
   ...BASIC_FIELDS, ...DIAGNOSTIC_FIELDS,
@@ -123,5 +123,84 @@ describe('deviceFieldConfig', () => {
       const f = DIAGNOSTIC_FIELDS.find(x => x.key === k)!;
       expect(f.staticOptions && f.staticOptions.length).toBeTruthy();
     }
+  });
+
+  // --- NEW: NVMe / PCB / Head Stack families ---
+  it('nvme config has expected technical field keys in order', () => {
+    const cfg = getDeviceFamilyConfig('nvme');
+    expect(cfg.technical.map(f => f.key)).toEqual([
+      'controller', 'pcie_generation', 'firmware_version', 'nand_type', 'pcb_number',
+    ]);
+  });
+
+  it('nvme config has expected component keys', () => {
+    const cfg = getDeviceFamilyConfig('nvme');
+    expect(cfg.components.map(f => f.key)).toEqual([
+      'controller_status', 'memory_chips_status', 'pcb_status',
+    ]);
+  });
+
+  it('pcb config technical keys include pcb_revision, compatible_models, firmware_family', () => {
+    const cfg = getDeviceFamilyConfig('pcb');
+    const keys = cfg.technical.map(f => f.key);
+    expect(keys).toContain('pcb_revision');
+    expect(keys).toContain('compatible_models');
+    expect(keys).toContain('firmware_family');
+  });
+
+  it('pcb config has empty components array', () => {
+    const cfg = getDeviceFamilyConfig('pcb');
+    expect(cfg.components).toHaveLength(0);
+  });
+
+  it('head_stack config technical keys include physical_head_map, head_count_id, pre_amp, compatible_models', () => {
+    const cfg = getDeviceFamilyConfig('head_stack');
+    const keys = cfg.technical.map(f => f.key);
+    expect(keys).toContain('physical_head_map');
+    expect(keys).toContain('head_count_id');
+    expect(keys).toContain('pre_amp');
+    expect(keys).toContain('compatible_models');
+  });
+
+  it('head_stack config has empty components array', () => {
+    const cfg = getDeviceFamilyConfig('head_stack');
+    expect(cfg.components).toHaveLength(0);
+  });
+
+  it('ssd technical field keys include nand_type after firmware upgrade', () => {
+    const cfg = getDeviceFamilyConfig('ssd');
+    const keys = cfg.technical.map(f => f.key);
+    expect(keys).toContain('nand_type');
+  });
+
+  it('ssd technical field keys match new spec exactly', () => {
+    const cfg = getDeviceFamilyConfig('ssd');
+    expect(cfg.technical.map(f => f.key)).toEqual([
+      'controller', 'firmware_version', 'nand_type', 'pcb_number', 'chipset', 'encryption_id', 'dom', 'made_in_id',
+    ]);
+  });
+
+  it('raid technical uses raidController (raid_controller) not generic controller', () => {
+    const cfg = getDeviceFamilyConfig('raid');
+    const keys = cfg.technical.map(f => f.key);
+    expect(keys).toContain('raid_controller');
+    expect(keys).not.toContain('controller');
+  });
+
+  it('raid technical field keys match new spec exactly', () => {
+    const cfg = getDeviceFamilyConfig('raid');
+    expect(cfg.technical.map(f => f.key)).toEqual([
+      'raid_level', 'raid_controller', 'num_drives', 'file_system', 'firmware_version',
+    ]);
+  });
+
+  it('ALL_FIELD_DEFS contains the new field keys', () => {
+    const keys = ALL_FIELD_DEFS.map(f => f.key);
+    expect(keys).toContain('nand_type');
+    expect(keys).toContain('pcie_generation');
+    expect(keys).toContain('raid_controller');
+    expect(keys).toContain('pcb_revision');
+    expect(keys).toContain('compatible_models');
+    expect(keys).toContain('firmware_family');
   });
 });
