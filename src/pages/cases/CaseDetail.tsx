@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
+import { Dialog } from '../../components/ui/Dialog';
 import { formatDate } from '../../lib/format';
 import { quotesService } from '../../lib/quotesService';
 import { invoiceService } from '../../lib/invoiceService';
@@ -48,6 +49,9 @@ import { useCaseModals } from '../../components/cases/detail/useCaseModals';
 import { useCaseQueries } from '../../components/cases/detail/useCaseQueries';
 import { useCaseMutations } from '../../components/cases/detail/useCaseMutations';
 import { isDocStudioEnabled } from '../../lib/featureFlags';
+import { DocumentDraftReview } from '../../components/cases/DocumentDraftReview';
+import { REPORT_TYPES, type ReportType } from '../../lib/reportTypes';
+import { documentInstanceKeys } from '../../lib/queryKeys';
 
 // Every tab except the default Overview is code-split (direct file imports, not
 // the barrel, so each panel gets its own chunk). CaseDetail was the heaviest
@@ -1389,6 +1393,61 @@ export const CaseDetail: React.FC = () => {
             </div>
           )}
         </Suspense>
+      )}
+
+      {/* Doc Studio — subtype picker + draft review modal (flag-gated) */}
+      {isDocStudioEnabled() && (
+        <>
+          {/* Subtype picker: list REPORT_TYPES so user can choose what to create */}
+          <Dialog
+            open={modals.showDocTypeSelector}
+            onClose={() => modals.setShowDocTypeSelector(false)}
+            label="New Document"
+            className="max-w-sm w-full"
+          >
+            <div className="p-6">
+              <h2 className="text-base font-semibold text-slate-900 mb-4">New Document</h2>
+              <div className="space-y-2">
+                {(Object.keys(REPORT_TYPES) as ReportType[]).map((key) => {
+                  const cfg = REPORT_TYPES[key];
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      className="w-full text-left px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+                      onClick={() => {
+                        modals.setDocCreateSubtype(key);
+                        modals.setShowDocTypeSelector(false);
+                      }}
+                    >
+                      {cfg.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </Dialog>
+
+          {/* Draft Review modal — create (docCreateSubtype set) or edit (editingDocumentId set) */}
+          <DocumentDraftReview
+            isOpen={!!(modals.editingDocumentId || modals.docCreateSubtype)}
+            onClose={() => {
+              modals.setEditingDocumentId(null);
+              modals.setDocCreateSubtype(null);
+            }}
+            caseId={id!}
+            instanceId={modals.editingDocumentId ?? undefined}
+            newSubtype={modals.docCreateSubtype ?? undefined}
+            newTitle={
+              modals.docCreateSubtype
+                ? REPORT_TYPES[modals.docCreateSubtype as ReportType]?.name
+                : undefined
+            }
+            onSaved={() =>
+              queryClient.invalidateQueries({ queryKey: documentInstanceKeys.byCase(id!) })
+            }
+          />
+        </>
       )}
 
     </DetailPageTemplate>

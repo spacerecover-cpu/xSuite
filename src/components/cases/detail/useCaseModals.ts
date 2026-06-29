@@ -52,6 +52,7 @@ export function useCaseModals() {
   const [showDocTypeSelector, setShowDocTypeSelector] = useState(false);
   const [editingDocumentId, setEditingDocumentId] = useState<string | null>(null);
   const [viewDocumentId, setViewDocumentId] = useState<string | null>(null);
+  const [docCreateSubtype, setDocCreateSubtype] = useState<string | null>(null);
 
   return {
     showCheckoutModal, setShowCheckoutModal,
@@ -96,5 +97,6 @@ export function useCaseModals() {
     showDocTypeSelector, setShowDocTypeSelector,
     editingDocumentId, setEditingDocumentId,
     viewDocumentId, setViewDocumentId,
+    docCreateSubtype, setDocCreateSubtype,
   };
 }
