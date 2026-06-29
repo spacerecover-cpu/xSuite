@@ -103,7 +103,6 @@ export const settingsKeys = {
   systemNumbers: () => ['settings', 'system-numbers'] as const,
   locales: () => ['settings', 'locales'] as const,
   portal: () => ['settings', 'portal'] as const,
-  reportSections: () => ['settings', 'report-sections'] as const,
   categoryCount: (categoryId: string) => ['settings', 'category-count', categoryId] as const,
   masterData: (table: string) => ['settings', 'master-data', table] as const,
   seedStatus: (categoryId: string) => ['settings', 'seed-status', categoryId] as const,
@@ -146,14 +145,6 @@ export const communicationKeys = {
   byCase: (caseId: string) => [...communicationKeys.all, 'case', caseId] as const,
   byCustomer: (customerId: string) =>
     [...communicationKeys.all, 'customer', customerId] as const,
-};
-
-export const reportKeys = {
-  all: ['case-reports'] as const,
-  hub: (filters: Record<string, unknown>) => [...reportKeys.all, 'hub', filters] as const,
-  templates: (reportType?: string) => [...reportKeys.all, 'templates', reportType ?? 'all'] as const,
-  templateSections: (templateId: string) =>
-    [...reportKeys.all, 'template-sections', templateId] as const,
 };
 
 export const templateKeys = {

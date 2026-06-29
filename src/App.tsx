@@ -135,7 +135,7 @@ const router = createBrowserRouter(
         <Route path="dashboard" lazy={page(() => import('./pages/portal/PortalDashboard'), 'PortalDashboard')} />
         <Route path="cases" lazy={page(() => import('./pages/portal/PortalCases'), 'PortalCases')} />
         <Route path="quotes" lazy={page(() => import('./pages/portal/PortalQuotes'), 'PortalQuotes')} />
-        <Route path="reports" lazy={page(() => import('./pages/portal/PortalReports'), 'default')} />
+        <Route path="reports" element={<Navigate to="/portal/documents" replace />} />
         <Route path="documents" lazy={page(() => import('./pages/portal/PortalDocuments'), 'PortalDocuments')} />
         <Route path="purchases" lazy={page(() => import('./pages/portal/PortalPurchasesPage'), 'PortalPurchasesPage')} />
         <Route path="payments" lazy={page(() => import('./pages/portal/PortalPayments'), 'PortalPayments')} />
@@ -258,7 +258,7 @@ const router = createBrowserRouter(
             <Route path="client-portal" lazy={page(() => import('./pages/settings/ClientPortalSettings'), 'ClientPortalSettings')} />
             <Route path="billing" lazy={page(() => import('./pages/settings/BillingPage'), 'default')} />
             <Route path="plans" lazy={page(() => import('./pages/settings/PlansPage'), 'default')} />
-<Route path="documents" lazy={page(() => import('./pages/settings/DocumentTemplatesPage'), 'DocumentTemplatesPage')} />
+            <Route path="documents" lazy={page(() => import('./pages/settings/DocumentTemplatesPage'), 'DocumentTemplatesPage')} />
             <Route path="security" lazy={page(() => import('./pages/settings/SecuritySettingsPage'), 'SecuritySettingsPage')} />
             <Route path="gdpr" lazy={page(() => import('./pages/settings/GDPRCompliancePage'), 'GDPRCompliancePage')} />
             <Route path=":categoryId" lazy={page(() => import('./pages/settings/CategoryDetail'), 'CategoryDetail')} />

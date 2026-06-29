@@ -12,4 +12,5 @@ export const BANNED_TABLES = [
   'template_categories', 'template_types', 'template_variables', 'modules',
   'countries', 'cities',
   'report_section_library', 'report_section_presets', 'report_template_section_mappings',
+  'case_reports', 'case_report_sections', 'master_case_report_templates',
 ];
