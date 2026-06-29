@@ -15,6 +15,7 @@
 
 import type { Content } from 'pdfmake/interfaces';
 import { PDF_COLORS, createBilingualInfoBox } from '../../styles';
+import { resolveBandFill } from '../branding';
 import { safeString } from '../../utils';
 import { getGeneralIconSvg } from '../../../deviceIconMapper';
 import type {
@@ -65,6 +66,7 @@ export const renderCaseInfo: SectionRenderer = (
     bilingual ? ar(caseInfo.title, language) : null,
     rows,
     fileIcon,
+    resolveBandFill(engine.config),
   ) as Content;
 
   return { stack: [box], margin: [0, 0, 0, 8] };

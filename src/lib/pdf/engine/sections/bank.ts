@@ -14,6 +14,7 @@ import type { Content } from 'pdfmake/interfaces';
 import { PDF_COLORS } from '../../styles';
 import { safeString } from '../../utils';
 import { isBilingualMode, en, ar } from '../labels';
+import { resolveBandFill } from '../branding';
 import { resolveSecondary } from '../../templateConfig';
 import type { BankBlock, EngineContext, EngineDocData, SectionRenderer } from '../types';
 
@@ -92,7 +93,7 @@ export function buildBankBox(bank: BankBlock, engine: EngineContext): Content {
   const headerCell: Content = {
     columns: headerColumns,
     columnGap: 6,
-    fillColor: PDF_COLORS.background,
+    fillColor: resolveBandFill(engine.config),
     margin: [6, 4, 6, 4],
   } as Content;
 

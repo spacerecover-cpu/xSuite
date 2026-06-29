@@ -59,6 +59,17 @@ function collectLineColors(node: unknown, out: string[]): void {
   for (const value of Object.values(obj)) collectLineColors(value, out);
 }
 
+function collectFills(node: unknown, out: string[]): void {
+  if (node == null || typeof node !== 'object') return;
+  if (Array.isArray(node)) {
+    for (const child of node) collectFills(child, out);
+    return;
+  }
+  const obj = node as Record<string, unknown>;
+  if (typeof obj.fillColor === 'string') out.push(obj.fillColor);
+  for (const value of Object.values(obj)) collectFills(value, out);
+}
+
 function collectText(node: unknown, out: string[]): void {
   if (node == null || typeof node !== 'object') return;
   if (Array.isArray(node)) {
@@ -121,6 +132,29 @@ describe('renderTemplate — colors group', () => {
     collectLineColors(def.content, lineColors);
     expect(lineColors).toContain(GREEN);
     expect(findTextColor(def.content, 'TAX INVOICE')).toBe(GREEN);
+  });
+
+  it('info-box bands default to the neutral shade (parity)', () => {
+    const def = renderTemplate(BUILT_IN_TEMPLATE_CONFIGS.invoice, makeData(), englishCtx, null, null);
+    const fills: string[] = [];
+    collectFills(def.content, fills);
+    expect(fills).toContain(PDF_COLORS.background); // band fill unchanged by default
+  });
+
+  it('info-box bands follow colors.headerBackground, keeping the heading readable', () => {
+    // White accent on the default light band would vanish → readable fallback.
+    const light = resolveTemplateConfig(BUILT_IN_TEMPLATE_CONFIGS.invoice, undefined, { colors: { accent: '#ffffff' } });
+    expect(styleColor(renderTemplate(light, makeData(), englishCtx, null, null), 'bilingualHeader')).not.toBe('#ffffff');
+
+    // A coloured header background fills the bands; the white accent now contrasts.
+    const blue = resolveTemplateConfig(BUILT_IN_TEMPLATE_CONFIGS.invoice, undefined, {
+      colors: { accent: '#ffffff', headerBackground: '#0080ff' },
+    });
+    const def = renderTemplate(blue, makeData(), englishCtx, null, null);
+    const fills: string[] = [];
+    collectFills(def.content, fills);
+    expect(fills).toContain('#0080ff'); // band fill = headerBackground
+    expect(styleColor(def, 'bilingualHeader')).toBe('#ffffff'); // accent readable on blue
   });
 });
 

@@ -526,7 +526,8 @@ export function createBilingualInfoBox(
   englishTitle: string,
   arabicTitle: string | null,
   content: object[],
-  iconSvg?: string
+  iconSvg?: string,
+  bandFill: string = PDF_COLORS.background,
 ): object {
   return {
     table: {
@@ -541,7 +542,7 @@ export function createBilingualInfoBox(
               arabicTitle ? { text: arabicTitle, style: 'bilingualHeader', alignment: 'right', width: 'auto' } : { text: '', width: 0 },
             ],
             columnGap: 6,
-            fillColor: PDF_COLORS.background,
+            fillColor: bandFill,
             margin: [6, 4, 6, 4],
           },
         ],

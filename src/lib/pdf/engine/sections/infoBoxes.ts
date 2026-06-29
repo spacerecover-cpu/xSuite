@@ -21,6 +21,7 @@ import type {
   SectionRenderer,
 } from '../types';
 import { isBilingualMode, en, ar, resolveLabel, fieldLabelLanguage } from '../labels';
+import { resolveBandFill } from '../branding';
 import { engineLayoutDirection } from '../rtl';
 
 function infoRow(
@@ -78,6 +79,7 @@ function partyBox(
     bilingual ? ar(party.title, language) : null,
     partyRows(party, labelLang),
     iconSvg,
+    resolveBandFill(engine.config),
   ) as Content;
 }
 
@@ -115,6 +117,7 @@ function buildMetaBox(engine: EngineContext, data: EngineDocData): Content | nul
     bilingual ? ar(metaTitle, language) : null,
     metaRows(engine, data),
     getGeneralIconSvg('fileText'),
+    resolveBandFill(engine.config),
   ) as Content;
 }
 
@@ -248,6 +251,7 @@ export function renderPartiesMeta(
           bilingual ? ar(details!.title, language) : null,
           details!.rows,
           getGeneralIconSvg('fileText'),
+          resolveBandFill(engine.config),
         ) as Content,
       ],
       margin: [0, 0, 0, 8],
@@ -255,7 +259,7 @@ export function renderPartiesMeta(
   }
   if (!details) return renderParties(engine, data);
 
-  const band = PDF_COLORS.background;
+  const band = resolveBandFill(engine.config);
 
   const partyHeaderCell = {
     ...bandHeaderColumns(partyIcon, en(party.title), bilingual ? ar(party.title, language) : null),

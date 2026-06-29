@@ -46,6 +46,11 @@ export function relativeLuminance(hex: string): number {
   return 0.2126 * channelLuminance(rgb[0]) + 0.7152 * channelLuminance(rgb[1]) + 0.0722 * channelLuminance(rgb[2]);
 }
 
+/** Pick the more readable of white / dark body text for a given background fill. */
+export function readableTextOn(bg: string): string {
+  return contrastRatio('#ffffff', bg) >= contrastRatio(PDF_COLORS.text, bg) ? '#ffffff' : PDF_COLORS.text;
+}
+
 /** WCAG 2.1 contrast ratio (1–21). Malformed input → 1 (worst), never throws. */
 export function contrastRatio(a: string, b: string): number {
   if (!isHex(a) || !isHex(b)) return 1;

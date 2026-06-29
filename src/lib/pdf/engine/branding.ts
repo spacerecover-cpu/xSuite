@@ -148,6 +148,15 @@ export function resolveColors(config: {
   };
 }
 
+/**
+ * Fill behind an info-box header band. Follows the opt-in `colors.headerBackground`
+ * (so the Studio "Header background" colours the info-box bands like the table
+ * header), else the neutral subtle shade — keeping the default look unchanged.
+ */
+export function resolveBandFill(config: { colors?: ColorsConfig }): string {
+  return normalizeHex(config.colors?.headerBackground) ?? PDF_COLORS.background;
+}
+
 export interface ResolvedTypography {
   fontFamily: string;
   /** The clamped base font scale (1 when absent) — applied to inline content too. */

@@ -29,11 +29,13 @@ import { buildReportPageFooter } from './sections/reportFooter';
 import { engineLayoutDirection, engineDefaultFont } from './rtl';
 import {
   resolveColors,
+  resolveBandFill,
   resolvePageFitting,
   resolvePageNumbers,
   resolveTypography,
   resolveWatermarkSettings,
 } from './branding';
+import { contrastRatio, readableTextOn } from './palette';
 
 /** Spacing/size multiplier per density preset (comfortable = identity/legacy). */
 const DENSITY_SCALE: Record<'comfortable' | 'compact' | 'dense', number> = {
@@ -232,7 +234,15 @@ export function renderTemplate(
   // byte-for-byte unchanged.
   const colors = resolveColors(config);
   styles.sectionTitle = { ...styles.sectionTitle, color: colors.accent };
-  styles.bilingualHeader = { ...styles.bilingualHeader, color: colors.accent };
+  // The info-box band heading sits on the band fill (the opt-in header background,
+  // else the neutral shade). Use the accent when it's readable on that fill, else
+  // an auto-contrast colour — so a light accent (e.g. white) on a coloured band
+  // stays legible instead of vanishing.
+  const bandFill = resolveBandFill(config);
+  styles.bilingualHeader = {
+    ...styles.bilingualHeader,
+    color: contrastRatio(colors.accent, bandFill) >= 3 ? colors.accent : readableTextOn(bandFill),
+  };
   if (config.colors) {
     styles.value = { ...styles.value, color: colors.text };
     styles.valueBold = { ...styles.valueBold, color: colors.text };
