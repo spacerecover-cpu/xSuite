@@ -5449,6 +5449,7 @@ export type Database = {
           instance_overrides: Json
           invoice_id: string | null
           is_latest: boolean
+          legacy_case_report_id: string | null
           pdf_generated_at: string | null
           pdf_sha256: string | null
           pdf_storage_bucket: string | null
@@ -5492,6 +5493,7 @@ export type Database = {
           instance_overrides?: Json
           invoice_id?: string | null
           is_latest?: boolean
+          legacy_case_report_id?: string | null
           pdf_generated_at?: string | null
           pdf_sha256?: string | null
           pdf_storage_bucket?: string | null
@@ -5535,6 +5537,7 @@ export type Database = {
           instance_overrides?: Json
           invoice_id?: string | null
           is_latest?: boolean
+          legacy_case_report_id?: string | null
           pdf_generated_at?: string | null
           pdf_sha256?: string | null
           pdf_storage_bucket?: string | null
