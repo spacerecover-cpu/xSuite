@@ -49,6 +49,9 @@ export function useCaseModals() {
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailPdfBlob, setEmailPdfBlob] = useState<Blob | null>(null);
   const [emailPdfFilename, setEmailPdfFilename] = useState<string>('');
+  const [showDocTypeSelector, setShowDocTypeSelector] = useState(false);
+  const [editingDocumentId, setEditingDocumentId] = useState<string | null>(null);
+  const [viewDocumentId, setViewDocumentId] = useState<string | null>(null);
 
   return {
     showCheckoutModal, setShowCheckoutModal,
@@ -90,5 +93,8 @@ export function useCaseModals() {
     showEmailModal, setShowEmailModal,
     emailPdfBlob, setEmailPdfBlob,
     emailPdfFilename, setEmailPdfFilename,
+    showDocTypeSelector, setShowDocTypeSelector,
+    editingDocumentId, setEditingDocumentId,
+    viewDocumentId, setViewDocumentId,
   };
 }

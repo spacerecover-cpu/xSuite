@@ -5,6 +5,14 @@ import { invoiceService } from '@/lib/invoiceService';
 import { getCaseFinancialSummary } from '@/lib/caseFinanceService';
 import { type ReportType, type ReportStatus } from '@/lib/reportTypes';
 import { logger } from '../../../lib/logger';
+import { listDocumentInstances } from '../../../lib/documentInstanceService';
+import { documentInstanceKeys } from '../../../lib/queryKeys';
+
+/** Extracted so the query fn is unit-testable without a React render. */
+export async function fetchCaseDocuments(caseId: string | undefined) {
+  if (!caseId) return [];
+  return listDocumentInstances(caseId);
+}
 
 export function useCaseQueries(
   id: string | undefined,
@@ -355,6 +363,12 @@ export function useCaseQueries(
     enabled: !!id,
   });
 
+  const { data: documentInstances = [] } = useQuery({
+    queryKey: documentInstanceKeys.byCase(id ?? ''),
+    queryFn: () => fetchCaseDocuments(id),
+    enabled: !!id,
+  });
+
   const { data: caseEngineers = [] } = useQuery({
     queryKey: ['case_engineers', id],
     queryFn: async () => {
@@ -452,6 +466,7 @@ export function useCaseQueries(
     invoices,
     caseFinancialSummary,
     reports,
+    documentInstances,
     caseEngineers,
     portalSettings,
     notes,

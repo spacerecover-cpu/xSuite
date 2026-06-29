@@ -47,6 +47,7 @@ import { ContentLoadingFallback } from '../../components/shared/ContentLoadingFa
 import { useCaseModals } from '../../components/cases/detail/useCaseModals';
 import { useCaseQueries } from '../../components/cases/detail/useCaseQueries';
 import { useCaseMutations } from '../../components/cases/detail/useCaseMutations';
+import { isDocStudioEnabled } from '../../lib/featureFlags';
 
 // Every tab except the default Overview is code-split (direct file imports, not
 // the barrel, so each panel gets its own chunk). CaseDetail was the heaviest
@@ -66,8 +67,11 @@ const CaseEngineersTab = lazyWithRetry(() => import('../../components/cases/deta
 const CaseRecoveryQaTab = lazyWithRetry(() => import('../../components/cases/detail/CaseRecoveryQaTab').then(m => ({ default: m.CaseRecoveryQaTab })));
 const CaseNotesTab = lazyWithRetry(() => import('../../components/cases/detail/CaseNotesTab').then(m => ({ default: m.CaseNotesTab })));
 const CasePortalTab = lazyWithRetry(() => import('../../components/cases/detail/CasePortalTab').then(m => ({ default: m.CasePortalTab })));
+const CaseDocumentsTab = React.lazy(() =>
+  import('../../components/cases/detail/CaseDocumentsTab').then((m) => ({ default: m.CaseDocumentsTab })),
+);
 
-type TabType = 'overview' | 'client' | 'devices' | 'clones' | 'reports' | 'quotes' | 'communications' | 'files' | 'engineers' | 'recovery_qa' | 'notes' | 'portal' | 'history' | 'stock';
+type TabType = 'overview' | 'client' | 'devices' | 'clones' | 'reports' | 'documents' | 'quotes' | 'communications' | 'files' | 'engineers' | 'recovery_qa' | 'notes' | 'portal' | 'history' | 'stock';
 
 export const CaseDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -83,6 +87,7 @@ export const CaseDetail: React.FC = () => {
     caseData, isLoading, caseError,
     caseStatuses, devices, cloneDrives, attachments,
     quotes, invoices, caseFinancialSummary, reports,
+    documentInstances,
     caseEngineers, portalSettings, notes,
   } = useCaseQueries(id, {
     reportTypeFilter: modals.reportTypeFilter,
@@ -254,6 +259,7 @@ export const CaseDetail: React.FC = () => {
     { id: 'devices', label: 'Devices', icon: HardDrive },
     { id: 'clones', label: 'Clone Drives', icon: Copy },
     { id: 'reports', label: 'Reports', icon: FileText },
+    ...(isDocStudioEnabled() ? [{ id: 'documents', label: 'Documents', icon: FileStack }] : []),
     { id: 'quotes', label: 'Quotes/Invoices', icon: DollarSign },
     { id: 'communications', label: 'Communications', icon: Mail },
     { id: 'stock', label: 'Backup Devices', icon: Package },
@@ -1197,6 +1203,26 @@ export const CaseDetail: React.FC = () => {
               onSetShowLatestOnly={modals.setShowLatestOnly}
               onSetViewReportId={modals.setViewReportId}
               onSetEditingReport={modals.setEditingReport}
+            />
+          )}
+
+
+          {/* Documents Tab (Doc Studio — flag-gated) */}
+          {activeTab === 'documents' && (
+            <CaseDocumentsTab
+              documents={(documentInstances || []).map((d) => ({
+                id: d.id,
+                title: d.title,
+                document_number: d.document_number,
+                report_subtype: d.report_subtype,
+                status: d.status,
+                version_number: d.version_number,
+                visible_to_customer: d.visible_to_customer,
+                created_at: d.created_at,
+              }))}
+              onNewDocument={() => modals.setShowDocTypeSelector(true)}
+              onView={(id) => modals.setViewDocumentId(id)}
+              onEdit={(id) => modals.setEditingDocumentId(id)}
             />
           )}
 
