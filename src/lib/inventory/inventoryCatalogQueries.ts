@@ -13,6 +13,7 @@ export interface InventoryDeviceType {
   family: string | null;
   default_category_id: string | null;
   inventory_prefix: string | null;
+  inventory_padding: number;
   icon: string | null;
   is_inventory_tracked: boolean;
 }
@@ -41,7 +42,7 @@ export function useInventoryDeviceTypes() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('catalog_device_types')
-        .select('id, name, family, default_category_id, inventory_prefix, icon, is_inventory_tracked')
+        .select('id, name, family, default_category_id, inventory_prefix, inventory_padding, icon, is_inventory_tracked')
         .eq('is_active', true)
         .order('name');
       if (error) throw error;

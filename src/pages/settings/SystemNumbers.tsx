@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
@@ -7,7 +8,7 @@ import { Input } from '../../components/ui/Input';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/ui/Badge';
-import { ChevronLeft, Hash, Search } from 'lucide-react';
+import { ChevronLeft, Hash, Search, ArrowRight } from 'lucide-react';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
 
@@ -19,7 +20,6 @@ type SequenceScope =
   | 'expense'
   | 'asset'
   | 'proforma_invoice'
-  | 'inventory'
   | 'transfer'
   | 'deposit'
   | 'company'
@@ -61,7 +61,6 @@ const SEQUENCE_CONFIG = [
   { key: 'company', label: 'Company Number', description: 'Corporate client IDs', category: 'Business Partners', color: '#0ea5e9' },
   { key: 'supplier', label: 'Supplier Number', description: 'Vendor/supplier IDs', category: 'Business Partners', color: '#14b8a6' },
   { key: 'asset', label: 'Asset Number', description: 'Company asset tracking', category: 'Inventory', color: 'rgb(var(--color-accent))' },
-  { key: 'inventory', label: 'Inventory Number', description: 'Inventory item tracking', category: 'Inventory', color: 'rgb(var(--color-accent))' },
   { key: 'clone_drive', label: 'Clone ID', description: 'Physical clone drive resources', category: 'Inventory', color: '#3b82f6' },
   { key: 'stock', label: 'Stock Number', description: 'Stock item management', category: 'Inventory', color: 'rgb(var(--color-accent))' },
   { key: 'purchase_order', label: 'Purchase Order Number', description: 'Supplier purchase orders', category: 'Operations', color: '#d946ef' },
@@ -233,6 +232,20 @@ export const SystemNumbers: React.FC = () => {
                 Number Sequences ({filteredSequenceTypes.length})
               </h2>
               <p className="text-slate-500">Configure prefixes and current numbers for automatic numbering</p>
+              <div className="mt-3 flex items-center gap-2 text-sm text-slate-500 bg-info-muted border border-info/20 rounded-lg px-4 py-2.5">
+                <Hash className="w-4 h-4 text-info shrink-0" />
+                <span>
+                  <strong className="font-medium text-slate-700">Inventory item numbers</strong> are now configured
+                  per device type.{' '}
+                  <Link
+                    to="/settings/inventory"
+                    className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
+                  >
+                    Manage Inventory Number Sequences
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </span>
+              </div>
             </div>
 
             {isLoading ? (

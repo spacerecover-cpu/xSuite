@@ -1,19 +1,43 @@
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Package, Check, Loader2 } from 'lucide-react';
+import { ChevronLeft, Package, Check, Loader2, Hash, Pencil, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Modal } from '../../components/ui/Modal';
+import { Badge } from '../../components/ui/Badge';
 import { HierarchicalLocationPicker } from '../../components/inventory/HierarchicalLocationPicker';
 import { useInventoryDeviceTypes, useInventoryLocations } from '../../lib/inventory/inventoryCatalogQueries';
+import type { InventoryDeviceType } from '../../lib/inventory/inventoryCatalogQueries';
 import {
   useDeviceTypeSettings,
   setDeviceTypeDefaultLocation,
   deviceTypeSettingsQueryKey,
 } from '../../lib/inventory/deviceTypeSettingsService';
+import {
+  useInventorySequences,
+  updateInventorySequence,
+  formatNextNumber,
+  formatCurrentNumber,
+  INVENTORY_SEQUENCES_QUERY_KEY,
+} from '../../lib/inventory/inventorySequenceService';
+import { logger } from '../../lib/logger';
+import type { Database } from '../../types/database.types';
+
+type NumberSequenceRow = Database['public']['Tables']['number_sequences']['Row'];
 
 const MANAGER_ROLES = ['owner', 'admin', 'manager'] as const;
+
+interface SequenceEditState {
+  deviceType: InventoryDeviceType;
+  sequence: NumberSequenceRow | null;
+  prefix: string;
+  padding: number;
+  resetAnnually: boolean;
+}
 
 export default function InventorySettingsPage() {
   const navigate = useNavigate();
@@ -26,9 +50,13 @@ export default function InventorySettingsPage() {
   const { data: deviceTypes = [], isLoading: dtLoading } = useInventoryDeviceTypes();
   const { data: locations = [], isLoading: locLoading } = useInventoryLocations();
   const { data: settingsMap, isLoading: settingsLoading } = useDeviceTypeSettings();
+  const { data: sequences = [], isLoading: seqLoading } = useInventorySequences();
 
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [saved, setSaved] = useState<Record<string, boolean>>({});
+
+  const [editModal, setEditModal] = useState<SequenceEditState | null>(null);
+  const [seqSaving, setSeqSaving] = useState(false);
 
   const isLoading = dtLoading || locLoading || settingsLoading;
 
@@ -47,6 +75,45 @@ export default function InventorySettingsPage() {
     }
   };
 
+  const openSequenceEdit = (dt: InventoryDeviceType) => {
+    const existing = sequences.find(s => s.scope === `inventory:${dt.id}`) ?? null;
+    const defaultPrefix = dt.inventory_prefix ?? dt.name.replace(/\s+/g, '').toUpperCase().slice(0, 4);
+    const defaultPadding = dt.inventory_padding ?? 4;
+    setEditModal({
+      deviceType: dt,
+      sequence: existing,
+      prefix: existing?.prefix ?? defaultPrefix,
+      padding: existing?.padding ?? defaultPadding,
+      resetAnnually: existing?.reset_annually ?? false,
+    });
+  };
+
+  const handleSequenceSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editModal) return;
+    setSeqSaving(true);
+    try {
+      await updateInventorySequence(
+        editModal.deviceType.id,
+        editModal.prefix,
+        editModal.padding,
+        editModal.resetAnnually,
+      );
+      await queryClient.invalidateQueries({ queryKey: INVENTORY_SEQUENCES_QUERY_KEY });
+      toast.success('Inventory sequence updated.');
+      setEditModal(null);
+    } catch (err) {
+      logger.error('Failed to update inventory sequence:', err);
+      toast.error('Failed to update sequence.');
+    } finally {
+      setSeqSaving(false);
+    }
+  };
+
+  const previewNext = editModal
+    ? formatNextNumber(editModal.prefix || 'PREFIX', (editModal.sequence?.current_value ?? 0), editModal.padding)
+    : '';
+
   return (
     <div className="min-h-screen">
       <div className="mb-6 flex items-center gap-3">
@@ -64,13 +131,14 @@ export default function InventorySettingsPage() {
           <div>
             <h1 className="text-xl font-bold text-slate-900 mb-0.5">Inventory Settings</h1>
             <p className="text-slate-600 text-sm">
-              Configure default storage locations per device type.
+              Configure default locations and number sequences per device type.
             </p>
           </div>
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-surface p-6">
+      {/* Default Locations Section */}
+      <div className="rounded-xl border border-border bg-surface p-6 mb-6">
         <div className="mb-4">
           <h2 className="text-base font-semibold text-slate-900">Device Type Default Locations</h2>
           <p className="text-sm text-slate-500 mt-0.5">
@@ -147,6 +215,226 @@ export default function InventorySettingsPage() {
           </div>
         )}
       </div>
+
+      {/* Inventory Number Sequences Section */}
+      <div className="rounded-xl border border-border bg-surface p-6">
+        <div className="mb-4 flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0 mt-0.5">
+            <Hash className="w-4 h-4 text-accent" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Inventory Number Sequences</h2>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Configure the prefix and padding for inventory item numbers per device type.
+              Numbers are allocated atomically when items are created.
+            </p>
+          </div>
+        </div>
+
+        {seqLoading || dtLoading ? (
+          <div className="space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : deviceTypes.length === 0 ? (
+          <p className="text-sm text-slate-400 py-6 text-center">No device types configured.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm" role="table" aria-label="Inventory number sequences per device type">
+              <thead>
+                <tr className="border-b border-border">
+                  <th scope="col" className="text-left py-2.5 pr-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Device Type
+                  </th>
+                  <th scope="col" className="text-left py-2.5 pr-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Prefix
+                  </th>
+                  <th scope="col" className="text-left py-2.5 pr-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Current
+                  </th>
+                  <th scope="col" className="text-left py-2.5 pr-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Next
+                  </th>
+                  <th scope="col" className="text-left py-2.5 pr-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Padding
+                  </th>
+                  <th scope="col" className="text-left py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  {canEdit && (
+                    <th scope="col" className="text-right py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {deviceTypes.map(dt => {
+                  const seq = sequences.find(s => s.scope === `inventory:${dt.id}`) ?? null;
+                  const effectivePrefix = seq?.prefix ?? dt.inventory_prefix ?? dt.name.replace(/\s+/g, '').toUpperCase().slice(0, 4);
+                  const effectivePadding = seq?.padding ?? dt.inventory_padding ?? 4;
+                  const currentValue = seq?.current_value ?? 0;
+                  const hasStarted = currentValue > 0;
+                  const isSeeded = seq !== null;
+
+                  return (
+                    <tr key={dt.id} className="group hover:bg-slate-50/70 transition-colors">
+                      <td className="py-3 pr-4">
+                        <div>
+                          <span className="font-medium text-slate-800">{dt.name}</span>
+                          {dt.family && (
+                            <span className="ml-2 text-xs text-slate-400 capitalize">{dt.family}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 pr-4 font-mono text-slate-700">{effectivePrefix}</td>
+                      <td className="py-3 pr-4 font-mono text-slate-500">
+                        {hasStarted
+                          ? formatCurrentNumber(effectivePrefix, currentValue, effectivePadding)
+                          : <span className="text-slate-400">—</span>}
+                      </td>
+                      <td className="py-3 pr-4">
+                        <Badge variant="success" size="sm" className="font-mono">
+                          {formatNextNumber(effectivePrefix, currentValue, effectivePadding)}
+                        </Badge>
+                      </td>
+                      <td className="py-3 pr-4 text-slate-600">{effectivePadding}</td>
+                      <td className="py-3">
+                        {isSeeded ? (
+                          hasStarted ? (
+                            <Badge variant="info" size="sm">Active</Badge>
+                          ) : (
+                            <Badge variant="secondary" size="sm">Configured</Badge>
+                          )
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+                            <AlertCircle className="w-3 h-3" />
+                            Not started
+                          </span>
+                        )}
+                      </td>
+                      {canEdit && (
+                        <td className="py-3 text-right">
+                          <button
+                            onClick={() => openSequenceEdit(dt)}
+                            className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                            aria-label={`Edit sequence for ${dt.name}`}
+                            title={`Edit sequence for ${dt.name}`}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Edit Sequence Modal */}
+      <Modal
+        isOpen={editModal !== null}
+        onClose={() => setEditModal(null)}
+        title={editModal ? `Edit Sequence — ${editModal.deviceType.name}` : ''}
+      >
+        {editModal && (
+          <form onSubmit={handleSequenceSave} className="space-y-6">
+            <div>
+              <label htmlFor="seq-prefix" className="block text-sm font-semibold text-slate-700 mb-2">
+                Prefix
+              </label>
+              <Input
+                id="seq-prefix"
+                value={editModal.prefix}
+                onChange={e => setEditModal(prev => prev ? { ...prev, prefix: e.target.value.toUpperCase() } : prev)}
+                placeholder="e.g. HDD"
+                className="font-mono"
+                autoFocus
+              />
+              <p className="text-xs text-slate-500 mt-1.5">
+                Appears before the number — e.g. <span className="font-semibold">HDD</span>-0001
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="seq-padding" className="block text-sm font-semibold text-slate-700 mb-2">
+                Number Padding
+              </label>
+              <Input
+                id="seq-padding"
+                type="number"
+                value={editModal.padding}
+                onChange={e =>
+                  setEditModal(prev =>
+                    prev
+                      ? { ...prev, padding: Math.max(1, Math.min(10, parseInt(e.target.value) || 4)) }
+                      : prev,
+                  )
+                }
+                min={1}
+                max={10}
+                className="font-mono"
+              />
+              <p className="text-xs text-slate-500 mt-1.5">
+                Preview next number:{' '}
+                <span className="font-semibold font-mono">{previewNext}</span>
+              </p>
+            </div>
+
+            {editModal.sequence && (
+              <div className="rounded-lg bg-slate-50 border border-border p-3 text-xs text-slate-500">
+                <span className="font-semibold text-slate-700">Current:</span>{' '}
+                {(editModal.sequence.current_value ?? 0) === 0
+                  ? 'No items allocated yet'
+                  : formatCurrentNumber(editModal.prefix, editModal.sequence.current_value ?? 0, editModal.padding)}
+                {' '}— current value is read-only; numbers are allocated atomically when inventory items are created.
+              </div>
+            )}
+
+            {!editModal.sequence && (
+              <div className="rounded-lg bg-info-muted border border-info/20 p-3 text-xs text-slate-600">
+                No sequence row exists yet for this device type. Saving will create it. The first inventory item
+                created for <span className="font-semibold">{editModal.deviceType.name}</span> will receive
+                number <span className="font-mono font-semibold">{previewNext}</span>.
+              </div>
+            )}
+
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="seq-reset"
+                checked={editModal.resetAnnually}
+                onChange={e => setEditModal(prev => prev ? { ...prev, resetAnnually: e.target.checked } : prev)}
+                className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+              />
+              <label htmlFor="seq-reset" className="text-sm font-medium text-slate-700">
+                Reset numbering annually
+              </label>
+            </div>
+
+            <div className="flex gap-3 justify-end pt-4 border-t border-border">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setEditModal(null)}
+                disabled={seqSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={seqSaving || !editModal.prefix.trim()}
+              >
+                {seqSaving ? 'Saving…' : 'Save Sequence'}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 }

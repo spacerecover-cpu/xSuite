@@ -127,7 +127,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     borderColor: '#2563eb',
     tables: [],
     actionLabel: 'Configure',
-    description: 'Set the default storage location pre-filled per device type when adding inventory items.',
+    description: 'Set default storage locations and configure inventory number sequences per device type.',
   },
   {
     id: 'case-service',
