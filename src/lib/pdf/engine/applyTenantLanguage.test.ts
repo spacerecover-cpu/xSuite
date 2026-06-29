@@ -168,6 +168,17 @@ describe('applyTenantLanguage', () => {
     expect(out.language.mode).toBe('bilingual_stacked');
     expect(out.language.primary).toBe('en');
   });
+
+  it('an EXPLICIT "English Only" template overrides a bilingual tenant default', () => {
+    // The template's English-only is indistinguishable from the built-in default
+    // by value, so `languageExplicit` carries the user's intent: it must win over
+    // the tenant's bilingual setting (the per-template picker overrides the workspace).
+    const englishCfg = baseConfig(); // { mode: 'en', primary: 'en' }
+    const tenant = settings({ mode: 'bilingual', secondary_language: 'it', language_name: 'Italian' });
+    expect(applyTenantLanguage(englishCfg, tenant, /* explicit */ true).language.mode).toBe('en');
+    // …but without the explicit flag (unconfigured template) it still falls back.
+    expect(applyTenantLanguage(englishCfg, tenant, /* explicit */ false).language.mode).toBe('bilingual_stacked');
+  });
 });
 
 // ---------------------------------------------------------------------------

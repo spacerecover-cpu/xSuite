@@ -209,7 +209,7 @@ class ReportPDFService {
 
     // Bridge the tenant's document-language setting into the resolved config so
     // the engine renders bilingual/RTL when the tenant is configured for it.
-    const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+    const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
 
     // Derive the translation context from the RESOLVED config so the per-template
     // language drives BOTH layout (config.language) AND translation (ctx) — and

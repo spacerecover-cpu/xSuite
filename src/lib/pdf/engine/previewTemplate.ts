@@ -102,14 +102,15 @@ export async function previewTemplate(
   stampImage?: BrandingImage | null,
   signatureImage?: BrandingImage | null,
   companySettings?: CompanySettingsData,
+  languageExplicit = false,
 ): Promise<PreviewResult> {
   // When the tenant's company settings are supplied, render the way the generator
   // does: the tenant's real company replaces the sample company, and the config
-  // `language` follows the per-template Studio picker (falling back to the
-  // tenant's document-language setting only when the template is English-default).
-  // Without it, the legacy sample-company + caller-supplied-context behavior is
-  // preserved (callers/tests that pass no tenant settings).
-  const effectiveConfig = companySettings ? applyTenantLanguage(config, companySettings) : config;
+  // `language` follows the per-template Studio picker. `languageExplicit` (the user
+  // picked a language — including "English Only") makes that choice override the
+  // tenant default; only an unconfigured template falls back to the tenant setting.
+  // Without companySettings, the legacy sample-company behavior is preserved.
+  const effectiveConfig = companySettings ? applyTenantLanguage(config, companySettings, languageExplicit) : config;
   // Derive the translation context from the RESOLVED per-template language so the
   // Studio's secondary-language choice drives BOTH layout (config.language) AND
   // translation (ctx) — any of the 13 languages, not just the tenant-wide Arabic.

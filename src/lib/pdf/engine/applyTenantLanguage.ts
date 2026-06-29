@@ -113,11 +113,15 @@ function normalizeBilingualLead(language: LanguageConfig): LanguageConfig {
 export function applyTenantLanguage(
   config: DocumentTemplateConfig,
   companySettings: CompanySettingsData,
+  languageExplicit = false,
 ): DocumentTemplateConfig {
-  const resolved =
-    config.language && config.language.mode !== 'en'
-      ? config.language
-      : resolveTenantLanguageConfig(companySettings);
+  // The template language wins when it is a non-English layout OR was explicitly
+  // configured (`languageExplicit`) — the latter lets a per-template "English Only"
+  // choice override a bilingual tenant default, which a bare `mode: 'en'` cannot
+  // express (it is indistinguishable from an unconfigured template). Only an
+  // unconfigured template (`mode: 'en'` AND not explicit) falls back to the tenant.
+  const templateWins = languageExplicit || (config.language && config.language.mode !== 'en');
+  const resolved = templateWins ? config.language : resolveTenantLanguageConfig(companySettings);
   const language = normalizeBilingualLead(resolved);
   if (language === config.language) return config;
   return { ...config, language };

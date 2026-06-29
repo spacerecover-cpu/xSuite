@@ -121,7 +121,7 @@ async function buildInvoiceDocumentViaEngine(
 
   // Bridge the tenant's document-language setting into the resolved config so
   // the engine renders bilingual/RTL when the tenant is configured for it.
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
 
   const engineData = toEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -161,7 +161,7 @@ async function buildQuoteViaEngine(
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
 
   const engineData = toQuoteEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -198,7 +198,7 @@ async function buildPaymentReceiptViaEngine(
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
 
   const engineData = toPaymentReceiptEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -234,7 +234,7 @@ async function buildPayslipViaEngine(
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
 
   const engineData = toPayslipEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -278,7 +278,7 @@ async function buildOfficeReceiptViaEngine(
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
 
   const engineData = toReceiptEngineData(data, languageAwareConfig, variant);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -343,7 +343,7 @@ async function buildCheckoutFormViaEngine(
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
 
   const engineData = toCheckoutEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -383,7 +383,7 @@ async function buildCaseLabelViaEngine(
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
 
   const engineData = toCaseLabelEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -424,7 +424,7 @@ async function buildChainOfCustodyViaEngine(
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
 
   const engineData = toChainOfCustodyEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));

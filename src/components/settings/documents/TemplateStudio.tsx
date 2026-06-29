@@ -173,6 +173,10 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
     () => resolveTemplateConfig(builtIn, undefined, override),
     [builtIn, override],
   );
+  // The user explicitly set a document language (incl. "English Only") iff the
+  // override carries one — that choice must override the tenant default in the
+  // preview, so the preview matches the picker (and the saved/generated PDF).
+  const languageExplicit = override.language !== undefined;
 
   // ---- Live preview (debounced, real pdfmake artifact) --------------------
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -200,10 +204,10 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
           // Pass the tenant's real company settings so the sample preview shows the
           // tenant's own header/branding/language (predicting the generated PDF),
           // not the neutral bilingual sample company.
-          ({ url, warnings } = await previewTemplate(docType, resolved, undefined, tenantLogo, tenantStamp, tenantSignature, companySettings ?? undefined));
+          ({ url, warnings } = await previewTemplate(docType, resolved, undefined, tenantLogo, tenantStamp, tenantSignature, companySettings ?? undefined, languageExplicit));
         } else {
           const { previewDocumentForRecord } = await import('../../../lib/pdf/previewRecord');
-          ({ url, warnings } = await previewDocumentForRecord(docType, dataSource, resolved));
+          ({ url, warnings } = await previewDocumentForRecord(docType, dataSource, resolved, languageExplicit));
         }
         if (cancelled) {
           URL.revokeObjectURL(url);
@@ -225,7 +229,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [resolved, dataSource, docType, tenantLogo, tenantStamp, tenantSignature, companySettings]);
+  }, [resolved, languageExplicit, dataSource, docType, tenantLogo, tenantStamp, tenantSignature, companySettings]);
 
   useEffect(() => () => {
     if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);

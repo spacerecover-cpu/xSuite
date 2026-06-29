@@ -136,7 +136,10 @@ export function seedTemplateLanguage(
   config: TemplateConfigPayload,
   companySettings: CompanySettingsData,
 ): TemplateConfigPayload {
-  if (config.language && config.language.mode && config.language.mode !== 'en') {
+  // Any EXPLICIT per-template language wins — including an "English Only" choice
+  // (`mode: 'en'`), which must override a bilingual tenant default rather than be
+  // re-seeded from it. Only a template that never set a language is seeded.
+  if (config.language && config.language.mode) {
     return config;
   }
   return { ...config, language: resolveTenantLanguageConfig(companySettings) };

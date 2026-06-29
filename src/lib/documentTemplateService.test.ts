@@ -298,6 +298,12 @@ describe('seedTemplateLanguage', () => {
     const out = seedTemplateLanguage(cfg, tenant('bilingual', 'ar'));
     expect(out.language).toEqual({ mode: 'bilingual_sidebyside', primary: 'en' });
   });
+
+  it('keeps an explicit "English Only" choice (does NOT re-seed from a bilingual tenant)', () => {
+    const cfg = { language: { mode: 'en', primary: 'en' } } as TemplateConfigPayload;
+    const out = seedTemplateLanguage(cfg, tenant('bilingual', 'it'));
+    expect(out.language).toEqual({ mode: 'en', primary: 'en' });
+  });
 });
 
 // ---------------------------------------------------------------------------

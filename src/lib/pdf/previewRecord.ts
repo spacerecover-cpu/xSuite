@@ -93,6 +93,7 @@ export async function previewDocumentForRecord(
   docType: TemplateDocumentType,
   recordId: string,
   config: DocumentTemplateConfig,
+  languageExplicit = false,
 ): Promise<PreviewResult> {
   let engineData: EngineDocData;
   let companySettings: CompanySettingsData | null = null;
@@ -140,7 +141,7 @@ export async function previewDocumentForRecord(
   // tenant setting fills in only when the template is English-default), then build
   // the translation context FROM that resolved language so the chosen secondary
   // (any of the 13) drives both layout and translation.
-  const langConfig = companySettings ? applyTenantLanguage(config, companySettings) : config;
+  const langConfig = companySettings ? applyTenantLanguage(config, companySettings, languageExplicit) : config;
   // ctxFromLanguageConfig needs only `language` (never companySettings); `langConfig`
   // is already `config` when no tenant settings were fetched, so deriving from it
   // ALWAYS honours the per-template secondary — no English fallback that silently
