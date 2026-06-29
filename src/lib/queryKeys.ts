@@ -4,7 +4,6 @@ export const caseKeys = {
   list: (filters: Record<string, unknown>) => [...caseKeys.lists(), filters] as const,
   detail: (id: string) => [...caseKeys.all, 'detail', id] as const,
   devices: (caseId: string) => [...caseKeys.all, 'devices', caseId] as const,
-  reports: (caseId: string) => [...caseKeys.all, 'reports', caseId] as const,
   custody: (caseId: string) => [...caseKeys.all, 'custody', caseId] as const,
   activity: (caseId: string) => [...caseKeys.all, 'activity', caseId] as const,
   finance: (caseId: string) => [...caseKeys.all, 'finance', caseId] as const,

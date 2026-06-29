@@ -254,7 +254,7 @@ export const CaseDetail: React.FC = () => {
     { id: 'client', label: 'Client', icon: User },
     { id: 'devices', label: 'Devices', icon: HardDrive },
     { id: 'clones', label: 'Clone Drives', icon: Copy },
-    { id: 'documents', label: 'Reports', icon: FileStack },
+    ...(isDocStudioEnabled() ? [{ id: 'documents', label: 'Reports', icon: FileStack }] : []),
     { id: 'quotes', label: 'Quotes/Invoices', icon: DollarSign },
     { id: 'communications', label: 'Communications', icon: Mail },
     { id: 'stock', label: 'Backup Devices', icon: Package },
@@ -1091,8 +1091,8 @@ export const CaseDetail: React.FC = () => {
           )}
 
 
-          {/* Documents Tab — Reports surface (Doc Studio) */}
-          {activeTab === 'documents' && (
+          {/* Documents Tab — Reports surface (Doc Studio, flag-gated) */}
+          {isDocStudioEnabled() && activeTab === 'documents' && (
             <CaseDocumentsTab
               documents={(documentInstances || []).map((d) => ({
                 id: d.id,

@@ -76,3 +76,24 @@ it('shows an error/retry block when the document list fetch fails', async () => 
   expect(screen.queryByText(/no documents/i)).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
 });
+
+it('shows "no PDF available" message and no sign-off CTA when selected doc has no pdf_storage_path', async () => {
+  svc.fetchPortalDocuments.mockResolvedValue([
+    { id: 'd2', title: 'Approved Report', document_number: 'REP-APPR-0001', report_subtype: 'evaluation', status: 'delivered', pdf_storage_bucket: null, pdf_storage_path: null, created_at: '2026-06-02T00:00:00Z' },
+  ]);
+  svc.getPortalDocumentPdfUrl.mockResolvedValue(null);
+  render(wrap(<PortalDocuments />));
+  await waitFor(() => expect(screen.getByText('Approved Report')).toBeInTheDocument());
+  fireEvent.click(screen.getByText('Approved Report'));
+  await waitFor(() => expect(screen.getByText(/no pdf is available/i)).toBeInTheDocument());
+  expect(screen.queryByRole('button', { name: /sign off/i })).not.toBeInTheDocument();
+  expect(svc.getPortalDocumentPdfUrl).not.toHaveBeenCalled();
+});
+
+it('does not show "no PDF available" and still shows sign-off CTA when pdf_storage_path is set', async () => {
+  render(wrap(<PortalDocuments />));
+  await waitFor(() => expect(screen.getByText('Evaluation Report')).toBeInTheDocument());
+  fireEvent.click(screen.getByText('Evaluation Report'));
+  await waitFor(() => expect(svc.getPortalDocumentPdfUrl).toHaveBeenCalled());
+  expect(screen.queryByText(/no pdf is available/i)).not.toBeInTheDocument();
+});

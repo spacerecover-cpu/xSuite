@@ -156,7 +156,7 @@ export const PortalDocuments: React.FC = () => {
                         ? t('portal.documents.status.delivered', { defaultValue: 'Delivered' })
                         : t(`portal.documents.status.${doc.status}`, { defaultValue: doc.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) })}
                   </Badge>
-                  {doc.status === 'delivered' && (
+                  {doc.status === 'delivered' && doc.pdf_storage_path && (
                     <Button
                       size="sm"
                       onClick={(e) => {
@@ -181,19 +181,25 @@ export const PortalDocuments: React.FC = () => {
           <h2 className="text-lg font-semibold text-slate-800">
             {selectedDoc.title ?? selectedDoc.document_number}
           </h2>
-          {pdfUrl ? (
-            <iframe
-              title="Document"
-              src={pdfUrl}
-              className="w-full rounded-lg border border-slate-200 min-h-[60vh]"
-            />
+          {selectedDoc.pdf_storage_path ? (
+            pdfUrl ? (
+              <iframe
+                title="Document"
+                src={pdfUrl}
+                className="w-full rounded-lg border border-slate-200 min-h-[60vh]"
+              />
+            ) : (
+              <div className="w-full flex items-center justify-center py-16 text-slate-400">
+                {t('portal.documents.loadingPdf', { defaultValue: 'Loading PDF…' })}
+              </div>
+            )
           ) : (
             <div className="w-full flex items-center justify-center py-16 text-slate-400">
-              {t('portal.documents.loadingPdf', { defaultValue: 'Loading PDF…' })}
+              {t('portal.documents.noPdfAvailable', { defaultValue: 'No PDF is available for this document.' })}
             </div>
           )}
 
-          {selectedDoc.status === 'delivered' && (
+          {selectedDoc.status === 'delivered' && selectedDoc.pdf_storage_path && (
             <Button onClick={handleSignOff} disabled={signOffMutation.isPending} aria-label={t('portal.documents.signOffButton', { defaultValue: 'Sign off' })}>
               {signOffMutation.isPending
                 ? t('portal.documents.signingOff', { defaultValue: 'Signing off…' })
