@@ -1,5 +1,12 @@
 # Phase 11 — Post-Deploy Freeze of the Retired Legacy Report Tables
 
+> **🛑 SUPERSEDED (2026-06-30) — DO NOT APPLY.** The owner chose to **DROP** the 6 legacy report
+> tables outright rather than freeze them. That was done in migration
+> `20260629202115_drop_legacy_report_tables` (applied post-merge of PR #340, after confirming the
+> new code was live). Once dropped, there is nothing left to `REVOKE`, so the freeze below is moot.
+> The eslint banned-tables entries for the 6 names are kept (they still block any `.from()`
+> re-introduction). This file is retained only as a record of the original (rejected) freeze plan.
+
 > **⚠️ APPLY AFTER DEPLOY ONLY.** This is the single Phase-11 step that must run **after** the
 > new frontend (which no longer writes any of these tables) is live in production. Applying it
 > **before** the new code ships will break the still-running production app, whose old code still
