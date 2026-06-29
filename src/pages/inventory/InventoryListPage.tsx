@@ -10,6 +10,8 @@ import InventoryDetailModal from '../../components/inventory/InventoryDetailModa
 import DeleteInventoryConfirmationModal from '../../components/inventory/DeleteInventoryConfirmationModal';
 import { InventoryInsightsHeader } from '../../components/inventory/InventoryInsightsHeader';
 import { BulkInventoryImportModal } from '../../components/importExport/BulkInventoryImportModal';
+import { InventoryAdvancedSearch, type AdvancedSearchValues } from '../../components/inventory/InventoryAdvancedSearch';
+import { useInventoryDeviceTypes, useInventoryLocations } from '../../lib/inventory/inventoryCatalogQueries';
 import {
   getInventoryItemsPage,
   getInventoryCategories,
@@ -32,6 +34,9 @@ type InventoryRow = Awaited<ReturnType<typeof getInventoryItemsPage>>['rows'][nu
 export default function InventoryListPage() {
   const navigate = useNavigate();
   const toast = useToast();
+
+  const { data: deviceTypes = [] } = useInventoryDeviceTypes();
+  const { data: locations = [] } = useInventoryLocations();
 
   const [items, setItems] = useState<InventoryRow[]>([]);
   const [categories, setCategories] = useState<InventoryCategory[]>([]);
@@ -56,6 +61,7 @@ export default function InventoryListPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedSearchValues>({});
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -76,11 +82,11 @@ export default function InventoryListPage() {
 
   useEffect(() => {
     loadData();
-  }, [selectedCategory, selectedStatus, debouncedSearch, page]);
+  }, [selectedCategory, selectedStatus, debouncedSearch, page, advancedFilters]);
 
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, selectedCategory, selectedStatus]);
+  }, [debouncedSearch, selectedCategory, selectedStatus, advancedFilters]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -122,6 +128,7 @@ export default function InventoryListPage() {
             search: debouncedSearch || undefined,
             page,
             pageSize: PAGE_SIZE,
+            ...advancedFilters,
           }),
           getInventoryCategories(),
           getInventoryStatusTypes(),
@@ -336,12 +343,13 @@ export default function InventoryListPage() {
         <div className="p-6">
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
             <div className="w-full lg:w-80 relative flex-shrink-0">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" aria-hidden="true" />
               <input
                 type="text"
-                placeholder="Search inventory..."
+                placeholder="Search inventory…"
                 value={searchTerm}
                 onChange={(e) => handleSearch(e.target.value)}
+                aria-label="Search inventory items"
                 className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
@@ -351,6 +359,7 @@ export default function InventoryListPage() {
                 <button
                   key={category.id}
                   onClick={() => setSelectedCategory(selectedCategory === category.id ? null : category.id)}
+                  aria-pressed={selectedCategory === category.id}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                     selectedCategory === category.id
                       ? 'bg-primary text-primary-foreground shadow-md'
@@ -360,11 +369,37 @@ export default function InventoryListPage() {
                   {category.name}
                 </button>
               ))}
-              {(selectedCategory || selectedStatus) && (
+
+              <div className="flex-shrink-0">
+                <label htmlFor="device-type-filter" className="sr-only">Device Type</label>
+                <select
+                  id="device-type-filter"
+                  value={advancedFilters.device_type_id ?? ''}
+                  onChange={(e) =>
+                    setAdvancedFilters(prev => ({
+                      ...prev,
+                      device_type_id: e.target.value || undefined,
+                    }))
+                  }
+                  className={`px-3 py-1.5 text-sm border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-colors ${
+                    advancedFilters.device_type_id
+                      ? 'border-primary bg-primary/5 text-primary font-medium'
+                      : 'border-slate-300 bg-white text-slate-600'
+                  }`}
+                >
+                  <option value="">All Device Types</option>
+                  {deviceTypes.map((dt) => (
+                    <option key={dt.id} value={dt.id}>{dt.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {(selectedCategory || selectedStatus || advancedFilters.device_type_id) && (
                 <button
                   onClick={() => {
                     setSelectedCategory(null);
                     setSelectedStatus(null);
+                    setAdvancedFilters(prev => ({ ...prev, device_type_id: undefined }));
                   }}
                   className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-200 text-slate-700 hover:bg-slate-300 transition-all"
                 >
@@ -377,22 +412,28 @@ export default function InventoryListPage() {
               variant="secondary"
               onClick={() => setShowFilters(!showFilters)}
               className="flex items-center gap-2 flex-shrink-0"
+              aria-expanded={showFilters}
+              aria-controls="more-filters-panel"
             >
-              <Filter className="w-4 h-4" />
+              <Filter className="w-4 h-4" aria-hidden="true" />
               More Filters
               {(selectedCategory || selectedStatus) && (
-                <span className="ml-1 w-2 h-2 rounded-full bg-primary"></span>
+                <span className="ml-1 w-2 h-2 rounded-full bg-primary" aria-hidden="true" />
               )}
             </Button>
           </div>
 
           {showFilters && (
-            <div className="mt-4 pt-4 border-t border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div
+              id="more-filters-panel"
+              className="mt-4 pt-4 border-t border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4"
+            >
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label htmlFor="category-filter" className="block text-sm font-medium text-slate-700 mb-2">
                   Category
                 </label>
                 <select
+                  id="category-filter"
                   value={selectedCategory || ''}
                   onChange={(e) => setSelectedCategory(e.target.value || null)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
@@ -406,10 +447,11 @@ export default function InventoryListPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label htmlFor="status-filter" className="block text-sm font-medium text-slate-700 mb-2">
                   Status
                 </label>
                 <select
+                  id="status-filter"
                   value={selectedStatus || ''}
                   onChange={(e) => setSelectedStatus(e.target.value || null)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
@@ -424,6 +466,15 @@ export default function InventoryListPage() {
               </div>
             </div>
           )}
+
+          <div className="mt-4 pt-4 border-t border-slate-200">
+            <InventoryAdvancedSearch
+              values={advancedFilters}
+              onChange={setAdvancedFilters}
+              deviceTypes={deviceTypes}
+              locations={locations}
+            />
+          </div>
         </div>
       </div>
 
