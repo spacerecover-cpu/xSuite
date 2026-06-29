@@ -7,8 +7,19 @@
  * the whole provability/delivery stack is unchanged.
  */
 import { $typst, preloadRemoteFonts, loadFonts } from '@myriaddreamin/typst.ts';
-import compilerWasmUrl from '@myriaddreamin/typst-ts-web-compiler/pkg/typst_ts_web_compiler_bg.wasm?url';
 import type { TypstAsset } from './assets';
+
+/**
+ * The Typst compiler WASM is ~27 MiB — over Cloudflare Pages' 25 MiB per-file
+ * asset limit — so it is NOT bundled into `dist/` (that would fail the deploy).
+ * Instead it is fetched at runtime from jsDelivr, pinned to the EXACT installed
+ * package version so the compiler always matches `@myriaddreamin/typst.ts`. This
+ * is preview-only egress: the compiler never touches a delivered PDF (those use
+ * pdfmake), so it does not affect document provability. Keep this version in sync
+ * with `@myriaddreamin/typst-ts-web-compiler` in package.json.
+ */
+const COMPILER_WASM_URL =
+  'https://cdn.jsdelivr.net/npm/@myriaddreamin/typst-ts-web-compiler@0.7.0/pkg/typst_ts_web_compiler_bg.wasm';
 
 /**
  * The brand + script fonts served from `public/fonts` (at `/fonts/*`). Tajawal +
@@ -31,7 +42,7 @@ let initialized = false;
 function ensureInit(): void {
   if (initialized) return;
   $typst.setCompilerInitOptions({
-    getModule: () => compilerWasmUrl,
+    getModule: () => COMPILER_WASM_URL,
     beforeBuild: [
       // Disable typst.ts's default font fetch from the jsdelivr CDN — a forensic
       // app must not depend on external egress (and the CSP blocks it). We supply
