@@ -94,7 +94,6 @@ export const NAV_SECTIONS: NavSectionConfig[] = [
     items: [
       { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
       { to: '/cases', icon: FolderOpen, label: 'Cases', badgeKey: 'casesTodayCount', badgeColor: 'blue' },
-      { to: '/case-reports', icon: FileText, label: 'Case Reports' },
     ],
   },
   {

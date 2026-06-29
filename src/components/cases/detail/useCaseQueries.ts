@@ -3,17 +3,17 @@ import { supabase } from '@/lib/supabaseClient';
 import { quotesService } from '@/lib/quotesService';
 import { invoiceService } from '@/lib/invoiceService';
 import { getCaseFinancialSummary } from '@/lib/caseFinanceService';
-import { type ReportType, type ReportStatus } from '@/lib/reportTypes';
 import { logger } from '../../../lib/logger';
+import { listDocumentInstances } from '../../../lib/documentInstanceService';
+import { documentInstanceKeys } from '../../../lib/queryKeys';
 
-export function useCaseQueries(
-  id: string | undefined,
-  filters: {
-    reportTypeFilter: ReportType | 'all';
-    reportStatusFilter: ReportStatus | 'all';
-    showLatestOnly: boolean;
-  }
-) {
+/** Extracted so the query fn is unit-testable without a React render. */
+export async function fetchCaseDocuments(caseId: string | undefined) {
+  if (!caseId) return [];
+  return listDocumentInstances(caseId);
+}
+
+export function useCaseQueries(id: string | undefined) {
   const { data: caseData, isLoading, error: caseError } = useQuery({
     queryKey: ['case', id],
     queryFn: async () => {
@@ -304,54 +304,9 @@ export function useCaseQueries(
     enabled: !!id,
   });
 
-  const { data: reports = [] } = useQuery({
-    queryKey: ['case_reports', id, filters.reportTypeFilter, filters.reportStatusFilter, filters.showLatestOnly],
-    queryFn: async () => {
-      if (!id) return [];
-      // FK profiles!created_by join removed (no FK constraint).
-      let query = supabase
-        .from('case_reports')
-        .select(`
-          id,
-          report_number,
-          title,
-          status,
-          content,
-          created_at,
-          generated_at,
-          created_by
-        `)
-        .eq('case_id', id);
-
-      if (filters.reportStatusFilter !== 'all') {
-        query = query.eq('status', filters.reportStatusFilter);
-      }
-
-      query = query.order('created_at', { ascending: false });
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      // report_type, version_number, is_latest_version, and approval/send
-      // metadata live inside the `content` JSONB column (not as top-level
-      // table columns). Filter client-side based on the filters that target
-      // those fields.
-      const rows = data ?? [];
-      const filtered = rows.filter((r) => {
-        const content = (r.content && typeof r.content === 'object' && !Array.isArray(r.content))
-          ? (r.content as Record<string, unknown>)
-          : {};
-        if (filters.reportTypeFilter !== 'all') {
-          if (content.report_type !== filters.reportTypeFilter) return false;
-        }
-        if (filters.showLatestOnly) {
-          if (content.is_latest_version !== true) return false;
-        }
-        return true;
-      });
-      return filtered;
-    },
+  const { data: documentInstances = [] } = useQuery({
+    queryKey: documentInstanceKeys.byCase(id ?? ''),
+    queryFn: () => fetchCaseDocuments(id),
     enabled: !!id,
   });
 
@@ -451,7 +406,7 @@ export function useCaseQueries(
     quotes,
     invoices,
     caseFinancialSummary,
-    reports,
+    documentInstances,
     caseEngineers,
     portalSettings,
     notes,

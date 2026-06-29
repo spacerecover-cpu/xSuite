@@ -135,7 +135,8 @@ const router = createBrowserRouter(
         <Route path="dashboard" lazy={page(() => import('./pages/portal/PortalDashboard'), 'PortalDashboard')} />
         <Route path="cases" lazy={page(() => import('./pages/portal/PortalCases'), 'PortalCases')} />
         <Route path="quotes" lazy={page(() => import('./pages/portal/PortalQuotes'), 'PortalQuotes')} />
-        <Route path="reports" lazy={page(() => import('./pages/portal/PortalReports'), 'default')} />
+        <Route path="reports" element={<Navigate to="/portal/documents" replace />} />
+        <Route path="documents" lazy={page(() => import('./pages/portal/PortalDocuments'), 'PortalDocuments')} />
         <Route path="purchases" lazy={page(() => import('./pages/portal/PortalPurchasesPage'), 'PortalPurchasesPage')} />
         <Route path="payments" lazy={page(() => import('./pages/portal/PortalPayments'), 'PortalPayments')} />
         <Route path="communications" lazy={page(() => import('./pages/portal/PortalCommunications'), 'PortalCommunications')} />
@@ -159,7 +160,6 @@ const router = createBrowserRouter(
         <Route path="notifications" lazy={page(() => import('./pages/notifications/NotificationsHistory'), 'NotificationsHistory')} />
         <Route path="cases" lazy={page(() => import('./pages/cases/CasesList'), 'CasesList')} />
         <Route path="cases/:id" lazy={page(() => import('./pages/cases/CaseDetail'), 'CaseDetail')} />
-        <Route path="case-reports" lazy={page(() => import('./pages/cases/CaseReportsHub'), 'CaseReportsHub')} />
         <Route path="clients" lazy={page(() => import('./pages/clients/ClientsList'), 'ClientsList')} />
         <Route path="customers" lazy={page(() => import('./pages/customers/CustomersListPage'), 'CustomersListPage')} />
         <Route path="customers/:id" lazy={page(() => import('./pages/customers/CustomerProfilePage'), 'CustomerProfilePage')} />
@@ -258,7 +258,6 @@ const router = createBrowserRouter(
             <Route path="client-portal" lazy={page(() => import('./pages/settings/ClientPortalSettings'), 'ClientPortalSettings')} />
             <Route path="billing" lazy={page(() => import('./pages/settings/BillingPage'), 'default')} />
             <Route path="plans" lazy={page(() => import('./pages/settings/PlansPage'), 'default')} />
-            <Route path="report-sections" lazy={page(() => import('./pages/settings/ReportSectionsPage'), 'ReportSectionsPage')} />
             <Route path="documents" lazy={page(() => import('./pages/settings/DocumentTemplatesPage'), 'DocumentTemplatesPage')} />
             <Route path="security" lazy={page(() => import('./pages/settings/SecuritySettingsPage'), 'SecuritySettingsPage')} />
             <Route path="gdpr" lazy={page(() => import('./pages/settings/GDPRCompliancePage'), 'GDPRCompliancePage')} />

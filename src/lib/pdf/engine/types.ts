@@ -582,6 +582,31 @@ export interface DiagnosticsBlock {
 }
 
 /**
+ * A captured signature to embed in a PDF (Phase 6). `slot` identifies the
+ * signing role (e.g. `'approver'`, `'engineer'`, `'witness'`, `'customer'`).
+ * `method` distinguishes how the signature was captured; `imageDataUrl` carries
+ * the base64 data URL for drawn/uploaded signatures; `typedValue` carries the
+ * typed string for `'typed'` method. Empty/undefined `signatureBlocks` on
+ * {@link EngineDocData} → wet-ink lines only (no change to existing rendering).
+ */
+export interface SignatureBlockData {
+  /** Signing-role slot identifier (e.g. `'approver'` | `'engineer'` | `'witness'` | `'customer'`). */
+  slot: string;
+  /** Signer display name. */
+  name?: string;
+  /** Signer role label for display (e.g. `'Operator'`, `'Witness'`, `'Approver'`). */
+  role?: string;
+  /** How the signature was captured. */
+  method?: 'typed' | 'drawn' | 'uploaded_image' | 'click_to_accept';
+  /** Base64 data URL for drawn/uploaded signatures — embeddable directly by pdfmake. */
+  imageDataUrl?: string;
+  /** Typed-name string for `method === 'typed'`. */
+  typedValue?: string;
+  /** ISO 8601 timestamp of when the signature was captured. */
+  signedAt?: string;
+}
+
+/**
  * The document-agnostic shape every section renderer consumes. Adapters
  * (one per source `*DocumentData`) map their domain data into this shape; the
  * engine never sees invoice/quote/etc. specifics. Optional members let one
@@ -661,6 +686,8 @@ export interface EngineDocData {
   paymentHistory?: PaymentHistoryBlock | null;
   /** Signature line labels (e.g. ["Received by", "Authorized by"]). */
   signatures?: LabelText[];
+  /** Captured signatures to EMBED (Phase 6). Empty/undefined → wet-ink lines only. */
+  signatureBlocks?: SignatureBlockData[];
   /**
    * Forensic chain-of-custody entries table (entry no / occurred-at / action
    * category + type / actor + role / evidence ref / optional hash+signature)

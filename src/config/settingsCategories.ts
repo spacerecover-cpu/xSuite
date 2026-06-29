@@ -202,16 +202,6 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     description: 'Customize how invoices, quotes, and receipts look when printed or emailed.',
   },
   {
-    id: 'report-sections',
-    title: 'Report Sections',
-    icon: FileText,
-    backgroundColor: '#be185d',
-    borderColor: '#be185d',
-    tables: [],
-    actionLabel: 'Manage Sections',
-    description: 'Professional report section library and content presets',
-  },
-  {
     id: 'client-portal',
     title: 'Client Portal',
     icon: Shield,
@@ -296,7 +286,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   { id: 'workspace', label: 'Workspace', categoryIds: ['appearance', 'table-columns', 'features', 'general-settings', 'notifications'] },
   { id: 'operations', label: 'Operations', categoryIds: ['device-media', 'case-service', 'procurement'] },
   { id: 'finance', label: 'Client & Finance', categoryIds: ['client-financial', 'currencies', 'localization'] },
-  { id: 'documents', label: 'Documents & Reports', categoryIds: ['templates', 'documents', 'report-sections'] },
+  { id: 'documents', label: 'Documents & Reports', categoryIds: ['templates', 'documents'] },
   { id: 'system', label: 'System & Data', categoryIds: ['system-numbers', 'import-export', 'client-portal'] },
   { id: 'compliance', label: 'Security & Compliance', categoryIds: ['security', 'gdpr'] },
 ];

@@ -1,7 +1,6 @@
 export { CaseOverviewTab } from './CaseOverviewTab';
 export { CaseDevicesTab } from './CaseDevicesTab';
 export { CaseCloneDrivesTab } from './CaseCloneDrivesTab';
-export { CaseReportsTab } from './CaseReportsTab';
 export { CaseFinancesTab } from './CaseFinancesTab';
 export { CaseFilesTab } from './CaseFilesTab';
 export { CaseEngineersTab } from './CaseEngineersTab';

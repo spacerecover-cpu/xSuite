@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/useToast';
 import { describeGateError } from '@/lib/caseReleaseGate';
 import { logger } from '../../../lib/logger';
+import { onCaseTransitioned } from '../../../lib/automation/documentAutomation';
 import type { Database } from '@/types/database.types';
 import type { CreateCloneDriveFormValues } from '../CreateCloneDriveModal';
 
@@ -138,11 +139,16 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
       }
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['case', id] });
       queryClient.invalidateQueries({ queryKey: ['cases'] });
       queryClient.invalidateQueries({ queryKey: ['cases_stats'] });
       queryClient.invalidateQueries({ queryKey: ['case_history', id] });
+      const t = data as { from_phase?: string; to_phase?: string; no_op?: boolean } | null;
+      if (id && t?.from_phase && t?.to_phase) {
+        void onCaseTransitioned(id, t.from_phase, t.to_phase, t)
+          .catch((err) => logger.error('[documentAutomation] onCaseTransitioned failed (non-blocking):', err));
+      }
     },
     onError: (error) => {
       logger.error('Status update failed:', error);

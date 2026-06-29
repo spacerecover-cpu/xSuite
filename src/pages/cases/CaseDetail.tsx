@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
+import { Dialog } from '../../components/ui/Dialog';
 import { formatDate } from '../../lib/format';
 import { quotesService } from '../../lib/quotesService';
 import { invoiceService } from '../../lib/invoiceService';
@@ -27,10 +28,6 @@ import { AuditInfo } from '../../components/ui/AuditInfo';
 import { DetailPageTemplate } from '../../components/templates/DetailPageTemplate';
 import { DetailPageSkeleton } from '../../components/templates/DetailPageSkeleton';
 import { DetailPageNotFound } from '../../components/templates/DetailPageNotFound';
-import { ReportTypeSelectionModal } from '../../components/cases/ReportTypeSelectionModal';
-import { StreamlinedReportEditor } from '../../components/cases/StreamlinedReportEditor';
-import ReportViewModal from '../../components/cases/ReportViewModal';
-import { reportsService } from '../../lib/reportsService';
 import { PDFPreviewModal } from '../../components/cases/PDFPreviewModal';
 import { EmailDocumentModal } from '../../components/cases/EmailDocumentModal';
 import { QuoteFormModal } from '../../components/cases/QuoteFormModal';
@@ -47,6 +44,11 @@ import { ContentLoadingFallback } from '../../components/shared/ContentLoadingFa
 import { useCaseModals } from '../../components/cases/detail/useCaseModals';
 import { useCaseQueries } from '../../components/cases/detail/useCaseQueries';
 import { useCaseMutations } from '../../components/cases/detail/useCaseMutations';
+import { isDocStudioEnabled } from '../../lib/featureFlags';
+import { DocumentDraftReview } from '../../components/cases/DocumentDraftReview';
+import { DocumentViewerModal } from '../../components/cases/DocumentViewerModal';
+import { REPORT_TYPES, type ReportType } from '../../lib/reportTypes';
+import { documentInstanceKeys } from '../../lib/queryKeys';
 
 // Every tab except the default Overview is code-split (direct file imports, not
 // the barrel, so each panel gets its own chunk). CaseDetail was the heaviest
@@ -59,15 +61,17 @@ const CaseCommunicationsTab = lazyWithRetry(() => import('../../components/cases
 const CaseActivityTab = lazyWithRetry(() => import('../../components/cases/detail/CaseActivityTab').then(m => ({ default: m.CaseActivityTab })));
 const CaseDevicesTab = lazyWithRetry(() => import('../../components/cases/detail/CaseDevicesTab').then(m => ({ default: m.CaseDevicesTab })));
 const CaseCloneDrivesTab = lazyWithRetry(() => import('../../components/cases/detail/CaseCloneDrivesTab').then(m => ({ default: m.CaseCloneDrivesTab })));
-const CaseReportsTab = lazyWithRetry(() => import('../../components/cases/detail/CaseReportsTab').then(m => ({ default: m.CaseReportsTab })));
 const CaseFinancesTab = lazyWithRetry(() => import('../../components/cases/detail/CaseFinancesTab').then(m => ({ default: m.CaseFinancesTab })));
 const CaseFilesTab = lazyWithRetry(() => import('../../components/cases/detail/CaseFilesTab').then(m => ({ default: m.CaseFilesTab })));
 const CaseEngineersTab = lazyWithRetry(() => import('../../components/cases/detail/CaseEngineersTab').then(m => ({ default: m.CaseEngineersTab })));
 const CaseRecoveryQaTab = lazyWithRetry(() => import('../../components/cases/detail/CaseRecoveryQaTab').then(m => ({ default: m.CaseRecoveryQaTab })));
 const CaseNotesTab = lazyWithRetry(() => import('../../components/cases/detail/CaseNotesTab').then(m => ({ default: m.CaseNotesTab })));
 const CasePortalTab = lazyWithRetry(() => import('../../components/cases/detail/CasePortalTab').then(m => ({ default: m.CasePortalTab })));
+const CaseDocumentsTab = React.lazy(() =>
+  import('../../components/cases/detail/CaseDocumentsTab').then((m) => ({ default: m.CaseDocumentsTab })),
+);
 
-type TabType = 'overview' | 'client' | 'devices' | 'clones' | 'reports' | 'quotes' | 'communications' | 'files' | 'engineers' | 'recovery_qa' | 'notes' | 'portal' | 'history' | 'stock';
+type TabType = 'overview' | 'client' | 'devices' | 'clones' | 'documents' | 'quotes' | 'communications' | 'files' | 'engineers' | 'recovery_qa' | 'notes' | 'portal' | 'history' | 'stock';
 
 export const CaseDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -82,13 +86,10 @@ export const CaseDetail: React.FC = () => {
   const {
     caseData, isLoading, caseError,
     caseStatuses, devices, cloneDrives, attachments,
-    quotes, invoices, caseFinancialSummary, reports,
+    quotes, invoices, caseFinancialSummary,
+    documentInstances,
     caseEngineers, portalSettings, notes,
-  } = useCaseQueries(id, {
-    reportTypeFilter: modals.reportTypeFilter,
-    reportStatusFilter: modals.reportStatusFilter,
-    showLatestOnly: modals.showLatestOnly,
-  });
+  } = useCaseQueries(id);
 
 
   const {
@@ -253,7 +254,7 @@ export const CaseDetail: React.FC = () => {
     { id: 'client', label: 'Client', icon: User },
     { id: 'devices', label: 'Devices', icon: HardDrive },
     { id: 'clones', label: 'Clone Drives', icon: Copy },
-    { id: 'reports', label: 'Reports', icon: FileText },
+    ...(isDocStudioEnabled() ? [{ id: 'documents', label: 'Reports', icon: FileStack }] : []),
     { id: 'quotes', label: 'Quotes/Invoices', icon: DollarSign },
     { id: 'communications', label: 'Communications', icon: Mail },
     { id: 'stock', label: 'Backup Devices', icon: Package },
@@ -607,81 +608,6 @@ export const CaseDetail: React.FC = () => {
               customerEmail={modals.viewingInvoice.customers_enhanced?.email || modals.viewingInvoice.customers?.email}
             />
           )}
-
-          {/* Report Type Selection Modal */}
-          {caseData && (
-            <ReportTypeSelectionModal
-              isOpen={modals.showReportTypeSelector}
-              onClose={() => modals.setShowReportTypeSelector(false)}
-              onSelectType={(type) => {
-                modals.setSelectedReportType(type);
-                modals.setShowReportTypeSelector(false);
-              }}
-              caseNumber={caseData.case_no || caseData.case_number || ''}
-              serviceType={caseData.service_type?.name || 'Data Recovery'}
-            />
-          )}
-
-          {/* Streamlined Report Editor */}
-          {caseData && (modals.selectedReportType || modals.editingReport || modals.reportVersioningId) && (
-            <StreamlinedReportEditor
-              isOpen={!!(modals.selectedReportType || modals.editingReport || modals.reportVersioningId)}
-              onClose={() => {
-                modals.setSelectedReportType(null);
-                modals.setEditingReport(null);
-                modals.setReportVersioningId(null);
-              }}
-              reportType={modals.editingReport?.report_type || modals.selectedReportType}
-              caseId={id!}
-              caseData={{
-                case_no: caseData.case_no || caseData.case_number || '',
-                title: caseData.title || '',
-                service_type: caseData.service_type ?? undefined,
-                customer: caseData.customer
-                  ? {
-                      first_name: caseData.customer.customer_name,
-                    }
-                  : undefined,
-                assigned_engineer: caseData.assigned_engineer ?? undefined,
-                created_at: caseData.created_at,
-              }}
-              deviceData={devices && devices.length > 0 ? {
-                device_type: devices[0].device_type?.name || '',
-                brand: devices[0].brand?.name || '',
-                model: devices[0].model || '',
-                capacity: devices[0].capacity?.name || '',
-                serial_number: devices[0].serial_number || '',
-                symptoms: devices[0].symptoms || '',
-              } : undefined}
-              reportId={modals.editingReport?.id}
-              existingReport={modals.editingReport}
-              onSuccess={() => {
-                queryClient.invalidateQueries({ queryKey: ['case_reports', id] });
-                modals.setSelectedReportType(null);
-                modals.setEditingReport(null);
-                modals.setReportVersioningId(null);
-              }}
-            />
-          )}
-
-          {/* Report View Modal */}
-          <ReportViewModal
-            isOpen={!!modals.viewReportId}
-            onClose={() => modals.setViewReportId(null)}
-            reportId={modals.viewReportId || ''}
-            onNewVersion={() => {
-              modals.setReportVersioningId(modals.viewReportId);
-              modals.setViewReportId(null);
-            }}
-            onApprove={async (reportId) => {
-              await reportsService.approveReport(reportId, profile?.id || '');
-              queryClient.invalidateQueries({ queryKey: ['case_reports', id] });
-            }}
-            onSend={async (reportId) => {
-              await reportsService.sendReportToCustomer(reportId);
-              queryClient.invalidateQueries({ queryKey: ['case_reports', id] });
-            }}
-          />
 
           {/* PDF Preview Modal */}
           {modals.showPDFPreviewModal && modals.previewDocumentType && caseData && (
@@ -1165,38 +1091,22 @@ export const CaseDetail: React.FC = () => {
           )}
 
 
-          {/* Reports Tab */}
-          {activeTab === 'reports' && (
-            <CaseReportsTab
-              reports={(reports || []).map((r) => {
-                const content = (r.content && typeof r.content === 'object' && !Array.isArray(r.content))
-                  ? (r.content as Record<string, unknown>)
-                  : {};
-                const validReportTypes: readonly string[] = ['evaluation', 'service', 'server', 'malware', 'forensic', 'data_destruction', 'prevention'];
-                const reportType = (typeof content.report_type === 'string' && validReportTypes.includes(content.report_type) ? content.report_type : 'evaluation') as
-                  'evaluation' | 'service' | 'server' | 'malware' | 'forensic' | 'data_destruction' | 'prevention';
-                return {
-                  id: r.id,
-                  title: r.title,
-                  report_number: r.report_number ?? '',
-                  report_type: reportType,
-                  status: (r.status ?? 'draft') as 'draft' | 'review' | 'approved' | 'sent',
-                  version_number: typeof content.version_number === 'number' ? content.version_number : 1,
-                  visible_to_customer: content.visible_to_customer === true,
-                  approved_at: typeof content.approved_at === 'string' ? content.approved_at : null,
-                  sent_to_customer_at: typeof content.sent_to_customer_at === 'string' ? content.sent_to_customer_at : null,
-                  created_at: r.created_at,
-                };
-              })}
-              reportTypeFilter={modals.reportTypeFilter}
-              reportStatusFilter={modals.reportStatusFilter}
-              showLatestOnly={modals.showLatestOnly}
-              onSetShowReportTypeSelector={modals.setShowReportTypeSelector}
-              onSetReportTypeFilter={modals.setReportTypeFilter}
-              onSetReportStatusFilter={modals.setReportStatusFilter}
-              onSetShowLatestOnly={modals.setShowLatestOnly}
-              onSetViewReportId={modals.setViewReportId}
-              onSetEditingReport={modals.setEditingReport}
+          {/* Documents Tab — Reports surface (Doc Studio, flag-gated) */}
+          {isDocStudioEnabled() && activeTab === 'documents' && (
+            <CaseDocumentsTab
+              documents={(documentInstances || []).map((d) => ({
+                id: d.id,
+                title: d.title,
+                document_number: d.document_number,
+                report_subtype: d.report_subtype,
+                status: d.status,
+                version_number: d.version_number,
+                visible_to_customer: d.visible_to_customer,
+                created_at: d.created_at,
+              }))}
+              onNewDocument={() => modals.setShowDocTypeSelector(true)}
+              onView={(id) => modals.setViewDocumentId(id)}
+              onEdit={(id) => modals.setEditingDocumentId(id)}
             />
           )}
 
@@ -1363,6 +1273,70 @@ export const CaseDetail: React.FC = () => {
             </div>
           )}
         </Suspense>
+      )}
+
+      {/* Doc Studio — subtype picker + draft review modal (flag-gated) */}
+      {isDocStudioEnabled() && (
+        <>
+          {/* Subtype picker: list REPORT_TYPES so user can choose what to create */}
+          <Dialog
+            open={modals.showDocTypeSelector}
+            onClose={() => modals.setShowDocTypeSelector(false)}
+            label="New Document"
+            className="max-w-sm w-full"
+          >
+            <div className="p-6">
+              <h2 className="text-base font-semibold text-slate-900 mb-4">New Document</h2>
+              <div className="space-y-2">
+                {(Object.keys(REPORT_TYPES) as ReportType[]).map((key) => {
+                  const cfg = REPORT_TYPES[key];
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      className="w-full text-left px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+                      onClick={() => {
+                        modals.setDocCreateSubtype(key);
+                        modals.setShowDocTypeSelector(false);
+                      }}
+                    >
+                      {cfg.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </Dialog>
+
+          {/* Draft Review modal — create (docCreateSubtype set) or edit (editingDocumentId set) */}
+          <DocumentDraftReview
+            isOpen={!!(modals.editingDocumentId || modals.docCreateSubtype)}
+            onClose={() => {
+              modals.setEditingDocumentId(null);
+              modals.setDocCreateSubtype(null);
+            }}
+            caseId={id!}
+            instanceId={modals.editingDocumentId ?? undefined}
+            newSubtype={modals.docCreateSubtype ?? undefined}
+            newTitle={
+              modals.docCreateSubtype
+                ? REPORT_TYPES[modals.docCreateSubtype as ReportType]?.name
+                : undefined
+            }
+            onSaved={() =>
+              queryClient.invalidateQueries({ queryKey: documentInstanceKeys.byCase(id!) })
+            }
+          />
+
+          {/* Viewer modal — read-only archived PDF + audit panel */}
+          {modals.viewDocumentId && (
+            <DocumentViewerModal
+              isOpen={!!modals.viewDocumentId}
+              onClose={() => modals.setViewDocumentId(null)}
+              instanceId={modals.viewDocumentId}
+            />
+          )}
+        </>
       )}
 
     </DetailPageTemplate>

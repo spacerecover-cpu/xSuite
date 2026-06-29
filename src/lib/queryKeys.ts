@@ -4,7 +4,6 @@ export const caseKeys = {
   list: (filters: Record<string, unknown>) => [...caseKeys.lists(), filters] as const,
   detail: (id: string) => [...caseKeys.all, 'detail', id] as const,
   devices: (caseId: string) => [...caseKeys.all, 'devices', caseId] as const,
-  reports: (caseId: string) => [...caseKeys.all, 'reports', caseId] as const,
   custody: (caseId: string) => [...caseKeys.all, 'custody', caseId] as const,
   activity: (caseId: string) => [...caseKeys.all, 'activity', caseId] as const,
   finance: (caseId: string) => [...caseKeys.all, 'finance', caseId] as const,
@@ -103,7 +102,6 @@ export const settingsKeys = {
   systemNumbers: () => ['settings', 'system-numbers'] as const,
   locales: () => ['settings', 'locales'] as const,
   portal: () => ['settings', 'portal'] as const,
-  reportSections: () => ['settings', 'report-sections'] as const,
   categoryCount: (categoryId: string) => ['settings', 'category-count', categoryId] as const,
   masterData: (table: string) => ['settings', 'master-data', table] as const,
   seedStatus: (categoryId: string) => ['settings', 'seed-status', categoryId] as const,
@@ -146,14 +144,6 @@ export const communicationKeys = {
   byCase: (caseId: string) => [...communicationKeys.all, 'case', caseId] as const,
   byCustomer: (customerId: string) =>
     [...communicationKeys.all, 'customer', customerId] as const,
-};
-
-export const reportKeys = {
-  all: ['case-reports'] as const,
-  hub: (filters: Record<string, unknown>) => [...reportKeys.all, 'hub', filters] as const,
-  templates: (reportType?: string) => [...reportKeys.all, 'templates', reportType ?? 'all'] as const,
-  templateSections: (templateId: string) =>
-    [...reportKeys.all, 'template-sections', templateId] as const,
 };
 
 export const templateKeys = {

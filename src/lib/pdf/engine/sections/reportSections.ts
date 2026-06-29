@@ -25,12 +25,14 @@
 
 import type { Content } from 'pdfmake/interfaces';
 import { PDF_COLORS, createBilingualSignatureBlock, resolvePdfTone } from '../../styles';
+import { buildLogoNode } from '../../brandingImage';
 import { safeString } from '../../utils';
 import type {
   EngineContext,
   EngineDocData,
   ReportSectionsBlock,
   SectionRenderer,
+  SignatureBlockData,
 } from '../types';
 import { isBilingualMode, en, ar } from '../labels';
 
@@ -39,18 +41,34 @@ type ReportSection = ReportSectionsBlock['sections'][number];
 /** Operator + witness signature slots for a destruction certificate. */
 function destructionSignatures(
   language: EngineContext['config']['language'],
+  blocks?: SignatureBlockData[],
 ): Content {
   const bilingual = isBilingualMode(language);
-  const operator = createBilingualSignatureBlock(
-    'Operator',
-    bilingual ? 'المشغّل' : null,
-  ) as Content;
-  const witness = createBilingualSignatureBlock(
-    'Witness',
-    bilingual ? 'الشاهد' : null,
-  ) as Content;
+  const col = (slot: string, enLabel: string, arLabel: string): Content => {
+    const b = blocks?.find((x) => x.slot === slot && (x.imageDataUrl || x.typedValue));
+    if (b?.imageDataUrl) {
+      const imgNode = buildLogoNode(b.imageDataUrl, { width: 130 });
+      return {
+        stack: [
+          ...(imgNode ? [imgNode] : []),
+          { text: bilingual ? `${enLabel}\n${arLabel}` : enLabel, style: 'signatureLabel', alignment: 'center', margin: [0, 3, 0, 0] },
+        ],
+        width: 200,
+      } as Content;
+    }
+    if (b?.typedValue) {
+      return {
+        stack: [
+          { text: b.typedValue, italics: true, fontSize: 13, alignment: 'center', margin: [0, 6, 0, 2] },
+          { text: bilingual ? `${enLabel}\n${arLabel}` : enLabel, style: 'signatureLabel', alignment: 'center' },
+        ],
+        width: 200,
+      } as Content;
+    }
+    return createBilingualSignatureBlock(enLabel, bilingual ? arLabel : null) as Content;
+  };
   return {
-    columns: [operator, { text: '', width: '*' }, witness],
+    columns: [col('engineer', 'Operator', 'المشغّل'), { text: '', width: '*' }, col('witness', 'Witness', 'الشاهد')],
     margin: [0, 18, 0, 4],
   };
 }
@@ -64,6 +82,7 @@ function destructionSignatures(
 function editorialSection(
   section: ReportSection,
   language: EngineContext['config']['language'],
+  signatureBlocks?: SignatureBlockData[],
 ): Content {
   const bilingual = isBilingualMode(language);
   const tone = resolvePdfTone(section.tone);
@@ -119,7 +138,7 @@ function editorialSection(
 
   const stack: Content[] = [titleRow, body];
   if (section.kind === 'destruction_certificate') {
-    stack.push(destructionSignatures(language));
+    stack.push(destructionSignatures(language, signatureBlocks));
   }
   return { stack, margin: [0, 0, 0, 10] };
 }
@@ -153,5 +172,5 @@ export const renderReportSections: SectionRenderer = (
 
   if (ordered.length === 0) return null;
 
-  return ordered.map((section) => editorialSection(section, language));
+  return ordered.map((section) => editorialSection(section, language, data.signatureBlocks));
 };

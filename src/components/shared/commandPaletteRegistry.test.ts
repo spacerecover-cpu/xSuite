@@ -48,7 +48,6 @@ describe('buildCommands — gated command palette registry', () => {
     const cmds = buildCommands(ctx({ modules: ['cases', 'dashboard'] }));
     expect(has(cmds, '/')).toBe(true); // dashboard
     expect(has(cmds, '/cases')).toBe(true);
-    expect(has(cmds, '/case-reports')).toBe(true); // also maps to the 'cases' module
   });
 
   it('an admin with the right modules + features sees System + financial nav', () => {

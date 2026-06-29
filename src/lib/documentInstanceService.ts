@@ -20,6 +20,7 @@ import {
   buildDocumentPdfPath,
   type DocumentInstanceType,
 } from './pdf/contentHash';
+import { reportSubtypeSections } from './pdf/engine/adapters/reportAdapter';
 
 type DocumentInstanceRow = Database['public']['Tables']['document_instances']['Row'];
 type DocumentInstanceInsert = Database['public']['Tables']['document_instances']['Insert'];
@@ -212,4 +213,65 @@ export async function getDocumentPdfSignedUrl(
     return null;
   }
   return data?.signedUrl ?? null;
+}
+
+export interface CreateReportInstanceParams {
+  caseId: string;
+  reportSubtype: string;
+  title: string;
+}
+
+/**
+ * Create a draft report document_instance and seed its sections from the subtype's
+ * canonical prose section list (so the engineer opens a structured, near-complete draft).
+ * Number scope mirrors the legacy report numbering: `report_<subtype>`.
+ */
+export async function createReportInstance(params: CreateReportInstanceParams): Promise<DocumentInstanceRow> {
+  const tenantId = await resolveTenantId();
+  const scope = `report_${params.reportSubtype}`;
+  const { data: number, error: numErr } = await supabase.rpc('get_next_number', { p_scope: scope });
+  if (numErr) {
+    logger.error('[documentInstanceService] number mint failed:', numErr);
+    throw numErr;
+  }
+
+  const instance = await createDocumentInstance({
+    docType: 'report',
+    title: params.title,
+    reportSubtype: params.reportSubtype,
+    caseId: params.caseId,
+    documentNumber: (number as string) ?? null,
+  });
+
+  const seeds = reportSubtypeSections(params.reportSubtype);
+  if (seeds.length > 0) {
+    const rows = seeds.map((s, i) => ({
+      tenant_id: tenantId,
+      document_instance_id: instance.id,
+      section_key: s.key,
+      title: s.title,
+      content: '',
+      sort_order: i,
+      is_visible: true,
+    }));
+    const { error: secErr } = await supabase.from('document_instance_sections').insert(rows);
+    if (secErr) {
+      logger.error('[documentInstanceService] section seed failed:', secErr);
+      throw secErr;
+    }
+  }
+  return instance;
+}
+
+/** Render + archive (sha256) the instance's PDF; required before a deliver transition. */
+export async function archiveDocumentInstance(
+  instanceId: string,
+  docType: DocumentInstanceType = 'report',
+): Promise<{ path: string; sha256: string }> {
+  const { reportPDFService } = await import('./reportPDFService');
+  const result = await reportPDFService.generateDocumentInstanceAsBlob(instanceId);
+  if (!result.success || !result.blob) {
+    throw new Error(result.error || 'Failed to render document PDF');
+  }
+  return attachArtifact(instanceId, docType, result.blob);
 }

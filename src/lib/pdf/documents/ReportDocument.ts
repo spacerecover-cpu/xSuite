@@ -1,5 +1,6 @@
 import type { TDocumentDefinitions, Content } from 'pdfmake/interfaces';
 import type { TranslationContext } from '../types';
+import type { SignatureBlockData } from '../engine/types';
 import {
   PDF_COLORS,
   getStylesWithFont,
@@ -150,6 +151,8 @@ export interface ReportData {
    * `requires_donor` | `pending`, or absent/null to omit the tile.
    */
   recoverability?: string | null;
+  /** Captured signatures to EMBED (Phase 6). Empty/undefined → wet-ink lines only. */
+  signatureBlocks?: SignatureBlockData[];
 }
 
 export function buildReportDocument(

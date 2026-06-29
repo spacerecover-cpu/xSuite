@@ -1,5 +1,21 @@
 import { supabase } from './supabaseClient';
 
+export const PORTAL_VISIBILITY_FLAGS = [
+  'show_device_details',
+  'show_technical_details',
+  'show_device_password',
+  'show_important_data',
+  'show_accessories',
+  'show_status_updates',
+  'show_quotes',
+  'show_invoices',
+  'show_reports',
+  'show_attachments',
+  'show_documents',
+] as const;
+
+export type PortalVisibilityFlag = typeof PORTAL_VISIBILITY_FLAGS[number];
+
 export interface PortalVisibilityRow {
   case_id: string;
   visible_fields: string[] | null;
@@ -39,6 +55,13 @@ export async function fetchPortalVisibility(
 
 export function getVisibleCaseIds(rows: PortalVisibilityRow[]): string[] {
   return rows.map((r) => r.case_id);
+}
+
+// Returns true when a single visibility row has the given flag enabled.
+// Single-row mirror of getCaseIdsWithFlag's predicate — useful when the caller
+// already holds the relevant row and doesn't need to filter across a collection.
+export function isFieldVisible(row: PortalVisibilityRow, flag: string): boolean {
+  return Array.isArray(row.visible_fields) && row.visible_fields.includes(flag);
 }
 
 // Returns the subset of case_ids whose visibility row enables the given flag.

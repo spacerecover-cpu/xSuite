@@ -48,6 +48,7 @@ import { renderPaymentHistory } from './sections/paymentHistory';
 import { renderTerms, renderRecordTerms } from './sections/terms';
 import { renderBank } from './sections/bank';
 import { renderSignature } from './sections/signature';
+import { renderReportApproval } from './sections/reportApproval';
 import { renderQr } from './sections/qr';
 import { renderFooter } from './sections/footer';
 import { renderTaxBar } from './sections/taxBar';
@@ -85,6 +86,7 @@ export const SECTION_REGISTRY: Record<string, SectionRenderer> = {
   recordTerms: renderRecordTerms,
   bank: renderBank,
   signature: renderSignature,
+  reportApproval: renderReportApproval,
   qr: renderQr,
   footer: renderFooter,
 };

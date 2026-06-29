@@ -55,7 +55,7 @@ export const FEATURE_REGISTRY: FeatureDef[] = [
   { key: 'case.tab.client', label: 'Client', description: 'Client information tab.', category: 'case_tabs', defaultEnabled: true, core: true, caseTabId: 'client' },
   { key: 'case.tab.devices', label: 'Devices', description: 'Devices on the case.', category: 'case_tabs', defaultEnabled: true, core: true, caseTabId: 'devices' },
   { key: 'case.tab.clones', label: 'Clone Drives', description: 'Clone/imaging drive management.', category: 'case_tabs', defaultEnabled: true, caseTabId: 'clones' },
-  { key: 'case.tab.reports', label: 'Reports', description: 'Case report generation & viewing.', category: 'case_tabs', defaultEnabled: true, caseTabId: 'reports' },
+  { key: 'case.tab.documents', label: 'Reports', description: 'Case documents & report generation.', category: 'case_tabs', defaultEnabled: true, caseTabId: 'documents' },
   { key: 'case.tab.quotes', label: 'Quotes / Invoices', description: 'Quotes and invoices in case context.', category: 'case_tabs', defaultEnabled: true, caseTabId: 'quotes' },
   { key: 'case.tab.stock', label: 'Backup Devices', description: 'Backup/stock device handling for the case.', category: 'case_tabs', defaultEnabled: true, caseTabId: 'stock' },
   { key: 'case.tab.files', label: 'Files', description: 'File attachments.', category: 'case_tabs', defaultEnabled: true, caseTabId: 'files' },

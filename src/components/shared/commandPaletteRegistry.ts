@@ -20,7 +20,6 @@ export interface CommandItem {
 const NAV_KEYWORDS: Record<string, string> = {
   '/': 'home overview',
   '/cases': 'jobs work tickets',
-  '/case-reports': 'reports',
   '/customers': 'clients contacts',
   '/companies': 'organizations businesses',
   '/quotes': 'proforma estimates',
