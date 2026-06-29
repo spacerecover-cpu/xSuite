@@ -136,6 +136,7 @@ const router = createBrowserRouter(
         <Route path="cases" lazy={page(() => import('./pages/portal/PortalCases'), 'PortalCases')} />
         <Route path="quotes" lazy={page(() => import('./pages/portal/PortalQuotes'), 'PortalQuotes')} />
         <Route path="reports" lazy={page(() => import('./pages/portal/PortalReports'), 'default')} />
+        <Route path="documents" lazy={page(() => import('./pages/portal/PortalDocuments'), 'PortalDocuments')} />
         <Route path="purchases" lazy={page(() => import('./pages/portal/PortalPurchasesPage'), 'PortalPurchasesPage')} />
         <Route path="payments" lazy={page(() => import('./pages/portal/PortalPayments'), 'PortalPayments')} />
         <Route path="communications" lazy={page(() => import('./pages/portal/PortalCommunications'), 'PortalCommunications')} />

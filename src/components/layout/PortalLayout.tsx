@@ -5,7 +5,7 @@ import { ContentLoadingFallback } from '../shared/ContentLoadingFallback';
 import { usePortalAuth } from '../../contexts/PortalAuthContext';
 import { useTenantFeature } from '../../contexts/TenantConfigContext';
 import { CustomerAvatar } from '../ui/CustomerAvatar';
-import { FileText, DollarSign, MessageSquare, LogOut, LayoutDashboard, Settings, FileBarChart, ShoppingBag, ChevronDown, Receipt } from 'lucide-react';
+import { FileText, DollarSign, MessageSquare, LogOut, LayoutDashboard, Settings, FileBarChart, ShoppingBag, ChevronDown, Receipt, FileCheck } from 'lucide-react';
 import { AnnouncementBanner } from '../shared/AnnouncementBanner';
 import { getPortalSettings } from '../../lib/portalUrlService';
 import { logger } from '../../lib/logger';
@@ -94,6 +94,7 @@ export const PortalLayout: React.FC = () => {
     { path: '/portal/cases', label: t('portal.nav.myCases'), icon: FileText },
     { path: '/portal/quotes', label: t('portal.nav.quotes'), icon: DollarSign },
     { path: '/portal/reports', label: t('portal.nav.reports'), icon: FileBarChart },
+    { path: '/portal/documents', label: t('portal.nav.documents', { defaultValue: 'Documents' }), icon: FileCheck },
     { path: '/portal/purchases', label: t('portal.nav.myPurchases'), icon: ShoppingBag },
     { path: '/portal/payments', label: t('portal.nav.payments'), icon: Receipt },
     { path: '/portal/communications', label: t('portal.nav.messages'), icon: MessageSquare },
