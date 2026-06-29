@@ -24,8 +24,9 @@ export const PortalDocuments: React.FC = () => {
 
   const [selectedDoc, setSelectedDoc] = useState<DocumentInstance | null>(null);
   const [isSignModalOpen, setIsSignModalOpen] = useState(false);
+  const [signOffError, setSignOffError] = useState<string | null>(null);
 
-  const { data: documents = [], isLoading } = useQuery({
+  const { data: documents = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['portal_documents', customer?.id],
     queryFn: () => fetchPortalDocuments(customer!.id),
     enabled: !!customer?.id,
@@ -43,6 +44,15 @@ export const PortalDocuments: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['portal_documents', customer?.id] });
       setIsSignModalOpen(false);
+      setSignOffError(null);
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error
+          ? err.message
+          : t('portal.documents.signOffErrorFallback', { defaultValue: 'Sign-off failed. Please try again.' });
+      setSignOffError(message);
+      setIsSignModalOpen(true);
     },
   });
 
@@ -56,6 +66,7 @@ export const PortalDocuments: React.FC = () => {
 
   const handleCapture = (sig: CapturedSignature) => {
     if (!selectedDoc) return;
+    setSignOffError(null);
     signOffMutation.mutate({ docId: selectedDoc.id, sig });
   };
 
@@ -89,14 +100,28 @@ export const PortalDocuments: React.FC = () => {
         </p>
       </div>
 
-      {documents.length === 0 ? (
+      {isError && (
+        <div role="alert" className="rounded-lg border border-danger/30 bg-danger-muted p-4 text-sm">
+          <p className="text-danger font-medium">
+            {t('portal.documents.loadError', { defaultValue: 'Could not load documents.' })}
+          </p>
+          <button
+            onClick={() => refetch()}
+            className="mt-2 text-primary underline"
+          >
+            {t('portal.documents.retry', { defaultValue: 'Retry' })}
+          </button>
+        </div>
+      )}
+
+      {!isError && documents.length === 0 ? (
         <Card className="p-12 text-center">
           <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" aria-hidden="true" />
           <p className="text-lg text-slate-600">
             {t('portal.documents.noDocuments', { defaultValue: 'No documents' })}
           </p>
         </Card>
-      ) : (
+      ) : !isError && (
         <div className="grid grid-cols-1 gap-4">
           {documents.map((doc) => (
             <Card
@@ -183,7 +208,13 @@ export const PortalDocuments: React.FC = () => {
         allowedMethods={['typed', 'click_to_accept']}
         title={t('portal.documents.signOff', { defaultValue: 'Sign off' })}
         onCapture={handleCapture}
-        onClose={() => setIsSignModalOpen(false)}
+        onClose={() => {
+          if (!signOffMutation.isPending) {
+            setIsSignModalOpen(false);
+            setSignOffError(null);
+          }
+        }}
+        errorMessage={signOffError}
       />
     </div>
   );

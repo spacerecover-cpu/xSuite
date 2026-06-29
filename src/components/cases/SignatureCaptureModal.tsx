@@ -16,6 +16,7 @@ interface SignatureCaptureModalProps {
   title: string;
   onCapture: (sig: CapturedSignature) => void;
   allowedMethods?: CaptureMethod[];
+  errorMessage?: string | null;
 }
 
 const METHODS: { id: CaptureMethod; label: string }[] = [
@@ -25,7 +26,7 @@ const METHODS: { id: CaptureMethod; label: string }[] = [
   { id: 'click_to_accept', label: 'Accept' },
 ];
 
-export function SignatureCaptureModal({ open, onClose, title, onCapture, allowedMethods }: SignatureCaptureModalProps) {
+export function SignatureCaptureModal({ open, onClose, title, onCapture, allowedMethods, errorMessage }: SignatureCaptureModalProps) {
   const methods = METHODS.filter((m) => !allowedMethods || allowedMethods.includes(m.id));
   const [method, setMethod] = useState<CaptureMethod>(methods[0]?.id ?? 'typed');
   const [typedValue, setTypedValue] = useState('');
@@ -227,6 +228,12 @@ export function SignatureCaptureModal({ open, onClose, title, onCapture, allowed
             <label htmlFor="sig-accept" className="text-sm text-slate-700">
               I confirm that this action constitutes my electronic signature
             </label>
+          </div>
+        )}
+
+        {errorMessage && (
+          <div role="alert" className="rounded-md border border-danger/30 bg-danger-muted px-3 py-2 text-sm text-danger">
+            {errorMessage}
           </div>
         )}
 
