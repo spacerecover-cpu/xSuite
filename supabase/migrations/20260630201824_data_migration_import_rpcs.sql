@@ -85,14 +85,19 @@ DECLARE
   v_tenant uuid;
   v_row jsonb;
   v_legacy text;
-  v_refs jsonb;
   v_new_id uuid;
   v_existing uuid;
   v_existing_status text;
   v_err text;
   v_results jsonb := '[]'::jsonb;
+  -- flat parent-ref legacy ids (workbook/export shape: top-level *_legacy_id keys)
+  v_customer_legacy text; v_company_legacy text; v_case_legacy text;
+  v_quote_legacy text; v_invoice_legacy text;
   -- resolved parents
   v_case uuid; v_customer uuid; v_company uuid; v_quote uuid; v_invoice uuid;
+  -- resolved device catalog refs (by name → uuid; unknown name → NULL, report-only)
+  v_device_type_id uuid; v_brand_id uuid; v_capacity_id uuid;
+  v_interface_id uuid; v_condition_id uuid;
 BEGIN
   -- transaction-local: suppress fabricating triggers + permit explicit-tenant inserts
   PERFORM set_config('app.importing', 'true', true);
@@ -109,7 +114,12 @@ BEGIN
   FOR v_row IN SELECT * FROM jsonb_array_elements(p_rows)
   LOOP
     v_legacy := v_row->>'legacy_id';
-    v_refs := COALESCE(v_row->'parentRefs', '{}'::jsonb);
+    -- Parent refs are FLAT top-level keys (the export/workbook contract), NOT a parentRefs sub-object.
+    v_customer_legacy := NULLIF(v_row->>'customer_legacy_id', '');
+    v_company_legacy  := NULLIF(v_row->>'company_legacy_id', '');
+    v_case_legacy     := NULLIF(v_row->>'case_legacy_id', '');
+    v_quote_legacy    := NULLIF(v_row->>'quote_legacy_id', '');
+    v_invoice_legacy  := NULLIF(v_row->>'invoice_legacy_id', '');
     v_new_id := NULL;
     v_err := NULL;
 
@@ -144,10 +154,17 @@ BEGIN
                 COALESCE((v_row->>'created_at')::timestamptz, now()));
 
       ELSIF p_entity_type = 'relationships' THEN
-        v_customer := data_migration__resolve(p_run_id, 'customers', v_refs->>'customer_legacy_id');
-        v_company  := data_migration__resolve(p_run_id, 'companies', v_refs->>'company_legacy_id');
+        -- relationships require BOTH parents.
+        IF v_customer_legacy IS NULL THEN
+          RAISE EXCEPTION 'relationship row missing required customer_legacy_id';
+        END IF;
+        IF v_company_legacy IS NULL THEN
+          RAISE EXCEPTION 'relationship row missing required company_legacy_id';
+        END IF;
+        v_customer := data_migration__resolve(p_run_id, 'customers', v_customer_legacy);
+        v_company  := data_migration__resolve(p_run_id, 'companies', v_company_legacy);
         IF v_customer IS NULL OR v_company IS NULL THEN
-          RAISE EXCEPTION 'unresolved parent (customer=% company=%)', v_refs->>'customer_legacy_id', v_refs->>'company_legacy_id';
+          RAISE EXCEPTION 'unresolved parent (customer=% company=%)', v_customer_legacy, v_company_legacy;
         END IF;
         INSERT INTO customer_company_relationships (id, tenant_id, customer_id, company_id, role, is_primary, created_at)
         VALUES (v_new_id, v_tenant, v_customer, v_company, v_row->>'role',
@@ -155,8 +172,21 @@ BEGIN
                 COALESCE((v_row->>'created_at')::timestamptz, now()));
 
       ELSIF p_entity_type = 'cases' THEN
-        v_customer := data_migration__resolve(p_run_id, 'customers', v_refs->>'customer_legacy_id');
-        v_company  := data_migration__resolve(p_run_id, 'companies', v_refs->>'company_legacy_id');
+        -- cases require customer (FK target of recovered job); company is optional.
+        IF v_customer_legacy IS NULL THEN
+          RAISE EXCEPTION 'case row missing required customer_legacy_id';
+        END IF;
+        v_customer := data_migration__resolve(p_run_id, 'customers', v_customer_legacy);
+        IF v_customer IS NULL THEN
+          RAISE EXCEPTION 'unresolved customer %', v_customer_legacy;
+        END IF;
+        -- company optional: resolve only when a legacy id was supplied.
+        v_company := CASE WHEN v_company_legacy IS NOT NULL
+                          THEN data_migration__resolve(p_run_id, 'companies', v_company_legacy)
+                          ELSE NULL END;
+        IF v_company_legacy IS NOT NULL AND v_company IS NULL THEN
+          RAISE EXCEPTION 'unresolved company %', v_company_legacy;
+        END IF;
         -- cases.title is GENERATED ALWAYS AS (subject) and case_no AS (case_number); never insert them.
         INSERT INTO cases (id, tenant_id, case_number, customer_id, company_id, status, subject, description, created_at)
         VALUES (v_new_id, v_tenant, v_row->>'case_number', v_customer, v_company, v_row->>'status',
@@ -164,19 +194,38 @@ BEGIN
                 COALESCE((v_row->>'created_at')::timestamptz, now()));
 
       ELSIF p_entity_type = 'devices' THEN
-        v_case := data_migration__resolve(p_run_id, 'cases', v_refs->>'case_legacy_id');
-        IF v_case IS NULL THEN RAISE EXCEPTION 'unresolved case %', v_refs->>'case_legacy_id'; END IF;
+        IF v_case_legacy IS NULL THEN
+          RAISE EXCEPTION 'device row missing required case_legacy_id';
+        END IF;
+        v_case := data_migration__resolve(p_run_id, 'cases', v_case_legacy);
+        IF v_case IS NULL THEN RAISE EXCEPTION 'unresolved case %', v_case_legacy; END IF;
+        -- Catalog refs arrive as human-readable NAME keys (device_type/brand/capacity/interface/
+        -- condition), NOT *_id uuids. Resolve by lower(name) against the global catalog tables
+        -- (FK targets verified against live schema). Locked default: an UNKNOWN name → NULL
+        -- (report-only), never a row error.
+        SELECT id INTO v_device_type_id FROM catalog_device_types
+          WHERE lower(name) = lower(NULLIF(v_row->>'device_type','')) LIMIT 1;
+        SELECT id INTO v_brand_id FROM catalog_device_brands
+          WHERE lower(name) = lower(NULLIF(v_row->>'brand','')) LIMIT 1;
+        SELECT id INTO v_capacity_id FROM catalog_device_capacities
+          WHERE lower(name) = lower(NULLIF(v_row->>'capacity','')) LIMIT 1;
+        SELECT id INTO v_interface_id FROM catalog_interfaces
+          WHERE lower(name) = lower(NULLIF(v_row->>'interface','')) LIMIT 1;
+        SELECT id INTO v_condition_id FROM catalog_device_conditions
+          WHERE lower(name) = lower(NULLIF(v_row->>'condition','')) LIMIT 1;
         INSERT INTO case_devices (id, tenant_id, case_id, device_type_id, brand_id, capacity_id, interface_id, condition_id,
                                   model, serial_number, symptoms, notes, created_at)
         VALUES (v_new_id, v_tenant, v_case,
-                NULLIF(v_row->>'device_type_id','')::uuid, NULLIF(v_row->>'brand_id','')::uuid,
-                NULLIF(v_row->>'capacity_id','')::uuid, NULLIF(v_row->>'interface_id','')::uuid,
-                NULLIF(v_row->>'condition_id','')::uuid,
+                v_device_type_id, v_brand_id, v_capacity_id, v_interface_id, v_condition_id,
                 v_row->>'model', v_row->>'serial_number', v_row->>'symptoms', v_row->>'notes',
                 COALESCE((v_row->>'created_at')::timestamptz, now()));
 
       ELSIF p_entity_type = 'quotes' THEN
-        v_case := data_migration__resolve(p_run_id, 'cases', v_refs->>'case_legacy_id');
+        IF v_case_legacy IS NULL THEN
+          RAISE EXCEPTION 'quote row missing required case_legacy_id';
+        END IF;
+        v_case := data_migration__resolve(p_run_id, 'cases', v_case_legacy);
+        IF v_case IS NULL THEN RAISE EXCEPTION 'unresolved case %', v_case_legacy; END IF;
         INSERT INTO quotes (id, tenant_id, quote_number, case_id, status, subtotal, tax_amount, total_amount, notes, created_at)
         VALUES (v_new_id, v_tenant, v_row->>'quote_number', v_case, v_row->>'status',
                 COALESCE((v_row->>'subtotal')::numeric, 0), COALESCE((v_row->>'tax_amount')::numeric, 0),
@@ -184,8 +233,11 @@ BEGIN
                 COALESCE((v_row->>'created_at')::timestamptz, now()));
 
       ELSIF p_entity_type = 'quoteItems' THEN
-        v_quote := data_migration__resolve(p_run_id, 'quotes', v_refs->>'quote_legacy_id');
-        IF v_quote IS NULL THEN RAISE EXCEPTION 'unresolved quote %', v_refs->>'quote_legacy_id'; END IF;
+        IF v_quote_legacy IS NULL THEN
+          RAISE EXCEPTION 'quoteItem row missing required quote_legacy_id';
+        END IF;
+        v_quote := data_migration__resolve(p_run_id, 'quotes', v_quote_legacy);
+        IF v_quote IS NULL THEN RAISE EXCEPTION 'unresolved quote %', v_quote_legacy; END IF;
         INSERT INTO quote_items (id, tenant_id, quote_id, description, quantity, unit_price, total, sort_order, created_at)
         VALUES (v_new_id, v_tenant, v_quote, v_row->>'description',
                 COALESCE((v_row->>'quantity')::numeric, 1), COALESCE((v_row->>'unit_price')::numeric, 0),
@@ -193,7 +245,11 @@ BEGIN
                 COALESCE((v_row->>'created_at')::timestamptz, now()));
 
       ELSIF p_entity_type = 'invoices' THEN
-        v_case := data_migration__resolve(p_run_id, 'cases', v_refs->>'case_legacy_id');
+        IF v_case_legacy IS NULL THEN
+          RAISE EXCEPTION 'invoice row missing required case_legacy_id';
+        END IF;
+        v_case := data_migration__resolve(p_run_id, 'cases', v_case_legacy);
+        IF v_case IS NULL THEN RAISE EXCEPTION 'unresolved case %', v_case_legacy; END IF;
         INSERT INTO invoices (id, tenant_id, invoice_number, case_id, status, subtotal, tax_amount, total_amount, notes, created_at)
         VALUES (v_new_id, v_tenant, v_row->>'invoice_number', v_case, COALESCE(v_row->>'status','draft'),
                 COALESCE((v_row->>'subtotal')::numeric, 0), COALESCE((v_row->>'tax_amount')::numeric, 0),
@@ -201,8 +257,11 @@ BEGIN
                 COALESCE((v_row->>'created_at')::timestamptz, now()));
 
       ELSIF p_entity_type = 'invoiceLineItems' THEN
-        v_invoice := data_migration__resolve(p_run_id, 'invoices', v_refs->>'invoice_legacy_id');
-        IF v_invoice IS NULL THEN RAISE EXCEPTION 'unresolved invoice %', v_refs->>'invoice_legacy_id'; END IF;
+        IF v_invoice_legacy IS NULL THEN
+          RAISE EXCEPTION 'invoiceLineItem row missing required invoice_legacy_id';
+        END IF;
+        v_invoice := data_migration__resolve(p_run_id, 'invoices', v_invoice_legacy);
+        IF v_invoice IS NULL THEN RAISE EXCEPTION 'unresolved invoice %', v_invoice_legacy; END IF;
         INSERT INTO invoice_line_items (id, tenant_id, invoice_id, description, quantity, unit_price, tax_amount, total, sort_order, created_at)
         VALUES (v_new_id, v_tenant, v_invoice, v_row->>'description',
                 COALESCE((v_row->>'quantity')::numeric, 1), COALESCE((v_row->>'unit_price')::numeric, 0),
@@ -211,15 +270,21 @@ BEGIN
                 COALESCE((v_row->>'created_at')::timestamptz, now()));
 
       ELSIF p_entity_type = 'notes' THEN
-        v_case := data_migration__resolve(p_run_id, 'cases', v_refs->>'case_legacy_id');
-        IF v_case IS NULL THEN RAISE EXCEPTION 'unresolved case %', v_refs->>'case_legacy_id'; END IF;
+        IF v_case_legacy IS NULL THEN
+          RAISE EXCEPTION 'note row missing required case_legacy_id';
+        END IF;
+        v_case := data_migration__resolve(p_run_id, 'cases', v_case_legacy);
+        IF v_case IS NULL THEN RAISE EXCEPTION 'unresolved case %', v_case_legacy; END IF;
         INSERT INTO case_internal_notes (id, tenant_id, case_id, content, created_at)
         VALUES (v_new_id, v_tenant, v_case, COALESCE(v_row->>'content',''),
                 COALESCE((v_row->>'created_at')::timestamptz, now()));
 
       ELSIF p_entity_type = 'statusHistory' THEN
-        v_case := data_migration__resolve(p_run_id, 'cases', v_refs->>'case_legacy_id');
-        IF v_case IS NULL THEN RAISE EXCEPTION 'unresolved case %', v_refs->>'case_legacy_id'; END IF;
+        IF v_case_legacy IS NULL THEN
+          RAISE EXCEPTION 'statusHistory row missing required case_legacy_id';
+        END IF;
+        v_case := data_migration__resolve(p_run_id, 'cases', v_case_legacy);
+        IF v_case IS NULL THEN RAISE EXCEPTION 'unresolved case %', v_case_legacy; END IF;
         INSERT INTO case_job_history (id, tenant_id, case_id, action, old_value, new_value, created_at)
         VALUES (v_new_id, v_tenant, v_case, COALESCE(v_row->>'action','STATUS_CHANGED'),
                 v_row->>'old_value', v_row->>'new_value',
@@ -282,7 +347,9 @@ BEGIN
       ('customers','customers','customers_enhanced','customer_number'),
       ('companies','companies','companies',       'company_number'),
       ('quotes',   'quote',    'quotes',          'quote_number'),
-      ('invoices', 'invoice',  'invoices',        'invoice_number')
+      -- invoice numbering uses scope 'invoices' (get_next_invoice_number → get_next_number('invoices'));
+      -- the legacy 'invoice' row is vestigial. Confirmed against live number_sequences + generators.
+      ('invoices', 'invoices', 'invoices',        'invoice_number')
     ) AS s(entity_type, scope, tbl, col)
   LOOP
     EXECUTE format(
