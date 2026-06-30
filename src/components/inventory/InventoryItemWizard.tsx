@@ -659,6 +659,8 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
               </div>
             </div>
 
+            {/* Donor Parts + Location — side by side on one row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
             {/* ── Section 3b: Donor Parts ──────────────────────── */}
             {(form.is_donor as boolean) && getDonorParts(family).length > 0 && (
               <div className="rounded-lg border border-border bg-surface-muted p-4 space-y-3">
@@ -704,8 +706,10 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
               </div>
             )}
 
-            {/* ── Section 4: Location ───────────────────────────── */}
-            <div className="rounded-lg border border-border bg-surface-muted p-4 space-y-3">
+            {/* ── Section 4: Location (spans full width when donor parts hidden) ─ */}
+            <div className={`rounded-lg border border-border bg-surface-muted p-4 space-y-3 ${
+              !((form.is_donor as boolean) && getDonorParts(family).length > 0) ? 'lg:col-span-2' : ''
+            }`}>
               <div className="flex items-center gap-2">
                 <ChevronRight className="w-3.5 h-3.5 text-primary" />
                 <h3 className={SECTION_HEAD}>Location</h3>
@@ -722,6 +726,7 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                   <p className="mt-1 text-xs text-primary/70">{autoLocationHint}</p>
                 )}
               </div>
+            </div>
             </div>
 
             {/* ── Submit error ──────────────────────────────────── */}
