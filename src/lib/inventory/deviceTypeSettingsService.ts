@@ -23,24 +23,31 @@ export async function setDeviceTypeDefaultLocation(
   deviceTypeId: string,
   locationId: string | null,
 ): Promise<void> {
-  if (locationId !== null) {
+  // The unique index on (tenant_id, device_type_id) is PARTIAL (WHERE deleted_at IS NULL),
+  // so PostgREST cannot infer it for ON CONFLICT — upsert would always emit 42P10.
+  // Use a read-then-insert/update reconcile identical to setItemDonorParts.
+  const { data: existing, error: selectErr } = await supabase
+    .from('tenant_device_type_settings')
+    .select('id')
+    .eq('device_type_id', deviceTypeId)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (selectErr) throw selectErr;
+
+  if (existing) {
+    const { error } = await supabase
+      .from('tenant_device_type_settings')
+      .update({ default_location_id: locationId })
+      .eq('id', existing.id);
+    if (error) throw error;
+  } else {
+    if (locationId === null) return; // nothing to create for a null clear
     // tenant_id is stamped server-side by the set_*_tenant_and_audit trigger;
-    // supplied here only to satisfy the generated Insert type. resolveTenantId()
-    // mirrors the established client pattern and is not the source of isolation.
+    // supplied here only to satisfy the generated Insert type.
     const tenantId = await resolveTenantId();
     const { error } = await supabase
       .from('tenant_device_type_settings')
-      .upsert(
-        { tenant_id: tenantId, device_type_id: deviceTypeId, default_location_id: locationId },
-        { onConflict: 'tenant_id,device_type_id' },
-      );
-    if (error) throw error;
-  } else {
-    const { error } = await supabase
-      .from('tenant_device_type_settings')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('device_type_id', deviceTypeId)
-      .is('deleted_at', null);
+      .insert({ tenant_id: tenantId, device_type_id: deviceTypeId, default_location_id: locationId });
     if (error) throw error;
   }
 }

@@ -144,7 +144,6 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [itemNumber, setItemNumber] = useState<string>('');
-  const [loadingNumber, setLoadingNumber] = useState(false);
   const [autoLocationHint, setAutoLocationHint] = useState<string>('');
   const locationUserChanged = useRef(false);
 
@@ -218,18 +217,12 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
   const family = resolveFamily(form.device_type_id as string);
   const familyConfig = getDeviceFamilyConfig(family);
 
-  // Load next number when device type changes
+  // Show a non-consuming pattern hint when device type changes (create mode only).
+  // The real number is allocated exactly once at submit via getNextInventoryNumber.
   useEffect(() => {
     const typeId = form.device_type_id as string;
     if (!typeId || isEdit) return;
-    let cancelled = false;
-    setLoadingNumber(true);
     setItemNumber(numberPreview(deviceTypes, typeId));
-    getNextInventoryNumber(typeId)
-      .then(n => { if (!cancelled) setItemNumber(n); })
-      .catch(() => { if (!cancelled) setItemNumber(numberPreview(deviceTypes, typeId)); })
-      .finally(() => { if (!cancelled) setLoadingNumber(false); });
-    return () => { cancelled = true; };
   }, [form.device_type_id, deviceTypes, isEdit]);
 
   // When device type is selected, auto-populate category_id from default_category_id
@@ -463,17 +456,13 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
       maxWidth="7xl"
       closeOnBackdrop={false}
       headerAction={
-        (itemNumber || loadingNumber) ? (
+        itemNumber ? (
           <div className="flex items-center gap-2 px-3 py-1.5 bg-info-muted border border-info/30 rounded-lg">
             <Hash className="w-3.5 h-3.5 text-info" />
             <span className="text-xs font-medium text-slate-600">
-              {isEdit ? 'Item Number:' : 'Next Number:'}
+              {isEdit ? 'Item Number:' : 'Number Pattern:'}
             </span>
-            {loadingNumber ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-info" />
-            ) : (
-              <span className="text-sm font-bold text-info font-mono">{itemNumber}</span>
-            )}
+            <span className="text-sm font-bold text-info font-mono">{itemNumber}</span>
           </div>
         ) : undefined
       }

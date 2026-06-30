@@ -196,7 +196,7 @@ export default function DonorSearchPage() {
       ? (drive.pcb_number ?? td?.pcb_number ?? '') === searchedPcb
       : true;
     const fwMatch = searchedFirmware
-      ? (drive.firmware_version ?? td?.firmware ?? '') === searchedFirmware
+      ? (td?.firmware_version ?? '') === searchedFirmware
       : true;
     return pcbMatch && fwMatch;
   };
@@ -485,9 +485,9 @@ export default function DonorSearchPage() {
                       <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Technical Specs</div>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                         {renderTechSpec('PCB', drive.pcb_number ?? (td?.pcb_number as string | null))}
-                        {renderTechSpec('Firmware', drive.firmware_version ?? (td?.firmware as string | null))}
+                        {renderTechSpec('Firmware', td?.firmware_version as string | null)}
                         {renderTechSpec('DCM', td?.dcm as string | null)}
-                        {renderTechSpec('Head Map', drive.head_map ?? (td?.head_map as string | null))}
+                        {renderTechSpec('Head Map', td?.physical_head_map as string | null)}
                         {renderTechSpec('Controller', td?.controller as string | null)}
                         {renderTechSpec('Chipset', td?.chipset as string | null)}
                       </div>
