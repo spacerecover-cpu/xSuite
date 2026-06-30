@@ -28,7 +28,6 @@ import {
   createInventoryItem,
   updateInventoryItem,
   getInventoryItemById,
-  getNextInventoryNumber,
 } from '../../lib/inventoryService';
 import { useQuery } from '@tanstack/react-query';
 import { supabase, getTenantId } from '../../lib/supabaseClient';
@@ -390,14 +389,12 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
       } else {
         const tenantId = getTenantId();
         if (!tenantId) throw new Error('No tenant context. Please log in again.');
-        // Fetch the real next number at submit time (the preview may be stale)
-        const nextNumber = await getNextInventoryNumber(typeId);
+        // item_number/barcode/qr_value are assigned atomically by the DB trigger
+        // (trg_assign_inventory_item_number) inside the insert transaction, so a failed
+        // insert never burns a sequence number (no phantom counter advances).
         const created = await createInventoryItem({
           ...basePayload,
           tenant_id: tenantId,
-          item_number: nextNumber,
-          qr_value: nextNumber,
-          barcode: nextNumber,
         });
         if (!created) throw new Error('Failed to create inventory item');
         savedItemId = created.id;
