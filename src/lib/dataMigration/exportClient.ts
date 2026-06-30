@@ -1,4 +1,5 @@
 import { supabase, getTenantId } from '../supabaseClient';
+import type { Json } from '../../types/database.types';
 import { buildWorkbook, type WorkbookMeta } from './workbookBuilder';
 import {
   IMPORT_ORDER,
@@ -51,10 +52,12 @@ export async function runExport(
     for (;;) {
       const { data: page, error } = await supabase.rpc('data_migration_export_page', {
         p_entity_type: entity,
-        p_after_created_at: afterCreatedAt,
-        p_after_id: afterId,
+        // Cursor args are nullable in the SQL fn (NULL on the first page); the generated
+        // types mark them non-null, so pass through as the RPC expects.
+        p_after_created_at: afterCreatedAt as unknown as string,
+        p_after_id: afterId as unknown as string,
         p_limit: EXPORT_PAGE_SIZE,
-        p_filters: filters,
+        p_filters: filters as Json,
       });
       if (error) throw new Error(`export failed for ${entity}: ${error.message}`);
 
