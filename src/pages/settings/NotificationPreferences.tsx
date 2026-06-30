@@ -377,7 +377,7 @@ export const NotificationPreferences: React.FC = () => {
           <Bell className="w-7 h-7 text-white" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-1">
+          <h1 className="text-xl font-bold text-slate-900 mb-1">
             Notifications
           </h1>
           <p className="text-slate-600 text-sm">

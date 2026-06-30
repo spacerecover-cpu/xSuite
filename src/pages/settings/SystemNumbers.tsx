@@ -192,8 +192,8 @@ export const SystemNumbers: React.FC = () => {
             <Hash className="w-8 h-8 text-accent-foreground" />
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">System & Numbers</h1>
-            <p className="text-slate-600 text-base">Configure automatic numbering sequences for all entities</p>
+            <h1 className="text-xl font-bold text-slate-900 mb-2">System & Numbers</h1>
+            <p className="text-slate-600 text-sm">Configure automatic numbering sequences for all entities</p>
           </div>
         </div>
       </div>

@@ -248,8 +248,8 @@ export const ClientPortalSettings: React.FC = () => {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Client Portal Settings</h1>
-          <p className="mt-1 text-slate-600">
+          <h1 className="text-xl font-bold text-slate-900">Client Portal Settings</h1>
+          <p className="mt-1 text-sm text-slate-600">
             Configure portal access, security, and customer-facing features
           </p>
         </div>

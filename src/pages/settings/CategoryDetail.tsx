@@ -102,8 +102,8 @@ export const CategoryDetail: React.FC = () => {
             <category.icon className="w-8 h-8 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">{category.title}</h1>
-            <p className="text-slate-600 text-lg">{category.description}</p>
+            <h1 className="text-xl font-bold text-slate-900 mb-2">{category.title}</h1>
+            <p className="text-slate-600 text-sm">{category.description}</p>
           </div>
         </div>
 
@@ -607,8 +607,8 @@ export const CategoryDetail: React.FC = () => {
               <category.icon className="w-6 h-6 md:w-7 md:h-7 text-white" />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-bold text-slate-900 mb-1">{category.title}</h1>
-              <p className="text-slate-600 text-sm md:text-base">{category.description}</p>
+              <h1 className="text-xl font-bold text-slate-900 mb-1">{category.title}</h1>
+              <p className="text-slate-600 text-sm">{category.description}</p>
             </div>
           </div>
 

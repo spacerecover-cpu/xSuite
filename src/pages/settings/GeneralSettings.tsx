@@ -657,7 +657,7 @@ export const GeneralSettings: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl font-bold text-slate-900">General Settings</h1>
+              <h1 className="text-xl font-bold text-slate-900">General Settings</h1>
               {hasUnsavedChanges && (
                 <span className="px-3 py-1 bg-warning-muted text-warning text-sm font-semibold rounded-full border border-warning/30 flex items-center gap-1.5">
                   <AlertCircle className="w-4 h-4" />
@@ -665,7 +665,7 @@ export const GeneralSettings: React.FC = () => {
                 </span>
               )}
             </div>
-            <p className="text-slate-600 text-base">
+            <p className="text-slate-600 text-sm">
               Configure company information, branding assets, and business details
             </p>
             {lastSavedAt && (
