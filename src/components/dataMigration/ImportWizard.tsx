@@ -12,8 +12,8 @@ import {
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
-import { parseWorkbook, computeFileHash } from '../../lib/dataMigration/workbookParser';
-import { validateWorkbook } from '../../lib/dataMigration/importValidator';
+import { parseWorkbook, readWorkbookMeta, computeFileHash } from '../../lib/dataMigration/workbookParser';
+import { validateWorkbook, validateSchemaVersion } from '../../lib/dataMigration/importValidator';
 import { runImport } from '../../lib/dataMigration/importClient';
 import { IMPORT_ORDER, SHEET_NAMES } from '../../lib/dataMigration/workbookContract';
 import type { ParsedWorkbook, EntityType } from '../../lib/dataMigration/workbookContract';
@@ -69,6 +69,18 @@ export const ImportWizard: React.FC<Props> = ({ onClose }) => {
         Promise.resolve(parseWorkbook(buf)),
       ]);
       const report = validateWorkbook(wb);
+      // I3: reject incompatible workbook schema versions before anything else.
+      const versionCheck = validateSchemaVersion(readWorkbookMeta(buf));
+      if (!versionCheck.ok) {
+        report.issues.unshift({
+          entity: IMPORT_ORDER[0],
+          rowIndex: -1,
+          severity: 'error',
+          field: 'schema_version',
+          message: versionCheck.message ?? 'Incompatible workbook schema version.',
+        });
+        report.ok = false;
+      }
       setParsedWb(wb);
       setFileMeta({ filename: file.name, hash });
       setValidation(report);

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as XLSX from 'xlsx';
 import { buildWorkbook, type WorkbookMeta } from './workbookBuilder';
+import { parseWorkbook } from './workbookParser';
 import {
   SHEET_NAMES,
   ENTITY_COLUMNS,
@@ -49,7 +50,7 @@ describe('buildWorkbook', () => {
     expect(headerRows[0]).toEqual(ENTITY_COLUMNS.companies.map((c) => c.header));
   });
 
-  it('preserves row values keyed by ColumnDef.key (header-mapped) on round-trip', () => {
+  it('writes values under the human HEADER (raw SheetJS read is header-keyed)', () => {
     const firstCol = ENTITY_COLUMNS.companies[0];
     const data = emptyData();
     data.companies = [
@@ -60,8 +61,24 @@ describe('buildWorkbook', () => {
     const wb = XLSX.read(buildWorkbook(data, meta), { type: 'array' });
     const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[SHEET_NAMES.companies]);
     expect(rows).toHaveLength(1);
-    // values are written under the human header, keyed back by header
+    // Raw SheetJS read keys by the human header (builder writes col.header as the column label).
     expect(rows[0][firstCol.header]).toBe(`${firstCol.key}-val`);
+    // The header text is NOT a ColumnDef.key — proving the parser must translate it back.
+    expect(rows[0][firstCol.key]).toBeUndefined();
+  });
+
+  it('parseWorkbook recovers ColumnDef.key-shaped rows from buildWorkbook output (symmetry)', () => {
+    const data = emptyData();
+    data.companies = [
+      Object.fromEntries(
+        ENTITY_COLUMNS.companies.map((c) => [c.key, `${c.key}-val`]),
+      ) as RawRow,
+    ];
+    const parsed = parseWorkbook(buildWorkbook(data, meta));
+    expect(parsed.companies).toHaveLength(1);
+    for (const c of ENTITY_COLUMNS.companies) {
+      expect(parsed.companies[0][c.key]).toBe(`${c.key}-val`);
+    }
   });
 
   it('writes meta fields into the _meta sheet', () => {

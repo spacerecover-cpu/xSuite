@@ -6,17 +6,21 @@ import { HeaderSlotProvider } from '../../contexts/HeaderSlotContext';
 
 const mocks = vi.hoisted(() => ({
   parseWorkbook: vi.fn(),
+  readWorkbookMeta: vi.fn(() => ({ schemaVersion: 1, sourceTenant: null, exportedAt: null })),
   computeFileHash: vi.fn(async () => 'sha256:aabbccdd'),
   validateWorkbook: vi.fn(),
+  validateSchemaVersion: vi.fn(() => ({ ok: true })),
   runImport: vi.fn(),
 }));
 
 vi.mock('../../lib/dataMigration/workbookParser', () => ({
   parseWorkbook: mocks.parseWorkbook,
+  readWorkbookMeta: mocks.readWorkbookMeta,
   computeFileHash: mocks.computeFileHash,
 }));
 vi.mock('../../lib/dataMigration/importValidator', () => ({
   validateWorkbook: mocks.validateWorkbook,
+  validateSchemaVersion: mocks.validateSchemaVersion,
 }));
 vi.mock('../../lib/dataMigration/importClient', () => ({
   runImport: mocks.runImport,

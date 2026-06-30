@@ -158,8 +158,8 @@ export const ENTITY_COLUMNS: Record<EntityType, ColumnDef[]> = {
 
   // ── devices (→ case_devices table) ───────────────────────────────────────
   // Catalog FKs (device_type_id, brand_id, capacity_id, interface_id,
-  // condition_id) are represented as human-readable strings; the RPC
-  // resolves them by name via catalogResolver at import time.
+  // condition_id) are represented as human-readable strings; the import RPC
+  // (data_migration_import_batch) resolves them by name server-side at import time.
   devices: [
     { key: 'legacy_id',       header: 'Legacy ID',       type: 'string',  required: true },
     { key: 'case_legacy_id',  header: 'Case Legacy ID',  type: 'string',  required: true, ref: 'cases' },
