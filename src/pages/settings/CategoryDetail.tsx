@@ -9,9 +9,10 @@ import { Modal } from '../../components/ui/Modal';
 import { Table } from '../../components/ui/Table';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Plus, Edit2, Trash2, ChevronLeft, Sparkles, Search, X, Star, ToggleLeft, ToggleRight } from 'lucide-react';
-import { SETTINGS_CATEGORIES, MasterDataTable, TABLE_LABELS, isTenantScopedTable, hasDeletedAt } from '../../config/settingsCategories';
+import { SETTINGS_CATEGORIES, MasterDataTable, TABLE_LABELS, isTenantScopedTable, hasDeletedAt, hasActiveToggle } from '../../config/settingsCategories';
 import type { Database } from '../../types/database.types';
 import { HierarchicalLocationPicker } from '../../components/inventory/HierarchicalLocationPicker';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { settingsKeys } from '../../lib/queryKeys';
 import {
   checkIfSeeded,
@@ -72,6 +73,7 @@ export const CategoryDetail: React.FC = () => {
   if (!category) {
     return (
       <div className="text-center py-12">
+        <PageHeaderSlot title="Settings" />
         <p className="text-slate-600">Category not found</p>
         <Button onClick={() => navigate('/settings')} className="mt-4">
           Back to Settings
@@ -83,29 +85,15 @@ export const CategoryDetail: React.FC = () => {
   if (category.tables.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+        <PageHeaderSlot title={category.title} />
+
         <button
           onClick={() => navigate('/settings')}
-          className="flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-8 transition-all hover:gap-3 font-medium"
+          className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900 mb-4 transition-all hover:gap-2.5 font-medium"
         >
-          <ChevronLeft className="w-5 h-5" />
-          <span>Back</span>
+          <ChevronLeft className="w-4 h-4" />
+          <span>Back to Settings</span>
         </button>
-
-        <div className="mb-8 flex items-start gap-6">
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg"
-            style={{
-              backgroundColor: category.backgroundColor,
-              boxShadow: `0 10px 40px -10px ${category.backgroundColor}80`
-            }}
-          >
-            <category.icon className="w-8 h-8 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-2">{category.title}</h1>
-            <p className="text-slate-600 text-sm">{category.description}</p>
-          </div>
-        </div>
 
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
           <div
@@ -363,6 +351,10 @@ export const CategoryDetail: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['payment_methods_active'] });
       queryClient.invalidateQueries({ queryKey: ['master'] });
     },
+    onError: (error: Error) => {
+      logger.error('Toggle active error:', error);
+      toast.error(`Could not update visibility: ${error.message}`);
+    },
   });
 
   const handleToggleActive = (item: MasterDataItem) => {
@@ -490,7 +482,7 @@ export const CategoryDetail: React.FC = () => {
     }
   };
 
-  const hasEnabledToggle = activeTable === 'master_payment_methods';
+  const hasEnabledToggle = activeTable === 'master_payment_methods' || hasActiveToggle(activeTable);
 
   const columns = [
     {
@@ -508,17 +500,25 @@ export const CategoryDetail: React.FC = () => {
     {
       key: 'name',
       header: 'Name',
-      render: (row: MasterDataItem) => (
-        <div className="flex items-center gap-3">
-          {row.color && (
-            <div
-              className="w-5 h-5 rounded-md shadow-sm border border-slate-200"
-              style={{ backgroundColor: row.color }}
-            />
-          )}
-          <span className="font-medium text-slate-900">{row.name}</span>
-        </div>
-      ),
+      render: (row: MasterDataItem) => {
+        const inactive = hasEnabledToggle && row.is_active === false;
+        return (
+          <div className="flex items-center gap-3">
+            {row.color && (
+              <div
+                className="w-5 h-5 rounded-md shadow-sm border border-slate-200"
+                style={{ backgroundColor: row.color }}
+              />
+            )}
+            <span className={`font-medium ${inactive ? 'text-slate-400' : 'text-slate-900'}`}>{row.name}</span>
+            {inactive && (
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                Hidden
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     ...(hasEnabledToggle
       ? [
@@ -590,70 +590,55 @@ export const CategoryDetail: React.FC = () => {
     },
   ];
 
+  const seedEligible = ['device-media', 'client-financial', 'case-service'].includes(category.id) && !isSeeded;
+  // The page title now lives in the top-bar breadcrumb (PageHeaderSlot); the seed
+  // button is portaled into the bar's actions host so it sits top-right.
+  const seedAction = seedEligible ? (
+    <div className="relative group">
+      <Button
+        onClick={handleSeedData}
+        disabled={isSeeding}
+        variant="primary"
+        className="shadow-md"
+      >
+        {isSeeding ? (
+          <>
+            <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            Seeding...
+          </>
+        ) : (
+          <>
+            <Sparkles className="w-4 h-4 mr-2" />
+            One-Time Seed
+          </>
+        )}
+      </Button>
+      {!isSeeding && (
+        <div className="absolute top-full right-0 mt-2 w-64 bg-slate-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 shadow-lg z-10">
+          <p className="font-semibold mb-1">Smart Seeding</p>
+          <p>Only empty tables will be seeded. Tables with existing data will be skipped automatically.</p>
+        </div>
+      )}
+    </div>
+  ) : undefined;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      <PageHeaderSlot title={category.title} actions={seedAction} />
+
       <button
         onClick={() => navigate('/settings')}
-        className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900 mb-3 transition-all hover:gap-2.5 font-medium"
+        className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900 mb-4 transition-all hover:gap-2.5 font-medium"
       >
         <ChevronLeft className="w-4 h-4" />
-        <span>Back</span>
+        <span>Back to Settings</span>
       </button>
 
-      <div className="mb-5">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md flex-shrink-0"
-              style={{
-                backgroundColor: category.backgroundColor,
-                boxShadow: `0 8px 24px -8px ${category.backgroundColor}80`
-              }}
-            >
-              <category.icon className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-900 mb-0.5">{category.title}</h1>
-              <p className="text-slate-600 text-sm">{category.description}</p>
-            </div>
-          </div>
-
-          {['device-media', 'client-financial', 'case-service'].includes(category.id) && !isSeeded && (
-            <div className="relative group">
-              <Button
-                onClick={handleSeedData}
-                disabled={isSeeding}
-                variant="primary"
-                className="shadow-md self-start md:self-auto"
-              >
-                {isSeeding ? (
-                  <>
-                    <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Seeding...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    One-Time Seed
-                  </>
-                )}
-              </Button>
-              {!isSeeding && (
-                <div className="absolute top-full right-0 mt-2 w-64 bg-slate-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 shadow-lg z-10">
-                  <p className="font-semibold mb-1">Smart Seeding</p>
-                  <p>Only empty tables will be seeded. Tables with existing data will be skipped automatically.</p>
-                </div>
-              )}
-            </div>
-          )}
+      {showSeedSuccess && seedMessage && seedDetails && (
+        <div className="mb-6">
+          <SeedingResultsDisplay details={seedDetails} message={seedMessage} />
         </div>
-
-        {showSeedSuccess && seedMessage && seedDetails && (
-          <div className="mb-6">
-            <SeedingResultsDisplay details={seedDetails} message={seedMessage} />
-          </div>
-        )}
-      </div>
+      )}
 
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
         {category.tables.length > 1 && (

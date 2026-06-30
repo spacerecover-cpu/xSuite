@@ -308,6 +308,22 @@ export const isTenantScopedTable = (table: MasterDataTable): boolean =>
 export const hasDeletedAt = (table: MasterDataTable): boolean =>
   TENANT_SCOPED_TABLES.includes(table);
 
+// Catalogs whose rows feed the Case + Inventory device-form dropdowns and whose
+// is_active is admin-writable (migration device_service_catalogs_writable_by_admins).
+// CategoryDetail shows an active/inactive toggle for these so admins can hide an
+// option from the wizards without deleting it — useDeviceFormCatalogs filters
+// .eq('is_active', true), so toggling off removes it from the dropdowns.
+export const ACTIVE_TOGGLE_TABLES: MasterDataTable[] = [
+  'catalog_device_types', 'catalog_device_brands', 'catalog_device_capacities', 'catalog_accessories',
+  'catalog_interfaces', 'catalog_device_made_in', 'catalog_device_encryption', 'catalog_device_platter_counts',
+  'catalog_device_head_counts', 'master_inventory_categories', 'master_inventory_status_types',
+  'master_inventory_condition_types', 'catalog_service_types', 'catalog_service_problems',
+  'master_case_priorities', 'master_case_statuses', 'catalog_service_locations',
+  'catalog_device_conditions', 'catalog_device_roles',
+];
+export const hasActiveToggle = (table: MasterDataTable): boolean =>
+  ACTIVE_TOGGLE_TABLES.includes(table);
+
 export const TABLE_LABELS: Record<MasterDataTable, string> = {
   catalog_device_types: 'Device Types',
   catalog_device_brands: 'Brands',
