@@ -2,16 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileText,
-  Mail,
-  MessageSquare,
-  FileCheck,
-  Shield,
   Plus,
   Search,
   LayoutGrid,
   List as ListIcon,
   Sparkles,
-  ArrowLeft,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { seedTemplates, checkIfSeededTemplates } from '../../lib/seedService';
@@ -24,20 +19,12 @@ import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 import { LineItemTemplateFormModal } from '../../components/templates/LineItemTemplateFormModal';
 import { SeedingResultsDisplay } from '../../components/settings/SeedingResultsDisplay';
+import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { useAuth } from '../../contexts/AuthContext';
 import { logger } from '../../lib/logger';
 import type { Database } from '../../types/database.types';
 
 type DocumentTemplateInsert = Database['public']['Tables']['document_templates']['Insert'];
-
-interface TemplateCategory {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  color: string;
-  template_count: number;
-}
 
 interface TemplateType {
   id: string;
@@ -50,10 +37,8 @@ interface TemplateType {
 export const TemplatesDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const [categories, setCategories] = useState<TemplateCategory[]>([]);
   const [templateTypes, setTemplateTypes] = useState<TemplateType[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [isLoading, setIsLoading] = useState(true);
   const [seedingResults, setSeedingResults] = useState<any>(null);
@@ -71,12 +56,6 @@ export const TemplatesDashboard: React.FC = () => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const { data: categoriesData } = await supabase
-        .from('master_template_categories')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order');
-
       const { data: typesData } = await supabase
         .from('master_template_types')
         .select('*')
@@ -85,17 +64,13 @@ export const TemplatesDashboard: React.FC = () => {
 
       const { data: templatesData } = await supabase
         .from('document_templates')
-        .select('id, template_type_id, category_id')
+        .select('id, template_type_id')
         .eq('is_active', true);
 
       const typeCounts: Record<string, number> = {};
-      const categoryCounts: Record<string, number> = {};
       templatesData?.forEach((t) => {
         if (t.template_type_id) {
           typeCounts[t.template_type_id] = (typeCounts[t.template_type_id] || 0) + 1;
-        }
-        if (t.category_id) {
-          categoryCounts[t.category_id] = (categoryCounts[t.category_id] || 0) + 1;
         }
       });
 
@@ -107,16 +82,6 @@ export const TemplatesDashboard: React.FC = () => {
         template_count: typeCounts[type.id] || 0,
       })) || [];
 
-      const enrichedCategories: TemplateCategory[] = categoriesData?.map(cat => ({
-        id: cat.id,
-        name: cat.name,
-        description: '',
-        icon: 'FileText',
-        color: '#3b82f6',
-        template_count: categoryCounts[cat.id] || 0,
-      })) || [];
-
-      setCategories(enrichedCategories);
       setTemplateTypes(enrichedTypes);
       setIsSeeded(await checkIfSeededTemplates());
     } catch (error) {
@@ -167,17 +132,6 @@ export const TemplatesDashboard: React.FC = () => {
     setCreateTypeId('');
   };
 
-  const getIconComponent = (iconName: string) => {
-    const icons: Record<string, any> = {
-      FileText,
-      Mail,
-      MessageSquare,
-      FileCheck,
-      Shield,
-    };
-    return icons[iconName] || FileText;
-  };
-
   const filteredTypes = templateTypes.filter(type => {
     const matchesSearch = type.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          type.description?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -191,10 +145,11 @@ export const TemplatesDashboard: React.FC = () => {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-8 w-56" />
+        <SettingsPageHeader categoryId="templates" />
+        <Skeleton className="h-10 w-full" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-40 w-full rounded-lg" />
+            <Skeleton key={i} className="h-32 w-full rounded-lg" />
           ))}
         </div>
       </div>
@@ -203,22 +158,43 @@ export const TemplatesDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate('/settings')}
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back
-        </Button>
-      </div>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Terms & Templates</h1>
-          <p className="mt-1 text-slate-600">Manage quote/invoice terms, document, and communication templates</p>
+      <SettingsPageHeader categoryId="templates" />
+
+      {showSeedingResults && seedingResults && (
+        <SeedingResultsDisplay
+          details={seedingResults.details}
+          message={seedingResults.message}
+          onClose={() => setShowSeedingResults(false)}
+        />
+      )}
+
+      {/* Compact toolbar: at-a-glance counts, search, and primary actions in one row */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5">
+            <FileText className="w-4 h-4 text-cat-7" />
+            <span className="font-bold text-slate-900">{totalTemplates}</span>
+            <span className="text-slate-500">templates</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5">
+            <ListIcon className="w-4 h-4 text-accent-foreground" />
+            <span className="font-bold text-slate-900">{templateTypes.length}</span>
+            <span className="text-slate-500">types</span>
+          </span>
         </div>
-        <div className="flex gap-3">
+
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+          <Input
+            type="text"
+            placeholder="Search templates..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
+        <div className="flex gap-2">
           {!isSeeded && (
             <Button
               variant="secondary"
@@ -233,103 +209,18 @@ export const TemplatesDashboard: React.FC = () => {
             <Plus className="w-4 h-4 mr-2" />
             New Template
           </Button>
-        </div>
-      </div>
-
-      {showSeedingResults && seedingResults && (
-        <SeedingResultsDisplay
-          details={seedingResults.details}
-          message={seedingResults.message}
-          onClose={() => setShowSeedingResults(false)}
-        />
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Total Templates</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">{totalTemplates}</p>
-            </div>
-            <div className="w-12 h-12 bg-cat-7/10 rounded-lg flex items-center justify-center">
-              <FileText className="w-6 h-6 text-cat-7" />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Categories</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">{categories.length}</p>
-            </div>
-            <div className="w-12 h-12 bg-cat-3/10 rounded-lg flex items-center justify-center">
-              <LayoutGrid className="w-6 h-6 text-cat-3" />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Template Types</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">{templateTypes.length}</p>
-            </div>
-            <div className="w-12 h-12 bg-accent rounded-lg flex items-center justify-center">
-              <ListIcon className="w-6 h-6 text-accent-foreground" />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Active</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1">{totalTemplates}</p>
-            </div>
-            <div className="w-12 h-12 bg-cat-2/10 rounded-lg flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-cat-2" />
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-            <Input
-              type="text"
-              placeholder="Search templates..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <select
-            value={selectedCategory || ''}
-            onChange={(e) => setSelectedCategory(e.target.value || null)}
-            className="px-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          >
-            <option value="">All Categories</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
           <div className="flex border border-slate-300 rounded-lg overflow-hidden">
             <button
               onClick={() => setViewMode('grid')}
               className={`px-3 py-2 ${viewMode === 'grid' ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-50'}`}
+              aria-label="Grid view"
             >
               <LayoutGrid className="w-4 h-4" />
             </button>
             <button
               onClick={() => setViewMode('list')}
               className={`px-3 py-2 border-l border-slate-300 ${viewMode === 'list' ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-50'}`}
+              aria-label="List view"
             >
               <ListIcon className="w-4 h-4" />
             </button>
@@ -337,118 +228,75 @@ export const TemplatesDashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">Template Categories</h2>
+      <div>
+        <h2 className="text-lg font-semibold text-slate-900 mb-4">Template Types</h2>
+
+        {viewMode === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {categories.map((category) => {
-              const Icon = getIconComponent(category.icon);
-              return (
-                <Card
-                  key={category.id}
-                  className="p-6 cursor-pointer hover:shadow-lg transition-shadow"
-                  onClick={() => setSelectedCategory(category.id)}
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div
-                      className="w-12 h-12 rounded-lg flex items-center justify-center"
-                      style={{ backgroundColor: `${category.color}20` }}
-                    >
-                      <Icon className="w-6 h-6" style={{ color: category.color }} />
-                    </div>
-                    <Badge variant="secondary">{category.template_count}</Badge>
-                  </div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-2">{category.name}</h3>
-                  <p className="text-sm text-slate-600">{category.description}</p>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-slate-900">
-              {selectedCategory ? 'Filtered ' : 'All '}Template Types
-            </h2>
-            {selectedCategory && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedCategory(null)}
+            {filteredTypes.map((type) => (
+              <Card
+                key={type.id}
+                className="p-6 cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => navigate(`/templates/type/${type.code}`)}
               >
-                Clear Filter
-              </Button>
-            )}
+                <div className="flex items-start justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-slate-900">{type.name}</h3>
+                  <Badge variant={type.template_count > 0 ? 'success' : 'secondary'}>
+                    {type.template_count}
+                  </Badge>
+                </div>
+                <p className="text-sm text-slate-600 mb-4">{type.description}</p>
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span>Code: {type.code}</span>
+                  {type.template_count === 0 && (
+                    <span className="text-warning">No templates</span>
+                  )}
+                </div>
+              </Card>
+            ))}
           </div>
-
-          {viewMode === 'grid' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredTypes.map((type) => (
-                <Card
-                  key={type.id}
-                  className="p-6 cursor-pointer hover:shadow-lg transition-shadow"
-                  onClick={() => navigate(`/templates/type/${type.code}`)}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <h3 className="text-lg font-semibold text-slate-900">{type.name}</h3>
-                    <Badge variant={type.template_count > 0 ? 'success' : 'secondary'}>
-                      {type.template_count}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-slate-600 mb-4">{type.description}</p>
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span>Code: {type.code}</span>
-                    {type.template_count === 0 && (
-                      <span className="text-warning">No templates</span>
-                    )}
-                  </div>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {filteredTypes.map((type) => (
-                <Card
-                  key={type.id}
-                  className="p-4 cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => navigate(`/templates/type/${type.code}`)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <h3 className="font-semibold text-slate-900">{type.name}</h3>
-                        <Badge variant={type.template_count > 0 ? 'success' : 'secondary'}>
-                          {type.template_count}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-slate-600 mt-1">{type.description}</p>
+        ) : (
+          <div className="space-y-2">
+            {filteredTypes.map((type) => (
+              <Card
+                key={type.id}
+                className="p-4 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => navigate(`/templates/type/${type.code}`)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3">
+                      <h3 className="font-semibold text-slate-900">{type.name}</h3>
+                      <Badge variant={type.template_count > 0 ? 'success' : 'secondary'}>
+                        {type.template_count}
+                      </Badge>
                     </div>
-                    <div className="text-sm text-slate-500">
-                      {type.code}
-                    </div>
+                    <p className="text-sm text-slate-600 mt-1">{type.description}</p>
                   </div>
-                </Card>
-              ))}
-            </div>
-          )}
+                  <div className="text-sm text-slate-500">
+                    {type.code}
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
 
-          {filteredTypes.length === 0 && (
-            <Card className="p-12 text-center">
-              <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">No templates found</h3>
-              <p className="text-slate-600 mb-4">
-                {searchTerm
-                  ? 'Try adjusting your search terms'
-                  : 'Get started by creating your first template'}
-              </p>
-              <Button onClick={openCreateFlow}>
-                <Plus className="w-4 h-4 mr-2" />
-                Create Template
-              </Button>
-            </Card>
-          )}
-        </div>
+        {filteredTypes.length === 0 && (
+          <Card className="p-12 text-center">
+            <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">No templates found</h3>
+            <p className="text-slate-600 mb-4">
+              {searchTerm
+                ? 'Try adjusting your search terms'
+                : 'Get started by creating your first template'}
+            </p>
+            <Button onClick={openCreateFlow}>
+              <Plus className="w-4 h-4 mr-2" />
+              Create Template
+            </Button>
+          </Card>
+        )}
       </div>
 
       {showTypePicker && (

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TemplatesDashboard } from './TemplatesDashboard';
+import { HeaderSlotProvider } from '../../contexts/HeaderSlotContext';
 
 // --- Mocks ------------------------------------------------------------------
 
@@ -64,7 +65,11 @@ vi.mock('../../lib/supabaseClient', () => {
 });
 
 function renderDashboard() {
-  return render(<TemplatesDashboard />);
+  return render(
+    <HeaderSlotProvider>
+      <TemplatesDashboard />
+    </HeaderSlotProvider>,
+  );
 }
 
 describe('TemplatesDashboard', () => {
