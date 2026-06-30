@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
-  FileStack,
   Pencil,
   Copy,
   RotateCcw,
@@ -48,6 +47,7 @@ import {
 import { TemplateStudio } from '../../components/settings/documents/TemplateStudio';
 import { TemplateGalleryModal } from '../../components/settings/documents/TemplateGalleryModal';
 import { CopyStyleModal } from '../../components/settings/documents/CopyStyleModal';
+import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 
 /** Roles allowed to edit document templates (manager and above). */
 const EDITOR_ROLES = ['owner', 'admin', 'manager'] as const;
@@ -273,7 +273,7 @@ export const DocumentTemplatesPage: React.FC = () => {
   // ---- Landing (category master-detail) ------------------------------------
   return (
     <div className="min-h-screen">
-      {/* Header */}
+      <SettingsPageHeader categoryId="documents" />
       <div className="mb-6">
         <button
           onClick={() => navigate('/settings')}
@@ -282,18 +282,6 @@ export const DocumentTemplatesPage: React.FC = () => {
           <ArrowLeft className="h-4 w-4" />
           <span className="text-sm font-medium">Back to Settings</span>
         </button>
-
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-md">
-            <FileStack className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">Documents</h1>
-            <p className="text-sm text-slate-600">
-              Customize how your invoices, quotes, and receipts look when printed or emailed.
-            </p>
-          </div>
-        </div>
       </div>
 
       {!canEdit && (

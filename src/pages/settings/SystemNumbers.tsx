@@ -9,6 +9,7 @@ import { Skeleton } from '../../components/ui/Skeleton';
 import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/ui/Badge';
 import { ChevronLeft, Hash, Search, ArrowRight } from 'lucide-react';
+import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
 
@@ -173,6 +174,7 @@ export const SystemNumbers: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      <SettingsPageHeader categoryId="system-numbers" />
       <button
         onClick={() => navigate('/settings')}
         className="flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-6 transition-all hover:gap-3 font-medium"
@@ -180,23 +182,6 @@ export const SystemNumbers: React.FC = () => {
         <ChevronLeft className="w-5 h-5" />
         <span>Back to Settings</span>
       </button>
-
-      <div className="mb-8 flex items-start justify-between">
-        <div className="flex items-start gap-6">
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg bg-accent"
-            style={{
-              boxShadow: '0 10px 40px -10px rgb(var(--color-accent) / 0.5)'
-            }}
-          >
-            <Hash className="w-8 h-8 text-accent-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-2">System & Numbers</h1>
-            <p className="text-slate-600 text-sm">Configure automatic numbering sequences for all entities</p>
-          </div>
-        </div>
-      </div>
 
       <div className="mb-6 flex flex-col sm:flex-row gap-4">
             <div className="flex-1 relative">

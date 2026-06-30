@@ -13,6 +13,7 @@ import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { CollapsibleSection } from '../../components/ui/CollapsibleSection';
+import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import {
   ArrowLeft,
   Save,
@@ -239,6 +240,7 @@ export const ClientPortalSettings: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <SettingsPageHeader categoryId="client-portal" />
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" onClick={() => navigate('/settings')}>
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -246,13 +248,7 @@ export const ClientPortalSettings: React.FC = () => {
         </Button>
       </div>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">Client Portal Settings</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Configure portal access, security, and customer-facing features
-          </p>
-        </div>
+      <div className="flex justify-end">
         <Button onClick={handleSave} disabled={isSaving}>
           {isSaving ? (
             <>

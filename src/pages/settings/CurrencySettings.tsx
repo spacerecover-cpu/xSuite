@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, Star } from 'lucide-react';
+import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTenantConfig } from '../../contexts/TenantConfigContext';
 import { useToast } from '../../hooks/useToast';
@@ -67,13 +68,7 @@ export function CurrencySettings() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-primary">Currencies</h1>
-        <p className="text-sm text-surface-muted">
-          Your base (reporting) currency is locked once you have financial documents. Add the
-          transaction currencies you invoice in.
-        </p>
-      </div>
+      <SettingsPageHeader categoryId="currencies" />
 
       <div className="rounded-lg border border-border divide-y divide-border">
         {rows.map((row) => (

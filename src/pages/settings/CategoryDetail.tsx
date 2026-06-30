@@ -85,7 +85,7 @@ export const CategoryDetail: React.FC = () => {
   if (category.tables.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-        <PageHeaderSlot title={category.title} />
+        <PageHeaderSlot title={category.title} icon={category.icon} iconColor={category.backgroundColor} />
 
         <button
           onClick={() => navigate('/settings')}
@@ -628,7 +628,7 @@ export const CategoryDetail: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      <PageHeaderSlot title={category.title} actions={seedAction} />
+      <PageHeaderSlot title={category.title} icon={category.icon} iconColor={category.backgroundColor} actions={seedAction} />
 
       <button
         onClick={() => navigate('/settings')}

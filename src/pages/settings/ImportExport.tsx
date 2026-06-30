@@ -11,7 +11,7 @@ import {
   AlertCircle,
   ChevronRight,
 } from 'lucide-react';
-import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
+import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -88,7 +88,7 @@ export const ImportExport: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      <PageHeaderSlot title="Import / Export" />
+      <SettingsPageHeader categoryId="import-export" />
 
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

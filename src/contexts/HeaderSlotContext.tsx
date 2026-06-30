@@ -1,20 +1,29 @@
 import React, { createContext, useContext, useState, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
+import type { LucideIcon } from 'lucide-react';
+
+export interface HeaderSlot {
+  title?: string;
+  icon?: LucideIcon;
+  iconColor?: string;
+}
 
 interface HeaderSlotContextValue {
-  title: string | undefined;
-  setTitle: (t: string | undefined) => void;
+  header: HeaderSlot;
+  setHeader: (h: HeaderSlot) => void;
   actionsHost: HTMLElement | null;
   setActionsHost: (el: HTMLElement | null) => void;
 }
 
 const HeaderSlotContext = createContext<HeaderSlotContextValue | null>(null);
 
+const EMPTY_HEADER: HeaderSlot = {};
+
 export const HeaderSlotProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [title, setTitle] = useState<string | undefined>(undefined);
+  const [header, setHeader] = useState<HeaderSlot>(EMPTY_HEADER);
   const [actionsHost, setActionsHost] = useState<HTMLElement | null>(null);
   return (
-    <HeaderSlotContext.Provider value={{ title, setTitle, actionsHost, setActionsHost }}>
+    <HeaderSlotContext.Provider value={{ header, setHeader, actionsHost, setActionsHost }}>
       {children}
     </HeaderSlotContext.Provider>
   );
@@ -27,18 +36,19 @@ export function useHeaderSlot(): HeaderSlotContextValue {
 }
 
 /**
- * Register the current page's title (shown in the top-bar breadcrumb) and
- * actions (portaled into the bar's actions host). Title is context state set in
- * a layout effect (pre-paint, no flash); actions are portaled live so dynamic
- * action nodes stay current. Returns the portal (or null) for the caller to render.
+ * Register the current page's header (title + optional icon/colour shown in the
+ * top-bar breadcrumb) and actions (portaled into the bar's actions host). The
+ * header is context state set in a layout effect (pre-paint, no flash); actions
+ * are portaled live so dynamic action nodes stay current. Returns the portal
+ * (or null) for the caller to render.
  */
 export function usePageHeaderSlot(
-  { title, actions }: { title: string; actions?: React.ReactNode },
+  { title, icon, iconColor, actions }: { title: string; icon?: LucideIcon; iconColor?: string; actions?: React.ReactNode },
 ): React.ReactPortal | null {
-  const { setTitle, actionsHost } = useHeaderSlot();
+  const { setHeader, actionsHost } = useHeaderSlot();
   useLayoutEffect(() => {
-    setTitle(title);
-    return () => setTitle(undefined);
-  }, [title, setTitle]);
+    setHeader({ title, icon, iconColor });
+    return () => setHeader(EMPTY_HEADER);
+  }, [title, icon, iconColor, setHeader]);
   return actionsHost && actions != null ? createPortal(actions, actionsHost) : null;
 }

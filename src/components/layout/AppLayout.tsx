@@ -88,8 +88,21 @@ function getBreadcrumbs(pathname: string): { label: string; section?: string } {
 }
 
 const HeaderCurrentTitle: React.FC<{ routeLabel: string }> = ({ routeLabel }) => {
-  const { title } = useHeaderSlot();
-  return <span className="text-[13px] font-semibold text-slate-700 truncate">{title ?? routeLabel}</span>;
+  const { header } = useHeaderSlot();
+  const Icon = header.icon;
+  return (
+    <span className="flex items-center gap-2 min-w-0">
+      {Icon && (
+        <span
+          className="inline-flex items-center justify-center w-6 h-6 rounded-md shadow-sm flex-shrink-0"
+          style={header.iconColor ? { backgroundColor: header.iconColor } : undefined}
+        >
+          <Icon className="w-3.5 h-3.5 text-white" />
+        </span>
+      )}
+      <span className="text-[13px] font-semibold text-slate-700 truncate">{header.title ?? routeLabel}</span>
+    </span>
+  );
 };
 
 const HeaderActionsHost: React.FC = () => {

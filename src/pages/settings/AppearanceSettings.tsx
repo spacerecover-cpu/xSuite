@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Palette, Check, Loader2, Languages } from 'lucide-react';
+import { ChevronLeft, Check, Loader2, Languages } from 'lucide-react';
+import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLocale } from '../../contexts/LocaleContext';
 import { useToast } from '../../hooks/useToast';
@@ -87,7 +88,8 @@ export const AppearanceSettings: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      <div className="mb-6 flex items-center gap-3">
+      <SettingsPageHeader categoryId="appearance" />
+      <div className="mb-6">
         <button
           onClick={() => navigate('/settings')}
           className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
@@ -95,17 +97,6 @@ export const AppearanceSettings: React.FC = () => {
         >
           <ChevronLeft className="w-5 h-5 text-slate-600" />
         </button>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary shadow-md">
-            <Palette className="w-5 h-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-0.5">Appearance</h1>
-            <p className="text-slate-600 text-sm">
-              Choose how xSuite looks for everyone in your workspace.
-            </p>
-          </div>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

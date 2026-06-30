@@ -4,6 +4,7 @@ import {
   Shield, Download, Trash2, Clock, CheckCircle2, XCircle,
   AlertTriangle, Loader2, Plus, FileText, Search,
 } from 'lucide-react';
+import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { gdprService } from '../../lib/gdprService';
 import { gdprKeys } from '../../lib/queryKeys';
 import { useAuth } from '../../contexts/AuthContext';
@@ -118,11 +119,8 @@ export const GDPRCompliancePage: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">GDPR & Compliance</h1>
-          <p className="text-sm text-slate-600 mt-1">Manage data subject requests, exports, and retention policies</p>
-        </div>
+      <SettingsPageHeader categoryId="gdpr" />
+      <div className="flex justify-end">
         <button
           onClick={() => setShowNewRequest(true)}
           className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 flex items-center gap-2"

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Loader2, Lock, Save, RotateCcw, SlidersHorizontal } from 'lucide-react';
+import { ChevronLeft, Loader2, Lock, Save, RotateCcw } from 'lucide-react';
+import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { useTenantConfig } from '../../contexts/TenantConfigContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
@@ -125,6 +126,7 @@ export const FeaturesSettings: React.FC = () => {
 
   return (
     <div className="min-h-screen pb-24">
+      <SettingsPageHeader categoryId="features" />
       <div className="mb-6 flex items-center gap-3">
         <button
           onClick={() => navigate('/settings')}
@@ -133,18 +135,6 @@ export const FeaturesSettings: React.FC = () => {
         >
           <ChevronLeft className="h-5 w-5 text-slate-600" />
         </button>
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-md">
-            <SlidersHorizontal className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="mb-0.5 text-xl font-bold text-slate-900">Features &amp; Modules</h1>
-            <p className="text-sm text-slate-600">
-              Turn modules, tabs, widgets, and workflow stages on or off for your whole workspace.
-              Disabled features disappear from the interface; your data is never deleted.
-            </p>
-          </div>
-        </div>
       </div>
 
       <div className="space-y-8">

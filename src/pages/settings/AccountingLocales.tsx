@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ChevronLeft,
-  Globe,
   Lock,
   Coins,
   CalendarClock,
@@ -11,6 +10,7 @@ import {
   MapPin,
   Info,
 } from 'lucide-react';
+import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -259,7 +259,7 @@ export const LocalizationCenter: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      {/* Header */}
+      <SettingsPageHeader categoryId="localization" />
       <div className="mb-6 flex items-center gap-3">
         <button
           onClick={() => navigate('/settings')}
@@ -268,17 +268,6 @@ export const LocalizationCenter: React.FC = () => {
         >
           <ChevronLeft className="h-5 w-5 text-slate-600" />
         </button>
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-md">
-            <Globe className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="mb-0.5 text-xl font-bold text-slate-900">Localization Center</h1>
-            <p className="text-sm text-slate-600">
-              How currency, dates, and documents render across {config.countryName || 'your workspace'}.
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* Jurisdiction-vs-preference primer */}

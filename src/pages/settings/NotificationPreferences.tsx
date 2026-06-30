@@ -11,6 +11,7 @@ import {
   Clock,
   Loader2,
 } from 'lucide-react';
+import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
@@ -359,6 +360,7 @@ export const NotificationPreferences: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      <SettingsPageHeader categoryId="notifications" />
       <button
         onClick={() => navigate('/settings')}
         className="flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-6 transition-all hover:gap-3 font-medium"
@@ -366,27 +368,6 @@ export const NotificationPreferences: React.FC = () => {
         <ChevronLeft className="w-5 h-5" />
         <span>Back to Settings</span>
       </button>
-
-      <div className="mb-8 flex items-start gap-4">
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0"
-          style={{
-            background: 'linear-gradient(135deg, rgb(var(--color-primary)) 0%, rgb(var(--color-cat-1)) 100%)',
-          }}
-        >
-          <Bell className="w-7 h-7 text-white" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 mb-1">
-            Notifications
-          </h1>
-          <p className="text-slate-600 text-sm">
-            {activeTab === 'templates'
-              ? 'Customize the automatic emails this lab sends when events happen.'
-              : 'Choose which events notify you, and on which channels. Settings are personal to your account.'}
-          </p>
-        </div>
-      </div>
 
       {canManageTemplates && (
         <div className="mb-6 border-b border-slate-200 flex gap-1" role="tablist">

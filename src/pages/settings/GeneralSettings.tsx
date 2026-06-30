@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { uploadLogo, uploadQRCode, deleteLogo, deleteQRCode, uploadStamp, uploadSignature } from '../../lib/fileStorageService';
@@ -22,7 +23,6 @@ import {
   Palette,
   Save,
   ChevronLeft,
-  CheckCircle2,
   Upload as UploadIcon,
   Shield,
   Maximize2,
@@ -123,7 +123,6 @@ export const GeneralSettings: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [, setUploadingFiles] = useState<Set<string>>(new Set());
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [openSections, setOpenSections] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('generalSettings_openSections');
     return saved ? new Set(JSON.parse(saved)) : new Set(['basic_info']);
@@ -381,7 +380,6 @@ export const GeneralSettings: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['company_settings'] });
       setIsSaving(false);
       setHasUnsavedChanges(false);
-      setLastSavedAt(new Date());
       toast.success('Settings saved successfully');
     },
     onError: (error) => {
@@ -637,6 +635,7 @@ export const GeneralSettings: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      <SettingsPageHeader categoryId="general-settings" />
       <button
         onClick={handleBackClick}
         className="flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-6 transition-all hover:gap-3 font-medium"
@@ -644,39 +643,6 @@ export const GeneralSettings: React.FC = () => {
         <ChevronLeft className="w-5 h-5" />
         <span>Back to Settings</span>
       </button>
-
-      <div className="mb-8 flex items-start justify-between">
-        <div className="flex items-start gap-6">
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg"
-            style={{
-              background: 'linear-gradient(135deg, rgb(var(--color-cat-1)) 0%, rgb(var(--color-primary)) 100%)',
-            }}
-          >
-            <Building2 className="w-8 h-8 text-white" />
-          </div>
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-xl font-bold text-slate-900">General Settings</h1>
-              {hasUnsavedChanges && (
-                <span className="px-3 py-1 bg-warning-muted text-warning text-sm font-semibold rounded-full border border-warning/30 flex items-center gap-1.5">
-                  <AlertCircle className="w-4 h-4" />
-                  Unsaved Changes
-                </span>
-              )}
-            </div>
-            <p className="text-slate-600 text-sm">
-              Configure company information, branding assets, and business details
-            </p>
-            {lastSavedAt && (
-              <p className="text-slate-500 text-sm mt-1 flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-success" />
-                Last saved at {lastSavedAt.toLocaleTimeString()}
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
 
       <div className="mb-6 bg-info-muted border-l-4 border-info rounded-lg p-4">
         <div className="flex items-start gap-3">
