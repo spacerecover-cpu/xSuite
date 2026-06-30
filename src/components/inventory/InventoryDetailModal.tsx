@@ -660,15 +660,20 @@ export default function InventoryDetailModal({
             loadData();
             if (onUpdate) onUpdate();
           }}
-          deviceSpecs={{
-            brand: item.brand?.name,
-            model: item.model ?? undefined,
-            serial_number: item.serial_number ?? undefined,
-            capacity: item.capacity?.name,
-            firmware_version: item.firmware_version ?? undefined,
-            pcb_number: item.pcb_number ?? undefined,
-            head_map: item.head_map ?? undefined,
-          }}
+          deviceSpecs={(() => {
+            const td = (item.technical_details as Record<string, unknown> | null) ?? {};
+            const s = (k: string) => (typeof td[k] === 'string' ? (td[k] as string) : undefined);
+            return {
+              brand: item.brand?.name,
+              model: item.model ?? undefined,
+              serial_number: item.serial_number ?? undefined,
+              capacity: item.capacity?.name,
+              firmware_version: s('firmware_version'),
+              pcb_number: s('pcb_number'),
+              dcm: s('dcm'),
+              head_map: s('physical_head_map'),
+            };
+          })()}
         />
       )}
     </>
