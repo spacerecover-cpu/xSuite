@@ -4,7 +4,6 @@ import { validateWorkbook } from './importValidator';
 import {
   type EntityType,
   type ParsedWorkbook,
-  type RawRow,
   IMPORT_ORDER,
   WORKBOOK_SCHEMA_VERSION,
 } from './workbookContract';
@@ -91,7 +90,8 @@ export async function runImport(
       const { data, error } = await supabase.rpc('data_migration_import_batch', {
         p_run_id: runId as string,
         p_entity_type: entity,
-        p_rows: batch as RawRow[],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        p_rows: batch as unknown as any,
       });
       if (error) throw error;
 

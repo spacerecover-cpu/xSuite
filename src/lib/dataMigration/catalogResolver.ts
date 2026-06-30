@@ -11,7 +11,10 @@ export interface CatalogMaps {
 const norm = (name: string): string => name.trim().toLowerCase();
 
 async function loadOne(table: string): Promise<Map<string, string>> {
-  const { data, error } = await supabase.from(table).select('id, name').eq('is_active', true);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from(table as any) as any)
+    .select('id, name')
+    .eq('is_active', true);
   if (error) throw error;
   const map = new Map<string, string>();
   for (const row of (data ?? []) as Array<{ id: string; name: string | null }>) {
