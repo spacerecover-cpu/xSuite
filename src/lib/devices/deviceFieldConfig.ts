@@ -156,7 +156,7 @@ const F = {
 
 const REGISTRY: Record<DeviceFamily, { technical: DeviceFieldDef[]; components: DeviceFieldDef[] }> = {
   hdd: {
-    technical: [F.pcb, F.firmware, F.partNumber, F.madeIn, F.dom, F.dcm, F.encryption, F.platters, F.heads, F.headMap, F.preAmp],
+    technical: [F.pcb, F.firmware, F.partNumber, F.madeIn, F.dom, F.dcm, F.platters, F.heads, F.headMap, F.preAmp],
     components: [comp('heads', 'Heads'), comp('pcb', 'PCB'), comp('motor', 'Motor'), comp('surface', 'Read/Write Surface'), comp('service_area', 'Service Area (SA)')],
   },
   ssd: {

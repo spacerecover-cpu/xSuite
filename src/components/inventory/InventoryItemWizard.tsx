@@ -495,7 +495,7 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
               </div>
 
               {/* Device Type — top of identity, drives technical fields */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+              <div className={FIELD_GRID}>
                 <div>
                   <SearchableSelect
                     label={t('devices.field.device_type_id', { defaultValue: 'Device Type' })}
