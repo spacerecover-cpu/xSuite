@@ -377,4 +377,6 @@ export const dataMigrationKeys = {
   all: ['dataMigration'] as const,
   runs: () => [...dataMigrationKeys.all, 'runs'] as const,
   run: (id: string) => [...dataMigrationKeys.all, 'run', id] as const,
+  validateResult: (fileHash: string) => [...dataMigrationKeys.all, 'validateResult', fileHash] as const,
+  exportProgress: () => [...dataMigrationKeys.all, 'exportProgress'] as const,
 };
