@@ -369,9 +369,54 @@ describe('Round-trip integration — export → import → verify', { timeout: 3
     expect(row?.new_values).toBeTruthy();
   });
 
-  it('idempotent re-run inserts 0 new rows (C2/C3 dedup through the file boundary)', async () => {
-    // Re-run with the same file (re-parsed) and same file_hash. The completed run plus the
-    // DB-level dedup must skip every row (mapped to the existing uuid) and insert nothing.
+  it('completed re-upload resumes the SAME run and inserts 0 new rows for ALL entities, incl. keyless children', async () => {
+    // Re-run with the same file (re-parsed) and same file_hash. RUN1 finalized -> status='completed'.
+    // create_run must RESUME that completed run (return RUN1's id), so the persisted entity_map
+    // short-circuits EVERY entity (keyed parents AND keyless children) -> 0 inserts. This is the C3
+    // audit-integrity fix: before it, keyless children (devices/quoteItems/invoiceLineItems/notes/
+    // statusHistory) had no business key + no metadata column, so a fresh-run re-upload duplicated
+    // them (duplicating append-only case_job_history violates forensic/audit rules).
+
+    // Count live keyless-child rows for the imported cases BEFORE the re-upload.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const anyClient = client as any;
+    const { data: importedCases } = await anyClient
+      .from('cases')
+      .select('id')
+      .filter('metadata->>data_migration_run_id', 'eq', runId)
+      .is('deleted_at', null) as { data: Array<{ id: string }> | null };
+    const caseIds = (importedCases ?? []).map(c => c.id);
+    expect(caseIds.length).toBeGreaterThan(0);
+
+    async function childCounts(): Promise<Record<string, number>> {
+      const quoteIds = (
+        (await client.from('quotes').select('id').in('case_id', caseIds).is('deleted_at', null)).data ?? []
+      ).map(q => q.id);
+      const invoiceIds = (
+        (await client.from('invoices').select('id').in('case_id', caseIds).is('deleted_at', null)).data ?? []
+      ).map(i => i.id);
+      const [devices, notes, statusHistory, quoteItems, invoiceLineItems] = await Promise.all([
+        client.from('case_devices').select('*', { count: 'exact', head: true }).in('case_id', caseIds).is('deleted_at', null),
+        client.from('case_internal_notes').select('*', { count: 'exact', head: true }).in('case_id', caseIds).is('deleted_at', null),
+        client.from('case_job_history').select('*', { count: 'exact', head: true }).in('case_id', caseIds).eq('action', 'STATUS_CHANGED'),
+        quoteIds.length
+          ? client.from('quote_items').select('*', { count: 'exact', head: true }).in('quote_id', quoteIds).is('deleted_at', null)
+          : Promise.resolve({ count: 0 }),
+        invoiceIds.length
+          ? client.from('invoice_line_items').select('*', { count: 'exact', head: true }).in('invoice_id', invoiceIds).is('deleted_at', null)
+          : Promise.resolve({ count: 0 }),
+      ]);
+      return {
+        devices: devices.count ?? 0,
+        notes: notes.count ?? 0,
+        statusHistory: statusHistory.count ?? 0,
+        quoteItems: quoteItems.count ?? 0,
+        invoiceLineItems: invoiceLineItems.count ?? 0,
+      };
+    }
+
+    const childrenBefore = await childCounts();
+
     const reparsed = parseWorkbook(fileBytes);
     const summary2 = await runImport(
       reparsed,
@@ -379,9 +424,24 @@ describe('Round-trip integration — export → import → verify', { timeout: 3
       _p => undefined,
     );
 
-    // All entities: 0 inserted (skipped_duplicate)
+    // create_run resumed the completed run: SAME run id, no new run.
+    expect(summary2.runId).toBe(runId);
+
+    // All entities: 0 inserted (every legacy_id already in the entity_map -> skipped_duplicate).
     for (const entity of Object.keys(summary2.counts)) {
       expect(summary2.counts[entity as keyof typeof summary2.counts]?.inserted ?? 0).toBe(0);
     }
+
+    // No duplicate child rows materialized: live keyless-child counts are unchanged after RUN2.
+    const childrenAfter = await childCounts();
+    expect(childrenAfter).toEqual(childrenBefore);
+
+    // finalize is idempotent: exactly ONE IMPORT_FINALIZED provenance row remains (no second).
+    const { count: provCount } = await client
+      .from('audit_trails')
+      .select('id', { count: 'exact', head: true })
+      .eq('record_id', runId)
+      .eq('action', 'IMPORT_FINALIZED');
+    expect(provCount).toBe(1);
   });
 });
