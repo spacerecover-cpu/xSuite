@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Package, Zap, Edit2, Trash2, RefreshCw, Filter, Upload, MapPin, Printer } from 'lucide-react';
+import { Plus, Search, Package, Zap, Edit2, Trash2, RefreshCw, Filter, MapPin, Printer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../hooks/useToast';
 import { Button } from '../../components/ui/Button';
@@ -72,8 +72,6 @@ export default function InventoryListPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
-  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
-
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
     return () => clearTimeout(timer);
@@ -308,14 +306,6 @@ export default function InventoryListPage() {
       >
         <MapPin className="w-4 h-4 mr-2" />
         Locations
-      </Button>
-      <Button
-        onClick={() => setIsBulkImportOpen(true)}
-        variant="secondary"
-        className="bg-success-muted hover:bg-success-muted/80 text-success border-success/30"
-      >
-        <Upload className="w-4 h-4 mr-2" />
-        Bulk Import
       </Button>
       <Button
         onClick={handleRefresh}
@@ -787,10 +777,6 @@ export default function InventoryListPage() {
         />
       )}
 
-      {/* BulkInventoryImportModal removed in P0 teardown; folds into the
-          data-migration engine in P5. isBulkImportOpen retained as a no-op
-          until then. */}
-      {isBulkImportOpen && (setIsBulkImportOpen(false), null)}
     </ListPageTemplate>
   );
 }
