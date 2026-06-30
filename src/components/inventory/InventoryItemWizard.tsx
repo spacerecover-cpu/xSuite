@@ -42,7 +42,7 @@ import type { CatalogOption } from '../../lib/devices/deviceCatalogQueries';
 import { getDonorParts } from '../../lib/inventory/donorParts';
 import { getItemDonorParts, setItemDonorParts } from '../../lib/inventory/donorPartsService';
 import type { DonorPartInput } from '../../lib/inventory/donorPartsService';
-import { Wrench } from 'lucide-react';
+import { Wrench, Check } from 'lucide-react';
 import { HierarchicalLocationPicker } from './HierarchicalLocationPicker';
 import { useDeviceTypeSettings } from '../../lib/inventory/deviceTypeSettingsService';
 
@@ -97,7 +97,7 @@ const EMPTY_FORM: InventoryForm = {
   purchase_price: '',
   purchase_date: '',
   supplier_id: '',
-  is_donor: false,
+  is_donor: true,
   notes: '',
   location_id: '',
 };
@@ -193,19 +193,6 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: conditionTypes = [] } = useQuery({
-    queryKey: ['master_inventory_condition_types'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('master_inventory_condition_types')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('rating', { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as CatalogOption[];
-    },
-    staleTime: 5 * 60 * 1000,
-  });
 
   const isLoading = catalogsLoading || dtLoading;
 
@@ -682,91 +669,35 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                     — {family.toUpperCase()} parts
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+                {/* Compact coloured tick-cards on one wrapping row (tick = part available; qty defaults to 1). */}
+                <div className="flex flex-wrap gap-2.5">
                   {getDonorParts(family).map(def => {
                     const checked = donorPartChecked[def.key] ?? false;
-                    const qty = donorPartQty[def.key] ?? 1;
-                    const condId = donorPartCondition[def.key] ?? '';
                     return (
-                      <div
+                      <label
                         key={def.key}
-                        className={`rounded-md border p-3 transition-colors ${
+                        className={`inline-flex items-center gap-2 rounded-lg border px-3.5 py-2.5 min-h-[44px] cursor-pointer select-none transition-colors focus-within:ring-2 focus-within:ring-primary/40 focus-within:ring-offset-1 ${
                           checked
-                            ? 'border-primary/40 bg-primary/5'
-                            : 'border-border bg-surface'
+                            ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                            : 'border-border bg-surface text-slate-700 hover:border-primary/40 hover:bg-primary/5'
                         }`}
                       >
-                        {/* Part checkbox + label */}
-                        <div className="flex items-center gap-2 mb-2">
-                          <input
-                            id={`donor-part-${def.key}`}
-                            type="checkbox"
-                            checked={checked}
-                            onChange={e => {
-                              setDonorPartChecked(prev => ({ ...prev, [def.key]: e.target.checked }));
-                            }}
-                            className="rounded border-border text-primary focus:ring-primary focus:ring-offset-0"
-                          />
-                          <label
-                            htmlFor={`donor-part-${def.key}`}
-                            className="text-sm font-medium text-slate-700 select-none cursor-pointer"
-                          >
-                            {def.label}
-                          </label>
-                        </div>
-                        {/* Quantity + condition (only when checked) */}
-                        {checked && (
-                          <div className="pl-5 space-y-2">
-                            <div className="flex items-center gap-2">
-                              <label
-                                htmlFor={`donor-qty-${def.key}`}
-                                className="text-xs text-slate-500 w-14 shrink-0"
-                              >
-                                Qty
-                              </label>
-                              <input
-                                id={`donor-qty-${def.key}`}
-                                type="number"
-                                min="1"
-                                value={qty}
-                                onChange={e =>
-                                  setDonorPartQty(prev => ({
-                                    ...prev,
-                                    [def.key]: Math.max(1, parseInt(e.target.value) || 1),
-                                  }))
-                                }
-                                className="w-20 rounded border border-border bg-surface px-2 py-1 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary"
-                              />
-                            </div>
-                            {conditionTypes.length > 0 && (
-                              <div className="flex items-center gap-2">
-                                <label
-                                  htmlFor={`donor-cond-${def.key}`}
-                                  className="text-xs text-slate-500 w-14 shrink-0"
-                                >
-                                  Condition
-                                </label>
-                                <select
-                                  id={`donor-cond-${def.key}`}
-                                  value={condId}
-                                  onChange={e =>
-                                    setDonorPartCondition(prev => ({
-                                      ...prev,
-                                      [def.key]: e.target.value,
-                                    }))
-                                  }
-                                  className="flex-1 rounded border border-border bg-surface px-2 py-1 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary"
-                                >
-                                  <option value="">— optional —</option>
-                                  {conditionTypes.map(c => (
-                                    <option key={c.id} value={c.id}>{c.name}</option>
-                                  ))}
-                                </select>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                        <input
+                          type="checkbox"
+                          className="sr-only"
+                          checked={checked}
+                          onChange={e => setDonorPartChecked(prev => ({ ...prev, [def.key]: e.target.checked }))}
+                        />
+                        <span
+                          aria-hidden="true"
+                          className={`flex items-center justify-center w-4 h-4 rounded border transition-colors ${
+                            checked ? 'border-primary bg-primary text-primary-foreground' : 'border-slate-300 bg-surface'
+                          }`}
+                        >
+                          {checked && <Check className="w-3 h-3" strokeWidth={3} />}
+                        </span>
+                        <span className="text-sm font-medium whitespace-nowrap">{def.label}</span>
+                      </label>
                     );
                   })}
                 </div>
