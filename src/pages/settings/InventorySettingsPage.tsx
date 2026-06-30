@@ -161,22 +161,22 @@ export default function InventorySettingsPage() {
         ) : deviceTypes.length === 0 ? (
           <p className="text-sm text-slate-400 py-6 text-center">No device types configured.</p>
         ) : (
-          <div className="divide-y divide-border">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {deviceTypes.map(dt => {
               const currentLocationId = settingsMap?.get(dt.id) ?? null;
               const isSaving = saving[dt.id] ?? false;
               const isSaved = saved[dt.id] ?? false;
 
               return (
-                <div key={dt.id} className="py-4 flex flex-col sm:flex-row sm:items-start gap-3">
-                  <div className="sm:w-48 shrink-0 pt-1">
-                    <p className="text-sm font-medium text-slate-800">{dt.name}</p>
+                <div key={dt.id} className="rounded-lg border border-border bg-surface-muted p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{dt.name}</p>
                     {dt.family && (
-                      <p className="text-xs text-slate-400 capitalize">{dt.family}</p>
+                      <span className="text-[10px] uppercase tracking-wide text-slate-400 shrink-0">{dt.family}</span>
                     )}
                   </div>
 
-                  <div className="flex-1 max-w-sm">
+                  <div>
                     {canEdit ? (
                       <>
                         <HierarchicalLocationPicker
@@ -240,97 +240,67 @@ export default function InventorySettingsPage() {
         ) : deviceTypes.length === 0 ? (
           <p className="text-sm text-slate-400 py-6 text-center">No device types configured.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm" role="table" aria-label="Inventory number sequences per device type">
-              <thead>
-                <tr className="border-b border-border">
-                  <th scope="col" className="text-left py-2.5 pr-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Device Type
-                  </th>
-                  <th scope="col" className="text-left py-2.5 pr-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Prefix
-                  </th>
-                  <th scope="col" className="text-left py-2.5 pr-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Current
-                  </th>
-                  <th scope="col" className="text-left py-2.5 pr-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Next
-                  </th>
-                  <th scope="col" className="text-left py-2.5 pr-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Padding
-                  </th>
-                  <th scope="col" className="text-left py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  {canEdit && (
-                    <th scope="col" className="text-right py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      <span className="sr-only">Actions</span>
-                    </th>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {deviceTypes.map(dt => {
-                  const seq = sequences.find(s => s.scope === `inventory:${dt.id}`) ?? null;
-                  const effectivePrefix = seq?.prefix ?? dt.inventory_prefix ?? dt.name.replace(/\s+/g, '').toUpperCase().slice(0, 4);
-                  const effectivePadding = seq?.padding ?? dt.inventory_padding ?? 4;
-                  const currentValue = seq?.current_value ?? 0;
-                  const hasStarted = currentValue > 0;
-                  const isSeeded = seq !== null;
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {deviceTypes.map(dt => {
+              const seq = sequences.find(s => s.scope === `inventory:${dt.id}`) ?? null;
+              const effectivePrefix = seq?.prefix ?? dt.inventory_prefix ?? dt.name.replace(/\s+/g, '').toUpperCase().slice(0, 4);
+              const effectivePadding = seq?.padding ?? dt.inventory_padding ?? 4;
+              const currentValue = seq?.current_value ?? 0;
+              const hasStarted = currentValue > 0;
+              const isSeeded = seq !== null;
 
-                  return (
-                    <tr key={dt.id} className="group hover:bg-slate-50/70 transition-colors">
-                      <td className="py-3 pr-4">
-                        <div>
-                          <span className="font-medium text-slate-800">{dt.name}</span>
-                          {dt.family && (
-                            <span className="ml-2 text-xs text-slate-400 capitalize">{dt.family}</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3 pr-4 font-mono text-slate-700">{effectivePrefix}</td>
-                      <td className="py-3 pr-4 font-mono text-slate-500">
-                        {hasStarted
-                          ? formatCurrentNumber(effectivePrefix, currentValue, effectivePadding)
-                          : <span className="text-slate-400">—</span>}
-                      </td>
-                      <td className="py-3 pr-4">
-                        <Badge variant="success" size="sm" className="font-mono">
-                          {formatNextNumber(effectivePrefix, currentValue, effectivePadding)}
-                        </Badge>
-                      </td>
-                      <td className="py-3 pr-4 text-slate-600">{effectivePadding}</td>
-                      <td className="py-3">
-                        {isSeeded ? (
-                          hasStarted ? (
-                            <Badge variant="info" size="sm">Active</Badge>
-                          ) : (
-                            <Badge variant="secondary" size="sm">Configured</Badge>
-                          )
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-xs text-slate-400">
-                            <AlertCircle className="w-3 h-3" />
-                            Not started
-                          </span>
-                        )}
-                      </td>
-                      {canEdit && (
-                        <td className="py-3 text-right">
-                          <button
-                            onClick={() => openSequenceEdit(dt)}
-                            className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                            aria-label={`Edit sequence for ${dt.name}`}
-                            title={`Edit sequence for ${dt.name}`}
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                        </td>
+              return (
+                <div key={dt.id} className="rounded-lg border border-border bg-surface-muted p-3">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 truncate">{dt.name}</p>
+                      {dt.family && (
+                        <p className="text-[10px] uppercase tracking-wide text-slate-400">{dt.family}</p>
                       )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {isSeeded ? (
+                        hasStarted ? (
+                          <Badge variant="info" size="sm">Active</Badge>
+                        ) : (
+                          <Badge variant="secondary" size="sm">Configured</Badge>
+                        )
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
+                          <AlertCircle className="w-3 h-3" />
+                          Not started
+                        </span>
+                      )}
+                      {canEdit && (
+                        <button
+                          onClick={() => openSequenceEdit(dt)}
+                          className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                          aria-label={`Edit sequence for ${dt.name}`}
+                          title={`Edit sequence for ${dt.name}`}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-slate-500">Next number</span>
+                    <Badge variant="success" size="sm" className="font-mono">
+                      {formatNextNumber(effectivePrefix, currentValue, effectivePadding)}
+                    </Badge>
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500 border-t border-border pt-2">
+                    <span>Prefix <span className="block font-mono text-slate-700">{effectivePrefix}</span></span>
+                    <span>Padding <span className="block font-mono text-slate-700">{effectivePadding}</span></span>
+                    <span>Current <span className="block font-mono text-slate-700">
+                      {hasStarted ? formatCurrentNumber(effectivePrefix, currentValue, effectivePadding) : '—'}
+                    </span></span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
