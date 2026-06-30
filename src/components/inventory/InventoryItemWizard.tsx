@@ -178,6 +178,23 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
     staleTime: 5 * 60 * 1000,
   });
 
+  // Inventory condition types (master_inventory_condition_types). NOTE: distinct from the
+  // case-device 'conditions' catalog — inventory_items.condition_id FKs THIS table, so the
+  // Condition field must be sourced here (not from BASIC_FIELDS' catalog_device_conditions).
+  const { data: conditionTypes = [] } = useQuery({
+    queryKey: ['master_inventory_condition_types'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('master_inventory_condition_types')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('rating', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as CatalogOption[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
   const { data: inventoryCategories = [] } = useQuery({
     queryKey: ['master_inventory_categories'],
     queryFn: async () => {
@@ -517,7 +534,11 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                       def={def}
                       value={form[def.key]}
                       onChange={setField}
-                      options={def.optionsSource ? (catalogOptions[def.optionsSource] ?? []) : []}
+                      // condition_id FKs master_inventory_condition_types for inventory items,
+                      // NOT the shared catalog_device_conditions that BASIC_FIELDS points at.
+                      options={def.key === 'condition_id'
+                        ? conditionTypes
+                        : (def.optionsSource ? (catalogOptions[def.optionsSource] ?? []) : [])}
                       error={errors[def.key]}
                     />
                   </div>
