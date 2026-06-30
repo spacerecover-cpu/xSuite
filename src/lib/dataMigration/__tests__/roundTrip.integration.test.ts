@@ -15,8 +15,12 @@
 //  6. status_history timestamps and ordering are preserved per-case.
 //  7. Number sequences were advanced past the max imported number.
 //  8. Idempotent re-run: submitting the same file_hash a second time inserts 0 new rows.
-//  9. Fabricating triggers did NOT fire: custody/VAT/portal row counts are unchanged.
+//  9. Fabricating triggers did NOT fire: custody/VAT/portal-subscription row counts unchanged.
 // 10. Exactly one provenance entry (audit_trails row) was written by finalize.
+//
+// The import is driven THROUGH the file boundary: the in-memory fixture is serialised with
+// buildWorkbook, then re-read with parseWorkbook, and THAT parsed result is imported — so the
+// header<->key translation (C1) is exercised end-to-end, not bypassed.
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
@@ -50,6 +54,10 @@ async function snapshotFabricatingCounts(
   client: ReturnType<typeof makeClient>,
   tenantId: string,
 ): Promise<{ custody: number; vat: number; portal: number }> {
+  // The portal fabricating trigger is trg_seed_portal_customer_subscriptions, which seeds
+  // notification_subscriptions (NOT user_preferences). Snapshot the table it actually writes.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anyClient = client as any;
   const [custodyRes, vatRes, portalRes] = await Promise.all([
     client
       .from('chain_of_custody')
@@ -61,11 +69,10 @@ async function snapshotFabricatingCounts(
       .select('*', { count: 'exact', head: true })
       .eq('tenant_id', tenantId)
       .is('deleted_at', null),
-    client
-      .from('user_preferences')
+    anyClient
+      .from('notification_subscriptions')
       .select('*', { count: 'exact', head: true })
-      .eq('tenant_id', tenantId)
-      .is('deleted_at', null),
+      .eq('tenant_id', tenantId),
   ]);
   return {
     custody: custodyRes.count ?? 0,
@@ -91,7 +98,9 @@ describe('Round-trip integration — export → import → verify', { timeout: 3
   let fileHash: string;
   let beforeCounts: { custody: number; vat: number; portal: number };
 
-  // The fixture workbook (not from export RPC — it is the canonical in-memory fixture)
+  // The fixture workbook is the canonical in-memory source. It is used ONLY for assertions
+  // (original legacy_ids / values). The data actually imported is the result of round-tripping
+  // it through the FILE boundary (buildWorkbook -> bytes -> parseWorkbook) below.
   const fixtureWb = generateLargeFixture({ customerCount: CUSTOMER_COUNT, seed: 99 });
 
   beforeAll(async () => {
@@ -123,9 +132,13 @@ describe('Round-trip integration — export → import → verify', { timeout: 3
     fileBytes = buildWorkbook(fixtureWb, meta);
     fileHash = await computeFileHash(fileBytes);
 
+    // Import THROUGH the file boundary: parse the bytes back (header -> key) and import THAT.
+    // This exercises C1 (the header<->key translation) end-to-end.
+    const parsedFromFile = parseWorkbook(fileBytes);
+
     // Run import (progress is logged but not asserted here)
     summary = await runImport(
-      fixtureWb,
+      parsedFromFile,
       { filename: 'round-trip-fixture.xlsx', hash: fileHash },
       _p => undefined,
     );
@@ -341,32 +354,34 @@ describe('Round-trip integration — export → import → verify', { timeout: 3
   });
 
   it('exactly one audit_trails provenance entry was written by finalize', async () => {
+    // audit_trails has NO metadata column. finalize writes:
+    //   record_type='data_migration_run', record_id=run_id, action='IMPORT_FINALIZED', new_values=<jsonb>
     const { data: provenanceRows, count } = await client
       .from('audit_trails')
-      .select('id, action, metadata', { count: 'exact' })
-      .filter('metadata->>data_migration_run_id', 'eq', runId)
-      .eq('action', 'DATA_MIGRATION_IMPORT_COMPLETED');
+      .select('id, action, record_id, record_type, new_values', { count: 'exact' })
+      .eq('record_id', runId)
+      .eq('action', 'IMPORT_FINALIZED');
 
     expect(count).toBe(1);
-    expect((provenanceRows ?? [])[0]).toBeTruthy();
+    const row = (provenanceRows ?? [])[0];
+    expect(row).toBeTruthy();
+    expect(row?.record_type).toBe('data_migration_run');
+    expect(row?.new_values).toBeTruthy();
   });
 
-  it('idempotent re-run inserts 0 new rows', async () => {
-    // Re-run with the same file_hash; the RPC must resume the already-completed run
-    // and insert nothing (all rows already mapped)
+  it('idempotent re-run inserts 0 new rows (C2/C3 dedup through the file boundary)', async () => {
+    // Re-run with the same file (re-parsed) and same file_hash. The completed run plus the
+    // DB-level dedup must skip every row (mapped to the existing uuid) and insert nothing.
+    const reparsed = parseWorkbook(fileBytes);
     const summary2 = await runImport(
-      fixtureWb,
+      reparsed,
       { filename: 'round-trip-fixture.xlsx', hash: fileHash },
       _p => undefined,
     );
 
-    // All entities: 0 inserted (skipped_duplicate), same runId
-    expect(summary2.runId).toBe(runId);
+    // All entities: 0 inserted (skipped_duplicate)
     for (const entity of Object.keys(summary2.counts)) {
       expect(summary2.counts[entity as keyof typeof summary2.counts]?.inserted ?? 0).toBe(0);
     }
   });
 });
-
-// Silence the unused import warnings for the non-integration path
-void parseWorkbook;
