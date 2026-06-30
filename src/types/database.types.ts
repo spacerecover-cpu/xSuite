@@ -4994,6 +4994,137 @@ export type Database = {
           },
         ]
       }
+      data_migration_entity_map: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          entity_type: string
+          error: string | null
+          id: string
+          legacy_id: string
+          new_id: string | null
+          run_id: string
+          status: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          entity_type: string
+          error?: string | null
+          id?: string
+          legacy_id: string
+          new_id?: string | null
+          run_id: string
+          status: string
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          entity_type?: string
+          error?: string | null
+          id?: string
+          legacy_id?: string
+          new_id?: string | null
+          run_id?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_migration_entity_map_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "data_migration_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_migration_entity_map_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_migration_runs: {
+        Row: {
+          counts: Json
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          error_summary: Json
+          file_hash: string | null
+          finished_at: string | null
+          id: string
+          kind: string
+          schema_version: number
+          source_filename: string | null
+          started_at: string | null
+          status: string
+          tenant_id: string
+          totals: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          counts?: Json
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          error_summary?: Json
+          file_hash?: string | null
+          finished_at?: string | null
+          id?: string
+          kind: string
+          schema_version?: number
+          source_filename?: string | null
+          started_at?: string | null
+          status?: string
+          tenant_id: string
+          totals?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          counts?: Json
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          error_summary?: Json
+          file_hash?: string | null
+          finished_at?: string | null
+          id?: string
+          kind?: string
+          schema_version?: number
+          source_filename?: string | null
+          started_at?: string | null
+          status?: string
+          tenant_id?: string
+          totals?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_migration_runs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_retention_policies: {
         Row: {
           auto_purge: boolean | null
@@ -7207,248 +7338,6 @@ export type Database = {
           value?: string
         }
         Relationships: []
-      }
-      import_export_jobs: {
-        Row: {
-          completed_at: string | null
-          created_at: string
-          created_by: string | null
-          deleted_at: string | null
-          entity_type: string
-          error_records: number | null
-          errors: Json | null
-          file_name: string | null
-          file_url: string | null
-          id: string
-          processed_records: number | null
-          started_at: string | null
-          status: string | null
-          success_records: number | null
-          template_id: string | null
-          tenant_id: string
-          total_records: number | null
-          type: string
-          updated_at: string
-        }
-        Insert: {
-          completed_at?: string | null
-          created_at?: string
-          created_by?: string | null
-          deleted_at?: string | null
-          entity_type: string
-          error_records?: number | null
-          errors?: Json | null
-          file_name?: string | null
-          file_url?: string | null
-          id?: string
-          processed_records?: number | null
-          started_at?: string | null
-          status?: string | null
-          success_records?: number | null
-          template_id?: string | null
-          tenant_id: string
-          total_records?: number | null
-          type: string
-          updated_at?: string
-        }
-        Update: {
-          completed_at?: string | null
-          created_at?: string
-          created_by?: string | null
-          deleted_at?: string | null
-          entity_type?: string
-          error_records?: number | null
-          errors?: Json | null
-          file_name?: string | null
-          file_url?: string | null
-          id?: string
-          processed_records?: number | null
-          started_at?: string | null
-          status?: string | null
-          success_records?: number | null
-          template_id?: string | null
-          tenant_id?: string
-          total_records?: number | null
-          type?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "import_export_jobs_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "import_export_templates"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "import_export_jobs_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      import_export_logs: {
-        Row: {
-          created_at: string
-          data: Json | null
-          id: string
-          job_id: string
-          message: string | null
-          row_number: number | null
-          status: string | null
-          tenant_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          data?: Json | null
-          id?: string
-          job_id: string
-          message?: string | null
-          row_number?: number | null
-          status?: string | null
-          tenant_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          data?: Json | null
-          id?: string
-          job_id?: string
-          message?: string | null
-          row_number?: number | null
-          status?: string | null
-          tenant_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "import_export_logs_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "import_export_jobs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "import_export_logs_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      import_export_templates: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          deleted_at: string | null
-          entity_type: string
-          id: string
-          mapping: Json | null
-          name: string
-          settings: Json | null
-          tenant_id: string
-          type: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          deleted_at?: string | null
-          entity_type: string
-          id?: string
-          mapping?: Json | null
-          name: string
-          settings?: Json | null
-          tenant_id: string
-          type: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          deleted_at?: string | null
-          entity_type?: string
-          id?: string
-          mapping?: Json | null
-          name?: string
-          settings?: Json | null
-          tenant_id?: string
-          type?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "import_export_templates_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      import_field_mappings: {
-        Row: {
-          created_at: string
-          default_value: string | null
-          deleted_at: string | null
-          id: string
-          is_required: boolean | null
-          sort_order: number | null
-          source_field: string
-          target_field: string
-          template_id: string
-          tenant_id: string
-          transformation: string | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          default_value?: string | null
-          deleted_at?: string | null
-          id?: string
-          is_required?: boolean | null
-          sort_order?: number | null
-          source_field: string
-          target_field: string
-          template_id: string
-          tenant_id: string
-          transformation?: string | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          default_value?: string | null
-          deleted_at?: string | null
-          id?: string
-          is_required?: boolean | null
-          sort_order?: number | null
-          source_field?: string
-          target_field?: string
-          template_id?: string
-          tenant_id?: string
-          transformation?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "import_field_mappings_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "import_export_templates"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "import_field_mappings_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       inventory_assignments: {
         Row: {
@@ -17528,14 +17417,6 @@ export type Database = {
         }
         Returns: string
       }
-      lookup_brand: { Args: { p_name: string }; Returns: string }
-      lookup_capacity: { Args: { p_name: string }; Returns: string }
-      lookup_condition_type: { Args: { p_name: string }; Returns: string }
-      lookup_country: { Args: { p_name: string }; Returns: string }
-      lookup_device_type: { Args: { p_name: string }; Returns: string }
-      lookup_interface: { Args: { p_name: string }; Returns: string }
-      lookup_status_type: { Args: { p_name: string }; Returns: string }
-      lookup_storage_location: { Args: { p_name: string }; Returns: string }
       portal_sign_off_document: {
         Args: {
           p_image_bucket?: string
