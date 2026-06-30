@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, ChevronLeft, Columns3, Loader2, Lock, LockOpen } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronLeft, Loader2, Lock, LockOpen } from 'lucide-react';
+import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { Button } from '../../components/ui/Button';
 import { useToast } from '../../hooks/useToast';
 import { casesColumns, CASES_TABLE_KEY } from '../../lib/tables/casesColumns';
@@ -105,6 +106,7 @@ export const TableColumnsSettings: React.FC = () => {
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
+      <SettingsPageHeader categoryId="table-columns" />
       <button
         onClick={() => navigate('/settings')}
         className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors mb-4"
@@ -112,20 +114,6 @@ export const TableColumnsSettings: React.FC = () => {
         <ChevronLeft className="w-4 h-4" />
         <span className="text-sm font-medium">Back to Settings</span>
       </button>
-
-      <div className="mb-6 flex items-start gap-4">
-        <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg bg-primary">
-          <Columns3 className="w-6 h-6 text-primary-foreground" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 mb-1">Table Columns</h1>
-          <p className="text-slate-600 text-sm">
-            Default columns for the Cases table, for everyone in this workspace. Users can still
-            show, hide and reorder columns for themselves — except locked ones. Columns that don't
-            fit a window collapse into the row expander instead of horizontal scrolling.
-          </p>
-        </div>
-      </div>
 
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
         <h2 className="text-base font-semibold text-slate-900 mb-4">Cases table</h2>

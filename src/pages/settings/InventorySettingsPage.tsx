@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Package, Check, Loader2, Hash, Pencil, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Check, Loader2, Hash, Pencil, AlertCircle } from 'lucide-react';
+import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
@@ -116,6 +117,7 @@ export default function InventorySettingsPage() {
 
   return (
     <div className="min-h-screen">
+      <SettingsPageHeader categoryId="inventory-settings" />
       <div className="mb-6 flex items-center gap-3">
         <button
           onClick={() => navigate('/settings')}
@@ -124,17 +126,6 @@ export default function InventorySettingsPage() {
         >
           <ChevronLeft className="w-5 h-5 text-slate-600" />
         </button>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary shadow-md">
-            <Package className="w-5 h-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-0.5">Inventory Settings</h1>
-            <p className="text-slate-600 text-sm">
-              Configure default locations and number sequences per device type.
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* Default Locations Section */}

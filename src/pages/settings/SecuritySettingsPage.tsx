@@ -5,6 +5,7 @@ import { mfaService } from '../../lib/mfaService';
 import { MFAEnrollment } from '../../components/auth/MFAEnrollment';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
+import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 
 export const SecuritySettingsPage: React.FC = () => {
   const toast = useToast();
@@ -41,10 +42,7 @@ export const SecuritySettingsPage: React.FC = () => {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-slate-900">Security Settings</h1>
-        <p className="text-sm text-slate-600 mt-1">Manage your account security and authentication preferences</p>
-      </div>
+      <SettingsPageHeader categoryId="security" />
 
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-200">
