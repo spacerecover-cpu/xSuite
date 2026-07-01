@@ -78,13 +78,29 @@ function isEmpty(v: unknown): boolean {
   return v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
 }
 
+// The literal strings Postgres accepts for a `text::boolean` cast (case-insensitive,
+// surrounding whitespace ignored). The import RPC stores booleans via `(v_row->>'x')::boolean`,
+// so the client dry-run must accept exactly this vocabulary — no more, no less — to stay in
+// lock-step with what the database will actually do. See https://www.postgresql.org/docs/current/datatype-boolean.html
+const PG_BOOLEAN_LITERALS = new Set([
+  'true', 't', 'yes', 'y', 'on', '1',
+  'false', 'f', 'no', 'n', 'off', '0',
+]);
+
+function booleanOk(value: unknown): boolean {
+  if (typeof value === 'boolean') return true;
+  if (typeof value === 'number') return value === 1 || value === 0;
+  if (typeof value === 'string') return PG_BOOLEAN_LITERALS.has(value.trim().toLowerCase());
+  return false;
+}
+
 function typeOk(value: unknown, type: ColType): boolean {
   if (isEmpty(value)) return true;
   switch (type) {
     case 'number':
       return typeof value === 'number' ? Number.isFinite(value) : !Number.isNaN(Number(value));
     case 'boolean':
-      return typeof value === 'boolean' || value === 'true' || value === 'false' || value === 1 || value === 0;
+      return booleanOk(value);
     case 'date':
       return !Number.isNaN(new Date(value as string).getTime());
     case 'uuid':
