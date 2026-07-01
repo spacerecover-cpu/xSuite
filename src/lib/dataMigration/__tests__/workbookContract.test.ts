@@ -181,3 +181,32 @@ describe('workbookContract — structural invariants', () => {
     expect(ENTITY_COLUMNS['invoiceLineItems'].find(c => c.key === 'invoice_legacy_id')?.required).toBe(true);
   });
 });
+
+// The workbook keys stay `legacy_id` / `*_legacy_id` (the RPC + entity_map key on
+// them), but the human HEADER shown in the sheet is "Record Ref" — "Legacy ID"
+// misleads operators, since on a fresh export it is simply the current internal id.
+describe('workbookContract — identifier column headers', () => {
+  it("legacy_id header reads 'Record Ref' on every entity", () => {
+    for (const e of ALL_ENTITIES) {
+      const col = ENTITY_COLUMNS[e].find(c => c.key === 'legacy_id');
+      expect(col?.header).toBe('Record Ref');
+    }
+  });
+
+  it("foreign-key *_legacy_id columns read '<Entity> Record Ref'", () => {
+    const expected: Record<string, string> = {
+      customer_legacy_id: 'Customer Record Ref',
+      company_legacy_id: 'Company Record Ref',
+      case_legacy_id: 'Case Record Ref',
+      quote_legacy_id: 'Quote Record Ref',
+      invoice_legacy_id: 'Invoice Record Ref',
+    };
+    for (const e of ALL_ENTITIES) {
+      for (const col of ENTITY_COLUMNS[e]) {
+        if (col.key in expected) {
+          expect(col.header, `${e}.${col.key}`).toBe(expected[col.key]);
+        }
+      }
+    }
+  });
+});

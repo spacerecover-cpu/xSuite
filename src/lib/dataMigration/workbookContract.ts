@@ -86,7 +86,7 @@ export type ParsedWorkbook = Record<EntityType, RawRow[]>;
 export const ENTITY_COLUMNS: Record<EntityType, ColumnDef[]> = {
   // ── companies (→ companies table) ────────────────────────────────────────
   companies: [
-    { key: 'legacy_id',           header: 'Legacy ID',            type: 'string',  required: true },
+    { key: 'legacy_id',           header: 'Record Ref',            type: 'string',  required: true },
     { key: 'name',                header: 'Company Name',         type: 'string',  required: true },
     { key: 'company_number',      header: 'Company Number',       type: 'string' },
     { key: 'email',               header: 'Email',                type: 'string' },
@@ -105,7 +105,7 @@ export const ENTITY_COLUMNS: Record<EntityType, ColumnDef[]> = {
 
   // ── customers (→ customers_enhanced table) ────────────────────────────────
   customers: [
-    { key: 'legacy_id',       header: 'Legacy ID',       type: 'string',  required: true },
+    { key: 'legacy_id',       header: 'Record Ref',       type: 'string',  required: true },
     { key: 'customer_name',   header: 'Customer Name',   type: 'string',  required: true },
     { key: 'customer_number', header: 'Customer Number', type: 'string' },
     { key: 'email',           header: 'Email',           type: 'string' },
@@ -125,9 +125,9 @@ export const ENTITY_COLUMNS: Record<EntityType, ColumnDef[]> = {
 
   // ── relationships (→ customer_company_relationships table) ────────────────
   relationships: [
-    { key: 'legacy_id',          header: 'Legacy ID',          type: 'string',  required: true },
-    { key: 'customer_legacy_id', header: 'Customer Legacy ID', type: 'string',  required: true, ref: 'customers' },
-    { key: 'company_legacy_id',  header: 'Company Legacy ID',  type: 'string',  required: true, ref: 'companies' },
+    { key: 'legacy_id',          header: 'Record Ref',          type: 'string',  required: true },
+    { key: 'customer_legacy_id', header: 'Customer Record Ref', type: 'string',  required: true, ref: 'customers' },
+    { key: 'company_legacy_id',  header: 'Company Record Ref',  type: 'string',  required: true, ref: 'companies' },
     { key: 'role',               header: 'Role',               type: 'string' },
     { key: 'is_primary',         header: 'Is Primary',         type: 'boolean' },
     { key: 'created_at',         header: 'Created At',         type: 'date' },
@@ -135,10 +135,10 @@ export const ENTITY_COLUMNS: Record<EntityType, ColumnDef[]> = {
 
   // ── cases (→ cases table) ─────────────────────────────────────────────────
   cases: [
-    { key: 'legacy_id',          header: 'Legacy ID',          type: 'string',  required: true },
+    { key: 'legacy_id',          header: 'Record Ref',          type: 'string',  required: true },
     { key: 'case_number',        header: 'Case Number',        type: 'string' },
-    { key: 'customer_legacy_id', header: 'Customer Legacy ID', type: 'string',  required: true, ref: 'customers' },
-    { key: 'company_legacy_id',  header: 'Company Legacy ID',  type: 'string',  ref: 'companies' },
+    { key: 'customer_legacy_id', header: 'Customer Record Ref', type: 'string',  required: true, ref: 'customers' },
+    { key: 'company_legacy_id',  header: 'Company Record Ref',  type: 'string',  ref: 'companies' },
     { key: 'title',              header: 'Title',              type: 'string' },
     { key: 'subject',            header: 'Subject',            type: 'string' },
     { key: 'description',        header: 'Description',        type: 'string' },
@@ -161,8 +161,8 @@ export const ENTITY_COLUMNS: Record<EntityType, ColumnDef[]> = {
   // condition_id) are represented as human-readable strings; the import RPC
   // (data_migration_import_batch) resolves them by name server-side at import time.
   devices: [
-    { key: 'legacy_id',       header: 'Legacy ID',       type: 'string',  required: true },
-    { key: 'case_legacy_id',  header: 'Case Legacy ID',  type: 'string',  required: true, ref: 'cases' },
+    { key: 'legacy_id',       header: 'Record Ref',       type: 'string',  required: true },
+    { key: 'case_legacy_id',  header: 'Case Record Ref',  type: 'string',  required: true, ref: 'cases' },
     { key: 'device_type',     header: 'Device Type',     type: 'string' },
     { key: 'brand',           header: 'Brand',           type: 'string' },
     { key: 'model',           header: 'Model',           type: 'string' },
@@ -188,8 +188,8 @@ export const ENTITY_COLUMNS: Record<EntityType, ColumnDef[]> = {
 
   // ── quotes (→ quotes table) ───────────────────────────────────────────────
   quotes: [
-    { key: 'legacy_id',       header: 'Legacy ID',       type: 'string',  required: true },
-    { key: 'case_legacy_id',  header: 'Case Legacy ID',  type: 'string',  required: true, ref: 'cases' },
+    { key: 'legacy_id',       header: 'Record Ref',       type: 'string',  required: true },
+    { key: 'case_legacy_id',  header: 'Case Record Ref',  type: 'string',  required: true, ref: 'cases' },
     { key: 'quote_number',    header: 'Quote Number',    type: 'string' },
     { key: 'title',           header: 'Title',           type: 'string' },
     { key: 'status',          header: 'Status',          type: 'string' },
@@ -213,8 +213,8 @@ export const ENTITY_COLUMNS: Record<EntityType, ColumnDef[]> = {
 
   // ── quoteItems (→ quote_items table) ─────────────────────────────────────
   quoteItems: [
-    { key: 'legacy_id',        header: 'Legacy ID',        type: 'string',  required: true },
-    { key: 'quote_legacy_id',  header: 'Quote Legacy ID',  type: 'string',  required: true, ref: 'quotes' },
+    { key: 'legacy_id',        header: 'Record Ref',        type: 'string',  required: true },
+    { key: 'quote_legacy_id',  header: 'Quote Record Ref',  type: 'string',  required: true, ref: 'quotes' },
     { key: 'description',      header: 'Description',      type: 'string',  required: true },
     { key: 'quantity',         header: 'Quantity',         type: 'number' },
     { key: 'unit_price',       header: 'Unit Price',       type: 'number',  required: true },
@@ -228,8 +228,8 @@ export const ENTITY_COLUMNS: Record<EntityType, ColumnDef[]> = {
 
   // ── invoices (→ invoices table) ───────────────────────────────────────────
   invoices: [
-    { key: 'legacy_id',       header: 'Legacy ID',       type: 'string',  required: true },
-    { key: 'case_legacy_id',  header: 'Case Legacy ID',  type: 'string',  required: true, ref: 'cases' },
+    { key: 'legacy_id',       header: 'Record Ref',       type: 'string',  required: true },
+    { key: 'case_legacy_id',  header: 'Case Record Ref',  type: 'string',  required: true, ref: 'cases' },
     { key: 'invoice_number',  header: 'Invoice Number',  type: 'string' },
     { key: 'title',           header: 'Title',           type: 'string' },
     { key: 'status',          header: 'Status',          type: 'string' },
@@ -256,8 +256,8 @@ export const ENTITY_COLUMNS: Record<EntityType, ColumnDef[]> = {
 
   // ── invoiceLineItems (→ invoice_line_items table) ─────────────────────────
   invoiceLineItems: [
-    { key: 'legacy_id',          header: 'Legacy ID',          type: 'string',  required: true },
-    { key: 'invoice_legacy_id',  header: 'Invoice Legacy ID',  type: 'string',  required: true, ref: 'invoices' },
+    { key: 'legacy_id',          header: 'Record Ref',          type: 'string',  required: true },
+    { key: 'invoice_legacy_id',  header: 'Invoice Record Ref',  type: 'string',  required: true, ref: 'invoices' },
     { key: 'description',        header: 'Description',        type: 'string',  required: true },
     { key: 'quantity',           header: 'Quantity',           type: 'number' },
     { key: 'unit_price',         header: 'Unit Price',         type: 'number',  required: true },
@@ -271,8 +271,8 @@ export const ENTITY_COLUMNS: Record<EntityType, ColumnDef[]> = {
 
   // ── notes (→ case_internal_notes table) ──────────────────────────────────
   notes: [
-    { key: 'legacy_id',      header: 'Legacy ID',      type: 'string',  required: true },
-    { key: 'case_legacy_id', header: 'Case Legacy ID', type: 'string',  required: true, ref: 'cases' },
+    { key: 'legacy_id',      header: 'Record Ref',      type: 'string',  required: true },
+    { key: 'case_legacy_id', header: 'Case Record Ref', type: 'string',  required: true, ref: 'cases' },
     { key: 'content',        header: 'Content',        type: 'string',  required: true },
     { key: 'created_at',     header: 'Created At',     type: 'date' },
   ],
@@ -281,8 +281,8 @@ export const ENTITY_COLUMNS: Record<EntityType, ColumnDef[]> = {
   // case_job_history is append-only (mutation guard in DB). The engine only
   // INSERTs here — never UPDATE/DELETE — preserving forensic integrity.
   statusHistory: [
-    { key: 'legacy_id',      header: 'Legacy ID',      type: 'string',  required: true },
-    { key: 'case_legacy_id', header: 'Case Legacy ID', type: 'string',  required: true, ref: 'cases' },
+    { key: 'legacy_id',      header: 'Record Ref',      type: 'string',  required: true },
+    { key: 'case_legacy_id', header: 'Case Record Ref', type: 'string',  required: true, ref: 'cases' },
     { key: 'action',         header: 'Action',         type: 'string',  required: true },
     { key: 'old_value',      header: 'Old Value',      type: 'string' },
     { key: 'new_value',      header: 'New Value',      type: 'string' },

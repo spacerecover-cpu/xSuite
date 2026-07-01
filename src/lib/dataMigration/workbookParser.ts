@@ -9,6 +9,21 @@ import {
 
 const ENTITY_TYPES = Object.keys(SHEET_NAMES) as EntityType[];
 
+/**
+ * Headers used by workbooks exported BEFORE the "Legacy ID" -> "Record Ref"
+ * header rename. Mapped back to their contract keys so already-exported files
+ * keep importing. Each alias is only applied on sheets whose entity actually
+ * has the target key, preserving the parser's per-entity column scoping.
+ */
+const HEADER_ALIASES: Record<string, string> = {
+  'Legacy ID': 'legacy_id',
+  'Customer Legacy ID': 'customer_legacy_id',
+  'Company Legacy ID': 'company_legacy_id',
+  'Case Legacy ID': 'case_legacy_id',
+  'Quote Legacy ID': 'quote_legacy_id',
+  'Invoice Legacy ID': 'invoice_legacy_id',
+};
+
 /** Read an .xlsx ArrayBuffer into a per-entity row map. Missing sheets → []. */
 export function parseWorkbook(file: ArrayBuffer): ParsedWorkbook {
   const book = XLSX.read(file, { type: 'array', cellDates: false });
@@ -30,6 +45,10 @@ export function parseWorkbook(file: ArrayBuffer): ParsedWorkbook {
     for (const col of ENTITY_COLUMNS[entity]) {
       headerToKey.set(col.header, col.key);
       validKeys.add(col.key);
+    }
+    // Accept legacy pre-rename headers ("Legacy ID" etc.) for keys this entity owns.
+    for (const [oldHeader, key] of Object.entries(HEADER_ALIASES)) {
+      if (validKeys.has(key)) headerToKey.set(oldHeader, key);
     }
     result[entity] = rows.map((row) => {
       const clean: RawRow = {};

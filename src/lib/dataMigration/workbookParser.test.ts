@@ -57,6 +57,31 @@ describe('parseWorkbook', () => {
     expect(wb.invoices).toEqual([]);
     expect(wb.quoteItems).toEqual([]);
   });
+
+  // Back-compat: files exported BEFORE the "Legacy ID" -> "Record Ref" header
+  // rename carry the old header text. The parser must still map them to the
+  // legacy_id / *_legacy_id keys so those workbooks keep importing.
+  it('accepts the legacy "Legacy ID" header from pre-rename exports', () => {
+    const wb = XLSX.utils.book_new();
+    const companies = XLSX.utils.json_to_sheet([{ 'Legacy ID': 'C1', 'Company Name': 'Acme' }]);
+    XLSX.utils.book_append_sheet(wb, companies, SHEET_NAMES.companies);
+    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+    const parsed = parseWorkbook(buf);
+    expect(parsed.companies[0]).toMatchObject({ legacy_id: 'C1', name: 'Acme' });
+  });
+
+  it('accepts the legacy FK "* Legacy ID" headers from pre-rename exports', () => {
+    const wb = XLSX.utils.book_new();
+    const rels = XLSX.utils.json_to_sheet([
+      { 'Legacy ID': 'R1', 'Customer Legacy ID': 'CU1', 'Company Legacy ID': 'CO1', 'Role': 'client' },
+    ]);
+    XLSX.utils.book_append_sheet(wb, rels, SHEET_NAMES.relationships);
+    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+    const parsed = parseWorkbook(buf);
+    expect(parsed.relationships[0]).toMatchObject({
+      legacy_id: 'R1', customer_legacy_id: 'CU1', company_legacy_id: 'CO1', role: 'client',
+    });
+  });
 });
 
 describe('buildWorkbook -> parseWorkbook symmetry', () => {
