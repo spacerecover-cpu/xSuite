@@ -19,6 +19,8 @@
 // 10. Exactly one provenance entry (audit_trails row) was written by finalize.
 // 11. Company contact_person/contact_email/contact_phone/is_active survive the round-trip
 //     (B1) and carry metadata.legacy_id provenance (B2); explicit is_active=false stays false.
+// 12. Device serial_number + forensic fields (part_number/firmware_version/pcb_number/dcm/dom/
+//     diagnosis/recovery_result/…) and the is_primary "patient" designation survive the round-trip.
 //
 // The import is driven THROUGH the file boundary: the in-memory fixture is serialised with
 // buildWorkbook, then re-read with parseWorkbook, and THAT parsed result is imported — so the
@@ -249,15 +251,28 @@ describe('Round-trip integration — export → import → verify', { timeout: 3
     }
   });
 
-  it('every imported device references an existing case', async () => {
+  // case_devices has NO run_id metadata column, so devices are reached through the run's
+  // cases (case_id IN <run case ids>), not by a metadata filter.
+  async function runCaseIds(): Promise<string[]> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: sampleDevices } = await (client as any)
-      .from('case_devices')
-      .select('id, case_id, metadata')
+    const { data } = await (client as any)
+      .from('cases').select('id')
       .filter('metadata->>data_migration_run_id', 'eq', runId)
-      .is('deleted_at', null)
-      .limit(20) as { data: Array<{ id: string; case_id: string; metadata: Record<string, unknown> | null }> | null };
+      .is('deleted_at', null) as { data: Array<{ id: string }> | null };
+    return (data ?? []).map(c => c.id);
+  }
 
+  it('every imported device references an existing case', async () => {
+    const caseIds = await runCaseIds();
+    expect(caseIds.length).toBeGreaterThan(0);
+    const { data: sampleDevices } = await client
+      .from('case_devices')
+      .select('id, case_id')
+      .in('case_id', caseIds)
+      .is('deleted_at', null)
+      .limit(20);
+
+    expect((sampleDevices ?? []).length).toBeGreaterThan(0);
     for (const d of sampleDevices ?? []) {
       const { data: c } = await client
         .from('cases')
@@ -267,6 +282,32 @@ describe('Round-trip integration — export → import → verify', { timeout: 3
         .maybeSingle();
       expect(c).not.toBeNull();
     }
+  });
+
+  it('device serial_number + forensic fields + is_primary survive the round-trip', async () => {
+    const caseIds = await runCaseIds();
+    expect(caseIds.length).toBeGreaterThan(0);
+    const { data: devs } = await client
+      .from('case_devices')
+      .select('serial_number, part_number, pcb_number, firmware_version, dcm, dom, diagnosis, recovery_result, is_primary')
+      .in('case_id', caseIds)
+      .is('deleted_at', null);
+    const devices = devs ?? [];
+    expect(devices.length).toBeGreaterThan(0);
+
+    // serial_number must survive on EVERY device — before this fix the export emitted the
+    // wrong key ('serial'), so buildWorkbook wrote a blank Serial Number cell and it was lost.
+    expect(devices.every(d => (d.serial_number ?? '').length > 0)).toBe(true);
+    // and the imported serials are exactly the fixture's serials (no loss / fabrication).
+    const fixtureSerials = new Set(fixtureWb.devices.map(d => d['serial_number'] as string));
+    for (const d of devices) expect(fixtureSerials.has(d.serial_number as string)).toBe(true);
+
+    // Donor-matching fingerprints + the patient ("is_primary") designation survived.
+    expect(devices.some(d => (d.pcb_number ?? '').length > 0)).toBe(true);
+    expect(devices.some(d => (d.firmware_version ?? '').length > 0)).toBe(true);
+    expect(devices.some(d => (d.dcm ?? '').length > 0)).toBe(true);
+    expect(devices.some(d => d.dom !== null)).toBe(true);
+    expect(devices.some(d => d.is_primary === true)).toBe(true);
   });
 
   it('every imported quote references an existing case', async () => {

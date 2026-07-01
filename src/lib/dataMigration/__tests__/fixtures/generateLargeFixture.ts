@@ -216,6 +216,19 @@ export function generateLargeFixture(opts: FixtureOptions = {}): ParsedWorkbook 
       capacity: rng.pick(CAPACITIES),
       interface: rng.pick(INTERFACES),
       condition: rng.pick(CONDITIONS),
+      // Forensic fields — donor-matching fingerprints + fault/outcome + physical tracking.
+      part_number: `PN-${rng.int(9000) + 1000}`,
+      firmware_version: rng.pick(['CC26', 'CC27', 'SC61', '0002', 'AN01']),
+      pcb_number: `PCB-${rng.int(9000) + 1000}`,
+      dcm: `DCM${rng.int(9000) + 1000}`,
+      dom: isoOffset(epochBase, rng.int(YEAR_MS)).slice(0, 10), // YYYY-MM-DD (date column)
+      physical_damage: rng.pick(['none', 'water ingress', 'clicking', 'burnt PCB', 'dropped']),
+      diagnosis: rng.pick(['head crash', 'firmware corruption', 'bad sectors', 'PCB failure', 'stiction']),
+      recovery_result: rng.pick(['full', 'partial', 'none', 'pending']),
+      data_recovered_size: `${rng.int(2000)}GB`,
+      storage_location: `Shelf ${rng.pick(['A', 'B', 'C'])}${rng.int(20) + 1}`,
+      // First device of each case is the primary ("patient") device.
+      is_primary: i < caseCount,
       created_at: cases[caseIdx]['created_at'],
     });
   }
