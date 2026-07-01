@@ -352,6 +352,81 @@ export function generateLargeFixture(opts: FixtureOptions = {}): ParsedWorkbook 
     }
   }
 
+  // ---- bankAccounts (2 fixed accounts) ------------------------------------
+  const bankAccountIds: string[] = [];
+  const bankAccounts: RawRow[] = [];
+  for (let i = 0; i < 2; i++) {
+    const id = rng.uuid();
+    bankAccountIds.push(id);
+    bankAccounts.push({
+      legacy_id: id,
+      name: i === 0 ? 'Main Operating Account' : 'Cash Drawer',
+      account_number: `ACC-${1000 + i}`,
+      bank_name: i === 0 ? 'Bank of Recovery' : 'Cash',
+      currency: 'USD',
+      opening_balance: 10000 + i * 5000,
+      current_balance: 12000 + i * 5000,
+      is_default: i === 0,
+      is_active: true,
+      created_at: isoOffset(epochBase, 0),
+    });
+  }
+
+  // ---- payments (1 per invoice, alternating bank account) -----------------
+  const payments: RawRow[] = [];
+  for (let i = 0; i < invoiceIds.length; i++) {
+    payments.push({
+      legacy_id: rng.uuid(),
+      invoice_legacy_id: invoiceIds[i],
+      customer_legacy_id: customerIds[i % customerCount],
+      bank_account_legacy_id: bankAccountIds[i % bankAccountIds.length],
+      payment_number: `PAY-${String(i + 1).padStart(5, '0')}`,
+      amount: invoices[i]['total_amount'] as number,
+      currency: 'USD',
+      payment_method: 'Cash',
+      payment_date: invoices[i]['created_at'],
+      status: 'completed',
+      created_at: invoices[i]['created_at'],
+    });
+  }
+
+  // ---- receipts (1 per 10 customers) --------------------------------------
+  const receipts: RawRow[] = [];
+  for (let i = 0; i < Math.floor(customerCount / 10); i++) {
+    receipts.push({
+      legacy_id: rng.uuid(),
+      customer_legacy_id: customerIds[i],
+      receipt_number: `RCP-${String(i + 1).padStart(5, '0')}`,
+      amount: rng.int(1000) + 100,
+      currency_code: 'USD',
+      payment_method: 'Cash',
+      receipt_date: customers[i]['created_at'],
+      status: 'issued',
+      created_at: customers[i]['created_at'],
+    });
+  }
+
+  // ---- expenses (1 per 10 cases, alternating bank account) ----------------
+  const expenses: RawRow[] = [];
+  for (let i = 0; i < Math.floor(caseCount / 10); i++) {
+    expenses.push({
+      legacy_id: rng.uuid(),
+      case_legacy_id: caseIds[i],
+      bank_account_legacy_id: bankAccountIds[i % bankAccountIds.length],
+      expense_number: `EXP-${String(i + 1).padStart(5, '0')}`,
+      category: 'Parts',
+      vendor: `Vendor ${i + 1}`,
+      description: `Donor part for case ${i + 1}`,
+      amount: rng.int(500) + 50,
+      currency: 'USD',
+      tax_amount: 0,
+      expense_date: cases[i]['created_at'],
+      status: 'paid',
+      is_billable: i % 2 === 0,
+      created_at: cases[i]['created_at'],
+    });
+  }
+
   // Inventory is imported/exported as a SEPARATE domain workbook (not mixed with case records),
   // so this records-domain fixture leaves the inventory entities empty. Inventory round-trip is
   // covered end-to-end by the rolled-back live smoke test.
@@ -369,6 +444,10 @@ export function generateLargeFixture(opts: FixtureOptions = {}): ParsedWorkbook 
     quoteItems,
     invoices,
     invoiceLineItems,
+    bankAccounts,
+    payments,
+    receipts,
+    expenses,
     notes,
     statusHistory,
     inventoryLocations,

@@ -43,6 +43,17 @@ const FK_REFS: Partial<Record<EntityType, Array<{ field: string; target: EntityT
   quoteItems: [{ field: 'quote_legacy_id', target: 'quotes', required: true }],
   invoices: [{ field: 'case_legacy_id', target: 'cases', required: false }],
   invoiceLineItems: [{ field: 'invoice_legacy_id', target: 'invoices', required: true }],
+  payments: [
+    { field: 'invoice_legacy_id', target: 'invoices', required: false },
+    { field: 'customer_legacy_id', target: 'customers', required: false },
+    { field: 'case_legacy_id', target: 'cases', required: false },
+    { field: 'bank_account_legacy_id', target: 'bankAccounts', required: false },
+  ],
+  receipts: [{ field: 'customer_legacy_id', target: 'customers', required: false }],
+  expenses: [
+    { field: 'case_legacy_id', target: 'cases', required: false },
+    { field: 'bank_account_legacy_id', target: 'bankAccounts', required: false },
+  ],
   notes: [{ field: 'case_legacy_id', target: 'cases', required: true }],
   statusHistory: [{ field: 'case_legacy_id', target: 'cases', required: true }],
   // Donor parts must reference an item present in the file. inventoryItems.location_legacy_id

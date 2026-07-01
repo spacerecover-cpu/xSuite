@@ -8,6 +8,10 @@ export type EntityType =
   | 'quoteItems'
   | 'invoices'
   | 'invoiceLineItems'
+  | 'bankAccounts'
+  | 'payments'
+  | 'receipts'
+  | 'expenses'
   | 'notes'
   | 'statusHistory'
   | 'inventoryLocations'
@@ -26,6 +30,10 @@ export const SHEET_NAMES: Record<EntityType, string> = {
   quoteItems: 'QuoteItems',
   invoices: 'Invoices',
   invoiceLineItems: 'InvoiceLineItems',
+  bankAccounts: 'BankAccounts',
+  payments: 'Payments',
+  receipts: 'Receipts',
+  expenses: 'Expenses',
   notes: 'Notes',
   statusHistory: 'StatusHistory',
   inventoryLocations: 'InventoryLocations',
@@ -63,6 +71,10 @@ export const DOMAIN_ENTITIES: Record<WorkbookDomain, EntityType[]> = {
     'quoteItems',
     'invoices',
     'invoiceLineItems',
+    'bankAccounts',
+    'payments',
+    'receipts',
+    'expenses',
     'notes',
     'statusHistory',
   ],
@@ -302,6 +314,91 @@ export const ENTITY_COLUMNS: Record<EntityType, ColumnDef[]> = {
     { key: 'total',              header: 'Total',              type: 'number',  required: true },
     { key: 'sort_order',         header: 'Sort Order',         type: 'number' },
     { key: 'created_at',         header: 'Created At',         type: 'date' },
+  ],
+
+  // ── bankAccounts (→ bank_accounts table) ─────────────────────────────────
+  // Balances are STORED fields (no trigger computes them) — set opening/current directly to
+  // the cutover values. Payments and expenses reference an account via bank_account_legacy_id.
+  bankAccounts: [
+    { key: 'legacy_id',       header: 'Record Ref',       type: 'string',  required: true },
+    { key: 'name',            header: 'Account Name',     type: 'string',  required: true },
+    { key: 'account_number',  header: 'Account Number',   type: 'string' },
+    { key: 'bank_name',       header: 'Bank Name',        type: 'string' },
+    { key: 'account_type',    header: 'Account Type',     type: 'string' },
+    { key: 'iban',            header: 'IBAN',             type: 'string' },
+    { key: 'swift_code',      header: 'SWIFT Code',       type: 'string' },
+    { key: 'branch_code',     header: 'Branch Code',      type: 'string' },
+    { key: 'currency',        header: 'Currency',         type: 'string' },
+    { key: 'opening_balance', header: 'Opening Balance',  type: 'number' },
+    { key: 'current_balance', header: 'Current Balance',  type: 'number' },
+    { key: 'is_default',      header: 'Is Default',       type: 'boolean' },
+    { key: 'is_active',       header: 'Is Active',        type: 'boolean' },
+    { key: 'notes',           header: 'Notes',            type: 'string' },
+    { key: 'created_at',      header: 'Created At',       type: 'date' },
+  ],
+
+  // ── payments (→ payments table) ──────────────────────────────────────────
+  // Invoice payments. bank_account_legacy_id + invoice_legacy_id resolve through the entity
+  // map; payment_method resolves by name against the GLOBAL master_payment_methods. On import
+  // the RPC also posts a financial_transactions (GL) row for the money-in.
+  payments: [
+    { key: 'legacy_id',              header: 'Record Ref',           type: 'string',  required: true },
+    { key: 'invoice_legacy_id',      header: 'Invoice Record Ref',   type: 'string',  ref: 'invoices' },
+    { key: 'customer_legacy_id',     header: 'Customer Record Ref',  type: 'string',  ref: 'customers' },
+    { key: 'case_legacy_id',         header: 'Case Record Ref',      type: 'string',  ref: 'cases' },
+    { key: 'bank_account_legacy_id', header: 'Bank Account Ref',     type: 'string',  ref: 'bankAccounts' },
+    { key: 'payment_number',         header: 'Payment Number',       type: 'string' },
+    { key: 'amount',                 header: 'Amount',               type: 'number',  required: true },
+    { key: 'currency',               header: 'Currency',             type: 'string' },
+    { key: 'exchange_rate',          header: 'Exchange Rate',        type: 'number' },
+    { key: 'payment_method',         header: 'Payment Method',       type: 'string' },
+    { key: 'payment_date',           header: 'Payment Date',         type: 'date' },
+    { key: 'reference',              header: 'Reference',            type: 'string' },
+    { key: 'status',                 header: 'Status',               type: 'string' },
+    { key: 'notes',                  header: 'Notes',                type: 'string' },
+    { key: 'created_at',             header: 'Created At',           type: 'date' },
+  ],
+
+  // ── receipts (→ receipts table) ──────────────────────────────────────────
+  // Standalone customer money-in (not tied to a bank account column on the receipts table).
+  receipts: [
+    { key: 'legacy_id',          header: 'Record Ref',           type: 'string',  required: true },
+    { key: 'customer_legacy_id', header: 'Customer Record Ref',  type: 'string',  ref: 'customers' },
+    { key: 'receipt_number',     header: 'Receipt Number',       type: 'string' },
+    { key: 'amount',             header: 'Amount',               type: 'number',  required: true },
+    { key: 'currency_code',      header: 'Currency',             type: 'string' },
+    { key: 'exchange_rate',      header: 'Exchange Rate',        type: 'number' },
+    { key: 'payment_method',     header: 'Payment Method',       type: 'string' },
+    { key: 'receipt_date',       header: 'Receipt Date',         type: 'date' },
+    { key: 'reference',          header: 'Reference',            type: 'string' },
+    { key: 'status',             header: 'Status',               type: 'string' },
+    { key: 'notes',              header: 'Notes',                type: 'string' },
+    { key: 'created_at',         header: 'Created At',           type: 'date' },
+  ],
+
+  // ── expenses (→ expenses table) ──────────────────────────────────────────
+  // category resolves by name against the GLOBAL master_expense_categories; bank account + case
+  // through the entity map. status ∈ draft/pending/approved/rejected/paid/voided. On import the
+  // RPC posts a financial_transactions (GL) row for the money-out.
+  expenses: [
+    { key: 'legacy_id',              header: 'Record Ref',           type: 'string',  required: true },
+    { key: 'case_legacy_id',         header: 'Case Record Ref',      type: 'string',  ref: 'cases' },
+    { key: 'bank_account_legacy_id', header: 'Bank Account Ref',     type: 'string',  ref: 'bankAccounts' },
+    { key: 'expense_number',         header: 'Expense Number',       type: 'string' },
+    { key: 'category',               header: 'Category',             type: 'string' },
+    { key: 'vendor',                 header: 'Vendor',               type: 'string' },
+    { key: 'description',            header: 'Description',          type: 'string' },
+    { key: 'amount',                 header: 'Amount',               type: 'number',  required: true },
+    { key: 'currency',               header: 'Currency',             type: 'string' },
+    { key: 'exchange_rate',          header: 'Exchange Rate',        type: 'number' },
+    { key: 'tax_amount',             header: 'Tax Amount',           type: 'number' },
+    { key: 'expense_date',           header: 'Expense Date',         type: 'date' },
+    { key: 'paid_at',                header: 'Paid At',              type: 'date' },
+    { key: 'status',                 header: 'Status',               type: 'string' },
+    { key: 'reference',              header: 'Reference',            type: 'string' },
+    { key: 'is_billable',            header: 'Is Billable',          type: 'boolean' },
+    { key: 'notes',                  header: 'Notes',                type: 'string' },
+    { key: 'created_at',             header: 'Created At',           type: 'date' },
   ],
 
   // ── notes (→ case_internal_notes table) ──────────────────────────────────

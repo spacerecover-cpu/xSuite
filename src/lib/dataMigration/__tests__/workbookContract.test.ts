@@ -9,7 +9,9 @@ import type { EntityType } from '../workbookContract';
 
 const ALL_ENTITIES: EntityType[] = [
   'companies', 'customers', 'relationships', 'cases', 'devices',
-  'quotes', 'quoteItems', 'invoices', 'invoiceLineItems', 'notes', 'statusHistory',
+  'quotes', 'quoteItems', 'invoices', 'invoiceLineItems',
+  'bankAccounts', 'payments', 'receipts', 'expenses',
+  'notes', 'statusHistory',
   'inventoryLocations', 'inventoryItems', 'inventoryDonorParts',
 ];
 
@@ -26,12 +28,19 @@ describe('workbookContract — structural invariants', () => {
     }
   });
 
-  it('IMPORT_ORDER contains exactly the 14 EntityTypes (no duplicates, no missing)', () => {
-    expect(IMPORT_ORDER).toHaveLength(14);
-    expect(new Set(IMPORT_ORDER).size).toBe(14);
+  it('IMPORT_ORDER contains exactly the 18 EntityTypes (no duplicates, no missing)', () => {
+    expect(IMPORT_ORDER).toHaveLength(18);
+    expect(new Set(IMPORT_ORDER).size).toBe(18);
     for (const e of ALL_ENTITIES) {
       expect(IMPORT_ORDER).toContain(e);
     }
+  });
+
+  it('IMPORT_ORDER: financial refs come after their parents', () => {
+    // payments reference invoices + bank accounts; expenses reference bank accounts.
+    expect(IMPORT_ORDER.indexOf('invoices')).toBeLessThan(IMPORT_ORDER.indexOf('payments'));
+    expect(IMPORT_ORDER.indexOf('bankAccounts')).toBeLessThan(IMPORT_ORDER.indexOf('payments'));
+    expect(IMPORT_ORDER.indexOf('bankAccounts')).toBeLessThan(IMPORT_ORDER.indexOf('expenses'));
   });
 
   it('IMPORT_ORDER: companies before customers', () => {
