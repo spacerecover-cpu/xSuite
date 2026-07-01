@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { unzipSync, zipSync } from 'fflate';
 import {
   type EntityType,
   type ParsedWorkbook,
@@ -10,6 +11,42 @@ import {
 } from './workbookContract';
 
 const ENTITY_TYPES = Object.keys(SHEET_NAMES) as EntityType[];
+
+const XLSX_READ_OPTS = { type: 'array', cellDates: false } as const;
+
+/**
+ * Re-pack a ZIP archive into a plain STORE (uncompressed) zip. fflate's `unzipSync`
+ * tolerates the "streaming"/data-descriptor ZIP variant (general-purpose bit 3) that
+ * LibreOffice, Google Sheets and Apple Numbers write; re-emitting the same entries with
+ * `zipSync({ level: 0 })` yields a standard archive SheetJS reads reliably. Exported for tests.
+ */
+export function repackXlsxZip(bytes: Uint8Array): Uint8Array {
+  return zipSync(unzipSync(bytes), { level: 0 });
+}
+
+/**
+ * Read an .xlsx ArrayBuffer into a SheetJS workbook, tolerant of streaming ZIPs.
+ *
+ * In the browser SheetJS has no `zlib` (its `browser` field disables it) and cannot walk a
+ * data-descriptor ZIP, throwing "Unsupported ZIP Compression method NaN". When the direct
+ * read fails on ZIP input, recover by re-packing the archive with fflate and retrying. The
+ * `read` seam is injectable so the fallback path is unit-testable (Node's SheetJS has zlib
+ * and reads such files directly, so the failure can't be reproduced without it).
+ */
+export function readXlsx(
+  file: ArrayBuffer,
+  read: (f: ArrayBuffer) => XLSX.WorkBook = (f) => XLSX.read(f, XLSX_READ_OPTS),
+): XLSX.WorkBook {
+  try {
+    return read(file);
+  } catch (err) {
+    const bytes = new Uint8Array(file);
+    // Only attempt recovery for real ZIP archives (local-file-header signature PK\x03\x04);
+    // anything else is a genuinely malformed upload — surface the original error.
+    if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) throw err;
+    return read(repackXlsxZip(bytes).buffer as ArrayBuffer);
+  }
+}
 
 /**
  * Headers used by workbooks exported BEFORE the "Legacy ID" -> "Record Ref"
@@ -28,7 +65,7 @@ const HEADER_ALIASES: Record<string, string> = {
 
 /** Read an .xlsx ArrayBuffer into a per-entity row map. Missing sheets → []. */
 export function parseWorkbook(file: ArrayBuffer): ParsedWorkbook {
-  const book = XLSX.read(file, { type: 'array', cellDates: false });
+  const book = readXlsx(file);
   const result = {} as ParsedWorkbook;
 
   for (const entity of ENTITY_TYPES) {
@@ -80,7 +117,7 @@ export interface ParsedWorkbookMeta {
  * is enforced by the validator so it can be reported as a structured issue.
  */
 export function readWorkbookMeta(file: ArrayBuffer): ParsedWorkbookMeta {
-  const book = XLSX.read(file, { type: 'array', cellDates: false });
+  const book = readXlsx(file);
   const sheet = book.Sheets['_meta'];
   if (!sheet) return { schemaVersion: null, domain: null, sourceTenant: null, exportedAt: null };
   const rows = XLSX.utils.sheet_to_json<{ key?: unknown; value?: unknown }>(sheet, { defval: null });
