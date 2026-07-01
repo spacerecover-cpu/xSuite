@@ -19,6 +19,24 @@ export interface WorkbookMeta {
   counts: Record<EntityType, number>;
 }
 
+/** Global master-data lists (label -> valid values) surfaced in the template so an admin can
+ *  map their data to the exact names the importer resolves, and spot what's missing to add. */
+export type ReferenceLists = Record<string, string[]>;
+
+/** Sheet name for the reference block. NOT a contract entity sheet, so the parser ignores it. */
+export const REFERENCE_SHEET_NAME = 'Reference (Valid Values)';
+
+function appendReferenceSheet(wb: XLSX.WorkBook, referenceLists: ReferenceLists): void {
+  const labels = Object.keys(referenceLists).filter((l) => (referenceLists[l]?.length ?? 0) > 0);
+  if (labels.length === 0) return;
+  const maxLen = Math.max(...labels.map((l) => referenceLists[l].length));
+  const aoa: unknown[][] = [labels]; // header row = list labels; each column lists its valid values
+  for (let i = 0; i < maxLen; i++) {
+    aoa.push(labels.map((l) => referenceLists[l][i] ?? null));
+  }
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), REFERENCE_SHEET_NAME);
+}
+
 /**
  * Build a workbook for ONE domain: one sheet per entity of that domain (SHEET_NAMES order,
  * ENTITY_COLUMNS headers) plus a `_meta` sheet carrying `domain` + schema_version. Values are
@@ -26,7 +44,7 @@ export interface WorkbookMeta {
  * header -> ColumnDef.key on the way back in. A records workbook never contains inventory
  * sheets and vice versa — the `domain` marker lets the importer reject a cross-domain file.
  */
-export function buildWorkbook(data: ParsedWorkbook, meta: WorkbookMeta): ArrayBuffer {
+export function buildWorkbook(data: ParsedWorkbook, meta: WorkbookMeta, referenceLists?: ReferenceLists): ArrayBuffer {
   const wb = XLSX.utils.book_new();
   const entities = DOMAIN_ENTITIES[meta.domain];
 
@@ -51,6 +69,8 @@ export function buildWorkbook(data: ParsedWorkbook, meta: WorkbookMeta): ArrayBu
   const metaSheet = XLSX.utils.json_to_sheet(metaRows, { header: ['key', 'value'] });
   XLSX.utils.book_append_sheet(wb, metaSheet, '_meta');
 
+  if (referenceLists) appendReferenceSheet(wb, referenceLists);
+
   const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
   return out;
 }
@@ -60,7 +80,7 @@ export function buildWorkbook(data: ParsedWorkbook, meta: WorkbookMeta): ArrayBu
  * NO data rows, plus a `_meta` sheet carrying `domain` + schema_version so a filled-in copy
  * re-imports cleanly (and only into the matching domain flow).
  */
-export function buildTemplateWorkbook(domain: WorkbookDomain): ArrayBuffer {
+export function buildTemplateWorkbook(domain: WorkbookDomain, referenceLists?: ReferenceLists): ArrayBuffer {
   const emptyData = Object.fromEntries(IMPORT_ORDER.map((e) => [e, [] as RawRow[]])) as ParsedWorkbook;
   const counts = Object.fromEntries(IMPORT_ORDER.map((e) => [e, 0])) as Record<EntityType, number>;
   return buildWorkbook(emptyData, {
@@ -69,7 +89,7 @@ export function buildTemplateWorkbook(domain: WorkbookDomain): ArrayBuffer {
     exportedAt: '',
     schemaVersion: WORKBOOK_SCHEMA_VERSION,
     counts,
-  });
+  }, referenceLists);
 }
 
 function normalizeCell(value: unknown): string | number | boolean | null {

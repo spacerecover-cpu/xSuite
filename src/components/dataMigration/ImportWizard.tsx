@@ -15,6 +15,7 @@ import { Badge } from '../ui/Badge';
 import { parseWorkbook, readWorkbookMeta, computeFileHash } from '../../lib/dataMigration/workbookParser';
 import { coerceWorkbook } from '../../lib/dataMigration/coerceWorkbook';
 import { buildTemplateWorkbook } from '../../lib/dataMigration/workbookBuilder';
+import { fetchReferenceLists } from '../../lib/dataMigration/referenceLists';
 import { validateWorkbook, validateSchemaVersion } from '../../lib/dataMigration/importValidator';
 import { runImport } from '../../lib/dataMigration/importClient';
 import { DOMAIN_ENTITIES, DOMAIN_LABELS, SHEET_NAMES } from '../../lib/dataMigration/workbookContract';
@@ -28,8 +29,11 @@ interface FileMeta { filename: string; hash: string; }
 
 interface Props { domain: WorkbookDomain; onClose: () => void; }
 
-function downloadTemplate(domain: WorkbookDomain): void {
-  const blob = new Blob([buildTemplateWorkbook(domain)], {
+async function downloadTemplate(domain: WorkbookDomain): Promise<void> {
+  // Include the global master lists so the admin can map values to the names the importer
+  // resolves (and see what's missing to add). Best-effort — template still downloads if it fails.
+  const referenceLists = await fetchReferenceLists(domain);
+  const blob = new Blob([buildTemplateWorkbook(domain, referenceLists)], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
   const url = URL.createObjectURL(blob);
@@ -222,7 +226,7 @@ export const ImportWizard: React.FC<Props> = ({ domain, onClose }) => {
                 size="sm"
                 className="shrink-0"
                 aria-label="Download blank import template"
-                onClick={() => downloadTemplate(domain)}
+                onClick={() => void downloadTemplate(domain)}
               >
                 <Download className="w-4 h-4 mr-1.5" />
                 Download Template

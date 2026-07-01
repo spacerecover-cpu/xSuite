@@ -17254,6 +17254,10 @@ export type Database = {
         Args: { p_entity_type: string; p_rows: Json; p_run_id: string }
         Returns: Json
       }
+      data_migration_reference_lists: {
+        Args: { p_domain: string }
+        Returns: Json
+      }
       delete_case_permanently: {
         Args: { p_case_id: string }
         Returns: undefined

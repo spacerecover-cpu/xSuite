@@ -38,6 +38,23 @@ describe('buildWorkbook', () => {
     expect(wb.SheetNames).toContain('_meta');
   });
 
+  it('appends a Reference sheet with the master lists, which the parser ignores on re-import', () => {
+    const refs = { 'Payment Methods': ['Cash', 'Card'], Currencies: ['USD', 'OMR', 'AED'] };
+    const buf = buildWorkbook(emptyData(), meta, refs);
+    const wb = XLSX.read(buf, { type: 'array' });
+    // The reference block is a distinct sheet (not one of the entity sheets).
+    expect(wb.SheetNames).toContain('Reference (Valid Values)');
+    const aoa = XLSX.utils.sheet_to_json<string[]>(wb.Sheets['Reference (Valid Values)'], { header: 1 });
+    expect(aoa[0]).toEqual(['Payment Methods', 'Currencies']); // header row = list labels
+    const flat = aoa.slice(1).flat();
+    expect(flat).toContain('Cash');
+    expect(flat).toContain('OMR');
+    // The parser never treats the reference sheet as an entity — data still parses cleanly.
+    const parsed = parseWorkbook(buf);
+    expect(parsed.companies).toEqual([]);
+    expect(readWorkbookMeta(buf).domain).toBe('records');
+  });
+
   it('writes one sheet per DOMAIN entity using SHEET_NAMES, plus _meta (no cross-domain sheets)', () => {
     const wb = XLSX.read(buildWorkbook(emptyData(), meta), { type: 'array' });
     for (const entity of DOMAIN_ENTITIES.records) {

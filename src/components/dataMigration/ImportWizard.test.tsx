@@ -21,6 +21,9 @@ vi.mock('../../lib/dataMigration/workbookParser', () => ({
 vi.mock('../../lib/dataMigration/coerceWorkbook', () => ({
   coerceWorkbook: (wb: unknown) => wb,
 }));
+vi.mock('../../lib/dataMigration/referenceLists', () => ({
+  fetchReferenceLists: vi.fn(async () => ({})),
+}));
 vi.mock('../../lib/dataMigration/importValidator', () => ({
   validateWorkbook: mocks.validateWorkbook,
   validateSchemaVersion: mocks.validateSchemaVersion,
