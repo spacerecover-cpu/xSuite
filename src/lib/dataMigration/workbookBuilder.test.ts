@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import * as XLSX from 'xlsx';
-import { buildWorkbook, type WorkbookMeta } from './workbookBuilder';
-import { parseWorkbook } from './workbookParser';
+import { buildWorkbook, buildTemplateWorkbook, type WorkbookMeta } from './workbookBuilder';
+import { parseWorkbook, readWorkbookMeta } from './workbookParser';
 import {
   SHEET_NAMES,
   ENTITY_COLUMNS,
   IMPORT_ORDER,
+  WORKBOOK_SCHEMA_VERSION,
   type EntityType,
   type ParsedWorkbook,
   type RawRow,
@@ -88,5 +89,24 @@ describe('buildWorkbook', () => {
     expect(byKey.source_tenant).toBe('tenant-123');
     expect(byKey.exported_at).toBe('2026-06-30T00:00:00.000Z');
     expect(String(byKey.schema_version)).toBe('1');
+  });
+});
+
+describe('buildTemplateWorkbook', () => {
+  it('produces a headers-only template: every entity sheet present with zero data rows', () => {
+    const buf = buildTemplateWorkbook();
+    const parsed = parseWorkbook(buf);
+    for (const entity of IMPORT_ORDER) {
+      expect(parsed[entity], `${entity} should have no data rows`).toEqual([]);
+    }
+    const wb = XLSX.read(buf, { type: 'array' });
+    for (const entity of IMPORT_ORDER) {
+      const headerRows = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[SHEET_NAMES[entity]], { header: 1 });
+      expect(headerRows[0]).toEqual(ENTITY_COLUMNS[entity].map((c) => c.header));
+    }
+  });
+
+  it('carries the current schema_version so a filled-in template re-imports cleanly', () => {
+    expect(readWorkbookMeta(buildTemplateWorkbook()).schemaVersion).toBe(WORKBOOK_SCHEMA_VERSION);
   });
 });

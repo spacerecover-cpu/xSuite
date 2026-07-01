@@ -3,8 +3,10 @@ import {
   SHEET_NAMES,
   ENTITY_COLUMNS,
   IMPORT_ORDER,
+  WORKBOOK_SCHEMA_VERSION,
   type EntityType,
   type ParsedWorkbook,
+  type RawRow,
 } from './workbookContract';
 
 export interface WorkbookMeta {
@@ -48,6 +50,23 @@ export function buildWorkbook(data: ParsedWorkbook, meta: WorkbookMeta): ArrayBu
 
   const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
   return out;
+}
+
+/**
+ * Build a blank import template: one sheet per entity with the contract headers and NO data
+ * rows, plus a `_meta` sheet carrying the current schema_version so a filled-in copy re-imports
+ * cleanly. This is exactly an empty export workbook (same shape the importer expects), so a user
+ * can download it, fill it in, and upload it back.
+ */
+export function buildTemplateWorkbook(): ArrayBuffer {
+  const emptyData = Object.fromEntries(IMPORT_ORDER.map((e) => [e, [] as RawRow[]])) as ParsedWorkbook;
+  const counts = Object.fromEntries(IMPORT_ORDER.map((e) => [e, 0])) as Record<EntityType, number>;
+  return buildWorkbook(emptyData, {
+    sourceTenant: '',
+    exportedAt: '',
+    schemaVersion: WORKBOOK_SCHEMA_VERSION,
+    counts,
+  });
 }
 
 function normalizeCell(value: unknown): string | number | boolean | null {

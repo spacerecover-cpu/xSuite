@@ -13,6 +13,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { parseWorkbook, readWorkbookMeta, computeFileHash } from '../../lib/dataMigration/workbookParser';
+import { buildTemplateWorkbook } from '../../lib/dataMigration/workbookBuilder';
 import { validateWorkbook, validateSchemaVersion } from '../../lib/dataMigration/importValidator';
 import { runImport } from '../../lib/dataMigration/importClient';
 import { IMPORT_ORDER, SHEET_NAMES } from '../../lib/dataMigration/workbookContract';
@@ -25,6 +26,18 @@ type WizardStep = 'upload' | 'validate' | 'import' | 'summary';
 interface FileMeta { filename: string; hash: string; }
 
 interface Props { onClose: () => void; }
+
+function downloadTemplate(): void {
+  const blob = new Blob([buildTemplateWorkbook()], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'xsuite-import-template.xlsx';
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function downloadErrorReport(issues: ValidationIssue[]): void {
   const lines = ['Entity,Row,Field,Severity,Message'];
@@ -178,6 +191,27 @@ export const ImportWizard: React.FC<Props> = ({ onClose }) => {
                 </>
               )}
             </div>
+
+            {/* Template download — so users know the exact sheets & columns to fill in */}
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileSpreadsheet className="w-4 h-4 text-slate-400 shrink-0" />
+                <p className="text-sm text-slate-600 truncate">
+                  New to importing? Start from a blank template with every sheet &amp; column.
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="shrink-0"
+                aria-label="Download blank import template"
+                onClick={downloadTemplate}
+              >
+                <Download className="w-4 h-4 mr-1.5" />
+                Download Template
+              </Button>
+            </div>
+
             <div className="mt-4 flex justify-end">
               <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
             </div>

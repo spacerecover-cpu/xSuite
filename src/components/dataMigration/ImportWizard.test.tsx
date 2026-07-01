@@ -54,6 +54,11 @@ describe('ImportWizard', () => {
     expect(screen.getByRole('button', { name: /browse file/i })).toBeInTheDocument();
   });
 
+  it('offers a blank-template download in the Upload step', () => {
+    wrap(<ImportWizard onClose={onClose} />);
+    expect(screen.getByRole('button', { name: /download.*template/i })).toBeInTheDocument();
+  });
+
   it('Validate button is disabled without a file selected', () => {
     wrap(<ImportWizard onClose={onClose} />);
     const validateBtn = screen.queryByRole('button', { name: /validate/i });
