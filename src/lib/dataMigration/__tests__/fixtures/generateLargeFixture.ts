@@ -352,66 +352,12 @@ export function generateLargeFixture(opts: FixtureOptions = {}): ParsedWorkbook 
     }
   }
 
-  // ---- inventory: locations (a tree, listed OUT OF ORDER to exercise soft-parent resolve) ----
-  const invLocRack = rng.uuid();
-  const invLocShelf = rng.uuid();
-  const invLocBin = rng.uuid();
-  const inventoryLocations: RawRow[] = [
-    // child before parent on purpose — the RPC soft-resolves parent_legacy_id (unresolved → NULL)
-    { legacy_id: invLocBin, parent_legacy_id: invLocShelf, name: 'Bin 12', location_code: 'BIN-12', is_active: true, created_at: isoOffset(epochBase, 1000) },
-    { legacy_id: invLocRack, name: 'Rack A', location_code: 'RACK-A', is_active: true, created_at: isoOffset(epochBase, 500) },
-    { legacy_id: invLocShelf, parent_legacy_id: invLocRack, name: 'Shelf 3', location_code: 'SHELF-3', is_active: true, created_at: isoOffset(epochBase, 750) },
-  ];
-
-  // ---- inventory: items ----
-  const INV_ITEM_COUNT = 20;
-  const CONDITIONS_INV = ['New', 'Used - Good', 'Used - Fair', 'Refurbished'];
-  const STATUSES_INV = ['Available', 'Reserved', 'In Use'];
+  // Inventory is imported/exported as a SEPARATE domain workbook (not mixed with case records),
+  // so this records-domain fixture leaves the inventory entities empty. Inventory round-trip is
+  // covered end-to-end by the rolled-back live smoke test.
+  const inventoryLocations: RawRow[] = [];
   const inventoryItems: RawRow[] = [];
-  const invDonorItemIds: string[] = [];
-  for (let i = 0; i < INV_ITEM_COUNT; i++) {
-    const id = rng.uuid();
-    const isDonor = i % 4 === 0;
-    if (isDonor) invDonorItemIds.push(id);
-    inventoryItems.push({
-      legacy_id: id,
-      // Always supply item_number (preserve path). The auto-assign path needs an authed user
-      // session (get_current_tenant_id), which the service-role integration test lacks; it is
-      // covered separately by the rolled-back live smoke test.
-      item_number: `INV-${9000 + i}`,
-      device_type: rng.pick(DEVICE_TYPES),
-      brand: rng.pick(BRANDS),
-      model: `InvModel-${rng.int(9000) + 1000}`,
-      serial_number: `ISN${rng.int(900000000) + 100000000}`,
-      capacity: rng.pick(CAPACITIES),
-      interface: rng.pick(INTERFACES),
-      condition: rng.pick(CONDITIONS_INV),
-      status: rng.pick(STATUSES_INV),
-      location_legacy_id: rng.pick([invLocRack, invLocShelf, invLocBin]),
-      quantity: rng.int(5) + 1,
-      min_quantity: 0,
-      is_donor: isDonor,
-      technical_details: JSON.stringify({ pcb_number: `100${rng.int(900000) + 100000}`, dcm: `CC${rng.int(90) + 10}`, firmware_version: rng.pick(['CC26', 'SC61', '0002']) }),
-      notes: `Fixture inventory item ${i + 1}`,
-      created_at: isoOffset(epochBase, rng.int(YEAR_MS)),
-    });
-  }
-
-  // ---- inventory: donor parts (only for the donor items) ----
   const inventoryDonorParts: RawRow[] = [];
-  for (const itemId of invDonorItemIds) {
-    for (const partType of ['heads', 'pcb']) {
-      inventoryDonorParts.push({
-        legacy_id: rng.uuid(),
-        item_legacy_id: itemId,
-        part_type: partType,
-        quantity: rng.int(4) + 1,
-        condition: rng.pick(CONDITIONS_INV),
-        notes: `${partType} harvested`,
-        created_at: isoOffset(epochBase, rng.int(YEAR_MS)),
-      });
-    }
-  }
 
   return {
     companies,

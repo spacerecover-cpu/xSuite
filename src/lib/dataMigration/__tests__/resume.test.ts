@@ -95,6 +95,7 @@ describe('importClient resume logic — unit (mocked RPC)', () => {
       wb,
       { filename: 'test.xlsx', hash: FILE_HASH },
       (_p: ImportProgress) => undefined,
+      'records',
     );
 
     // The run ID must be the existing one, not a fresh one
@@ -175,6 +176,7 @@ describe('importClient resume logic — unit (mocked RPC)', () => {
       wb,
       { filename: 'partial.xlsx', hash: 'partial-hash' },
       (_p: ImportProgress) => undefined,
+      'records',
     );
 
     // companies and customers: 0 inserted (skipped)
@@ -228,6 +230,7 @@ describe('importClient resume logic — unit (mocked RPC)', () => {
         wb,
         { filename: 'abort-test.xlsx', hash: 'abort-hash' },
         (_p: ImportProgress) => undefined,
+        'records',
       );
     } catch (_e) {
       // expected — the import aborts at batch 3
@@ -242,6 +245,7 @@ describe('importClient resume logic — unit (mocked RPC)', () => {
       wb,
       { filename: 'abort-test.xlsx', hash: 'abort-hash' },
       (_p: ImportProgress) => undefined,
+      'records',
     );
 
     // Total unique inserts across both runs must equal total rows in wb
@@ -298,8 +302,8 @@ describe('Forced-abort resume — integration (live DB)', { timeout: 180_000 }, 
     const fileMeta = { filename: 'resume-it.xlsx', hash: `it-resume-${liveWb.customers.length}` };
 
     // First import inserts everything; re-importing the SAME file inserts nothing.
-    const first = await runImportLive(liveWb, fileMeta, () => {});
-    const second = await runImportLive(liveWb, fileMeta, () => {});
+    const first = await runImportLive(liveWb, fileMeta, () => {}, 'records');
+    const second = await runImportLive(liveWb, fileMeta, () => {}, 'records');
 
     for (const entity of IMPORT_ORDER) {
       expect(second.counts[entity]?.inserted ?? 0).toBe(0);

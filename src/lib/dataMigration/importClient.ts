@@ -4,7 +4,9 @@ import { validateWorkbook } from './importValidator';
 import {
   type EntityType,
   type ParsedWorkbook,
+  type WorkbookDomain,
   IMPORT_ORDER,
+  DOMAIN_ENTITIES,
   WORKBOOK_SCHEMA_VERSION,
 } from './workbookContract';
 
@@ -60,14 +62,17 @@ export async function runImport(
   wb: ParsedWorkbook,
   fileMeta: { filename: string; hash: string },
   onProgress: (p: ImportProgress) => void,
+  domain: WorkbookDomain,
 ): Promise<ImportSummary> {
-  const report = validateWorkbook(wb);
+  const report = validateWorkbook(wb, domain);
   if (!report.ok) {
     throw new Error('Workbook failed validation; fix errors before import.');
   }
 
+  const entities = DOMAIN_ENTITIES[domain];
+  const lastEntity = entities[entities.length - 1];
   const totals: Record<string, number> = {};
-  for (const e of IMPORT_ORDER) totals[e] = (wb[e] ?? []).length;
+  for (const e of entities) totals[e] = (wb[e] ?? []).length;
 
   const { data: runId, error: runErr } = await supabase.rpc('data_migration_create_run', {
     p_kind: 'import',
@@ -81,7 +86,7 @@ export async function runImport(
   const counts = emptyCounts();
   const failedRows = emptyWorkbook();
 
-  for (const entity of IMPORT_ORDER) {
+  for (const entity of entities) {
     const rows = wb[entity] ?? [];
     if (rows.length === 0) continue;
     let processed = 0;
@@ -114,13 +119,14 @@ export async function runImport(
     }
   }
 
-  onProgress({ entity: IMPORT_ORDER[IMPORT_ORDER.length - 1], processed: 0, total: 0, phase: 'finalizing' });
+  onProgress({ entity: lastEntity, processed: 0, total: 0, phase: 'finalizing' });
   const { error: finErr } = await supabase.rpc('data_migration_finalize', { p_run_id: runId as string });
   if (finErr) throw finErr;
 
-  const hasFailures = IMPORT_ORDER.some((e) => failedRows[e].length > 0);
+  const hasFailures = entities.some((e) => failedRows[e].length > 0);
   const errorReport = hasFailures
     ? buildWorkbook(failedRows, {
+        domain,
         sourceTenant: '',
         exportedAt: new Date().toISOString(),
         schemaVersion: WORKBOOK_SCHEMA_VERSION,
@@ -128,6 +134,6 @@ export async function runImport(
       })
     : undefined;
 
-  onProgress({ entity: IMPORT_ORDER[IMPORT_ORDER.length - 1], processed: 0, total: 0, phase: 'done' });
+  onProgress({ entity: lastEntity, processed: 0, total: 0, phase: 'done' });
   return { runId: runId as string, counts, errorReport };
 }

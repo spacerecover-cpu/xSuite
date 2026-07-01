@@ -4,8 +4,12 @@ import {
   type RawRow,
   type ColType,
   type ColumnDef,
+  type WorkbookDomain,
   ENTITY_COLUMNS,
   IMPORT_ORDER,
+  DOMAIN_ENTITIES,
+  SHEET_NAMES,
+  DOMAIN_LABELS,
   WORKBOOK_SCHEMA_VERSION,
 } from './workbookContract';
 import type { ParsedWorkbookMeta } from './workbookParser';
@@ -100,15 +104,33 @@ function legacyIdSets(wb: ParsedWorkbook): Record<EntityType, Set<string>> {
   return sets;
 }
 
-/** Pure client dry-run: required fields, types, in-file FK presence, dup legacy_id/numbers. Writes nothing. */
-export function validateWorkbook(wb: ParsedWorkbook): ValidationReport {
+/**
+ * Pure client dry-run for ONE domain: required fields, types, in-file FK presence, dup
+ * legacy_id/numbers. Also rejects a cross-domain file (records rows in an inventory import,
+ * or vice versa). Writes nothing.
+ */
+export function validateWorkbook(wb: ParsedWorkbook, domain: WorkbookDomain): ValidationReport {
   const issues: ValidationIssue[] = [];
-  const counts = {} as Record<EntityType, number>;
+  const counts = Object.fromEntries(IMPORT_ORDER.map((e) => [e, (wb[e] ?? []).length])) as Record<EntityType, number>;
   const idSets = legacyIdSets(wb);
+  const entities = DOMAIN_ENTITIES[domain];
+  const inDomain = new Set(entities);
 
+  // Cross-domain guard: a file whose data belongs to the OTHER domain must not be imported here.
   for (const entity of IMPORT_ORDER) {
+    if (!inDomain.has(entity) && (wb[entity] ?? []).length > 0) {
+      issues.push({
+        entity,
+        rowIndex: -1,
+        severity: 'error',
+        field: 'domain',
+        message: `This looks like a different import type — the "${SHEET_NAMES[entity]}" sheet has data but does not belong in a ${DOMAIN_LABELS[domain]} import.`,
+      });
+    }
+  }
+
+  for (const entity of entities) {
     const rows = wb[entity] ?? [];
-    counts[entity] = rows.length;
     const cols: ColumnDef[] = ENTITY_COLUMNS[entity];
     const seenLegacy = new Set<string>();
     const numberField = UNIQUE_NUMBER[entity];

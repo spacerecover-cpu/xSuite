@@ -6,6 +6,7 @@ import {
   SHEET_NAMES,
   ENTITY_COLUMNS,
   IMPORT_ORDER,
+  DOMAIN_ENTITIES,
   WORKBOOK_SCHEMA_VERSION,
   type EntityType,
   type ParsedWorkbook,
@@ -22,6 +23,7 @@ function emptyCounts(): Record<EntityType, number> {
 
 describe('buildWorkbook', () => {
   const meta: WorkbookMeta = {
+    domain: 'records',
     sourceTenant: 'tenant-123',
     exportedAt: '2026-06-30T00:00:00.000Z',
     schemaVersion: 1,
@@ -36,11 +38,13 @@ describe('buildWorkbook', () => {
     expect(wb.SheetNames).toContain('_meta');
   });
 
-  it('writes one sheet per entity using SHEET_NAMES, plus _meta', () => {
+  it('writes one sheet per DOMAIN entity using SHEET_NAMES, plus _meta (no cross-domain sheets)', () => {
     const wb = XLSX.read(buildWorkbook(emptyData(), meta), { type: 'array' });
-    for (const entity of IMPORT_ORDER) {
+    for (const entity of DOMAIN_ENTITIES.records) {
       expect(wb.SheetNames).toContain(SHEET_NAMES[entity]);
     }
+    // an inventory sheet must NOT appear in a records workbook
+    expect(wb.SheetNames).not.toContain(SHEET_NAMES.inventoryItems);
     expect(wb.SheetNames).toContain('_meta');
   });
 
@@ -93,27 +97,32 @@ describe('buildWorkbook', () => {
 });
 
 describe('buildTemplateWorkbook', () => {
-  it('produces a headers-only template: every entity sheet present with zero data rows', () => {
-    const buf = buildTemplateWorkbook();
-    const parsed = parseWorkbook(buf);
-    for (const entity of IMPORT_ORDER) {
-      expect(parsed[entity], `${entity} should have no data rows`).toEqual([]);
-    }
-    const wb = XLSX.read(buf, { type: 'array' });
-    for (const entity of IMPORT_ORDER) {
-      const headerRows = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[SHEET_NAMES[entity]], { header: 1 });
-      expect(headerRows[0]).toEqual(ENTITY_COLUMNS[entity].map((c) => c.header));
+  it('produces a headers-only template with exactly the domain sheets and zero data rows', () => {
+    for (const domain of ['records', 'inventory'] as const) {
+      const buf = buildTemplateWorkbook(domain);
+      const parsed = parseWorkbook(buf);
+      const wb = XLSX.read(buf, { type: 'array' });
+      const expectedSheets = DOMAIN_ENTITIES[domain].map((e) => SHEET_NAMES[e]);
+      // exactly this domain's sheets (+ _meta) — no cross-domain sheets
+      expect(wb.SheetNames.filter((n) => n !== '_meta').sort()).toEqual([...expectedSheets].sort());
+      for (const entity of DOMAIN_ENTITIES[domain]) {
+        expect(parsed[entity], `${entity} should have no data rows`).toEqual([]);
+        const headerRows = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[SHEET_NAMES[entity]], { header: 1 });
+        expect(headerRows[0]).toEqual(ENTITY_COLUMNS[entity].map((c) => c.header));
+      }
     }
   });
 
-  it('carries the current schema_version so a filled-in template re-imports cleanly', () => {
-    expect(readWorkbookMeta(buildTemplateWorkbook()).schemaVersion).toBe(WORKBOOK_SCHEMA_VERSION);
+  it('carries the domain + schema_version so a filled-in template re-imports cleanly', () => {
+    const meta = readWorkbookMeta(buildTemplateWorkbook('inventory'));
+    expect(meta.schemaVersion).toBe(WORKBOOK_SCHEMA_VERSION);
+    expect(meta.domain).toBe('inventory');
   });
 });
 
 describe('buildWorkbook — jsonb object cells', () => {
   const meta: WorkbookMeta = {
-    sourceTenant: 't', exportedAt: '2026-07-01T00:00:00.000Z', schemaVersion: 1, counts: emptyCounts(),
+    domain: 'inventory', sourceTenant: 't', exportedAt: '2026-07-01T00:00:00.000Z', schemaVersion: 1, counts: emptyCounts(),
   };
   it('serializes an object-valued cell (technical_details) to a JSON string, not "[object Object]"', () => {
     const data = emptyData();

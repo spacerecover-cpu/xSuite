@@ -19,6 +19,7 @@ function emptyCounts(): Record<EntityType, number> {
 }
 
 const META: WorkbookMeta = {
+  domain: 'records',
   sourceTenant: 'tenant-123',
   exportedAt: '2026-06-30T00:00:00.000Z',
   schemaVersion: 1,

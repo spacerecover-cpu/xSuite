@@ -9,12 +9,12 @@ import {
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { runExport } from '../../lib/dataMigration/exportClient';
-import { IMPORT_ORDER, SHEET_NAMES } from '../../lib/dataMigration/workbookContract';
-import type { EntityType } from '../../lib/dataMigration/workbookContract';
+import { DOMAIN_ENTITIES, DOMAIN_LABELS, SHEET_NAMES } from '../../lib/dataMigration/workbookContract';
+import type { EntityType, WorkbookDomain } from '../../lib/dataMigration/workbookContract';
 
 type WizardStep = 'scope' | 'generate' | 'download';
 
-interface Props { onClose: () => void; }
+interface Props { domain: WorkbookDomain; onClose: () => void; }
 
 const STEP_LABELS: Record<WizardStep, string> = {
   scope: 'Scope',
@@ -22,10 +22,11 @@ const STEP_LABELS: Record<WizardStep, string> = {
   download: 'Download',
 };
 
-export const ExportWizard: React.FC<Props> = ({ onClose }) => {
+export const ExportWizard: React.FC<Props> = ({ domain, onClose }) => {
+  const domainEntities = DOMAIN_ENTITIES[domain];
   const [step, setStep] = useState<WizardStep>('scope');
   const [selectedEntities, setSelectedEntities] = useState<Set<EntityType>>(
-    new Set(IMPORT_ORDER as EntityType[]),
+    new Set(domainEntities),
   );
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -53,7 +54,8 @@ export const ExportWizard: React.FC<Props> = ({ onClose }) => {
     try {
       const buf = await runExport(
         {
-          entities: IMPORT_ORDER.filter((e) => selectedEntities.has(e as EntityType)) as EntityType[],
+          domain,
+          entities: domainEntities.filter((e) => selectedEntities.has(e as EntityType)) as EntityType[],
           ...(dateFrom ? { dateFrom } : {}),
           ...(dateTo ? { dateTo } : {}),
         },
@@ -76,7 +78,7 @@ export const ExportWizard: React.FC<Props> = ({ onClose }) => {
     const url = URL.createObjectURL(new Blob([exportedBlob]));
     const a = document.createElement('a');
     a.href = url;
-    a.download = `xsuite-export-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    a.download = `xsuite-${domain}-export-${new Date().toISOString().slice(0, 10)}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -84,7 +86,7 @@ export const ExportWizard: React.FC<Props> = ({ onClose }) => {
   const steps: WizardStep[] = ['scope', 'generate', 'download'];
 
   return (
-    <Modal isOpen onClose={onClose} title="Export Data" size="xl" closeOnBackdrop={false}>
+    <Modal isOpen onClose={onClose} title={`Export ${DOMAIN_LABELS[domain]}`} size="xl" closeOnBackdrop={false}>
       <div className="space-y-6">
         {/* Breadcrumb */}
         <nav aria-label="Export steps" className="flex items-center gap-1 text-sm">
@@ -104,7 +106,7 @@ export const ExportWizard: React.FC<Props> = ({ onClose }) => {
             <div>
               <p className="text-sm font-medium text-slate-700 mb-2">Select entities to export</p>
               <div className="rounded-lg border border-slate-200 divide-y divide-slate-100">
-                {(IMPORT_ORDER as EntityType[]).map((entity) => (
+                {(domainEntities as EntityType[]).map((entity) => (
                   <label
                     key={entity}
                     className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50"
@@ -177,10 +179,10 @@ export const ExportWizard: React.FC<Props> = ({ onClose }) => {
             </div>
 
             <div className="rounded-lg border border-slate-200 divide-y divide-slate-100">
-              {(IMPORT_ORDER as EntityType[]).filter((e) => selectedEntities.has(e)).map((entity) => {
+              {(domainEntities as EntityType[]).filter((e) => selectedEntities.has(e)).map((entity) => {
                 const isActive = progressEntity === entity;
                 const isDone = progressEntity
-                  ? IMPORT_ORDER.indexOf(entity) < IMPORT_ORDER.indexOf(progressEntity)
+                  ? domainEntities.indexOf(entity) < domainEntities.indexOf(progressEntity)
                   : false;
                 return (
                   <div key={entity} className="px-4 py-2.5 flex items-center justify-between text-sm">

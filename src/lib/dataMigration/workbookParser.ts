@@ -3,8 +3,10 @@ import {
   type EntityType,
   type ParsedWorkbook,
   type RawRow,
+  type WorkbookDomain,
   SHEET_NAMES,
   ENTITY_COLUMNS,
+  WORKBOOK_DOMAINS,
 } from './workbookContract';
 
 const ENTITY_TYPES = Object.keys(SHEET_NAMES) as EntityType[];
@@ -65,6 +67,8 @@ export function parseWorkbook(file: ArrayBuffer): ParsedWorkbook {
 export interface ParsedWorkbookMeta {
   /** schema_version parsed from the `_meta` sheet; null when the sheet/field is absent. */
   schemaVersion: number | null;
+  /** which domain this workbook belongs to; null for older/operator files with no `domain` marker. */
+  domain: WorkbookDomain | null;
   sourceTenant: string | null;
   exportedAt: string | null;
 }
@@ -78,7 +82,7 @@ export interface ParsedWorkbookMeta {
 export function readWorkbookMeta(file: ArrayBuffer): ParsedWorkbookMeta {
   const book = XLSX.read(file, { type: 'array', cellDates: false });
   const sheet = book.Sheets['_meta'];
-  if (!sheet) return { schemaVersion: null, sourceTenant: null, exportedAt: null };
+  if (!sheet) return { schemaVersion: null, domain: null, sourceTenant: null, exportedAt: null };
   const rows = XLSX.utils.sheet_to_json<{ key?: unknown; value?: unknown }>(sheet, { defval: null });
   const byKey = new Map<string, unknown>();
   for (const row of rows) {
@@ -87,8 +91,11 @@ export function readWorkbookMeta(file: ArrayBuffer): ParsedWorkbookMeta {
   const rawVersion = byKey.get('schema_version');
   const parsedVersion =
     rawVersion == null || rawVersion === '' ? null : Number(rawVersion);
+  const rawDomain = byKey.has('domain') ? String(byKey.get('domain') ?? '') : '';
+  const domain = (WORKBOOK_DOMAINS as string[]).includes(rawDomain) ? (rawDomain as WorkbookDomain) : null;
   return {
     schemaVersion: parsedVersion != null && Number.isFinite(parsedVersion) ? parsedVersion : null,
+    domain,
     sourceTenant: byKey.has('source_tenant') ? String(byKey.get('source_tenant') ?? '') : null,
     exportedAt: byKey.has('exported_at') ? String(byKey.get('exported_at') ?? '') : null,
   };

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Upload, Download, Database, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react';
+import { Upload, Download, Database, CheckCircle, Clock, XCircle, AlertCircle, Briefcase, Package } from 'lucide-react';
 import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -10,6 +10,31 @@ import { supabase } from '../../lib/supabaseClient';
 import { dataMigrationKeys } from '../../lib/queryKeys';
 import { ImportWizard } from '../../components/dataMigration/ImportWizard';
 import { ExportWizard } from '../../components/dataMigration/ExportWizard';
+import type { WorkbookDomain } from '../../lib/dataMigration/workbookContract';
+
+// Two independent import/export domains — never mixed in one file.
+const DOMAIN_CARDS: Array<{
+  domain: WorkbookDomain;
+  title: string;
+  blurb: string;
+  icon: React.ReactNode;
+  tint: string;
+}> = [
+  {
+    domain: 'records',
+    title: 'Case Records',
+    blurb: 'Customers, companies, cases, devices, quotes, invoices, and case history.',
+    icon: <Briefcase className="w-6 h-6 text-info" />,
+    tint: 'bg-info-muted',
+  },
+  {
+    domain: 'inventory',
+    title: 'Inventory',
+    blurb: 'Stock items (with technical specs), storage locations, and donor parts.',
+    icon: <Package className="w-6 h-6 text-accent" />,
+    tint: 'bg-accent/10',
+  },
+];
 
 type RunStatus = 'pending' | 'validating' | 'running' | 'paused' | 'completed' | 'failed';
 
@@ -43,8 +68,7 @@ const STATUS_BADGE: Record<RunStatus, 'success' | 'danger' | 'info' | 'warning' 
 };
 
 export const ImportExportCenter: React.FC = () => {
-  const [showImport, setShowImport] = useState(false);
-  const [showExport, setShowExport] = useState(false);
+  const [wizard, setWizard] = useState<{ kind: 'import' | 'export'; domain: WorkbookDomain } | null>(null);
 
   const { data: recentRuns, isLoading } = useQuery({
     queryKey: dataMigrationKeys.runs(),
@@ -59,9 +83,6 @@ export const ImportExportCenter: React.FC = () => {
     },
   });
 
-  const importRuns = recentRuns?.filter((r) => r.kind === 'import') ?? [];
-  const exportRuns = recentRuns?.filter((r) => r.kind === 'export') ?? [];
-
   const totalCounts = (run: MigrationRun) =>
     Object.values(run.counts ?? {}).reduce(
       (acc, c) => ({ inserted: acc.inserted + c.inserted, skipped: acc.skipped + c.skipped, error: acc.error + c.error }),
@@ -73,59 +94,39 @@ export const ImportExportCenter: React.FC = () => {
       <SettingsPageHeader categoryId="import-export" />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <Card className="p-6 flex flex-col gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-info-muted flex items-center justify-center shrink-0">
-              <Upload className="w-6 h-6 text-info" />
+        {DOMAIN_CARDS.map((d) => (
+          <Card key={d.domain} className="p-6 flex flex-col gap-4">
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-xl ${d.tint} flex items-center justify-center shrink-0`}>
+                {d.icon}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-base font-semibold text-slate-900">{d.title}</h2>
+                <p className="text-sm text-slate-500 mt-0.5">{d.blurb}</p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-base font-semibold text-slate-900">Import Data</h2>
-              <p className="text-sm text-slate-500 mt-0.5">
-                Load a full-lab workbook (.xlsx) — customers, cases, devices, quotes, invoices, and history.
-              </p>
+            <div className="flex items-center gap-2 mt-auto">
+              <Button
+                variant="primary"
+                size="sm"
+                aria-label={`Import ${d.title}`}
+                onClick={() => setWizard({ kind: 'import', domain: d.domain })}
+              >
+                <Upload className="w-4 h-4 mr-1.5" />
+                Import
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-label={`Export ${d.title}`}
+                onClick={() => setWizard({ kind: 'export', domain: d.domain })}
+              >
+                <Download className="w-4 h-4 mr-1.5" />
+                Export
+              </Button>
             </div>
-          </div>
-          <div className="flex items-center gap-3 text-sm text-slate-500">
-            <span className="font-medium text-slate-700">{importRuns.length}</span> import run{importRuns.length !== 1 ? 's' : ''}
-          </div>
-          <Button
-            variant="primary"
-            size="sm"
-            className="self-start"
-            aria-label="Start import"
-            onClick={() => setShowImport(true)}
-          >
-            <Upload className="w-4 h-4 mr-1.5" />
-            Start Import
-          </Button>
-        </Card>
-
-        <Card className="p-6 flex flex-col gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-success-muted flex items-center justify-center shrink-0">
-              <Download className="w-6 h-6 text-success" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-base font-semibold text-slate-900">Export Data</h2>
-              <p className="text-sm text-slate-500 mt-0.5">
-                Download the full relational graph as a re-importable .xlsx workbook for backup or migration.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 text-sm text-slate-500">
-            <span className="font-medium text-slate-700">{exportRuns.length}</span> export run{exportRuns.length !== 1 ? 's' : ''}
-          </div>
-          <Button
-            variant="success"
-            size="sm"
-            className="self-start"
-            aria-label="Start export"
-            onClick={() => setShowExport(true)}
-          >
-            <Download className="w-4 h-4 mr-1.5" />
-            Start Export
-          </Button>
-        </Card>
+          </Card>
+        ))}
       </div>
 
       <div>
@@ -184,8 +185,12 @@ export const ImportExportCenter: React.FC = () => {
         </Card>
       </div>
 
-      {showImport && <ImportWizard onClose={() => setShowImport(false)} />}
-      {showExport && <ExportWizard onClose={() => setShowExport(false)} />}
+      {wizard?.kind === 'import' && (
+        <ImportWizard domain={wizard.domain} onClose={() => setWizard(null)} />
+      )}
+      {wizard?.kind === 'export' && (
+        <ExportWizard domain={wizard.domain} onClose={() => setWizard(null)} />
+      )}
     </div>
   );
 };

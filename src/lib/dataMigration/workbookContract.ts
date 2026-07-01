@@ -39,23 +39,48 @@ export const SHEET_NAMES: Record<EntityType, string> = {
 //                                               → invoices → invoiceLineItems
 //                                               → notes
 //                                               → statusHistory
-export const IMPORT_ORDER: EntityType[] = [
-  'companies',
-  'customers',
-  'relationships',
-  'cases',
-  'devices',
-  'quotes',
-  'quoteItems',
-  'invoices',
-  'invoiceLineItems',
-  'notes',
-  'statusHistory',
+// A workbook belongs to exactly ONE domain — the case-records graph OR inventory. The two are
+// never mixed in a single file: each has its own template, import/export flow, and a `domain`
+// marker in `_meta` so a file from one domain cannot be imported into the other.
+export type WorkbookDomain = 'records' | 'inventory';
+
+export const WORKBOOK_DOMAINS: WorkbookDomain[] = ['records', 'inventory'];
+
+export const DOMAIN_LABELS: Record<WorkbookDomain, string> = {
+  records: 'Case Records',
+  inventory: 'Inventory',
+};
+
+// Per-domain entity lists, in dependency order (parent before child).
+export const DOMAIN_ENTITIES: Record<WorkbookDomain, EntityType[]> = {
+  records: [
+    'companies',
+    'customers',
+    'relationships',
+    'cases',
+    'devices',
+    'quotes',
+    'quoteItems',
+    'invoices',
+    'invoiceLineItems',
+    'notes',
+    'statusHistory',
+  ],
   // Inventory forms its own independent sub-graph: locations (self-parent) → items → donor parts.
-  'inventoryLocations',
-  'inventoryItems',
-  'inventoryDonorParts',
-];
+  inventory: [
+    'inventoryLocations',
+    'inventoryItems',
+    'inventoryDonorParts',
+  ],
+};
+
+/** Full dependency-ordered entity list across both domains (records first, then inventory). */
+export const IMPORT_ORDER: EntityType[] = [...DOMAIN_ENTITIES.records, ...DOMAIN_ENTITIES.inventory];
+
+/** Which domain an entity belongs to. */
+export function domainForEntity(entity: EntityType): WorkbookDomain {
+  return DOMAIN_ENTITIES.inventory.includes(entity) ? 'inventory' : 'records';
+}
 
 export type ColType = 'string' | 'number' | 'boolean' | 'date' | 'uuid';
 

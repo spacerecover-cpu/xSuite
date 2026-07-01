@@ -11,7 +11,7 @@ describe('validateWorkbook', () => {
     const wb = empty();
     wb.customers = [{ legacy_id: 'CU1', customer_name: 'Jo', created_at: '2021-01-01T00:00:00Z' }];
     wb.cases = [{ legacy_id: 'K1', case_number: 'CASE-0001', customer_legacy_id: 'CU1' }];
-    const r = validateWorkbook(wb);
+    const r = validateWorkbook(wb, 'records');
     expect(r.ok).toBe(true);
     expect(r.issues).toEqual([]);
     expect(r.counts.cases).toBe(1);
@@ -20,7 +20,7 @@ describe('validateWorkbook', () => {
   it('flags a missing required field as an error', () => {
     const wb = empty();
     wb.customers = [{ legacy_id: 'CU1' }]; // customer_name required
-    const r = validateWorkbook(wb);
+    const r = validateWorkbook(wb, 'records');
     expect(r.ok).toBe(false);
     expect(r.issues).toContainEqual(
       expect.objectContaining({ entity: 'customers', field: 'customer_name', severity: 'error' }),
@@ -33,7 +33,7 @@ describe('validateWorkbook', () => {
       { legacy_id: 'CU1', customer_name: 'A' },
       { legacy_id: 'CU1', customer_name: 'B' },
     ];
-    const r = validateWorkbook(wb);
+    const r = validateWorkbook(wb, 'records');
     expect(r.ok).toBe(false);
     expect(r.issues.some((i) => i.message.toLowerCase().includes('duplicate legacy_id'))).toBe(true);
   });
@@ -41,7 +41,7 @@ describe('validateWorkbook', () => {
   it('flags a dangling in-file FK (case → unknown customer)', () => {
     const wb = empty();
     wb.cases = [{ legacy_id: 'K1', case_number: 'CASE-1', customer_legacy_id: 'NOPE' }];
-    const r = validateWorkbook(wb);
+    const r = validateWorkbook(wb, 'records');
     expect(r.ok).toBe(false);
     expect(r.issues).toContainEqual(
       expect.objectContaining({ entity: 'cases', legacyId: 'K1', severity: 'error' }),
@@ -58,7 +58,7 @@ describe('validateWorkbook', () => {
       { legacy_id: 'I1', invoice_number: 'INV-1' },
       { legacy_id: 'I2', invoice_number: 'INV-1' },
     ];
-    const r = validateWorkbook(wb);
+    const r = validateWorkbook(wb, 'records');
     expect(r.issues.filter((i) => i.message.toLowerCase().includes('duplicate')).length).toBeGreaterThanOrEqual(2);
   });
 
@@ -66,7 +66,7 @@ describe('validateWorkbook', () => {
     const wb = empty();
     wb.customers = [{ legacy_id: 'CU1', customer_name: 'A', created_at: 'not-a-date' }];
     wb.quotes = [{ legacy_id: 'Q1', quote_number: 'Q-1', total_amount: 'abc' }];
-    const r = validateWorkbook(wb);
+    const r = validateWorkbook(wb, 'records');
     expect(r.ok).toBe(false);
     expect(r.issues.some((i) => i.field === 'created_at')).toBe(true);
     expect(r.issues.some((i) => i.field === 'total_amount')).toBe(true);
@@ -78,7 +78,7 @@ describe('validateWorkbook', () => {
     wb.customers = [{ legacy_id: 'CU1', customer_name: 'A' }];
     wb.cases = [{ legacy_id: 'K1', case_number: 'C-1', customer_legacy_id: 'CU1' }];
     wb.invoices = [{ legacy_id: 'I1', invoice_number: 'INV-1', case_legacy_id: 'K1', status: 'issued' }];
-    const r = validateWorkbook(wb);
+    const r = validateWorkbook(wb, 'records');
     expect(r.ok).toBe(false);
     expect(r.issues).toContainEqual(
       expect.objectContaining({ entity: 'invoices', field: 'status', severity: 'error' }),
@@ -91,7 +91,7 @@ describe('validateWorkbook', () => {
       wb.customers = [{ legacy_id: 'CU1', customer_name: 'A' }];
       wb.cases = [{ legacy_id: 'K1', case_number: 'C-1', customer_legacy_id: 'CU1' }];
       wb.invoices = [{ legacy_id: 'I1', invoice_number: 'INV-1', case_legacy_id: 'K1', status }];
-      const r = validateWorkbook(wb);
+      const r = validateWorkbook(wb, 'records');
       expect(r.issues.some((i) => i.entity === 'invoices' && i.field === 'status')).toBe(false);
     }
   });
@@ -101,7 +101,7 @@ describe('validateWorkbook', () => {
     wb.customers = [{ legacy_id: 'CU1', customer_name: 'A' }];
     wb.cases = [{ legacy_id: 'K1', case_number: 'C-1', customer_legacy_id: 'CU1', status: 'diagnosis in progress' }];
     wb.quotes = [{ legacy_id: 'Q1', quote_number: 'Q-1', case_legacy_id: 'K1', status: 'under negotiation' }];
-    const r = validateWorkbook(wb);
+    const r = validateWorkbook(wb, 'records');
     expect(r.issues.some((i) => i.field === 'status')).toBe(false);
   });
 });
