@@ -9,7 +9,10 @@ export type EntityType =
   | 'invoices'
   | 'invoiceLineItems'
   | 'notes'
-  | 'statusHistory';
+  | 'statusHistory'
+  | 'inventoryLocations'
+  | 'inventoryItems'
+  | 'inventoryDonorParts';
 
 export const WORKBOOK_SCHEMA_VERSION = 1 as const;
 
@@ -25,6 +28,9 @@ export const SHEET_NAMES: Record<EntityType, string> = {
   invoiceLineItems: 'InvoiceLineItems',
   notes: 'Notes',
   statusHistory: 'StatusHistory',
+  inventoryLocations: 'InventoryLocations',
+  inventoryItems: 'InventoryItems',
+  inventoryDonorParts: 'InventoryDonorParts',
 };
 
 // Dependency-ordered: parent before child throughout.
@@ -45,6 +51,10 @@ export const IMPORT_ORDER: EntityType[] = [
   'invoiceLineItems',
   'notes',
   'statusHistory',
+  // Inventory forms its own independent sub-graph: locations (self-parent) → items → donor parts.
+  'inventoryLocations',
+  'inventoryItems',
+  'inventoryDonorParts',
 ];
 
 export type ColType = 'string' | 'number' | 'boolean' | 'date' | 'uuid';
@@ -288,6 +298,62 @@ export const ENTITY_COLUMNS: Record<EntityType, ColumnDef[]> = {
     { key: 'new_value',      header: 'New Value',      type: 'string' },
     { key: 'details',        header: 'Details',        type: 'string' },
     { key: 'created_at',     header: 'Performed At',   type: 'date' },
+  ],
+
+  // ── inventoryLocations (→ inventory_locations table) ──────────────────────
+  // Hierarchical via parent_id (self-ref). parent_legacy_id is a SOFT ref: an
+  // unresolved parent imports as NULL (report-only), so rows need not be topo-sorted.
+  inventoryLocations: [
+    { key: 'legacy_id',        header: 'Record Ref',          type: 'string',  required: true },
+    { key: 'parent_legacy_id', header: 'Parent Location Ref', type: 'string',  ref: 'inventoryLocations' },
+    { key: 'name',             header: 'Location Name',       type: 'string',  required: true },
+    { key: 'location_code',    header: 'Location Code',       type: 'string' },
+    { key: 'description',      header: 'Description',         type: 'string' },
+    { key: 'is_active',        header: 'Is Active',           type: 'boolean' },
+    { key: 'created_at',       header: 'Created At',          type: 'date' },
+  ],
+
+  // ── inventoryItems (→ inventory_items table) ──────────────────────────────
+  // device_type/brand/capacity/interface resolve against the GLOBAL device catalogs
+  // by name; condition/status/category resolve against the INVENTORY master tables
+  // (master_inventory_condition_types/status_types/categories) — NOT the case-device
+  // catalogs. item_number is preserved if supplied, else the DB trigger assigns a
+  // per-device-type number. technical_details is a JSON-object string (family-keyed).
+  inventoryItems: [
+    { key: 'legacy_id',          header: 'Record Ref',              type: 'string',  required: true },
+    { key: 'item_number',        header: 'Item Number',             type: 'string' },
+    { key: 'device_type',        header: 'Device Type',             type: 'string' },
+    { key: 'category',           header: 'Inventory Category',      type: 'string' },
+    { key: 'brand',              header: 'Brand',                   type: 'string' },
+    { key: 'model',              header: 'Model',                   type: 'string',  required: true },
+    { key: 'serial_number',      header: 'Serial Number',           type: 'string' },
+    { key: 'capacity',           header: 'Capacity',                type: 'string' },
+    { key: 'interface',          header: 'Interface',               type: 'string' },
+    { key: 'condition',          header: 'Condition',               type: 'string' },
+    { key: 'status',             header: 'Status',                  type: 'string' },
+    { key: 'location_legacy_id', header: 'Location Ref',            type: 'string',  ref: 'inventoryLocations' },
+    { key: 'quantity',           header: 'Quantity',                type: 'number' },
+    { key: 'min_quantity',       header: 'Min Quantity',            type: 'number' },
+    { key: 'purchase_price',     header: 'Purchase Cost',           type: 'number' },
+    { key: 'purchase_date',      header: 'Purchase Date',           type: 'date' },
+    { key: 'is_donor',           header: 'Is Donor Drive',          type: 'boolean' },
+    { key: 'description',        header: 'Description',             type: 'string' },
+    { key: 'notes',              header: 'Notes',                   type: 'string' },
+    { key: 'technical_details',  header: 'Technical Details (JSON)', type: 'string' },
+    { key: 'created_at',         header: 'Created At',              type: 'date' },
+  ],
+
+  // ── inventoryDonorParts (→ inventory_donor_parts table) ───────────────────
+  // Child of inventoryItems; only meaningful when the item is_donor. part_type is a
+  // stable family-specific key (heads/pcb/controller/…). Unique (item_id, part_type).
+  inventoryDonorParts: [
+    { key: 'legacy_id',      header: 'Record Ref',      type: 'string',  required: true },
+    { key: 'item_legacy_id', header: 'Item Record Ref', type: 'string',  required: true, ref: 'inventoryItems' },
+    { key: 'part_type',      header: 'Part Type',       type: 'string',  required: true },
+    { key: 'quantity',       header: 'Quantity',        type: 'number' },
+    { key: 'condition',      header: 'Condition',       type: 'string' },
+    { key: 'notes',          header: 'Notes',           type: 'string' },
+    { key: 'created_at',     header: 'Created At',      type: 'date' },
   ],
 };
 

@@ -73,5 +73,8 @@ function normalizeCell(value: unknown): string | number | boolean | null {
   if (value === null || value === undefined) return null;
   if (typeof value === 'number' || typeof value === 'boolean') return value;
   if (value instanceof Date) return value.toISOString();
+  // jsonb columns (e.g. inventoryItems.technical_details) arrive as objects/arrays on
+  // export — serialize to a JSON string so the cell round-trips, not "[object Object]".
+  if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
 }

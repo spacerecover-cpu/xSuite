@@ -10,6 +10,7 @@ import type { EntityType } from '../workbookContract';
 const ALL_ENTITIES: EntityType[] = [
   'companies', 'customers', 'relationships', 'cases', 'devices',
   'quotes', 'quoteItems', 'invoices', 'invoiceLineItems', 'notes', 'statusHistory',
+  'inventoryLocations', 'inventoryItems', 'inventoryDonorParts',
 ];
 
 describe('workbookContract — structural invariants', () => {
@@ -25,9 +26,9 @@ describe('workbookContract — structural invariants', () => {
     }
   });
 
-  it('IMPORT_ORDER contains exactly the 11 EntityTypes (no duplicates, no missing)', () => {
-    expect(IMPORT_ORDER).toHaveLength(11);
-    expect(new Set(IMPORT_ORDER).size).toBe(11);
+  it('IMPORT_ORDER contains exactly the 14 EntityTypes (no duplicates, no missing)', () => {
+    expect(IMPORT_ORDER).toHaveLength(14);
+    expect(new Set(IMPORT_ORDER).size).toBe(14);
     for (const e of ALL_ENTITIES) {
       expect(IMPORT_ORDER).toContain(e);
     }
@@ -71,6 +72,11 @@ describe('workbookContract — structural invariants', () => {
 
   it('IMPORT_ORDER: cases before statusHistory', () => {
     expect(IMPORT_ORDER.indexOf('cases')).toBeLessThan(IMPORT_ORDER.indexOf('statusHistory'));
+  });
+
+  it('IMPORT_ORDER: inventoryLocations before inventoryItems before inventoryDonorParts', () => {
+    expect(IMPORT_ORDER.indexOf('inventoryLocations')).toBeLessThan(IMPORT_ORDER.indexOf('inventoryItems'));
+    expect(IMPORT_ORDER.indexOf('inventoryItems')).toBeLessThan(IMPORT_ORDER.indexOf('inventoryDonorParts'));
   });
 
   it('ENTITY_COLUMNS covers every EntityType', () => {

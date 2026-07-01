@@ -23,6 +23,9 @@
 //     diagnosis/recovery_result/…) and the is_primary "patient" designation survive the round-trip.
 // 13. Human-readable numbers: file-supplied case/company numbers are preserved; blank
 //     customer/company numbers are auto-filled by finalize (unique, above the max supplied).
+// 14. Inventory locations (hierarchy), items (catalog/master resolution by name, preserved
+//     item_number, technical_details JSON), and donor parts all round-trip; donor parts link
+//     to their imported item. Reached via the entity_map (no run_id metadata on these tables).
 //
 // The import is driven THROUGH the file boundary: the in-memory fixture is serialised with
 // buildWorkbook, then re-read with parseWorkbook, and THAT parsed result is imported — so the
@@ -172,7 +175,33 @@ describe('Round-trip integration — export → import → verify', { timeout: 3
         .update({ deleted_at: new Date().toISOString() })
         .filter('metadata->>data_migration_run_id', 'eq', runId);
     }
+    // Inventory tables have no run_id metadata → clean them via the entity_map (child→parent)
+    // so a re-run doesn't hit uq_inventory_items_tenant_barcode on preserved barcodes.
+    for (const [entity, table] of [
+      ['inventoryDonorParts', 'inventory_donor_parts'],
+      ['inventoryItems', 'inventory_items'],
+      ['inventoryLocations', 'inventory_locations'],
+    ] as const) {
+      const { data: mapped } = await anyClient
+        .from('data_migration_entity_map')
+        .select('new_id')
+        .eq('run_id', runId).eq('entity_type', entity).eq('status', 'inserted');
+      const ids = (mapped ?? []).map((m: { new_id: string | null }) => m.new_id).filter(Boolean);
+      if (ids.length) {
+        await anyClient.from(table).update({ deleted_at: new Date().toISOString() }).in('id', ids);
+      }
+    }
   });
+
+  // Inventory rows carry no run_id metadata; reach them through this run's entity_map.
+  async function mappedIds(entity: string): Promise<string[]> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (client as any)
+      .from('data_migration_entity_map')
+      .select('new_id')
+      .eq('run_id', runId).eq('entity_type', entity).eq('status', 'inserted') as { data: Array<{ new_id: string | null }> | null };
+    return (data ?? []).map((m) => m.new_id).filter((x): x is string => !!x);
+  }
 
   it('import completed without a top-level error', () => {
     expect(summary.runId).toBeTruthy();
@@ -257,6 +286,47 @@ describe('Round-trip integration — export → import → verify', { timeout: 3
     expect(custNums.length).toBeGreaterThan(0);
     expect(custNums.every(n => (n ?? '').length > 0)).toBe(true);
     expect(new Set(custNums).size).toBe(custNums.length);
+  });
+
+  it('inventory: locations, items, and donor parts all import', () => {
+    expect(summary.counts['inventoryLocations']?.inserted).toBe(fixtureWb.inventoryLocations.length);
+    expect(summary.counts['inventoryItems']?.inserted).toBe(fixtureWb.inventoryItems.length);
+    expect(summary.counts['inventoryDonorParts']?.inserted).toBe(fixtureWb.inventoryDonorParts.length);
+    expect(summary.counts['inventoryItems']?.error).toBe(0);
+  });
+
+  it('inventory items preserve item_number and round-trip technical_details JSON', async () => {
+    const itemIds = await mappedIds('inventoryItems');
+    expect(itemIds.length).toBe(fixtureWb.inventoryItems.length);
+    const { data: items } = await client
+      .from('inventory_items')
+      .select('item_number, barcode, technical_details')
+      .in('id', itemIds)
+      .is('deleted_at', null);
+    const rows = items ?? [];
+    expect(rows.length).toBe(fixtureWb.inventoryItems.length);
+    // preserved item_number, with barcode reconstructed from it
+    expect(rows.every(r => (r.item_number ?? '').length > 0)).toBe(true);
+    expect(rows.every(r => r.barcode === r.item_number)).toBe(true);
+    // technical_details survived as queryable JSON (pcb_number present on every row)
+    expect(rows.every(r => {
+      const td = r.technical_details as Record<string, unknown> | null;
+      return td != null && typeof td === 'object' && typeof td['pcb_number'] === 'string';
+    })).toBe(true);
+  });
+
+  it('every imported donor part references an imported inventory item', async () => {
+    const itemIds = new Set(await mappedIds('inventoryItems'));
+    const donorIds = await mappedIds('inventoryDonorParts');
+    expect(donorIds.length).toBe(fixtureWb.inventoryDonorParts.length);
+    const { data: dps } = await client
+      .from('inventory_donor_parts')
+      .select('item_id')
+      .in('id', donorIds)
+      .is('deleted_at', null);
+    for (const dp of dps ?? []) {
+      expect(itemIds.has(dp.item_id)).toBe(true);
+    }
   });
 
   it('all cases were inserted', () => {

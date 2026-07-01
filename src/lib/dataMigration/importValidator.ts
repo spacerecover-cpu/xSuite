@@ -41,6 +41,10 @@ const FK_REFS: Partial<Record<EntityType, Array<{ field: string; target: EntityT
   invoiceLineItems: [{ field: 'invoice_legacy_id', target: 'invoices', required: true }],
   notes: [{ field: 'case_legacy_id', target: 'cases', required: true }],
   statusHistory: [{ field: 'case_legacy_id', target: 'cases', required: true }],
+  // Donor parts must reference an item present in the file. inventoryItems.location_legacy_id
+  // is intentionally NOT a strict ref (optional + resolved with a name/code fallback in the
+  // RPC), and inventoryLocations.parent_legacy_id is a soft self-ref (unresolved → NULL).
+  inventoryDonorParts: [{ field: 'item_legacy_id', target: 'inventoryItems', required: true }],
 };
 
 // Entity -> unique business-number column to dedup within file.

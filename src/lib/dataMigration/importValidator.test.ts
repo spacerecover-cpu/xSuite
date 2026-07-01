@@ -1,12 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import type { ParsedWorkbook } from './workbookContract';
+import { IMPORT_ORDER, type ParsedWorkbook, type RawRow } from './workbookContract';
 import { validateWorkbook, validateSchemaVersion } from './importValidator';
 
 function empty(): ParsedWorkbook {
-  return {
-    companies: [], customers: [], relationships: [], cases: [], devices: [],
-    quotes: [], quoteItems: [], invoices: [], invoiceLineItems: [], notes: [], statusHistory: [],
-  };
+  return Object.fromEntries(IMPORT_ORDER.map((e) => [e, [] as RawRow[]])) as ParsedWorkbook;
 }
 
 describe('validateWorkbook', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { ParsedWorkbook } from './workbookContract';
+import type { ParsedWorkbook, RawRow } from './workbookContract';
 import { IMPORT_ORDER } from './workbookContract';
 
 const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
@@ -10,10 +10,7 @@ vi.mock('./workbookBuilder', () => ({ buildWorkbook: vi.fn(() => new ArrayBuffer
 import { runImport } from './importClient';
 
 function empty(): ParsedWorkbook {
-  return {
-    companies: [], customers: [], relationships: [], cases: [], devices: [],
-    quotes: [], quoteItems: [], invoices: [], invoiceLineItems: [], notes: [], statusHistory: [],
-  };
+  return Object.fromEntries(IMPORT_ORDER.map((e) => [e, [] as RawRow[]])) as ParsedWorkbook;
 }
 
 function mockRpc(insertedOk = true) {

@@ -110,3 +110,17 @@ describe('buildTemplateWorkbook', () => {
     expect(readWorkbookMeta(buildTemplateWorkbook()).schemaVersion).toBe(WORKBOOK_SCHEMA_VERSION);
   });
 });
+
+describe('buildWorkbook — jsonb object cells', () => {
+  const meta: WorkbookMeta = {
+    sourceTenant: 't', exportedAt: '2026-07-01T00:00:00.000Z', schemaVersion: 1, counts: emptyCounts(),
+  };
+  it('serializes an object-valued cell (technical_details) to a JSON string, not "[object Object]"', () => {
+    const data = emptyData();
+    data.inventoryItems = [
+      { legacy_id: 'INV1', model: 'ST2000', technical_details: { pcb_number: '100664987', dcm: 'CC45' } } as RawRow,
+    ];
+    const parsed = parseWorkbook(buildWorkbook(data, meta));
+    expect(parsed.inventoryItems[0].technical_details).toBe('{"pcb_number":"100664987","dcm":"CC45"}');
+  });
+});
