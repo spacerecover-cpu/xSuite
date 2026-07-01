@@ -273,7 +273,8 @@ export const CasesList: React.FC = () => {
   const startIndex = (currentPage - 1) * CASES_PER_PAGE + 1;
   const endIndex = Math.min(currentPage * CASES_PER_PAGE, totalCountData || 0);
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityColor = (priority: string | null | undefined) => {
+    if (!priority) return '#6b7280';
     const priorityItem = casePriorities.find(
       p => p.name.toLowerCase() === priority.toLowerCase()
     );
