@@ -75,13 +75,24 @@ const TrendMark: React.FC<{ trend: Trend }> = ({ trend }) => {
   );
 };
 
-const BUCKET_META: Array<{ bucket: CaseBucket; label: string; dotClass: string }> = [
-  { bucket: 'new', label: 'New', dotClass: 'bg-primary' },
-  { bucket: 'diagnosis', label: 'In diagnosis', dotClass: 'bg-warning' },
-  { bucket: 'approval', label: 'Awaiting approval', dotClass: 'bg-accent' },
-  { bucket: 'recovery', label: 'In recovery', dotClass: 'bg-info' },
-  { bucket: 'ready', label: 'Ready', dotClass: 'bg-success' },
-  { bucket: 'delivered', label: 'Delivered', dotClass: 'bg-slate-400' },
+// Each bucket owns a hue end-to-end: dot + number share it, and the active
+// (filtering) card tints in the same colour rather than a generic outline.
+// Delivered stays ink/slate — terminal states shouldn't compete for attention.
+// Recovery borrows teal from the identity palette (stage identity, not status
+// semantics); approval uses info because the accent token is too light on white.
+const BUCKET_META: Array<{
+  bucket: CaseBucket;
+  label: string;
+  dotClass: string;
+  valueClass: string;
+  activeClass: string;
+}> = [
+  { bucket: 'new', label: 'New', dotClass: 'bg-primary', valueClass: 'text-primary', activeClass: 'border-primary bg-primary/10' },
+  { bucket: 'diagnosis', label: 'In diagnosis', dotClass: 'bg-warning', valueClass: 'text-warning', activeClass: 'border-warning bg-warning-muted' },
+  { bucket: 'approval', label: 'Awaiting approval', dotClass: 'bg-info', valueClass: 'text-info', activeClass: 'border-info bg-info-muted' },
+  { bucket: 'recovery', label: 'In recovery', dotClass: 'bg-cat-2', valueClass: 'text-cat-2', activeClass: 'border-cat-2 bg-cat-2/10' },
+  { bucket: 'ready', label: 'Ready', dotClass: 'bg-success', valueClass: 'text-success', activeClass: 'border-success bg-success-muted' },
+  { bucket: 'delivered', label: 'Delivered', dotClass: 'bg-slate-400', valueClass: 'text-slate-900', activeClass: 'border-slate-400 bg-slate-100' },
 ];
 
 /**
@@ -235,7 +246,7 @@ export const CasesCommandCenter: React.FC<CasesCommandCenterProps> = ({
         role="group"
         aria-label="Filter cases by lifecycle stage"
       >
-        {BUCKET_META.map(({ bucket, label, dotClass }) => {
+        {BUCKET_META.map(({ bucket, label, dotClass, valueClass, activeClass }) => {
           const active = activeBucket === bucket;
           const value = stats?.buckets[bucket];
           return (
@@ -246,9 +257,7 @@ export const CasesCommandCenter: React.FC<CasesCommandCenterProps> = ({
               aria-pressed={active}
               className={cn(
                 'rounded-xl border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                active
-                  ? 'border-primary bg-primary/5'
-                  : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50',
+                active ? activeClass : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50',
               )}
             >
               <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
@@ -258,7 +267,7 @@ export const CasesCommandCenter: React.FC<CasesCommandCenterProps> = ({
               {loading || value === undefined ? (
                 <span className="mt-1 block h-6 w-12 animate-pulse rounded bg-slate-100" />
               ) : (
-                <span className="block text-lg font-bold leading-6 tabular-nums text-slate-900">
+                <span className={cn('block text-lg font-bold leading-6 tabular-nums', valueClass)}>
                   {value.toLocaleString()}
                 </span>
               )}

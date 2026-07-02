@@ -29,6 +29,25 @@ const DOT: Record<StatCardTone, string> = {
   'cat-8': 'bg-cat-8',
 };
 
+/** Compact-style value colour: the number carries the hue (neutral + the
+ *  too-light lime cat-3 stay ink for contrast on white). */
+const VALUE: Record<StatCardTone, string> = {
+  neutral: 'text-slate-900',
+  primary: 'text-primary',
+  info: 'text-info',
+  success: 'text-success',
+  warning: 'text-warning',
+  danger: 'text-danger',
+  'cat-1': 'text-cat-1',
+  'cat-2': 'text-cat-2',
+  'cat-3': 'text-slate-900',
+  'cat-4': 'text-cat-4',
+  'cat-5': 'text-cat-5',
+  'cat-6': 'text-cat-6',
+  'cat-7': 'text-cat-7',
+  'cat-8': 'text-cat-8',
+};
+
 interface StatCardProps {
   label: string;
   value: string | number;
@@ -98,7 +117,7 @@ export const StatCard: React.FC<StatCardProps> = ({
         <span className="mt-1 block h-6 w-12 animate-pulse rounded bg-slate-100" />
       ) : (
         <span
-          className="block truncate text-lg font-bold leading-6 tabular-nums text-slate-900"
+          className={cn('block truncate text-lg font-bold leading-6 tabular-nums', VALUE[tone])}
           title={typeof value === 'string' ? value : undefined}
         >
           {value}

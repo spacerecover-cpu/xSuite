@@ -67,6 +67,13 @@ describe('StatCard (compact style)', () => {
     expect(screen.getByText('4 paid')).toBeInTheDocument();
   });
 
+  it('the number carries the tone hue; neutral stays ink', () => {
+    render(<StatCard tone="success" label="Paid" value="2,175.000 OMR" />);
+    expect(screen.getByText('2,175.000 OMR').className).toContain('text-success');
+    render(<StatCard label="Count" value="42" />);
+    expect(screen.getByText('42').className).toContain('text-slate-900');
+  });
+
   it('becomes a real button when onClick is given', () => {
     render(<StatCard label="Total" value={10} onClick={() => {}} />);
     expect(screen.getByRole('button')).toBeInTheDocument();

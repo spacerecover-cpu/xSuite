@@ -357,14 +357,14 @@ export const AppearanceSettings: React.FC = () => {
                         <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden="true" />
                         In diagnosis
                       </span>
-                      <span className="block text-sm font-bold tabular-nums text-slate-900">31</span>
+                      <span className="block text-sm font-bold tabular-nums text-warning">31</span>
                     </div>
                     <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5">
                       <span className="flex items-center gap-1.5 text-xxs font-medium text-slate-500">
                         <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden="true" />
                         Ready
                       </span>
-                      <span className="block text-sm font-bold tabular-nums text-slate-900">5</span>
+                      <span className="block text-sm font-bold tabular-nums text-success">5</span>
                     </div>
                   </div>
                 ) : (
