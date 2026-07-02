@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
+import { buildExpenseSearchOr } from '../../lib/searchResolvers';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
@@ -142,7 +143,7 @@ export const ExpensesList: React.FC = () => {
 
         if (searchTerm) {
           const s = sanitizeFilterValue(searchTerm);
-          query = query.or(`expense_number.ilike.%${s}%,description.ilike.%${s}%,vendor.ilike.%${s}%`);
+          query = query.or(await buildExpenseSearchOr(s));
         }
 
         if (statusFilter !== 'all') {
@@ -477,7 +478,7 @@ export const ExpensesList: React.FC = () => {
                 .is('deleted_at', null);
               if (searchTerm) {
                 const s = sanitizeFilterValue(searchTerm);
-                q = q.or(`expense_number.ilike.%${s}%,vendor.ilike.%${s}%,description.ilike.%${s}%`);
+                q = q.or(await buildExpenseSearchOr(s));
               }
               if (statusFilter !== 'all') q = q.eq('status', statusFilter);
               const { data, error } = await q.order('expense_date', { ascending: false, nullsFirst: false });

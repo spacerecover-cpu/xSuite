@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
+import { buildPaymentSearchOr } from '../../lib/searchResolvers';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -115,7 +116,7 @@ export const PaymentsList: React.FC = () => {
 
       if (searchTerm) {
         const s = sanitizeFilterValue(searchTerm);
-        query = query.or(`payment_number.ilike.%${s}%,reference.ilike.%${s}%`);
+        query = query.or(await buildPaymentSearchOr(s));
       }
 
       if (statusFilter !== 'all') {
@@ -246,7 +247,7 @@ export const PaymentsList: React.FC = () => {
 
     if (searchTerm) {
       const s = sanitizeFilterValue(searchTerm);
-      query = query.or(`payment_number.ilike.%${s}%,reference.ilike.%${s}%`);
+      query = query.or(await buildPaymentSearchOr(s));
     }
     if (statusFilter !== 'all') query = query.eq('status', statusFilter);
     if (paymentMethodFilter !== 'all') query = query.eq('payment_method_id', paymentMethodFilter);

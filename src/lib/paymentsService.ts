@@ -2,6 +2,7 @@ import { supabase } from './supabaseClient';
 import { logAuditTrail } from './auditTrailService';
 import { logInvoicePayment } from './chainOfCustodyService';
 import { sanitizeFilterValue } from './postgrestSanitizer';
+import { buildPaymentSearchOr } from './searchResolvers';
 import { logger } from './logger';
 import { resolveRateContext } from './currencyService';
 import { baseAmount } from './financialMath';
@@ -132,7 +133,7 @@ export const fetchPayments = async (filters?: {
 
   if (filters?.search) {
     const s = sanitizeFilterValue(filters.search);
-    query = query.or(`payment_number.ilike.%${s}%,reference.ilike.%${s}%`);
+    query = query.or(await buildPaymentSearchOr(s));
   }
 
   const pageSize = filters?.pageSize || DEFAULT_PAGE_SIZE;

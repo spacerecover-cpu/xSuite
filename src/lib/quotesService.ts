@@ -4,6 +4,7 @@ import { logAuditTrail } from './auditTrailService';
 import { logQuoteCreated, logQuoteStatusChanged } from './chainOfCustodyService';
 import { sanitizeUuidFields as sanitizeUuids, dropEmptyKeys } from './dataValidation';
 import { sanitizeFilterValue } from './postgrestSanitizer';
+import { buildQuoteSearchOr } from './searchResolvers';
 import { logger } from './logger';
 import { calculateQuoteTotals, calculateQuoteTotalsBase, roundMoney } from './financialMath';
 import { resolveRateContext, getBaseCurrency, getCurrencyDecimals } from './currencyService';
@@ -195,7 +196,7 @@ export const fetchQuotesPage = async (filters?: {
 
     if (filters?.search) {
       const s = sanitizeFilterValue(filters.search);
-    query = query.or(`quote_number.ilike.%${s}%,title.ilike.%${s}%`);
+      query = query.or(await buildQuoteSearchOr(s));
     }
 
     if (filters?.customerId) {
