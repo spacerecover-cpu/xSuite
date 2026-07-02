@@ -4,6 +4,9 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { calculateVATForPeriod, VATSummary } from '../../lib/vatService';
 import { useCurrency } from '../../hooks/useCurrency';
+import { calendarQuarterBounds, quarterOf } from '../../lib/vatPeriods';
+import { tenantToday } from '../../lib/tenantToday';
+import { useDateTimeConfig } from '../../contexts/TenantConfigContext';
 import {
   Calendar,
   Calculator,
@@ -36,6 +39,7 @@ export const VATReturnModal: React.FC<VATReturnModalProps> = ({
   onSave,
 }) => {
   const { formatCurrency } = useCurrency();
+  const { timezone } = useDateTimeConfig();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [periodStart, setPeriodStart] = useState('');
   const [periodEnd, setPeriodEnd] = useState('');
@@ -44,14 +48,11 @@ export const VATReturnModal: React.FC<VATReturnModalProps> = ({
   const firstFieldRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const now = new Date();
-    const quarterMonth = Math.floor(now.getMonth() / 3) * 3;
-    const quarterStart = new Date(now.getFullYear(), quarterMonth, 1);
-    const quarterEnd = new Date(now.getFullYear(), quarterMonth + 3, 0);
-
-    setPeriodStart(quarterStart.toISOString().split('T')[0]);
-    setPeriodEnd(quarterEnd.toISOString().split('T')[0]);
-  }, [isOpen]);
+    const { year, quarter } = quarterOf(tenantToday(timezone));
+    const bounds = calendarQuarterBounds(year, quarter);
+    setPeriodStart(bounds.periodStart);
+    setPeriodEnd(bounds.periodEnd);
+  }, [isOpen, timezone]);
 
   const handleCalculate = async () => {
     if (!periodStart || !periodEnd) return;
@@ -100,14 +101,12 @@ export const VATReturnModal: React.FC<VATReturnModalProps> = ({
   };
 
   const setQuarterPeriod = (quarter: number, year: number) => {
-    const quarterMonth = (quarter - 1) * 3;
-    const start = new Date(year, quarterMonth, 1);
-    const end = new Date(year, quarterMonth + 3, 0);
-    setPeriodStart(start.toISOString().split('T')[0]);
-    setPeriodEnd(end.toISOString().split('T')[0]);
+    const bounds = calendarQuarterBounds(year, quarter as 1 | 2 | 3 | 4);
+    setPeriodStart(bounds.periodStart);
+    setPeriodEnd(bounds.periodEnd);
   };
 
-  const currentYear = new Date().getFullYear();
+  const currentYear = quarterOf(tenantToday(timezone)).year;
   const quarters = [
     { label: 'Q1', quarter: 1 },
     { label: 'Q2', quarter: 2 },
