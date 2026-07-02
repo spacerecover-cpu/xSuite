@@ -7021,6 +7021,7 @@ export type Database = {
           decimal_places: number
           decimal_separator: string
           default_tax_rate: number
+          deleted_at: string | null
           digit_grouping: string
           fiscal_year_start: string
           id: string
@@ -7071,6 +7072,7 @@ export type Database = {
           decimal_places?: number
           decimal_separator?: string
           default_tax_rate?: number
+          deleted_at?: string | null
           digit_grouping?: string
           fiscal_year_start?: string
           id?: string
@@ -7121,6 +7123,7 @@ export type Database = {
           decimal_places?: number
           decimal_separator?: string
           default_tax_rate?: number
+          deleted_at?: string | null
           digit_grouping?: string
           fiscal_year_start?: string
           id?: string
