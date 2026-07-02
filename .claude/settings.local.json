@@ -49,7 +49,10 @@
       "PowerShell(\"---UNPUSHED---\")",
       "mcp__c0de3041-287c-4030-9398-8ea61c49fb22__get_publishable_keys",
       "PowerShell(git check-ignore .env)",
-      "PowerShell(if \\($LASTEXITCODE -eq 0\\) { \"OK: .env is gitignored\" } else { \"WARNING: .env is NOT gitignored\" })"
+      "PowerShell(if \\($LASTEXITCODE -eq 0\\) { \"OK: .env is gitignored\" } else { \"WARNING: .env is NOT gitignored\" })",
+      "Bash(git switch *)",
+      "Bash(sed -n 100~0p /dev/null)",
+      "Bash(awk 'NR==104 || NR==115 || NR==142 || NR==171 || NR==208' \"C:/Projects/Space_Recovery/supabase/migrations.manifest.md\")"
     ]
   },
   "enableAllProjectMcpServers": true,

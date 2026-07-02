@@ -7,6 +7,7 @@ import { Input } from '../ui/Input';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown';
 import { CustomerFormModal } from '../customers/CustomerFormModal';
+import { useCustomerPickerRows } from '../../lib/pickerSearch';
 import { CaseSuccessModal } from './CaseSuccessModal';
 import { ServerBulkDrivesModal } from './ServerBulkDrivesModal';
 import { UsageLimitGuard } from '../shared/UsageLimitGuard';
@@ -96,18 +97,11 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
     },
   ]);
 
-  const { data: customers = [] } = useQuery({
-    queryKey: ['customers_for_cases'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('customers_enhanced')
-        .select('id, customer_number, customer_name, email, mobile_number')
-        .eq('is_active', true)
-        .order('customer_name');
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Server-side picker search — fetch-all silently capped at 1000 rows, hiding
+  // most customers on large tenants (see lib/pickerSearch.ts).
+  const { rows: customers, onSearchTermChange: onCustomerSearch } = useCustomerPickerRows(
+    formData.customer_id || undefined,
+  );
 
   const { data: serviceTypes = [] } = useQuery({
     queryKey: ['service_types'],
@@ -314,7 +308,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
   }, [deviceRoles]);
 
   const handleCustomerCreated = (newCustomer: Record<string, unknown>) => {
-    queryClient.invalidateQueries({ queryKey: ['customers_for_cases'] });
+    queryClient.invalidateQueries({ queryKey: ['picker_customers'] });
     const newId = typeof newCustomer.id === 'string' ? newCustomer.id : '';
     if (newId) {
       setFormData({ ...formData, customer_id: newId });
@@ -602,6 +596,8 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                           name: `${c.customer_name} (${c.customer_number})`,
                           keywords: `${c.email ?? ''} ${c.mobile_number ?? ''}`,
                         }))}
+                        onSearchTermChange={onCustomerSearch}
+                        emptyMessage="No matches — searched name, number, phone, and email"
                         placeholder="Search by name, number, phone, or email"
                         required
                         clearable={false}

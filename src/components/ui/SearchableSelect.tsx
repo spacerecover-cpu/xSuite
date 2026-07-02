@@ -37,6 +37,9 @@ interface SearchableSelectProps {
   name?: string;
   className?: string;
   size?: 'sm' | 'md';
+  /** Reports the live filter term (and '' on close) so consumers can fetch
+   *  options server-side — required beyond PostgREST's 1000-row cap. */
+  onSearchTermChange?: (term: string) => void;
 }
 
 export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelectProps>(
@@ -60,6 +63,7 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
       name,
       className,
       size = 'md',
+      onSearchTermChange,
     },
     ref
   ) => {
@@ -95,7 +99,8 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
     const closeDropdown = useCallback(() => {
       setIsOpen(false);
       setSearchTerm('');
-    }, []);
+      onSearchTermChange?.('');
+    }, [onSearchTermChange]);
 
     const handleSelect = useCallback(
       (optionId: string) => {
@@ -197,6 +202,7 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
+                onSearchTermChange?.(e.target.value);
                 setActiveIndex(-1);
               }}
               onKeyDown={(e) => {

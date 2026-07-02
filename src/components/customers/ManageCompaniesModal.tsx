@@ -7,7 +7,7 @@ import { Badge } from '../ui/Badge';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { Input } from '../ui/Input';
 import { useToast } from '../../hooks/useToast';
-import { supabase } from '../../lib/supabaseClient';
+import { useCompanyPickerRows } from '../../lib/pickerSearch';
 import {
   addCompanyRelationship,
   endCompanyRelationship,
@@ -63,19 +63,11 @@ export const ManageCompaniesModal: React.FC<ManageCompaniesModalProps> = ({
     enabled: isOpen,
   });
 
-  const { data: companyOptions = [] } = useQuery({
-    queryKey: ['companies', 'options'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('id, name, company_name, company_number, email, phone')
-        .is('deleted_at', null)
-        .order('name');
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: isOpen,
-  });
+  // Server-side picker search — fetch-all is capped at 1000 rows by PostgREST.
+  const {
+    rows: companyOptions,
+    onSearchTermChange: onCompanySearch,
+  } = useCompanyPickerRows(addCompanyId || undefined);
 
   // Impact surface for a per-company action: open cases that reference the
   // affected company (terminal cases are never touched).
@@ -357,9 +349,10 @@ export const ManageCompaniesModal: React.FC<ManageCompaniesModalProps> = ({
               label="Company"
               value={addCompanyId}
               onChange={setAddCompanyId}
+              onSearchTermChange={onCompanySearch}
               options={addOptions}
-              placeholder="Select a company…"
-              emptyMessage="No unlinked companies found"
+              placeholder="Search by name, number, email, or phone…"
+              emptyMessage="No matches — searched name, number, email, and phone"
             />
             <Input
               label="Role (optional)"

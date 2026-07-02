@@ -45,6 +45,40 @@ function Harness({
   );
 }
 
+describe('SearchableSelect onSearchTermChange', () => {
+  it('reports typed terms so consumers can fetch server-side options', async () => {
+    const user = userEvent.setup();
+    const spy = vi.fn();
+    render(
+      <SearchableSelect
+        label="Client"
+        value=""
+        onChange={() => {}}
+        options={OPTIONS}
+        onSearchTermChange={spy}
+      />,
+    );
+    await user.click(screen.getByRole('combobox'));
+    await user.type(screen.getByPlaceholderText(/search/i), 'ruq');
+    expect(spy).toHaveBeenLastCalledWith('ruq');
+  });
+
+  it('resets the reported term when the dropdown closes', async () => {
+    const user = userEvent.setup();
+    const spy = vi.fn();
+    render(
+      <div>
+        <SearchableSelect label="Client" value="" onChange={() => {}} options={OPTIONS} onSearchTermChange={spy} />
+        <button type="button">outside</button>
+      </div>,
+    );
+    await user.click(screen.getByRole('combobox'));
+    await user.type(screen.getByPlaceholderText(/search/i), 'ruq');
+    await user.click(screen.getByRole('button', { name: 'outside' }));
+    expect(spy).toHaveBeenLastCalledWith('');
+  });
+});
+
 describe('SearchableSelect keywords', () => {
   const CUSTOMER_OPTIONS = [
     { id: '1', name: 'Kashif Rahat (CUST-0001)', keywords: 'kashif@x.com +96899112233' },

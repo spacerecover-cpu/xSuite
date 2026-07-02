@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabaseClient';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { SearchableSelect } from '../ui/SearchableSelect';
+import { useCustomerPickerRows } from '../../lib/pickerSearch';
 import { User, Mail, Phone, Hash } from 'lucide-react';
 
 interface ChangeClientModalProps {
@@ -29,20 +28,12 @@ export const ChangeClientModal: React.FC<ChangeClientModalProps> = ({
 }) => {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
 
-  const { data: customers = [], isLoading: customersLoading } = useQuery({
-    queryKey: ['customers_all'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('customers_enhanced')
-        .select('id, customer_number, customer_name, email, mobile_number, city_id, country_id')
-        .eq('is_active', true)
-        .order('customer_name');
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: isOpen,
-  });
+  // Server-side picker search — fetch-all is capped at 1000 rows by PostgREST.
+  const {
+    rows: customers,
+    isLoading: customersLoading,
+    onSearchTermChange: onCustomerSearch,
+  } = useCustomerPickerRows(selectedCustomerId || undefined);
 
   const handleConfirm = () => {
     if (selectedCustomerId && selectedCustomerId !== currentCustomer?.id) {
@@ -106,7 +97,9 @@ export const ChangeClientModal: React.FC<ChangeClientModalProps> = ({
             options={customerOptions}
             value={selectedCustomerId}
             onChange={(value) => setSelectedCustomerId(value)}
-            placeholder="Search by name or customer number..."
+            onSearchTermChange={onCustomerSearch}
+            emptyMessage="No matches — searched name, number, phone, and email"
+            placeholder="Search by name, number, phone, or email..."
             required={false}
             disabled={customersLoading}
           />

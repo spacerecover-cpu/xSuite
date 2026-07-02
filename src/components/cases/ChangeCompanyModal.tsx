@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabaseClient';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { SearchableSelect } from '../ui/SearchableSelect';
+import { useCompanyPickerRows } from '../../lib/pickerSearch';
 import { Building2, Mail, Phone, Hash, Globe } from 'lucide-react';
 
 interface ChangeCompanyModalProps {
@@ -33,21 +32,16 @@ export const ChangeCompanyModal: React.FC<ChangeCompanyModalProps> = ({
 }) => {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
 
-  const { data: companies = [], isLoading: companiesLoading } = useQuery({
-    queryKey: ['companies_all'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('id, company_number, name, company_name, email, phone, tax_number, geo_countries(name), geo_cities(name)')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: isOpen,
-  });
-
+  // Server-side picker search — fetch-all is capped at 1000 rows by PostgREST
+  // (this tenant has 1,110 companies).
+  const {
+    rows: companies,
+    isLoading: companiesLoading,
+    onSearchTermChange: onCompanySearch,
+  } = useCompanyPickerRows(
+    selectedCompanyId && selectedCompanyId !== 'none' ? selectedCompanyId : undefined,
+    { activeOnly: true },
+  );
   const handleConfirm = () => {
     if (selectedCompanyId === 'none') {
       onConfirm(null);
@@ -64,7 +58,7 @@ export const ChangeCompanyModal: React.FC<ChangeCompanyModalProps> = ({
     ...companies.map((company) => ({
       id: company.id,
       name: `${company.name || company.company_name} - ${company.company_number}`,
-      keywords: `${company.email ?? ''} ${company.phone ?? ''} ${company.tax_number ?? ''}`,
+      keywords: `${company.email ?? ''} ${company.phone ?? ''}`,
     })),
   ];
 
@@ -138,7 +132,9 @@ export const ChangeCompanyModal: React.FC<ChangeCompanyModalProps> = ({
             options={companyOptions}
             value={selectedCompanyId}
             onChange={(value) => setSelectedCompanyId(value)}
-            placeholder="Search by company name or number..."
+            onSearchTermChange={onCompanySearch}
+            emptyMessage="No matches — searched name, number, email, and phone"
+            placeholder="Search by name, number, email, or phone..."
             required={false}
             disabled={companiesLoading}
           />
