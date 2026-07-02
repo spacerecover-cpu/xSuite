@@ -185,7 +185,7 @@ export const PayrollDashboard = () => {
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-sm text-slate-600">Average Salary</span>
-                  <span className="text-lg font-semibold text-slate-900">
+                  <span className="text-lg font-semibold text-slate-900 tabular-nums">
                     {isLoading ? '...' : formatCurrency(stats?.avgSalary || 0)}
                   </span>
                 </div>
@@ -261,7 +261,7 @@ export const PayrollDashboard = () => {
                         {format(new Date(period.start_date), 'MMM d')} - {format(new Date(period.end_date), 'MMM d, yyyy')}
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-600">{period.employee_count}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-slate-900">{formatCurrency(period.total_net ?? 0)}</td>
+                      <td className="px-4 py-3 text-sm font-semibold text-slate-900 tabular-nums">{formatCurrency(period.total_net ?? 0)}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
                           period.status === 'paid'

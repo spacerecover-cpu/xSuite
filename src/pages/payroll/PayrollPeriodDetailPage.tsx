@@ -318,16 +318,16 @@ export default function PayrollPeriodDetailPage() {
                     <td className="px-6 py-4 text-sm text-slate-700">
                       {record.hours_worked ?? 0} / {record.working_days ?? 0}
                     </td>
-                    <td className="px-6 py-4 text-right text-sm text-slate-900">
+                    <td className="px-6 py-4 text-right text-sm font-semibold text-slate-900 tabular-nums">
                       {formatCurrency(record.basic_salary || 0)}
                     </td>
-                    <td className="px-6 py-4 text-right text-sm font-medium text-success">
+                    <td className="px-6 py-4 text-right text-sm font-semibold text-success tabular-nums">
                       {formatCurrency(record.total_earnings || 0)}
                     </td>
-                    <td className="px-6 py-4 text-right text-sm font-medium text-danger">
+                    <td className="px-6 py-4 text-right text-sm font-semibold text-danger tabular-nums">
                       {formatCurrency(record.total_deductions || 0)}
                     </td>
-                    <td className="px-6 py-4 text-right text-sm font-bold text-slate-900">
+                    <td className="px-6 py-4 text-right text-sm font-semibold text-slate-900 tabular-nums">
                       {formatCurrency(record.net_salary || 0)}
                     </td>
                     <td className="px-6 py-4">

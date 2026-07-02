@@ -354,13 +354,13 @@ export const VATAuditPage: React.FC = () => {
                                 {formatDate(vatReturn.period_start)} - {formatDate(vatReturn.period_end)}
                               </div>
                             </td>
-                            <td className="py-4 px-6 text-right text-sm font-semibold text-success">
+                            <td className="py-4 px-6 text-right text-sm font-semibold text-success tabular-nums">
                               {formatCurrency(vatReturn.output_vat)}
                             </td>
-                            <td className="py-4 px-6 text-right text-sm font-semibold text-danger">
+                            <td className="py-4 px-6 text-right text-sm font-semibold text-danger tabular-nums">
                               {formatCurrency(vatReturn.input_vat)}
                             </td>
-                            <td className="py-4 px-6 text-right text-sm font-bold text-primary">
+                            <td className="py-4 px-6 text-right text-sm font-bold text-primary tabular-nums">
                               {formatCurrency(vatReturn.net_vat)}
                             </td>
                             <td className="py-4 px-6">

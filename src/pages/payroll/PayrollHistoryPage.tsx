@@ -114,13 +114,13 @@ export default function PayrollHistoryPage() {
                         {period.employee_count}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm font-medium text-slate-900">
+                    <td className="px-6 py-4 text-sm font-semibold text-slate-900 tabular-nums">
                       {formatCurrency(period.total_gross ?? 0)}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">
                       {formatCurrency(period.total_deductions ?? 0)}
                     </td>
-                    <td className="px-6 py-4 text-sm font-bold text-slate-900">
+                    <td className="px-6 py-4 text-sm font-semibold text-slate-900 tabular-nums">
                       {formatCurrency(period.total_net ?? 0)}
                     </td>
                     <td className="px-6 py-4">

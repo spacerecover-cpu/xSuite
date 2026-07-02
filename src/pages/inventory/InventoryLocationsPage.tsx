@@ -392,10 +392,10 @@ export default function InventoryLocationsPage() {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-border bg-surface-muted">
-                <th className="py-2.5 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
-                <th className="py-2.5 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Code</th>
-                <th className="py-2.5 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="py-2.5 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                <th className="py-2.5 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">Name</th>
+                <th className="py-2.5 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">Code</th>
+                <th className="py-2.5 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
+                <th className="py-2.5 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
             <tbody>

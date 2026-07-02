@@ -402,7 +402,7 @@ export const TransactionsList: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
                     <span
-                      className={`text-sm font-bold ${
+                      className={`text-sm font-semibold tabular-nums ${
                         transaction.type === 'income' ? 'text-success' : 'text-danger'
                       }`}
                     >

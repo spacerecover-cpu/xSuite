@@ -655,22 +655,22 @@ export const ReportsDashboard: React.FC = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-success-muted rounded-xl p-4 border border-success/30">
                       <p className="text-sm font-medium text-success">Total Revenue</p>
-                      <p className="text-2xl font-bold text-success">{formatCurrency(profitLossData.revenue.total)}</p>
+                      <p className="text-2xl font-bold text-success tabular-nums">{formatCurrency(profitLossData.revenue.total)}</p>
                     </div>
                     <div className="bg-danger-muted rounded-xl p-4 border border-danger/30">
                       <p className="text-sm font-medium text-danger">Total Expenses</p>
-                      <p className="text-2xl font-bold text-danger">{formatCurrency(profitLossData.expenses.total)}</p>
+                      <p className="text-2xl font-bold text-danger tabular-nums">{formatCurrency(profitLossData.expenses.total)}</p>
                     </div>
                   </div>
                   <div className="bg-info-muted rounded-xl p-4 border border-info/30">
                     <div className="flex justify-between items-center">
                       <div>
                         <p className="text-sm font-medium text-info">Net Profit</p>
-                        <p className="text-2xl font-bold text-info">{formatCurrency(profitLossData.netProfit)}</p>
+                        <p className="text-2xl font-bold text-info tabular-nums">{formatCurrency(profitLossData.netProfit)}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-medium text-info">Profit Margin</p>
-                        <p className="text-2xl font-bold text-info">{profitLossData.profitMargin.toFixed(2)}%</p>
+                        <p className="text-2xl font-bold text-info tabular-nums">{profitLossData.profitMargin.toFixed(2)}%</p>
                       </div>
                     </div>
                   </div>
@@ -681,7 +681,7 @@ export const ReportsDashboard: React.FC = () => {
                         {profitLossData.expenses.byCategory.map((cat, i) => (
                           <div key={i} className="flex justify-between items-center py-2 border-b border-slate-100">
                             <span className="text-sm text-slate-600">{cat.category}</span>
-                            <span className="text-sm font-semibold text-slate-900">{formatCurrency(cat.amount)}</span>
+                            <span className="text-sm font-semibold text-slate-900 tabular-nums">{formatCurrency(cat.amount)}</span>
                           </div>
                         ))}
                       </div>
@@ -728,15 +728,15 @@ export const ReportsDashboard: React.FC = () => {
                     <div className="space-y-3">
                       <div className="flex justify-between">
                         <span className="text-sm text-slate-600">Cash Receipts</span>
-                        <span className="text-sm font-semibold text-success">+{formatCurrency(cashFlowData.operatingActivities.receipts)}</span>
+                        <span className="text-sm font-semibold text-success tabular-nums">+{formatCurrency(cashFlowData.operatingActivities.receipts)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-sm text-slate-600">Cash Payments</span>
-                        <span className="text-sm font-semibold text-danger">-{formatCurrency(cashFlowData.operatingActivities.payments)}</span>
+                        <span className="text-sm font-semibold text-danger tabular-nums">-{formatCurrency(cashFlowData.operatingActivities.payments)}</span>
                       </div>
                       <div className="flex justify-between pt-2 border-t border-slate-200">
                         <span className="text-sm font-medium text-slate-700">Net Operating</span>
-                        <span className={`text-sm font-bold ${cashFlowData.operatingActivities.net >= 0 ? 'text-success' : 'text-danger'}`}>
+                        <span className={`text-sm font-bold tabular-nums ${cashFlowData.operatingActivities.net >= 0 ? 'text-success' : 'text-danger'}`}>
                           {formatCurrency(cashFlowData.operatingActivities.net)}
                         </span>
                       </div>
@@ -786,7 +786,7 @@ export const ReportsDashboard: React.FC = () => {
                               <Badge variant="secondary" className="capitalize">{status.status}</Badge>
                               <span className="text-sm text-slate-600">{status.count} invoices</span>
                             </div>
-                            <span className="text-sm font-semibold text-slate-900">{formatCurrency(status.amount)}</span>
+                            <span className="text-sm font-semibold text-slate-900 tabular-nums">{formatCurrency(status.amount)}</span>
                           </div>
                         ))}
                       </div>
@@ -851,7 +851,7 @@ export const ReportsDashboard: React.FC = () => {
                           <div className="flex-1">
                             <div className="flex justify-between items-baseline">
                               <span className="text-sm font-medium text-slate-700">{row.category}</span>
-                              <span className="text-sm font-semibold text-slate-900">{formatCurrency(row.amount)}</span>
+                              <span className="text-sm font-semibold text-slate-900 tabular-nums">{formatCurrency(row.amount)}</span>
                             </div>
                             {/* Inline percentage bar — visualizes share at a glance. */}
                             <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">

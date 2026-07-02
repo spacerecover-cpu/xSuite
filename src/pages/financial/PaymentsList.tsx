@@ -458,13 +458,13 @@ export const PaymentsList: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white rounded-lg p-4 border border-info/20">
               <p className="text-xs text-slate-500 mb-1">Average Payment</p>
-              <p className="text-2xl font-bold text-primary">
+              <p className="text-2xl font-bold text-primary tabular-nums">
                 {formatCurrency(stats && stats.total > 0 ? stats.totalAmount / stats.total : 0)}
               </p>
             </div>
             <div className="bg-white rounded-lg p-4 border border-success/20">
               <p className="text-xs text-slate-500 mb-1">Success Rate</p>
-              <p className="text-2xl font-bold text-success">
+              <p className="text-2xl font-bold text-success tabular-nums">
                 {stats && stats.total > 0
                   ? ((stats.completed / stats.total) * 100).toFixed(1)
                   : 0}%
@@ -518,7 +518,7 @@ export const PaymentsList: React.FC = () => {
                     className="hover:bg-slate-50 transition-colors"
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="font-semibold text-primary">{payment.payment_number}</span>
+                      <span className="text-sm font-semibold text-primary">{payment.payment_number}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
                       {payment.payment_date ? formatDate(payment.payment_date) : '-'}
@@ -539,7 +539,7 @@ export const PaymentsList: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <span className="text-sm font-bold text-success">
+                      <span className="text-sm font-semibold text-success tabular-nums">
                         {formatCurrency(baseAmount(payment, 'amount'))}
                       </span>
                     </td>
