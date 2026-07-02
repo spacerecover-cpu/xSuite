@@ -817,7 +817,7 @@ export const GeneralSettings: React.FC = () => {
               label="Default Country"
               value={toStr(formData.location?.default_country_id)}
               onChange={(value) => updateField('location', 'default_country_id', value)}
-              options={countries.map((c) => ({ id: c.id, name: c.name }))}
+              options={[{ id: '', name: 'Not specified' }, ...countries.map((c) => ({ id: c.id, name: c.name }))]}
               placeholder="Select Default Country"
             />
             <FormField

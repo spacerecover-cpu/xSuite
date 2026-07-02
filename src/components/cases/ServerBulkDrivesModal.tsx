@@ -442,7 +442,7 @@ export const ServerBulkDrivesModal: React.FC<ServerBulkDrivesModalProps> = ({
                             label=""
                             value={drive.brand_id}
                             onChange={(value) => updateDrive(drive.id, 'brand_id', value)}
-                            options={brands.map((b) => ({ id: b.id, name: b.name }))}
+                            options={[{ id: '', name: 'Not specified' }, ...brands.map((b) => ({ id: b.id, name: b.name }))]}
                             placeholder="Select brand..."
                             usePortal={true}
                           />
@@ -484,7 +484,7 @@ export const ServerBulkDrivesModal: React.FC<ServerBulkDrivesModalProps> = ({
                             label=""
                             value={drive.capacity_id}
                             onChange={(value) => updateDrive(drive.id, 'capacity_id', value)}
-                            options={capacities.map((c) => ({ id: c.id, name: c.name }))}
+                            options={[{ id: '', name: 'Not specified' }, ...capacities.map((c) => ({ id: c.id, name: c.name }))]}
                             placeholder="Select capacity..."
                             usePortal={true}
                           />

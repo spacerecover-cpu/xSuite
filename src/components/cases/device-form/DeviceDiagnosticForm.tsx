@@ -313,7 +313,11 @@ export function DeviceDiagnosticForm({ state, onChange, options, errors = {}, ca
       label={labelFor(key)}
       value={str(state[key])}
       onChange={(v) => onChange(key, v)}
-      options={optionList}
+      options={
+        opts.required
+          ? optionList
+          : [{ id: '', name: t('ui.select.notSpecified', { defaultValue: 'Not specified' }) }, ...optionList]
+      }
       required={opts.required}
       error={errors[key]}
       placeholder={t('ui.select.placeholder', { defaultValue: 'Select…' })}

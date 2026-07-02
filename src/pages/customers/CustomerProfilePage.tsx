@@ -627,7 +627,7 @@ export const CustomerProfilePage: React.FC = () => {
                 label="Customer Group"
                 value={editFormData.customer_group_id}
                 onChange={(value) => setEditFormData({ ...editFormData, customer_group_id: value })}
-                options={customerGroups.map((g: { id: string; name: string }) => ({ id: g.id, name: g.name }))}
+                options={[{ id: '', name: 'No group' }, ...customerGroups.map((g: { id: string; name: string }) => ({ id: g.id, name: g.name }))]}
                 placeholder="Select Group"
               />
 
@@ -638,14 +638,14 @@ export const CustomerProfilePage: React.FC = () => {
                   onChange={(value) => {
                     setEditFormData({ ...editFormData, country_id: value, city_id: '' });
                   }}
-                  options={countries.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))}
+                  options={[{ id: '', name: 'Not specified' }, ...countries.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))]}
                   placeholder="Select Country"
                 />
                 <SearchableSelect
                   label="City"
                   value={editFormData.city_id}
                   onChange={(value) => setEditFormData({ ...editFormData, city_id: value })}
-                  options={filteredCities.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))}
+                  options={[{ id: '', name: 'Not specified' }, ...filteredCities.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))]}
                   placeholder="Select City"
                   disabled={!editFormData.country_id}
                 />

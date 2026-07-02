@@ -296,6 +296,18 @@ Documents the field-grouping the redesign introduces, plus the existing `FormFie
   explicit **"None"-style option** in the list, never an × button. *(Distinct pattern, unaffected:
   free-text tag inputs — `ChipInput`/`TagInput` — keep per-chip removal; their chips ARE the value
   editor, not a selection mirror.)*
+  - **Sentinel labeling convention:** prepend `{ id: '', name: '<Label>' }` to the options array.
+    Named-entity relationships (Company, Customer Group, Primary Contact, Supplier) → **"No
+    &lt;Entity&gt;"**; catalog attributes and geography (Brand, Capacity, Interface, Condition,
+    Industry, Country, City) → **"Not specified"** (avoids colliding with a catalog row that is
+    itself semantically "None", e.g. an encryption-type catalog's real "Unencrypted" entry).
+  - **Not every optional field gets a sentinel.** Skip it where the catalog already carries its own
+    "not yet known" row (e.g. a Pending/Untested status option), where the field is a list-page
+    filter (an empty filter already reads as "no filter" via its placeholder), or where the control
+    is a single-purpose action picker whose only "nothing selected" state is Cancel (e.g. "assign to
+    case", "transfer custody to"). Do not add a sentinel to a field that must always carry a value
+    for the record to make sense (e.g. case priority) — that isn't a clearable relationship, and
+    restoring the removed × there would just reintroduce an invalid state.
 
 ## Motion
 `tailwind.config.js` `animation` / `keyframes`. Keep motion functional and short.

@@ -680,7 +680,7 @@ export const CompaniesListPage: React.FC = () => {
               label="Industry"
               value={formData.industry_id}
               onChange={(value) => setFormData({ ...formData, industry_id: value })}
-              options={industries.map((i) => ({ id: i.id, name: i.name }))}
+              options={[{ id: '', name: 'Not specified' }, ...industries.map((i) => ({ id: i.id, name: i.name }))]}
               placeholder="Select Industry"
             />
           </div>
@@ -710,10 +710,13 @@ export const CompaniesListPage: React.FC = () => {
             label="Primary Contact"
             value={formData.primary_contact_id}
             onChange={(value) => setFormData({ ...formData, primary_contact_id: value })}
-            options={customers.map((c) => ({
-              id: c.id,
-              name: `${c.customer_name}${c.email ? ` (${c.email})` : ''}`,
-            }))}
+            options={[
+              { id: '', name: 'No contact' },
+              ...customers.map((c) => ({
+                id: c.id,
+                name: `${c.customer_name}${c.email ? ` (${c.email})` : ''}`,
+              })),
+            ]}
             placeholder="Select Primary Contact"
           />
 
@@ -724,14 +727,14 @@ export const CompaniesListPage: React.FC = () => {
               onChange={(value) => {
                 setFormData({ ...formData, country_id: value, city_id: '' });
               }}
-              options={countries.map((c) => ({ id: c.id, name: c.name }))}
+              options={[{ id: '', name: 'Not specified' }, ...countries.map((c) => ({ id: c.id, name: c.name }))]}
               placeholder="Select Country"
             />
             <SearchableSelect
               label="City"
               value={formData.city_id}
               onChange={(value) => setFormData({ ...formData, city_id: value })}
-              options={filteredCities.map((c) => ({ id: c.id, name: c.name }))}
+              options={[{ id: '', name: 'Not specified' }, ...filteredCities.map((c) => ({ id: c.id, name: c.name }))]}
               placeholder="Select City"
               disabled={!formData.country_id}
             />
@@ -809,7 +812,7 @@ export const CompaniesListPage: React.FC = () => {
               label="Industry"
               value={formData.industry_id}
               onChange={(value) => setFormData({ ...formData, industry_id: value })}
-              options={industries.map((i) => ({ id: i.id, name: i.name }))}
+              options={[{ id: '', name: 'Not specified' }, ...industries.map((i) => ({ id: i.id, name: i.name }))]}
               placeholder="Select Industry"
             />
           </div>
@@ -842,14 +845,14 @@ export const CompaniesListPage: React.FC = () => {
               onChange={(value) => {
                 setFormData({ ...formData, country_id: value, city_id: '' });
               }}
-              options={countries.map((c) => ({ id: c.id, name: c.name }))}
+              options={[{ id: '', name: 'Not specified' }, ...countries.map((c) => ({ id: c.id, name: c.name }))]}
               placeholder="Select Country"
             />
             <SearchableSelect
               label="City"
               value={formData.city_id}
               onChange={(value) => setFormData({ ...formData, city_id: value })}
-              options={filteredCities.map((c) => ({ id: c.id, name: c.name }))}
+              options={[{ id: '', name: 'Not specified' }, ...filteredCities.map((c) => ({ id: c.id, name: c.name }))]}
               placeholder="Select City"
               disabled={!formData.country_id}
             />

@@ -376,7 +376,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 label="Customer Group"
                 value={formData.customer_group_id}
                 onChange={(value) => handleFieldChange('customer_group_id', value)}
-                options={customerGroups.map((g) => ({ id: g.id, name: g.name }))}
+                options={[{ id: '', name: 'No group' }, ...customerGroups.map((g) => ({ id: g.id, name: g.name }))]}
                 placeholder="Select type"
                 usePortal
               />
@@ -384,10 +384,13 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 label="Company"
                 value={formData.company_id}
                 onChange={(value) => handleFieldChange('company_id', value)}
-                options={companies.map((c) => ({
-                  id: c.id,
-                  name: `${c.company_name} (${c.company_number})`,
-                }))}
+                options={[
+                  { id: '', name: 'No company' },
+                  ...companies.map((c) => ({
+                    id: c.id,
+                    name: `${c.company_name} (${c.company_number})`,
+                  })),
+                ]}
                 placeholder="No company"
                 onAddNew={() => setIsAddCompanyModalOpen(true)}
                 addNewLabel="Add New Company"
@@ -408,7 +411,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                   onChange={(value) => {
                     setFormData({ ...formData, country_id: value, city_id: '' });
                   }}
-                  options={countries.map((c) => ({ id: c.id, name: c.name }))}
+                  options={[{ id: '', name: 'Not specified' }, ...countries.map((c) => ({ id: c.id, name: c.name }))]}
                   placeholder="Select country"
                   usePortal
                 />
@@ -416,7 +419,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                   label="City"
                   value={formData.city_id}
                   onChange={(value) => handleFieldChange('city_id', value)}
-                  options={filteredCities.map((c) => ({ id: c.id, name: c.name }))}
+                  options={[{ id: '', name: 'Not specified' }, ...filteredCities.map((c) => ({ id: c.id, name: c.name }))]}
                   placeholder="Select city"
                   disabled={!formData.country_id}
                   usePortal

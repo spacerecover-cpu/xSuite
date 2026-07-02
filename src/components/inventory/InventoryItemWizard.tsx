@@ -709,7 +709,7 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                     label="Supplier"
                     value={form.supplier_id as string}
                     onChange={v => setField('supplier_id', v)}
-                    options={suppliers}
+                    options={[{ id: '', name: 'Not specified' }, ...suppliers]}
                     placeholder="Select supplier"
                     size="sm"
                     usePortal

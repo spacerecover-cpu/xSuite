@@ -824,7 +824,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                             label="Brand"
                             value={device.brand_id}
                             onChange={(value) => updateDevice(device.id, 'brand_id', value)}
-                            options={brands.map(b => ({ id: b.id, name: b.name }))}
+                            options={[{ id: '', name: 'Not specified' }, ...brands.map(b => ({ id: b.id, name: b.name }))]}
                             placeholder="Brand..."
                           />
 
@@ -862,7 +862,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                             onChange={(value) =>
                               updateDevice(device.id, 'capacity_id', value)
                             }
-                            options={capacities.map(c => ({ id: c.id, name: c.name }))}
+                            options={[{ id: '', name: 'Not specified' }, ...capacities.map(c => ({ id: c.id, name: c.name }))]}
                             placeholder="Capacity..."
                             usePortal={true}
                           />
@@ -875,10 +875,13 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                             onChange={(value) =>
                               updateDevice(device.id, 'condition_id', value)
                             }
-                            options={deviceConditions.map(dc => ({
-                              id: dc.id.toString(),
-                              name: dc.name,
-                            }))}
+                            options={[
+                              { id: '', name: 'Not specified' },
+                              ...deviceConditions.map(dc => ({
+                                id: dc.id.toString(),
+                                name: dc.name,
+                              })),
+                            ]}
                             placeholder="Condition..."
                             usePortal={true}
                           />
@@ -979,7 +982,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                     onChange={(value) =>
                       updateDevice('1', 'encryption_type_id', value)
                     }
-                    options={deviceEncryption.map(de => ({ id: de.id, name: de.name }))}
+                    options={[{ id: '', name: 'Not specified' }, ...deviceEncryption.map(de => ({ id: de.id, name: de.name }))]}
                     placeholder="Select encryption type..."
                   />
 

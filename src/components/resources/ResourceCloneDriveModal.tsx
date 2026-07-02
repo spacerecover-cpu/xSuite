@@ -277,10 +277,13 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
 
             <SearchableSelect
               label="Brand"
-              options={brands.map((brand) => ({
-                id: brand.id,
-                name: brand.name,
-              }))}
+              options={[
+                { id: '', name: 'Not specified' },
+                ...brands.map((brand) => ({
+                  id: brand.id,
+                  name: brand.name,
+                })),
+              ]}
               value={formData.brand_id}
               onChange={(value) => setFormData({ ...formData, brand_id: value })}
               placeholder="Select brand"
@@ -288,10 +291,13 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
 
             <SearchableSelect
               label="Capacity"
-              options={capacities.map((cap) => ({
-                id: cap.id,
-                name: cap.name,
-              }))}
+              options={[
+                { id: '', name: 'Not specified' },
+                ...capacities.map((cap) => ({
+                  id: cap.id,
+                  name: cap.name,
+                })),
+              ]}
               value={formData.capacity_id}
               onChange={(value) => setFormData({ ...formData, capacity_id: value })}
               placeholder="Select capacity"
@@ -299,10 +305,13 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
 
             <SearchableSelect
               label="Interface"
-              options={interfaces.map((iface) => ({
-                id: iface.id,
-                name: iface.name,
-              }))}
+              options={[
+                { id: '', name: 'Not specified' },
+                ...interfaces.map((iface) => ({
+                  id: iface.id,
+                  name: iface.name,
+                })),
+              ]}
               value={formData.interface_id}
               onChange={(value) => setFormData({ ...formData, interface_id: value })}
               placeholder="Select interface"
@@ -335,10 +344,13 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
 
             <SearchableSelect
               label="Condition"
-              options={conditions.map((condition) => ({
-                id: condition.name,
-                name: condition.name,
-              }))}
+              options={[
+                { id: '', name: 'Not specified' },
+                ...conditions.map((condition) => ({
+                  id: condition.name,
+                  name: condition.name,
+                })),
+              ]}
               value={formData.condition}
               onChange={(value) => setFormData({ ...formData, condition: value })}
               placeholder="Select condition"
@@ -346,10 +358,13 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
 
             <SearchableSelect
               label="Storage Location"
-              options={locations.map((loc) => ({
-                id: loc.name,
-                name: loc.name,
-              }))}
+              options={[
+                { id: '', name: 'Not specified' },
+                ...locations.map((loc) => ({
+                  id: loc.name,
+                  name: loc.name,
+                })),
+              ]}
               value={formData.location}
               onChange={(value) => setFormData({ ...formData, location: value })}
               placeholder="Select physical location"
