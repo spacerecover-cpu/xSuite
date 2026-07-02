@@ -75,11 +75,11 @@ const TrendMark: React.FC<{ trend: Trend }> = ({ trend }) => {
   );
 };
 
-// Each bucket owns a hue end-to-end: dot + number share it, and the active
-// (filtering) card tints in the same colour rather than a generic outline.
-// Delivered stays ink/slate — terminal states shouldn't compete for attention.
-// Recovery borrows teal from the identity palette (stage identity, not status
-// semantics); approval uses info because the accent token is too light on white.
+// Each bucket owns a VISIBLE-on-white hue end-to-end: dot + number share it,
+// and the active (filtering) card tints in the same colour rather than a
+// generic outline. Brand navy/accent are deliberately avoided here — navy
+// reads as ink and royal accent is a pale cream, so neither registers as
+// colour. Delivered stays ink/slate: terminal states shouldn't compete.
 const BUCKET_META: Array<{
   bucket: CaseBucket;
   label: string;
@@ -87,9 +87,9 @@ const BUCKET_META: Array<{
   valueClass: string;
   activeClass: string;
 }> = [
-  { bucket: 'new', label: 'New', dotClass: 'bg-primary', valueClass: 'text-primary', activeClass: 'border-primary bg-primary/10' },
+  { bucket: 'new', label: 'New', dotClass: 'bg-info', valueClass: 'text-info', activeClass: 'border-info bg-info-muted' },
   { bucket: 'diagnosis', label: 'In diagnosis', dotClass: 'bg-warning', valueClass: 'text-warning', activeClass: 'border-warning bg-warning-muted' },
-  { bucket: 'approval', label: 'Awaiting approval', dotClass: 'bg-info', valueClass: 'text-info', activeClass: 'border-info bg-info-muted' },
+  { bucket: 'approval', label: 'Awaiting approval', dotClass: 'bg-cat-6', valueClass: 'text-cat-6', activeClass: 'border-cat-6 bg-cat-6/10' },
   { bucket: 'recovery', label: 'In recovery', dotClass: 'bg-cat-2', valueClass: 'text-cat-2', activeClass: 'border-cat-2 bg-cat-2/10' },
   { bucket: 'ready', label: 'Ready', dotClass: 'bg-success', valueClass: 'text-success', activeClass: 'border-success bg-success-muted' },
   { bucket: 'delivered', label: 'Delivered', dotClass: 'bg-slate-400', valueClass: 'text-slate-900', activeClass: 'border-slate-400 bg-slate-100' },
@@ -261,13 +261,13 @@ export const CasesCommandCenter: React.FC<CasesCommandCenterProps> = ({
               )}
             >
               <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
-                <span className={cn('h-2 w-2 shrink-0 rounded-full', dotClass)} aria-hidden="true" />
+                <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', dotClass)} aria-hidden="true" />
                 <span className="truncate">{label}</span>
               </span>
               {loading || value === undefined ? (
-                <span className="mt-1 block h-6 w-12 animate-pulse rounded bg-slate-100" />
+                <span className="mt-1 block h-7 w-14 animate-pulse rounded bg-slate-100" />
               ) : (
-                <span className={cn('block text-lg font-bold leading-6 tabular-nums', valueClass)}>
+                <span className={cn('block text-xl font-bold leading-7 tabular-nums', valueClass)}>
                   {value.toLocaleString()}
                 </span>
               )}

@@ -110,14 +110,14 @@ export const StatCard: React.FC<StatCardProps> = ({
       )}
     >
       <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
-        <span className={cn('h-2 w-2 shrink-0 rounded-full', DOT[tone])} aria-hidden="true" />
+        <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', DOT[tone])} aria-hidden="true" />
         <span className="truncate">{label}</span>
       </span>
       {loading ? (
-        <span className="mt-1 block h-6 w-12 animate-pulse rounded bg-slate-100" />
+        <span className="mt-1 block h-7 w-14 animate-pulse rounded bg-slate-100" />
       ) : (
         <span
-          className={cn('block truncate text-lg font-bold leading-6 tabular-nums', VALUE[tone])}
+          className={cn('block truncate text-xl font-bold leading-7 tabular-nums', VALUE[tone])}
           title={typeof value === 'string' ? value : undefined}
         >
           {value}
