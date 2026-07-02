@@ -7,6 +7,7 @@ import { platformAdminKeys } from '../../lib/queryKeys';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { PageHeader } from '../../components/shared/PageHeader';
 import { useToast } from '../../hooks/useToast';
 
 export const TenantsListPage: React.FC = () => {
@@ -73,12 +74,7 @@ export const TenantsListPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Tenants</h1>
-          <p className="text-slate-600 mt-2">Manage all tenant accounts</p>
-        </div>
-      </div>
+      <PageHeader title="Tenants" description="Manage all tenant accounts" />
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
         <div className="flex flex-col lg:flex-row gap-4">

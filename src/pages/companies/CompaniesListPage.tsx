@@ -11,6 +11,7 @@ import { SearchableSelect } from '../../components/ui/SearchableSelect';
 import { Plus, Search, Filter, Mail, Phone, Building2, MapPin, Users, UserCheck, Clock, ChevronLeft, ChevronRight, Layers } from 'lucide-react';
 import { formatDate } from '../../lib/format';
 import { KpiRow } from '../../components/templates/KpiRow';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { useAuth } from '../../contexts/AuthContext';
 import { logger } from '../../lib/logger';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -320,29 +321,17 @@ export const CompaniesListPage: React.FC = () => {
   });
 
   return (
-    <div className="p-6 max-w-[1800px] mx-auto">
-      <div className="mb-6 flex items-start justify-between">
-        <div className="flex items-start gap-4">
-          <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg bg-primary"
-            style={{
-              boxShadow: '0 10px 40px -10px rgb(var(--color-primary) / 0.5)',
-            }}
-          >
-            <Building2 className="w-6 h-6 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-1">Companies</h1>
-            <p className="text-slate-600 text-base">
-              Manage corporate clients and business relationships
-            </p>
-          </div>
-        </div>
-        <Button onClick={handleOpenModal}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Company
-        </Button>
-      </div>
+    <div className="px-6 py-5 max-w-[1800px] mx-auto">
+      <PageHeaderSlot
+        title="Companies"
+        icon={Building2}
+        actions={
+          <Button size="sm" onClick={handleOpenModal}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Company
+          </Button>
+        }
+      />
 
       <KpiRow
         cols="grid-cols-2 lg:grid-cols-4"

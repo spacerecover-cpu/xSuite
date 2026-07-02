@@ -6,6 +6,7 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { getDashboardStats, getMRRTrend, getPlanDistribution, getAtRiskTenants } from '../../lib/platformAdminService';
 import { platformAdminKeys } from '../../lib/queryKeys';
 import { StatCard } from '../../components/shared/StatCard';
+import { PageHeader } from '../../components/shared/PageHeader';
 import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { chartAxis, chartCategorical, chartGrid } from '../../lib/chartTheme';
@@ -72,10 +73,10 @@ export const PlatformDashboard: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900">Platform Overview</h1>
-        <p className="text-slate-600 mt-2">Monitor all tenants, revenue, and platform health</p>
-      </div>
+      <PageHeader
+        title="Platform Overview"
+        description="Monitor all tenants, revenue, and platform health"
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div onClick={() => navigate('/platform-admin/tenants')} className="cursor-pointer">

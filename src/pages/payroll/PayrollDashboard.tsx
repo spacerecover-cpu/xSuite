@@ -5,6 +5,7 @@ import { payrollService } from '../../lib/payrollService';
 import { payrollKeys } from '../../lib/queryKeys';
 import { Button } from '../../components/ui/Button';
 import { StatCard } from '../../components/shared/StatCard';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { useCurrency } from '../../hooks/useCurrency';
 import { format } from 'date-fns';
 
@@ -31,53 +32,44 @@ export const PayrollDashboard = () => {
     queryFn: () => payrollService.getPendingAdjustments(),
   });
 
-  const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-
   return (
-    <div className="p-8 max-w-[1800px] mx-auto">
-      <div className="mb-8 flex items-start justify-between">
-        <div className="flex items-start gap-6">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg bg-primary shadow-primary/40">
-            <DollarSign className="w-7 h-7 text-primary-foreground" />
+    <div className="px-6 py-5 max-w-[1800px] mx-auto">
+      <PageHeaderSlot
+        title="Payroll Management"
+        icon={DollarSign}
+        actions={
+          <>
+            <Link to="/payroll/history">
+              <Button variant="secondary" size="sm">
+                <History className="w-4 h-4 mr-2" />
+                History
+              </Button>
+            </Link>
+            <Link to="/payroll/process">
+              <Button size="sm">
+                <Plus className="w-4 h-4 mr-2" />
+                Process Payroll
+              </Button>
+            </Link>
+          </>
+        }
+      />
+      {currentPeriod && (
+        <div className="mb-4 flex gap-4">
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-2 h-2 rounded-full bg-success"></div>
+            <span className="text-slate-600">
+              Current Period: {format(new Date(currentPeriod.start_date), 'MMM d')} - {format(new Date(currentPeriod.end_date), 'MMM d, yyyy')}
+            </span>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-2">Payroll Management</h1>
-            <p className="text-slate-600 text-base">
-              Process and manage employee compensation for {currentMonth}
-            </p>
-            {currentPeriod && (
-              <div className="flex gap-4 mt-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="w-2 h-2 rounded-full bg-success"></div>
-                  <span className="text-slate-600">
-                    Current Period: {format(new Date(currentPeriod.start_date), 'MMM d')} - {format(new Date(currentPeriod.end_date), 'MMM d, yyyy')}
-                  </span>
-                </div>
-                {currentPeriod.payment_date && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <div className="w-2 h-2 rounded-full bg-info"></div>
-                    <span className="text-slate-600">Payment: {format(new Date(currentPeriod.payment_date), 'MMM d, yyyy')}</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          {currentPeriod.payment_date && (
+            <div className="flex items-center gap-2 text-sm">
+              <div className="w-2 h-2 rounded-full bg-info"></div>
+              <span className="text-slate-600">Payment: {format(new Date(currentPeriod.payment_date), 'MMM d, yyyy')}</span>
+            </div>
+          )}
         </div>
-        <div className="flex gap-2">
-          <Link to="/payroll/history">
-            <Button variant="secondary">
-              <History className="w-4 h-4 mr-2" />
-              History
-            </Button>
-          </Link>
-          <Link to="/payroll/process">
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Process Payroll
-            </Button>
-          </Link>
-        </div>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard

@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { KpiRow } from '../../components/templates/KpiRow';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
@@ -124,18 +125,16 @@ export const DatabaseManagement: React.FC = () => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Database Management</h1>
-            <p className="text-slate-600 mt-1">Backup and restore operations</p>
-          </div>
-          <Button onClick={handleCreateBackup} disabled={creating} className="gap-2">
+      <PageHeaderSlot
+        title="Database Management"
+        icon={Database}
+        actions={
+          <Button onClick={handleCreateBackup} disabled={creating} size="sm" className="gap-2">
             <Download className="w-4 h-4" />
             {creating ? 'Creating...' : 'Create Backup'}
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <KpiRow
         cols="grid-cols-1 md:grid-cols-3"

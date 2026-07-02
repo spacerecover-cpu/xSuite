@@ -7,6 +7,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { timesheetService, TimesheetWithEmployee, TimesheetFilters } from '../../lib/timesheetService';
 import { timesheetKeys } from '../../lib/queryKeys';
 import { Modal } from '../../components/ui/Modal';
+import { Button } from '../../components/ui/Button';
+import { KpiRow } from '../../components/templates/KpiRow';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { useDateTimeConfig } from '../../contexts/TenantConfigContext';
 import { resolveWeekStartsOn } from './workWeek';
 
@@ -441,70 +444,28 @@ export function TimesheetManagement() {
     });
   };
 
-  const statCards = [
-    {
-      label: 'Total Hours This Week',
-      value: stats ? `${stats.totalHoursThisWeek.toFixed(1)}h` : '—',
-      icon: Clock,
-      bg: 'bg-primary/10',
-      iconBg: 'bg-primary/20',
-      iconColor: 'text-primary',
-    },
-    {
-      label: 'Billable Hours This Month',
-      value: stats ? `${stats.billableHoursThisMonth.toFixed(1)}h` : '—',
-      icon: DollarSign,
-      bg: 'bg-success-muted',
-      iconBg: 'bg-success/20',
-      iconColor: 'text-success',
-    },
-    {
-      label: 'Pending Review',
-      value: stats?.pendingReview ?? '—',
-      icon: Send,
-      bg: 'bg-info-muted',
-      iconBg: 'bg-info/20',
-      iconColor: 'text-info',
-    },
-    {
-      label: 'Total Entries',
-      value: stats?.totalEntries ?? '—',
-      icon: FileText,
-      bg: 'bg-slate-50',
-      iconBg: 'bg-slate-100',
-      iconColor: 'text-slate-600',
-    },
-  ];
-
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Timesheets</h1>
-          <p className="text-slate-500 text-sm mt-1">Track and manage employee work hours</p>
-        </div>
-        <button
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-xl hover:bg-primary/90 transition-colors shadow-sm"
-          onClick={() => setEditingEntry(null)}
-        >
-          <Plus className="w-4 h-4" />
-          New Entry
-        </button>
-      </div>
+    <div className="px-6 py-5 space-y-6">
+      <PageHeaderSlot
+        title="Timesheets"
+        icon={Clock}
+        actions={
+          <Button size="sm" variant="primary" onClick={() => setEditingEntry(null)}>
+            <Plus className="w-4 h-4 mr-2" />
+            New Entry
+          </Button>
+        }
+      />
 
-      <div className="grid grid-cols-4 gap-4">
-        {statCards.map(card => (
-          <div key={card.label} className={`${card.bg} rounded-2xl p-5 border border-white shadow-sm`}>
-            <div className="flex items-center gap-3 mb-3">
-              <div className={`${card.iconBg} rounded-xl p-2`}>
-                <card.icon className={`w-5 h-5 ${card.iconColor}`} />
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-slate-900">{card.value}</div>
-            <div className="text-xs font-medium text-slate-500 mt-1">{card.label}</div>
-          </div>
-        ))}
-      </div>
+      <KpiRow
+        cols="grid-cols-2 md:grid-cols-4"
+        stats={[
+          { tone: 'primary', label: 'Total Hours This Week', value: stats ? `${stats.totalHoursThisWeek.toFixed(1)}h` : '—', icon: Clock },
+          { tone: 'cat-2', label: 'Billable Hours This Month', value: stats ? `${stats.billableHoursThisMonth.toFixed(1)}h` : '—', icon: DollarSign },
+          { tone: 'info', label: 'Pending Review', value: stats?.pendingReview ?? '—', icon: Send },
+          { tone: 'cat-5', label: 'Total Entries', value: stats?.totalEntries ?? '—', icon: FileText },
+        ]}
+      />
 
       <div className="flex border-b border-slate-200 gap-6">
         {([

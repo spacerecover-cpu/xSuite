@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { BookOpen, Search, Plus, FolderOpen, Star, Eye, Clock, Tag, ChevronRight, FileText, Layers, CheckCircle, CreditCard as Edit3, Filter } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { KpiRow } from '../../components/templates/KpiRow';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { ArticleEditorModal } from '../../components/kb/ArticleEditorModal';
 import { CategoryManagerModal } from '../../components/kb/CategoryManagerModal';
 import {
@@ -115,22 +117,6 @@ function ArticleCard({ article, onEdit, onClick }: { article: KBArticleWithDetai
   );
 }
 
-function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType; label: string; value: number; color: string }) {
-  return (
-    <div className={`rounded-xl p-4 ${color}`}>
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-white bg-opacity-60 rounded-lg">
-          <Icon className="w-4 h-4" />
-        </div>
-        <div>
-          <div className="text-2xl font-bold leading-none">{value}</div>
-          <div className="text-xs mt-0.5 opacity-75">{label}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export const KBCenterPage: React.FC = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
@@ -186,39 +172,35 @@ export const KBCenterPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <PageHeaderSlot
+        title="KB Center"
+        icon={BookOpen}
+        actions={
+          <>
+            {isAdmin && (
+              <Button variant="secondary" size="sm" onClick={() => setIsCategoryManagerOpen(true)}>
+                <FolderOpen className="w-3.5 h-3.5 mr-1.5" />
+                Categories
+              </Button>
+            )}
+            <Button variant="primary" size="sm" onClick={() => handleOpenEditor()}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" />
+              New Article
+            </Button>
+          </>
+        }
+      />
       <div className="bg-white border-b border-slate-200">
         <div className="px-6 py-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary rounded-xl">
-                <BookOpen className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-slate-900">KB Center</h1>
-                <p className="text-xs text-slate-500 mt-0.5">Standard Operating Procedures & Technical Knowledge Base</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {isAdmin && (
-                <Button variant="secondary" size="sm" onClick={() => setIsCategoryManagerOpen(true)}>
-                  <FolderOpen className="w-3.5 h-3.5 mr-1.5" />
-                  Categories
-                </Button>
-              )}
-              <Button variant="primary" size="sm" onClick={() => handleOpenEditor()}>
-                <Plus className="w-3.5 h-3.5 mr-1.5" />
-                New Article
-              </Button>
-            </div>
-          </div>
-
           {stats && (
-            <div className="grid grid-cols-4 gap-3 mb-4">
-              <StatCard icon={FileText} label="Total Articles" value={stats.total} color="bg-info-muted text-info" />
-              <StatCard icon={CheckCircle} label="Published" value={stats.published} color="bg-success-muted text-success" />
-              <StatCard icon={Edit3} label="Drafts" value={stats.drafts} color="bg-warning-muted text-warning" />
-              <StatCard icon={Layers} label="Categories" value={stats.categories} color="bg-slate-50 text-slate-700" />
-            </div>
+            <KpiRow
+              stats={[
+                { tone: 'primary', label: 'Total Articles', value: stats.total, icon: FileText },
+                { tone: 'info', label: 'Published', value: stats.published, icon: CheckCircle },
+                { tone: 'cat-2', label: 'Drafts', value: stats.drafts, icon: Edit3 },
+                { tone: 'cat-5', label: 'Categories', value: stats.categories, icon: Layers },
+              ]}
+            />
           )}
 
           <div className="relative">

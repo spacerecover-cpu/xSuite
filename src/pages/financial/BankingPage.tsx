@@ -6,13 +6,14 @@ import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
-import { formatCurrencyWithConfig, renderCurrencyToken } from '../../lib/format';
+import { formatCurrencyWithConfig } from '../../lib/format';
 import { useToast } from '../../hooks/useToast';
 import { AccountFormModal } from '../../components/banking/AccountFormModal';
 import { RecordReceiptModal } from '../../components/banking/RecordReceiptModal';
 import { TransferFundsModal } from '../../components/banking/TransferFundsModal';
 import { VirtualizedTableBody } from '../../components/ui/VirtualizedTableBody';
 import { KpiRow } from '../../components/templates/KpiRow';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import {
   Plus,
   Landmark,
@@ -206,7 +207,7 @@ export const BankingPage: React.FC = () => {
 
   if (accountsLoading || summaryLoading) {
     return (
-      <div className="p-8 max-w-[1800px] mx-auto space-y-6">
+      <div className="px-6 py-5 max-w-[1800px] mx-auto space-y-6">
         <Skeleton className="h-28 w-full rounded-2xl" />
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -224,85 +225,38 @@ export const BankingPage: React.FC = () => {
   }
 
   return (
-    <div className="p-8 max-w-[1800px] mx-auto">
-      <div className="mb-8 flex items-start justify-between">
-        <div className="flex items-start gap-6">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg bg-primary">
-            <Landmark className="w-7 h-7 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-2">Banking & Cash Management</h1>
-            <p className="text-slate-600 text-base">
-              Manage accounts, track payments, and reconcile transactions
-              <span className="ml-2 text-sm text-slate-500">
-                • Currency: {renderCurrencyToken(currencyConfig)}
-              </span>
-            </p>
-            <div className="flex gap-4 mt-3">
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-primary"></div>
-                <span className="text-slate-600">
-                  {formatCurrencyValue(balanceSummary?.totalBankBalance || 0)} Bank
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-success"></div>
-                <span className="text-slate-600">
-                  {formatCurrencyValue(balanceSummary?.totalCashBalance || 0)} Cash
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-cat-5"></div>
-                <span className="text-slate-600">
-                  {formatCurrencyValue(balanceSummary?.totalMobileBalance || 0)} Mobile
-                </span>
-              </div>
-              {balanceSummary && balanceSummary.pendingReconciliations > 0 && (
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="w-2 h-2 rounded-full bg-danger"></div>
-                  <span className="text-slate-600">
-                    {balanceSummary.pendingReconciliations} Pending Reconciliations
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={() => refetchAccounts()}
-            variant="secondary"
-            title="Refresh"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
-          <Button
-            onClick={() => setShowTransferModal(true)}
-            variant="secondary"
-          >
-            <ArrowLeftRight className="w-4 h-4 mr-2" />
-            Transfer
-          </Button>
-          <Button
-            onClick={() => setShowReceiptModal(true)}
-            variant="secondary"
-          >
-            <Receipt className="w-4 h-4 mr-2" />
-            Record Receipt
-          </Button>
-          <Button
-            onClick={() => {
-              setEditingAccount(null);
-              setShowAccountModal(true);
-            }}
-            variant="primary"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Account
-          </Button>
-        </div>
-      </div>
+    <div className="px-6 py-5 max-w-[1800px] mx-auto">
+      <PageHeaderSlot
+        title="Banking & Cash Management"
+        icon={Landmark}
+        actions={
+          <>
+            <Button onClick={() => refetchAccounts()} variant="secondary" size="sm" title="Refresh">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+            <Button onClick={() => setShowTransferModal(true)} variant="secondary" size="sm">
+              <ArrowLeftRight className="w-4 h-4 mr-2" />
+              Transfer
+            </Button>
+            <Button onClick={() => setShowReceiptModal(true)} variant="secondary" size="sm">
+              <Receipt className="w-4 h-4 mr-2" />
+              Record Receipt
+            </Button>
+            <Button
+              onClick={() => {
+                setEditingAccount(null);
+                setShowAccountModal(true);
+              }}
+              variant="primary"
+              size="sm"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Account
+            </Button>
+          </>
+        }
+      />
 
       <KpiRow
         cols="grid-cols-1 md:grid-cols-4"
@@ -572,12 +526,12 @@ export const BankingPage: React.FC = () => {
                   <table className="w-full">
                     <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
                       <tr>
-                        <th className="text-left py-2 px-4 text-xs font-semibold text-slate-700">Date</th>
-                        <th className="text-left py-2 px-4 text-xs font-semibold text-slate-700">Description</th>
-                        <th className="text-right py-2 px-4 text-xs font-semibold text-slate-700">Debit</th>
-                        <th className="text-right py-2 px-4 text-xs font-semibold text-slate-700">Credit</th>
-                        <th className="text-right py-2 px-4 text-xs font-semibold text-slate-700">Balance</th>
-                        <th className="text-center py-2 px-4 text-xs font-semibold text-slate-700">Status</th>
+                        <th className="text-left py-2 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">Date</th>
+                        <th className="text-left py-2 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">Description</th>
+                        <th className="text-right py-2 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">Debit</th>
+                        <th className="text-right py-2 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">Credit</th>
+                        <th className="text-right py-2 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">Balance</th>
+                        <th className="text-center py-2 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
@@ -593,43 +547,43 @@ export const BankingPage: React.FC = () => {
                           items={bankTransactions}
                           scrollRef={transactionsScrollRef}
                           colSpan={6}
-                          estimateRowHeight={44}
+                          estimateRowHeight={48}
                           renderRow={(transaction) => {
                             // bank_transactions has amount+type, not separate debit/credit columns.
                             const isDebit = transaction.type === 'debit' || transaction.type === 'expense' || transaction.type === 'withdrawal';
                             const isCredit = transaction.type === 'credit' || transaction.type === 'income' || transaction.type === 'deposit';
                             return (
                             <tr key={transaction.id} className="hover:bg-slate-50 transition-colors">
-                              <td className="py-2 px-4 text-xs text-slate-600">
+                              <td className="py-2 px-4 text-sm text-slate-700">
                                 {new Date(transaction.transaction_date).toLocaleDateString()}
                               </td>
                               <td className="py-2 px-4">
-                                <p className="text-xs font-medium text-slate-900">{transaction.description ?? ''}</p>
+                                <p className="text-sm font-medium text-slate-900">{transaction.description ?? ''}</p>
                                 {transaction.reference && (
                                   <p className="text-xs text-slate-500">{transaction.reference}</p>
                                 )}
                               </td>
                               <td className="py-2 px-4 text-right">
                                 {isDebit && transaction.amount > 0 ? (
-                                  <span className="text-xs font-semibold text-danger flex items-center justify-end gap-1">
+                                  <span className="text-sm font-semibold text-danger tabular-nums flex items-center justify-end gap-1">
                                     <TrendingDown className="w-3 h-3" />
                                     {formatCurrencyValue(transaction.amount)}
                                   </span>
                                 ) : (
-                                  <span className="text-xs text-slate-400">-</span>
+                                  <span className="text-sm text-slate-400">-</span>
                                 )}
                               </td>
                               <td className="py-2 px-4 text-right">
                                 {isCredit && transaction.amount > 0 ? (
-                                  <span className="text-xs font-semibold text-success flex items-center justify-end gap-1">
+                                  <span className="text-sm font-semibold text-success tabular-nums flex items-center justify-end gap-1">
                                     <TrendingUp className="w-3 h-3" />
                                     {formatCurrencyValue(transaction.amount)}
                                   </span>
                                 ) : (
-                                  <span className="text-xs text-slate-400">-</span>
+                                  <span className="text-sm text-slate-400">-</span>
                                 )}
                               </td>
-                              <td className="py-2 px-4 text-right text-xs font-semibold text-slate-900">
+                              <td className="py-2 px-4 text-right text-sm font-semibold text-slate-900 tabular-nums">
                                 -
                               </td>
                               <td className="py-2 px-4 text-center">

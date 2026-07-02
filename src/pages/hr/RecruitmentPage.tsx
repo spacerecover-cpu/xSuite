@@ -3,6 +3,8 @@ import { Briefcase, Users, UserCheck, TrendingUp, Plus, Search, MoreHorizontal, 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
+import { KpiRow } from '../../components/templates/KpiRow';
 import { recruitmentKeys } from '../../lib/queryKeys';
 import {
   getJobs,
@@ -238,43 +240,26 @@ export const RecruitmentPage: React.FC = () => {
   };
 
   return (
-    <div className="p-8 max-w-[1800px] mx-auto">
-      <div className="mb-8 flex items-start justify-between">
-        <div className="flex items-start gap-6">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg bg-info shadow-info/40">
-            <Briefcase className="w-7 h-7 text-info-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-1">Recruitment</h1>
-            <p className="text-slate-500 text-sm">Manage job openings and track candidates through the hiring pipeline</p>
-          </div>
-        </div>
-        <Button onClick={() => { setEditingJob(null); setShowJobModal(true); }}>
-          <Plus className="w-4 h-4 mr-2" />
-          Post Job
-        </Button>
-      </div>
+    <div className="px-6 py-5 max-w-[1800px] mx-auto">
+      <PageHeaderSlot
+        title="Recruitment"
+        icon={Briefcase}
+        actions={
+          <Button size="sm" onClick={() => { setEditingJob(null); setShowJobModal(true); }}>
+            <Plus className="w-4 h-4 mr-2" />
+            Post Job
+          </Button>
+        }
+      />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: 'Open Positions', value: stats?.openJobs ?? '–', icon: Briefcase, color: 'info', bg: 'bg-info-muted', border: 'border-info/30', icon_bg: 'bg-info', text: 'text-info', num: 'text-info' },
-          { label: 'Total Applicants', value: stats?.totalCandidates ?? '–', icon: Users, color: 'slate', bg: 'bg-slate-100', border: 'border-slate-200', icon_bg: 'bg-slate-500', text: 'text-slate-600', num: 'text-slate-900' },
-          { label: 'In Interview', value: stats?.interviews ?? '–', icon: TrendingUp, color: 'warning', bg: 'bg-warning-muted', border: 'border-warning/30', icon_bg: 'bg-warning', text: 'text-warning', num: 'text-warning' },
-          { label: 'Hired This Period', value: stats?.hired ?? '–', icon: UserCheck, color: 'success', bg: 'bg-success-muted', border: 'border-success/30', icon_bg: 'bg-success', text: 'text-success', num: 'text-success' },
-        ].map(card => (
-          <div key={card.label} className={`${card.bg} rounded-xl p-4 border ${card.border}`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-xs font-medium ${card.text} uppercase tracking-wider`}>{card.label}</p>
-                <p className={`text-2xl font-bold ${card.num} mt-1`}>{card.value}</p>
-              </div>
-              <div className={`w-10 h-10 ${card.icon_bg} rounded-lg flex items-center justify-center`}>
-                <card.icon className="w-5 h-5 text-white" />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <KpiRow
+        stats={[
+          { tone: 'info', label: 'Open Positions', value: stats?.openJobs ?? '–', icon: Briefcase },
+          { tone: 'primary', label: 'Total Applicants', value: stats?.totalCandidates ?? '–', icon: Users },
+          { tone: 'cat-5', label: 'In Interview', value: stats?.interviews ?? '–', icon: TrendingUp },
+          { tone: 'success', label: 'Hired This Period', value: stats?.hired ?? '–', icon: UserCheck },
+        ]}
+      />
 
       <div className="flex gap-1 mb-6 bg-slate-100 rounded-xl p-1 w-fit">
         {(['jobs', 'pipeline'] as const).map(tab => (

@@ -3,6 +3,7 @@ import { Users, Briefcase, UserPlus, UserCheck, ClipboardList, Calendar, Refresh
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { KpiRow } from '../../components/templates/KpiRow';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { logger } from '../../lib/logger';
 
 export const HRDashboard: React.FC = () => {
@@ -42,45 +43,23 @@ export const HRDashboard: React.FC = () => {
   };
 
   return (
-    <div className="p-8 max-w-[1800px] mx-auto">
-      <div className="mb-8 flex items-start justify-between">
-        <div className="flex items-start gap-6">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg bg-primary shadow-primary/40">
-            <Users className="w-7 h-7 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-2">Human Resources</h1>
-            <p className="text-slate-600 text-base">
-              Manage your organization's workforce and talent
-            </p>
-            <div className="flex gap-4 mt-3">
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-info"></div>
-                <span className="text-slate-600">{stats.totalEmployees} Total Employees</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-success"></div>
-                <span className="text-slate-600">{stats.activeEmployees} Active</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-warning"></div>
-                <span className="text-slate-600">{stats.openPositions} Open Positions</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-2">
+    <div className="px-6 py-5 max-w-[1800px] mx-auto">
+      <PageHeaderSlot
+        title="Human Resources"
+        icon={Users}
+        actions={
           <Button
             onClick={loadStats}
             variant="secondary"
+            size="sm"
             disabled={loading}
             title="Refresh statistics"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             {loading ? 'Refreshing...' : 'Refresh'}
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <KpiRow
         cols="grid-cols-1 md:grid-cols-4"

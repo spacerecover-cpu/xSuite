@@ -11,6 +11,7 @@ import { useTaxConfig } from '../../contexts/TenantConfigContext';
 import { Input } from '../../components/ui/Input';
 import { VATReturnModal } from '../../components/financial/VATReturnModal';
 import { KpiRow } from '../../components/templates/KpiRow';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import {
   createVATReturn,
   updateVATReturnStatus,
@@ -213,53 +214,27 @@ export const VATAuditPage: React.FC = () => {
   };
 
   return (
-    <div className="p-8 max-w-[1800px] mx-auto">
-      <div className="mb-8 flex items-start justify-between">
-        <div className="flex items-start gap-6">
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg"
-            style={{
-              backgroundColor: 'rgb(var(--color-primary))',
-              boxShadow: '0 10px 40px -10px rgba(var(--color-primary) / 0.5)',
-            }}
-          >
-            <FileCheck className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-2">VAT & Audit</h1>
-            <p className="text-slate-600 text-base">
-              Tax compliance and financial audit trails
-            </p>
-            <div className="flex gap-4 mt-3">
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-success"></div>
-                <span className="text-slate-600">{formatCurrency(totalVATCollected)} VAT Collected</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-danger"></div>
-                <span className="text-slate-600">{formatCurrency(totalVATPaid)} VAT Paid</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-info"></div>
-                <span className="text-slate-600">{formatCurrency(Math.abs(netVATPosition))} Net Position</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" className="flex items-center gap-2">
-            <Download className="w-4 h-4 mr-2" />
-            Export VAT Report
-          </Button>
-          <Button
-            className="flex items-center gap-2"
-            onClick={() => setShowVATReturnModal(true)}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            New VAT Return
-          </Button>
-        </div>
-      </div>
+    <div className="px-6 py-5 max-w-[1800px] mx-auto">
+      <PageHeaderSlot
+        title="VAT & Audit"
+        icon={FileCheck}
+        actions={
+          <>
+            <Button variant="secondary" size="sm" className="flex items-center gap-2">
+              <Download className="w-4 h-4 mr-2" />
+              Export VAT Report
+            </Button>
+            <Button
+              size="sm"
+              className="flex items-center gap-2"
+              onClick={() => setShowVATReturnModal(true)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New VAT Return
+            </Button>
+          </>
+        }
+      />
 
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6 p-6">
         <div className="flex gap-2">

@@ -3,6 +3,8 @@ import { TrendingUp, Users, CheckCircle, Clock, Star, Plus, Search, Filter, Cred
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
+import { KpiRow } from '../../components/templates/KpiRow';
 import { performanceKeys } from '../../lib/queryKeys';
 import {
   getReviews,
@@ -212,46 +214,28 @@ export const PerformanceReviewsPage: React.FC = () => {
   const avgRating = stats?.averageRating;
 
   return (
-    <div className="p-8 max-w-[1800px] mx-auto">
-      <div className="mb-8 flex items-start justify-between">
-        <div className="flex items-start gap-6">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg bg-warning shadow-warning/40">
-            <TrendingUp className="w-7 h-7 text-warning-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-1">Performance Reviews</h1>
-            <p className="text-slate-500 text-sm">
-              Track and manage employee performance evaluations
-            </p>
-          </div>
-        </div>
-        <Button onClick={() => { setEditingReview(null); setShowModal(true); }}>
-          <Plus className="w-4 h-4 mr-2" />
-          New Review
-        </Button>
-      </div>
+    <div className="px-6 py-5 max-w-[1800px] mx-auto">
+      <PageHeaderSlot
+        title="Performance Reviews"
+        icon={TrendingUp}
+        actions={
+          <Button size="sm" onClick={() => { setEditingReview(null); setShowModal(true); }}>
+            <Plus className="w-4 h-4 mr-2" />
+            New Review
+          </Button>
+        }
+      />
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-        {[
-          { label: 'Total Reviews', value: stats?.total ?? '–', icon: TrendingUp, bg: 'from-slate-50 to-slate-100', border: 'border-slate-200', icon_bg: 'bg-slate-500', text: 'text-slate-600', num: 'text-slate-900' },
-          { label: 'Draft', value: stats?.draft ?? '–', icon: Clock, bg: 'from-slate-50 to-slate-100', border: 'border-slate-200', icon_bg: 'bg-slate-400', text: 'text-slate-600', num: 'text-slate-900' },
-          { label: 'Submitted', value: stats?.submitted ?? '–', icon: Send, bg: 'bg-info-muted', border: 'border-info/30', icon_bg: 'bg-info', text: 'text-info', num: 'text-info' },
-          { label: 'Completed', value: stats?.completed ?? '–', icon: CheckCircle, bg: 'bg-success-muted', border: 'border-success/30', icon_bg: 'bg-success', text: 'text-success', num: 'text-success' },
-          { label: 'Avg. Rating', value: avgRating ? `${avgRating}/5` : '–', icon: Star, bg: 'bg-warning-muted', border: 'border-warning/30', icon_bg: 'bg-warning', text: 'text-warning', num: 'text-warning' },
-        ].map(card => (
-          <div key={card.label} className={`${card.bg} rounded-xl p-4 border ${card.border}`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-xs font-medium ${card.text} uppercase tracking-wider`}>{card.label}</p>
-                <p className={`text-2xl font-bold ${card.num} mt-1`}>{card.value}</p>
-              </div>
-              <div className={`w-10 h-10 ${card.icon_bg} rounded-lg flex items-center justify-center`}>
-                <card.icon className="w-5 h-5 text-white" />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <KpiRow
+        cols="grid-cols-2 md:grid-cols-5"
+        stats={[
+          { tone: 'primary', label: 'Total Reviews', value: stats?.total ?? '–', icon: TrendingUp },
+          { tone: 'cat-2', label: 'Draft', value: stats?.draft ?? '–', icon: Clock },
+          { tone: 'info', label: 'Submitted', value: stats?.submitted ?? '–', icon: Send },
+          { tone: 'success', label: 'Completed', value: stats?.completed ?? '–', icon: CheckCircle },
+          { tone: 'cat-5', label: 'Avg. Rating', value: avgRating ? `${avgRating}/5` : '–', icon: Star },
+        ]}
+      />
 
       <div className="flex items-center gap-4 mb-6">
         <div className="relative flex-1 max-w-sm">

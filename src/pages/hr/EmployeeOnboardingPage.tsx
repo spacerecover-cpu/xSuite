@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { UserCheck, ClipboardList, AlertTriangle, CheckCircle2, Plus, ChevronDown, ChevronRight, Clock, User, CreditCard as Edit2, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../../components/ui/Button';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
+import { KpiRow } from '../../components/templates/KpiRow';
 import { employeeOnboardingKeys } from '../../lib/queryKeys';
 import {
   getChecklists,
@@ -305,53 +307,34 @@ export const EmployeeOnboardingPage: React.FC = () => {
   };
 
   return (
-    <div className="p-8 max-w-[1800px] mx-auto">
-      <div className="mb-8 flex items-start justify-between">
-        <div className="flex items-start gap-6">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg bg-success shadow-success/40">
-            <UserCheck className="w-7 h-7 text-success-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-1">Employee Onboarding</h1>
-            <p className="text-slate-500 text-sm">
-              Track onboarding progress and manage checklists for new team members
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => handleAssign(undefined)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Assign Checklist
-          </Button>
-          {activeTab === 'templates' && (
-            <Button onClick={() => { setEditingChecklist(null); setShowChecklistModal(true); }}>
+    <div className="px-6 py-5 max-w-[1800px] mx-auto">
+      <PageHeaderSlot
+        title="Employee Onboarding"
+        icon={UserCheck}
+        actions={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => handleAssign(undefined)}>
               <Plus className="w-4 h-4 mr-2" />
-              New Checklist
+              Assign Checklist
             </Button>
-          )}
-        </div>
-      </div>
+            {activeTab === 'templates' && (
+              <Button size="sm" onClick={() => { setEditingChecklist(null); setShowChecklistModal(true); }}>
+                <Plus className="w-4 h-4 mr-2" />
+                New Checklist
+              </Button>
+            )}
+          </>
+        }
+      />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: 'Active Onboardees', value: stats?.activeOnboardees ?? '–', icon: UserCheck, bg: 'bg-info-muted', border: 'border-info/30', icon_bg: 'bg-info', text: 'text-info', num: 'text-info' },
-          { label: 'Overdue Tasks', value: stats?.overdueTasksCount ?? '–', icon: AlertTriangle, bg: 'bg-danger-muted', border: 'border-danger/30', icon_bg: 'bg-danger', text: 'text-danger', num: 'text-danger' },
-          { label: 'Completion Rate', value: stats?.completionRate != null ? `${stats.completionRate}%` : '–', icon: CheckCircle2, bg: 'bg-success-muted', border: 'border-success/30', icon_bg: 'bg-success', text: 'text-success', num: 'text-success' },
-          { label: 'Templates', value: checklists.length || '–', icon: ClipboardList, bg: 'bg-slate-100', border: 'border-slate-200', icon_bg: 'bg-slate-500', text: 'text-slate-600', num: 'text-slate-900' },
-        ].map(card => (
-          <div key={card.label} className={`${card.bg} rounded-xl p-4 border ${card.border}`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-xs font-medium ${card.text} uppercase tracking-wider`}>{card.label}</p>
-                <p className={`text-2xl font-bold ${card.num} mt-1`}>{card.value}</p>
-              </div>
-              <div className={`w-10 h-10 ${card.icon_bg} rounded-lg flex items-center justify-center`}>
-                <card.icon className="w-5 h-5 text-white" />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <KpiRow
+        stats={[
+          { tone: 'info', label: 'Active Onboardees', value: stats?.activeOnboardees ?? '–', icon: UserCheck },
+          { tone: 'danger', label: 'Overdue Tasks', value: stats?.overdueTasksCount ?? '–', icon: AlertTriangle },
+          { tone: 'success', label: 'Completion Rate', value: stats?.completionRate != null ? `${stats.completionRate}%` : '–', icon: CheckCircle2 },
+          { tone: 'primary', label: 'Templates', value: checklists.length || '–', icon: ClipboardList },
+        ]}
+      />
 
       <div className="flex gap-1 mb-6 bg-slate-100 rounded-xl p-1 w-fit">
         {(['active', 'templates'] as const).map(tab => (

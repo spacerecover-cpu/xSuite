@@ -66,15 +66,15 @@ export const TenantIsolationTestPage: React.FC = () => {
       {summaryResults.length > 0 && (
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white rounded-lg border border-slate-200 p-4 text-center">
-            <p className="text-3xl font-bold text-slate-900">{detailResults.length}</p>
+            <p className="text-2xl font-bold text-slate-900 tabular-nums">{detailResults.length}</p>
             <p className="text-sm text-slate-500">Total Tests</p>
           </div>
           <div className="bg-white rounded-lg border border-success/30 p-4 text-center">
-            <p className="text-3xl font-bold text-success">{passCount}</p>
+            <p className="text-2xl font-bold text-success tabular-nums">{passCount}</p>
             <p className="text-sm text-success">Passed</p>
           </div>
           <div className={`bg-white rounded-lg border p-4 text-center ${failCount > 0 ? 'border-danger/30' : 'border-slate-200'}`}>
-            <p className={`text-3xl font-bold ${failCount > 0 ? 'text-danger' : 'text-slate-400'}`}>{failCount}</p>
+            <p className={`text-2xl font-bold tabular-nums ${failCount > 0 ? 'text-danger' : 'text-slate-400'}`}>{failCount}</p>
             <p className={`text-sm ${failCount > 0 ? 'text-danger' : 'text-slate-500'}`}>Failed</p>
           </div>
         </div>

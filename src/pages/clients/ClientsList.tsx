@@ -6,8 +6,9 @@ import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Table } from '../../components/ui/Table';
 import { Badge } from '../../components/ui/Badge';
-import { Plus } from 'lucide-react';
+import { Plus, Users } from 'lucide-react';
 import { formatDate } from '../../lib/format';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 
 interface Customer {
   id: string;
@@ -106,16 +107,16 @@ export const ClientsList: React.FC = () => {
 
   return (
     <div className="p-6">
-      <div className="mb-6 flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Clients</h1>
-          <p className="text-slate-600 mt-1">Manage individual and company customers</p>
-        </div>
-        <Button onClick={() => setIsModalOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Client
-        </Button>
-      </div>
+      <PageHeaderSlot
+        title="Clients"
+        icon={Users}
+        actions={
+          <Button size="sm" onClick={() => setIsModalOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Client
+          </Button>
+        }
+      />
 
       <div className="bg-white rounded-lg shadow">
         {isLoading ? (

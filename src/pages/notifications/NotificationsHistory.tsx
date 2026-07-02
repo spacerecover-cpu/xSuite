@@ -19,6 +19,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { useListPageSize } from '../../hooks/useListPageSize';
@@ -150,37 +151,34 @@ export function NotificationsHistory() {
     (search.trim() ? 1 : 0);
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Bell className="w-5 h-5 text-primary" />
-          <h1 className="text-xl font-bold text-slate-900">Notifications</h1>
-          {total > 0 && (
-            <span className="text-sm text-slate-500">({total.toLocaleString()})</span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/settings/notifications')}
-            className="flex items-center gap-1.5"
-          >
-            <Settings className="w-4 h-4" />
-            Preferences
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => markAllRead.mutate()}
-            disabled={markAllRead.isPending}
-            className="flex items-center gap-1.5"
-          >
-            <CheckCheck className="w-4 h-4" />
-            Mark all read
-          </Button>
-        </div>
-      </div>
+    <div className="px-6 py-5 space-y-4">
+      <PageHeaderSlot
+        title="Notifications"
+        icon={Bell}
+        actions={
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/settings/notifications')}
+              className="flex items-center gap-1.5"
+            >
+              <Settings className="w-4 h-4" />
+              Preferences
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => markAllRead.mutate()}
+              disabled={markAllRead.isPending}
+              className="flex items-center gap-1.5"
+            >
+              <CheckCheck className="w-4 h-4" />
+              Mark all read
+            </Button>
+          </>
+        }
+      />
 
       <Card>
         <div className="p-4 space-y-3">

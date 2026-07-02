@@ -28,6 +28,7 @@ import {
 } from '../../lib/financialReportsService';
 import { logger } from '../../lib/logger';
 import { KpiRow } from '../../components/templates/KpiRow';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import {
   BarChart3,
   TrendingUp,
@@ -408,7 +409,7 @@ export const ReportsDashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-8 max-w-[1800px] mx-auto space-y-6">
+      <div className="px-6 py-5 max-w-[1800px] mx-auto space-y-6">
         <Skeleton className="h-12 w-64 rounded-lg" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -420,56 +421,29 @@ export const ReportsDashboard: React.FC = () => {
   }
 
   return (
-    <div className="p-8 max-w-[1800px] mx-auto">
-      <div className="mb-8 flex items-start justify-between">
-        <div className="flex items-start gap-6">
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg"
-            style={{
-              backgroundColor: 'rgb(var(--color-primary))',
-              boxShadow: '0 10px 40px -10px rgba(var(--color-primary) / 0.5)',
-            }}
-          >
-            <BarChart3 className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-2">Financial Reports</h1>
-            <p className="text-slate-600 text-base">
-              Comprehensive financial analysis and insights
-            </p>
-            <div className="flex gap-4 mt-3">
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-success"></div>
-                <span className="text-slate-600">{formatCurrency(reportData?.totalRevenue || 0)} Revenue</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-danger"></div>
-                <span className="text-slate-600">{formatCurrency(reportData?.totalExpenses || 0)} Expenses</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-info"></div>
-                <span className="text-slate-600">{formatCurrency(reportData?.netProfit || 0)} Net Profit</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <select
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value)}
-            className="px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-          >
-            <option value="thisMonth">This Month</option>
-            <option value="lastMonth">Last Month</option>
-            <option value="thisQuarter">This Quarter</option>
-            <option value="thisYear">This Year</option>
-            <option value="lastYear">Last Year</option>
-          </select>
-          <Button variant="secondary" className="flex items-center gap-2">
+    <div className="px-6 py-5 max-w-[1800px] mx-auto">
+      <PageHeaderSlot
+        title="Financial Reports"
+        icon={BarChart3}
+        actions={
+          <Button variant="secondary" size="sm" className="flex items-center gap-2">
             <Download className="w-4 h-4 mr-2" />
             Export All
           </Button>
-        </div>
+        }
+      />
+      <div className="mb-4 flex justify-end">
+        <select
+          value={dateRange}
+          onChange={(e) => setDateRange(e.target.value)}
+          className="px-3 py-1.5 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+        >
+          <option value="thisMonth">This Month</option>
+          <option value="lastMonth">Last Month</option>
+          <option value="thisQuarter">This Quarter</option>
+          <option value="thisYear">This Year</option>
+          <option value="lastYear">Last Year</option>
+        </select>
       </div>
 
       <KpiRow

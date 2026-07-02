@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Megaphone } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { PageHeader } from '../../components/shared/PageHeader';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { AnnouncementCard } from '../../components/platform-admin/announcements/AnnouncementCard';
 import { AnnouncementFormModal } from '../../components/platform-admin/announcements/AnnouncementFormModal';
@@ -72,13 +73,15 @@ export const AnnouncementsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-slate-900">Announcements</h1>
-        <Button onClick={() => setShowFormModal(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Create Announcement
-        </Button>
-      </div>
+      <PageHeader
+        title="Announcements"
+        actions={
+          <Button size="sm" onClick={() => setShowFormModal(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Create Announcement
+          </Button>
+        }
+      />
 
       <div className="border-b border-slate-200">
         <nav className="flex gap-6">

@@ -119,7 +119,7 @@ export const PaymentViewModal: React.FC<PaymentViewModalProps> = ({
             </div>
             <div className="text-right">
               <p className="text-sm text-slate-600 mb-1">Amount</p>
-              <p className="text-3xl font-bold text-success">
+              <p className="text-2xl font-bold text-success tabular-nums">
                 {formatCurrency(payment.amount ?? 0)}
               </p>
               <div className="mt-2">

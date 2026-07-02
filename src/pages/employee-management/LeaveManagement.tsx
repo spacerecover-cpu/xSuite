@@ -9,6 +9,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { KpiRow } from '../../components/templates/KpiRow';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
 import type { Database } from '../../types/database.types';
@@ -682,50 +683,31 @@ export const LeaveManagement: React.FC = () => {
   ];
 
   return (
-    <div className="p-8 max-w-[1800px] mx-auto">
-      <div className="mb-8 flex items-start justify-between">
-        <div className="flex items-start gap-6">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg bg-primary shadow-primary/40">
-            <CalendarDays className="w-7 h-7 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 mb-2">Leave Management</h1>
-            <p className="text-slate-600 text-base">Manage employee leave requests, balances, and policies</p>
-            <div className="flex gap-4 mt-3">
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-warning"></div>
-                <span className="text-slate-600">{stats?.pendingApprovals ?? 0} Pending</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-info"></div>
-                <span className="text-slate-600">{stats?.employeesOnLeaveToday ?? 0} On Leave Today</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-success"></div>
-                <span className="text-slate-600">{stats?.approvedThisMonth ?? 0} Approved This Month</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={() => { invalidateAll(); }}
-            variant="secondary"
-            size="sm"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
-          <Button
-            onClick={() => setShowRequestModal(true)}
-            size="sm"
-            className="bg-primary hover:bg-primary/90 text-primary-foreground focus:ring-primary"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Request Leave
-          </Button>
-        </div>
-      </div>
+    <div className="px-6 py-5 max-w-[1800px] mx-auto">
+      <PageHeaderSlot
+        title="Leave Management"
+        icon={CalendarDays}
+        actions={
+          <>
+            <Button
+              onClick={() => { invalidateAll(); }}
+              variant="secondary"
+              size="sm"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+            <Button
+              onClick={() => setShowRequestModal(true)}
+              size="sm"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground focus:ring-primary"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Request Leave
+            </Button>
+          </>
+        }
+      />
 
       <KpiRow
         cols="grid-cols-2 md:grid-cols-4"

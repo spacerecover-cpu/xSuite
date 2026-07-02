@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, AlertCircle, Clock, Activity } from 'lucide-react';
+import { AlertCircle, Clock, Activity } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Badge } from '../../components/ui/Badge';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { DetailPageHeader } from '../../components/shared/DetailPageHeader';
 import { TenantOverviewTab } from '../../components/platform-admin/tenant-detail/TenantOverviewTab';
 import { TenantActivityTab } from '../../components/platform-admin/tenant-detail/TenantActivityTab';
 import { TenantUsersTab } from '../../components/platform-admin/tenant-detail/TenantUsersTab';
@@ -106,43 +107,31 @@ export const TenantDetailPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate('/platform-admin/tenants')}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">{tenant.name}</h1>
-            <div className="flex items-center gap-3 mt-2">
-              {tenant.tenant_code && (
-                <span
-                  className="font-mono text-sm font-semibold tabular-nums text-slate-700 bg-slate-100 border border-slate-200 rounded px-2 py-0.5"
-                  title="Tenant code — for support & identification"
-                >
-                  {tenant.tenant_code}
-                </span>
-              )}
-              <Badge variant={getStatusBadgeVariant(tenant.status)}>
-                {tenant.status.replace('_', ' ').toUpperCase()}
-              </Badge>
-              {tenant.health && (
-                <span className="text-sm text-slate-500 flex items-center gap-1">
-                  <Activity className="w-4 h-4" />
-                  Health Score: {tenant.health.health_score ?? 0}
-                </span>
-              )}
-              <span className="text-sm text-slate-500 flex items-center gap-1">
-                <Clock className="w-4 h-4" />
-                Last active {formatDistanceToNow(new Date(tenant.updated_at))} ago
+      <DetailPageHeader
+        breadcrumbs={[
+          { label: 'Tenants', to: '/platform-admin/tenants' },
+          { label: tenant.name },
+        ]}
+        badges={
+          <>
+            {tenant.tenant_code && (
+              <span
+                className="font-mono text-sm font-semibold tabular-nums text-slate-700 bg-slate-100 border border-slate-200 rounded px-2 py-0.5"
+                title="Tenant code — for support & identification"
+              >
+                {tenant.tenant_code}
               </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {tenant.status === 'active' ? (
+            )}
+            <Badge variant={getStatusBadgeVariant(tenant.status)}>
+              {tenant.status.replace('_', ' ').toUpperCase()}
+            </Badge>
+          </>
+        }
+        actions={
+          tenant.status === 'active' ? (
             <Button
               variant="ghost"
+              size="sm"
               onClick={() => setShowSuspendDialog(true)}
               className="border border-danger/40 text-danger hover:bg-danger-muted"
             >
@@ -151,14 +140,29 @@ export const TenantDetailPage: React.FC = () => {
           ) : tenant.status === 'suspended' ? (
             <Button
               variant="ghost"
+              size="sm"
               onClick={() => setShowReactivateDialog(true)}
               className="border border-success/40 text-success hover:bg-success-muted"
             >
               Reactivate Tenant
             </Button>
-          ) : null}
-        </div>
-      </div>
+          ) : null
+        }
+        meta={
+          <div className="flex flex-wrap items-center gap-3">
+            {tenant.health && (
+              <span className="flex items-center gap-1">
+                <Activity className="w-4 h-4" />
+                Health Score: {tenant.health.health_score ?? 0}
+              </span>
+            )}
+            <span className="flex items-center gap-1">
+              <Clock className="w-4 h-4" />
+              Last active {formatDistanceToNow(new Date(tenant.updated_at))} ago
+            </span>
+          </div>
+        }
+      />
 
       <div className="border-b border-slate-200">
         <nav className="flex gap-6">

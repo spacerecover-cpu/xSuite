@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useId } from 'react';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Search, Filter, Save, X, Star, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -245,22 +246,20 @@ export default function DonorSearchPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Advanced Donor Drive Search</h1>
-          <p className="text-slate-600 mt-1">
-            Find compatible donor drives by technical specifications
-          </p>
-        </div>
-        <Button
-          onClick={() => setShowSaveTemplate(true)}
-          variant="secondary"
-          disabled={activeCriteriaCount === 0}
-        >
-          <Save className="w-4 h-4 mr-2" />
-          Save Search
-        </Button>
-      </div>
+      <PageHeaderSlot
+        title="Advanced Donor Drive Search"
+        actions={
+          <Button
+            onClick={() => setShowSaveTemplate(true)}
+            variant="secondary"
+            size="sm"
+            disabled={activeCriteriaCount === 0}
+          >
+            <Save className="w-4 h-4 mr-2" />
+            Save Search
+          </Button>
+        }
+      />
 
       {searchTemplates.length > 0 && (
         <Card className="p-4">

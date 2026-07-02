@@ -5,6 +5,7 @@ import { Ticket, Search } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { StatCard } from '../../components/shared/StatCard';
+import { PageHeader } from '../../components/shared/PageHeader';
 import { Table } from '../../components/ui/Table';
 import { Input } from '../../components/ui/Input';
 import { TicketStatusBadge } from '../../components/platform-admin/tickets/TicketStatusBadge';
@@ -123,9 +124,7 @@ export const SupportTicketsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-slate-900">Support Tickets</h1>
-      </div>
+      <PageHeader title="Support Tickets" />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <StatCard

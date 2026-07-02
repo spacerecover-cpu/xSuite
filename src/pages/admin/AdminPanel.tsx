@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { Card } from '../../components/ui/Card';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { StatCard } from '../../components/shared/StatCard';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import {
   Users,
   Activity,
@@ -169,10 +170,7 @@ export const AdminPanel: React.FC = () => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-slate-900">Admin Panel</h1>
-        <p className="text-slate-600 mt-1">System administration and monitoring</p>
-      </div>
+      <PageHeaderSlot title="Admin Panel" icon={Shield} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard

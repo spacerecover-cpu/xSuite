@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Card } from '../../components/ui/Card';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Button } from '../../components/ui/Button';
@@ -199,17 +200,7 @@ export const RolePermissions: React.FC = () => {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Role Permissions</h1>
-            <p className="text-slate-600 mt-1">
-              Manage module access for each user role
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Shield className="w-8 h-8 text-primary" />
-          </div>
-        </div>
+        <PageHeaderSlot title="Role Permissions" icon={Shield} />
 
         <Card className="p-4 bg-info-muted border-info/30">
           <div className="flex items-start gap-3">

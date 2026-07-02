@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
 import { useSidebarPreferences, type SidebarPosition } from '../../contexts/SidebarPreferencesContext';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 
 const POSITION_OPTIONS: { id: SidebarPosition; label: string; icon: typeof PanelLeft; description: string }[] = [
   { id: 'left', label: 'Left', icon: PanelLeft, description: 'Navigation on the left (default).' },
@@ -134,10 +135,7 @@ export const UserProfile: React.FC = () => {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-slate-900">My Profile</h1>
-        <p className="text-slate-600 mt-1">Manage your account settings and information</p>
-      </div>
+      <PageHeaderSlot title="My Profile" icon={User} />
 
       <div className="grid gap-6">
         <Card>
