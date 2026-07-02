@@ -79,12 +79,12 @@ export const SidebarNavItem: React.FC<SidebarNavItemProps> = ({
 
       {!isCollapsed && (
         <>
-          <span className={`flex-1 text-[13px] tracking-tight ${isActive ? 'font-semibold' : 'font-medium'}`}>
+          <span className={`flex-1 text-nav tracking-tight ${isActive ? 'font-semibold' : 'font-medium'}`}>
             {label}
           </span>
           {badge !== undefined && (
             <span
-              className={`ml-auto px-2 py-0.5 text-[11px] font-semibold rounded text-center ${
+              className={`ml-auto px-2 py-0.5 text-xxs font-semibold rounded text-center ${
                 isActive ? 'bg-primary-foreground/20 text-primary-foreground' : badgeColorClasses[badgeColor]
               }`}
             >
@@ -96,7 +96,7 @@ export const SidebarNavItem: React.FC<SidebarNavItemProps> = ({
 
       {isCollapsed && badge !== undefined && (
         <span
-          className={`absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center text-[9px] font-bold shadow ${
+          className={`absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center text-xxs font-bold shadow ${
             isActive ? 'bg-primary-foreground text-primary' : badgeColorClasses[badgeColor]
           }`}
         >

@@ -64,7 +64,7 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
       {Icon && (
         <Icon className={`w-[17px] h-[17px] flex-shrink-0 transition-colors ${iconColor}`} strokeWidth={1.75} />
       )}
-      <span className={`text-xxs font-semibold uppercase tracking-[0.1em] transition-colors ${labelColor}`}>
+      <span className={`text-xxs font-semibold uppercase tracking-widest transition-colors ${labelColor}`}>
         {title}
       </span>
     </div>

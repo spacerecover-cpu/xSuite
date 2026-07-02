@@ -62,6 +62,10 @@ export default {
       },
       fontSize: {
         'xxs': '0.625rem',
+        // App-chrome text size (top-bar title/crumbs, sidebar nav items) —
+        // the shell's compact 13px tier, tokenized 2026-07-02 (DESIGN.md →
+        // Typography → Sizes). Content surfaces never use it.
+        'nav': ['0.8125rem', { lineHeight: '1.25rem' }],
       },
       boxShadow: {
         // Retained, deliberately: a themed decorative glow for the onboarding

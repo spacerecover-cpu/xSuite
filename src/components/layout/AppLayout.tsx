@@ -100,7 +100,7 @@ const HeaderCurrentTitle: React.FC<{ routeLabel: string }> = ({ routeLabel }) =>
           <Icon className="w-3.5 h-3.5 text-white" />
         </span>
       )}
-      <span className="text-[13px] font-semibold text-slate-700 truncate">{header.title ?? routeLabel}</span>
+      <span className="text-nav font-semibold text-slate-700 truncate">{header.title ?? routeLabel}</span>
     </span>
   );
 };
@@ -157,7 +157,7 @@ export const AppLayout: React.FC = () => {
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
             {section && (
               <>
-                <span className="text-[13px] text-slate-400 font-medium truncate">{section}</span>
+                <span className="text-nav text-slate-400 font-medium truncate">{section}</span>
                 <ChevronRight className="w-3.5 h-3.5 text-slate-300 flex-shrink-0" />
               </>
             )}
@@ -177,7 +177,7 @@ export const AppLayout: React.FC = () => {
             >
               <Search className="w-3.5 h-3.5" />
               <span>Search…</span>
-              <kbd className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-slate-100 text-[10px] font-mono text-slate-500">
+              <kbd className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-slate-100 text-xxs font-mono text-slate-500">
                 {isMac ? <Command className="w-2.5 h-2.5" /> : 'Ctrl'}
                 K
               </kbd>

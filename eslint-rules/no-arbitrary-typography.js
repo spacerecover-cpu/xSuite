@@ -8,9 +8,8 @@
 //  - Letter-spacing `tracking-[…]`: uppercase labels use `tracking-wider`.
 //    Sole exception: `tracking-[0.5em]` on OTP/code inputs (allowed here).
 //
-// Pre-existing offenders are baselined OFF per-file in eslint.config.js
-// ("typography-arbitrary burndown") and RATCHET DOWN ONLY — remove entries
-// as the standardization program (Phases 4–5) sweeps them; never add files.
+// Fully enforced with NO baseline since 2026-07-02 (the P4-P5 burndown took
+// arbitrary sizes 93 -> 0; the app chrome now uses the `text-nav` token).
 // Color/var arbitraries like `text-[#hex]` are NOT this rule's concern
 // (no-raw-* rules govern color).
 

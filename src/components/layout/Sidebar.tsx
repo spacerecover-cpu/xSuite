@@ -85,8 +85,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'docked' }) => {
           </div>
           {!collapsed && (
             <div>
-              <h1 className="text-[15px] font-semibold tracking-tight leading-tight text-slate-900">DataRecovery</h1>
-              <p className="mt-0.5 text-xxs font-medium uppercase tracking-[0.16em] text-slate-500">Professional Suite</p>
+              <h1 className="text-sm font-semibold tracking-tight leading-tight text-slate-900">DataRecovery</h1>
+              <p className="mt-0.5 text-xxs font-medium uppercase tracking-widest text-slate-500">Professional Suite</p>
             </div>
           )}
         </div>
@@ -158,7 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'docked' }) => {
                 aria-label="Help & Support"
               >
                 <LifeBuoy className="w-[18px] h-[18px] flex-shrink-0 text-slate-500 group-hover:text-primary" strokeWidth={1.75} />
-                {!collapsed && <span className="text-[13px] font-medium tracking-tight">Help &amp; Support</span>}
+                {!collapsed && <span className="text-nav font-medium tracking-tight">Help &amp; Support</span>}
               </button>
             );
             return collapsed ? (
@@ -206,7 +206,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'docked' }) => {
                   {getInitials(profile.full_name)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="truncate text-[13px] font-semibold tracking-tight leading-tight text-slate-900">
+                  <p className="truncate text-nav font-semibold tracking-tight leading-tight text-slate-900">
                     {profile.full_name}
                   </p>
                   <span className="inline-block mt-1 px-1.5 py-px text-xxs font-semibold uppercase tracking-wider rounded bg-primary text-primary-foreground">

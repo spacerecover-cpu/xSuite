@@ -53,10 +53,11 @@ Fonts load via Google Fonts in `index.html` (CSP allows `fonts.googleapis.com` /
 - Default Tailwind type scale only. **Arbitrary sizes (`text-[Npx]`) are banned** (lint:
   `xsuite/no-arbitrary-typography`; pre-existing offenders are baselined per-file and ratchet down).
 - `text-xxs` = `0.625rem` (10px) — sanctioned **only** for KPI-tile microlabels/pills and app-chrome
-  metadata. Never for content labels or body text.
-- **Content floor is 12px (`text-xs`).** 9px/11px/13px/15px are retired from content surfaces; the app
-  chrome (sidebar / top bar) temporarily keeps its 13/15px ramp until it is promoted to named tokens
-  (program Phase 5) — do not copy chrome sizes into pages.
+  metadata (nav count bubbles, kbd hints). Never for content labels or body text.
+- `text-nav` = `0.8125rem/1.25rem` (13px/20px) — the **app-chrome tier** (top-bar title + crumbs,
+  sidebar nav items/user name). Chrome-only; content surfaces never use it.
+- **Content floor is 12px (`text-xs`).** 9/10/11/13/15px arbitrary values are fully retired (93 → 0,
+  2026-07-02); the chrome ramp is tokenized (`text-nav`/`text-xxs`; wordmark `text-sm`).
 - **Explicit size on table/tab text is mandatory.** Unsized `<td>`/`<span>`/tab text inherits the 16px
   root and silently breaks the 14px rhythm (the audit's F-4 class of bugs).
 
@@ -80,7 +81,7 @@ Fonts load via Google Fonts in `index.html` (CSP allows `fonts.googleapis.com` /
 | KPI cards | the two `StatCard` styles only — compact (label `text-xs font-medium text-slate-500`, value `text-xl font-bold tabular-nums`) and vivid `GradientStatCard` (label `text-xxs font-semibold uppercase tracking-wider`, value `text-xl/2xl font-bold tabular-nums`); no hand-rolled KPI markup |
 | Empty state | `shared/EmptyState` (`text-lg font-semibold` + `text-sm`) |
 | Pagination | `ui/Pager` (`text-sm text-slate-600`) |
-| Breadcrumbs | top-bar 13px (chrome); `DetailPageHeader` crumbs `text-sm text-slate-500` — surface-specific, both sanctioned |
+| Breadcrumbs | top-bar `text-nav` (chrome); `DetailPageHeader` crumbs `text-sm text-slate-500` — surface-specific, both sanctioned |
 
 ### Neutral text (slate only)
 `text-gray-*` (and every `*-gray-*` utility) is **banned** in `src/` — lint `xsuite/no-gray-palette`.
@@ -93,10 +94,19 @@ Shade roles: primary content `slate-900` · body `slate-700` · secondary `slate
   on OTP/code inputs (built into the lint rule).
 - `italic` only for quoted/testimonial content and notes.
 
+### Portal surface (customer-facing — sanctioned larger ramp)
+The customer portal (`src/pages/portal/**`, `PortalLayout`) is read by customers like a website, not a
+dense ops tool, so it keeps its own **larger sanctioned ramp** (owner decision 2026-07-02, "Option A"):
+in-page page titles `text-2xl font-bold`, card headings `text-lg font-bold`, stat values up to
+`text-3xl`. Everything else follows the shared roles — table headers use the standard th spec, labels/
+hints/errors/badges/buttons use the shared primitives and specs, uppercase labels use `tracking-wider`,
+money uses `tabular-nums`. Do not import the portal ramp into the ops app, and do not "fix" portal
+titles down to ops sizes.
+
 ### Enforcement
-`eslint-rules/no-gray-palette.js` (error, no baseline) and `eslint-rules/no-arbitrary-typography.js`
-(error; per-file baseline in `eslint.config.js`, ratchet-down only) — same operating model as the
-raw-color rules.
+`eslint-rules/no-gray-palette.js` and `eslint-rules/no-arbitrary-typography.js` — both `error` with
+**no baseline** (fully enforced since 2026-07-02; the sole in-rule exception is OTP
+`tracking-[0.5em]`). Same operating model as the raw-color rules.
 
 ## Color
 Every brand/status token is an **RGB triplet** CSS variable (e.g. `--color-primary: 22 38 96`) so Tailwind's `<alpha-value>` opacity syntax works. The 14 semantic tokens are wired in `tailwind.config.js`; values live in `src/index.css`. **Use semantic tokens only — never raw Tailwind brand colors or hex in `src/`.**
@@ -334,4 +344,5 @@ Captured 2026-06-01 from a code audit; drifts #1–#3 resolved 2026-06-02. **A 2
 | 2026-06-26 | Added a **Z-Index Scale** (`src/lib/ui/zIndex.ts` + Tailwind tokens: dropdown 30 / overlay 40 / modal 50 / popover 60 / toast 70) and an **Elevation** ladder (resting `shadow-sm` → overlay `shadow-xl`). The z-index scale leads the code (it does not exist yet); the elevation ladder documents the live `shadow-*` vocabulary and flags the dead custom tokens for removal. | The recon found `z-50` saturated with ad-hoc `z-[60]`/`z-[100]`/`z-[9999]` overrides and no governance, and the custom shadow scale unused (1 usage) with depth leaning ~5:1 on borders (~2000 vs ~400). Both are now named layers/levels so overlays stack predictably and depth is intentional; the scale file + token migration and the dead-shadow cleanup are tracked (Known Deviations #10–#11). Toast layering is governed by `react-hot-toast`'s default today, not an app token — flagged in the Z-Index section. |
 | 2026-06-26 | Added a **Forms & Field Layout** section: responsive 4-column grid for Workspace forms, uppercase section-header dividers, `col-span-full` for long fields, `ui/FormField` + `ui/` primitives as the presentational standard. | Documents the field-grouping the redesign introduces and the existing `FormField` conventions (verified at `ui/FormField.tsx`, not `shared/`) the doc never captured. The 4-column grid is the main scroll-reducer (≈ ¼ the rows of a single column). The grid + dividers are net-new prescriptions (no form uses them yet), applied to new/edited work; field state-model migration is not forced. |
 | 2026-06-26 | **Implemented Known Deviations #8–#11** the same day they were codified: `Dialog` scrim → `bg-slate-900/40` (+ `CommandPalette`/`MobileNavDrawer` reconcile); opt-in `ui/Tabs` `variant="pills"` adopted by `DeviceFormModal`; named z-index scale (`src/lib/ui/zIndex.ts` + Tailwind tokens, `cn()`/twMerge extended, magic numbers migrated, Toaster wired); removed the two dead `boxShadow` tokens (retained `glow-primary`). Doc reconciled — #8–#11 ✅, the Overlays / Z-Index / Tabbed-form "Status — leads the code" notes now read "shipped". | The owner asked to proceed with the tracked items; doing the code in the same change set keeps the contract honest (no "shipped" claim ahead of code). The z-index migration was behavior-preserving and **corrected the scale's latent regression**: page menus-with-backdrop (`RowActionsMenu`/`ColumnPickerPopover`) coexist with `BulkActionsBar` (overlay 40) so they map to `z-modal` (50)/`z-overlay` (40), not `z-dropdown` (30); `Select` is a native element (no z-index) and was dropped from the field-listbox set. tsc 0; full suite green except 2 pre-existing invoicePilot PDF failures. |
+| 2026-07-02 | **Typography standardization program executed end-to-end (P1–P5), same day the standard was codified.** Final state: gray palette 477→0 (30 files); dead Inter aliases removed + `font-mono`/`text-nav` tokenized; ui/ primitives converged (universal `FormField` error/hint spec, one th tracking, Button md=14px with preserved control heights); F-4 unsized identity cells fixed across all list tables; ONE table-header spec app-wide; uppercase-tracking fork 285/104→`tracking-wider` only; money = `font-semibold tabular-nums` (totals bold+tabular); 24 pages migrated onto the standard header system (19 → top-bar `PageHeaderSlot` incl. the full Banking migration; platform-admin 5 → `PageHeader`/`DetailPageHeader`); rogue KPI grids → shared `KpiRow`; arbitrary sizes 93→0 (chrome tokenized as `text-nav`/`text-xxs`); **both lint rules enforced with no baseline**. **Portal = Option A** (owner): keeps its larger customer-facing ramp, documented above; its table headers/labels aligned to shared specs. Known small leftovers (tracked, not hidden): `TemplateTypeDetail` uses a size-aligned h1 rather than `DetailPageHeader`; hand-rolled empty-state/pagination markup remains in a few pages (class-conformant, component adoption optional). | One program, one operating model (sweep → lint `error` → ratchet → delete baseline), copying the raw-color burndown. Verification at every phase: tsc 0, suite 2,250 passing (typst PDF test is load-flaky, passes isolated), lint delta = 0 new problems. Full before/after inventory: `docs/typography-audit-2026-07-02.md` (incl. program-outcome addendum). |
 | 2026-07-02 | **Typography role standard codified** (Typography section rewritten with the locked role table): page titles per surface, headings, modal titles, table th/td, **Button md = 14px**, badges, labels/hints/errors (`FormField` spec universal), uppercase micro-labels on `tracking-wider`, KPI two-style rule, money = `font-semibold tabular-nums`, mono policy (character-verified strings only), 12px content floor, slate-only neutrals with shade roles. Banned: `text-[Npx]`, all `*-gray-*` utilities, arbitrary `tracking-[…]` (OTP `0.5em` exception) — enforced by `xsuite/no-gray-palette` (no baseline) + `xsuite/no-arbitrary-typography` (per-file ratchet baseline). §Forms section-header tracking harmonized `wide`→`wider`. | The 2026-07-02 typography audit (`docs/typography-audit-2026-07-02.md`) found role-level spec absence as the root cause of 5 page-title specs, 7 table-header specs, a 30-file gray fork, 93 arbitrary sizes, and error/hint splits inside `ui/` itself. Standard values were chosen to match the codebase **majority** (minimum visual churn); deviations burn down via the phased standardization program (P1 mechanical sweeps → P2 primitive convergence → P3 high-traffic tables → P4 structural header/KPI migrations → P5 chrome tokenization + portal), copying the proven raw-color-burndown operating model (sweep → lint `error` → ratchet). |

@@ -763,3 +763,30 @@ tiers coexist on one screen, mirroring Expenses.
 
 *End of audit. No code, styles, or configuration were modified in producing this report; the only file
 added is this document.*
+
+---
+
+## Addendum — Program outcome (added 2026-07-02, post-standardization)
+
+The standardization program (DESIGN.md → Decisions Log 2026-07-02) executed against this audit the same
+day. Re-running §Method's mechanical sweep on the final tree:
+
+| Metric (this audit's baseline) | Before | After |
+|---|---|---|
+| Arbitrary font sizes `text-[Npx]` (§3.3) | 93 (5 values) | **0** (chrome tokenized: `text-nav` 13px, `text-xxs`) |
+| `text-gray-*` occurrences / files (F-9) | 477 / 30 | **0 / 0** |
+| Arbitrary `tracking-[…]` (§3.6) | 12 | **2** (sanctioned OTP `0.5em` only) |
+| `uppercase tracking-wide` vs `-wider` fork (F-15) | 104 / 285 | **0 / one spec (`wider`)** |
+| Table-header specs (F-5) | 7+ | **1** (portal ramp documented separately) |
+| Page-title specs (F-1) | 5 | **3, by surface** (top-bar 13px chrome · `DetailPageHeader` 24px · `PageHeader` 18px; portal 24px sanctioned by owner "Option A") |
+| Field error-text specs in `ui/` (F-12) | 2 (xs vs sm) | **1** (`FormField` spec universal, icon incl.) |
+| Button text sizes (F-7) | 14/16/18px mixed per screen | **14px platform-wide** (md default; heights preserved) |
+| Dead Inter aliases `font-body`/`display` (§3.1) | 86 | **0** (`font-mono` tokenized) |
+| Unsized identity cells at 16px (F-4) | 14+ list tables | **0** |
+| Money cells with `tabular-nums` (F-13) | financial only | **all financial/payroll/timesheet figures** |
+| Lint enforcement (§10) | none | `no-gray-palette` + `no-arbitrary-typography`, both `error`, **no baseline** |
+
+Intentionally unchanged, per this audit's "by design" findings: PDFs (Roboto ramp), charts, auth
+decorative surface, print dialogs, OTP tracking. Known tracked leftovers: `TemplateTypeDetail` h1 is
+size-aligned (2xl) but not yet on `DetailPageHeader`; a few hand-rolled empty-state/pagination blocks
+remain class-conformant without component adoption.

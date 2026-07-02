@@ -166,25 +166,6 @@
       rules: { 'xsuite/no-raw-style-colors': 'off' },
     },
     {
-      // xsuite/no-arbitrary-typography baseline (per-file OFF) — the
-      // typography-arbitrary burndown (DESIGN.md → Typography → Sizes;
-      // docs/typography-audit-2026-07-02.md §3.3). RATCHET-DOWN ONLY:
-      // remove entries as Phases 4–5 of the standardization program sweep
-      // them (cases hotspots + app chrome tokenization); never add files.
-      // Ratcheted down 2026-07-02 (P4d burndown: 31 files -> 5). What remains
-      // is the app chrome's private 9-15px ramp, which migrates to named
-      // tokens in program Phase 5.
-      files: [
-        'src/components/layout/AppLayout.tsx',
-        'src/components/layout/NotificationBell.tsx',
-        'src/components/layout/Sidebar.tsx',
-        'src/components/layout/SidebarNavItem.tsx',
-        'src/components/layout/SidebarSection.tsx',
-      ],
-      plugins: { 'xsuite': xsuitePlugin },
-      rules: { 'xsuite/no-arbitrary-typography': 'off' },
-    },
-    {
       // i18n enforcement gate (A0/A3, Country Engine Phase 2): the portal is the
       // externally-visible non-English surface and is now fully extracted, so a
       // NEW untranslated literal there must FAIL CI (not just warn). The rest of

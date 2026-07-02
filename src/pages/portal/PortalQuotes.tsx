@@ -363,10 +363,10 @@ export const PortalQuotes: React.FC = () => {
                   <table className="w-full text-sm">
                     <thead className="bg-slate-50 border-b border-slate-200">
                       <tr>
-                        <th className="text-left p-3 font-semibold text-slate-700">{t('portal.quotes.tableItem')}</th>
-                        <th className="text-center p-3 font-semibold text-slate-700">{t('portal.quotes.tableQty')}</th>
-                        <th className="text-right p-3 font-semibold text-slate-700">{t('portal.quotes.tableUnitPrice')}</th>
-                        <th className="text-right p-3 font-semibold text-slate-700">{t('portal.quotes.tableTotal')}</th>
+                        <th className="text-left p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">{t('portal.quotes.tableItem')}</th>
+                        <th className="text-center p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">{t('portal.quotes.tableQty')}</th>
+                        <th className="text-right p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">{t('portal.quotes.tableUnitPrice')}</th>
+                        <th className="text-right p-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">{t('portal.quotes.tableTotal')}</th>
                       </tr>
                     </thead>
                     <tbody>

@@ -56,7 +56,7 @@ export function NotificationBell() {
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 ? (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold leading-none text-danger-foreground">
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-danger px-1 text-xxs font-bold leading-none text-danger-foreground">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         ) : null}
@@ -117,7 +117,7 @@ export function NotificationBell() {
                       {n.body ? (
                         <div className="mt-0.5 text-xs text-slate-600 line-clamp-2">{n.body}</div>
                       ) : null}
-                      <div className="mt-1 text-[11px] text-slate-400">
+                      <div className="mt-1 text-xs text-slate-400">
                         {formatRelative(new Date(n.created_at))}
                       </div>
                     </button>
