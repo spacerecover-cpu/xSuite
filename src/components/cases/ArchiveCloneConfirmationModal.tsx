@@ -75,7 +75,7 @@ export const ArchiveCloneConfirmationModal: React.FC<ArchiveCloneConfirmationMod
           <div className="space-y-4 mb-5">
             <div className="bg-slate-50 rounded-lg p-4 space-y-3">
               <div>
-                <div className="text-xs font-medium text-slate-500 uppercase mb-1">Clone Drive</div>
+                <div className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Clone Drive</div>
                 <div className="text-sm font-semibold text-slate-900">
                   Clone #{caseNo || clone.id.slice(0, 8)}
                 </div>
@@ -83,14 +83,14 @@ export const ArchiveCloneConfirmationModal: React.FC<ArchiveCloneConfirmationMod
 
               {patientDeviceName && (
                 <div>
-                  <div className="text-xs font-medium text-slate-500 uppercase mb-1">Patient Device</div>
+                  <div className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Patient Device</div>
                   <div className="text-sm text-slate-900">{patientDeviceName}</div>
                 </div>
               )}
 
               {(displaySerial || displayBrand !== 'Unknown') && (
                 <div>
-                  <div className="text-xs font-medium text-slate-500 uppercase mb-1 flex items-center gap-1">
+                  <div className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1 flex items-center gap-1">
                     <HardDrive className="w-3 h-3" />
                     Physical Drive
                   </div>
@@ -105,7 +105,7 @@ export const ArchiveCloneConfirmationModal: React.FC<ArchiveCloneConfirmationMod
               )}
 
               <div>
-                <div className="text-xs font-medium text-slate-500 uppercase mb-1 flex items-center gap-1">
+                <div className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1 flex items-center gap-1">
                   <FolderOpen className="w-3 h-3" />
                   Storage Location
                 </div>
@@ -137,7 +137,7 @@ export const ArchiveCloneConfirmationModal: React.FC<ArchiveCloneConfirmationMod
               </div>
 
               <div>
-                <div className="text-xs font-medium text-slate-500 uppercase mb-1 flex items-center gap-1">
+                <div className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1 flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
                   Clone Date
                 </div>

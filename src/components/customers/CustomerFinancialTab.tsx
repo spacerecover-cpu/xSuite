@@ -143,20 +143,20 @@ export function CustomerFinancialTab({ customerId, companyId }: CustomerFinancia
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Card>
           <div className="p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Total Invoiced</p>
+            <p className="text-xs uppercase tracking-wider text-slate-500 font-medium">Total Invoiced</p>
             <p className="text-2xl font-bold text-slate-900 mt-1">{formatCurrency(totals.invoiced)}</p>
             <p className="text-xs text-slate-500 mt-1">{realInvoices.length} invoice(s)</p>
           </div>
         </Card>
         <Card>
           <div className="p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Total Paid</p>
+            <p className="text-xs uppercase tracking-wider text-slate-500 font-medium">Total Paid</p>
             <p className="text-2xl font-bold text-success mt-1">{formatCurrency(totals.paid)}</p>
           </div>
         </Card>
         <Card>
           <div className="p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Outstanding</p>
+            <p className="text-xs uppercase tracking-wider text-slate-500 font-medium">Outstanding</p>
             <p className={`text-2xl font-bold mt-1 ${totals.outstanding > 0 ? 'text-warning' : 'text-slate-500'}`}>
               {formatCurrency(totals.outstanding)}
             </p>
@@ -175,12 +175,12 @@ export function CustomerFinancialTab({ customerId, companyId }: CustomerFinancia
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100">
-                    <th className="text-left pb-3 font-medium text-slate-600">Invoice #</th>
-                    <th className="text-left pb-3 font-medium text-slate-600">Date</th>
-                    <th className="text-right pb-3 font-medium text-slate-600">Amount</th>
-                    <th className="text-right pb-3 font-medium text-slate-600">Balance</th>
-                    <th className="text-center pb-3 font-medium text-slate-600">Status</th>
-                    <th className="text-right pb-3 font-medium text-slate-600"></th>
+                    <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Invoice #</th>
+                    <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Date</th>
+                    <th className="text-right pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Amount</th>
+                    <th className="text-right pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Balance</th>
+                    <th className="text-center pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
+                    <th className="text-right pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -235,11 +235,11 @@ export function CustomerFinancialTab({ customerId, companyId }: CustomerFinancia
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100">
-                    <th className="text-left pb-3 font-medium text-slate-600">Quote #</th>
-                    <th className="text-left pb-3 font-medium text-slate-600">Date</th>
-                    <th className="text-right pb-3 font-medium text-slate-600">Amount</th>
-                    <th className="text-center pb-3 font-medium text-slate-600">Status</th>
-                    <th className="text-right pb-3 font-medium text-slate-600"></th>
+                    <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Quote #</th>
+                    <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Date</th>
+                    <th className="text-right pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Amount</th>
+                    <th className="text-center pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
+                    <th className="text-right pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">

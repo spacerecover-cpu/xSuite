@@ -395,15 +395,15 @@ export const LocalizationCenter: React.FC = () => {
             <SectionCard title="Live preview" description="Exactly how amounts will appear with the settings above.">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div role="group" aria-label={`Positive amount preview: ${positivePreview}`} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Positive</div>
+                  <div className="text-xs font-medium uppercase tracking-wider text-slate-500">Positive</div>
                   <div className="mt-1 font-mono text-lg text-slate-900" dir="auto">{positivePreview}</div>
                 </div>
                 <div role="group" aria-label={`Negative amount preview: ${negativePreview}`} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Negative</div>
+                  <div className="text-xs font-medium uppercase tracking-wider text-slate-500">Negative</div>
                   <div className="mt-1 font-mono text-lg text-slate-900" dir="auto">{negativePreview}</div>
                 </div>
                 <div role="group" aria-label={`Currency token preview: ${tokenPreview}`} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Token</div>
+                  <div className="text-xs font-medium uppercase tracking-wider text-slate-500">Token</div>
                   <div className="mt-1 font-mono text-lg text-slate-900" dir="auto">{tokenPreview}</div>
                 </div>
               </div>
@@ -453,15 +453,15 @@ export const LocalizationCenter: React.FC = () => {
             <SectionCard title="Live preview">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div role="group" aria-label={`Date preview: ${datePreview}`} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Date</div>
+                  <div className="text-xs font-medium uppercase tracking-wider text-slate-500">Date</div>
                   <div className="mt-1 font-mono text-lg text-slate-900">{datePreview}</div>
                 </div>
                 <div role="group" aria-label={`Time preview: ${timePreview}`} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Time</div>
+                  <div className="text-xs font-medium uppercase tracking-wider text-slate-500">Time</div>
                   <div className="mt-1 font-mono text-lg text-slate-900">{timePreview}</div>
                 </div>
                 <div role="group" aria-label={`Week starts on ${weekStartDay}`} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Week starts</div>
+                  <div className="text-xs font-medium uppercase tracking-wider text-slate-500">Week starts</div>
                   <div className="mt-1 text-lg text-slate-900">{weekStartDay}</div>
                 </div>
               </div>

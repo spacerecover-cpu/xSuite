@@ -102,7 +102,7 @@ export const PreserveLongTermModal: React.FC<PreserveLongTermModalProps> = ({
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div className="bg-slate-50 rounded-lg p-3 space-y-2">
               <div>
-                <div className="text-xs font-medium text-slate-500 uppercase mb-0.5">Clone Drive</div>
+                <div className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-0.5">Clone Drive</div>
                 <div className="text-sm font-semibold text-slate-900">
                   Clone #{caseNo || clone.id.slice(0, 8)}
                 </div>
@@ -110,14 +110,14 @@ export const PreserveLongTermModal: React.FC<PreserveLongTermModalProps> = ({
 
               {patientDeviceName && (
                 <div>
-                  <div className="text-xs font-medium text-slate-500 uppercase mb-0.5">Patient Device</div>
+                  <div className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-0.5">Patient Device</div>
                   <div className="text-xs text-slate-900">{patientDeviceName}</div>
                 </div>
               )}
 
               {(displaySerial || displayBrand !== 'Unknown') && (
                 <div>
-                  <div className="text-xs font-medium text-slate-500 uppercase mb-0.5 flex items-center gap-1">
+                  <div className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-0.5 flex items-center gap-1">
                     <HardDrive className="w-3 h-3" />
                     Physical Drive
                   </div>
@@ -132,7 +132,7 @@ export const PreserveLongTermModal: React.FC<PreserveLongTermModalProps> = ({
               )}
 
               <div>
-                <div className="text-xs font-medium text-slate-500 uppercase mb-0.5 flex items-center gap-1">
+                <div className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-0.5 flex items-center gap-1">
                   <FolderOpen className="w-3 h-3" />
                   Storage Location
                 </div>

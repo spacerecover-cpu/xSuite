@@ -870,14 +870,14 @@ export const LeaveManagement: React.FC = () => {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-slate-200">
-                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Employee</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Leave Type</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Duration</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Days</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Reason</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Status</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Submitted</th>
-                        {isAdmin && <th className="text-right py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Actions</th>}
+                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wider">Employee</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wider">Leave Type</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wider">Duration</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wider">Days</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wider">Reason</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wider">Status</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wider">Submitted</th>
+                        {isAdmin && <th className="text-right py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wider">Actions</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -1000,13 +1000,13 @@ export const LeaveManagement: React.FC = () => {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-slate-200">
-                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Employee</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Leave Type</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Year</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Allocated</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Used</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Remaining</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Usage</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wider">Employee</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wider">Leave Type</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wider">Year</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wider">Allocated</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wider">Used</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wider">Remaining</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-600 text-xs uppercase tracking-wider">Usage</th>
                       </tr>
                     </thead>
                     <tbody>

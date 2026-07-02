@@ -262,7 +262,7 @@ export const CasePortalTab: React.FC<CasePortalTabProps> = ({ caseId, portalSett
           </div>
 
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3 uppercase tracking-wide">
+            <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3 uppercase tracking-wider">
               <Eye className="w-4 h-4 text-primary" />
               Visibility Settings
             </h3>
@@ -304,7 +304,7 @@ export const CasePortalTab: React.FC<CasePortalTabProps> = ({ caseId, portalSett
           </div>
 
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3 uppercase tracking-wide">
+            <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3 uppercase tracking-wider">
               <Bell className="w-4 h-4 text-warning" />
               Notification Settings
             </h3>
@@ -346,7 +346,7 @@ export const CasePortalTab: React.FC<CasePortalTabProps> = ({ caseId, portalSett
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3 uppercase tracking-wide">
+            <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3 uppercase tracking-wider">
               <Shield className="w-4 h-4 text-slate-500" />
               Custom Message to Customer
             </h3>

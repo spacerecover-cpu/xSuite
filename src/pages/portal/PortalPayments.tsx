@@ -165,7 +165,7 @@ export const PortalPayments: React.FC = () => {
               <Receipt className="w-5 h-5 text-info" aria-hidden="true" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">{t('portal.payments.totalPayments')}</p>
+              <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">{t('portal.payments.totalPayments')}</p>
               <p className="text-2xl font-bold text-slate-900">{list.length}</p>
             </div>
           </div>
@@ -176,7 +176,7 @@ export const PortalPayments: React.FC = () => {
               <DollarSign className="w-5 h-5 text-success" aria-hidden="true" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">{t('portal.payments.totalPaid')}</p>
+              <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">{t('portal.payments.totalPaid')}</p>
               <p className="text-2xl font-bold text-slate-900">{formatCurrency(totalPaid)}</p>
             </div>
           </div>

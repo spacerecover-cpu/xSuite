@@ -217,7 +217,7 @@ export const ArticleEditorModal: React.FC<ArticleEditorModalProps> = ({ isOpen, 
 
         <div className="w-72 border-l border-slate-200 overflow-y-auto px-5 py-4 space-y-5 bg-slate-50">
           <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Status</label>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Status</label>
             <div className="flex rounded-lg overflow-hidden border border-slate-200">
               {(['draft', 'published'] as const).map((s) => (
                 <button
@@ -238,7 +238,7 @@ export const ArticleEditorModal: React.FC<ArticleEditorModalProps> = ({ isOpen, 
           </div>
 
           <div>
-            <label htmlFor={categoryId_a11y} className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Category</label>
+            <label htmlFor={categoryId_a11y} className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Category</label>
             <select
               id={categoryId_a11y}
               value={categoryId}
@@ -254,7 +254,7 @@ export const ArticleEditorModal: React.FC<ArticleEditorModalProps> = ({ isOpen, 
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">Tags</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Tags</label>
               <button
                 onClick={() => setIsCreatingTag(!isCreatingTag)}
                 className="text-primary hover:text-primary/80"
@@ -307,7 +307,7 @@ export const ArticleEditorModal: React.FC<ArticleEditorModalProps> = ({ isOpen, 
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Options</label>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Options</label>
             <label className="flex items-center gap-2.5 cursor-pointer group">
               <div
                 onClick={() => setIsFeatured(!isFeatured)}

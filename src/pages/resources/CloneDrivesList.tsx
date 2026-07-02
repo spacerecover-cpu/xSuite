@@ -645,7 +645,7 @@ export const CloneDrivesList: React.FC = () => {
                         <td colSpan={10} className="p-6">
                           <div className="grid grid-cols-4 gap-6">
                             <div>
-                              <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">
+                              <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">
                                 Serial Number
                               </p>
                               <p className="text-sm text-slate-900 font-mono">
@@ -653,7 +653,7 @@ export const CloneDrivesList: React.FC = () => {
                               </p>
                             </div>
                             <div>
-                              <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">
+                              <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">
                                 Type / Interface
                               </p>
                               <p className="text-sm text-slate-900">
@@ -662,7 +662,7 @@ export const CloneDrivesList: React.FC = () => {
                               </p>
                             </div>
                             <div>
-                              <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">
+                              <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">
                                 Health Status
                               </p>
                               <p className="text-sm text-slate-900">
@@ -672,7 +672,7 @@ export const CloneDrivesList: React.FC = () => {
                               </p>
                             </div>
                             <div>
-                              <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">
+                              <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">
                                 Capacity Usage
                               </p>
                               <div className="space-y-1">
@@ -716,7 +716,7 @@ export const CloneDrivesList: React.FC = () => {
                             </div>
                             {drive.notes && (
                               <div className="col-span-4">
-                                <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">
+                                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">
                                   Notes
                                 </p>
                                 <p className="text-sm text-slate-700">{drive.notes}</p>
@@ -724,7 +724,7 @@ export const CloneDrivesList: React.FC = () => {
                             )}
                             {cloneAssignments.length > 0 && (
                               <div className="col-span-4">
-                                <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">
+                                <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">
                                   Recent Clone Assignments ({cloneAssignments.length})
                                 </p>
                                 <div className="grid grid-cols-2 gap-2">

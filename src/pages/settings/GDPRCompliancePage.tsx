@@ -291,10 +291,10 @@ export const GDPRCompliancePage: React.FC = () => {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 text-left">
-                <th className="px-4 py-2 font-medium text-slate-600">Table</th>
-                <th className="px-4 py-2 font-medium text-slate-600">Retention (days)</th>
-                <th className="px-4 py-2 font-medium text-slate-600">Auto Purge</th>
-                <th className="px-4 py-2 font-medium text-slate-600">Status</th>
+                <th className="px-4 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wider">Table</th>
+                <th className="px-4 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wider">Retention (days)</th>
+                <th className="px-4 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wider">Auto Purge</th>
+                <th className="px-4 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">

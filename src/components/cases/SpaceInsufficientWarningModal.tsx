@@ -71,7 +71,7 @@ export const SpaceInsufficientWarningModal: React.FC<SpaceInsufficientWarningMod
                 <HardDrive className="w-3.5 h-3.5 text-info" />
               </div>
               <div>
-                <p className="text-[9px] font-medium text-slate-500 uppercase tracking-wide">
+                <p className="text-[9px] font-medium text-slate-500 uppercase tracking-wider">
                   Clone Drive
                 </p>
                 <p className="text-xs font-bold text-slate-900 font-mono">{cloneId}</p>
@@ -99,7 +99,7 @@ export const SpaceInsufficientWarningModal: React.FC<SpaceInsufficientWarningMod
                 <Database className="w-3.5 h-3.5 text-warning" />
               </div>
               <div>
-                <p className="text-[9px] font-medium text-slate-500 uppercase tracking-wide">
+                <p className="text-[9px] font-medium text-slate-500 uppercase tracking-wider">
                   Space Analysis
                 </p>
                 <p className="text-xs font-bold text-warning">Insufficient</p>

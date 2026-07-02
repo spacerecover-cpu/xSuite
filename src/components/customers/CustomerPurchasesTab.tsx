@@ -82,12 +82,12 @@ export const CustomerPurchasesTab: React.FC<CustomerPurchasesTabProps> = ({ cust
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100">
-                    <th className="text-left pb-3 font-medium text-slate-600">Sale #</th>
-                    <th className="text-left pb-3 font-medium text-slate-600">Date</th>
-                    <th className="text-left pb-3 font-medium text-slate-600">Items</th>
-                    <th className="text-right pb-3 font-medium text-slate-600">Total</th>
-                    <th className="text-center pb-3 font-medium text-slate-600">Status</th>
-                    <th className="text-right pb-3 font-medium text-slate-600"></th>
+                    <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Sale #</th>
+                    <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Date</th>
+                    <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Items</th>
+                    <th className="text-right pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Total</th>
+                    <th className="text-center pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
+                    <th className="text-right pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -160,11 +160,11 @@ export const CustomerPurchasesTab: React.FC<CustomerPurchasesTabProps> = ({ cust
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100">
-                    <th className="text-left pb-3 font-medium text-slate-600">Device</th>
-                    <th className="text-left pb-3 font-medium text-slate-600">Serial #</th>
-                    <th className="text-left pb-3 font-medium text-slate-600">Purchase Date</th>
-                    <th className="text-left pb-3 font-medium text-slate-600">Expires</th>
-                    <th className="text-center pb-3 font-medium text-slate-600">Status</th>
+                    <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Device</th>
+                    <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Serial #</th>
+                    <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Purchase Date</th>
+                    <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Expires</th>
+                    <th className="text-center pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -224,11 +224,11 @@ export const CustomerPurchasesTab: React.FC<CustomerPurchasesTabProps> = ({ cust
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100">
-                    <th className="text-left pb-3 font-medium text-slate-600">Item</th>
-                    <th className="text-left pb-3 font-medium text-slate-600">Serial #</th>
-                    <th className="text-left pb-3 font-medium text-slate-600">Purchase Date</th>
-                    <th className="text-left pb-3 font-medium text-slate-600">Warranty Ends</th>
-                    <th className="text-center pb-3 font-medium text-slate-600">Status</th>
+                    <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Item</th>
+                    <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Serial #</th>
+                    <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Purchase Date</th>
+                    <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Warranty Ends</th>
+                    <th className="text-center pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">

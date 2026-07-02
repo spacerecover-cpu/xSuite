@@ -36,14 +36,14 @@ export const PaymentHistoryTable: React.FC<PaymentHistoryTableProps> = ({ entrie
     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs text-slate-500">
-            <th scope="col" className="px-3 py-2 font-medium">Date</th>
-            <th scope="col" className="px-3 py-2 font-medium">Document</th>
-            <th scope="col" className="px-3 py-2 font-medium">Method</th>
-            <th scope="col" className="px-3 py-2 font-medium">Reference</th>
-            <th scope="col" className="px-3 py-2 font-medium">Recorded by</th>
-            <th scope="col" className="px-3 py-2 text-right font-medium">Amount</th>
-            <th scope="col" className="px-3 py-2 text-right font-medium">Balance</th>
+          <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+            <th scope="col" className="px-3 py-2">Date</th>
+            <th scope="col" className="px-3 py-2">Document</th>
+            <th scope="col" className="px-3 py-2">Method</th>
+            <th scope="col" className="px-3 py-2">Reference</th>
+            <th scope="col" className="px-3 py-2">Recorded by</th>
+            <th scope="col" className="px-3 py-2 text-right">Amount</th>
+            <th scope="col" className="px-3 py-2 text-right">Balance</th>
           </tr>
         </thead>
         <tbody>
@@ -55,7 +55,7 @@ export const PaymentHistoryTable: React.FC<PaymentHistoryTableProps> = ({ entrie
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1.5">
                     <span
-                      className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                      className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
                         e.source === 'receipt' ? 'bg-info-muted text-info' : 'bg-primary/10 text-primary'
                       }`}
                     >

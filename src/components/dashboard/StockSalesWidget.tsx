@@ -28,7 +28,7 @@ export const StockSalesWidget: React.FC = () => {
             <ShoppingCart className="w-4 h-4 text-success" />
           </div>
           <div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Today's Sales</p>
+            <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Today's Sales</p>
             <p className="text-xl font-bold text-slate-900 leading-tight">
               {isLoading ? '—' : count}
             </p>

@@ -38,7 +38,7 @@ export const DueFollowUpsWidget: React.FC = () => {
             <CalendarClock className="w-4 h-4 text-info" />
           </div>
           <div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+            <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
               Follow-ups Due
             </p>
             <p className="text-xl font-bold text-slate-900 leading-tight">

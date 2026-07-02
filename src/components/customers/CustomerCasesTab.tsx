@@ -119,25 +119,25 @@ export function CustomerCasesTab({ customerId, companyId }: CustomerCasesTabProp
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <Card>
           <div className="p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Total Cases</p>
+            <p className="text-xs uppercase tracking-wider text-slate-500 font-medium">Total Cases</p>
             <p className="text-2xl font-bold text-slate-900 mt-1">{cases.length}</p>
           </div>
         </Card>
         <Card>
           <div className="p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Open</p>
+            <p className="text-xs uppercase tracking-wider text-slate-500 font-medium">Open</p>
             <p className="text-2xl font-bold text-info mt-1">{summary.open}</p>
           </div>
         </Card>
         <Card>
           <div className="p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Delivered</p>
+            <p className="text-xs uppercase tracking-wider text-slate-500 font-medium">Delivered</p>
             <p className="text-2xl font-bold text-success mt-1">{summary.delivered}</p>
           </div>
         </Card>
         <Card>
           <div className="p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500 font-medium">Cancelled</p>
+            <p className="text-xs uppercase tracking-wider text-slate-500 font-medium">Cancelled</p>
             <p className="text-2xl font-bold text-slate-500 mt-1">{summary.cancelled}</p>
           </div>
         </Card>
@@ -153,12 +153,12 @@ export function CustomerCasesTab({ customerId, companyId }: CustomerCasesTabProp
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100">
-                  <th className="text-left pb-3 font-medium text-slate-600">Case #</th>
-                  <th className="text-left pb-3 font-medium text-slate-600">Title</th>
-                  <th className="text-left pb-3 font-medium text-slate-600">Priority</th>
-                  <th className="text-left pb-3 font-medium text-slate-600">Status</th>
-                  <th className="text-left pb-3 font-medium text-slate-600">Created</th>
-                  <th className="text-right pb-3 font-medium text-slate-600"></th>
+                  <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Case #</th>
+                  <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Title</th>
+                  <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Priority</th>
+                  <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
+                  <th className="text-left pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Created</th>
+                  <th className="text-right pb-3 text-xs font-semibold text-slate-600 uppercase tracking-wider"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">

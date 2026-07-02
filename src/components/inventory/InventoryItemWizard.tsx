@@ -101,7 +101,7 @@ const EMPTY_FORM: InventoryForm = {
   location_id: '',
 };
 
-const SECTION_HEAD = 'text-xs font-bold uppercase tracking-wide text-primary mb-3';
+const SECTION_HEAD = 'text-xs font-bold uppercase tracking-wider text-primary mb-3';
 
 // Identity fields shown in inventory (device_type_id is rendered specially above).
 // Module-level: BASIC_FIELDS is a static constant, so this never needs recomputing per render.

@@ -177,7 +177,7 @@ export function InventoryAdvancedSearch({ values, onChange, deviceTypes, locatio
             <div className="px-4 pt-4 pb-3 border-b border-slate-200 bg-white">
               <div className="flex items-center gap-2 mb-2">
                 <Star className="w-3.5 h-3.5 text-warning" aria-hidden="true" />
-                <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
                   Saved Searches
                 </span>
               </div>

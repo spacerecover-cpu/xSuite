@@ -458,13 +458,13 @@ const PlanFeaturesTab: React.FC<{
           <table className="w-full">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="text-left text-xs font-medium text-slate-500 uppercase px-6 py-3">Feature</th>
-                <th className="text-left text-xs font-medium text-slate-500 uppercase px-6 py-3">Key</th>
-                <th className="text-center text-xs font-medium text-slate-500 uppercase px-6 py-3">Enabled</th>
-                <th className="text-center text-xs font-medium text-slate-500 uppercase px-6 py-3">Highlighted</th>
-                <th className="text-left text-xs font-medium text-slate-500 uppercase px-6 py-3">Limit</th>
-                <th className="text-center text-xs font-medium text-slate-500 uppercase px-6 py-3">Order</th>
-                <th className="text-right text-xs font-medium text-slate-500 uppercase px-6 py-3">Actions</th>
+                <th className="text-left text-xs font-semibold text-slate-600 uppercase tracking-wider px-6 py-3">Feature</th>
+                <th className="text-left text-xs font-semibold text-slate-600 uppercase tracking-wider px-6 py-3">Key</th>
+                <th className="text-center text-xs font-semibold text-slate-600 uppercase tracking-wider px-6 py-3">Enabled</th>
+                <th className="text-center text-xs font-semibold text-slate-600 uppercase tracking-wider px-6 py-3">Highlighted</th>
+                <th className="text-left text-xs font-semibold text-slate-600 uppercase tracking-wider px-6 py-3">Limit</th>
+                <th className="text-center text-xs font-semibold text-slate-600 uppercase tracking-wider px-6 py-3">Order</th>
+                <th className="text-right text-xs font-semibold text-slate-600 uppercase tracking-wider px-6 py-3">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">

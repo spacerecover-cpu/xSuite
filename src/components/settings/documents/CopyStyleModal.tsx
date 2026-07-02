@@ -63,7 +63,7 @@ export const CopyStyleModal: React.FC<CopyStyleModalProps> = ({
         </p>
 
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Apply to</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Apply to</span>
           <button
             type="button"
             onClick={toggleAll}
@@ -79,7 +79,7 @@ export const CopyStyleModal: React.FC<CopyStyleModalProps> = ({
             if (!rows.length) return null;
             return (
               <div key={cat.id}>
-                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">{cat.label}</p>
+                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">{cat.label}</p>
                 <div className="space-y-1.5">
                   {rows.map((d) => {
                     const on = selected.has(d.type);

@@ -48,7 +48,7 @@ export const DuplicateCaseConfirmationModal: React.FC<DuplicateCaseConfirmationM
 
       {/* Prominent preview of the job number the new case will be assigned. */}
       <div className="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-4 text-center">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">New Job Number</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">New Job Number</p>
         {isGeneratingNumber ? (
           <span className="mt-1.5 inline-flex items-center gap-2 text-sm text-slate-500">
             <Loader2 className="h-4 w-4 animate-spin" />

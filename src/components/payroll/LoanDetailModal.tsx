@@ -290,16 +290,16 @@ export const LoanDetailModal: React.FC<LoanDetailModalProps> = ({
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                     #
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                     Due Date
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">
                     Amount
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">
                     Status
                   </th>
                 </tr>

@@ -83,7 +83,7 @@ export const PortalPurchasesPage: React.FC = () => {
               <ShoppingBag className="w-5 h-5 text-info" aria-hidden="true" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">{t('portal.purchases.totalOrders')}</p>
+              <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">{t('portal.purchases.totalOrders')}</p>
               <p className="text-2xl font-bold text-slate-900">{purchases?.length ?? 0}</p>
             </div>
           </div>
@@ -94,7 +94,7 @@ export const PortalPurchasesPage: React.FC = () => {
               <DollarSign className="w-5 h-5 text-warning" aria-hidden="true" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">{t('portal.purchases.totalSpent')}</p>
+              <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">{t('portal.purchases.totalSpent')}</p>
               <p className="text-2xl font-bold text-slate-900">{formatCurrency(totalSpent)}</p>
             </div>
           </div>

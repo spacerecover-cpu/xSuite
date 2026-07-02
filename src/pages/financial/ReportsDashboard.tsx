@@ -896,10 +896,10 @@ export const ReportsDashboard: React.FC = () => {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-slate-200">
-                            <th className="text-left py-2 font-medium text-slate-600">Month</th>
-                            <th className="text-right py-2 font-medium text-slate-600">Revenue</th>
-                            <th className="text-right py-2 font-medium text-slate-600">Expense</th>
-                            <th className="text-right py-2 font-medium text-slate-600">Net</th>
+                            <th className="text-left py-2 text-xs font-semibold text-slate-600 uppercase tracking-wider">Month</th>
+                            <th className="text-right py-2 text-xs font-semibold text-slate-600 uppercase tracking-wider">Revenue</th>
+                            <th className="text-right py-2 text-xs font-semibold text-slate-600 uppercase tracking-wider">Expense</th>
+                            <th className="text-right py-2 text-xs font-semibold text-slate-600 uppercase tracking-wider">Net</th>
                           </tr>
                         </thead>
                         <tbody>

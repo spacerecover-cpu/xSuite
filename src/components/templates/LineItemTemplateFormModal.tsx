@@ -347,7 +347,7 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
 
                 {showPreview && (
                   <div className="mt-2 border border-slate-200 rounded-lg bg-slate-50 p-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
                       Preview with sample data
                     </p>
                     {isEmailType && formData.subject_line && (

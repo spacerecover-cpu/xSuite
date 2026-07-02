@@ -342,14 +342,14 @@ const NotificationDLQ: React.FC = () => {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-3 py-3 text-left font-medium text-slate-600 w-6"></th>
-                <th className="px-3 py-3 text-left font-medium text-slate-600">Occurred</th>
-                <th className="px-3 py-3 text-left font-medium text-slate-600">Event type</th>
-                <th className="px-3 py-3 text-left font-medium text-slate-600">Entity</th>
-                <th className="px-3 py-3 text-left font-medium text-slate-600">Payload</th>
-                <th className="px-3 py-3 text-left font-medium text-slate-600">Last error</th>
-                <th className="px-3 py-3 text-left font-medium text-slate-600">Attempts</th>
-                <th className="px-3 py-3 text-left font-medium text-slate-600">Status</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-6"></th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Occurred</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Event type</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Entity</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Payload</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Last error</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Attempts</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
                 <th className="px-3 py-3 text-right font-medium text-slate-600">Actions</th>
               </tr>
             </thead>
@@ -542,12 +542,12 @@ const NotificationDLQ: React.FC = () => {
                   <table className="w-full text-xs">
                     <thead className="bg-slate-50 border-b border-slate-200">
                       <tr>
-                        <th className="px-3 py-2 text-left font-medium text-slate-600">Channel</th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-600">Status</th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-600">Recipient</th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-600">Retries</th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-600">Error</th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-600">Created</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Channel</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Recipient</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Retries</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Error</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Created</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">

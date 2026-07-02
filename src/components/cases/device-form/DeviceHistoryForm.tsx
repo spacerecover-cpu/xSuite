@@ -84,7 +84,7 @@ function AdditionalDetails({ metadata }: { metadata: unknown }) {
         <dl className="space-y-2">
           {entries.map(([k, v]) => (
             <div key={k}>
-              <dt className="text-[11px] uppercase tracking-wide text-slate-400">{k.replace(/_/g, ' ')}</dt>
+              <dt className="text-[11px] uppercase tracking-wider text-slate-400">{k.replace(/_/g, ' ')}</dt>
               <dd className="text-sm text-slate-700 break-words">{String(v)}</dd>
             </div>
           ))}
@@ -92,7 +92,7 @@ function AdditionalDetails({ metadata }: { metadata: unknown }) {
       )}
       {attachments.length > 0 && (
         <div className="mt-3">
-          <dt className="text-[11px] uppercase tracking-wide text-slate-400 mb-1">
+          <dt className="text-[11px] uppercase tracking-wider text-slate-400 mb-1">
             {t('devices.history.attachments', { defaultValue: 'Attachments' })}
           </dt>
           <div className="flex flex-wrap gap-2">

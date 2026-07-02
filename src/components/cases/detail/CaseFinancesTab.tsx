@@ -156,22 +156,22 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
           {caseFinancialSummary && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-3">
               <div className="bg-success-muted rounded-lg p-3 border border-success/20">
-                <p className="text-[10px] font-semibold text-success uppercase tracking-wide">Quoted</p>
+                <p className="text-[10px] font-semibold text-success uppercase tracking-wider">Quoted</p>
                 <p className="text-lg font-bold text-success mt-0.5 truncate tabular-nums">{formatCurrency(caseFinancialSummary.totalQuoted)}</p>
                 <p className="text-[11px] text-success/80 mt-0.5">{caseFinancialSummary.quotesCount} {caseFinancialSummary.quotesCount === 1 ? 'quote' : 'quotes'}</p>
               </div>
               <div className="bg-info-muted rounded-lg p-3 border border-info/20">
-                <p className="text-[10px] font-semibold text-info uppercase tracking-wide">Invoiced</p>
+                <p className="text-[10px] font-semibold text-info uppercase tracking-wider">Invoiced</p>
                 <p className="text-lg font-bold text-info mt-0.5 truncate tabular-nums">{formatCurrency(caseFinancialSummary.totalInvoiced)}</p>
                 <p className="text-[11px] text-info/80 mt-0.5">{caseFinancialSummary.invoicesCount} {caseFinancialSummary.invoicesCount === 1 ? 'invoice' : 'invoices'}</p>
               </div>
               <div className="bg-success/10 rounded-lg p-3 border border-success/25">
-                <p className="text-[10px] font-semibold text-success uppercase tracking-wide">Received</p>
+                <p className="text-[10px] font-semibold text-success uppercase tracking-wider">Received</p>
                 <p className="text-lg font-bold text-success mt-0.5 truncate tabular-nums">{formatCurrency(caseFinancialSummary.totalPaid)}</p>
                 <p className="text-[11px] text-success/80 mt-0.5">{collectedPct}% collected</p>
               </div>
               <div className={`rounded-lg p-3 border ${fullyCollected ? 'bg-success-muted border-success/20' : 'bg-warning-muted border-warning/20'}`}>
-                <p className={`text-[10px] font-semibold uppercase tracking-wide ${fullyCollected ? 'text-success' : 'text-warning'}`}>Outstanding</p>
+                <p className={`text-[10px] font-semibold uppercase tracking-wider ${fullyCollected ? 'text-success' : 'text-warning'}`}>Outstanding</p>
                 <p className={`text-lg font-bold mt-0.5 truncate tabular-nums ${fullyCollected ? 'text-success' : 'text-warning'}`}>{formatCurrency(outstanding)}</p>
                 <p className={`text-[11px] mt-0.5 ${fullyCollected ? 'text-success/80' : 'text-warning/80'}`}>
                   {fullyCollected ? 'Fully collected' : `${invoicesDue} ${invoicesDue === 1 ? 'invoice' : 'invoices'} due`}
@@ -205,7 +205,7 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             {/* Quotes */}
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 flex items-center gap-1.5 mb-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 mb-2">
                 <FileText className="w-3.5 h-3.5 text-success" />
                 Quotes
                 <CountPill value={quotes.length} />
@@ -277,7 +277,7 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
 
             {/* Invoices */}
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 flex items-center gap-1.5 mb-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 mb-2">
                 <FileText className="w-3.5 h-3.5 text-primary" />
                 Invoices
                 <CountPill value={invoices.length} />
@@ -436,7 +436,7 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
           {/* Payment history — folded into the same card as a compact chip grid */}
           {payments.length > 0 && (
             <div className="mt-4 pt-4 border-t border-dashed border-slate-200">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 flex items-center gap-1.5 mb-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 mb-2">
                 <Wallet className="w-3.5 h-3.5 text-success" />
                 Payment History
                 <CountPill value={payments.length} />
@@ -468,7 +468,7 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
       {isOwnerAdmin && expenses.length > 0 && (
         <Card>
           <div className="p-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 flex items-center gap-1.5 mb-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 mb-3">
               <Receipt className="w-3.5 h-3.5 text-warning" />
               Case Expenses
               <CountPill value={expenses.length} />

@@ -81,7 +81,7 @@ export const PendingApprovalScreen: React.FC = () => {
                   <Mail className="w-5 h-5 text-slate-500" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                  <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider tracking-wide">
                     Registered Email
                   </p>
                   <p className="text-sm font-medium text-slate-900 truncate">

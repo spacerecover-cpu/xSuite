@@ -342,7 +342,7 @@ export const EmployeeOnboardingPage: React.FC = () => {
           <div key={card.label} className={`${card.bg} rounded-xl p-4 border ${card.border}`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className={`text-xs font-medium ${card.text} uppercase tracking-wide`}>{card.label}</p>
+                <p className={`text-xs font-medium ${card.text} uppercase tracking-wider`}>{card.label}</p>
                 <p className={`text-2xl font-bold ${card.num} mt-1`}>{card.value}</p>
               </div>
               <div className={`w-10 h-10 ${card.icon_bg} rounded-lg flex items-center justify-center`}>

@@ -254,7 +254,7 @@ export const KBCenterPage: React.FC = () => {
         <div className="w-56 flex-shrink-0 border-r border-slate-200 bg-white min-h-[calc(100vh-200px)] p-4">
           <div className="flex items-center gap-2 mb-3">
             <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Categories</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Categories</span>
           </div>
           <div className="space-y-0.5">
             <button

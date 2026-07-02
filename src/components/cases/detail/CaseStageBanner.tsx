@@ -122,7 +122,7 @@ export function CaseStageBanner({
     <div className="rounded-lg border border-border bg-surface p-4">
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          <span className="text-xs font-medium uppercase tracking-wider text-slate-500">
             Current Stage
           </span>
           <span className="text-lg font-semibold text-slate-900">

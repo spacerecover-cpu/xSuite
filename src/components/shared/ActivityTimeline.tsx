@@ -39,7 +39,7 @@ function DetailsBlock({ details }: { details: string | null }) {
     <dl className="grid grid-cols-[minmax(0,40%)_1fr] gap-x-3 gap-y-0.5">
       {entries.map(([key, value]) => (
         <React.Fragment key={key}>
-          <dt className="text-xs uppercase tracking-wide text-slate-400">{key.replace(/_/g, ' ')}</dt>
+          <dt className="text-xs uppercase tracking-wider text-slate-400">{key.replace(/_/g, ' ')}</dt>
           <dd className="text-xs text-slate-600 break-words">{String(value)}</dd>
         </React.Fragment>
       ))}
