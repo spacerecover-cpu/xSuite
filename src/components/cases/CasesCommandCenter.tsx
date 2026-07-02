@@ -160,11 +160,12 @@ export const CasesCommandCenter: React.FC<CasesCommandCenterProps> = ({
 
       {cardStyle === 'vivid' ? (
         <div
-          className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-6"
+          className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6"
           role="group"
           aria-label="Filter cases by lifecycle stage"
         >
           <GradientStatCard
+            size="sm"
             tone="primary"
             icon={FilePlus2}
             label="New"
@@ -175,6 +176,7 @@ export const CasesCommandCenter: React.FC<CasesCommandCenterProps> = ({
             className={cn(activeBucket === 'new' && activeRing)}
           />
           <GradientStatCard
+            size="sm"
             tone="info"
             icon={Briefcase}
             label="Active"
@@ -184,6 +186,7 @@ export const CasesCommandCenter: React.FC<CasesCommandCenterProps> = ({
             onClick={() => onBucketChange(null)}
           />
           <GradientStatCard
+            size="sm"
             tone="danger"
             icon={AlertCircle}
             label="Urgent"
@@ -193,6 +196,7 @@ export const CasesCommandCenter: React.FC<CasesCommandCenterProps> = ({
             onClick={onUrgentFilter}
           />
           <GradientStatCard
+            size="sm"
             tone="warning"
             icon={Microscope}
             label="In Diagnosis"
@@ -203,6 +207,7 @@ export const CasesCommandCenter: React.FC<CasesCommandCenterProps> = ({
             className={cn(activeBucket === 'diagnosis' && activeRing)}
           />
           <GradientStatCard
+            size="sm"
             tone="success"
             icon={CheckCircle2}
             label="Ready"
@@ -213,6 +218,7 @@ export const CasesCommandCenter: React.FC<CasesCommandCenterProps> = ({
             className={cn(activeBucket === 'ready' && activeRing)}
           />
           <GradientStatCard
+            size="sm"
             tone="cat-2"
             icon={PackageCheck}
             label="Delivered"
