@@ -11,6 +11,7 @@ import {
   Info,
 } from 'lucide-react';
 import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
+import { TenantCurrenciesSection } from './CurrencySettings';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -406,6 +407,12 @@ export const LocalizationCenter: React.FC = () => {
                   <div className="mt-1 font-mono text-lg text-slate-900" dir="auto">{tokenPreview}</div>
                 </div>
               </div>
+            </SectionCard>
+            <SectionCard
+              title="Transaction currencies"
+              description="The currencies you can invoice in. The base currency comes from your country; add others to enable multi-currency documents."
+            >
+              <TenantCurrenciesSection />
             </SectionCard>
           </>
         )}
