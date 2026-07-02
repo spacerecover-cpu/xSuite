@@ -18,7 +18,15 @@ import {
 export function useStatCardStyle(): StatCardStyle {
   const { data } = useQuery({
     queryKey: settingsKeys.statCardStyle(),
-    queryFn: async () => (await getTenantStatCardStyle()) ?? null,
+    // Resilient: StatCard renders on surfaces without tenant settings
+    // (platform admin) — fall back to the default instead of erroring.
+    queryFn: async () => {
+      try {
+        return (await getTenantStatCardStyle()) ?? null;
+      } catch {
+        return null;
+      }
+    },
     initialData: () => readStatCardStyleHint() ?? null,
     initialDataUpdatedAt: 0,
     staleTime: 5 * 60 * 1000,
