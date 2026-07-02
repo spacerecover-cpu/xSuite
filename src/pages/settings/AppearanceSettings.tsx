@@ -1,12 +1,20 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Check, Loader2, Languages } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChevronLeft, Check, Loader2, Languages, LayoutGrid } from 'lucide-react';
 import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLocale } from '../../contexts/LocaleContext';
 import { useToast } from '../../hooks/useToast';
 import type { Theme } from '../../types/tenantConfig';
 import { THEMES } from '../../types/tenantConfig';
+import { settingsKeys } from '../../lib/queryKeys';
+import {
+  DEFAULT_STAT_CARD_STYLE,
+  getTenantStatCardStyle,
+  setTenantStatCardStyle,
+  type StatCardStyle,
+} from '../../lib/statCardStyleService';
 
 interface ThemeOption {
   id: Theme;
@@ -71,6 +79,31 @@ export const AppearanceSettings: React.FC = () => {
     }
   };
 
+  const queryClient = useQueryClient();
+  const { data: statCardStyle } = useQuery({
+    queryKey: settingsKeys.statCardStyle(),
+    queryFn: async () => (await getTenantStatCardStyle()) ?? null,
+  });
+  const effectiveCardStyle = statCardStyle ?? DEFAULT_STAT_CARD_STYLE;
+  const [pendingCardStyle, setPendingCardStyle] = useState<StatCardStyle | null>(null);
+
+  const handleSelectCardStyle = async (next: StatCardStyle) => {
+    if (next === effectiveCardStyle || pendingCardStyle !== null) return;
+    const previous = statCardStyle ?? null;
+    setPendingCardStyle(next);
+    queryClient.setQueryData(settingsKeys.statCardStyle(), next);
+    try {
+      await setTenantStatCardStyle(next);
+      toast.success(next === 'vivid' ? 'Stat cards set to Vivid tiles' : 'Stat cards set to Compact chips');
+    } catch (error) {
+      queryClient.setQueryData(settingsKeys.statCardStyle(), previous);
+      toast.error((error as Error).message || 'Failed to update stat card style');
+    } finally {
+      setPendingCardStyle(null);
+      queryClient.invalidateQueries({ queryKey: settingsKeys.statCardStyle() });
+    }
+  };
+
   const handleSelectLang = async (next: 'en' | 'ar') => {
     if (next === locale || isUpdatingLang) return;
     setPendingLang(next);
@@ -87,7 +120,7 @@ export const AppearanceSettings: React.FC = () => {
   if (!THEMES.length) return null;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen p-6">
       <SettingsPageHeader categoryId="appearance" />
       <div className="mb-6">
         <button
@@ -260,9 +293,107 @@ export const AppearanceSettings: React.FC = () => {
         </div>
       </div>
 
+      <div className="mt-10">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary shadow-md">
+            <LayoutGrid className="w-5 h-5 text-primary-foreground" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 mb-0.5">Stat cards</h2>
+            <p className="text-slate-600 text-sm">
+              How KPI cards look on the Cases page — calm compact chips, or the classic vivid
+              tiles. Both show the same live numbers and filter the list on click.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+          {(
+            [
+              { id: 'compact' as StatCardStyle, name: 'Compact', note: 'Quiet white chips — easiest on the eyes for all-day use.' },
+              { id: 'vivid' as StatCardStyle, name: 'Vivid', note: 'Bold gradient tiles — the classic colorful dashboard look.' },
+            ]
+          ).map((option) => {
+            const isActive = effectiveCardStyle === option.id;
+            const isPending = pendingCardStyle === option.id;
+            const isDisabled = pendingCardStyle !== null && !isPending;
+
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => handleSelectCardStyle(option.id)}
+                disabled={isDisabled || isPending}
+                aria-pressed={isActive}
+                className={[
+                  'group relative text-left rounded-xl border-2 bg-white p-5 transition-all',
+                  isActive ? 'border-primary shadow-md' : 'border-slate-200 hover:border-slate-300 hover:shadow-sm',
+                  isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+                ].join(' ')}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="font-semibold text-slate-900">{option.name}</span>
+                  <span
+                    className={[
+                      'w-6 h-6 rounded-full flex items-center justify-center transition-all',
+                      isActive
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-slate-100 text-transparent group-hover:bg-slate-200',
+                    ].join(' ')}
+                    aria-hidden="true"
+                  >
+                    {isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" />
+                    ) : isActive ? (
+                      <Check className="w-3.5 h-3.5" />
+                    ) : null}
+                  </span>
+                </div>
+
+                {option.id === 'compact' ? (
+                  <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 border border-slate-100 p-3">
+                    <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5">
+                      <span className="flex items-center gap-1.5 text-xxs font-medium text-slate-500">
+                        <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden="true" />
+                        In diagnosis
+                      </span>
+                      <span className="block text-sm font-bold tabular-nums text-warning">31</span>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5">
+                      <span className="flex items-center gap-1.5 text-xxs font-medium text-slate-500">
+                        <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden="true" />
+                        Ready
+                      </span>
+                      <span className="block text-sm font-bold tabular-nums text-success">5</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 border border-slate-100 p-3">
+                    <div className="rounded-lg bg-gradient-to-br from-warning to-warning/85 px-2.5 py-1.5 text-slate-900">
+                      <span className="block text-xxs font-semibold uppercase tracking-wider text-slate-900/80">
+                        In Diagnosis
+                      </span>
+                      <span className="block text-sm font-bold tabular-nums">31</span>
+                    </div>
+                    <div className="rounded-lg bg-gradient-to-br from-success to-success/85 px-2.5 py-1.5 text-white">
+                      <span className="block text-xxs font-semibold uppercase tracking-wider text-white/90">
+                        Ready
+                      </span>
+                      <span className="block text-sm font-bold tabular-nums">5</span>
+                    </div>
+                  </div>
+                )}
+
+                <p className="mt-3 text-xs text-slate-600 leading-relaxed">{option.note}</p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <p className="mt-8 text-xs text-slate-500">
-        Theme and language are set per workspace and apply to every user. PDF documents stay
-        in a neutral color scheme regardless of theme.
+        Theme, language, and stat cards are set per workspace and apply to every user. PDF
+        documents stay in a neutral color scheme regardless of theme.
       </p>
     </div>
   );

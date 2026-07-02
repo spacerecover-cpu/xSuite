@@ -105,7 +105,7 @@ export const ClientsList: React.FC = () => {
   ];
 
   return (
-    <div>
+    <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Clients</h1>

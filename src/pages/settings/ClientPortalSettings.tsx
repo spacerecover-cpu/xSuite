@@ -223,7 +223,7 @@ export const ClientPortalSettings: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="p-6 space-y-6">
         <div className="flex items-center gap-4">
           <Skeleton className="w-12 h-12 rounded-xl" />
           <div className="space-y-2">
@@ -239,7 +239,7 @@ export const ClientPortalSettings: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <SettingsPageHeader categoryId="client-portal" />
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" onClick={() => navigate('/settings')}>

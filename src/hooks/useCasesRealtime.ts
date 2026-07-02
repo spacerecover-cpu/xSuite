@@ -3,9 +3,21 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase, getTenantId } from '../lib/supabaseClient';
 import { logger } from '../lib/logger';
 
-export const useCasesRealtime = () => {
+interface UseCasesRealtimeOptions {
+  /**
+   * When provided, list-level changes call this instead of invalidating the
+   * ['cases'] queries — the page shows a "N updates — refresh" pill rather
+   * than reordering rows under a reading operator. Per-case detail keys are
+   * still invalidated either way.
+   */
+  onListChange?: () => void;
+}
+
+export const useCasesRealtime = (options?: UseCasesRealtimeOptions) => {
   const queryClient = useQueryClient();
   const debounceTimers = useRef<{ [key: string]: NodeJS.Timeout }>({});
+  const onListChangeRef = useRef(options?.onListChange);
+  onListChangeRef.current = options?.onListChange;
 
   useEffect(() => {
     // Scope the subscription to the current tenant so Postgres pre-filters before
@@ -50,7 +62,11 @@ export const useCasesRealtime = () => {
             debouncedInvalidate(['case', payload.old.id], 300);
           }
 
-          debouncedInvalidate(['cases'], 800);
+          if (onListChangeRef.current) {
+            onListChangeRef.current();
+          } else {
+            debouncedInvalidate(['cases'], 800);
+          }
         }
       )
       .on(

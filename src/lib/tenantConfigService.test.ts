@@ -71,6 +71,25 @@ describe('resolveTenantConfigFromLayers — engine path (fail-loud, no US litera
     expect(() => resolveTenantConfigFromLayers(baseRow, layers)).toThrow(CountryConfigError);
   });
 
+  it('falls back to the embedded geo_countries row for country name/code when the snapshot lacks country.* keys', () => {
+    const layers = buildConfigLayers(
+      {
+        resolved_country_config: {
+          'currency.code': 'OMR', 'tax.label': 'VAT', 'tax.default_rate': 5,
+          'number_format.amount_in_words_minor_units': 3, 'locale.code': 'ar-OM',
+          'datetime.date_format': 'dd/MM/yyyy', 'datetime.timezone': 'Asia/Muscat',
+        },
+        country_config_overrides: {},
+      },
+    );
+    const cfg = resolveTenantConfigFromLayers(
+      { ...baseRow, country: { code: 'OM', name: 'Oman' } },
+      layers,
+    );
+    expect(cfg.countryCode).toBe('OM');
+    expect(cfg.countryName).toBe('Oman');
+  });
+
   it('defaults currency display preferences to symbol/minus when no layer sets them', () => {
     const layers = buildConfigLayers(
       {

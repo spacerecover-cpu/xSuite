@@ -118,7 +118,7 @@ export const GDPRCompliancePage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="p-6 max-w-5xl mx-auto space-y-6">
       <SettingsPageHeader categoryId="gdpr" />
       <div className="flex justify-end">
         <button

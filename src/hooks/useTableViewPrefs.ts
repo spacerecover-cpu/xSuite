@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getTenantTableColumns,
@@ -34,9 +34,19 @@ export function useTableViewPrefs(tableKey: string, registry: RegistryMeta[]) {
   const { data: userPrefs } = useQuery({
     queryKey: ['table_columns', 'user', tableKey],
     queryFn: async () => (await getUserTablePrefs(tableKey)) ?? null,
+    // Hint paints instantly; initialDataUpdatedAt: 0 marks it stale so the
+    // server truth still loads right away (a stale hint otherwise survives
+    // 60s per mount — e.g. after tenant defaults change server-side).
     initialData: () => readTablePrefsHint(tableKey) ?? null,
+    initialDataUpdatedAt: 0,
     staleTime: 60 * 1000,
   });
+
+  // Keep the hint in lockstep with the server truth, including clearing it
+  // when the user's override was removed server-side.
+  useEffect(() => {
+    if (userPrefs !== undefined) writeTablePrefsHint(tableKey, userPrefs ?? {});
+  }, [tableKey, userPrefs]);
 
   const view: ResolvedTableView = useMemo(
     () => resolveTableView(registry, tenantConfig, userPrefs ?? undefined),

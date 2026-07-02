@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Plus, Star } from 'lucide-react';
-import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTenantConfig } from '../../contexts/TenantConfigContext';
 import { useToast } from '../../hooks/useToast';
@@ -12,7 +12,12 @@ import {
   type TenantCurrencyRow,
 } from '../../lib/tenantCurrencyService';
 
-export function CurrencySettings() {
+/**
+ * Transaction-currency management (the tenant's invoicing currency set).
+ * Lives inside Localization Center → Currency so the platform has ONE
+ * currency home; the old standalone /settings/currencies route redirects.
+ */
+export function TenantCurrenciesSection() {
   const { profile } = useAuth();
   const { refreshConfig } = useTenantConfig();
   const isAdmin = profile?.role === 'owner' || profile?.role === 'admin';
@@ -64,12 +69,10 @@ export function CurrencySettings() {
     }
   };
 
-  if (loading) return <div className="p-6 text-surface-muted">Loading…</div>;
+  if (loading) return <div className="py-4 text-surface-muted">Loading…</div>;
 
   return (
-    <div className="p-6 space-y-6">
-      <SettingsPageHeader categoryId="currencies" />
-
+    <div className="space-y-4">
       <div className="rounded-lg border border-border divide-y divide-border">
         {rows.map((row) => (
           <div key={row.id} className="flex items-center justify-between px-4 py-3">
@@ -102,6 +105,7 @@ export function CurrencySettings() {
             value={selected}
             onChange={(e) => setSelected(e.target.value)}
             className="rounded border border-border bg-surface px-3 py-2 text-sm"
+            aria-label="Currency to add"
           >
             {addable.map((c) => (
               <option key={c.code} value={c.code}>
@@ -119,4 +123,9 @@ export function CurrencySettings() {
       )}
     </div>
   );
+}
+
+/** Legacy route: currency management merged into Localization Center → Currency. */
+export function CurrencySettings() {
+  return <Navigate to="/settings/localization?tab=currency" replace />;
 }

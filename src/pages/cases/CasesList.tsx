@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
@@ -7,7 +7,6 @@ import { buildCaseSearchOr } from '../../lib/caseSearch';
 import { Button } from '../../components/ui/Button';
 import { Plus, Search, Filter, Briefcase, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Archive, Download } from 'lucide-react';
 import { EmptyState } from '../../components/shared/EmptyState';
-import { ExportButton } from '../../components/shared/ExportButton';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { downloadCSV } from '../../lib/csvExport';
@@ -18,6 +17,12 @@ import type { CaseListRow } from '../../lib/tables/casesColumns';
 import { useTableViewPrefs } from '../../hooks/useTableViewPrefs';
 import { useListPageSize } from '../../hooks/useListPageSize';
 import { useListSelectionEnabled } from '../../hooks/useListSelectionEnabled';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
+import { statusNamesForBucket, type CaseBucket, type CaseStatusType } from '../../lib/caseLifecycle';
+import { pageWindow } from '../../lib/pagination';
+import { useStatCardStyle } from '../../hooks/useStatCardStyle';
+import { CaseViewsMenu } from '../../components/cases/CaseViewsMenu';
+import { CasePeekPanel } from '../../components/cases/CasePeekPanel';
 import { CreateCaseWizard } from '../../components/cases/CreateCaseWizard';
 import { useCasesRealtime } from '../../hooks/useCasesRealtime';
 import { useAuth } from '../../contexts/AuthContext';
@@ -50,6 +55,10 @@ interface Case {
     id: string;
     full_name: string;
   } | null;
+  engineer_profile: {
+    id: string;
+    full_name: string;
+  } | null;
   devices: {
     id: string;
     serial_no: string | null;
@@ -74,6 +83,33 @@ type ExportDevice = {
 };
 const exportPrimaryDevice = (r: Record<string, unknown>) =>
   pickPrimaryDevice((r.case_devices as ExportDevice[] | null) ?? undefined);
+
+// Quick-chip tinting by lifecycle type — the same colour language as the
+// bucket cards, resolved through the tenant's status mapping so any imported
+// vocabulary tints correctly. Literal classes for JIT safety; cat-2 actives
+// use a ring+tint (teal-600 solid fails AA under white 14px text).
+const CHIP_STYLE: Partial<Record<CaseStatusType, { idle: string; active: string }>> = {
+  intake: { idle: 'bg-primary/10 text-primary hover:bg-primary/20', active: 'bg-primary text-primary-foreground shadow-md' },
+  diagnosis: { idle: 'bg-warning-muted text-warning hover:bg-warning/20', active: 'bg-warning text-warning-foreground shadow-md' },
+  quoting: { idle: 'bg-cat-6/10 text-cat-6 hover:bg-cat-6/20', active: 'bg-cat-6 text-white shadow-md' },
+  awaiting_approval: { idle: 'bg-cat-6/10 text-cat-6 hover:bg-cat-6/20', active: 'bg-cat-6 text-white shadow-md' },
+  approved: { idle: 'bg-cat-2/10 text-cat-2 hover:bg-cat-2/20', active: 'bg-cat-2/20 text-cat-2 ring-2 ring-cat-2' },
+  recovery: { idle: 'bg-cat-2/10 text-cat-2 hover:bg-cat-2/20', active: 'bg-cat-2/20 text-cat-2 ring-2 ring-cat-2' },
+  qa: { idle: 'bg-cat-2/10 text-cat-2 hover:bg-cat-2/20', active: 'bg-cat-2/20 text-cat-2 ring-2 ring-cat-2' },
+  ready: { idle: 'bg-success-muted text-success hover:bg-success/20', active: 'bg-success text-success-foreground shadow-md' },
+  completed: { idle: 'bg-success-muted text-success hover:bg-success/20', active: 'bg-success text-success-foreground shadow-md' },
+  delivered: { idle: 'bg-success-muted text-success hover:bg-success/20', active: 'bg-success text-success-foreground shadow-md' },
+  cancelled: { idle: 'bg-danger-muted text-danger hover:bg-danger/20', active: 'bg-danger text-danger-foreground shadow-md' },
+};
+const DEFAULT_CHIP_STYLE = {
+  idle: 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+  active: 'bg-primary text-primary-foreground shadow-md',
+};
+
+function statusChipClasses(type: CaseStatusType | undefined, active: boolean): string {
+  const style = (type && CHIP_STYLE[type]) || DEFAULT_CHIP_STYLE;
+  return active ? style.active : style.idle;
+}
 
 export const CasesList: React.FC = () => {
   const navigate = useNavigate();
@@ -106,19 +142,78 @@ export const CasesList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const casesPerPage = useListPageSize();
   const selectionEnabled = useListSelectionEnabled();
+  const statCardStyle = useStatCardStyle();
+  const [bucketFilter, setBucketFilter] = useState<CaseBucket | null>(null);
+  const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' }>({
+    key: 'created_at',
+    dir: 'desc',
+  });
 
   const queryClient = useQueryClient();
-  useCasesRealtime();
+
+  // Live changes accumulate into a refresh pill instead of reordering the
+  // table under a reading operator.
+  const [pendingChanges, setPendingChanges] = useState(0);
+  useCasesRealtime({ onListChange: () => setPendingChanges((n) => n + 1) });
+
+  const applyPendingChanges = () => {
+    setPendingChanges(0);
+    queryClient.invalidateQueries({ queryKey: ['cases'] });
+    queryClient.invalidateQueries({ queryKey: ['cases_count'] });
+    queryClient.invalidateQueries({ queryKey: [CASE_COMMAND_STATS_KEY] });
+  };
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterStatus, filterPriority, casesPerPage]);
+  }, [searchTerm, filterStatus, filterPriority, casesPerPage, bucketFilter, sort]);
 
   // Hiding checkboxes (tenant preference) drops any in-flight selection so
   // bulk actions can't act on rows the user can no longer see or unselect.
   useEffect(() => {
     if (!selectionEnabled) selection.clear();
   }, [selectionEnabled, selection.clear]);
+
+  // Status chip/select and bucket cards are mutually exclusive filters.
+  useEffect(() => {
+    if (filterStatus !== 'all') setBucketFilter(null);
+  }, [filterStatus]);
+
+  const { data: caseStatuses = [] } = useQuery({
+    queryKey: ['case_statuses'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('master_case_statuses')
+        .select('id, name, type, color')
+        .eq('is_active', true)
+        .order('sort_order');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Command-center data: one status-counts RPC classified via master types +
+  // tenant overrides (truthful buckets) plus period flow metrics — see
+  // useCaseCommandStats.
+  const { data: commandStats, isLoading: statsLoading } = useCaseCommandStats(period, caseStatuses);
+
+  // Status names behind the active bucket card — drives the .in() filter.
+  const bucketStatusNames = useMemo(
+    () =>
+      bucketFilter && commandStats
+        ? statusNamesForBucket(bucketFilter, commandStats.statusCounts, commandStats.statusTypeMap)
+        : null,
+    [bucketFilter, commandStats],
+  );
+
+  // Data-driven quick chips: the tenant's real vocabulary, busiest first.
+  const statusesByCount = useMemo(
+    () =>
+      [...(commandStats?.statusCounts ?? [])]
+        .filter((s): s is { status: string; total: number } => s.status !== null)
+        .sort((a, b) => b.total - a.total),
+    [commandStats],
+  );
+  const topStatusChips = statusesByCount.slice(0, 4);
 
   // Search spans case_no / client_reference / subject plus customer (name, email, mobile,
   // number) and device serials — the latter two pre-resolved to ids (see caseSearch.ts).
@@ -143,11 +238,16 @@ export const CasesList: React.FC = () => {
       query = query.eq('priority', filterPriority);
     }
 
+    if (bucketStatusNames) {
+      // Empty bucket → match nothing rather than everything.
+      query = query.in('status', bucketStatusNames.length > 0 ? bucketStatusNames : ['__none__']);
+    }
+
     return query;
   };
 
   const { data: totalCountData } = useQuery({
-    queryKey: ['cases_count', searchTerm, filterStatus, filterPriority],
+    queryKey: ['cases_count', searchTerm, filterStatus, filterPriority, bucketFilter, bucketStatusNames?.join('|') ?? ''],
     queryFn: async () => {
       const query = buildFiltersQuery(await resolveSearchOr());
       const { count, error } = await query;
@@ -157,7 +257,7 @@ export const CasesList: React.FC = () => {
   });
 
   const { data: cases = [], isLoading, isError, error, refetch, isFetching } = useQuery({
-    queryKey: ['cases', currentPage, casesPerPage, searchTerm, filterStatus, filterPriority],
+    queryKey: ['cases', currentPage, casesPerPage, searchTerm, filterStatus, filterPriority, bucketFilter, bucketStatusNames?.join('|') ?? '', sort],
     queryFn: async () => {
       const from = (currentPage - 1) * casesPerPage;
       const to = from + casesPerPage - 1;
@@ -198,7 +298,7 @@ export const CasesList: React.FC = () => {
       }
 
       const { data, error } = await query
-        .order('created_at', { ascending: false })
+        .order(sort.key, { ascending: sort.dir === 'asc' })
         .order('is_primary', { referencedTable: 'case_devices', ascending: false })
         .order('created_at', { referencedTable: 'case_devices', ascending: true })
         .range(from, to);
@@ -207,15 +307,19 @@ export const CasesList: React.FC = () => {
 
       const rows = data || [];
 
-      // Batch the creator-profile lookup into a single query (no FK to embed; many
-      // rows share a creator, so dedupe the ids first).
-      const creatorIds = [...new Set(rows.map((r) => r.created_by).filter(Boolean))] as string[];
+      // Batch the creator + assigned-engineer profile lookups into a single
+      // query (no FK to embed; many rows share people, so dedupe the ids first).
+      const profileIds = [
+        ...new Set(
+          rows.flatMap((r) => [r.created_by, r.assigned_engineer_id]).filter(Boolean),
+        ),
+      ] as string[];
       const profilesById = new Map<string, { id: string; full_name: string | null }>();
-      if (creatorIds.length > 0) {
+      if (profileIds.length > 0) {
         const { data: profilesData } = await supabase
           .from('profiles')
           .select('id, full_name')
-          .in('id', creatorIds);
+          .in('id', profileIds);
         for (const p of profilesData || []) profilesById.set(p.id, p);
       }
 
@@ -223,6 +327,9 @@ export const CasesList: React.FC = () => {
         ...caseItem,
         customer: caseItem.customer ?? null,
         created_by_profile: caseItem.created_by ? profilesById.get(caseItem.created_by) ?? null : null,
+        engineer_profile: caseItem.assigned_engineer_id
+          ? profilesById.get(caseItem.assigned_engineer_id) ?? null
+          : null,
         devices: (caseItem.devices || []).map((device) => ({
           id: device.id,
           serial_no: device.serial_number,
@@ -237,24 +344,6 @@ export const CasesList: React.FC = () => {
       return casesWithRelations as Case[];
     },
   });
-
-  const { data: caseStatuses = [] } = useQuery({
-    queryKey: ['case_statuses'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('master_case_statuses')
-        .select('id, name, type, color')
-        .eq('is_active', true)
-        .order('sort_order');
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  // Command-center KPIs (snapshot counts + period flow + trends) as head-only
-  // COUNT queries — see useCaseCommandStats. Reuses the same status-type logic
-  // the old inline counters used, so the snapshot numbers are unchanged.
-  const { data: commandStats, isLoading: statsLoading } = useCaseCommandStats(period, caseStatuses);
 
   const { data: casePriorities = [] } = useQuery({
     queryKey: ['case_priorities'],
@@ -275,7 +364,9 @@ export const CasesList: React.FC = () => {
   };
 
   const handleRefresh = () => {
+    setPendingChanges(0);
     refetch();
+    queryClient.invalidateQueries({ queryKey: ['cases_count'] });
     queryClient.invalidateQueries({ queryKey: [CASE_COMMAND_STATS_KEY] });
   };
 
@@ -335,10 +426,94 @@ export const CasesList: React.FC = () => {
           device_capacity: primary?.capacity?.name ?? null,
           serial_primary: primary?.serial_no ?? null,
           device_count: c.devices?.length ?? 0,
+          engineer_name: c.engineer_profile?.full_name ?? null,
+          lifecycle_type: commandStats?.statusTypeMap.get(c.status) ?? null,
         };
       }),
-    [cases, caseStatuses, casePriorities],
+    [cases, caseStatuses, casePriorities, commandStats],
   );
+
+  // Header-click sort: same key flips direction; a new key starts at its
+  // natural direction (dates newest-first, everything else A→Z).
+  const handleSortChange = (key: string) => {
+    setSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+        : { key, dir: key === 'created_at' ? 'desc' : 'asc' },
+    );
+  };
+
+  // Operator keyboard layer: j/k rows, Enter open, x select, / search, [ ] pages.
+  // Inert while typing in any input/select/textarea (Escape blurs the field).
+  const [focusedRowId, setFocusedRowId] = useState<string | null>(null);
+  const [peekCaseId, setPeekCaseId] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const isTypingContext = (target: EventTarget | null) => {
+      const el = target as HTMLElement | null;
+      if (!el) return false;
+      return (
+        el.tagName === 'INPUT' ||
+        el.tagName === 'TEXTAREA' ||
+        el.tagName === 'SELECT' ||
+        el.isContentEditable
+      );
+    };
+
+    const handler = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isTypingContext(e.target)) {
+        if (e.key === 'Escape') (e.target as HTMLElement).blur();
+        return;
+      }
+
+      switch (e.key) {
+        case '/':
+          e.preventDefault();
+          searchInputRef.current?.focus();
+          break;
+        case '[':
+          setCurrentPage((p) => Math.max(1, p - 1));
+          break;
+        case ']':
+          setCurrentPage((p) => Math.min(Math.max(1, totalPages), p + 1));
+          break;
+        case 'j':
+        case 'k': {
+          if (tableRows.length === 0) break;
+          e.preventDefault();
+          setFocusedRowId((prev) => {
+            const idx = prev ? tableRows.findIndex((r) => r.id === prev) : -1;
+            const next =
+              e.key === 'j'
+                ? Math.min(tableRows.length - 1, idx + 1)
+                : Math.max(0, idx <= 0 ? 0 : idx - 1);
+            return tableRows[next]?.id ?? null;
+          });
+          break;
+        }
+        case 'Enter':
+          if (focusedRowId) navigate(`/cases/${focusedRowId}`);
+          break;
+        case 'x':
+        case 'X':
+          if (focusedRowId && selectionEnabled) selection.toggle(focusedRowId);
+          break;
+        case 'p':
+        case 'P':
+          if (focusedRowId) setPeekCaseId(focusedRowId);
+          break;
+        case 'Escape':
+          if (peekCaseId) setPeekCaseId(null);
+          else setFocusedRowId(null);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [tableRows, focusedRowId, peekCaseId, totalPages, selectionEnabled, selection, navigate]);
 
   const handleCreateCase = async () => {
     const check = await canPerformAction('max_cases_per_month');
@@ -426,12 +601,24 @@ export const CasesList: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-[1800px] 2xl:max-w-[2400px] mx-auto">
+    <div className="px-6 py-5 max-w-[1800px] 2xl:max-w-[2400px] mx-auto">
+      <PageHeaderSlot title="Cases" icon={Briefcase} iconColor="rgb(var(--color-primary))" />
       <CasesCommandCenter
         period={period}
         onPeriodChange={setPeriod}
         stats={commandStats}
         loading={statsLoading || caseStatuses.length === 0}
+        activeBucket={bucketFilter}
+        onBucketChange={(bucket) => {
+          setBucketFilter(bucket);
+          if (bucket) setFilterStatus('all');
+        }}
+        cardStyle={statCardStyle}
+        onUrgentFilter={() => {
+          setBucketFilter(null);
+          setFilterStatus('all');
+          setFilterPriority(filterPriority === 'urgent' ? 'all' : 'urgent');
+        }}
         note={
           caseUsage && caseUsage.limit
             ? `${caseUsage.current}/${caseUsage.limit} this month`
@@ -472,8 +659,9 @@ export const CasesList: React.FC = () => {
             <div className="w-full lg:w-80 relative flex-shrink-0">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
               <input
+                ref={searchInputRef}
                 type="text"
-                placeholder="Search cases..."
+                placeholder="Search cases...  ( / )"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary"
@@ -481,51 +669,29 @@ export const CasesList: React.FC = () => {
             </div>
 
             <div className="flex-1 flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => setFilterStatus(filterStatus === 'Received' ? 'all' : 'Received')}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  filterStatus === 'Received'
-                    ? 'bg-info text-info-foreground shadow-md'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Received
-              </button>
-              <button
-                onClick={() => setFilterStatus(filterStatus === 'Approved - In Queue' ? 'all' : 'Approved - In Queue')}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  filterStatus === 'Approved - In Queue'
-                    ? 'bg-accent text-accent-foreground shadow-md'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Approved - In Queue
-              </button>
-              <button
-                onClick={() => setFilterStatus(filterStatus === 'Recovery in Progress' ? 'all' : 'Recovery in Progress')}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  filterStatus === 'Recovery in Progress'
-                    ? 'bg-warning text-warning-foreground shadow-md'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Recovery in Progress
-              </button>
-              <button
-                onClick={() => setFilterStatus(filterStatus === 'Cancelled-Currently No Solution' ? 'all' : 'Cancelled-Currently No Solution')}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  filterStatus === 'Cancelled-Currently No Solution'
-                    ? 'bg-slate-500 text-white shadow-md'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Cancelled - No Solution
-              </button>
-              {(filterStatus !== 'all' || filterPriority !== 'all') && (
+              {topStatusChips.map(({ status, total }) => {
+                const active = filterStatus === status;
+                const type = commandStats?.statusTypeMap.get(status);
+                return (
+                  <button
+                    key={status}
+                    onClick={() => setFilterStatus(active ? 'all' : status)}
+                    aria-pressed={active}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${statusChipClasses(type, active)}`}
+                  >
+                    {status}
+                    <span className={`ml-1.5 text-xs tabular-nums ${active ? 'opacity-80' : 'opacity-60'}`}>
+                      {total.toLocaleString()}
+                    </span>
+                  </button>
+                );
+              })}
+              {(filterStatus !== 'all' || filterPriority !== 'all' || bucketFilter !== null) && (
                 <button
                   onClick={() => {
                     setFilterStatus('all');
                     setFilterPriority('all');
+                    setBucketFilter(null);
                   }}
                   className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-200 text-slate-700 hover:bg-slate-300 transition-all"
                 >
@@ -536,6 +702,7 @@ export const CasesList: React.FC = () => {
 
             <Button
               variant="secondary"
+              size="sm"
               onClick={() => setShowFilters(!showFilters)}
               className="flex items-center gap-2 flex-shrink-0"
             >
@@ -546,53 +713,21 @@ export const CasesList: React.FC = () => {
               )}
             </Button>
 
+            <CaseViewsMenu
+              current={{ filterStatus, filterPriority, bucket: bucketFilter, sort }}
+              onApply={(v) => {
+                setFilterStatus(v.filterStatus);
+                setFilterPriority(v.filterPriority);
+                setBucketFilter(v.bucket);
+                setSort(v.sort);
+              }}
+            />
+
             <ColumnPickerPopover
               columns={casesColumns.map((c) => ({ key: c.key, label: c.label }))}
               view={view}
               onApply={setVisibleAndOrder}
               onReset={resetPrefs}
-            />
-
-            {/* Fetches everything matching the active filter — not just
-                the current page — so accountant handoff CSVs aren't
-                truncated to one paginated screen. */}
-            <ExportButton
-              filename="cases"
-              columns={[
-                { key: 'case_no', label: 'Case #' },
-                { key: 'title', label: 'Title' },
-                { key: 'priority', label: 'Priority' },
-                { key: 'status', label: 'Status' },
-                {
-                  key: (r) => (r.customers_enhanced as { customer_name?: string } | null)?.customer_name,
-                  label: 'Customer',
-                },
-                { key: 'client_reference', label: 'Client Ref' },
-                { key: (r) => exportPrimaryDevice(r)?.catalog_device_types?.name, label: 'Device Type' },
-                { key: (r) => exportPrimaryDevice(r)?.model, label: 'Device Model' },
-                { key: (r) => exportPrimaryDevice(r)?.serial_number, label: 'Serial Number' },
-                { key: (r) => exportPrimaryDevice(r)?.catalog_device_capacities?.name, label: 'Capacity' },
-                {
-                  key: 'created_at',
-                  label: 'Created',
-                  format: (v) => (v ? new Date(v as string).toISOString().slice(0, 10) : ''),
-                },
-              ]}
-              getRows={async () => {
-                let q = supabase
-                  .from('cases')
-                  .select('case_no, title, priority, status, client_reference, created_at, customers_enhanced:customer_id(customer_name), case_devices(serial_number, model, is_primary, catalog_device_types(name), catalog_device_capacities(name))')
-                  .is('deleted_at', null);
-                const searchOr = await resolveSearchOr();
-                if (searchOr) {
-                  q = q.or(searchOr);
-                }
-                if (filterStatus !== 'all') q = q.eq('status', filterStatus);
-                if (filterPriority !== 'all') q = q.eq('priority', filterPriority);
-                const { data, error } = await q.order('created_at', { ascending: false });
-                if (error) throw error;
-                return data ?? [];
-              }}
             />
           </div>
 
@@ -608,9 +743,9 @@ export const CasesList: React.FC = () => {
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 >
                   <option value="all">All Statuses</option>
-                  {caseStatuses.map((status) => (
-                    <option key={status.id} value={status.name}>
-                      {status.name}
+                  {statusesByCount.map(({ status, total }) => (
+                    <option key={status} value={status}>
+                      {status} ({total})
                     </option>
                   ))}
                 </select>
@@ -636,6 +771,19 @@ export const CasesList: React.FC = () => {
           )}
         </div>
       </div>
+
+      {pendingChanges > 0 && (
+        <div className="mb-3 flex justify-center">
+          <button
+            type="button"
+            onClick={applyPendingChanges}
+            className="inline-flex items-center gap-2 rounded-full border border-info/30 bg-info-muted px-4 py-1.5 text-sm font-medium text-info shadow-sm transition-colors hover:bg-info/15"
+          >
+            <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+            {pendingChanges === 1 ? '1 case updated' : `${pendingChanges} case updates`} — refresh list
+          </button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
@@ -697,9 +845,15 @@ export const CasesList: React.FC = () => {
               columns={casesColumns}
               view={view}
               rowKey={(r) => r.id}
-              onRowClick={(r) => navigate(`/cases/${r.id}`)}
+              onRowClick={(r, e) => {
+                if (e && 'shiftKey' in e && (e.shiftKey || e.altKey)) setPeekCaseId(r.id);
+                else navigate(`/cases/${r.id}`);
+              }}
               selection={selectionEnabled ? selection : undefined}
               onWidthsChange={setWidths}
+              sort={sort}
+              onSortChange={handleSortChange}
+              activeRowKey={focusedRowId}
               rowAriaLabel={(r) => `case ${r.case_no}`}
             />
           </div>
@@ -707,16 +861,41 @@ export const CasesList: React.FC = () => {
           {totalPages > 1 && (
             <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mt-4 p-2.5">
               <div className="flex items-center justify-between">
-                <div className="text-sm text-slate-600">
-                  Showing <span className="font-medium text-slate-900">{startIndex}</span> to{' '}
-                  <span className="font-medium text-slate-900">{endIndex}</span> of{' '}
-                  <span className="font-medium text-slate-900">{totalCountData}</span> cases
+                <div className="flex items-center gap-3 text-sm text-slate-600">
+                  <span>
+                    Showing <span className="font-medium text-slate-900">{startIndex}</span> to{' '}
+                    <span className="font-medium text-slate-900">{endIndex}</span> of{' '}
+                    <span className="font-medium text-slate-900">{totalCountData}</span> cases
+                  </span>
+                  <span className="hidden text-xs text-slate-400 xl:inline">
+                    j/k rows · Enter open · p peek · x select · / search · [ ] pages
+                  </span>
                 </div>
                 <div className="flex items-center gap-4">
-                  <p className="text-sm text-slate-600">
-                    Page <span className="font-medium text-slate-900">{currentPage}</span> of{' '}
-                    <span className="font-medium text-slate-900">{totalPages}</span>
-                  </p>
+                  <nav className="hidden items-center gap-1 md:flex" aria-label="Pages">
+                    {pageWindow(currentPage, totalPages).map((p, i) =>
+                      p === 'gap' ? (
+                        <span key={`gap-${i}`} className="px-1 text-sm text-slate-400" aria-hidden="true">
+                          …
+                        </span>
+                      ) : (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setCurrentPage(p)}
+                          disabled={isFetching}
+                          aria-current={p === currentPage ? 'page' : undefined}
+                          className={`min-w-[2rem] rounded-lg px-2 py-1 text-sm font-medium tabular-nums transition-colors ${
+                            p === currentPage
+                              ? 'bg-primary text-primary-foreground'
+                              : 'text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      ),
+                    )}
+                  </nav>
                   <div className="flex gap-2">
                     <Button
                       size="sm"
@@ -745,6 +924,8 @@ export const CasesList: React.FC = () => {
           )}
         </>
       )}
+
+      <CasePeekPanel caseId={peekCaseId} onClose={() => setPeekCaseId(null)} />
 
       {isWizardOpen && (
         <CreateCaseWizard

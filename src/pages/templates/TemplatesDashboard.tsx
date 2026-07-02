@@ -144,7 +144,7 @@ export const TemplatesDashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="p-6 space-y-4">
         <SettingsPageHeader categoryId="templates" />
         <Skeleton className="h-10 w-full" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -157,7 +157,7 @@ export const TemplatesDashboard: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <SettingsPageHeader categoryId="templates" />
 
       {showSeedingResults && seedingResults && (

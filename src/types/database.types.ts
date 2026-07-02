@@ -17297,6 +17297,21 @@ export type Database = {
         }[]
       }
       get_base_currency: { Args: never; Returns: string }
+      get_case_flow_stats: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          delivered: number
+          median_tat_days: number
+          received: number
+        }[]
+      }
+      get_case_status_counts: {
+        Args: never
+        Returns: {
+          status: string
+          total: number
+        }[]
+      }
       get_current_business_unit_id: { Args: never; Returns: string }
       get_current_portal_customer_id: { Args: never; Returns: string }
       get_current_region_id: { Args: never; Returns: string }

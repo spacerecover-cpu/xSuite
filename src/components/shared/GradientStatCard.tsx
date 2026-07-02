@@ -94,6 +94,8 @@ export interface GradientStatCardProps {
   loading?: boolean;
   onClick?: () => void;
   className?: string;
+  /** 'sm' tightens padding + value size for dense header rows. */
+  size?: 'md' | 'sm';
 }
 
 /**
@@ -113,6 +115,7 @@ export const GradientStatCard: React.FC<GradientStatCardProps> = ({
   loading = false,
   onClick,
   className,
+  size = 'md',
 }) => {
   const spec = TONE[tone];
   const fg = spec.dark ? FG.light : FG.dark;
@@ -139,7 +142,8 @@ export const GradientStatCard: React.FC<GradientStatCardProps> = ({
           : undefined
       }
       className={cn(
-        'relative overflow-hidden rounded-xl p-3 shadow-md ring-1 ring-inset',
+        'relative overflow-hidden rounded-xl shadow-md ring-1 ring-inset',
+        size === 'sm' ? 'p-2.5' : 'p-3',
         fg.text,
         fg.ring,
         'bg-gradient-to-br',
@@ -155,13 +159,13 @@ export const GradientStatCard: React.FC<GradientStatCardProps> = ({
         <p className={cn('truncate text-xxs font-semibold uppercase tracking-wider', fg.label)}>{label}</p>
       </div>
 
-      <div className="relative mt-1.5 flex items-end justify-between gap-2">
+      <div className={cn('relative flex items-end justify-between gap-2', size === 'sm' ? 'mt-1' : 'mt-1.5')}>
         {loading ? (
-          <span className={cn('h-7 w-14 animate-pulse rounded', fg.track)} />
+          <span className={cn('animate-pulse rounded', size === 'sm' ? 'h-6 w-12' : 'h-7 w-14', fg.track)} />
         ) : (
           <span className="flex min-w-0 items-baseline gap-1 leading-none">
             <span
-              className="truncate text-2xl font-bold tabular-nums"
+              className={cn('truncate font-bold tabular-nums', size === 'sm' ? 'text-xl' : 'text-2xl')}
               title={typeof value === 'string' ? value : undefined}
             >
               {value}
@@ -180,7 +184,7 @@ export const GradientStatCard: React.FC<GradientStatCardProps> = ({
       {!loading && sub && !trend && <p className={cn('relative mt-1 truncate text-xxs', fg.sub)}>{sub}</p>}
 
       {pct != null && (
-        <div className={cn('relative mt-2 h-1 overflow-hidden rounded-full', fg.track)}>
+        <div className={cn('relative h-1 overflow-hidden rounded-full', size === 'sm' ? 'mt-1.5' : 'mt-2', fg.track)}>
           {!loading && <div className={cn('h-full rounded-full', fg.fill)} style={{ width: `${pct}%` }} />}
         </div>
       )}

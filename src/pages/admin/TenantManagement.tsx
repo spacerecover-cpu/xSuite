@@ -197,7 +197,7 @@ export const TenantManagement = () => {
     .reduce((sum, t) => sum + (t.plan?.price_monthly || 0), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <PageHeaderSlot title="Tenant Management" />
 
       <KpiRow

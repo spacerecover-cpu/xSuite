@@ -55,7 +55,7 @@ export default function PlansPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-64 p-6">
         <div className="text-gray-500">Loading plans...</div>
       </div>
     );
@@ -72,7 +72,7 @@ export default function PlansPage() {
   const savingsPercentage = calculateSavings(monthlyPrice, yearlyPrice);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="p-6 max-w-7xl mx-auto space-y-8">
       <PageHeaderSlot title="Choose Your Plan" />
 
       <div className="flex items-center justify-center gap-4">

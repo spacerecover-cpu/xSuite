@@ -41,7 +41,7 @@ export const SecuritySettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="p-6 max-w-3xl mx-auto">
       <SettingsPageHeader categoryId="security" />
 
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">

@@ -81,12 +81,15 @@ export function resolveTenantConfigFromLayers(
 ): TenantConfig {
   const snap = (layers.country ?? {}) as Record<string, unknown>;
   const get = <T>(key: string): T => resolveCountryConfigKey<T>(layers, key); // throws on unresolved required
+  // Snapshots predating the country.* keys exist in the wild — fall back to the
+  // embedded geo_countries row the fetch already joins (display-only fields).
+  const countryRow = (base.country as Record<string, unknown> | null) ?? null;
 
   return {
     tenantId: base.id as string,
     tenantName: base.name as string,
-    countryCode: (snap['country.code'] as string) || (base.countryCode as string) || '',
-    countryName: (snap['country.name'] as string) || (base.countryName as string) || '',
+    countryCode: (snap['country.code'] as string) || (countryRow?.code as string) || '',
+    countryName: (snap['country.name'] as string) || (countryRow?.name as string) || '',
     currency: {
       code: get<string>('currency.code'), // required → throws if unresolved
       symbol: (snap['currency.symbol'] as string) || '',

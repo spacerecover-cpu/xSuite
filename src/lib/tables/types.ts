@@ -14,6 +14,8 @@ export interface TableColumnDef<T> {
   /** Plain value for CSV export; omit to exclude from exports. */
   exportValue?: (row: T) => string | number | null | undefined;
   align?: 'start' | 'end';
+  /** Server column this header sorts by; omit for unsortable columns. */
+  sortKey?: string;
 }
 
 /** Tenant-level defaults, stored in company_settings.metadata.table_columns[tableKey]. */

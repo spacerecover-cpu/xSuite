@@ -13,11 +13,11 @@ import {
   ShieldCheck,
   Palette,
   Bell,
-  Coins,
   SlidersHorizontal,
   Columns3,
   FileStack,
   ListChecks,
+  Workflow,
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 
@@ -151,6 +151,16 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     description: 'Manage service types, case priorities, and status workflows',
   },
   {
+    id: 'case-lifecycle',
+    title: 'Case Lifecycle',
+    icon: Workflow,
+    backgroundColor: '#0369a1',
+    borderColor: '#0369a1',
+    tables: [],
+    actionLabel: 'Map Statuses',
+    description: 'Map your case statuses to lifecycle stages so dashboards and reports count them correctly.',
+  },
+  {
     id: 'client-financial',
     title: 'Client & Financial',
     icon: DollarSign,
@@ -241,17 +251,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     borderColor: '#14b8a6',
     tables: [],
     actionLabel: 'Configure',
-    description: 'Currency display, date & time, timezone, and document language',
-  },
-  {
-    id: 'currencies',
-    title: 'Currencies',
-    icon: Coins,
-    backgroundColor: '#10b981',
-    borderColor: '#10b981',
-    tables: [],
-    actionLabel: 'Manage Currencies',
-    description: 'Add and manage the transaction currencies you invoice in.',
+    description: 'Currencies and display, date & time, timezone, and document language',
   },
   {
     id: 'import-export',
@@ -306,8 +306,8 @@ export interface SettingsGroup {
 // a trailing "More" section so nothing silently disappears.
 export const SETTINGS_GROUPS: SettingsGroup[] = [
   { id: 'workspace', label: 'Workspace', categoryIds: ['appearance', 'preferences', 'table-columns', 'features', 'general-settings', 'notifications'] },
-  { id: 'operations', label: 'Operations', categoryIds: ['device-media', 'inventory-settings', 'case-service', 'procurement'] },
-  { id: 'finance', label: 'Client & Finance', categoryIds: ['client-financial', 'currencies', 'localization'] },
+  { id: 'operations', label: 'Operations', categoryIds: ['device-media', 'inventory-settings', 'case-service', 'case-lifecycle', 'procurement'] },
+  { id: 'finance', label: 'Client & Finance', categoryIds: ['client-financial', 'localization'] },
   { id: 'documents', label: 'Documents & Reports', categoryIds: ['templates', 'documents'] },
   { id: 'system', label: 'System & Data', categoryIds: ['system-numbers', 'import-export', 'client-portal'] },
   { id: 'compliance', label: 'Security & Compliance', categoryIds: ['security', 'gdpr'] },

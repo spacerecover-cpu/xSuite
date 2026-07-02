@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, ChevronsUpDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { fitColumns } from '../../lib/tables/fitColumns';
 import type { ResolvedTableView, TableColumnDef } from '../../lib/tables/types';
@@ -18,7 +18,8 @@ interface ConfigurableDataTableProps<T> {
   columns: TableColumnDef<T>[];
   view: ResolvedTableView;
   rowKey: (row: T) => string;
-  onRowClick?: (row: T) => void;
+  /** The event lets pages offer modifier-click behaviors (e.g. Shift+click to peek). */
+  onRowClick?: (row: T, event?: React.MouseEvent | React.KeyboardEvent) => void;
   selection?: ConfigurableSelection;
   /** Persist user column widths (called once per resize gesture, on release). */
   onWidthsChange?: (widths: Record<string, number>) => void;
@@ -36,6 +37,11 @@ interface ConfigurableDataTableProps<T> {
    *  column so a content-light table on an ultra-wide screen breathes evenly
    *  instead of opening a dead zone behind one column. */
   fillMode?: 'elastic' | 'proportional';
+  /** Active server sort; pairs with onSortChange to make sortKey headers clickable. */
+  sort?: { key: string; dir: 'asc' | 'desc' };
+  onSortChange?: (sortKey: string) => void;
+  /** Keyboard-focused row (page-owned j/k state): highlighted + scrolled into view. */
+  activeRowKey?: string | null;
 }
 
 const SELECTION_W = 48;
@@ -60,8 +66,16 @@ export function ConfigurableDataTable<T>({
   rowClassName,
   elasticColumnKey,
   fillMode = 'elastic',
+  sort,
+  onSortChange,
+  activeRowKey,
 }: ConfigurableDataTableProps<T>) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
+
+  useEffect(() => {
+    if (activeRowKey) rowRefs.current.get(activeRowKey)?.scrollIntoView({ block: 'nearest' });
+  }, [activeRowKey]);
   const [containerWidth, setContainerWidth] = useState<number>(1200);
   const [widths, setWidths] = useState<Record<string, number>>(view.widths);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -150,7 +164,7 @@ export function ConfigurableDataTable<T>({
   const handleRowKeyDown = (e: React.KeyboardEvent, row: T) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      onRowClick?.(row);
+      onRowClick?.(row, e);
     }
   };
 
@@ -197,12 +211,43 @@ export function ConfigurableDataTable<T>({
                   key={def.key}
                   scope="col"
                   style={{ width: widthFor(def, idx === fitDefs.length - 1) }}
+                  aria-sort={
+                    def.sortKey && sort?.key === def.sortKey
+                      ? sort.dir === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : undefined
+                  }
                   className={cn(
                     'relative px-6 py-4 text-xs font-semibold text-slate-600 uppercase tracking-wider',
                     def.align === 'end' ? 'text-end' : 'text-left',
                   )}
                 >
-                  <span className="block truncate">{def.label}</span>
+                  {def.sortKey && onSortChange ? (
+                    <button
+                      type="button"
+                      onClick={() => onSortChange(def.sortKey!)}
+                      aria-label={`Sort by ${def.label}`}
+                      className={cn(
+                        'flex w-full min-w-0 items-center gap-1 uppercase tracking-wider hover:text-slate-900',
+                        def.align === 'end' ? 'justify-end' : 'justify-start',
+                        sort?.key === def.sortKey ? 'text-slate-900' : 'text-slate-600',
+                      )}
+                    >
+                      <span className="truncate">{def.label}</span>
+                      {sort?.key === def.sortKey ? (
+                        sort.dir === 'asc' ? (
+                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        ) : (
+                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        )
+                      ) : (
+                        <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden="true" />
+                      )}
+                    </button>
+                  ) : (
+                    <span className="block truncate">{def.label}</span>
+                  )}
                   {onWidthsChange && idx < fitDefs.length - 1 ? (
                     <span
                       role="separator"
@@ -236,7 +281,11 @@ export function ConfigurableDataTable<T>({
               return (
                 <React.Fragment key={id}>
                   <tr
-                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    ref={(el) => {
+                      if (el) rowRefs.current.set(id, el);
+                      else rowRefs.current.delete(id);
+                    }}
+                    onClick={onRowClick ? (e) => onRowClick(row, e) : undefined}
                     onKeyDown={onRowClick ? (e) => handleRowKeyDown(e, row) : undefined}
                     tabIndex={onRowClick ? 0 : undefined}
                     aria-label={rowAriaLabel?.(row)}
@@ -245,6 +294,7 @@ export function ConfigurableDataTable<T>({
                       onRowClick && 'cursor-pointer',
                       rowClassName?.(row),
                       isSelected && 'bg-info-muted/30',
+                      activeRowKey === id && 'bg-primary/5 outline outline-2 -outline-offset-2 outline-primary/40',
                     )}
                   >
                     {selection ? (
@@ -318,7 +368,7 @@ export function ConfigurableDataTable<T>({
           return (
             <div
               key={id}
-              onClick={onRowClick ? () => onRowClick(row) : undefined}
+              onClick={onRowClick ? (e) => onRowClick(row, e) : undefined}
               onKeyDown={onRowClick ? (e) => handleRowKeyDown(e, row) : undefined}
               role={onRowClick ? 'button' : undefined}
               tabIndex={onRowClick ? 0 : undefined}
