@@ -45,13 +45,13 @@ function SectionHeader({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-center gap-2 mb-3">
       <span className="w-1 h-4 rounded-full bg-cat-6" aria-hidden="true" />
-      <h3 className="text-sm font-bold uppercase tracking-[0.04em] text-slate-800">{children}</h3>
+      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">{children}</h3>
     </div>
   );
 }
 
 function MetaLabel({ children }: { children: ReactNode }) {
-  return <span className="block text-[11px] font-semibold uppercase tracking-[0.05em] text-slate-400 mb-1">{children}</span>;
+  return <span className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">{children}</span>;
 }
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {

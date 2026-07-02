@@ -14,7 +14,7 @@ interface Props {
   extraFooter?: ReactNode;
 }
 
-const SECTION_HEADING = 'text-sm font-bold uppercase tracking-[0.04em] text-primary';
+const SECTION_HEADING = 'text-sm font-bold uppercase tracking-wider text-primary';
 const FIELD_GRID = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-3';
 
 export function DeviceDetailsForm({ state, onChange, options, errors, extraFooter }: Props) {

@@ -52,7 +52,7 @@ function SectionHeader({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-center gap-2 mb-3">
       <span className="w-1 h-4 rounded-full bg-cat-5" aria-hidden="true" />
-      <h3 className="text-sm font-bold uppercase tracking-[0.04em] text-slate-800">{children}</h3>
+      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">{children}</h3>
     </div>
   );
 }
@@ -60,7 +60,7 @@ function SectionHeader({ children }: { children: ReactNode }) {
 function SidebarCard({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
-      <h4 className="text-xs font-bold uppercase tracking-[0.06em] text-slate-500 mb-3">{title}</h4>
+      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">{title}</h4>
       {children}
     </div>
   );

@@ -36,13 +36,13 @@ function SectionHeader({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-center gap-2 mb-3">
       <span className="w-1 h-4 rounded-full bg-cat-2" aria-hidden="true" />
-      <h3 className="text-sm font-bold uppercase tracking-[0.04em] text-slate-800">{children}</h3>
+      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">{children}</h3>
     </div>
   );
 }
 
 function MetaLabel({ children }: { children: ReactNode }) {
-  return <span className="block text-[11px] font-semibold uppercase tracking-[0.05em] text-slate-400 mb-1">{children}</span>;
+  return <span className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">{children}</span>;
 }
 
 export function DeviceComponentsForm({
@@ -169,7 +169,7 @@ export function DeviceComponentsForm({
           </div>
 
           <div className="mt-4">
-            <div className="grid grid-cols-[1fr_auto_1.4fr_auto] items-center gap-3 px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-slate-400">
+            <div className="grid grid-cols-[1fr_auto_1.4fr_auto] items-center gap-3 px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
               <span>{t('devices.components.colComponent', { defaultValue: 'Component' })}</span>
               <span>{t('devices.components.colStatus', { defaultValue: 'Status' })}</span>
               <span>{t('devices.components.colDetails', { defaultValue: 'Details' })}</span>
