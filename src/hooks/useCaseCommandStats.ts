@@ -1,6 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
 import { getPeriodWindows, computeTrend, type CasePeriod, type Trend } from '../lib/casePeriods';
+import {
+  bucketizeStatusCounts,
+  resolveStatusTypes,
+  type CaseBucket,
+  type CaseStatusCount,
+  type CaseStatusType,
+} from '../lib/caseLifecycle';
+import { getTenantCaseStatusTypes } from '../lib/caseLifecycleService';
 
 export const CASE_COMMAND_STATS_KEY = 'case_command_stats';
 
@@ -13,30 +21,34 @@ export interface CaseStatusLite {
 export interface CaseCommandStats {
   /** Total non-deleted cases (the "of N total" denominator). */
   total: number;
-  // Snapshot (point-in-time "now") metrics.
+  /** Everything not delivered/completed/cancelled (unclassified counts as active). */
   active: number;
   urgent: number;
-  diagnosis: number;
-  ready: number;
+  /** Disjoint snapshot pipeline buckets (see caseLifecycle.ts). */
+  buckets: Record<CaseBucket, number>;
+  cancelled: number;
+  unmapped: number;
+  /** Raw per-status counts — powers the data-driven status chips. */
+  statusCounts: CaseStatusCount[];
+  /** Status name → lifecycle type (master rows + tenant overrides). */
+  statusTypeMap: Map<string, CaseStatusType>;
   // Flow (period-scoped) metrics + period-over-period trend.
-  newCount: number;
-  newTrend: Trend;
+  receivedCount: number;
+  receivedTrend: Trend;
   deliveredCount: number;
   deliveredTrend: Trend;
+  medianTatDays: number | null;
 }
 
 /**
- * Command-center KPIs for the Cases list. All ten figures are head-only COUNT
- * queries (no rows pulled, no new RPC), fired in parallel:
+ * Command-center data for the Cases list.
  *
- * - Snapshot counts (active/urgent/diagnosis/ready/total) reuse the page's
- *   existing `master_case_statuses.type` logic, so the numbers are identical to
- *   the old stat cards — "active" = (has-status) − (terminal).
- * - Flow counts compare the current period window against the previous equal
- *   window: `new` on `created_at`, `delivered` on `checkout_date` (the handover
- *   timestamp written by log_case_checkout).
- *
- * Trends are computed client-side from the two windows.
+ * Snapshot truth comes from one get_case_status_counts() RPC (per-status
+ * counts under RLS) classified via master_case_statuses.type layered with the
+ * tenant's company_settings.metadata.case_status_types overrides — so imported
+ * legacy vocabularies bucket correctly. Flow metrics (received / delivered /
+ * median TAT) come from get_case_flow_stats() for the current and previous
+ * period windows; trends are computed client-side.
  */
 export function useCaseCommandStats(period: CasePeriod, caseStatuses: CaseStatusLite[]) {
   return useQuery<CaseCommandStats>({
@@ -44,61 +56,54 @@ export function useCaseCommandStats(period: CasePeriod, caseStatuses: CaseStatus
     enabled: caseStatuses.length > 0,
     staleTime: 60_000,
     queryFn: async () => {
-      const { curStart, prevStart, prevEnd } = getPeriodWindows(period, new Date());
+      const now = new Date();
+      const { curStart, prevStart, prevEnd } = getPeriodWindows(period, now);
 
-      const namesOfTypes = (types: string[]) =>
-        caseStatuses.filter((s) => s.type !== null && types.includes(s.type)).map((s) => s.name);
-      const terminal = namesOfTypes(['completed', 'delivered', 'cancelled']);
-      const diagnosis = namesOfTypes(['diagnosis']);
-      const ready = namesOfTypes(['ready']);
-
-      const base = () =>
-        supabase.from('cases').select('id', { count: 'exact', head: true }).is('deleted_at', null);
-      const none = Promise.resolve({ count: 0 as number | null, error: null });
-
-      const [
-        total,
-        withStatus,
-        inTerminal,
-        urgent,
-        inDiagnosis,
-        inReady,
-        newCur,
-        newPrev,
-        delCur,
-        delPrev,
-      ] = await Promise.all([
-        base(),
-        base().not('status', 'is', null),
-        terminal.length ? base().in('status', terminal) : none,
-        base().eq('priority', 'urgent'),
-        diagnosis.length ? base().in('status', diagnosis) : none,
-        ready.length ? base().in('status', ready) : none,
-        base().gte('created_at', curStart),
-        base().gte('created_at', prevStart).lt('created_at', prevEnd),
-        base().gte('checkout_date', curStart),
-        base().gte('checkout_date', prevStart).lt('checkout_date', prevEnd),
+      const [countsRes, urgentRes, flowCurRes, flowPrevRes, overrides] = await Promise.all([
+        supabase.rpc('get_case_status_counts'),
+        supabase
+          .from('cases')
+          .select('id', { count: 'exact', head: true })
+          .is('deleted_at', null)
+          .eq('priority', 'urgent'),
+        supabase.rpc('get_case_flow_stats', { p_from: curStart, p_to: now.toISOString() }),
+        supabase.rpc('get_case_flow_stats', { p_from: prevStart, p_to: prevEnd }),
+        getTenantCaseStatusTypes(),
       ]);
 
-      for (const r of [
-        total, withStatus, inTerminal, urgent, inDiagnosis, inReady, newCur, newPrev, delCur, delPrev,
-      ]) {
+      for (const r of [countsRes, urgentRes, flowCurRes, flowPrevRes]) {
         if (r.error) throw r.error;
       }
 
-      const newCount = newCur.count ?? 0;
-      const deliveredCount = delCur.count ?? 0;
+      const statusCounts: CaseStatusCount[] = (countsRes.data ?? []).map((r) => ({
+        status: r.status,
+        total: Number(r.total),
+      }));
+      const statusTypeMap = resolveStatusTypes(caseStatuses, overrides);
+      const { buckets, cancelled, unmapped, total, active } = bucketizeStatusCounts(
+        statusCounts,
+        statusTypeMap,
+      );
+
+      const flowCur = flowCurRes.data?.[0];
+      const flowPrev = flowPrevRes.data?.[0];
+      const receivedCount = Number(flowCur?.received ?? 0);
+      const deliveredCount = Number(flowCur?.delivered ?? 0);
 
       return {
-        total: total.count ?? 0,
-        active: Math.max(0, (withStatus.count ?? 0) - (inTerminal.count ?? 0)),
-        urgent: urgent.count ?? 0,
-        diagnosis: inDiagnosis.count ?? 0,
-        ready: inReady.count ?? 0,
-        newCount,
-        newTrend: computeTrend(newCount, newPrev.count ?? 0),
+        total,
+        active,
+        urgent: urgentRes.count ?? 0,
+        buckets,
+        cancelled,
+        unmapped,
+        statusCounts,
+        statusTypeMap,
+        receivedCount,
+        receivedTrend: computeTrend(receivedCount, Number(flowPrev?.received ?? 0)),
         deliveredCount,
-        deliveredTrend: computeTrend(deliveredCount, delPrev.count ?? 0),
+        deliveredTrend: computeTrend(deliveredCount, Number(flowPrev?.delivered ?? 0)),
+        medianTatDays: flowCur?.median_tat_days != null ? Number(flowCur.median_tat_days) : null,
       };
     },
   });

@@ -1,5 +1,6 @@
 import { Badge } from '../../components/ui/Badge';
 import { formatDate } from '../format';
+import { ageDays, ageSeverity, formatCaseAge, type CaseStatusType } from '../caseLifecycle';
 import type { TableColumnDef } from './types';
 
 /** Display-ready row for the cases list — colors and the primary device are
@@ -23,6 +24,9 @@ export interface CaseListRow {
   device_capacity: string | null;
   serial_primary: string | null;
   device_count: number;
+  engineer_name: string | null;
+  /** Lifecycle classification of the row's status (terminal rows never age-flag). */
+  lifecycle_type: CaseStatusType | null;
 }
 
 const dash = <span className="text-slate-400">-</span>;
@@ -38,6 +42,12 @@ export function pickPrimaryDevice<D extends { is_primary?: boolean | null }>(
   return devices.find((d) => d.is_primary) ?? devices[0];
 }
 
+const AGE_SEVERITY_CLASSES = {
+  ok: 'text-sm tabular-nums text-slate-600',
+  warn: 'inline-flex rounded-full bg-warning-muted px-2 py-0.5 text-xs font-semibold tabular-nums text-warning',
+  crit: 'inline-flex rounded-full bg-danger-muted px-2 py-0.5 text-xs font-semibold tabular-nums text-danger',
+} as const;
+
 export const casesColumns: TableColumnDef<CaseListRow>[] = [
   {
     key: 'case_no',
@@ -45,15 +55,37 @@ export const casesColumns: TableColumnDef<CaseListRow>[] = [
     minWidth: 110,
     priority: 1,
     defaultVisible: true,
+    sortKey: 'case_no',
     render: (r) => <span className="font-semibold text-primary">{r.case_no}</span>,
     exportValue: (r) => r.case_no,
+  },
+  {
+    key: 'age',
+    label: 'Age',
+    minWidth: 80,
+    priority: 1,
+    defaultVisible: true,
+    sortKey: 'created_at',
+    render: (r) => {
+      const now = new Date();
+      return (
+        <span
+          className={AGE_SEVERITY_CLASSES[ageSeverity(r.created_at, now, r.lifecycle_type)]}
+          title={`Received ${formatDate(r.created_at)}`}
+        >
+          {formatCaseAge(r.created_at, now)}
+        </span>
+      );
+    },
+    exportValue: (r) => ageDays(r.created_at, new Date()),
   },
   {
     key: 'priority',
     label: 'Priority',
     minWidth: 100,
     priority: 2,
-    defaultVisible: true,
+    defaultVisible: false,
+    sortKey: 'priority',
     render: (r) => (
       <Badge variant="custom" color={r.priority_color} size="sm">
         {r.priority}
@@ -68,7 +100,16 @@ export const casesColumns: TableColumnDef<CaseListRow>[] = [
     priority: 1,
     defaultVisible: true,
     render: (r) =>
-      r.customer_name ? <span className="font-medium text-slate-900">{r.customer_name}</span> : dash,
+      r.customer_name ? (
+        <span className="block min-w-0">
+          <span className="block truncate font-medium text-slate-900">{r.customer_name}</span>
+          {r.customer_mobile && (
+            <span className="block truncate text-xs tabular-nums text-slate-500">{r.customer_mobile}</span>
+          )}
+        </span>
+      ) : (
+        dash
+      ),
     exportValue: (r) => r.customer_name,
   },
   {
@@ -76,7 +117,7 @@ export const casesColumns: TableColumnDef<CaseListRow>[] = [
     label: 'Contact Number',
     minWidth: 140,
     priority: 4,
-    defaultVisible: true,
+    defaultVisible: false,
     render: (r) =>
       r.customer_mobile ? (
         <span className="text-sm tabular-nums text-slate-700">{r.customer_mobile}</span>
@@ -90,7 +131,7 @@ export const casesColumns: TableColumnDef<CaseListRow>[] = [
     label: 'Client Ref',
     minWidth: 110,
     priority: 5,
-    defaultVisible: true,
+    defaultVisible: false,
     render: (r) =>
       r.client_reference ? <span className="text-sm text-slate-700">{r.client_reference}</span> : dash,
     exportValue: (r) => r.client_reference,
@@ -101,6 +142,7 @@ export const casesColumns: TableColumnDef<CaseListRow>[] = [
     minWidth: 150,
     priority: 1,
     defaultVisible: true,
+    sortKey: 'status',
     render: (r) => (
       <Badge variant="custom" color={r.status_color} size="sm">
         {r.status_name}
@@ -114,7 +156,22 @@ export const casesColumns: TableColumnDef<CaseListRow>[] = [
     minWidth: 120,
     priority: 3,
     defaultVisible: true,
-    render: (r) => (r.device_type ? <span className="text-sm text-slate-700">{r.device_type}</span> : dash),
+    render: (r) =>
+      r.device_type ? (
+        <span className="text-sm text-slate-700">
+          {r.device_type}
+          {r.device_count > 1 && (
+            <span
+              className="ml-1.5 inline-flex items-center rounded border border-slate-300 px-1 text-xs font-semibold tabular-nums text-slate-600"
+              title={`${r.device_count} devices on this case — device columns show the primary`}
+            >
+              ×{r.device_count}
+            </span>
+          )}
+        </span>
+      ) : (
+        dash
+      ),
     exportValue: (r) => r.device_type,
   },
   {
@@ -152,12 +209,21 @@ export const casesColumns: TableColumnDef<CaseListRow>[] = [
       r.serial_primary ? (
         <span className="text-sm tabular-nums text-slate-700" title={r.device_count > 1 ? `Primary device of ${r.device_count}` : undefined}>
           {r.serial_primary}
-          {r.device_count > 1 ? <span className="ml-1 text-xs text-slate-400">+{r.device_count - 1}</span> : null}
         </span>
       ) : (
         dash
       ),
     exportValue: (r) => r.serial_primary,
+  },
+  {
+    key: 'engineer',
+    label: 'Engineer',
+    minWidth: 130,
+    priority: 4,
+    defaultVisible: true,
+    render: (r) =>
+      r.engineer_name ? <span className="text-sm text-slate-700">{r.engineer_name}</span> : dash,
+    exportValue: (r) => r.engineer_name,
   },
   {
     key: 'capacity',
@@ -174,7 +240,8 @@ export const casesColumns: TableColumnDef<CaseListRow>[] = [
     label: 'Created At',
     minWidth: 115,
     priority: 2,
-    defaultVisible: true,
+    defaultVisible: false,
+    sortKey: 'created_at',
     render: (r) => <span className="text-sm text-slate-600">{formatDate(r.created_at)}</span>,
     exportValue: (r) => (r.created_at ? r.created_at.slice(0, 10) : ''),
   },

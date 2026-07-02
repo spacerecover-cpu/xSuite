@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, ChevronsUpDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { fitColumns } from '../../lib/tables/fitColumns';
 import type { ResolvedTableView, TableColumnDef } from '../../lib/tables/types';
@@ -36,6 +36,9 @@ interface ConfigurableDataTableProps<T> {
    *  column so a content-light table on an ultra-wide screen breathes evenly
    *  instead of opening a dead zone behind one column. */
   fillMode?: 'elastic' | 'proportional';
+  /** Active server sort; pairs with onSortChange to make sortKey headers clickable. */
+  sort?: { key: string; dir: 'asc' | 'desc' };
+  onSortChange?: (sortKey: string) => void;
 }
 
 const SELECTION_W = 48;
@@ -60,6 +63,8 @@ export function ConfigurableDataTable<T>({
   rowClassName,
   elasticColumnKey,
   fillMode = 'elastic',
+  sort,
+  onSortChange,
 }: ConfigurableDataTableProps<T>) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = useState<number>(1200);
@@ -197,12 +202,43 @@ export function ConfigurableDataTable<T>({
                   key={def.key}
                   scope="col"
                   style={{ width: widthFor(def, idx === fitDefs.length - 1) }}
+                  aria-sort={
+                    def.sortKey && sort?.key === def.sortKey
+                      ? sort.dir === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : undefined
+                  }
                   className={cn(
                     'relative px-6 py-4 text-xs font-semibold text-slate-600 uppercase tracking-wider',
                     def.align === 'end' ? 'text-end' : 'text-left',
                   )}
                 >
-                  <span className="block truncate">{def.label}</span>
+                  {def.sortKey && onSortChange ? (
+                    <button
+                      type="button"
+                      onClick={() => onSortChange(def.sortKey!)}
+                      aria-label={`Sort by ${def.label}`}
+                      className={cn(
+                        'flex w-full min-w-0 items-center gap-1 uppercase tracking-wider hover:text-slate-900',
+                        def.align === 'end' ? 'justify-end' : 'justify-start',
+                        sort?.key === def.sortKey ? 'text-slate-900' : 'text-slate-600',
+                      )}
+                    >
+                      <span className="truncate">{def.label}</span>
+                      {sort?.key === def.sortKey ? (
+                        sort.dir === 'asc' ? (
+                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        ) : (
+                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        )
+                      ) : (
+                        <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden="true" />
+                      )}
+                    </button>
+                  ) : (
+                    <span className="block truncate">{def.label}</span>
+                  )}
                   {onWidthsChange && idx < fitDefs.length - 1 ? (
                     <span
                       role="separator"
