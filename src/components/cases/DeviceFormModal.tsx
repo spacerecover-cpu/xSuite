@@ -524,7 +524,6 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
                     }))}
                     placeholder={t('devices.field.donorPlaceholder', { defaultValue: 'Select donor device from inventory...' })}
                     required
-                    clearable={false}
                   />
                 </div>
               ) : (

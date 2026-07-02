@@ -163,7 +163,6 @@ export function DeviceHistoryForm({ caseId, deviceId }: Props) {
               value={filter}
               onChange={setFilter}
               options={filterOptions}
-              clearable={false}
               size="sm"
               usePortal
               aria-label={t('devices.history.filter', { defaultValue: 'Filter activities' })}

@@ -157,24 +157,8 @@ describe('SearchableSelect', () => {
     expect(screen.getAllByPlaceholderText('Search...').length).toBe(1);
   });
 
-  it('gives the clear X an accessible name', async () => {
-    const user = userEvent.setup();
+  it('renders no clear X — values change by selecting another option (DESIGN.md → Forms)', () => {
     render(<Harness initial="a" />);
-    expect(screen.getByRole('button', { name: 'Clear' })).toBeInTheDocument();
-    // sanity: clearing fires onChange('') — not asserted here, just presence of the labeled control
-    await user.click(screen.getByRole('combobox'));
-  });
-
-  it('hides the clear X for a required field even when a value is selected', () => {
-    render(
-      <SearchableSelect
-        label="Fruit"
-        value="a"
-        onChange={() => {}}
-        options={OPTIONS}
-        required
-      />,
-    );
     expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();
   });
 

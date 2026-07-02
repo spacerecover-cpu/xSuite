@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { AlertCircle, ChevronDown, Search, X } from 'lucide-react';
+import { AlertCircle, ChevronDown, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useFieldA11y } from '../../hooks/useFieldA11y';
 import { useAnchoredPosition } from '../../hooks/useAnchoredPosition';
@@ -29,7 +29,6 @@ interface SearchableSelectProps {
   emptyMessage?: string;
   onAddNew?: () => void;
   addNewLabel?: string;
-  clearable?: boolean;
   usePortal?: boolean;
   id?: string;
   error?: string;
@@ -55,7 +54,6 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
       emptyMessage,
       onAddNew,
       addNewLabel,
-      clearable = true,
       usePortal = false,
       id,
       error,
@@ -170,12 +168,6 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
         el?.scrollIntoView?.({ block: 'nearest' });
       }
     }, [activeIndex, isOpen]);
-
-    const handleClear = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      onChange('');
-      setSearchTerm('');
-    };
 
     const handleAddNew = (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -327,23 +319,11 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
             <span className={selectedOption ? 'text-slate-900' : 'text-slate-400'}>
               {selectedOption ? selectedOption.name : resolvedPlaceholder}
             </span>
-            <div className="flex items-center gap-1">
-              {value && !disabled && clearable && !required && (
-                <button
-                  onClick={handleClear}
-                  aria-label={t('ui.select.clear')}
-                  className="p-0.5 hover:bg-slate-200 rounded transition-colors"
-                  type="button"
-                >
-                  <X className="w-4 h-4 text-slate-400" />
-                </button>
-              )}
-              <ChevronDown
-                className={`w-4 h-4 text-slate-400 transition-transform ${
-                  isOpen ? 'rotate-180' : ''
-                }`}
-              />
-            </div>
+            <ChevronDown
+              className={`w-4 h-4 text-slate-400 transition-transform ${
+                isOpen ? 'rotate-180' : ''
+              }`}
+            />
           </div>
         </div>
 

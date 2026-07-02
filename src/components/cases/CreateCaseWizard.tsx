@@ -600,7 +600,6 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                         emptyMessage="No matches — searched name, number, phone, and email"
                         placeholder="Search by name, number, phone, or email"
                         required
-                        clearable={false}
                       />
                       <button
                         type="button"
@@ -629,7 +628,6 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                       options={serviceTypes.map(st => ({ id: st.id, name: st.name }))}
                       placeholder="Select service type..."
                       required
-                      clearable={false}
                     />
 
                     <div className="grid grid-cols-2 gap-3">
@@ -639,7 +637,6 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                         onChange={(value) => setFormData({ ...formData, priority: value })}
                         options={casePriorities.map(p => ({ id: p.name.toLowerCase(), name: p.name }))}
                         placeholder="Priority..."
-                        clearable={false}
                       />
 
                       <SearchableSelect
@@ -650,7 +647,6 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                         }
                         options={serviceLocations.map(sl => ({ id: sl.id, name: sl.name }))}
                         placeholder="Location..."
-                        clearable={false}
                       />
                     </div>
 
@@ -809,7 +805,6 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                             options={deviceRoles.map(dr => ({ id: dr.id.toString(), name: dr.name }))}
                             placeholder="Select role..."
                             required
-                            clearable={false}
                           />
 
                           <SearchableSelect
@@ -821,7 +816,6 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                             options={deviceTypes.map(dt => ({ id: dt.id, name: dt.name }))}
                             placeholder="Select device type..."
                             required={index === 0}
-                            clearable={false}
                           />
                         </div>
 
@@ -832,7 +826,6 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                             onChange={(value) => updateDevice(device.id, 'brand_id', value)}
                             options={brands.map(b => ({ id: b.id, name: b.name }))}
                             placeholder="Brand..."
-                            clearable={false}
                           />
 
                           <div>
@@ -871,7 +864,6 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                             }
                             options={capacities.map(c => ({ id: c.id, name: c.name }))}
                             placeholder="Capacity..."
-                            clearable={false}
                             usePortal={true}
                           />
                         </div>
@@ -888,7 +880,6 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                               name: dc.name,
                             }))}
                             placeholder="Condition..."
-                            clearable={false}
                             usePortal={true}
                           />
 
@@ -934,7 +925,6 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                     options={serviceProblems.map(sp => ({ id: sp.id, name: sp.name }))}
                     placeholder={isServerDevice ? "e.g., RAID array failure, cannot boot..." : "Select device problem..."}
                     required
-                    clearable={false}
                   />
 
                   <div>
@@ -991,7 +981,6 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                     }
                     options={deviceEncryption.map(de => ({ id: de.id, name: de.name }))}
                     placeholder="Select encryption type..."
-                    clearable={false}
                   />
 
                   {isFormValid ? (

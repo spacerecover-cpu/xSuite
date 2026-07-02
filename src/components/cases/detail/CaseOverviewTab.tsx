@@ -373,7 +373,6 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
                     onChange={(value) => setEditedCaseData((prev) => ({ ...prev, service_type_id: value }))}
                     options={serviceTypes.map(st => ({ id: st.id, name: st.name }))}
                     placeholder="Select service..."
-                    clearable={false}
                   />
                 </div>
               ) : (
@@ -576,7 +575,6 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
                         options={capacities.map((cap) => ({ id: cap.id, name: cap.name }))}
                         placeholder="Select capacity..."
                         usePortal
-                        clearable={false}
                       />
                     </div>
                   ) : (

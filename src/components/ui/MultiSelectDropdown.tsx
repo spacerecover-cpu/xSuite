@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { AlertCircle, Check, ChevronDown, X, Search } from 'lucide-react';
+import { AlertCircle, Check, ChevronDown, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useFieldA11y } from '../../hooks/useFieldA11y';
 import { useAnchoredPosition } from '../../hooks/useAnchoredPosition';
@@ -148,11 +148,6 @@ export const MultiSelectDropdown = React.forwardRef<HTMLDivElement, MultiSelectD
         el?.scrollIntoView?.({ block: 'nearest' });
       }
     }, [activeIndex, isOpen]);
-
-    const removeOption = (optionId: string, e: React.MouseEvent) => {
-      e.stopPropagation();
-      onChange(value.filter((vid) => vid !== optionId));
-    };
 
     const renderListbox = () => (
       <>
@@ -318,17 +313,9 @@ export const MultiSelectDropdown = React.forwardRef<HTMLDivElement, MultiSelectD
                 {selectedOptions.map((option) => (
                   <span
                     key={option.id}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary/10 text-primary text-xs font-medium rounded-md"
+                    className="inline-flex items-center px-2 py-0.5 bg-primary/10 text-primary text-xs font-medium rounded-md"
                   >
                     {option.name}
-                    <button
-                      type="button"
-                      aria-label={t('ui.select.removeItem', { name: option.name })}
-                      onClick={(e) => removeOption(option.id, e)}
-                      className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
                   </span>
                 ))}
               </div>

@@ -160,7 +160,6 @@ export function DeviceComponentsForm({
                 value={filter}
                 onChange={setFilter}
                 options={filterOptions}
-                clearable={false}
                 size="sm"
                 usePortal
                 aria-label={t('devices.components.filterByStatus', { defaultValue: 'Filter by status' })}
@@ -279,7 +278,6 @@ export function DeviceComponentsForm({
                       value={str(state[selectedDef.key])}
                       onChange={(v) => setStatus(selectedDef, v)}
                       options={statusOptions}
-                      clearable={false}
                       placeholder={t('ui.select.placeholder', { defaultValue: 'Select…' })}
                       size="sm"
                       usePortal
@@ -305,7 +303,6 @@ export function DeviceComponentsForm({
                       value={str(cm.result)}
                       onChange={(v) => updateMeta(ck, { result: v })}
                       options={COMPONENT_RESULT_OPTIONS}
-                      clearable={false}
                       placeholder={t('ui.select.placeholder', { defaultValue: 'Select…' })}
                       size="sm"
                       usePortal

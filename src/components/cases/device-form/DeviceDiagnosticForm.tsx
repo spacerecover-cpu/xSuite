@@ -316,7 +316,6 @@ export function DeviceDiagnosticForm({ state, onChange, options, errors = {}, ca
       options={optionList}
       required={opts.required}
       error={errors[key]}
-      clearable={false}
       placeholder={t('ui.select.placeholder', { defaultValue: 'Select…' })}
       size="sm"
       usePortal

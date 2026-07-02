@@ -119,11 +119,10 @@ describe('MultiSelectDropdown', () => {
     expect(trigger).toHaveAccessibleName('Select accessories...');
   });
 
-  it('gives the chip remove button an accessible name', () => {
+  it('renders selected chips without remove buttons — deselection happens in the list (DESIGN.md → Forms)', () => {
     render(<Harness initial={['a']} />);
-    expect(
-      screen.getByRole('button', { name: 'Remove Apple' })
-    ).toBeInTheDocument();
+    expect(screen.getByText('Apple')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove Apple' })).not.toBeInTheDocument();
   });
 
   describe('RTL logical utilities (Phase 4a proof slice)', () => {
