@@ -52,7 +52,7 @@ function SectionHeader({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-center gap-2 mb-3">
       <span className="w-1 h-4 rounded-full bg-cat-5" aria-hidden="true" />
-      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">{children}</h3>
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">{children}</h3>
     </div>
   );
 }
@@ -60,7 +60,7 @@ function SectionHeader({ children }: { children: ReactNode }) {
 function SidebarCard({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
-      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">{title}</h4>
+      <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">{title}</h4>
       {children}
     </div>
   );
@@ -125,7 +125,7 @@ function DiagnosticStatusStepper({ status }: { status: string }) {
               </span>
               <span className={cn('h-0.5 flex-1', i === STATUS_STEPS.length - 1 ? 'opacity-0' : done ? 'bg-success' : 'bg-slate-200')} />
             </div>
-            <span className={cn('mt-1.5 text-[11px] leading-tight', isActive ? 'font-semibold text-slate-800' : done ? 'text-slate-600' : 'text-slate-400')}>
+            <span className={cn('mt-1.5 text-xs leading-tight', isActive ? 'font-semibold text-slate-800' : done ? 'text-slate-600' : 'text-slate-400')}>
               {label}
             </span>
           </div>
@@ -268,11 +268,11 @@ function RecentNotesPanel({ caseId }: { caseId: string }) {
             const author = nameFor(n.created_by);
             return (
               <li key={n.id} className="flex items-start gap-2.5">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-cat-2 text-white text-[11px] font-semibold shrink-0">
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-cat-2 text-white text-xs font-semibold shrink-0">
                   {initialsFor(author)}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-[11px] text-slate-400" title={`UTC: ${n.created_at}`}>
+                  <p className="text-xs text-slate-400" title={`UTC: ${n.created_at}`}>
                     {formatDateTimeWithConfig(n.created_at, dt)}
                   </p>
                   <p className="text-sm text-slate-700 line-clamp-2 break-words">{n.content}</p>

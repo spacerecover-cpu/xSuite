@@ -78,7 +78,7 @@ interface CaseFinancesTabProps {
 }
 
 const CountPill: React.FC<{ value: number }> = ({ value }) => (
-  <span className="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-semibold leading-none">
+  <span className="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold leading-none">
     {value}
   </span>
 );
@@ -156,24 +156,24 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
           {caseFinancialSummary && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-3">
               <div className="bg-success-muted rounded-lg p-3 border border-success/20">
-                <p className="text-[10px] font-semibold text-success uppercase tracking-wider">Quoted</p>
+                <p className="text-xs font-semibold text-success uppercase tracking-wider">Quoted</p>
                 <p className="text-lg font-bold text-success mt-0.5 truncate tabular-nums">{formatCurrency(caseFinancialSummary.totalQuoted)}</p>
-                <p className="text-[11px] text-success/80 mt-0.5">{caseFinancialSummary.quotesCount} {caseFinancialSummary.quotesCount === 1 ? 'quote' : 'quotes'}</p>
+                <p className="text-xs text-success/80 mt-0.5">{caseFinancialSummary.quotesCount} {caseFinancialSummary.quotesCount === 1 ? 'quote' : 'quotes'}</p>
               </div>
               <div className="bg-info-muted rounded-lg p-3 border border-info/20">
-                <p className="text-[10px] font-semibold text-info uppercase tracking-wider">Invoiced</p>
+                <p className="text-xs font-semibold text-info uppercase tracking-wider">Invoiced</p>
                 <p className="text-lg font-bold text-info mt-0.5 truncate tabular-nums">{formatCurrency(caseFinancialSummary.totalInvoiced)}</p>
-                <p className="text-[11px] text-info/80 mt-0.5">{caseFinancialSummary.invoicesCount} {caseFinancialSummary.invoicesCount === 1 ? 'invoice' : 'invoices'}</p>
+                <p className="text-xs text-info/80 mt-0.5">{caseFinancialSummary.invoicesCount} {caseFinancialSummary.invoicesCount === 1 ? 'invoice' : 'invoices'}</p>
               </div>
               <div className="bg-success/10 rounded-lg p-3 border border-success/25">
-                <p className="text-[10px] font-semibold text-success uppercase tracking-wider">Received</p>
+                <p className="text-xs font-semibold text-success uppercase tracking-wider">Received</p>
                 <p className="text-lg font-bold text-success mt-0.5 truncate tabular-nums">{formatCurrency(caseFinancialSummary.totalPaid)}</p>
-                <p className="text-[11px] text-success/80 mt-0.5">{collectedPct}% collected</p>
+                <p className="text-xs text-success/80 mt-0.5">{collectedPct}% collected</p>
               </div>
               <div className={`rounded-lg p-3 border ${fullyCollected ? 'bg-success-muted border-success/20' : 'bg-warning-muted border-warning/20'}`}>
-                <p className={`text-[10px] font-semibold uppercase tracking-wider ${fullyCollected ? 'text-success' : 'text-warning'}`}>Outstanding</p>
+                <p className={`text-xs font-semibold uppercase tracking-wider ${fullyCollected ? 'text-success' : 'text-warning'}`}>Outstanding</p>
                 <p className={`text-lg font-bold mt-0.5 truncate tabular-nums ${fullyCollected ? 'text-success' : 'text-warning'}`}>{formatCurrency(outstanding)}</p>
-                <p className={`text-[11px] mt-0.5 ${fullyCollected ? 'text-success/80' : 'text-warning/80'}`}>
+                <p className={`text-xs mt-0.5 ${fullyCollected ? 'text-success/80' : 'text-warning/80'}`}>
                   {fullyCollected ? 'Fully collected' : `${invoicesDue} ${invoicesDue === 1 ? 'invoice' : 'invoices'} due`}
                 </p>
               </div>
@@ -194,7 +194,7 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
                   {margin.toFixed(1)}%
                 </span>
               </span>
-              <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-medium text-slate-400">
+              <span className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-slate-400">
                 <Lock className="w-3 h-3" />
                 Owner / Admin only
               </span>
@@ -238,7 +238,7 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
                           </Badge>
                           <span className="text-xs font-medium text-slate-700 tabular-nums">{formatCurrencyWithConfig(quote.total_amount ?? 0, currencyConfig)}</span>
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                        <p className="text-xs text-slate-400 mt-0.5 truncate">
                           {quote.title ? `${quote.title} • ` : ''}Created {formatDate(quote.created_at)}
                           {quote.valid_until && ` • Valid until ${formatDate(quote.valid_until)}`}
                         </p>
@@ -323,7 +323,7 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
                                 e.stopPropagation();
                                 navigate(`/invoices/${invoice.converted_to_invoice_id}`);
                               }}
-                              className="flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 transition-colors"
+                              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
                               title="View converted tax invoice"
                             >
                               <ExternalLink className="w-3 h-3" />
@@ -336,7 +336,7 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
                                 e.stopPropagation();
                                 navigate(`/invoices/${invoice.proforma_invoice_id}`);
                               }}
-                              className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-700 transition-colors"
+                              className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 transition-colors"
                               title="View original proforma"
                             >
                               <span>From Proforma</span>
@@ -352,7 +352,7 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
                             <span className="text-warning tabular-nums">Bal {formatCurrencyWithConfig(invoice.balance_due ?? 0, currencyConfig)}</span>
                           )}
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                        <p className="text-xs text-slate-400 mt-0.5 truncate">
                           Created {formatDate(invoice.created_at)}
                           {invoice.due_date && ` • Due ${formatDate(invoice.due_date)}`}
                         </p>
@@ -449,7 +449,7 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-slate-900 truncate">{payment.payment_number}</p>
-                      <p className="text-[10px] text-slate-400 truncate">
+                      <p className="text-xs text-slate-400 truncate">
                         {formatDate(payment.payment_date)}
                         {payment.payment_method?.name && ` • ${payment.payment_method.name}`}
                         {payment.invoice?.invoice_number && ` • ${payment.invoice.invoice_number}`}
@@ -484,7 +484,7 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
                       <p className="text-xs font-medium text-slate-900 truncate">
                         {expense.description || expense.expense_number}
                       </p>
-                      <p className="text-[10px] text-slate-500 truncate">
+                      <p className="text-xs text-slate-500 truncate">
                         {formatDate(expense.expense_date)}
                         {expense.category?.name && ` • ${expense.category.name}`}
                         {expense.vendor && ` • ${expense.vendor}`}

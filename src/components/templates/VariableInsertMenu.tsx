@@ -63,7 +63,7 @@ export const VariableInsertMenu: React.FC<VariableInsertMenuProps> = ({
         <div className="absolute z-dropdown right-0 mt-1 w-72 max-h-64 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg py-1">
           {Object.entries(grouped).map(([category, items]) => (
             <div key={category}>
-              <p className="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <p className="px-3 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
                 {category}
               </p>
               {items.map((variable) => (

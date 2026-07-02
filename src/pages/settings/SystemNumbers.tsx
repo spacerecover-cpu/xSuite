@@ -275,7 +275,7 @@ export const SystemNumbers: React.FC = () => {
                           ) : hasRow ? (
                             <Badge variant="secondary" size="sm">Configured</Badge>
                           ) : (
-                            <span className="text-[10px] font-medium text-slate-400">Not started</span>
+                            <span className="text-xs font-medium text-slate-400">Not started</span>
                           )}
                           <button
                             onClick={() => handleEdit(displaySeq)}

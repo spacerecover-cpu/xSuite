@@ -289,14 +289,14 @@ export function NotificationsHistory() {
                       <Badge variant="secondary" size="sm">
                         {n.channel}
                       </Badge>
-                      <span className="text-[11px] text-slate-400 font-mono">
+                      <span className="text-xs text-slate-400 font-mono">
                         {n.event_type}
                       </span>
                     </div>
                     {n.body && (
                       <p className="mt-1 text-sm text-slate-600 line-clamp-2">{n.body}</p>
                     )}
-                    <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-400">
+                    <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
                       <span>{formatRelative(n.created_at)}</span>
                       {n.link_url && (
                         <span className="inline-flex items-center gap-0.5">

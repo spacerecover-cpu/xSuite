@@ -171,38 +171,15 @@
       // docs/typography-audit-2026-07-02.md §3.3). RATCHET-DOWN ONLY:
       // remove entries as Phases 4–5 of the standardization program sweep
       // them (cases hotspots + app chrome tokenization); never add files.
+      // Ratcheted down 2026-07-02 (P4d burndown: 31 files -> 5). What remains
+      // is the app chrome's private 9-15px ramp, which migrates to named
+      // tokens in program Phase 5.
       files: [
-        'src/components/cases/SpaceInsufficientWarningModal.tsx',
-        'src/components/cases/detail/CaseFinancesTab.tsx',
-        'src/components/cases/detail/DeviceDetailsModal.tsx',
-        'src/components/cases/device-form/DeviceComponentsForm.tsx',
-        'src/components/cases/device-form/DeviceDiagnosticForm.tsx',
-        'src/components/cases/device-form/DeviceHistoryForm.tsx',
-        'src/components/customers/CustomerFinancialTab.tsx',
-        'src/components/financial/PaymentHistoryTable.tsx',
         'src/components/layout/AppLayout.tsx',
         'src/components/layout/NotificationBell.tsx',
         'src/components/layout/Sidebar.tsx',
         'src/components/layout/SidebarNavItem.tsx',
         'src/components/layout/SidebarSection.tsx',
-        'src/components/settings/documents/TemplateGalleryModal.tsx',
-        'src/components/settings/documents/controls.tsx',
-        'src/components/shared/CommandPalette.tsx',
-        'src/components/stock/StockAlertsDropdown.tsx',
-        'src/components/stock/StockSaleModal.tsx',
-        'src/components/templates/LineItemTemplateFormModal.tsx',
-        'src/components/templates/VariableInsertMenu.tsx',
-        'src/pages/auth/login/FloatingInput.tsx',
-        'src/pages/auth/onboarding/steps/ConfigurationStep.tsx',
-        'src/pages/notifications/NotificationsHistory.tsx',
-        'src/pages/platform-admin/NotificationDLQ.tsx',
-        'src/pages/settings/CategoryDetail.tsx',
-        'src/pages/settings/InventorySettingsPage.tsx',
-        'src/pages/settings/NotificationPreferences.tsx',
-        'src/pages/settings/NotificationTemplatesTab.tsx',
-        'src/pages/settings/SettingsDashboard.tsx',
-        'src/pages/settings/SystemNumbers.tsx',
-        'src/pages/stock/StockLocationsPage.tsx',
       ],
       plugins: { 'xsuite': xsuitePlugin },
       rules: { 'xsuite/no-arbitrary-typography': 'off' },

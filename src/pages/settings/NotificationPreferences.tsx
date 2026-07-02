@@ -578,7 +578,7 @@ const EventRow: React.FC<EventRowProps> = ({
             {event.description}
           </div>
         )}
-        <div className="text-[11px] text-slate-400 mt-1 font-mono">
+        <div className="text-xs text-slate-400 mt-1 font-mono">
           {event.eventType}
         </div>
       </td>
@@ -596,7 +596,7 @@ const EventRow: React.FC<EventRowProps> = ({
               className="px-3 py-4 text-center align-middle"
             >
               <span
-                className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-medium text-slate-400 bg-slate-100 cursor-not-allowed"
+                className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium text-slate-400 bg-slate-100 cursor-not-allowed"
                 title="Coming soon"
               >
                 Soon

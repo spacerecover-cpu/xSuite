@@ -193,7 +193,7 @@ export function CustomerFinancialTab({ customerId, companyId }: CustomerFinancia
                       <td className="py-3 font-mono text-primary">
                         {inv.invoice_number ?? '—'}
                         {inv.is_proforma && (
-                          <span className="ml-1 text-[10px] uppercase text-slate-400 font-sans">
+                          <span className="ml-1 text-xs uppercase text-slate-400 font-sans">
                             Proforma
                           </span>
                         )}

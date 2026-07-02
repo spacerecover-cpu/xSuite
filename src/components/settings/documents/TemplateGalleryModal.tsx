@@ -195,7 +195,7 @@ export const TemplateGalleryModal: React.FC<TemplateGalleryModalProps> = ({
                     </Badge>
                   </div>
                   <p className="mt-1 line-clamp-2 text-xs text-slate-500">{preset.description}</p>
-                  <p className="mt-1.5 text-[11px] font-medium text-slate-400">{preset.fontLabel}</p>
+                  <p className="mt-1.5 text-xs font-medium text-slate-400">{preset.fontLabel}</p>
                 </button>
               );
             })}

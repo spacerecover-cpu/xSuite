@@ -60,7 +60,7 @@ const SettingsCategoryCard: React.FC<{
         <h3 className="pr-4 text-sm font-semibold leading-tight text-slate-900">
           {category.title}
         </h3>
-        <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-slate-400">
+        <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-slate-400">
           {category.description}
         </p>
         <div className="mt-1.5 flex items-center gap-1">
@@ -76,10 +76,10 @@ const SettingsCategoryCard: React.FC<{
                   count ?? 0
                 )}
               </span>
-              <span className="text-[10px] font-medium text-slate-400">items</span>
+              <span className="text-xs font-medium text-slate-400">items</span>
             </>
           ) : (
-            <span className="text-[11px] font-medium text-slate-500">{category.actionLabel}</span>
+            <span className="text-xs font-medium text-slate-500">{category.actionLabel}</span>
           )}
         </div>
       </div>
@@ -155,7 +155,7 @@ export const SettingsDashboard: React.FC = () => {
       <div className="space-y-5">
         {sections.map((section) => (
           <section key={section.label}>
-            <h2 className="mb-2.5 flex items-center gap-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            <h2 className="mb-2.5 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
               {section.label}
               <span className="h-px flex-1 bg-slate-200" aria-hidden="true" />
             </h2>

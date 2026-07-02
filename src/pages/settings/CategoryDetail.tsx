@@ -516,7 +516,7 @@ export const CategoryDetail: React.FC = () => {
             )}
             <span className={`font-medium ${inactive ? 'text-slate-400' : 'text-slate-900'}`}>{row.name}</span>
             {inactive && (
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
                 Hidden
               </span>
             )}

@@ -35,7 +35,7 @@ const ContrastBadge: React.FC<{ fg: string; bg: string; label?: string }> = ({ f
         ? 'bg-warning-muted text-warning'
         : 'bg-danger-muted text-danger';
   return (
-    <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ${tone}`}>
+    <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-semibold ${tone}`}>
       {tier} {ratio.toFixed(1)}:1{label ? ` ${label}` : ''}
     </span>
   );

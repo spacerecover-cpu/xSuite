@@ -55,7 +55,7 @@ export const PaymentHistoryTable: React.FC<PaymentHistoryTableProps> = ({ entrie
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1.5">
                     <span
-                      className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                      className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider ${
                         e.source === 'receipt' ? 'bg-info-muted text-info' : 'bg-primary/10 text-primary'
                       }`}
                     >
@@ -71,7 +71,7 @@ export const PaymentHistoryTable: React.FC<PaymentHistoryTableProps> = ({ entrie
                     )}
                   </div>
                   {e.transaction_id && (
-                    <p className="mt-0.5 font-mono text-[10px] text-slate-400">{e.transaction_id}</p>
+                    <p className="mt-0.5 font-mono text-xs text-slate-400">{e.transaction_id}</p>
                   )}
                 </td>
                 <td className="px-3 py-2 text-slate-700">{e.method ?? '—'}</td>

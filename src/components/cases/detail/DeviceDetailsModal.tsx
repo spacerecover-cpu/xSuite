@@ -40,7 +40,7 @@ const EMPTY = '—';
 function Field({ label, mono, children }: { label: string; mono?: boolean; children: ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</dt>
+      <dt className="mb-0.5 text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</dt>
       <dd className={cn('break-words text-sm text-slate-900', mono && 'font-mono text-xs')}>{children}</dd>
     </div>
   );
@@ -396,7 +396,7 @@ export function DeviceDetailsModal({ device, deviceIndex, caseId, isOpen, onClos
 
           {device.password && (
             <Section icon={KeyRound} title={t('devices.section.security', { defaultValue: 'Security' })} tone="bg-danger-muted text-danger">
-              <dt className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <dt className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">
                 {t('devices.field.password', { defaultValue: 'Device Password' })}
               </dt>
               <div className="flex items-center gap-2">

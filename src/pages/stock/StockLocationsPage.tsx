@@ -166,7 +166,7 @@ const StockLocationsPage: React.FC = () => {
                           </div>
                           <span className="font-medium text-slate-900">{loc.name}</span>
                           {loc.is_default && (
-                            <span className="px-1.5 py-0.5 bg-info-muted text-info text-[10px] font-semibold rounded uppercase tracking-wider">
+                            <span className="px-1.5 py-0.5 bg-info-muted text-info text-xs font-semibold rounded uppercase tracking-wider">
                               Default
                             </span>
                           )}

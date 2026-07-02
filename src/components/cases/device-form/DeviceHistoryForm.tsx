@@ -45,13 +45,13 @@ function SectionHeader({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-center gap-2 mb-3">
       <span className="w-1 h-4 rounded-full bg-cat-6" aria-hidden="true" />
-      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">{children}</h3>
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">{children}</h3>
     </div>
   );
 }
 
 function MetaLabel({ children }: { children: ReactNode }) {
-  return <span className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">{children}</span>;
+  return <span className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">{children}</span>;
 }
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
@@ -84,7 +84,7 @@ function AdditionalDetails({ metadata }: { metadata: unknown }) {
         <dl className="space-y-2">
           {entries.map(([k, v]) => (
             <div key={k}>
-              <dt className="text-[11px] uppercase tracking-wider text-slate-400">{k.replace(/_/g, ' ')}</dt>
+              <dt className="text-xs uppercase tracking-wider text-slate-400">{k.replace(/_/g, ' ')}</dt>
               <dd className="text-sm text-slate-700 break-words">{String(v)}</dd>
             </div>
           ))}
@@ -92,7 +92,7 @@ function AdditionalDetails({ metadata }: { metadata: unknown }) {
       )}
       {attachments.length > 0 && (
         <div className="mt-3">
-          <dt className="text-[11px] uppercase tracking-wider text-slate-400 mb-1">
+          <dt className="text-xs uppercase tracking-wider text-slate-400 mb-1">
             {t('devices.history.attachments', { defaultValue: 'Attachments' })}
           </dt>
           <div className="flex flex-wrap gap-2">
@@ -204,7 +204,7 @@ export function DeviceHistoryForm({ caseId, deviceId }: Props) {
                           {r.status && <Badge variant={statusToBadgeVariant(r.status)} size="sm">{r.status}</Badge>}
                         </div>
                         {r.description && <p className="mt-0.5 text-sm text-slate-500 break-words line-clamp-2">{r.description}</p>}
-                        <p className="mt-1 text-[11px] text-slate-400">
+                        <p className="mt-1 text-xs text-slate-400">
                           {formatDateTimeWithConfig(r.created_at, dt)} · {nameFor(r.created_by)}
                         </p>
                       </div>
@@ -265,7 +265,7 @@ function ActivityDetail({
         <DetailRow label={t('devices.history.detailsField', { defaultValue: 'Details' })} value={row.description} />
         <DetailRow label={t('devices.history.updatedBy', { defaultValue: 'Updated by' })} value={
           <span className="inline-flex items-center gap-2">
-            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-cat-6 text-white text-[10px] font-semibold">{initials(actorName)}</span>
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-cat-6 text-white text-xs font-semibold">{initials(actorName)}</span>
             {actorName}
           </span>
         } />

@@ -250,7 +250,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           }
           aria-autocomplete="list"
         />
-        <kbd className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-[11px] font-mono text-slate-500">
+        <kbd className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-xs font-mono text-slate-500">
           ESC
         </kbd>
       </div>
@@ -268,7 +268,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
             for (let i = 0; i < gi; i++) cursor += groupedItems[i].items.length;
             return (
               <div key={group.name} className="py-1">
-                <div className="px-4 pt-2 pb-1 text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
+                <div className="px-4 pt-2 pb-1 text-xs uppercase tracking-wider text-slate-400 font-semibold">
                   {group.name}
                 </div>
                 {group.items.map((item, i) => {
@@ -306,7 +306,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
         )}
       </div>
 
-      <div className="flex items-center gap-4 px-4 py-2 border-t border-border bg-slate-50 text-[11px] text-slate-500">
+      <div className="flex items-center gap-4 px-4 py-2 border-t border-border bg-slate-50 text-xs text-slate-500">
         <span className="inline-flex items-center gap-1">
           <ArrowUp className="w-3 h-3" />
           <ArrowDown className="w-3 h-3" />

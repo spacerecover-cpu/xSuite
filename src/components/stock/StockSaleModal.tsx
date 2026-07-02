@@ -40,7 +40,7 @@ const SerialLinePicker: React.FC<SerialLinePickerProps> = ({ itemId, value, onCh
 
   return (
     <div className="pt-1">
-      <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
         Serial Number
       </label>
       <SerialNumberSelect

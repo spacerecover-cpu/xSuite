@@ -124,7 +124,7 @@ export const ConfigurationStep = ({
                 >
                   {isRecommended && formData.estimatedCases && (
                     <div className="absolute -top-2.5 left-3">
-                      <span className="inline-flex items-center gap-1 bg-primary text-primary-foreground text-[10px] font-medium px-2 py-0.5 rounded-full">
+                      <span className="inline-flex items-center gap-1 bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full">
                         <Sparkles className="w-2.5 h-2.5" /> Recommended
                       </span>
                     </div>

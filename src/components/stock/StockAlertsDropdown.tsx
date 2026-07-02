@@ -79,7 +79,7 @@ export const StockAlertsDropdown: React.FC = () => {
       >
         <Bell className="w-5 h-5" />
         {count > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-danger text-danger-foreground text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-danger text-danger-foreground text-xs font-bold rounded-full flex items-center justify-center leading-none">
             {count > 9 ? '9+' : count}
           </span>
         )}
@@ -128,7 +128,7 @@ export const StockAlertsDropdown: React.FC = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-slate-700 leading-relaxed">{alert.message}</p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
+                      <p className="text-xs text-slate-400 mt-0.5">
                         {alert.created_at ? new Date(alert.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
                       </p>
                     </div>

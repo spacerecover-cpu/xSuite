@@ -42,8 +42,8 @@ export const FloatingInput = ({
           htmlFor={inputId}
           className={`absolute left-11 transition-all duration-200 pointer-events-none
             peer-placeholder-shown:top-1/2 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-sm
-            peer-focus:top-2.5 peer-focus:translate-y-0 peer-focus:text-[11px]
-            top-2.5 translate-y-0 text-[11px]
+            peer-focus:top-2.5 peer-focus:translate-y-0 peer-focus:text-xs
+            top-2.5 translate-y-0 text-xs
             ${error ? 'text-danger' : 'text-slate-500 peer-focus:text-primary'}`}
         >
           {label}

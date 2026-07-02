@@ -52,7 +52,7 @@ export const SpaceInsufficientWarningModal: React.FC<SpaceInsufficientWarningMod
               <h3 className="text-sm font-semibold text-warning mb-1">
                 Available Space Lower Than Expected Image Size
               </h3>
-              <p className="text-[11px] text-warning leading-relaxed">
+              <p className="text-xs text-warning leading-relaxed">
                 The clone drive <span className="font-mono font-bold">{cloneId}</span> has{' '}
                 <span className="font-semibold">{formatCapacity(availableSpace)}</span> available,
                 but you're attempting to clone an image of{' '}
@@ -71,22 +71,22 @@ export const SpaceInsufficientWarningModal: React.FC<SpaceInsufficientWarningMod
                 <HardDrive className="w-3.5 h-3.5 text-info" />
               </div>
               <div>
-                <p className="text-[9px] font-medium text-slate-500 uppercase tracking-wider">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Clone Drive
                 </p>
                 <p className="text-xs font-bold text-slate-900 font-mono">{cloneId}</p>
               </div>
             </div>
             <div className="space-y-1">
-              <div className="flex items-center justify-between text-[11px]">
+              <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-600">Total Capacity:</span>
                 <span className="font-semibold text-slate-900">{formatCapacity(totalCapacity)}</span>
               </div>
-              <div className="flex items-center justify-between text-[11px]">
+              <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-600">Currently Used:</span>
                 <span className="font-semibold text-info">{formatCapacity(currentUsed)}</span>
               </div>
-              <div className="flex items-center justify-between text-[11px]">
+              <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-600">Available Space:</span>
                 <span className="font-semibold text-success">{formatCapacity(availableSpace)}</span>
               </div>
@@ -99,22 +99,22 @@ export const SpaceInsufficientWarningModal: React.FC<SpaceInsufficientWarningMod
                 <Database className="w-3.5 h-3.5 text-warning" />
               </div>
               <div>
-                <p className="text-[9px] font-medium text-slate-500 uppercase tracking-wider">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Space Analysis
                 </p>
                 <p className="text-xs font-bold text-warning">Insufficient</p>
               </div>
             </div>
             <div className="space-y-1">
-              <div className="flex items-center justify-between text-[11px]">
+              <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-600">Required Space:</span>
                 <span className="font-semibold text-slate-900">{formatCapacity(requiredSpace)}</span>
               </div>
-              <div className="flex items-center justify-between text-[11px]">
+              <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-600">Shortage:</span>
                 <span className="font-semibold text-danger">-{formatCapacity(shortage)}</span>
               </div>
-              <div className="flex items-center justify-between text-[11px]">
+              <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-600">After Clone:</span>
                 <span className="font-semibold text-warning">{utilizationAfter.toFixed(1)}%</span>
               </div>
@@ -126,11 +126,11 @@ export const SpaceInsufficientWarningModal: React.FC<SpaceInsufficientWarningMod
           <div className="flex items-start gap-2">
             <TrendingUp className="w-3.5 h-3.5 text-slate-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <h4 className="text-[11px] font-semibold text-slate-900 mb-1.5">
+              <h4 className="text-xs font-semibold text-slate-900 mb-1.5">
                 Capacity Utilization Visualization
               </h4>
               <div className="space-y-1">
-                <div className="flex items-center justify-between text-[10px] text-slate-600 mb-0.5">
+                <div className="flex items-center justify-between text-xs text-slate-600 mb-0.5">
                   <span>Current Utilization</span>
                   <span className="font-medium">
                     {((currentUsed / totalCapacity) * 100).toFixed(1)}%
@@ -143,7 +143,7 @@ export const SpaceInsufficientWarningModal: React.FC<SpaceInsufficientWarningMod
                   />
                 </div>
 
-                <div className="flex items-center justify-between text-[10px] text-slate-600 mb-0.5 mt-1.5">
+                <div className="flex items-center justify-between text-xs text-slate-600 mb-0.5 mt-1.5">
                   <span>After This Clone (Projected)</span>
                   <span className="font-medium text-warning">
                     {utilizationAfter.toFixed(1)}%
@@ -159,7 +159,7 @@ export const SpaceInsufficientWarningModal: React.FC<SpaceInsufficientWarningMod
                   />
                 </div>
                 {utilizationAfter > 100 && (
-                  <p className="text-[10px] text-danger mt-1.5">
+                  <p className="text-xs text-danger mt-1.5">
                     ⚠️ Warning: This will exceed drive capacity by {(utilizationAfter - 100).toFixed(1)}%
                   </p>
                 )}
@@ -171,13 +171,13 @@ export const SpaceInsufficientWarningModal: React.FC<SpaceInsufficientWarningMod
         <div className="bg-info-muted border border-info/30 rounded-lg p-2.5">
           <div className="flex items-start gap-2">
             <div className="w-6 h-6 rounded-full bg-info/15 flex items-center justify-center flex-shrink-0">
-              <span className="text-info font-bold text-[10px]">ℹ</span>
+              <span className="text-info font-bold text-xs">ℹ</span>
             </div>
             <div className="flex-1">
-              <h4 className="text-[11px] font-semibold text-info mb-0.5">
+              <h4 className="text-xs font-semibold text-info mb-0.5">
                 Why Can I Proceed?
               </h4>
-              <p className="text-[10px] text-info leading-relaxed">
+              <p className="text-xs text-info leading-relaxed">
                 You can override this warning if you determine it's appropriate. Common reasons include:
                 the actual image size may be smaller than estimated, compressed images may use less space,
                 or you plan to free space by extracting/archiving other clones shortly. This warning
