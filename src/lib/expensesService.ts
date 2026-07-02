@@ -5,7 +5,7 @@ import { logger } from './logger';
 import type { Database } from '../types/database.types';
 import { createFinancialTransaction } from './financialService';
 import { resolveRateContext, getBaseCurrency, getCurrencyDecimals } from './currencyService';
-import { convertToBase, baseAmount } from './financialMath';
+import { convertToBase, baseAmount, roundMoney } from './financialMath';
 import { currentTenantToday } from './tenantToday';
 
 type ExpenseInsert = Database['public']['Tables']['expenses']['Insert'];
@@ -441,6 +441,8 @@ export const approveExpense = async (id: string, approvedBy: string) => {
       netAmount: Number(expense.amount ?? 0),
       taxAmount,
       expenseDate: expense.expense_date ?? null,
+      currency: expense.currency ?? null,
+      exchangeRate: expense.exchange_rate ?? null,
     });
   }
 
@@ -747,23 +749,32 @@ const createExpenseVATRecord = async (args: {
   netAmount: number;
   taxAmount: number;
   expenseDate: string | null;
+  currency: string | null;
+  exchangeRate: number | null;
 }) => {
   const vatRate = args.netAmount > 0 ? Math.round((args.taxAmount / args.netAmount) * 10000) / 100 : 0;
   const taxPeriod = (args.expenseDate ?? (await currentTenantToday())).slice(0, 7); // YYYY-MM
+  const baseCurrency = await getBaseCurrency();
+  const baseDp = await getCurrencyDecimals(baseCurrency);
+  const rate = args.exchangeRate ?? 1;
   const payload = {
     record_type: 'purchase',
     record_id: args.recordId,
     vat_amount: args.vatAmount,
     vat_rate: vatRate,
     tax_period: taxPeriod,
+    currency: args.currency ?? baseCurrency,
+    exchange_rate: rate,
+    vat_amount_base: roundMoney(args.vatAmount * rate, baseDp),
+    taxable_amount_base: roundMoney(args.netAmount * rate, baseDp),
   } as Database['public']['Tables']['vat_records']['Insert'];
 
-  const { error } = await supabase
-    .from('vat_records')
-    .insert([payload]);
-
+  const { error } = await supabase.from('vat_records').insert([payload]);
   if (error) {
     logger.error('Error creating expense VAT record:', error);
+    // Input-VAT posting failures must be LOUD: a silently missing purchase row
+    // understates the reclaim on the filed return (Phase-0 posture).
+    throw error;
   }
 };
 
