@@ -125,7 +125,7 @@ export const FeaturesSettings: React.FC = () => {
   const changeCount = changes.willHide.length + changes.willShow.length;
 
   return (
-    <div className="min-h-screen pb-24">
+    <div className="min-h-screen p-6 pb-24">
       <SettingsPageHeader categoryId="features" />
       <div className="mb-6 flex items-center gap-3">
         <button

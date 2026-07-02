@@ -601,9 +601,7 @@ export const CasesList: React.FC = () => {
   };
 
   return (
-    // AppLayout's <main> already pads 24px on every side — no page padding on
-    // top of it, so the first row of content sits directly under the top bar.
-    <div className="max-w-[1800px] 2xl:max-w-[2400px] mx-auto">
+    <div className="px-6 py-5 max-w-[1800px] 2xl:max-w-[2400px] mx-auto">
       <PageHeaderSlot title="Cases" icon={Briefcase} iconColor="rgb(var(--color-primary))" />
       <CasesCommandCenter
         period={period}

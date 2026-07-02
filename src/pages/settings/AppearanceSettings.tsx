@@ -120,7 +120,7 @@ export const AppearanceSettings: React.FC = () => {
   if (!THEMES.length) return null;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen p-6">
       <SettingsPageHeader categoryId="appearance" />
       <div className="mb-6">
         <button

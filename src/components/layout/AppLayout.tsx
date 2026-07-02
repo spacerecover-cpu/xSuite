@@ -187,7 +187,9 @@ export const AppLayout: React.FC = () => {
           </div>
         </header>
 
-        <main id="main-content" tabIndex={-1} className="flex-1 min-h-0 p-6 overflow-auto focus:outline-none">
+        {/* Pages own their padding (ListPageTemplate px-6 py-5 / bespoke p-6) —
+            main adds none, so nothing double-pads and full-bleed pages can exist. */}
+        <main id="main-content" tabIndex={-1} className="flex-1 min-h-0 overflow-auto focus:outline-none">
           <Suspense fallback={<ContentLoadingFallback />}>
             <Outlet />
           </Suspense>

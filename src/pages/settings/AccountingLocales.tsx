@@ -258,7 +258,7 @@ export const LocalizationCenter: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen p-6">
       <SettingsPageHeader categoryId="localization" />
       <div className="mb-6 flex items-center gap-3">
         <button

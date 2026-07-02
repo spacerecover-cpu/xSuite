@@ -96,7 +96,7 @@ export default function BillingPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-64 p-6">
         <div className="text-gray-500">Loading billing information...</div>
       </div>
     );
@@ -120,7 +120,7 @@ export default function BillingPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="p-6 max-w-5xl mx-auto space-y-6">
       <PageHeaderSlot title="Billing & Subscription" />
 
       {isPastDue && (

@@ -150,7 +150,7 @@ export function NotificationsHistory() {
     (search.trim() ? 1 : 0);
 
   return (
-    <div className="space-y-4">
+    <div className="p-6 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
           <Bell className="w-5 h-5 text-primary" />
