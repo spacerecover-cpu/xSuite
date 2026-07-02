@@ -55,7 +55,18 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
   const { formatCurrency } = useCurrency();
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Expense Details" size="lg" icon={Receipt}>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Expense Details"
+      size="lg"
+      icon={Receipt}
+      footer={
+        <div className="flex items-center justify-end gap-3">
+          <Button variant="ghost" onClick={onClose}>Close</Button>
+        </div>
+      }
+    >
       {isLoading && !expense ? (
         <div role="status" className="py-12 text-center text-sm text-slate-500">
           Loading expense…

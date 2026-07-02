@@ -1,4 +1,3 @@
-import { X } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Dialog } from './Dialog';
 
@@ -27,9 +26,9 @@ export function PhotoViewerModal({ isOpen, onClose, imageUrl, altText }: PhotoVi
       <button
         onClick={onClose}
         aria-label={t('ui.photoViewerClose')}
-        className="absolute -top-3 -end-3 z-10 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-all backdrop-blur-sm group"
+        className="absolute top-3 end-3 z-10 rounded-full bg-white/10 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/20 transition-colors"
       >
-        <X className="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
+        {t('ui.close')}
       </button>
 
       <img

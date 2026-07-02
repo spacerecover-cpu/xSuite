@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { X } from 'lucide-react';
 import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
@@ -163,9 +162,6 @@ export const AnnouncementFormModal: React.FC<AnnouncementFormModalProps> = ({
           <h2 className="text-2xl font-bold text-slate-900">
             {announcement ? 'Edit Announcement' : 'Create Announcement'}
           </h2>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <X className="w-6 h-6" />
-          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto">

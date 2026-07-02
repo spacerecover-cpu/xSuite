@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { HardDrive, Star, X } from 'lucide-react';
+import { HardDrive, Star } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../ui/Button';
 import { Skeleton } from '../ui/Skeleton';
@@ -75,14 +75,6 @@ export const CasePeekPanel: React.FC<CasePeekPanelProps> = ({ caseId, onClose })
             <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Case preview</p>
             <h2 className="truncate text-lg font-bold text-slate-900">{peek?.case_no ?? '…'}</h2>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close preview"
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-          >
-            <X className="h-5 w-5" aria-hidden="true" />
-          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">

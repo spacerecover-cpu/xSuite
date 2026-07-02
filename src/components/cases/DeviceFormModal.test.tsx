@@ -74,15 +74,17 @@ describe('DeviceFormModal — tabbed shell', () => {
     });
   });
 
-  it('matches the design: titled sections, a header close button, and no role/password/primary/delete controls', async () => {
+  it('matches the design: titled sections, footer-only dismissal, and no role/password/primary/delete controls', async () => {
     renderModal();
 
     // Details tab renders the two titled sections from the design.
     expect(await screen.findByText('Basic Information')).toBeInTheDocument();
     expect(screen.getByText('Technical Information')).toBeInTheDocument();
 
-    // Header close affordance is present (replaces the old role context row).
-    expect(screen.getByRole('button', { name: /Close/i })).toBeInTheDocument();
+    // The top-right X pattern is removed platform-wide (DESIGN.md → Overlays);
+    // dismissal is the pinned footer Cancel + ESC/backdrop.
+    expect(screen.queryByRole('button', { name: /^Close$/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /Cancel/i })).toBeInTheDocument();
 
     // Structural controls are intentionally absent from the UI. Their values are
     // still hydrated and written back on save — they just have no input here.

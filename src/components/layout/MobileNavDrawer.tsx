@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 
@@ -53,14 +52,6 @@ export const MobileNavDrawer: React.FC<MobileNavDrawerProps> = ({ isOpen, onClos
         inert={!isOpen}
         className={`absolute inset-y-0 ${isLeft ? 'left-0' : 'right-0'} w-72 max-w-[85vw] bg-surface shadow-2xl transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : closedTranslate}`}
       >
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close navigation menu"
-          className="absolute top-3.5 end-3 z-10 w-7 h-7 flex items-center justify-center rounded-lg bg-slate-200 text-slate-600 hover:bg-slate-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <X className="w-4 h-4" />
-        </button>
         <Sidebar mode="drawer" />
       </div>
     </div>,

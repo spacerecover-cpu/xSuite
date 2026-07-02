@@ -18,15 +18,31 @@ describe('Modal', () => {
     expect(dialog).toHaveAttribute('aria-labelledby', heading.id);
   });
 
-  it('with empty title renders no header but keeps a labelled floating close button', () => {
+  it('with empty title renders no header and no floating control (X pattern removed)', () => {
     render(<Modal isOpen onClose={() => {}} title=""><p>body</p></Modal>);
     expect(screen.queryByRole('heading')).toBeNull();
-    expect(screen.getByRole('button', { name: /close/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /close/i })).toBeNull();
   });
 
-  it('hides every close button when showCloseButton is false', () => {
-    render(<Modal isOpen onClose={() => {}} title="Forced" showCloseButton={false}><p>body</p></Modal>);
+  it('never renders a top-right X close control (removed platform-wide)', () => {
+    render(<Modal isOpen onClose={() => {}} title="Forced"><p>body</p></Modal>);
     expect(screen.queryByRole('button', { name: /close/i })).toBeNull();
+  });
+
+  it('renders a pinned footer region (border-t) when footer is provided', () => {
+    render(
+      <Modal isOpen onClose={() => {}} title="X" footer={<button>Done</button>}>
+        <p>body</p>
+      </Modal>,
+    );
+    const done = screen.getByRole('button', { name: 'Done' });
+    expect((done.parentElement as HTMLElement).className).toContain('border-t');
+    expect((done.parentElement as HTMLElement).className).toContain('shrink-0');
+  });
+
+  it('omits the footer region when footer is absent', () => {
+    render(<Modal isOpen onClose={() => {}} title="X"><p>body</p></Modal>);
+    expect(screen.getByRole('dialog').querySelector('.border-t.shrink-0')).toBeNull();
   });
 
   it('applies the wide maxWidth class to the panel (overrides Dialog default)', () => {
@@ -40,25 +56,21 @@ describe('Modal', () => {
     expect(screen.getByRole('dialog')).toHaveClass('max-w-4xl');
   });
 
-  it('calls onClose from the header close button', async () => {
+  it('calls onClose from a consumer footer button (the standard dismissal path)', async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
-    render(<Modal isOpen onClose={onClose} title="X"><p>body</p></Modal>);
-    await user.click(screen.getByRole('button', { name: /close/i }));
+    render(
+      <Modal isOpen onClose={onClose} title="X" footer={<button onClick={onClose}>Close</button>}>
+        <p>body</p>
+      </Modal>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('drops headerAction when title is empty (preserves the no-header contract)', () => {
     render(<Modal isOpen onClose={() => {}} title="" headerAction={<button>Download</button>}><p>body</p></Modal>);
     expect(screen.queryByRole('button', { name: 'Download' })).toBeNull();
-  });
-
-  it('calls onClose from the floating close button when there is no title', async () => {
-    const onClose = vi.fn();
-    const user = userEvent.setup();
-    render(<Modal isOpen onClose={onClose} title=""><p>body</p></Modal>);
-    await user.click(screen.getByRole('button', { name: /close/i }));
-    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('closes on backdrop click by default (behavior preserved)', async () => {
@@ -77,7 +89,7 @@ describe('Modal', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('redirects initial focus to initialFocusRef instead of the close button', () => {
+  it('redirects initial focus to initialFocusRef', () => {
     const inputRef = createRef<HTMLInputElement>();
     render(
       <Modal isOpen onClose={() => {}} title="X" initialFocusRef={inputRef}>
@@ -99,11 +111,5 @@ describe('Modal', () => {
       expect(wrapper.className).not.toContain('ml-2');
     });
 
-    it('floating (no-title) close button anchors to the logical end-3 corner, not right-3', () => {
-      render(<Modal isOpen onClose={() => {}} title=""><p>body</p></Modal>);
-      const btn = screen.getByRole('button', { name: /close/i });
-      expect(btn.className).toContain('end-3');
-      expect(btn.className).not.toContain('right-3');
-    });
   });
 });

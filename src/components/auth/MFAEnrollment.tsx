@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShieldCheck, Copy, Check, Loader2, AlertCircle, X } from 'lucide-react';
+import { ShieldCheck, Copy, Check, Loader2, AlertCircle } from 'lucide-react';
 import { mfaService, MFAEnrollResponse } from '../../lib/mfaService';
 import { useAuth } from '../../contexts/AuthContext';
 import { Dialog } from '../ui/Dialog';
+import { Button } from '../ui/Button';
 
 interface MFAEnrollmentProps {
   isOpen: boolean;
@@ -88,11 +89,6 @@ export const MFAEnrollment: React.FC<MFAEnrollmentProps> = ({ isOpen, onClose, o
             <ShieldCheck className="w-5 h-5 text-primary" />
             <h2 className="text-lg font-semibold text-slate-900">Set Up Two-Factor Authentication</h2>
           </div>
-          {step !== 'complete' && (
-            <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded">
-              <X className="w-5 h-5 text-slate-500" />
-            </button>
-          )}
         </div>
 
         <div className="p-6">
@@ -137,16 +133,27 @@ export const MFAEnrollment: React.FC<MFAEnrollmentProps> = ({ isOpen, onClose, o
                 </div>
               </div>
 
-              <button
-                onClick={() => {
-                  setStep('verify');
-                  setTimeout(() => inputRef.current?.focus(), 100);
-                }}
-                className="w-full px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 transition-colors"
-              >
-                I've scanned the QR code
-              </button>
+              <div className="flex gap-3">
+                <Button variant="ghost" onClick={onClose} className="flex-1">
+                  Cancel
+                </Button>
+                <button
+                  onClick={() => {
+                    setStep('verify');
+                    setTimeout(() => inputRef.current?.focus(), 100);
+                  }}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  I've scanned the QR code
+                </button>
+              </div>
             </div>
+          )}
+
+          {step === 'setup' && !enrollment && !loading && (
+            <Button variant="ghost" onClick={onClose} className="w-full">
+              Cancel
+            </Button>
           )}
 
           {step === 'verify' && (

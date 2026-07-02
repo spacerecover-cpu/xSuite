@@ -1,5 +1,4 @@
 import { useId, type ReactNode, type ElementType, type RefObject } from 'react';
-import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Dialog } from './Dialog';
 import { cn } from '../../lib/utils';
@@ -14,7 +13,12 @@ interface ModalProps {
   icon?: ElementType;
   headerAction?: ReactNode;
   headerBadges?: ReactNode;
-  showCloseButton?: boolean;
+  /** Pinned footer region (border-t, never scrolls). Consumers render their
+   *  own button row inside (convention: `flex items-center justify-end gap-3`;
+   *  destructive actions left via justify-between). Dismissal is footer
+   *  buttons + ESC + backdrop — the top-right X pattern was removed
+   *  platform-wide 2026-07-02 (DESIGN.md → Overlays). */
+  footer?: ReactNode;
   ariaLabel?: string;
   initialFocusRef?: RefObject<HTMLElement | null>;
   closeOnBackdrop?: boolean;
@@ -49,7 +53,7 @@ export function Modal({
   icon: Icon,
   headerAction,
   headerBadges,
-  showCloseButton = true,
+  footer,
   ariaLabel,
   initialFocusRef,
   closeOnBackdrop = true,
@@ -70,38 +74,20 @@ export function Modal({
       closeOnEscape={closeOnEscape}
       className={cn(widthClass, 'flex flex-col overflow-hidden')}
     >
-      {title ? (
+      {title && (
         <div className="no-print flex items-center justify-between p-3 border-b border-border">
           <div className="flex items-center gap-3">
             {Icon && <Icon className="w-5 h-5 text-primary" />}
             <h2 id={titleId} className="text-lg font-semibold text-slate-900">{title}</h2>
             {headerBadges && <div className="flex items-center gap-2 ms-2">{headerBadges}</div>}
           </div>
-          <div className="flex items-center gap-2">
-            {headerAction && <div>{headerAction}</div>}
-            {showCloseButton && (
-              <button
-                onClick={onClose}
-                aria-label={t('ui.close')}
-                className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            )}
-          </div>
+          {headerAction && <div className="flex items-center gap-2">{headerAction}</div>}
         </div>
-      ) : (
-        showCloseButton && (
-          <button
-            onClick={onClose}
-            aria-label={t('ui.close')}
-            className="no-print absolute top-3 end-3 z-10 p-1.5 hover:bg-surface-muted rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )
       )}
       <div className="p-4 overflow-y-auto flex-1">{children}</div>
+      {footer && (
+        <div className="no-print shrink-0 border-t border-border px-4 py-3">{footer}</div>
+      )}
     </Dialog>
   );
 }

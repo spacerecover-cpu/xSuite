@@ -188,7 +188,18 @@ export const ManageCompaniesModal: React.FC<ManageCompaniesModalProps> = ({
     ((pending?.type === 'end' || pending?.type === 'make_individual') && endReason.trim().length === 0);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Companies — ${customerName}`} icon={Building2} size="lg">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`Companies — ${customerName}`}
+      icon={Building2}
+      size="lg"
+      footer={
+        <div className="flex items-center justify-end gap-3">
+          <Button variant="ghost" onClick={onClose}>Close</Button>
+        </div>
+      }
+    >
       <div className="space-y-5">
         {/* Current relationships */}
         <div>

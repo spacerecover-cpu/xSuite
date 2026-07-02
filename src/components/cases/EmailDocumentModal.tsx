@@ -387,10 +387,10 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
           </div>
           <button
             onClick={() => setShowPdfPreview(false)}
-            className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+            className="rounded-md bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-200 transition-colors"
             aria-label="Close preview"
           >
-            <XIcon className="w-5 h-5" />
+            Close
           </button>
         </div>
         <div className="flex-1 p-4 overflow-hidden">

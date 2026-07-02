@@ -181,7 +181,19 @@ export default function InventoryDetailModal({
 
   if (!item) {
     return (
-      <Modal isOpen={isOpen} onClose={onClose} title="Item Not Found" size="md">
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title="Item Not Found"
+        size="md"
+        footer={
+          <div className="flex items-center justify-end">
+            <Button variant="ghost" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+        }
+      >
         <div className="text-center py-12">
           <Package className="mx-auto h-12 w-12 text-slate-400" />
           <h3 className="mt-2 text-sm font-medium text-slate-900">Item not found</h3>
@@ -250,6 +262,11 @@ export default function InventoryDetailModal({
                 Edit
               </Button>
             )}
+          </div>
+        }
+        footer={
+          <div className="flex items-center justify-end gap-3">
+            <Button variant="ghost" onClick={onClose}>Close</Button>
           </div>
         }
       >

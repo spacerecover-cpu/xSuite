@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
+import { Button } from '../ui/Button';
 import { PDFDownloadButton } from '../shared/PDFDownloadButton';
 import { PaymentReceiptDocument } from '../documents/PaymentReceiptDocument';
 import { useCurrency } from '../../hooks/useCurrency';
@@ -79,7 +80,18 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   );
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="" size="large" headerAction={downloadButton}>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Payment Receipt"
+      size="large"
+      headerAction={downloadButton}
+      footer={
+        <div className="flex items-center justify-end gap-3">
+          <Button variant="ghost" onClick={onClose}>Close</Button>
+        </div>
+      }
+    >
       <style>{`
         #receipt-print-frame {
           position: relative;

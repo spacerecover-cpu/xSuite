@@ -8,7 +8,7 @@ import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { Tabs, type TabDef } from '../ui/Tabs';
-import { HardDrive, Stethoscope, Cpu, History, X, Save } from 'lucide-react';
+import { HardDrive, Stethoscope, Cpu, History, Save } from 'lucide-react';
 import { diagnosticsService } from '../../lib/diagnosticsService';
 import { setPrimaryDevice } from '../../lib/deviceService';
 import { logger } from '../../lib/logger';
@@ -461,21 +461,13 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
       closeOnBackdrop={false}
       className="w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col rounded-2xl bg-surface border border-border shadow-[0_12px_40px_rgba(15,23,42,0.12)]"
     >
-      {/* Fixed header: title + close, thin divider underneath */}
+      {/* Fixed header: title, thin divider underneath */}
       <div className="shrink-0 flex items-center justify-between px-6 h-12 border-b border-border">
         <h2 id={titleId} className="text-lg font-bold tracking-tight text-slate-900">
           {isEditMode
             ? t('devices.action.editTitle', { defaultValue: 'Edit Device' })
             : t('devices.action.addTitle', { defaultValue: 'Add Device' })}
         </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={t('common.close', { defaultValue: 'Close' })}
-          className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-surface-muted hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          <X className="w-5 h-5" />
-        </button>
       </div>
 
       {/* Fixed tab navigation (colored pills) */}

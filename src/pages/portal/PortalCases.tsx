@@ -7,6 +7,7 @@ import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { Modal } from '../../components/ui/Modal';
+import { Button } from '../../components/ui/Button';
 import { FileText, Package, Clock, CheckCircle, XCircle, Info } from 'lucide-react';
 import { formatDate } from '../../lib/format';
 import { fetchPortalVisibility, getVisibleCaseIds } from '../../lib/portalVisibility';
@@ -271,6 +272,11 @@ export const PortalCases: React.FC = () => {
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
         title={t('portal.cases.caseDetails')}
+        footer={
+          <div className="flex items-center justify-end gap-3">
+            <Button variant="ghost" onClick={() => setIsDetailModalOpen(false)}>{t('ui.close')}</Button>
+          </div>
+        }
       >
         {selectedCase && (
           <div className="space-y-6">

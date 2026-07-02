@@ -114,7 +114,8 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
       onClose={() => {}}
       title="Change Your Password"
       size="md"
-      showCloseButton={false}
+      closeOnBackdrop={false}
+      closeOnEscape={false}
       initialFocusRef={firstFieldRef}
     >
       <form onSubmit={handleSubmit} className="space-y-6">

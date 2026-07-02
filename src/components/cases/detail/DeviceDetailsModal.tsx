@@ -1,7 +1,7 @@
 import { useEffect, useId, useState, type ComponentType, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Cpu, Database, Eye, EyeOff, Info, KeyRound, Package, Shield, Star, Stethoscope, X } from 'lucide-react';
+import { Cpu, Database, Eye, EyeOff, Info, KeyRound, Package, Shield, Star, Stethoscope } from 'lucide-react';
 import { Dialog } from '../../ui/Dialog';
 import { Button } from '../../ui/Button';
 import { Badge } from '../../ui/Badge';
@@ -300,14 +300,6 @@ export function DeviceDetailsModal({ device, deviceIndex, caseId, isOpen, onClos
                 {t('devices.detail.markBackup', { defaultValue: 'Mark as Backup' })}
               </Button>
             )}
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label={t('common.close', { defaultValue: 'Close' })}
-              className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-surface/70 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <X className="h-5 w-5" />
-            </button>
           </div>
         </div>
       </div>
@@ -436,7 +428,7 @@ export function DeviceDetailsModal({ device, deviceIndex, caseId, isOpen, onClos
           createdByName={device.created_by_profile?.full_name ?? null}
           createdLabel={t('devices.detail.added', { defaultValue: 'Added' })}
         />
-        <Button variant="secondary" size="md" onClick={onClose} disabled={busy} className="h-10 rounded-[10px] px-5">
+        <Button variant="ghost" onClick={onClose} disabled={busy}>
           {t('common.close', { defaultValue: 'Close' })}
         </Button>
       </div>
