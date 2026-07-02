@@ -20,6 +20,17 @@ function psqlRows(sql: string): string[] {
 }
 
 live('vat_records contra reversal (append-only sale-side ledger)', () => {
+  // The issue row and its void-reversal row are inserted in the SAME transaction, so
+  // they share an identical now()/created_at — any positional/ORDER BY assertion would
+  // flake. Assert only the order-independent contra invariants: exactly 2 sale rows,
+  // their vat_amounts (as a numerically-sorted multiset) equal the expected pair, and
+  // they sum to exactly 0.
+  function assertContraPair(amounts: number[], expected: [number, number]): void {
+    expect(amounts).toHaveLength(2);
+    expect([...amounts].sort((a, b) => a - b)).toEqual([...expected].sort((a, b) => a - b));
+    expect(amounts.reduce((a, b) => a + b, 0)).toBe(0);
+  }
+
   it('voiding a tax invoice posts an offsetting -VAT sale row (2 rows net to 0)', () => {
     const rows = psqlRows(`
       BEGIN;
@@ -32,16 +43,13 @@ live('vat_records contra reversal (append-only sale-side ledger)', () => {
       UPDATE public.invoices SET status='void' WHERE invoice_number='P0-REGR-VAT-INV';
       SELECT vr.vat_amount
       FROM public.vat_records vr JOIN public.invoices i ON i.id = vr.record_id
-      WHERE i.invoice_number = 'P0-REGR-VAT-INV'
-      ORDER BY vr.created_at;
+      WHERE i.invoice_number = 'P0-REGR-VAT-INV';
       ROLLBACK;
     `);
-    const amounts = rows.map(Number);
-    expect(amounts).toEqual([5, -5]);
-    expect(amounts.reduce((a, b) => a + b, 0)).toBe(0);
+    assertContraPair(rows.map(Number), [5, -5]);
   });
 
-  it('issuing then voiding a credit note posts -VAT then +VAT sale rows', () => {
+  it('issuing then voiding a credit note posts a -VAT and a +VAT sale row (net to 0)', () => {
     const rows = psqlRows(`
       BEGIN;
       SET LOCAL app.bypass_tenant_guard = 'true';
@@ -59,11 +67,9 @@ live('vat_records contra reversal (append-only sale-side ledger)', () => {
       UPDATE public.credit_notes SET status='void' WHERE credit_note_number='P0-REGR-CN-0001';
       SELECT vr.vat_amount
       FROM public.vat_records vr JOIN public.credit_notes cn ON cn.id = vr.record_id
-      WHERE cn.credit_note_number = 'P0-REGR-CN-0001'
-      ORDER BY vr.created_at;
+      WHERE cn.credit_note_number = 'P0-REGR-CN-0001';
       ROLLBACK;
     `);
-    const amounts = rows.map(Number);
-    expect(amounts).toEqual([-2, 2]);
+    assertContraPair(rows.map(Number), [-2, 2]);
   });
 });
