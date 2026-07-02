@@ -16645,38 +16645,50 @@ export type Database = {
       vat_records: {
         Row: {
           created_at: string
+          currency: string | null
           deleted_at: string | null
+          exchange_rate: number | null
           id: string
           record_id: string
           record_type: string
           tax_period: string | null
+          taxable_amount_base: number | null
           tenant_id: string
           updated_at: string
           vat_amount: number
+          vat_amount_base: number | null
           vat_rate: number
         }
         Insert: {
           created_at?: string
+          currency?: string | null
           deleted_at?: string | null
+          exchange_rate?: number | null
           id?: string
           record_id: string
           record_type: string
           tax_period?: string | null
+          taxable_amount_base?: number | null
           tenant_id: string
           updated_at?: string
           vat_amount: number
+          vat_amount_base?: number | null
           vat_rate: number
         }
         Update: {
           created_at?: string
+          currency?: string | null
           deleted_at?: string | null
+          exchange_rate?: number | null
           id?: string
           record_id?: string
           record_type?: string
           tax_period?: string | null
+          taxable_amount_base?: number | null
           tenant_id?: string
           updated_at?: string
           vat_amount?: number
+          vat_amount_base?: number | null
           vat_rate?: number
         }
         Relationships: [
