@@ -164,7 +164,7 @@ export async function getTenantsList(filters?: {
 
   if (filters?.search) {
     const s = sanitizeFilterValue(filters.search);
-    query = query.or(`company_name.ilike.%${s}%,email.ilike.%${s}%`);
+    query = query.or(`company_name.ilike.%${s}%,email.ilike.%${s}%,tenant_code.ilike.%${s}%`);
   }
 
   const { data: tenants } = await query;

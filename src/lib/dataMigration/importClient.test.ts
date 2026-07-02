@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { ParsedWorkbook } from './workbookContract';
+import type { ParsedWorkbook, RawRow } from './workbookContract';
 import { IMPORT_ORDER } from './workbookContract';
 
 const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
@@ -10,10 +10,7 @@ vi.mock('./workbookBuilder', () => ({ buildWorkbook: vi.fn(() => new ArrayBuffer
 import { runImport } from './importClient';
 
 function empty(): ParsedWorkbook {
-  return {
-    companies: [], customers: [], relationships: [], cases: [], devices: [],
-    quotes: [], quoteItems: [], invoices: [], invoiceLineItems: [], notes: [], statusHistory: [],
-  };
+  return Object.fromEntries(IMPORT_ORDER.map((e) => [e, [] as RawRow[]])) as ParsedWorkbook;
 }
 
 function mockRpc(insertedOk = true) {
@@ -38,7 +35,7 @@ describe('runImport orchestration', () => {
     mockRpc();
     const wb = empty();
     wb.customers = [{ legacy_id: 'CU1' }]; // missing required customer_name
-    await expect(runImport(wb, { filename: 'x.xlsx', hash: 'h' }, () => {})).rejects.toThrow(/validation/i);
+    await expect(runImport(wb, { filename: 'x.xlsx', hash: 'h' }, () => {}, 'records')).rejects.toThrow(/validation/i);
     expect(rpc).not.toHaveBeenCalled();
   });
 
@@ -47,7 +44,7 @@ describe('runImport orchestration', () => {
     const wb = empty();
     wb.companies = [{ legacy_id: 'C1', name: 'Acme' }];
     wb.customers = [{ legacy_id: 'CU1', customer_name: 'Jo' }];
-    await runImport(wb, { filename: 'x.xlsx', hash: 'h' }, () => {});
+    await runImport(wb, { filename: 'x.xlsx', hash: 'h' }, () => {}, 'records');
 
     const calls = rpc.mock.calls.map((c) => c[0]);
     expect(calls[0]).toBe('data_migration_create_run');
@@ -63,7 +60,7 @@ describe('runImport orchestration', () => {
     mockRpc();
     const wb = empty();
     wb.customers = Array.from({ length: 1200 }, (_, i) => ({ legacy_id: 'CU' + i, customer_name: 'n' + i }));
-    await runImport(wb, { filename: 'x.xlsx', hash: 'h' }, () => {});
+    await runImport(wb, { filename: 'x.xlsx', hash: 'h' }, () => {}, 'records');
     const custBatches = rpc.mock.calls.filter((c) => c[0] === 'data_migration_import_batch' && c[1].p_entity_type === 'customers');
     expect(custBatches).toHaveLength(3); // 500 + 500 + 200
     expect((custBatches[0][1].p_rows as unknown[]).length).toBe(500);
@@ -74,7 +71,7 @@ describe('runImport orchestration', () => {
     mockRpc(false);
     const wb = empty();
     wb.customers = [{ legacy_id: 'CU1', customer_name: 'Jo' }];
-    const summary = await runImport(wb, { filename: 'x.xlsx', hash: 'h' }, () => {});
+    const summary = await runImport(wb, { filename: 'x.xlsx', hash: 'h' }, () => {}, 'records');
     expect(summary.runId).toBe('run-1');
     expect(summary.counts.customers).toEqual({ inserted: 0, skipped: 0, error: 1 });
     expect(summary.errorReport).toBeInstanceOf(ArrayBuffer);
@@ -89,7 +86,7 @@ describe('runImport orchestration', () => {
     });
     const wb = empty();
     wb.customers = [{ legacy_id: 'CU1', customer_name: 'Jo' }];
-    const summary = await runImport(wb, { filename: 'x.xlsx', hash: 'h' }, () => {});
+    const summary = await runImport(wb, { filename: 'x.xlsx', hash: 'h' }, () => {}, 'records');
     expect(summary.counts.customers).toEqual({ inserted: 0, skipped: 1, error: 0 });
   });
 });

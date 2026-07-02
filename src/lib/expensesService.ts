@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { sanitizeFilterValue } from './postgrestSanitizer';
+import { buildExpenseSearchOr } from './searchResolvers';
 import { logger } from './logger';
 import type { Database } from '../types/database.types';
 import { createFinancialTransaction } from './financialService';
@@ -150,7 +151,7 @@ export const fetchExpenses = async (filters?: {
 
   if (filters?.search) {
     const s = sanitizeFilterValue(filters.search);
-    query = query.or(`expense_number.ilike.%${s}%,description.ilike.%${s}%,vendor.ilike.%${s}%`);
+    query = query.or(await buildExpenseSearchOr(s));
   }
 
   if (filters?.submittedBy) {

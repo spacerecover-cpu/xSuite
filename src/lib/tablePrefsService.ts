@@ -83,6 +83,106 @@ export async function setUserTablePrefs(
   }
 }
 
+/**
+ * Tenant-wide rows-per-page for list tables. Lives in
+ * company_settings.metadata.list_page_size next to table_columns; every
+ * paginated list reads it via useListPageSize().
+ */
+export const LIST_PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
+export const DEFAULT_LIST_PAGE_SIZE = 50;
+
+/** Guard against corrupt metadata / string round-trips: only allowed options pass. */
+export function normalizeListPageSize(value: unknown): number | undefined {
+  const n =
+    typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
+  return (LIST_PAGE_SIZE_OPTIONS as readonly number[]).includes(n) ? n : undefined;
+}
+
+export async function getTenantListPageSize(): Promise<number | undefined> {
+  const settings = await getOrCreateCompanySettings();
+  const metadata = (settings.metadata ?? {}) as Record<string, unknown>;
+  return normalizeListPageSize(metadata.list_page_size);
+}
+
+export async function setTenantListPageSize(size: number): Promise<void> {
+  const normalized = normalizeListPageSize(size);
+  if (normalized === undefined) throw new Error(`Invalid rows-per-page value: ${size}`);
+  const settings = await getOrCreateCompanySettings();
+  const metadata = {
+    ...((settings.metadata ?? {}) as Record<string, unknown>),
+    list_page_size: normalized,
+  };
+  await updateCompanySettings({ metadata: metadata as Json });
+  invalidateCompanySettingsCache();
+  writeListPageSizeHint(normalized);
+}
+
+const LIST_PAGE_SIZE_HINT_KEY = 'xsuite_list_page_size';
+
+/** localStorage hint so lists render at the tenant's size on first paint. */
+export function readListPageSizeHint(): number | undefined {
+  try {
+    return normalizeListPageSize(localStorage.getItem(LIST_PAGE_SIZE_HINT_KEY));
+  } catch {
+    return undefined;
+  }
+}
+
+export function writeListPageSizeHint(size: number): void {
+  try {
+    localStorage.setItem(LIST_PAGE_SIZE_HINT_KEY, String(size));
+  } catch {
+    // Best-effort hint only.
+  }
+}
+
+/**
+ * Tenant-wide visibility of the bulk-selection checkboxes on list tables
+ * (company_settings.metadata.list_selection_checkboxes). Hidden = lists render
+ * without the checkbox column; bulk actions stay dormant.
+ */
+export function normalizeListSelectionEnabled(value: unknown): boolean | undefined {
+  if (typeof value === 'boolean') return value;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return undefined;
+}
+
+export async function getTenantListSelectionEnabled(): Promise<boolean | undefined> {
+  const settings = await getOrCreateCompanySettings();
+  const metadata = (settings.metadata ?? {}) as Record<string, unknown>;
+  return normalizeListSelectionEnabled(metadata.list_selection_checkboxes);
+}
+
+export async function setTenantListSelectionEnabled(enabled: boolean): Promise<void> {
+  const settings = await getOrCreateCompanySettings();
+  const metadata = {
+    ...((settings.metadata ?? {}) as Record<string, unknown>),
+    list_selection_checkboxes: enabled,
+  };
+  await updateCompanySettings({ metadata: metadata as Json });
+  invalidateCompanySettingsCache();
+  writeListSelectionHint(enabled);
+}
+
+const LIST_SELECTION_HINT_KEY = 'xsuite_list_selection';
+
+export function readListSelectionHint(): boolean | undefined {
+  try {
+    return normalizeListSelectionEnabled(localStorage.getItem(LIST_SELECTION_HINT_KEY));
+  } catch {
+    return undefined;
+  }
+}
+
+export function writeListSelectionHint(enabled: boolean): void {
+  try {
+    localStorage.setItem(LIST_SELECTION_HINT_KEY, String(enabled));
+  } catch {
+    // Best-effort hint only.
+  }
+}
+
 const hintKey = (tableKey: string) => `xsuite_tablecols_${tableKey}`;
 
 /** localStorage hint so the table renders with the user's columns on first paint. */

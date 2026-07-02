@@ -9,9 +9,8 @@ import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
 import { KpiRow } from '../../components/templates/KpiRow';
 import { ResourceCloneDriveModal } from '../../components/resources/ResourceCloneDriveModal';
+import { useListPageSize } from '../../hooks/useListPageSize';
 import { HardDrive, Search, Filter, Plus, AlertCircle, CreditCard as Edit2, MapPin, Calendar, ArrowUpDown, FileText, X } from 'lucide-react';
-
-const PAGE_SIZE = 50;
 
 export const CloneDrivesList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,13 +23,14 @@ export const CloneDrivesList: React.FC = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const pageSize = useListPageSize();
 
   // Client-side pagination: the list is filtered/sorted in memory (and rows
   // expand), so we bound the DOM by slicing the sorted set. Reset to page 0 when
   // the filtered/sorted set changes so the view never lands on an empty page.
   useEffect(() => {
     setPage(0);
-  }, [searchTerm, statusFilter, driveTypeFilter, sortField, sortDirection]);
+  }, [searchTerm, statusFilter, driveTypeFilter, sortField, sortDirection, pageSize]);
 
   const { data: resourceCloneDrives = [], isLoading } = useQuery({
     queryKey: ['resource_clone_drives'],
@@ -166,7 +166,7 @@ export const CloneDrivesList: React.FC = () => {
     return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
   });
 
-  const pagedDrives = sortedDrives.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const pagedDrives = sortedDrives.slice(page * pageSize, (page + 1) * pageSize);
 
   const stats = {
     total: resourceCloneDrives.length,
@@ -451,7 +451,7 @@ export const CloneDrivesList: React.FC = () => {
       }
       pager={{
         page,
-        pageSize: PAGE_SIZE,
+        pageSize,
         total: sortedDrives.length,
         onPageChange: setPage,
         itemNoun: 'clone drives',

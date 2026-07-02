@@ -12,6 +12,7 @@ import SupplierFormModal from '../../components/suppliers/SupplierFormModal';
 import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useListPageSize } from '../../hooks/useListPageSize';
 import { formatDate } from '../../lib/format';
 import { baseAmount } from '../../lib/financialMath';
 
@@ -35,8 +36,6 @@ interface Category {
   name: string;
 }
 
-const PAGE_SIZE = 50;
-
 export default function SuppliersListPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -49,6 +48,7 @@ export default function SuppliersListPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(0);
+  const pageSize = useListPageSize();
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
@@ -57,7 +57,7 @@ export default function SuppliersListPage() {
 
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, statusFilter, categoryFilter]);
+  }, [debouncedSearch, statusFilter, categoryFilter, pageSize]);
 
   // Command-palette deep-link: /suppliers?new=1 opens the create modal.
   useEffect(() => {
@@ -70,7 +70,7 @@ export default function SuppliersListPage() {
   }, [searchParams, setSearchParams]);
 
   const { data: suppliersPage, isLoading: loading } = useQuery({
-    queryKey: ['suppliers', debouncedSearch, statusFilter, categoryFilter, page],
+    queryKey: ['suppliers', debouncedSearch, statusFilter, categoryFilter, page, pageSize],
     queryFn: async () => {
       let query = supabase
         .from('suppliers')
@@ -90,7 +90,7 @@ export default function SuppliersListPage() {
       else if (statusFilter === 'inactive') query = query.eq('is_active', false);
       if (categoryFilter !== 'all') query = query.eq('category_id', categoryFilter);
 
-      const { data, error, count } = await query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+      const { data, error, count } = await query.range(page * pageSize, (page + 1) * pageSize - 1);
       if (error) throw error;
 
       const rows: Supplier[] = (data ?? []).map((row) => ({
@@ -444,7 +444,7 @@ export default function SuppliersListPage() {
       }
       toolbar={toolbar}
       table={table}
-      pager={{ page, pageSize: PAGE_SIZE, total: totalSuppliers, onPageChange: setPage, itemNoun: 'suppliers' }}
+      pager={{ page, pageSize, total: totalSuppliers, onPageChange: setPage, itemNoun: 'suppliers' }}
       loading={loading}
       isEmpty={suppliers.length === 0}
       empty={emptyState}

@@ -135,6 +135,15 @@ export function generateLargeFixture(opts: FixtureOptions = {}): ParsedWorkbook 
       email: `info${i + 1}@company${i + 1}.example.com`,
       phone: `+1555${String(i).padStart(7, '0')}`,
       address: `${i + 1} Industrial Ave, Springfield`,
+      contact_person: `Contact ${i + 1}`,
+      contact_email: `contact${i + 1}@company${i + 1}.example.com`,
+      contact_phone: `+1999${String(i).padStart(7, '0')}`,
+      // Alternate so BOTH the explicit-false and the true paths round-trip — proves the
+      // import COALESCE((is_active)::boolean, true) does not clobber an explicit false.
+      is_active: i % 2 === 0,
+      // Half supply a company_number (must be preserved), half leave it blank (must be
+      // auto-filled by finalize). Customers below leave customer_number blank entirely.
+      ...(i % 2 === 0 ? { company_number: `CMP-SUP-${i}` } : {}),
       created_at: createdAt,
     });
   }
@@ -210,6 +219,19 @@ export function generateLargeFixture(opts: FixtureOptions = {}): ParsedWorkbook 
       capacity: rng.pick(CAPACITIES),
       interface: rng.pick(INTERFACES),
       condition: rng.pick(CONDITIONS),
+      // Forensic fields — donor-matching fingerprints + fault/outcome + physical tracking.
+      part_number: `PN-${rng.int(9000) + 1000}`,
+      firmware_version: rng.pick(['CC26', 'CC27', 'SC61', '0002', 'AN01']),
+      pcb_number: `PCB-${rng.int(9000) + 1000}`,
+      dcm: `DCM${rng.int(9000) + 1000}`,
+      dom: isoOffset(epochBase, rng.int(YEAR_MS)).slice(0, 10), // YYYY-MM-DD (date column)
+      physical_damage: rng.pick(['none', 'water ingress', 'clicking', 'burnt PCB', 'dropped']),
+      diagnosis: rng.pick(['head crash', 'firmware corruption', 'bad sectors', 'PCB failure', 'stiction']),
+      recovery_result: rng.pick(['full', 'partial', 'none', 'pending']),
+      data_recovered_size: `${rng.int(2000)}GB`,
+      storage_location: `Shelf ${rng.pick(['A', 'B', 'C'])}${rng.int(20) + 1}`,
+      // First device of each case is the primary ("patient") device.
+      is_primary: i < caseCount,
       created_at: cases[caseIdx]['created_at'],
     });
   }
@@ -330,8 +352,95 @@ export function generateLargeFixture(opts: FixtureOptions = {}): ParsedWorkbook 
     }
   }
 
+  // ---- bankAccounts (2 fixed accounts) ------------------------------------
+  const bankAccountIds: string[] = [];
+  const bankAccounts: RawRow[] = [];
+  for (let i = 0; i < 2; i++) {
+    const id = rng.uuid();
+    bankAccountIds.push(id);
+    bankAccounts.push({
+      legacy_id: id,
+      name: i === 0 ? 'Main Operating Account' : 'Cash Drawer',
+      account_number: `ACC-${1000 + i}`,
+      bank_name: i === 0 ? 'Bank of Recovery' : 'Cash',
+      currency: 'USD',
+      opening_balance: 10000 + i * 5000,
+      current_balance: 12000 + i * 5000,
+      is_default: i === 0,
+      is_active: true,
+      created_at: isoOffset(epochBase, 0),
+    });
+  }
+
+  // ---- payments (1 per invoice, alternating bank account) -----------------
+  const payments: RawRow[] = [];
+  for (let i = 0; i < invoiceIds.length; i++) {
+    payments.push({
+      legacy_id: rng.uuid(),
+      invoice_legacy_id: invoiceIds[i],
+      customer_legacy_id: customerIds[i % customerCount],
+      bank_account_legacy_id: bankAccountIds[i % bankAccountIds.length],
+      payment_number: `PAY-${String(i + 1).padStart(5, '0')}`,
+      amount: invoices[i]['total_amount'] as number,
+      currency: 'USD',
+      payment_method: 'Cash',
+      payment_date: invoices[i]['created_at'],
+      status: 'completed',
+      created_at: invoices[i]['created_at'],
+    });
+  }
+
+  // ---- receipts (1 per 10 customers) --------------------------------------
+  const receipts: RawRow[] = [];
+  for (let i = 0; i < Math.floor(customerCount / 10); i++) {
+    receipts.push({
+      legacy_id: rng.uuid(),
+      customer_legacy_id: customerIds[i],
+      receipt_number: `RCP-${String(i + 1).padStart(5, '0')}`,
+      amount: rng.int(1000) + 100,
+      currency_code: 'USD',
+      payment_method: 'Cash',
+      receipt_date: customers[i]['created_at'],
+      status: 'issued',
+      created_at: customers[i]['created_at'],
+    });
+  }
+
+  // ---- expenses (1 per 10 cases, alternating bank account) ----------------
+  const expenses: RawRow[] = [];
+  for (let i = 0; i < Math.floor(caseCount / 10); i++) {
+    expenses.push({
+      legacy_id: rng.uuid(),
+      case_legacy_id: caseIds[i],
+      bank_account_legacy_id: bankAccountIds[i % bankAccountIds.length],
+      expense_number: `EXP-${String(i + 1).padStart(5, '0')}`,
+      category: 'Parts',
+      vendor: `Vendor ${i + 1}`,
+      description: `Donor part for case ${i + 1}`,
+      amount: rng.int(500) + 50,
+      currency: 'USD',
+      tax_amount: 0,
+      expense_date: cases[i]['created_at'],
+      status: 'paid',
+      is_billable: i % 2 === 0,
+      created_at: cases[i]['created_at'],
+    });
+  }
+
+  // Inventory is imported/exported as a SEPARATE domain workbook (not mixed with case records),
+  // so this records-domain fixture leaves the inventory entities empty. Inventory round-trip is
+  // covered end-to-end by the rolled-back live smoke test.
+  const inventoryLocations: RawRow[] = [];
+  const inventoryItems: RawRow[] = [];
+  const inventoryDonorParts: RawRow[] = [];
+
+  // Newer records-domain entities + the procurement/stock/hr domains are exercised by the
+  // rolled-back live smoke tests, not this scale fixture — present but empty.
+  const empty: RawRow[] = [];
+
   return {
     companies,
+    customerGroups: empty,
     customers,
     relationships,
     cases,
@@ -340,7 +449,39 @@ export function generateLargeFixture(opts: FixtureOptions = {}): ParsedWorkbook 
     quoteItems,
     invoices,
     invoiceLineItems,
+    bankAccounts,
+    payments,
+    receipts,
+    expenses,
+    accountTransfers: empty,
+    paymentDisbursements: empty,
+    creditNotes: empty,
+    creditNoteItems: empty,
+    creditNoteAllocations: empty,
+    customerCommunications: empty,
+    caseCommunications: empty,
+    caseRecoveryAttempts: empty,
+    deviceDiagnostics: empty,
+    cloneDrives: empty,
     notes,
     statusHistory,
+    inventoryLocations,
+    inventoryItems,
+    inventoryDonorParts,
+    suppliers: empty,
+    supplierContacts: empty,
+    purchaseOrders: empty,
+    purchaseOrderItems: empty,
+    stockCategories: empty,
+    stockLocations: empty,
+    stockItems: empty,
+    stockSerialNumbers: empty,
+    stockSales: empty,
+    stockSaleItems: empty,
+    departments: empty,
+    positions: empty,
+    employees: empty,
+    leaveBalances: empty,
+    employeeLoans: empty,
   };
 }

@@ -13,6 +13,7 @@ import PurchaseOrderFormModal from '../../components/suppliers/PurchaseOrderForm
 import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useListPageSize } from '../../hooks/useListPageSize';
 import { format } from 'date-fns';
 import { baseAmount } from '../../lib/financialMath';
 import type { Database } from '../../types/database.types';
@@ -35,8 +36,6 @@ type PurchaseOrderWithJoins = PurchaseOrderRow & {
   status: StatusSummary | null;
 };
 
-const PAGE_SIZE = 50;
-
 // Pending/Approved KPIs are status-NAME based (the dropdown stores status_id), so
 // the global counts resolve these names → ids, matching the original in-memory rule.
 const PENDING_STATUS_NAMES = ['Draft', 'Ordered'];
@@ -53,6 +52,7 @@ export default function PurchaseOrdersListPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [page, setPage] = useState(0);
+  const pageSize = useListPageSize();
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -61,7 +61,7 @@ export default function PurchaseOrdersListPage() {
 
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, statusFilter]);
+  }, [debouncedSearch, statusFilter, pageSize]);
 
   // Command-palette deep-link: /purchase-orders?new=1 opens the create modal.
   useEffect(() => {
@@ -74,7 +74,7 @@ export default function PurchaseOrdersListPage() {
   }, [searchParams, setSearchParams]);
 
   const { data: ordersPage, isLoading: loading } = useQuery({
-    queryKey: ['purchase_orders', debouncedSearch, statusFilter, page],
+    queryKey: ['purchase_orders', debouncedSearch, statusFilter, page, pageSize],
     queryFn: async () => {
       let query = supabase
         .from('purchase_orders')
@@ -105,7 +105,7 @@ export default function PurchaseOrdersListPage() {
       }
       if (statusFilter !== 'all') query = query.eq('status_id', statusFilter);
 
-      const { data, error, count } = await query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+      const { data, error, count } = await query.range(page * pageSize, (page + 1) * pageSize - 1);
       if (error) throw error;
       return { rows: (data ?? []) as unknown as PurchaseOrderWithJoins[], total: count ?? 0 };
     },
@@ -342,7 +342,7 @@ export default function PurchaseOrdersListPage() {
       }
       pager={{
         page,
-        pageSize: PAGE_SIZE,
+        pageSize,
         total: totalOrders,
         onPageChange: setPage,
         itemNoun: 'purchase orders',

@@ -5,6 +5,7 @@ import { Badge } from '../../components/ui/Badge';
 import { formatDate } from '../../lib/format';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useConfirm } from '../../hooks/useConfirm';
+import { useListPageSize } from '../../hooks/useListPageSize';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { baseAmount } from '../../lib/financialMath';
 import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
@@ -49,8 +50,6 @@ interface TransactionDisplay {
   related_expense?: { expense_number: string };
 }
 
-const PAGE_SIZE = 50;
-
 export const TransactionsList: React.FC = () => {
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
@@ -61,6 +60,7 @@ export const TransactionsList: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [page, setPage] = useState(0);
+  const pageSize = useListPageSize();
 
   const getDateFromFilter = () => {
     if (dateRange === 'all') return undefined;
@@ -90,17 +90,17 @@ export const TransactionsList: React.FC = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [searchTerm, typeFilter, dateRange]);
+  }, [searchTerm, typeFilter, dateRange, pageSize]);
 
   const { data: transactionsPage, isLoading } = useQuery({
-    queryKey: ['financial_transactions', searchTerm, typeFilter, dateRange, page],
+    queryKey: ['financial_transactions', searchTerm, typeFilter, dateRange, page, pageSize],
     queryFn: async () => {
       const { rows, total } = await fetchTransactionsPage({
         type: typeFilter !== 'all' ? typeFilter : undefined,
         search: searchTerm || undefined,
         dateFrom: getDateFromFilter(),
         page,
-        pageSize: PAGE_SIZE,
+        pageSize,
       });
       // Adapt live schema (transaction_type, no status/reference_number) to display shape.
       const mapped = (rows || []).map((row): TransactionDisplay => ({
@@ -455,7 +455,7 @@ export const TransactionsList: React.FC = () => {
           </table>
         </div>
       }
-      pager={{ page, pageSize: PAGE_SIZE, total: totalTransactions, onPageChange: setPage, itemNoun: 'transactions' }}
+      pager={{ page, pageSize, total: totalTransactions, onPageChange: setPage, itemNoun: 'transactions' }}
     >
       <TransactionFormModal
         isOpen={showTransactionModal}

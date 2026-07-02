@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
+import { useListPageSize } from '../../hooks/useListPageSize';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
@@ -20,8 +21,6 @@ type Employee = Database['public']['Tables']['employees']['Row'] & {
 
 type StatusFilter = 'all' | 'active' | 'on_leave';
 
-const PAGE_SIZE = 50;
-
 export const EmployeesList: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -29,6 +28,7 @@ export const EmployeesList: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [page, setPage] = useState(0);
+  const pageSize = useListPageSize();
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
@@ -37,10 +37,10 @@ export const EmployeesList: React.FC = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, statusFilter]);
+  }, [debouncedSearch, statusFilter, pageSize]);
 
   const { data: employeesPage, isLoading: loading } = useQuery({
-    queryKey: ['employees', debouncedSearch, statusFilter, page],
+    queryKey: ['employees', debouncedSearch, statusFilter, page, pageSize],
     queryFn: async () => {
       let query = supabase
         .from('employees')
@@ -64,7 +64,7 @@ export const EmployeesList: React.FC = () => {
       }
       if (statusFilter !== 'all') query = query.eq('employment_status', statusFilter);
 
-      const { data, error, count } = await query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+      const { data, error, count } = await query.range(page * pageSize, (page + 1) * pageSize - 1);
       if (error) throw error;
       return { rows: (data ?? []) as unknown as Employee[], total: count ?? 0 };
     },
@@ -232,7 +232,7 @@ export const EmployeesList: React.FC = () => {
       }
       toolbar={toolbar}
       table={table}
-      pager={{ page, pageSize: PAGE_SIZE, total: totalEmployees, onPageChange: setPage, itemNoun: 'employees' }}
+      pager={{ page, pageSize, total: totalEmployees, onPageChange: setPage, itemNoun: 'employees' }}
       loading={loading}
       isEmpty={employees.length === 0}
       empty={

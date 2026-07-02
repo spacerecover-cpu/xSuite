@@ -36,29 +36,29 @@ function wrap(ui: React.ReactElement) {
 }
 
 describe('ImportExportCenter', () => {
-  it('renders Import and Export action cards', () => {
+  it('renders the two domain cards', () => {
     wrap(<ImportExportCenter />);
-    expect(screen.getByText('Import Data')).toBeInTheDocument();
-    expect(screen.getByText('Export Data')).toBeInTheDocument();
+    expect(screen.getByText('Case Records')).toBeInTheDocument();
+    expect(screen.getByText('Inventory')).toBeInTheDocument();
   });
 
-  it('opens ImportWizard when Import button clicked', () => {
+  it('opens the ImportWizard for a domain when its Import button is clicked', () => {
     wrap(<ImportExportCenter />);
     expect(screen.queryByTestId('import-wizard')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /start import/i }));
+    fireEvent.click(screen.getByRole('button', { name: /import case records/i }));
     expect(screen.getByTestId('import-wizard')).toBeInTheDocument();
   });
 
-  it('opens ExportWizard when Export button clicked', () => {
+  it('opens the ExportWizard for a domain when its Export button is clicked', () => {
     wrap(<ImportExportCenter />);
     expect(screen.queryByTestId('export-wizard')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /start export/i }));
+    fireEvent.click(screen.getByRole('button', { name: /export inventory/i }));
     expect(screen.getByTestId('export-wizard')).toBeInTheDocument();
   });
 
-  it('closes ImportWizard on wizard onClose', () => {
+  it('closes the ImportWizard on wizard onClose', () => {
     wrap(<ImportExportCenter />);
-    fireEvent.click(screen.getByRole('button', { name: /start import/i }));
+    fireEvent.click(screen.getByRole('button', { name: /import case records/i }));
     fireEvent.click(screen.getByRole('button', { name: 'close-import' }));
     expect(screen.queryByTestId('import-wizard')).not.toBeInTheDocument();
   });

@@ -17,6 +17,7 @@ import {
   SlidersHorizontal,
   Columns3,
   FileStack,
+  ListChecks,
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 
@@ -74,6 +75,16 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     tables: [],
     actionLabel: 'Choose Theme',
     description: 'Pick the look and feel of xSuite for everyone in your workspace.',
+  },
+  {
+    id: 'preferences',
+    title: 'Preferences',
+    icon: ListChecks,
+    backgroundColor: '#0d9488',
+    borderColor: '#0d9488',
+    tables: [],
+    actionLabel: 'Set Preferences',
+    description: 'Workspace display preferences — rows per page and selection checkboxes on list tables.',
   },
   {
     id: 'table-columns',
@@ -294,7 +305,7 @@ export interface SettingsGroup {
 // appear in exactly one group; the dashboard renders any unlisted category under
 // a trailing "More" section so nothing silently disappears.
 export const SETTINGS_GROUPS: SettingsGroup[] = [
-  { id: 'workspace', label: 'Workspace', categoryIds: ['appearance', 'table-columns', 'features', 'general-settings', 'notifications'] },
+  { id: 'workspace', label: 'Workspace', categoryIds: ['appearance', 'preferences', 'table-columns', 'features', 'general-settings', 'notifications'] },
   { id: 'operations', label: 'Operations', categoryIds: ['device-media', 'inventory-settings', 'case-service', 'procurement'] },
   { id: 'finance', label: 'Client & Finance', categoryIds: ['client-financial', 'currencies', 'localization'] },
   { id: 'documents', label: 'Documents & Reports', categoryIds: ['templates', 'documents'] },

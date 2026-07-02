@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
+import { buildPaymentSearchOr } from '../../lib/searchResolvers';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -16,6 +17,7 @@ import { PaymentReceiptModal } from '../../components/financial/PaymentReceiptMo
 import { useCurrency } from '../../hooks/useCurrency';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
+import { useListPageSize } from '../../hooks/useListPageSize';
 import { createPayment, getPaymentStats, voidPayment, fetchPaymentById } from '../../lib/paymentsService';
 import { baseAmount } from '../../lib/financialMath';
 import { EmptyState } from '../../components/shared/EmptyState';
@@ -37,8 +39,6 @@ import {
   BarChart3,
 } from 'lucide-react';
 
-const PAGE_SIZE = 50;
-
 export const PaymentsList: React.FC = () => {
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
@@ -50,6 +50,7 @@ export const PaymentsList: React.FC = () => {
   const [dateFilter, setDateFilter] = useState<string>('all');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
   const [page, setPage] = useState(0);
+  const pageSize = useListPageSize();
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
   const [_selectedPayment, _setSelectedPayment] = useState<any>(null);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -71,7 +72,7 @@ export const PaymentsList: React.FC = () => {
   // Reset to the first page whenever the active filters/search change.
   useEffect(() => {
     setPage(0);
-  }, [searchTerm, statusFilter, dateFilter, paymentMethodFilter]);
+  }, [searchTerm, statusFilter, dateFilter, paymentMethodFilter, pageSize]);
 
   const { data: paymentMethods = [] } = useQuery({
     queryKey: ['payment_methods_active'],
@@ -87,7 +88,7 @@ export const PaymentsList: React.FC = () => {
   });
 
   const { data: paymentsPage, isLoading } = useQuery({
-    queryKey: ['payments', searchTerm, statusFilter, dateFilter, paymentMethodFilter, page],
+    queryKey: ['payments', searchTerm, statusFilter, dateFilter, paymentMethodFilter, page, pageSize],
     queryFn: async () => {
       let query = supabase
         .from('payments')
@@ -102,6 +103,7 @@ export const PaymentsList: React.FC = () => {
           notes,
           payment_method_id,
           customer:customers_enhanced(id, customer_name, email),
+          case:cases(id, case_number),
           payment_method:master_payment_methods(id, name),
           bank_account:bank_accounts(account_name:name),
           allocations:payment_allocations(
@@ -110,11 +112,11 @@ export const PaymentsList: React.FC = () => {
           )
         `, { count: 'exact' })
         .order('payment_date', { ascending: false })
-        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+        .range(page * pageSize, (page + 1) * pageSize - 1);
 
       if (searchTerm) {
         const s = sanitizeFilterValue(searchTerm);
-        query = query.or(`payment_number.ilike.%${s}%,reference.ilike.%${s}%`);
+        query = query.or(await buildPaymentSearchOr(s));
       }
 
       if (statusFilter !== 'all') {
@@ -245,7 +247,7 @@ export const PaymentsList: React.FC = () => {
 
     if (searchTerm) {
       const s = sanitizeFilterValue(searchTerm);
-      query = query.or(`payment_number.ilike.%${s}%,reference.ilike.%${s}%`);
+      query = query.or(await buildPaymentSearchOr(s));
     }
     if (statusFilter !== 'all') query = query.eq('status', statusFilter);
     if (paymentMethodFilter !== 'all') query = query.eq('payment_method_id', paymentMethodFilter);
@@ -522,8 +524,11 @@ export const PaymentsList: React.FC = () => {
                       {payment.payment_date ? formatDate(payment.payment_date) : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {/* payments has no case_id column in v1.0.0 (linkage flows via invoice.case_id). */}
-                      <span className="text-sm text-slate-400">-</span>
+                      {payment.case?.case_number ? (
+                        <span className="text-sm font-medium text-slate-700">{payment.case.case_number}</span>
+                      ) : (
+                        <span className="text-sm text-slate-400">-</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
@@ -607,7 +612,6 @@ export const PaymentsList: React.FC = () => {
                                   <Eye className="w-4 h-4" />
                                   View Full Details
                                 </button>
-                                {/* payments has no case_id column in v1.0.0 — case linkage is via invoice. */}
                                 <div className="border-t border-slate-200 my-1" />
                                 {payment.status === 'completed' && (
                                   <button
@@ -643,7 +647,7 @@ export const PaymentsList: React.FC = () => {
       table={table}
       pager={{
         page,
-        pageSize: PAGE_SIZE,
+        pageSize,
         total: totalPaymentsCount,
         onPageChange: setPage,
         itemNoun: 'payments',

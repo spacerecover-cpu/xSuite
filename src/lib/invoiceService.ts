@@ -4,6 +4,7 @@ import { checkRateLimit, RATE_LIMITS } from './rateLimiter';
 import { logAuditTrail } from './auditTrailService';
 import { logInvoiceCreated, logInvoicePayment, logInvoiceStatusChanged } from './chainOfCustodyService';
 import { logger } from './logger';
+import { buildInvoiceSearchOr } from './searchResolvers';
 import { sanitizeUuidFields as sanitizeUuids, dropEmptyKeys } from './dataValidation';
 import { sanitizeFilterValue } from './postgrestSanitizer';
 import { calculateInvoiceTotals, calculateInvoiceTotalsBase, convertToBase, roundMoney } from './financialMath';
@@ -222,8 +223,10 @@ export const fetchInvoicesPage = async (filters?: {
   }
 
   if (filters?.search) {
+    // Spans invoice number/notes/client-ref plus customer + case (pre-resolved ids —
+    // PostgREST cannot OR foreign-table columns; see searchResolvers.ts).
     const s = sanitizeFilterValue(filters.search);
-    query = query.or(`invoice_number.ilike.%${s}%,notes.ilike.%${s}%`);
+    query = query.or(await buildInvoiceSearchOr(s));
   }
 
   if (filters?.caseId) {

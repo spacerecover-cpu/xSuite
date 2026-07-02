@@ -9,6 +9,7 @@ import { Badge } from '../../components/ui/Badge';
 import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
 import { Search, Eye, Edit, Trash2, Plus } from 'lucide-react';
 import { format } from 'date-fns';
+import { useListPageSize } from '../../hooks/useListPageSize';
 
 type BadgeTone = 'success' | 'info' | 'danger' | 'secondary';
 
@@ -36,13 +37,12 @@ interface AuditTrail {
   user_name?: string;
 }
 
-const PAGE_SIZE = 50;
-
 export const AuditTrails: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [actionFilter, setActionFilter] = useState<string>('all');
   const [page, setPage] = useState(0);
+  const pageSize = useListPageSize();
   const [scope, setScope] = useState<'system' | 'custody'>('system');
 
   useEffect(() => {
@@ -52,10 +52,10 @@ export const AuditTrails: React.FC = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [actionFilter, debouncedSearch]);
+  }, [actionFilter, debouncedSearch, pageSize]);
 
   const { data, isLoading: loading } = useQuery({
-    queryKey: ['audit_trails', actionFilter, debouncedSearch, page],
+    queryKey: ['audit_trails', actionFilter, debouncedSearch, page, pageSize],
     enabled: scope === 'system',
     queryFn: async () => {
       let query = supabase
@@ -85,7 +85,7 @@ export const AuditTrails: React.FC = () => {
         query = query.or(orParts.join(','));
       }
 
-      const { data, error, count } = await query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+      const { data, error, count } = await query.range(page * pageSize, (page + 1) * pageSize - 1);
       if (error) throw error;
 
       const formattedData: AuditTrail[] = (data || []).map((trail) => {
@@ -207,7 +207,7 @@ export const AuditTrails: React.FC = () => {
       title="Audit Trails"
       toolbar={toolbar}
       table={scope === 'custody' ? <AuditCustodyFeed page={page} onPageChange={setPage} search={debouncedSearch} /> : table}
-      pager={{ page, pageSize: PAGE_SIZE, total, onPageChange: setPage, itemNoun: 'entries' }}
+      pager={{ page, pageSize, total, onPageChange: setPage, itemNoun: 'entries' }}
       loading={loading}
       isEmpty={!loading && trails.length === 0}
       empty={

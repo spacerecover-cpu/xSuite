@@ -279,6 +279,16 @@ Deno.serve(async (req: Request) => {
 
     if (tenantError) throw tenantError;
 
+    // Assign the immutable, geo-derived, platform-unique tenant code (e.g. OMA0001).
+    // Fail-loud with soft-delete rollback (matching legal_entities/onboarding below):
+    // a tenant provisioned without its support identifier must not survive.
+    const { data: assignedTenantCode, error: tenantCodeError } = await supabase
+      .rpc('assign_tenant_code', { p_tenant_id: tenant.id });
+    if (tenantCodeError) {
+      await supabase.from('tenants').update({ deleted_at: new Date().toISOString() }).eq('id', tenant.id);
+      throw new Error(`Provisioning failed: assign_tenant_code: ${tenantCodeError.message}`);
+    }
+
     let userId: string;
 
     if (existingUser) {
@@ -448,6 +458,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         success: true,
         tenant_id: tenant.id,
+        tenant_code: assignedTenantCode,
         user_id: userId,
         message: 'Tenant provisioned successfully',
       }),

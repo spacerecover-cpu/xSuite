@@ -4073,6 +4073,7 @@ export type Database = {
           industry_id: string | null
           is_active: boolean | null
           logo_url: string | null
+          metadata: Json
           name: string
           notes: string | null
           phone: string | null
@@ -4100,6 +4101,7 @@ export type Database = {
           industry_id?: string | null
           is_active?: boolean | null
           logo_url?: string | null
+          metadata?: Json
           name: string
           notes?: string | null
           phone?: string | null
@@ -4127,6 +4129,7 @@ export type Database = {
           industry_id?: string | null
           is_active?: boolean | null
           logo_url?: string | null
+          metadata?: Json
           name?: string
           notes?: string | null
           phone?: string | null
@@ -4424,6 +4427,7 @@ export type Database = {
           id: string
           invoice_id: string
           tenant_id: string
+          updated_at: string
         }
         Insert: {
           amount: number
@@ -4434,6 +4438,7 @@ export type Database = {
           id?: string
           invoice_id: string
           tenant_id: string
+          updated_at?: string
         }
         Update: {
           amount?: number
@@ -4444,6 +4449,7 @@ export type Database = {
           id?: string
           invoice_id?: string
           tenant_id?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -8739,6 +8745,7 @@ export type Database = {
         Row: {
           carried_over: number | null
           created_at: string
+          deleted_at: string | null
           employee_id: string
           id: string
           leave_type_id: string
@@ -8752,6 +8759,7 @@ export type Database = {
         Insert: {
           carried_over?: number | null
           created_at?: string
+          deleted_at?: string | null
           employee_id: string
           id?: string
           leave_type_id: string
@@ -8765,6 +8773,7 @@ export type Database = {
         Update: {
           carried_over?: number | null
           created_at?: string
+          deleted_at?: string | null
           employee_id?: string
           id?: string
           leave_type_id?: string
@@ -11892,6 +11901,72 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_tenant_code_prefixes: {
+        Row: {
+          country_id: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          label: string | null
+          prefix: string
+          region_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          country_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string | null
+          prefix: string
+          region_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          country_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string | null
+          prefix?: string
+          region_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_tenant_code_prefixes_country_id_fkey"
+            columns: ["country_id"]
+            isOneToOne: false
+            referencedRelation: "geo_countries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_tenant_code_prefixes_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "geo_regions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_tenant_code_sequences: {
+        Row: {
+          current_value: number
+          prefix: string
+          updated_at: string
+        }
+        Insert: {
+          current_value?: number
+          prefix: string
+          updated_at?: string
+        }
+        Update: {
+          current_value?: number
+          prefix?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       portal_link_history: {
         Row: {
           action: string
@@ -14118,6 +14193,7 @@ export type Database = {
       stock_sale_items: {
         Row: {
           created_at: string
+          deleted_at: string | null
           discount: number | null
           id: string
           invoice_line_item_id: string | null
@@ -14132,6 +14208,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
           discount?: number | null
           id?: string
           invoice_line_item_id?: string | null
@@ -14146,6 +14223,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
           discount?: number | null
           id?: string
           invoice_line_item_id?: string | null
@@ -15979,6 +16057,7 @@ export type Database = {
           tax_number: string | null
           tax_number_label: string
           tax_system: string
+          tenant_code: string | null
           theme: string
           timezone: string
           trial_ends_at: string | null
@@ -16022,6 +16101,7 @@ export type Database = {
           tax_number?: string | null
           tax_number_label?: string
           tax_system?: string
+          tenant_code?: string | null
           theme?: string
           timezone?: string
           trial_ends_at?: string | null
@@ -16065,6 +16145,7 @@ export type Database = {
           tax_number?: string | null
           tax_number_label?: string
           tax_system?: string
+          tenant_code?: string | null
           theme?: string
           timezone?: string
           trial_ends_at?: string | null
@@ -17078,6 +17159,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      assign_tenant_code: { Args: { p_tenant_id: string }; Returns: string }
       authenticate_portal_customer: {
         Args: { p_email: string; p_password: string }
         Returns: Json
@@ -17179,6 +17261,10 @@ export type Database = {
       data_migration_finalize: { Args: { p_run_id: string }; Returns: Json }
       data_migration_import_batch: {
         Args: { p_entity_type: string; p_rows: Json; p_run_id: string }
+        Returns: Json
+      }
+      data_migration_reference_lists: {
+        Args: { p_domain: string }
         Returns: Json
       }
       delete_case_permanently: {

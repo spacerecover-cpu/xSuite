@@ -13,10 +13,13 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { parseWorkbook, readWorkbookMeta, computeFileHash } from '../../lib/dataMigration/workbookParser';
+import { coerceWorkbook } from '../../lib/dataMigration/coerceWorkbook';
+import { buildTemplateWorkbook } from '../../lib/dataMigration/workbookBuilder';
+import { fetchReferenceLists } from '../../lib/dataMigration/referenceLists';
 import { validateWorkbook, validateSchemaVersion } from '../../lib/dataMigration/importValidator';
 import { runImport } from '../../lib/dataMigration/importClient';
-import { IMPORT_ORDER, SHEET_NAMES } from '../../lib/dataMigration/workbookContract';
-import type { ParsedWorkbook, EntityType } from '../../lib/dataMigration/workbookContract';
+import { DOMAIN_ENTITIES, DOMAIN_LABELS, SHEET_NAMES } from '../../lib/dataMigration/workbookContract';
+import type { ParsedWorkbook, EntityType, WorkbookDomain } from '../../lib/dataMigration/workbookContract';
 import type { ValidationReport, ValidationIssue } from '../../lib/dataMigration/importValidator';
 import type { ImportProgress, ImportSummary } from '../../lib/dataMigration/importClient';
 
@@ -24,7 +27,22 @@ type WizardStep = 'upload' | 'validate' | 'import' | 'summary';
 
 interface FileMeta { filename: string; hash: string; }
 
-interface Props { onClose: () => void; }
+interface Props { domain: WorkbookDomain; onClose: () => void; }
+
+async function downloadTemplate(domain: WorkbookDomain): Promise<void> {
+  // Include the global master lists so the admin can map values to the names the importer
+  // resolves (and see what's missing to add). Best-effort — template still downloads if it fails.
+  const referenceLists = await fetchReferenceLists(domain);
+  const blob = new Blob([buildTemplateWorkbook(domain, referenceLists)], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `xsuite-${domain}-import-template.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function downloadErrorReport(issues: ValidationIssue[]): void {
   const lines = ['Entity,Row,Field,Severity,Message'];
@@ -47,7 +65,8 @@ const STEP_LABELS: Record<WizardStep, string> = {
   summary: 'Summary',
 };
 
-export const ImportWizard: React.FC<Props> = ({ onClose }) => {
+export const ImportWizard: React.FC<Props> = ({ domain, onClose }) => {
+  const domainEntities = DOMAIN_ENTITIES[domain];
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<WizardStep>('upload');
   const [dragOver, setDragOver] = useState(false);
@@ -64,20 +83,35 @@ export const ImportWizard: React.FC<Props> = ({ onClose }) => {
     setParsing(true);
     try {
       const buf = await file.arrayBuffer();
-      const [hash, wb] = await Promise.all([
+      const [hash, rawWb] = await Promise.all([
         computeFileHash(buf),
         Promise.resolve(parseWorkbook(buf)),
       ]);
-      const report = validateWorkbook(wb);
+      // Normalise dates + invoice statuses BEFORE validating/importing so the client dry-run
+      // and the Postgres RPC agree (see coerceWorkbook). The SAME object feeds both.
+      const wb = coerceWorkbook(rawWb);
+      const wbMeta = readWorkbookMeta(buf);
+      const report = validateWorkbook(wb, domain);
       // I3: reject incompatible workbook schema versions before anything else.
-      const versionCheck = validateSchemaVersion(readWorkbookMeta(buf));
+      const versionCheck = validateSchemaVersion(wbMeta);
       if (!versionCheck.ok) {
         report.issues.unshift({
-          entity: IMPORT_ORDER[0],
+          entity: domainEntities[0],
           rowIndex: -1,
           severity: 'error',
           field: 'schema_version',
           message: versionCheck.message ?? 'Incompatible workbook schema version.',
+        });
+        report.ok = false;
+      }
+      // Domain marker mismatch: a file exported/templated for the OTHER domain.
+      if (wbMeta.domain && wbMeta.domain !== domain) {
+        report.issues.unshift({
+          entity: domainEntities[0],
+          rowIndex: -1,
+          severity: 'error',
+          field: 'domain',
+          message: `This is a ${DOMAIN_LABELS[wbMeta.domain]} workbook — use the ${DOMAIN_LABELS[wbMeta.domain]} import instead.`,
         });
         report.ok = false;
       }
@@ -108,7 +142,7 @@ export const ImportWizard: React.FC<Props> = ({ onClose }) => {
     setImportError(null);
     setStep('import');
     try {
-      const result = await runImport(parsedWb, fileMeta, (p) => setProgress({ ...p }));
+      const result = await runImport(parsedWb, fileMeta, (p) => setProgress({ ...p }), domain);
       setSummary(result);
       setStep('summary');
     } catch (err) {
@@ -124,7 +158,7 @@ export const ImportWizard: React.FC<Props> = ({ onClose }) => {
   const steps: WizardStep[] = ['upload', 'validate', 'import', 'summary'];
 
   return (
-    <Modal isOpen onClose={onClose} title="Import Data" size="xl" closeOnBackdrop={false}>
+    <Modal isOpen onClose={onClose} title={`Import ${DOMAIN_LABELS[domain]}`} size="xl" closeOnBackdrop={false}>
       <div className="space-y-6">
         {/* Step breadcrumb */}
         <nav aria-label="Import steps" className="flex items-center gap-1 text-sm">
@@ -178,6 +212,27 @@ export const ImportWizard: React.FC<Props> = ({ onClose }) => {
                 </>
               )}
             </div>
+
+            {/* Template download — so users know the exact sheets & columns to fill in */}
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileSpreadsheet className="w-4 h-4 text-slate-400 shrink-0" />
+                <p className="text-sm text-slate-600 truncate">
+                  New to importing? Start from a blank template with every sheet &amp; column.
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="shrink-0"
+                aria-label="Download blank import template"
+                onClick={() => void downloadTemplate(domain)}
+              >
+                <Download className="w-4 h-4 mr-1.5" />
+                Download Template
+              </Button>
+            </div>
+
             <div className="mt-4 flex justify-end">
               <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
             </div>
@@ -207,7 +262,7 @@ export const ImportWizard: React.FC<Props> = ({ onClose }) => {
 
             {/* Per-entity counts */}
             <div className="rounded-lg border border-slate-200 divide-y divide-slate-100">
-              {IMPORT_ORDER.map((entity) => {
+              {domainEntities.map((entity) => {
                 const count = validation.counts[entity] ?? 0;
                 return (
                   <div key={entity} className="flex items-center justify-between px-4 py-2.5 text-sm">
@@ -280,10 +335,10 @@ export const ImportWizard: React.FC<Props> = ({ onClose }) => {
 
             {/* Per-stage progress bars */}
             <div className="rounded-lg border border-slate-200 divide-y divide-slate-100">
-              {IMPORT_ORDER.map((entity) => {
+              {domainEntities.map((entity) => {
                 const isActive = progress?.entity === entity;
                 const isDone = progress
-                  ? IMPORT_ORDER.indexOf(entity) < IMPORT_ORDER.indexOf(progress.entity)
+                  ? domainEntities.indexOf(entity) < domainEntities.indexOf(progress.entity)
                   : false;
                 const pct = isActive && progress && progress.total > 0
                   ? Math.round((progress.processed / progress.total) * 100)

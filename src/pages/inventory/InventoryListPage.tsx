@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Search, Package, Zap, Edit2, Trash2, RefreshCw, Filter, MapPin, Printer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../hooks/useToast';
+import { useListPageSize } from '../../hooks/useListPageSize';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
@@ -25,8 +26,6 @@ import {
 } from '../../lib/inventoryService';
 import { format } from 'date-fns';
 import { logger } from '../../lib/logger';
-
-const PAGE_SIZE = 50;
 
 type InventoryRow = Awaited<ReturnType<typeof getInventoryItemsPage>>['rows'][number];
 
@@ -71,6 +70,7 @@ export default function InventoryListPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [page, setPage] = useState(0);
+  const pageSize = useListPageSize();
   const [total, setTotal] = useState(0);
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
@@ -79,11 +79,11 @@ export default function InventoryListPage() {
 
   useEffect(() => {
     loadData();
-  }, [selectedCategory, selectedStatus, debouncedSearch, page, advancedFilters]);
+  }, [selectedCategory, selectedStatus, debouncedSearch, page, pageSize, advancedFilters]);
 
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, selectedCategory, selectedStatus, advancedFilters]);
+  }, [debouncedSearch, selectedCategory, selectedStatus, advancedFilters, pageSize]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -124,7 +124,7 @@ export default function InventoryListPage() {
             status_id: selectedStatus || undefined,
             search: debouncedSearch || undefined,
             page,
-            pageSize: PAGE_SIZE,
+            pageSize,
             ...advancedFilters,
           }),
           getInventoryCategories(),
@@ -738,7 +738,7 @@ export default function InventoryListPage() {
       kpis={kpis}
       toolbar={toolbar}
       table={tableNode}
-      pager={total > 0 ? { page, pageSize: PAGE_SIZE, total, onPageChange: setPage, itemNoun: 'inventory items' } : undefined}
+      pager={total > 0 ? { page, pageSize, total, onPageChange: setPage, itemNoun: 'inventory items' } : undefined}
       empty={emptyState}
       isEmpty={items.length === 0}
       loading={loading}

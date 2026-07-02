@@ -51,7 +51,7 @@ describe('runExport', () => {
 
   it('pages each selected entity with p_limit=1000 and follows next cursors', async () => {
     const progress: Array<{ entity: string; fetched: number }> = [];
-    const buf = await runExport({ entities: ['companies'] }, (p) => progress.push(p));
+    const buf = await runExport({ domain: 'records', entities: ['companies'] }, (p) => progress.push(p));
 
     const companyCalls = rpcCalls.filter((c) => c.p_entity_type === 'companies');
     expect(companyCalls).toHaveLength(2);
@@ -72,7 +72,7 @@ describe('runExport', () => {
 
   it('exports entities in IMPORT_ORDER and forwards the date range as filters', async () => {
     await runExport(
-      { entities: ['cases', 'companies'], dateFrom: '2026-01-01', dateTo: '2026-12-31' },
+      { domain: 'records', entities: ['cases', 'companies'], dateFrom: '2026-01-01', dateTo: '2026-12-31' },
       () => {},
     );
     const order = rpcCalls.map((c) => c.p_entity_type).filter((e, i, a) => a.indexOf(e) === i);
@@ -82,7 +82,7 @@ describe('runExport', () => {
   });
 
   it('only queries the selected entities', async () => {
-    await runExport({ entities: ['notes'] }, () => {});
+    await runExport({ domain: 'records', entities: ['notes'] }, () => {});
     const queried = new Set(rpcCalls.map((c) => c.p_entity_type));
     expect(queried).toEqual(new Set(['notes']));
     for (const e of IMPORT_ORDER) {

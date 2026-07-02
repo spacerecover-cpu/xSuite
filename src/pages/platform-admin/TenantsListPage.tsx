@@ -84,7 +84,7 @@ export const TenantsListPage: React.FC = () => {
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1">
             <Input
-              placeholder="Search by company name or email..."
+              placeholder="Search by name, email, or tenant code..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -189,6 +189,11 @@ export const TenantsListPage: React.FC = () => {
                     <td className="px-6 py-4">
                       <div>
                         <p className="font-medium text-slate-900">{tenant.name}</p>
+                        {tenant.tenant_code && (
+                          <p className="text-xs font-mono font-semibold tabular-nums text-slate-500">
+                            {tenant.tenant_code}
+                          </p>
+                        )}
                         <p className="text-sm text-slate-600">{tenant.slug}</p>
                       </div>
                     </td>

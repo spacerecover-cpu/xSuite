@@ -3,13 +3,16 @@ import type { Json } from '../../types/database.types';
 import { buildWorkbook, type WorkbookMeta } from './workbookBuilder';
 import {
   IMPORT_ORDER,
+  DOMAIN_ENTITIES,
   WORKBOOK_SCHEMA_VERSION,
   type EntityType,
   type ParsedWorkbook,
   type RawRow,
+  type WorkbookDomain,
 } from './workbookContract';
 
 export interface ExportOptions {
+  domain: WorkbookDomain;
   entities: EntityType[];
   dateFrom?: string;
   dateTo?: string;
@@ -42,7 +45,7 @@ export async function runExport(
   const data = emptyData();
   const counts = emptyCounts();
 
-  for (const entity of IMPORT_ORDER) {
+  for (const entity of DOMAIN_ENTITIES[opts.domain]) {
     if (!selected.has(entity)) continue;
 
     let afterCreatedAt: string | null = null;
@@ -75,6 +78,7 @@ export async function runExport(
   }
 
   const meta: WorkbookMeta = {
+    domain: opts.domain,
     sourceTenant: getTenantId() ?? '',
     exportedAt: new Date().toISOString(),
     schemaVersion: WORKBOOK_SCHEMA_VERSION,

@@ -114,6 +114,14 @@ export const TenantDetailPage: React.FC = () => {
           <div>
             <h1 className="text-3xl font-bold text-slate-900">{tenant.name}</h1>
             <div className="flex items-center gap-3 mt-2">
+              {tenant.tenant_code && (
+                <span
+                  className="font-mono text-sm font-semibold tabular-nums text-slate-700 bg-slate-100 border border-slate-200 rounded px-2 py-0.5"
+                  title="Tenant code — for support & identification"
+                >
+                  {tenant.tenant_code}
+                </span>
+              )}
               <Badge variant={getStatusBadgeVariant(tenant.status)}>
                 {tenant.status.replace('_', ' ').toUpperCase()}
               </Badge>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Mail, Building2, MapPin, CreditCard, Calendar, Activity, Users as UsersIcon, Briefcase, HardDrive } from 'lucide-react';
+import { Mail, Building2, MapPin, CreditCard, Calendar, Activity, Users as UsersIcon, Briefcase, HardDrive, Hash } from 'lucide-react';
 import { Card } from '../../ui/Card';
 import { Badge } from '../../ui/Badge';
 import { getHealthMetricsHistory } from '@/lib/platformAdminService';
@@ -129,6 +129,15 @@ export const TenantOverviewTab: React.FC<TenantOverviewTabProps> = ({
             <div>
               <p className="text-sm text-slate-500">Tenant</p>
               <p className="text-sm font-medium text-slate-900">{tenant.name}</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <Hash className="w-5 h-5 text-slate-400 mt-0.5" />
+            <div>
+              <p className="text-sm text-slate-500">Tenant Code</p>
+              <p className="text-sm font-mono font-semibold tabular-nums text-slate-900">
+                {tenant.tenant_code ?? '—'}
+              </p>
             </div>
           </div>
           {contactAddress && (

@@ -134,7 +134,8 @@ export const PortalCases: React.FC = () => {
     enabled: !!selectedCase?.id,
   });
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityColor = (priority: string | null | undefined) => {
+    if (!priority) return '#64748b';
     const priorityItem = casePriorities.find(
       p => p.name.toLowerCase() === priority.toLowerCase()
     );

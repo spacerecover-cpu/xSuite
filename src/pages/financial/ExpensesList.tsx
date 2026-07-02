@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
+import { buildExpenseSearchOr } from '../../lib/searchResolvers';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
@@ -39,6 +40,8 @@ import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { downloadCSV } from '../../lib/csvExport';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
+import { useListPageSize } from '../../hooks/useListPageSize';
+import { useListSelectionEnabled } from '../../hooks/useListSelectionEnabled';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { logger } from '../../lib/logger';
 import type { Database } from '../../types/database.types';
@@ -85,8 +88,6 @@ type ExpenseRow = Pick<
   case: { case_no: string | null; title: string | null } | null;
 };
 
-const PAGE_SIZE = 50;
-
 export const ExpensesList: React.FC = () => {
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -101,6 +102,8 @@ export const ExpensesList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [page, setPage] = useState(0);
+  const pageSize = useListPageSize();
+  const selectionEnabled = useListSelectionEnabled();
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState<any>(null);
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(null);
@@ -123,7 +126,13 @@ export const ExpensesList: React.FC = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, statusFilter, pageSize]);
+
+  // Hiding checkboxes (tenant preference) drops any in-flight selection so
+  // bulk actions can't act on rows the user can no longer see or unselect.
+  useEffect(() => {
+    if (!selectionEnabled) selection.clear();
+  }, [selectionEnabled, selection.clear]);
 
   // Mirror the server has_role('accounts') set (owner/admin/manager/accounts) so the
   // Approve/Reject/Mark-as-Paid affordances match what RLS+service actually permit (EXP-012).
@@ -131,7 +140,7 @@ export const ExpensesList: React.FC = () => {
   const canManage = canManageExpenses(profile?.role);
 
   const { data: expensesPage, isLoading, error, refetch } = useQuery({
-    queryKey: ['expenses', searchTerm, statusFilter, page],
+    queryKey: ['expenses', searchTerm, statusFilter, page, pageSize],
     queryFn: async () => {
       try {
         let query = supabase
@@ -142,14 +151,14 @@ export const ExpensesList: React.FC = () => {
 
         if (searchTerm) {
           const s = sanitizeFilterValue(searchTerm);
-          query = query.or(`expense_number.ilike.%${s}%,description.ilike.%${s}%,vendor.ilike.%${s}%`);
+          query = query.or(await buildExpenseSearchOr(s));
         }
 
         if (statusFilter !== 'all') {
           query = query.eq('status', statusFilter);
         }
 
-        const { data, error, count } = await query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+        const { data, error, count } = await query.range(page * pageSize, (page + 1) * pageSize - 1);
         if (error) throw error;
         return { rows: (data ?? []) as unknown as ExpenseRow[], total: count ?? 0 };
       } catch (err) {
@@ -477,7 +486,7 @@ export const ExpensesList: React.FC = () => {
                 .is('deleted_at', null);
               if (searchTerm) {
                 const s = sanitizeFilterValue(searchTerm);
-                q = q.or(`expense_number.ilike.%${s}%,vendor.ilike.%${s}%,description.ilike.%${s}%`);
+                q = q.or(await buildExpenseSearchOr(s));
               }
               if (statusFilter !== 'all') q = q.eq('status', statusFilter);
               const { data, error } = await q.order('expense_date', { ascending: false, nullsFirst: false });
@@ -591,12 +600,13 @@ export const ExpensesList: React.FC = () => {
           />
         </div>
       }
-      pager={{ page, pageSize: PAGE_SIZE, total: totalExpensesCount, onPageChange: setPage, itemNoun: 'expenses' }}
+      pager={{ page, pageSize, total: totalExpensesCount, onPageChange: setPage, itemNoun: 'expenses' }}
       table={
         <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
+                  {selectionEnabled && (
                   <th className="px-4 py-4 w-10">
                     <input
                       type="checkbox"
@@ -612,6 +622,7 @@ export const ExpensesList: React.FC = () => {
                       aria-label="Select all on this page"
                     />
                   </th>
+                  )}
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Expense #</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Date</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Description</th>
@@ -630,15 +641,17 @@ export const ExpensesList: React.FC = () => {
                       selection.isSelected(expense.id) ? 'bg-info-muted/30' : ''
                     }`}
                   >
-                    <td className="px-4 py-4 w-10">
-                      <input
-                        type="checkbox"
-                        checked={selection.isSelected(expense.id)}
-                        onChange={() => selection.toggle(expense.id)}
-                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
-                        aria-label={`Select expense ${expense.expense_number ?? expense.id}`}
-                      />
-                    </td>
+                    {selectionEnabled && (
+                      <td className="px-4 py-4 w-10">
+                        <input
+                          type="checkbox"
+                          checked={selection.isSelected(expense.id)}
+                          onChange={() => selection.toggle(expense.id)}
+                          className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                          aria-label={`Select expense ${expense.expense_number ?? expense.id}`}
+                        />
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="font-semibold text-primary">{expense.expense_number ?? '-'}</span>
                     </td>

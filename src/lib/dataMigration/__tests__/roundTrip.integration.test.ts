@@ -17,6 +17,14 @@
 //  8. Idempotent re-run: submitting the same file_hash a second time inserts 0 new rows.
 //  9. Fabricating triggers did NOT fire: custody/VAT/portal-subscription row counts unchanged.
 // 10. Exactly one provenance entry (audit_trails row) was written by finalize.
+// 11. Company contact_person/contact_email/contact_phone/is_active survive the round-trip
+//     (B1) and carry metadata.legacy_id provenance (B2); explicit is_active=false stays false.
+// 12. Device serial_number + forensic fields (part_number/firmware_version/pcb_number/dcm/dom/
+//     diagnosis/recovery_result/…) and the is_primary "patient" designation survive the round-trip.
+// 13. Human-readable numbers: file-supplied case/company numbers are preserved; blank
+//     customer/company numbers are auto-filled by finalize (unique, above the max supplied).
+// This is the RECORDS-domain round-trip. Inventory is a separate domain workbook, covered
+// end-to-end by the rolled-back live inventory smoke test.
 //
 // The import is driven THROUGH the file boundary: the in-memory fixture is serialised with
 // buildWorkbook, then re-read with parseWorkbook, and THAT parsed result is imported — so the
@@ -121,6 +129,7 @@ describe('Round-trip integration — export → import → verify', { timeout: 3
 
     // Build the workbook bytes from the in-memory fixture
     const meta = {
+      domain: 'records' as const,
       sourceTenant: 'fixture-tenant',
       exportedAt: new Date().toISOString(),
       schemaVersion: 1,
@@ -141,6 +150,7 @@ describe('Round-trip integration — export → import → verify', { timeout: 3
       parsedFromFile,
       { filename: 'round-trip-fixture.xlsx', hash: fileHash },
       _p => undefined,
+      'records',
     );
     runId = summary.runId;
   });
@@ -182,6 +192,77 @@ describe('Round-trip integration — export → import → verify', { timeout: 3
     expect(summary.counts['companies']?.error).toBe(0);
   });
 
+  it('company contact fields + is_active survive the round-trip (B1) with provenance (B2)', async () => {
+    // Before B1 the export/import dropped these 4 fields; before B2 companies had no
+    // metadata column so the run_id filter below matched nothing. Both are now fixed.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: rows } = await (client as any)
+      .from('companies')
+      .select('contact_person, contact_email, contact_phone, is_active, metadata')
+      .filter('metadata->>data_migration_run_id', 'eq', runId)
+      .is('deleted_at', null)
+      .limit(25) as { data: Array<{ contact_person: string | null; contact_email: string | null; contact_phone: string | null; is_active: boolean | null; metadata: Record<string, unknown> | null }> | null };
+
+    expect(rows).not.toBeNull();
+    expect((rows ?? []).length).toBeGreaterThan(0);
+    for (const r of rows ?? []) {
+      const legacyId = r.metadata?.['legacy_id'] as string;
+      expect(legacyId).toBeTruthy();                       // B2: provenance stamped on companies
+      const fixture = fixtureWb.companies.find(c => c['legacy_id'] === legacyId);
+      expect(fixture).toBeTruthy();
+      expect(r.contact_person).toBe(fixture!['contact_person']);   // B1: all four survive
+      expect(r.contact_email).toBe(fixture!['contact_email']);
+      expect(r.contact_phone).toBe(fixture!['contact_phone']);
+      expect(r.is_active).toBe(fixture!['is_active']);
+    }
+
+    // Deterministic: every explicit is_active=false company must import as false (the
+    // COALESCE default must not turn them true). Scoped to this run's companies.
+    const falseInFixture = fixtureWb.companies.filter(c => c['is_active'] === false).length;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { count: falseImported } = await (client as any)
+      .from('companies')
+      .select('*', { count: 'exact', head: true })
+      .filter('metadata->>data_migration_run_id', 'eq', runId)
+      .eq('is_active', false)
+      .is('deleted_at', null);
+    expect(falseImported).toBe(falseInFixture);
+  });
+
+  it('human-readable numbers: supplied preserved, blanks auto-filled and unique', async () => {
+    // Companies: the fixture supplies company_number on half (CMP-SUP-*) and leaves half blank.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: comps } = await (client as any)
+      .from('companies').select('company_number, metadata')
+      .filter('metadata->>data_migration_run_id', 'eq', runId)
+      .is('deleted_at', null) as { data: Array<{ company_number: string | null; metadata: Record<string, unknown> | null }> | null };
+    const companies = comps ?? [];
+    expect(companies.length).toBeGreaterThan(0);
+    // every company ends up with a number (blanks were auto-filled by finalize) and all are unique
+    expect(companies.every(c => (c.company_number ?? '').length > 0)).toBe(true);
+    const compNums = companies.map(c => c.company_number);
+    expect(new Set(compNums).size).toBe(compNums.length);
+    // supplied company_numbers preserved exactly (matched to the fixture by legacy_id)
+    for (const c of companies) {
+      const legacyId = c.metadata?.['legacy_id'] as string;
+      const fixture = fixtureWb.companies.find(f => f['legacy_id'] === legacyId);
+      if (fixture?.['company_number']) {
+        expect(c.company_number).toBe(fixture['company_number']);
+      }
+    }
+
+    // Customers: the fixture leaves customer_number blank → every one must be auto-filled + unique.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: custs } = await (client as any)
+      .from('customers_enhanced').select('customer_number')
+      .filter('metadata->>data_migration_run_id', 'eq', runId)
+      .is('deleted_at', null) as { data: Array<{ customer_number: string | null }> | null };
+    const custNums = (custs ?? []).map(c => c.customer_number);
+    expect(custNums.length).toBeGreaterThan(0);
+    expect(custNums.every(n => (n ?? '').length > 0)).toBe(true);
+    expect(new Set(custNums).size).toBe(custNums.length);
+  });
+
   it('all cases were inserted', () => {
     expect(summary.counts['cases']?.inserted).toBe(fixtureWb.cases.length);
     expect(summary.counts['cases']?.error).toBe(0);
@@ -210,15 +291,28 @@ describe('Round-trip integration — export → import → verify', { timeout: 3
     }
   });
 
-  it('every imported device references an existing case', async () => {
+  // case_devices has NO run_id metadata column, so devices are reached through the run's
+  // cases (case_id IN <run case ids>), not by a metadata filter.
+  async function runCaseIds(): Promise<string[]> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: sampleDevices } = await (client as any)
-      .from('case_devices')
-      .select('id, case_id, metadata')
+    const { data } = await (client as any)
+      .from('cases').select('id')
       .filter('metadata->>data_migration_run_id', 'eq', runId)
-      .is('deleted_at', null)
-      .limit(20) as { data: Array<{ id: string; case_id: string; metadata: Record<string, unknown> | null }> | null };
+      .is('deleted_at', null) as { data: Array<{ id: string }> | null };
+    return (data ?? []).map(c => c.id);
+  }
 
+  it('every imported device references an existing case', async () => {
+    const caseIds = await runCaseIds();
+    expect(caseIds.length).toBeGreaterThan(0);
+    const { data: sampleDevices } = await client
+      .from('case_devices')
+      .select('id, case_id')
+      .in('case_id', caseIds)
+      .is('deleted_at', null)
+      .limit(20);
+
+    expect((sampleDevices ?? []).length).toBeGreaterThan(0);
     for (const d of sampleDevices ?? []) {
       const { data: c } = await client
         .from('cases')
@@ -228,6 +322,32 @@ describe('Round-trip integration — export → import → verify', { timeout: 3
         .maybeSingle();
       expect(c).not.toBeNull();
     }
+  });
+
+  it('device serial_number + forensic fields + is_primary survive the round-trip', async () => {
+    const caseIds = await runCaseIds();
+    expect(caseIds.length).toBeGreaterThan(0);
+    const { data: devs } = await client
+      .from('case_devices')
+      .select('serial_number, part_number, pcb_number, firmware_version, dcm, dom, diagnosis, recovery_result, is_primary')
+      .in('case_id', caseIds)
+      .is('deleted_at', null);
+    const devices = devs ?? [];
+    expect(devices.length).toBeGreaterThan(0);
+
+    // serial_number must survive on EVERY device — before this fix the export emitted the
+    // wrong key ('serial'), so buildWorkbook wrote a blank Serial Number cell and it was lost.
+    expect(devices.every(d => (d.serial_number ?? '').length > 0)).toBe(true);
+    // and the imported serials are exactly the fixture's serials (no loss / fabrication).
+    const fixtureSerials = new Set(fixtureWb.devices.map(d => d['serial_number'] as string));
+    for (const d of devices) expect(fixtureSerials.has(d.serial_number as string)).toBe(true);
+
+    // Donor-matching fingerprints + the patient ("is_primary") designation survived.
+    expect(devices.some(d => (d.pcb_number ?? '').length > 0)).toBe(true);
+    expect(devices.some(d => (d.firmware_version ?? '').length > 0)).toBe(true);
+    expect(devices.some(d => (d.dcm ?? '').length > 0)).toBe(true);
+    expect(devices.some(d => d.dom !== null)).toBe(true);
+    expect(devices.some(d => d.is_primary === true)).toBe(true);
   });
 
   it('every imported quote references an existing case', async () => {
@@ -422,6 +542,7 @@ describe('Round-trip integration — export → import → verify', { timeout: 3
       reparsed,
       { filename: 'round-trip-fixture.xlsx', hash: fileHash },
       _p => undefined,
+      'records',
     );
 
     // create_run resumed the completed run: SAME run id, no new run.

@@ -7,7 +7,8 @@ import type { BulkSelection } from '../../hooks/useBulkSelection';
 
 export interface InvoicesTableProps {
   rows: InvoiceWithDetails[];
-  selection: BulkSelection;
+  /** Omit to hide the bulk-selection checkbox column (tenant preference). */
+  selection?: BulkSelection;
   navigate: (path: string) => void;
   formatCurrency: (amount: number) => string;
   getClientName: (invoice: InvoiceWithDetails) => string;

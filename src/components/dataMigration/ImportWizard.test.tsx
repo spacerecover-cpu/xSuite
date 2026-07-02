@@ -18,6 +18,12 @@ vi.mock('../../lib/dataMigration/workbookParser', () => ({
   readWorkbookMeta: mocks.readWorkbookMeta,
   computeFileHash: mocks.computeFileHash,
 }));
+vi.mock('../../lib/dataMigration/coerceWorkbook', () => ({
+  coerceWorkbook: (wb: unknown) => wb,
+}));
+vi.mock('../../lib/dataMigration/referenceLists', () => ({
+  fetchReferenceLists: vi.fn(async () => ({})),
+}));
 vi.mock('../../lib/dataMigration/importValidator', () => ({
   validateWorkbook: mocks.validateWorkbook,
   validateSchemaVersion: mocks.validateSchemaVersion,
@@ -28,6 +34,8 @@ vi.mock('../../lib/dataMigration/importClient', () => ({
 vi.mock('../../lib/dataMigration/workbookContract', () => ({
   IMPORT_ORDER: ['companies', 'customers', 'cases'] as const,
   SHEET_NAMES: { companies: 'Companies', customers: 'Customers', cases: 'Cases' },
+  DOMAIN_ENTITIES: { records: ['companies', 'customers', 'cases'], inventory: [] },
+  DOMAIN_LABELS: { records: 'Case Records', inventory: 'Inventory' },
 }));
 
 import { ImportWizard } from './ImportWizard';
@@ -49,19 +57,24 @@ describe('ImportWizard', () => {
   });
 
   it('renders the Upload step by default', () => {
-    wrap(<ImportWizard onClose={onClose} />);
+    wrap(<ImportWizard domain="records" onClose={onClose} />);
     expect(screen.getByText(/drop your/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /browse file/i })).toBeInTheDocument();
   });
 
+  it('offers a blank-template download in the Upload step', () => {
+    wrap(<ImportWizard domain="records" onClose={onClose} />);
+    expect(screen.getByRole('button', { name: /download.*template/i })).toBeInTheDocument();
+  });
+
   it('Validate button is disabled without a file selected', () => {
-    wrap(<ImportWizard onClose={onClose} />);
+    wrap(<ImportWizard domain="records" onClose={onClose} />);
     const validateBtn = screen.queryByRole('button', { name: /validate/i });
     expect(validateBtn).toBeNull();
   });
 
   it('calls onClose when Cancel is clicked', () => {
-    wrap(<ImportWizard onClose={onClose} />);
+    wrap(<ImportWizard domain="records" onClose={onClose} />);
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
     expect(onClose).toHaveBeenCalledOnce();
   });
@@ -75,7 +88,7 @@ describe('ImportWizard', () => {
       issues: [],
     });
 
-    wrap(<ImportWizard onClose={onClose} />);
+    wrap(<ImportWizard domain="records" onClose={onClose} />);
 
     const file = new File(['dummy'], 'lab-export.xlsx', {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -87,7 +100,7 @@ describe('ImportWizard', () => {
 
     await waitFor(() => expect(mocks.computeFileHash).toHaveBeenCalled());
     await waitFor(() => expect(mocks.parseWorkbook).toHaveBeenCalled());
-    await waitFor(() => expect(mocks.validateWorkbook).toHaveBeenCalledWith(parsedWb));
+    await waitFor(() => expect(mocks.validateWorkbook).toHaveBeenCalledWith(parsedWb, 'records'));
 
     expect(await screen.findByText(/validate \/ preview/i)).toBeInTheDocument();
     expect(screen.getByText('1')).toBeInTheDocument();
@@ -102,7 +115,7 @@ describe('ImportWizard', () => {
       issues: [{ entity: 'companies', rowIndex: 2, field: 'name', message: 'Required field missing', severity: 'error' }],
     });
 
-    wrap(<ImportWizard onClose={onClose} />);
+    wrap(<ImportWizard domain="records" onClose={onClose} />);
 
     const file = new File(['dummy'], 'bad.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;

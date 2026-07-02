@@ -64,6 +64,25 @@ describe('useListPage', () => {
     expect(typeof result.current.pagerProps.onPageChange).toBe('function');
   });
 
+  it('resets page and refetches when pageSize changes (tenant setting update)', async () => {
+    vi.useRealTimers(); // see note above — real clock for waitFor polling
+    const fetchPage = vi.fn(async () => ({ rows: [{ id: 'a' }], total: 100 }));
+    const { result, rerender } = renderHook(
+      ({ pageSize }) => useListPage(baseConfig({ fetchPage, pageSize })),
+      { wrapper: wrapper(), initialProps: { pageSize: 50 } },
+    );
+    await waitFor(() =>
+      expect(fetchPage).toHaveBeenCalledWith({ status: 'all', search: '', page: 0, pageSize: 50 }),
+    );
+    act(() => result.current.setPage(2));
+    await waitFor(() => expect(fetchPage).toHaveBeenCalledWith(expect.objectContaining({ page: 2 })));
+    rerender({ pageSize: 25 });
+    expect(result.current.page).toBe(0);
+    await waitFor(() =>
+      expect(fetchPage).toHaveBeenCalledWith({ status: 'all', search: '', page: 0, pageSize: 25 }),
+    );
+  });
+
   it('isEmpty is false while loading and true when loaded with no rows', async () => {
     vi.useRealTimers(); // see note above — real clock for waitFor polling
     const fetchPage = vi.fn(async () => ({ rows: [], total: 0 }));

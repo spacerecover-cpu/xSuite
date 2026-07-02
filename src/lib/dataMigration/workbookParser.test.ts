@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as XLSX from 'xlsx';
-import { parseWorkbook, readWorkbookMeta, computeFileHash } from './workbookParser';
+import { parseWorkbook, readWorkbookMeta, computeFileHash, repackXlsxZip, readXlsx } from './workbookParser';
 import { buildWorkbook, type WorkbookMeta } from './workbookBuilder';
 import {
   SHEET_NAMES,
@@ -19,6 +19,7 @@ function emptyCounts(): Record<EntityType, number> {
 }
 
 const META: WorkbookMeta = {
+  domain: 'records',
   sourceTenant: 'tenant-123',
   exportedAt: '2026-06-30T00:00:00.000Z',
   schemaVersion: 1,
@@ -56,6 +57,83 @@ describe('parseWorkbook', () => {
     const wb = parseWorkbook(buildWorkbook(data, META));
     expect(wb.invoices).toEqual([]);
     expect(wb.quoteItems).toEqual([]);
+  });
+
+  // Back-compat: files exported BEFORE the "Legacy ID" -> "Record Ref" header
+  // rename carry the old header text. The parser must still map them to the
+  // legacy_id / *_legacy_id keys so those workbooks keep importing.
+  it('accepts the legacy "Legacy ID" header from pre-rename exports', () => {
+    const wb = XLSX.utils.book_new();
+    const companies = XLSX.utils.json_to_sheet([{ 'Legacy ID': 'C1', 'Company Name': 'Acme' }]);
+    XLSX.utils.book_append_sheet(wb, companies, SHEET_NAMES.companies);
+    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+    const parsed = parseWorkbook(buf);
+    expect(parsed.companies[0]).toMatchObject({ legacy_id: 'C1', name: 'Acme' });
+  });
+
+  it('accepts the legacy FK "* Legacy ID" headers from pre-rename exports', () => {
+    const wb = XLSX.utils.book_new();
+    const rels = XLSX.utils.json_to_sheet([
+      { 'Legacy ID': 'R1', 'Customer Legacy ID': 'CU1', 'Company Legacy ID': 'CO1', 'Role': 'client' },
+    ]);
+    XLSX.utils.book_append_sheet(wb, rels, SHEET_NAMES.relationships);
+    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+    const parsed = parseWorkbook(buf);
+    expect(parsed.relationships[0]).toMatchObject({
+      legacy_id: 'R1', customer_legacy_id: 'CU1', company_legacy_id: 'CO1', role: 'client',
+    });
+  });
+});
+
+// Some spreadsheet apps (LibreOffice, Google Sheets, Numbers) save .xlsx as a "streaming"
+// ZIP with the data-descriptor bit set. SheetJS's browser build has no zlib and throws
+// "Unsupported ZIP Compression method NaN" on those archives. The parser must recover by
+// re-packing the ZIP (via fflate) into a plain STORE zip and retrying.
+describe('parseWorkbook — tolerant of streaming/data-descriptor ZIPs', () => {
+  it('repackXlsxZip produces a SheetJS-readable STORE zip with identical rows', () => {
+    const data = emptyData();
+    data.companies = [{ legacy_id: 'C1', name: 'Acme', email: 'a@acme.test' }];
+    const original = new Uint8Array(buildWorkbook(data, META));
+
+    const repacked = repackXlsxZip(original);
+
+    expect(repacked[0]).toBe(0x50); // 'P'
+    expect(repacked[1]).toBe(0x4b); // 'K'
+    const buf = repacked.buffer.slice(repacked.byteOffset, repacked.byteOffset + repacked.byteLength);
+    const parsed = parseWorkbook(buf as ArrayBuffer);
+    expect(parsed.companies[0]).toMatchObject({ legacy_id: 'C1', name: 'Acme' });
+  });
+
+  it('readXlsx re-packs and retries when the reader throws the no-zlib error', () => {
+    const data = emptyData();
+    data.companies = [{ legacy_id: 'C1', name: 'Acme' }];
+    const buf = buildWorkbook(data, META);
+
+    let calls = 0;
+    // Simulate the browser build: the first (direct) read throws; the retry (on the
+    // re-packed STORE zip) succeeds via the real reader.
+    const flakyRead = (f: ArrayBuffer): XLSX.WorkBook => {
+      calls++;
+      if (calls === 1) throw new Error('Unsupported ZIP Compression method NaN');
+      return XLSX.read(f, { type: 'array', cellDates: false });
+    };
+
+    const book = readXlsx(buf, flakyRead);
+
+    expect(book.SheetNames).toContain(SHEET_NAMES.companies);
+    expect(calls).toBe(2);
+  });
+
+  it('readXlsx does not re-pack non-ZIP input — it surfaces the original error', () => {
+    const notZip = new TextEncoder().encode('this is not a zip').buffer;
+    let calls = 0;
+    const alwaysThrows = (): XLSX.WorkBook => {
+      calls++;
+      throw new Error('some parse error');
+    };
+
+    expect(() => readXlsx(notZip, alwaysThrows)).toThrow('some parse error');
+    expect(calls).toBe(1); // guarded: no repack attempt when bytes aren't a PK zip
   });
 });
 

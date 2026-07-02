@@ -47,6 +47,7 @@ import { PrintLabelsModal } from '../../components/stock/PrintLabelsModal';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useToast } from '../../hooks/useToast';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useListPageSize } from '../../hooks/useListPageSize';
 
 type TabId = 'all' | 'saleable' | 'internal' | 'low_stock';
 
@@ -56,8 +57,6 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'internal', label: 'Internal Supplies' },
   { id: 'low_stock', label: 'Low Stock' },
 ];
-
-const PAGE_SIZE = 50;
 
 export const StockListPage: React.FC = () => {
   const { formatCurrency } = useCurrency();
@@ -71,6 +70,7 @@ export const StockListPage: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const pageSize = useListPageSize();
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [alertDismissed, setAlertDismissed] = useState(false);
 
@@ -104,7 +104,7 @@ export const StockListPage: React.FC = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [activeTab, debouncedSearch, categoryId]);
+  }, [activeTab, debouncedSearch, categoryId, pageSize]);
 
   const filters = useMemo((): StockFilters => {
     const base: StockFilters = {
@@ -118,8 +118,8 @@ export const StockListPage: React.FC = () => {
   }, [activeTab, debouncedSearch, categoryId]);
 
   const { data: itemsPage, isLoading: itemsLoading } = useQuery({
-    queryKey: [...stockKeys.items(), filters, page],
-    queryFn: () => getStockItemsPage(filters, page, PAGE_SIZE),
+    queryKey: [...stockKeys.items(), filters, page, pageSize],
+    queryFn: () => getStockItemsPage(filters, page, pageSize),
     staleTime: 30000,
     placeholderData: keepPreviousData,
   });
@@ -596,7 +596,7 @@ export const StockListPage: React.FC = () => {
       }
       pager={
         total > 0
-          ? { page, pageSize: PAGE_SIZE, total, onPageChange: setPage, itemNoun: 'stock items' }
+          ? { page, pageSize, total, onPageChange: setPage, itemNoun: 'stock items' }
           : undefined
       }
     >

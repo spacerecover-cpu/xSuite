@@ -11,6 +11,7 @@ import type { EntityType } from '../workbookContract';
 const ALL_ENTITIES: EntityType[] = [
   'companies', 'customers', 'relationships', 'cases', 'devices',
   'quotes', 'quoteItems', 'invoices', 'invoiceLineItems', 'notes', 'statusHistory',
+  'inventoryLocations', 'inventoryItems', 'inventoryDonorParts',
 ];
 
 describe('exportContractAsTemplate', () => {

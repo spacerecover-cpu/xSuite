@@ -101,6 +101,8 @@ export const userKeys = {
 
 export const settingsKeys = {
   general: () => ['settings', 'general'] as const,
+  listPageSize: () => ['settings', 'list-page-size'] as const,
+  listSelection: () => ['settings', 'list-selection'] as const,
   systemNumbers: () => ['settings', 'system-numbers'] as const,
   locales: () => ['settings', 'locales'] as const,
   portal: () => ['settings', 'portal'] as const,

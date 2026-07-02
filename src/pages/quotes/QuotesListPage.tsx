@@ -17,6 +17,8 @@ import { EmptyState } from '../../components/shared/EmptyState';
 import { ExportButton } from '../../components/shared/ExportButton';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
+import { useListPageSize } from '../../hooks/useListPageSize';
+import { useListSelectionEnabled } from '../../hooks/useListSelectionEnabled';
 import { downloadCSV } from '../../lib/csvExport';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
@@ -56,8 +58,6 @@ const toOptionalString = (value: unknown): string | null => {
   return null;
 };
 
-const PAGE_SIZE = 50;
-
 export const QuotesListPage: React.FC = () => {
   const navigate = useNavigate();
   const toast = useToast();
@@ -79,6 +79,8 @@ export const QuotesListPage: React.FC = () => {
   const [editingQuote, setEditingQuote] = useState<QuoteWithDetails | null>(null);
   const [sendingQuoteId, setSendingQuoteId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const pageSize = useListPageSize();
+  const selectionEnabled = useListSelectionEnabled();
 
   // Command-palette deep-link: /quotes?new=1 opens the create modal.
   useEffect(() => {
@@ -100,7 +102,13 @@ export const QuotesListPage: React.FC = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [statusFilter, debouncedSearch]);
+  }, [statusFilter, debouncedSearch, pageSize]);
+
+  // Hiding checkboxes (tenant preference) drops any in-flight selection so
+  // bulk actions can't act on rows the user can no longer see or unselect.
+  useEffect(() => {
+    if (!selectionEnabled) selection.clear();
+  }, [selectionEnabled, selection.clear]);
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['quote_stats'],
@@ -111,13 +119,13 @@ export const QuotesListPage: React.FC = () => {
   });
 
   const { data: quotesPage, isLoading, error: quotesError } = useQuery({
-    queryKey: ['quotes', statusFilter, debouncedSearch, page],
+    queryKey: ['quotes', statusFilter, debouncedSearch, page, pageSize],
     queryFn: () =>
       fetchQuotesPage({
         status: statusFilter !== 'all' ? statusFilter : undefined,
         search: debouncedSearch || undefined,
         page,
-        pageSize: PAGE_SIZE,
+        pageSize,
       }),
     staleTime: 30000,
     refetchOnWindowFocus: false,
@@ -468,21 +476,23 @@ export const QuotesListPage: React.FC = () => {
         <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-4 py-4 w-10">
-                    <input
-                      type="checkbox"
-                      checked={selection.allSelected(visibleIds)}
-                      ref={(el) => {
-                        if (el) {
-                          el.indeterminate =
-                            !selection.allSelected(visibleIds) && selection.someSelected(visibleIds);
-                        }
-                      }}
-                      onChange={(e) => selection.setMany(visibleIds, e.target.checked)}
-                      className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
-                      aria-label="Select all on this page"
-                    />
-                  </th>
+                  {selectionEnabled && (
+                    <th className="px-4 py-4 w-10">
+                      <input
+                        type="checkbox"
+                        checked={selection.allSelected(visibleIds)}
+                        ref={(el) => {
+                          if (el) {
+                            el.indeterminate =
+                              !selection.allSelected(visibleIds) && selection.someSelected(visibleIds);
+                          }
+                        }}
+                        onChange={(e) => selection.setMany(visibleIds, e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                        aria-label="Select all on this page"
+                      />
+                    </th>
+                  )}
                   <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                     Quote #
                   </th>
@@ -518,19 +528,21 @@ export const QuotesListPage: React.FC = () => {
                       quote.id && selection.isSelected(quote.id) ? 'bg-info-muted/30' : ''
                     }`}
                   >
-                    <td
-                      className="px-4 py-4 w-10"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={quote.id ? selection.isSelected(quote.id) : false}
-                        onChange={() => quote.id && selection.toggle(quote.id)}
-                        disabled={!quote.id}
-                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer disabled:opacity-30"
-                        aria-label={`Select quote ${quote.quote_number}`}
-                      />
-                    </td>
+                    {selectionEnabled && (
+                      <td
+                        className="px-4 py-4 w-10"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={quote.id ? selection.isSelected(quote.id) : false}
+                          onChange={() => quote.id && selection.toggle(quote.id)}
+                          disabled={!quote.id}
+                          className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer disabled:opacity-30"
+                          aria-label={`Select quote ${quote.quote_number}`}
+                        />
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="font-semibold text-primary">
                         {quote.quote_number}
@@ -677,7 +689,7 @@ export const QuotesListPage: React.FC = () => {
       kpis={kpis}
       toolbar={toolbar}
       table={table}
-      pager={{ page, pageSize: PAGE_SIZE, total: totalQuotes, onPageChange: setPage, itemNoun: 'quotes' }}
+      pager={{ page, pageSize, total: totalQuotes, onPageChange: setPage, itemNoun: 'quotes' }}
       loading={isLoading || statsLoading}
       isEmpty={quotes.length === 0}
       empty={empty}

@@ -14,6 +14,8 @@ vi.mock('../../lib/dataMigration/exportClient', () => ({
 vi.mock('../../lib/dataMigration/workbookContract', () => ({
   IMPORT_ORDER: ['companies', 'customers', 'cases'] as const,
   SHEET_NAMES: { companies: 'Companies', customers: 'Customers', cases: 'Cases' },
+  DOMAIN_ENTITIES: { records: ['companies', 'customers', 'cases'], inventory: [] },
+  DOMAIN_LABELS: { records: 'Case Records', inventory: 'Inventory' },
 }));
 
 import { ExportWizard } from './ExportWizard';
@@ -32,7 +34,7 @@ describe('ExportWizard', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   it('renders the Scope step with entity checkboxes', () => {
-    wrap(<ExportWizard onClose={onClose} />);
+    wrap(<ExportWizard domain="records" onClose={onClose} />);
     expect(screen.getByText('Scope')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /companies/i })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /customers/i })).toBeInTheDocument();
@@ -40,13 +42,13 @@ describe('ExportWizard', () => {
   });
 
   it('all entities are checked by default', () => {
-    wrap(<ExportWizard onClose={onClose} />);
+    wrap(<ExportWizard domain="records" onClose={onClose} />);
     const checkboxes = screen.getAllByRole('checkbox');
     checkboxes.forEach((cb) => expect(cb).toBeChecked());
   });
 
   it('calls onClose when Cancel is clicked', () => {
-    wrap(<ExportWizard onClose={onClose} />);
+    wrap(<ExportWizard domain="records" onClose={onClose} />);
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
     expect(onClose).toHaveBeenCalledOnce();
   });
@@ -55,7 +57,7 @@ describe('ExportWizard', () => {
     const fakeBuffer = new ArrayBuffer(8);
     mocks.runExport.mockResolvedValue(fakeBuffer);
 
-    wrap(<ExportWizard onClose={onClose} />);
+    wrap(<ExportWizard domain="records" onClose={onClose} />);
     fireEvent.click(screen.getByRole('button', { name: /generate export/i }));
 
     await waitFor(() => expect(mocks.runExport).toHaveBeenCalledOnce());
@@ -67,7 +69,7 @@ describe('ExportWizard', () => {
     const fakeBuffer = new ArrayBuffer(8);
     mocks.runExport.mockResolvedValue(fakeBuffer);
 
-    wrap(<ExportWizard onClose={onClose} />);
+    wrap(<ExportWizard domain="records" onClose={onClose} />);
     fireEvent.click(screen.getByRole('checkbox', { name: /companies/i }));
     fireEvent.click(screen.getByRole('button', { name: /generate export/i }));
 

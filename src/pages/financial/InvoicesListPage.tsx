@@ -20,6 +20,8 @@ import { downloadCSV } from '../../lib/csvExport';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
 import { useListPage } from '../../hooks/useListPage';
+import { useListPageSize } from '../../hooks/useListPageSize';
+import { useListSelectionEnabled } from '../../hooks/useListSelectionEnabled';
 import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
 import { KpiRow } from '../../components/templates/KpiRow';
 import { InvoicesFilterBar } from '../../components/financial/InvoicesFilterBar';
@@ -52,14 +54,17 @@ export const InvoicesListPage: React.FC<unknown> = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentInvoice, setPaymentInvoice] = useState<InvoiceWithDetails | null>(null);
 
+  const pageSize = useListPageSize();
+  const selectionEnabled = useListSelectionEnabled();
   const list = useListPage<InvoiceWithDetails, { status?: string; invoiceType?: string }>({
     queryKey: ['invoices'],
     filters: {
       status: statusFilter !== 'all' ? statusFilter : undefined,
       invoiceType: typeFilter !== 'all' ? typeFilter : undefined,
     },
-    fetchPage: ({ status, invoiceType, search, page, pageSize }) =>
-      fetchInvoicesPage({ status, invoiceType, search: search || undefined, page, pageSize }),
+    fetchPage: ({ status, invoiceType, search, page, pageSize: size }) =>
+      fetchInvoicesPage({ status, invoiceType, search: search || undefined, page, pageSize: size }),
+    pageSize,
   });
   const invoices = list.rows;
   const debouncedSearch = list.debouncedSearch;
@@ -73,6 +78,12 @@ export const InvoicesListPage: React.FC<unknown> = () => {
       setSearchParams(next, { replace: true });
     }
   }, [searchParams, setSearchParams]);
+
+  // Hiding checkboxes (tenant preference) drops any in-flight selection so
+  // bulk actions can't act on rows the user can no longer see or unselect.
+  useEffect(() => {
+    if (!selectionEnabled) selection.clear();
+  }, [selectionEnabled, selection.clear]);
 
   const { data: stats } = useQuery({
     queryKey: ['invoice_stats'],
@@ -336,7 +347,7 @@ export const InvoicesListPage: React.FC<unknown> = () => {
       table={
         <InvoicesTable
           rows={invoices}
-          selection={selection}
+          selection={selectionEnabled ? selection : undefined}
           navigate={navigate}
           formatCurrency={formatCurrency}
           getClientName={getClientName}

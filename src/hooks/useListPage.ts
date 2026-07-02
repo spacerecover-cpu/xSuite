@@ -64,13 +64,15 @@ export function useListPage<TRow, TFilters extends object>(
     return () => clearTimeout(t);
   }, [search, debounceMs]);
 
+  // pageSize is a reset trigger + key segment: the tenant setting can change at
+  // runtime (Settings → Tables), which must re-clamp to page 0 and refetch.
   const filtersKey = JSON.stringify(filters);
   useEffect(() => {
     setPage(0);
-  }, [filtersKey, debouncedSearch]);
+  }, [filtersKey, debouncedSearch, pageSize]);
 
   const query = useQuery({
-    queryKey: [...queryKey, filters, debouncedSearch, page],
+    queryKey: [...queryKey, filters, debouncedSearch, page, pageSize],
     queryFn: () => fetchPage({ ...filters, search: debouncedSearch, page, pageSize }),
     staleTime,
     refetchOnWindowFocus: false,

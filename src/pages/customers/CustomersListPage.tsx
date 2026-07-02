@@ -22,6 +22,8 @@ import { downloadCSV } from '../../lib/csvExport';
 import { formatDate } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
+import { useListPageSize } from '../../hooks/useListPageSize';
+import { useListSelectionEnabled } from '../../hooks/useListSelectionEnabled';
 import { useConfirm } from '../../hooks/useConfirm';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
@@ -80,8 +82,6 @@ interface City {
   is_active: boolean;
 }
 
-const PAGE_SIZE = 50;
-
 export const CustomersListPage: React.FC = () => {
   const navigate = useNavigate();
   const toast = useToast();
@@ -101,6 +101,8 @@ export const CustomersListPage: React.FC = () => {
   const [filterPortal, setFilterPortal] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(0);
+  const pageSize = useListPageSize();
+  const selectionEnabled = useListSelectionEnabled();
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
@@ -109,7 +111,13 @@ export const CustomersListPage: React.FC = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, filterGroup, filterPortal]);
+  }, [debouncedSearch, filterGroup, filterPortal, pageSize]);
+
+  // Hiding checkboxes (tenant preference) drops any in-flight selection so
+  // bulk actions can't act on rows the user can no longer see or unselect.
+  useEffect(() => {
+    if (!selectionEnabled) selection.clear();
+  }, [selectionEnabled, selection.clear]);
 
   // Command-palette deep-link: /customers?new=1 opens the create modal.
   useEffect(() => {
@@ -153,7 +161,7 @@ export const CustomersListPage: React.FC = () => {
   });
 
   const { data: customersPage, isLoading } = useQuery({
-    queryKey: ['customers_enhanced', debouncedSearch, filterGroup, filterPortal, page],
+    queryKey: ['customers_enhanced', debouncedSearch, filterGroup, filterPortal, page, pageSize],
     queryFn: async () => {
       let query = supabase
         .from('customers_enhanced')
@@ -183,7 +191,7 @@ export const CustomersListPage: React.FC = () => {
 
       const { data, error, count } = await query
         .order('created_at', { ascending: false })
-        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+        .range(page * pageSize, (page + 1) * pageSize - 1);
       if (error) throw error;
       return { rows: (data ?? []) as unknown as Customer[], total: count ?? 0 };
     },
@@ -647,21 +655,23 @@ export const CustomersListPage: React.FC = () => {
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="px-4 py-4 w-10">
-                      <input
-                        type="checkbox"
-                        checked={selection.allSelected(visibleIds)}
-                        ref={(el) => {
-                          if (el) {
-                            el.indeterminate =
-                              !selection.allSelected(visibleIds) && selection.someSelected(visibleIds);
-                          }
-                        }}
-                        onChange={(e) => selection.setMany(visibleIds, e.target.checked)}
-                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
-                        aria-label="Select all on this page"
-                      />
-                    </th>
+                    {selectionEnabled && (
+                      <th className="px-4 py-4 w-10">
+                        <input
+                          type="checkbox"
+                          checked={selection.allSelected(visibleIds)}
+                          ref={(el) => {
+                            if (el) {
+                              el.indeterminate =
+                                !selection.allSelected(visibleIds) && selection.someSelected(visibleIds);
+                            }
+                          }}
+                          onChange={(e) => selection.setMany(visibleIds, e.target.checked)}
+                          className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                          aria-label="Select all on this page"
+                        />
+                      </th>
+                    )}
                     <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                       Customer Number
                     </th>
@@ -700,18 +710,20 @@ export const CustomersListPage: React.FC = () => {
                         selection.isSelected(customer.id) ? 'bg-info-muted/30' : ''
                       }`}
                     >
-                      <td
-                        className="px-4 py-4 w-10"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selection.isSelected(customer.id)}
-                          onChange={() => selection.toggle(customer.id)}
-                          className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
-                          aria-label={`Select customer ${customer.customer_name}`}
-                        />
-                      </td>
+                      {selectionEnabled && (
+                        <td
+                          className="px-4 py-4 w-10"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selection.isSelected(customer.id)}
+                            onChange={() => selection.toggle(customer.id)}
+                            className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                            aria-label={`Select customer ${customer.customer_name}`}
+                          />
+                        </td>
+                      )}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="font-semibold text-primary">
                           {customer.customer_number}
@@ -816,7 +828,7 @@ export const CustomersListPage: React.FC = () => {
       kpis={kpis}
       toolbar={toolbar}
       table={table}
-      pager={{ page, pageSize: PAGE_SIZE, total: totalCustomers, onPageChange: setPage, itemNoun: 'customers' }}
+      pager={{ page, pageSize, total: totalCustomers, onPageChange: setPage, itemNoun: 'customers' }}
       loading={isLoading}
       loadingFallback={loadingFallback}
       isEmpty={customers.length === 0}

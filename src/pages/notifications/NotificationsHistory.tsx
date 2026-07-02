@@ -21,11 +21,10 @@ import { Badge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState } from '../../components/shared/EmptyState';
+import { useListPageSize } from '../../hooks/useListPageSize';
 import type { Database } from '../../types/database.types';
 
 type NotificationRow = Database['public']['Tables']['notification_log']['Row'];
-
-const PAGE_SIZE = 25;
 
 // Short relative-time formatter, shared shape with the bell dropdown so
 // users see consistent time strings between the two surfaces.
@@ -50,6 +49,7 @@ export function NotificationsHistory() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
+  const pageSize = useListPageSize();
   const [readFilter, setReadFilter] = useState<ReadFilter>('all');
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
   const [search, setSearch] = useState('');
@@ -59,8 +59,8 @@ export function NotificationsHistory() {
   // Reset to page 1 whenever filters change — otherwise pagination
   // overshoots the new (smaller) result set and shows an empty page.
   const queryKey = useMemo(
-    () => ['notifications-history', userId, page, readFilter, channelFilter, search],
-    [userId, page, readFilter, channelFilter, search],
+    () => ['notifications-history', userId, page, pageSize, readFilter, channelFilter, search],
+    [userId, page, pageSize, readFilter, channelFilter, search],
   );
 
   const { data, isLoading } = useQuery({
@@ -83,8 +83,8 @@ export function NotificationsHistory() {
         q = q.or(`title.ilike.${term},body.ilike.${term}`);
       }
 
-      const from = page * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
       const { data: rows, count, error } = await q
         .order('created_at', { ascending: false })
         .range(from, to);
@@ -97,7 +97,7 @@ export function NotificationsHistory() {
 
   const rows = data?.rows ?? [];
   const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['notifications-history'] });
@@ -335,7 +335,7 @@ export function NotificationsHistory() {
         )}
       </Card>
 
-      {total > PAGE_SIZE && (
+      {total > pageSize && (
         <div className="flex items-center justify-between text-sm text-slate-600">
           <span>
             Page {page + 1} of {totalPages} · {total.toLocaleString()} total

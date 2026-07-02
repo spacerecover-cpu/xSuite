@@ -10,6 +10,7 @@ import type { BadgeVariant } from '../../lib/ui/variants';
 import { Search, Download, AlertCircle, AlertTriangle, Info, Bug } from 'lucide-react';
 import { format } from 'date-fns';
 import { logger } from '../../lib/logger';
+import { useListPageSize } from '../../hooks/useListPageSize';
 
 interface SystemLog {
   id: string;
@@ -22,13 +23,12 @@ interface SystemLog {
   created_at: string;
 }
 
-const PAGE_SIZE = 50;
-
 export const SystemLogs: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [levelFilter, setLevelFilter] = useState<string>('all');
   const [page, setPage] = useState(0);
+  const pageSize = useListPageSize();
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -37,10 +37,10 @@ export const SystemLogs: React.FC = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [levelFilter, debouncedSearch]);
+  }, [levelFilter, debouncedSearch, pageSize]);
 
   const { data, isLoading: loading } = useQuery({
-    queryKey: ['system_logs', levelFilter, debouncedSearch, page],
+    queryKey: ['system_logs', levelFilter, debouncedSearch, page, pageSize],
     queryFn: async () => {
       let query = supabase
         .from('system_logs')
@@ -55,7 +55,7 @@ export const SystemLogs: React.FC = () => {
         query = query.or(`message.ilike.%${s}%,category.ilike.%${s}%`);
       }
 
-      const { data, error, count } = await query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+      const { data, error, count } = await query.range(page * pageSize, (page + 1) * pageSize - 1);
       if (error) throw error;
       const normalized: SystemLog[] = (data || []).map((row) => ({
         id: row.id,
@@ -217,7 +217,7 @@ export const SystemLogs: React.FC = () => {
           <p className="text-slate-500">No logs found</p>
         </div>
       }
-      pager={{ page, pageSize: PAGE_SIZE, total, onPageChange: setPage, itemNoun: 'logs' }}
+      pager={{ page, pageSize, total, onPageChange: setPage, itemNoun: 'logs' }}
       table={
         <div className="divide-y divide-slate-200">
           {logs.map((log) => (
