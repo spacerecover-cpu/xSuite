@@ -50,7 +50,7 @@ export function ConfirmDialog({
           <h3 id={titleId} className="text-lg font-semibold text-slate-900 mb-2">{title}</h3>
           <p className="text-sm text-slate-600 mb-6">{message}</p>
           <div className="flex gap-3 justify-end">
-            <Button variant="ghost" onClick={onClose} disabled={isLoading}>
+            <Button variant="secondary" onClick={onClose} disabled={isLoading}>
               {cancelText ?? t('common.cancel')}
             </Button>
             <Button variant={variant} onClick={onConfirm} disabled={isLoading} aria-busy={isLoading}>

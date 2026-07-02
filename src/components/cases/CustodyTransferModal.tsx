@@ -408,7 +408,7 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
         )}
 
         <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-          <Button onClick={onClose} variant="ghost" disabled={isLoading}>
+          <Button onClick={onClose} variant="secondary" disabled={isLoading}>
             Cancel
           </Button>
           <Button

@@ -252,7 +252,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOp
                 </FormField>
               </div>
               <div className="flex justify-end gap-2 pt-1">
-                <Button variant="ghost" size="sm" onClick={cancelForm}>Cancel</Button>
+                <Button variant="secondary" size="sm" onClick={cancelForm}>Cancel</Button>
                 <Button variant="primary" size="sm" onClick={handleSubmit} disabled={isPending}>
                   {editingId ? 'Update' : 'Create'}
                 </Button>

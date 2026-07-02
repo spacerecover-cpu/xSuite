@@ -182,7 +182,7 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
         </div>
 
         <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button

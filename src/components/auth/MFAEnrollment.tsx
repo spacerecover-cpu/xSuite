@@ -134,7 +134,7 @@ export const MFAEnrollment: React.FC<MFAEnrollmentProps> = ({ isOpen, onClose, o
               </div>
 
               <div className="flex gap-3">
-                <Button variant="ghost" onClick={onClose} className="flex-1">
+                <Button variant="secondary" onClick={onClose} className="flex-1">
                   Cancel
                 </Button>
                 <button
@@ -151,7 +151,7 @@ export const MFAEnrollment: React.FC<MFAEnrollmentProps> = ({ isOpen, onClose, o
           )}
 
           {step === 'setup' && !enrollment && !loading && (
-            <Button variant="ghost" onClick={onClose} className="w-full">
+            <Button variant="secondary" onClick={onClose} className="w-full">
               Cancel
             </Button>
           )}

@@ -324,7 +324,7 @@ export const ArticleEditorModal: React.FC<ArticleEditorModalProps> = ({ isOpen, 
       </div>
 
       <div className="flex items-center justify-between pt-4 border-t border-slate-200 mt-0 px-6 pb-4">
-        <Button variant="ghost" onClick={onClose} disabled={isPending}>Cancel</Button>
+        <Button variant="secondary" onClick={onClose} disabled={isPending}>Cancel</Button>
         <div className="flex items-center gap-2">
           <Button
             variant="secondary"

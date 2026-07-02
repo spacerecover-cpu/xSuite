@@ -88,7 +88,7 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
       headerAction={downloadButton}
       footer={
         <div className="flex items-center justify-end gap-3">
-          <Button variant="ghost" onClick={onClose}>Close</Button>
+          <Button variant="secondary" onClick={onClose}>Close</Button>
         </div>
       }
     >

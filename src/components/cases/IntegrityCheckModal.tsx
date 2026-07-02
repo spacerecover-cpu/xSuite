@@ -415,7 +415,7 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-          <Button onClick={onClose} variant="ghost" disabled={performCheckMutation.isPending}>
+          <Button onClick={onClose} variant="secondary" disabled={performCheckMutation.isPending}>
             Cancel
           </Button>
           <Button onClick={handleSubmit} disabled={performCheckMutation.isPending}>

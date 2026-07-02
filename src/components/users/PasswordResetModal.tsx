@@ -140,7 +140,7 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-          <Button variant="outline" onClick={onClose} disabled={loading}>
+          <Button variant="secondary" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
           <Button variant="primary" onClick={handleConfirm} disabled={loading}>
