@@ -22,6 +22,21 @@ export const CASE_STATUS_TYPES = [
 
 export type CaseStatusType = (typeof CASE_STATUS_TYPES)[number];
 
+/** Operator-facing labels for the lifecycle types (settings UI, tooltips). */
+export const STATUS_TYPE_LABELS: Record<CaseStatusType, string> = {
+  intake: 'New / intake',
+  diagnosis: 'Diagnosis',
+  quoting: 'Quoting',
+  awaiting_approval: 'Awaiting approval',
+  approved: 'Approved (queued)',
+  recovery: 'Recovery',
+  qa: 'QA / verification',
+  ready: 'Ready',
+  completed: 'Completed',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
+};
+
 /** Types that end the pipeline — never age-flagged, excluded from "active". */
 export const TERMINAL_TYPES: readonly CaseStatusType[] = ['completed', 'delivered', 'cancelled'];
 

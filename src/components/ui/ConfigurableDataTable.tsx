@@ -18,7 +18,8 @@ interface ConfigurableDataTableProps<T> {
   columns: TableColumnDef<T>[];
   view: ResolvedTableView;
   rowKey: (row: T) => string;
-  onRowClick?: (row: T) => void;
+  /** The event lets pages offer modifier-click behaviors (e.g. Shift+click to peek). */
+  onRowClick?: (row: T, event?: React.MouseEvent | React.KeyboardEvent) => void;
   selection?: ConfigurableSelection;
   /** Persist user column widths (called once per resize gesture, on release). */
   onWidthsChange?: (widths: Record<string, number>) => void;
@@ -39,6 +40,8 @@ interface ConfigurableDataTableProps<T> {
   /** Active server sort; pairs with onSortChange to make sortKey headers clickable. */
   sort?: { key: string; dir: 'asc' | 'desc' };
   onSortChange?: (sortKey: string) => void;
+  /** Keyboard-focused row (page-owned j/k state): highlighted + scrolled into view. */
+  activeRowKey?: string | null;
 }
 
 const SELECTION_W = 48;
@@ -65,8 +68,14 @@ export function ConfigurableDataTable<T>({
   fillMode = 'elastic',
   sort,
   onSortChange,
+  activeRowKey,
 }: ConfigurableDataTableProps<T>) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
+
+  useEffect(() => {
+    if (activeRowKey) rowRefs.current.get(activeRowKey)?.scrollIntoView({ block: 'nearest' });
+  }, [activeRowKey]);
   const [containerWidth, setContainerWidth] = useState<number>(1200);
   const [widths, setWidths] = useState<Record<string, number>>(view.widths);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -155,7 +164,7 @@ export function ConfigurableDataTable<T>({
   const handleRowKeyDown = (e: React.KeyboardEvent, row: T) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      onRowClick?.(row);
+      onRowClick?.(row, e);
     }
   };
 
@@ -272,7 +281,11 @@ export function ConfigurableDataTable<T>({
               return (
                 <React.Fragment key={id}>
                   <tr
-                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    ref={(el) => {
+                      if (el) rowRefs.current.set(id, el);
+                      else rowRefs.current.delete(id);
+                    }}
+                    onClick={onRowClick ? (e) => onRowClick(row, e) : undefined}
                     onKeyDown={onRowClick ? (e) => handleRowKeyDown(e, row) : undefined}
                     tabIndex={onRowClick ? 0 : undefined}
                     aria-label={rowAriaLabel?.(row)}
@@ -281,6 +294,7 @@ export function ConfigurableDataTable<T>({
                       onRowClick && 'cursor-pointer',
                       rowClassName?.(row),
                       isSelected && 'bg-info-muted/30',
+                      activeRowKey === id && 'bg-primary/5 outline outline-2 -outline-offset-2 outline-primary/40',
                     )}
                   >
                     {selection ? (
@@ -354,7 +368,7 @@ export function ConfigurableDataTable<T>({
           return (
             <div
               key={id}
-              onClick={onRowClick ? () => onRowClick(row) : undefined}
+              onClick={onRowClick ? (e) => onRowClick(row, e) : undefined}
               onKeyDown={onRowClick ? (e) => handleRowKeyDown(e, row) : undefined}
               role={onRowClick ? 'button' : undefined}
               tabIndex={onRowClick ? 0 : undefined}

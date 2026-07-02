@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
@@ -7,7 +7,6 @@ import { buildCaseSearchOr } from '../../lib/caseSearch';
 import { Button } from '../../components/ui/Button';
 import { Plus, Search, Filter, Briefcase, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Archive, Download } from 'lucide-react';
 import { EmptyState } from '../../components/shared/EmptyState';
-import { ExportButton } from '../../components/shared/ExportButton';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { downloadCSV } from '../../lib/csvExport';
@@ -20,6 +19,9 @@ import { useListPageSize } from '../../hooks/useListPageSize';
 import { useListSelectionEnabled } from '../../hooks/useListSelectionEnabled';
 import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { statusNamesForBucket, type CaseBucket } from '../../lib/caseLifecycle';
+import { pageWindow } from '../../lib/pagination';
+import { CaseViewsMenu } from '../../components/cases/CaseViewsMenu';
+import { CasePeekPanel } from '../../components/cases/CasePeekPanel';
 import { CreateCaseWizard } from '../../components/cases/CreateCaseWizard';
 import { useCasesRealtime } from '../../hooks/useCasesRealtime';
 import { useAuth } from '../../contexts/AuthContext';
@@ -119,7 +121,18 @@ export const CasesList: React.FC = () => {
   });
 
   const queryClient = useQueryClient();
-  useCasesRealtime();
+
+  // Live changes accumulate into a refresh pill instead of reordering the
+  // table under a reading operator.
+  const [pendingChanges, setPendingChanges] = useState(0);
+  useCasesRealtime({ onListChange: () => setPendingChanges((n) => n + 1) });
+
+  const applyPendingChanges = () => {
+    setPendingChanges(0);
+    queryClient.invalidateQueries({ queryKey: ['cases'] });
+    queryClient.invalidateQueries({ queryKey: ['cases_count'] });
+    queryClient.invalidateQueries({ queryKey: [CASE_COMMAND_STATS_KEY] });
+  };
 
   useEffect(() => {
     setCurrentPage(1);
@@ -322,7 +335,9 @@ export const CasesList: React.FC = () => {
   };
 
   const handleRefresh = () => {
+    setPendingChanges(0);
     refetch();
+    queryClient.invalidateQueries({ queryKey: ['cases_count'] });
     queryClient.invalidateQueries({ queryKey: [CASE_COMMAND_STATS_KEY] });
   };
 
@@ -398,6 +413,78 @@ export const CasesList: React.FC = () => {
         : { key, dir: key === 'created_at' ? 'desc' : 'asc' },
     );
   };
+
+  // Operator keyboard layer: j/k rows, Enter open, x select, / search, [ ] pages.
+  // Inert while typing in any input/select/textarea (Escape blurs the field).
+  const [focusedRowId, setFocusedRowId] = useState<string | null>(null);
+  const [peekCaseId, setPeekCaseId] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const isTypingContext = (target: EventTarget | null) => {
+      const el = target as HTMLElement | null;
+      if (!el) return false;
+      return (
+        el.tagName === 'INPUT' ||
+        el.tagName === 'TEXTAREA' ||
+        el.tagName === 'SELECT' ||
+        el.isContentEditable
+      );
+    };
+
+    const handler = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isTypingContext(e.target)) {
+        if (e.key === 'Escape') (e.target as HTMLElement).blur();
+        return;
+      }
+
+      switch (e.key) {
+        case '/':
+          e.preventDefault();
+          searchInputRef.current?.focus();
+          break;
+        case '[':
+          setCurrentPage((p) => Math.max(1, p - 1));
+          break;
+        case ']':
+          setCurrentPage((p) => Math.min(Math.max(1, totalPages), p + 1));
+          break;
+        case 'j':
+        case 'k': {
+          if (tableRows.length === 0) break;
+          e.preventDefault();
+          setFocusedRowId((prev) => {
+            const idx = prev ? tableRows.findIndex((r) => r.id === prev) : -1;
+            const next =
+              e.key === 'j'
+                ? Math.min(tableRows.length - 1, idx + 1)
+                : Math.max(0, idx <= 0 ? 0 : idx - 1);
+            return tableRows[next]?.id ?? null;
+          });
+          break;
+        }
+        case 'Enter':
+          if (focusedRowId) navigate(`/cases/${focusedRowId}`);
+          break;
+        case 'x':
+        case 'X':
+          if (focusedRowId && selectionEnabled) selection.toggle(focusedRowId);
+          break;
+        case 'p':
+        case 'P':
+          if (focusedRowId) setPeekCaseId(focusedRowId);
+          break;
+        case 'Escape':
+          if (peekCaseId) setPeekCaseId(null);
+          else setFocusedRowId(null);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [tableRows, focusedRowId, peekCaseId, totalPages, selectionEnabled, selection, navigate]);
 
   const handleCreateCase = async () => {
     const check = await canPerformAction('max_cases_per_month');
@@ -485,8 +572,10 @@ export const CasesList: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-[1800px] 2xl:max-w-[2400px] mx-auto">
-      <PageHeaderSlot title="Cases" icon={Briefcase} />
+    // AppLayout's <main> already pads 24px on every side — no page padding on
+    // top of it, so the first row of content sits directly under the top bar.
+    <div className="max-w-[1800px] 2xl:max-w-[2400px] mx-auto">
+      <PageHeaderSlot title="Cases" icon={Briefcase} iconColor="rgb(var(--color-primary))" />
       <CasesCommandCenter
         period={period}
         onPeriodChange={setPeriod}
@@ -537,8 +626,9 @@ export const CasesList: React.FC = () => {
             <div className="w-full lg:w-80 relative flex-shrink-0">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
               <input
+                ref={searchInputRef}
                 type="text"
-                placeholder="Search cases..."
+                placeholder="Search cases...  ( / )"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary"
@@ -579,6 +669,7 @@ export const CasesList: React.FC = () => {
 
             <Button
               variant="secondary"
+              size="sm"
               onClick={() => setShowFilters(!showFilters)}
               className="flex items-center gap-2 flex-shrink-0"
             >
@@ -589,53 +680,21 @@ export const CasesList: React.FC = () => {
               )}
             </Button>
 
+            <CaseViewsMenu
+              current={{ filterStatus, filterPriority, bucket: bucketFilter, sort }}
+              onApply={(v) => {
+                setFilterStatus(v.filterStatus);
+                setFilterPriority(v.filterPriority);
+                setBucketFilter(v.bucket);
+                setSort(v.sort);
+              }}
+            />
+
             <ColumnPickerPopover
               columns={casesColumns.map((c) => ({ key: c.key, label: c.label }))}
               view={view}
               onApply={setVisibleAndOrder}
               onReset={resetPrefs}
-            />
-
-            {/* Fetches everything matching the active filter — not just
-                the current page — so accountant handoff CSVs aren't
-                truncated to one paginated screen. */}
-            <ExportButton
-              filename="cases"
-              columns={[
-                { key: 'case_no', label: 'Case #' },
-                { key: 'title', label: 'Title' },
-                { key: 'priority', label: 'Priority' },
-                { key: 'status', label: 'Status' },
-                {
-                  key: (r) => (r.customers_enhanced as { customer_name?: string } | null)?.customer_name,
-                  label: 'Customer',
-                },
-                { key: 'client_reference', label: 'Client Ref' },
-                { key: (r) => exportPrimaryDevice(r)?.catalog_device_types?.name, label: 'Device Type' },
-                { key: (r) => exportPrimaryDevice(r)?.model, label: 'Device Model' },
-                { key: (r) => exportPrimaryDevice(r)?.serial_number, label: 'Serial Number' },
-                { key: (r) => exportPrimaryDevice(r)?.catalog_device_capacities?.name, label: 'Capacity' },
-                {
-                  key: 'created_at',
-                  label: 'Created',
-                  format: (v) => (v ? new Date(v as string).toISOString().slice(0, 10) : ''),
-                },
-              ]}
-              getRows={async () => {
-                let q = supabase
-                  .from('cases')
-                  .select('case_no, title, priority, status, client_reference, created_at, customers_enhanced:customer_id(customer_name), case_devices(serial_number, model, is_primary, catalog_device_types(name), catalog_device_capacities(name))')
-                  .is('deleted_at', null);
-                const searchOr = await resolveSearchOr();
-                if (searchOr) {
-                  q = q.or(searchOr);
-                }
-                if (filterStatus !== 'all') q = q.eq('status', filterStatus);
-                if (filterPriority !== 'all') q = q.eq('priority', filterPriority);
-                const { data, error } = await q.order('created_at', { ascending: false });
-                if (error) throw error;
-                return data ?? [];
-              }}
             />
           </div>
 
@@ -679,6 +738,19 @@ export const CasesList: React.FC = () => {
           )}
         </div>
       </div>
+
+      {pendingChanges > 0 && (
+        <div className="mb-3 flex justify-center">
+          <button
+            type="button"
+            onClick={applyPendingChanges}
+            className="inline-flex items-center gap-2 rounded-full border border-info/30 bg-info-muted px-4 py-1.5 text-sm font-medium text-info shadow-sm transition-colors hover:bg-info/15"
+          >
+            <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+            {pendingChanges === 1 ? '1 case updated' : `${pendingChanges} case updates`} — refresh list
+          </button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
@@ -740,11 +812,15 @@ export const CasesList: React.FC = () => {
               columns={casesColumns}
               view={view}
               rowKey={(r) => r.id}
-              onRowClick={(r) => navigate(`/cases/${r.id}`)}
+              onRowClick={(r, e) => {
+                if (e && 'shiftKey' in e && (e.shiftKey || e.altKey)) setPeekCaseId(r.id);
+                else navigate(`/cases/${r.id}`);
+              }}
               selection={selectionEnabled ? selection : undefined}
               onWidthsChange={setWidths}
               sort={sort}
               onSortChange={handleSortChange}
+              activeRowKey={focusedRowId}
               rowAriaLabel={(r) => `case ${r.case_no}`}
             />
           </div>
@@ -752,16 +828,41 @@ export const CasesList: React.FC = () => {
           {totalPages > 1 && (
             <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mt-4 p-2.5">
               <div className="flex items-center justify-between">
-                <div className="text-sm text-slate-600">
-                  Showing <span className="font-medium text-slate-900">{startIndex}</span> to{' '}
-                  <span className="font-medium text-slate-900">{endIndex}</span> of{' '}
-                  <span className="font-medium text-slate-900">{totalCountData}</span> cases
+                <div className="flex items-center gap-3 text-sm text-slate-600">
+                  <span>
+                    Showing <span className="font-medium text-slate-900">{startIndex}</span> to{' '}
+                    <span className="font-medium text-slate-900">{endIndex}</span> of{' '}
+                    <span className="font-medium text-slate-900">{totalCountData}</span> cases
+                  </span>
+                  <span className="hidden text-xs text-slate-400 xl:inline">
+                    j/k rows · Enter open · p peek · x select · / search · [ ] pages
+                  </span>
                 </div>
                 <div className="flex items-center gap-4">
-                  <p className="text-sm text-slate-600">
-                    Page <span className="font-medium text-slate-900">{currentPage}</span> of{' '}
-                    <span className="font-medium text-slate-900">{totalPages}</span>
-                  </p>
+                  <nav className="hidden items-center gap-1 md:flex" aria-label="Pages">
+                    {pageWindow(currentPage, totalPages).map((p, i) =>
+                      p === 'gap' ? (
+                        <span key={`gap-${i}`} className="px-1 text-sm text-slate-400" aria-hidden="true">
+                          …
+                        </span>
+                      ) : (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setCurrentPage(p)}
+                          disabled={isFetching}
+                          aria-current={p === currentPage ? 'page' : undefined}
+                          className={`min-w-[2rem] rounded-lg px-2 py-1 text-sm font-medium tabular-nums transition-colors ${
+                            p === currentPage
+                              ? 'bg-primary text-primary-foreground'
+                              : 'text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      ),
+                    )}
+                  </nav>
                   <div className="flex gap-2">
                     <Button
                       size="sm"
@@ -790,6 +891,8 @@ export const CasesList: React.FC = () => {
           )}
         </>
       )}
+
+      <CasePeekPanel caseId={peekCaseId} onClose={() => setPeekCaseId(null)} />
 
       {isWizardOpen && (
         <CreateCaseWizard

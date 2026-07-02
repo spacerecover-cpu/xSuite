@@ -1,4 +1,9 @@
-import { getOrCreateCompanySettings } from './companySettingsService';
+import {
+  getOrCreateCompanySettings,
+  updateCompanySettings,
+  invalidateCompanySettingsCache,
+} from './companySettingsService';
+import type { Json } from '../types/database.types';
 
 /**
  * Tenant status→lifecycle-type overrides, layered over master_case_statuses
@@ -14,4 +19,15 @@ export async function getTenantCaseStatusTypes(): Promise<Record<string, string>
     return raw as Record<string, string>;
   }
   return undefined;
+}
+
+/** Replace the tenant's status→type override map (Settings → Case Lifecycle). */
+export async function setTenantCaseStatusTypes(map: Record<string, string>): Promise<void> {
+  const settings = await getOrCreateCompanySettings();
+  const metadata = {
+    ...((settings.metadata ?? {}) as Record<string, unknown>),
+    case_status_types: map,
+  };
+  await updateCompanySettings({ metadata: metadata as Json });
+  invalidateCompanySettingsCache();
 }

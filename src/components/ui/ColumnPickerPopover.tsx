@@ -55,7 +55,7 @@ export const ColumnPickerPopover: React.FC<ColumnPickerPopoverProps> = ({
 
   return (
     <div className="relative flex-shrink-0">
-      <Button variant="secondary" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-haspopup="dialog">
+      <Button variant="secondary" size="sm" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-haspopup="dialog">
         <Settings2 className="w-4 h-4 mr-2" aria-hidden="true" />
         Columns
       </Button>
