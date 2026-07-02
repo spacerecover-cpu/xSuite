@@ -141,6 +141,7 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm run check:registry-trigger-parity
+      - run: npm run check:provisioning-ghost-scalars
       - run: npm run check:registry-mapper-parity
       - run: npm run check:signup-smoke
 
