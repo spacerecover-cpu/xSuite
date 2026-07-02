@@ -101,7 +101,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
     queryFn: async () => {
       const { data, error } = await supabase
         .from('customers_enhanced')
-        .select('id, customer_number, customer_name, email')
+        .select('id, customer_number, customer_name, email, mobile_number')
         .eq('is_active', true)
         .order('customer_name');
       if (error) throw error;
@@ -600,8 +600,9 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                         options={customers.map(c => ({
                           id: c.id,
                           name: `${c.customer_name} (${c.customer_number})`,
+                          keywords: `${c.email ?? ''} ${c.mobile_number ?? ''}`,
                         }))}
-                        placeholder="Search by name or customer number"
+                        placeholder="Search by name, number, phone, or email"
                         required
                         clearable={false}
                       />

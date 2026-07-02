@@ -13,6 +13,9 @@ interface Option {
   id: string;
   name: string;
   disabled?: boolean;
+  /** Hidden search haystack (e.g. a customer's email/phone/number) — matched
+   *  by the filter but never rendered, so "find by anything" pickers work. */
+  keywords?: string;
 }
 
 interface SearchableSelectProps {
@@ -86,7 +89,7 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
     const selectedOption = options.find((opt) => opt.id === value);
 
     const filteredOptions = options.filter((option) =>
-      option.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      `${option.name ?? ''} ${option.keywords ?? ''}`.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const closeDropdown = useCallback(() => {

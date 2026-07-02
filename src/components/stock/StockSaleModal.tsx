@@ -150,11 +150,12 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
       setCustomers([]);
       return;
     }
+    const s = sanitizeFilterValue(term);
     const { data } = await supabase
       .from('customers_enhanced')
-      .select('id, customer_name, email')
+      .select('id, customer_name, email, mobile_number, customer_number')
       .is('deleted_at', null)
-      .or(`customer_name.ilike.%${sanitizeFilterValue(term)}%,email.ilike.%${sanitizeFilterValue(term)}%`)
+      .or(`customer_name.ilike.%${s}%,email.ilike.%${s}%,mobile_number.ilike.%${s}%,customer_number.ilike.%${s}%`)
       .limit(20);
     setCustomers(
       (data ?? []).map((c) => ({

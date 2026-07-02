@@ -53,6 +53,7 @@ export const ChangeClientModal: React.FC<ChangeClientModalProps> = ({
   const customerOptions = customers.map((customer) => ({
     id: customer.id,
     name: `${customer.customer_name} - ${customer.customer_number}`,
+    keywords: `${customer.email ?? ''} ${customer.mobile_number ?? ''}`,
   }));
 
   return (

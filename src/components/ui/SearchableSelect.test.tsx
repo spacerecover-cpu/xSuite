@@ -27,7 +27,7 @@ function Harness({
   onChangeSpy?: (v: string) => void;
   usePortal?: boolean;
   placeholder?: string;
-  options?: { id: string; name: string }[];
+  options?: { id: string; name: string; keywords?: string }[];
 }) {
   const [value, setValue] = useState(initial);
   return (
@@ -44,6 +44,31 @@ function Harness({
     />
   );
 }
+
+describe('SearchableSelect keywords', () => {
+  const CUSTOMER_OPTIONS = [
+    { id: '1', name: 'Kashif Rahat (CUST-0001)', keywords: 'kashif@x.com +96899112233' },
+    { id: '2', name: 'Sara Ali (CUST-0002)', keywords: 'sara@y.com +96877445566' },
+  ];
+
+  it('matches options by hidden keywords (phone/email), not just the label', async () => {
+    const user = userEvent.setup();
+    render(<Harness options={CUSTOMER_OPTIONS} />);
+    await user.click(screen.getByRole('combobox'));
+    await user.type(screen.getByPlaceholderText(/search/i), '99112233');
+    expect(screen.getByRole('option', { name: /Kashif Rahat/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Sara Ali/ })).toBeNull();
+  });
+
+  it('still matches by the visible label', async () => {
+    const user = userEvent.setup();
+    render(<Harness options={CUSTOMER_OPTIONS} />);
+    await user.click(screen.getByRole('combobox'));
+    await user.type(screen.getByPlaceholderText(/search/i), 'sara');
+    expect(screen.getByRole('option', { name: /Sara Ali/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Kashif/ })).toBeNull();
+  });
+});
 
 describe('SearchableSelect', () => {
   it('renders a combobox trigger and toggles aria-expanded', async () => {

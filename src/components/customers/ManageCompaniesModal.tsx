@@ -68,7 +68,7 @@ export const ManageCompaniesModal: React.FC<ManageCompaniesModalProps> = ({
     queryFn: async () => {
       const { data, error } = await supabase
         .from('companies')
-        .select('id, name, company_name, company_number')
+        .select('id, name, company_name, company_number, email, phone')
         .is('deleted_at', null)
         .order('name');
       if (error) throw error;
@@ -104,7 +104,11 @@ export const ManageCompaniesModal: React.FC<ManageCompaniesModalProps> = ({
     () =>
       companyOptions
         .filter((c) => !linkedIds.has(c.id))
-        .map((c) => ({ id: c.id, name: `${c.company_name ?? c.name}${c.company_number ? ` (${c.company_number})` : ''}` })),
+        .map((c) => ({
+          id: c.id,
+          name: `${c.company_name ?? c.name}${c.company_number ? ` (${c.company_number})` : ''}`,
+          keywords: `${c.email ?? ''} ${c.phone ?? ''}`,
+        })),
     [companyOptions, linkedIds],
   );
 

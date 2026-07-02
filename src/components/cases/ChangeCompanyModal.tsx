@@ -64,6 +64,7 @@ export const ChangeCompanyModal: React.FC<ChangeCompanyModalProps> = ({
     ...companies.map((company) => ({
       id: company.id,
       name: `${company.name || company.company_name} - ${company.company_number}`,
+      keywords: `${company.email ?? ''} ${company.phone ?? ''} ${company.tax_number ?? ''}`,
     })),
   ];
 

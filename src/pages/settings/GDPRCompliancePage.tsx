@@ -102,10 +102,11 @@ export const GDPRCompliancePage: React.FC = () => {
 
   const searchCustomer = async () => {
     if (!customerSearch.trim()) return;
+    const s = sanitizeFilterValue(customerSearch);
     const { data } = await supabase
       .from('customers_enhanced')
       .select('id, customer_name, email')
-      .or(`email.ilike.%${sanitizeFilterValue(customerSearch)}%,customer_name.ilike.%${sanitizeFilterValue(customerSearch)}%`)
+      .or(`email.ilike.%${s}%,customer_name.ilike.%${s}%,mobile_number.ilike.%${s}%,customer_number.ilike.%${s}%`)
       .is('deleted_at', null)
       .limit(1)
       .maybeSingle();
