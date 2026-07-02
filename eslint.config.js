@@ -11,6 +11,8 @@
   import noUnfilteredItemEmbed from './eslint-rules/no-unfiltered-item-embed.js';
   import noRawCurrencyAggregation from './eslint-rules/no-raw-currency-aggregation.js';
   import noHardcodedLocaleFormat from './eslint-rules/no-hardcoded-locale-format.js';
+  import noGrayPalette from './eslint-rules/no-gray-palette.js';
+  import noArbitraryTypography from './eslint-rules/no-arbitrary-typography.js';
 
   // Hoisted so the main config and the fixed-surface override below share one
   // identical xsuite plugin object (flat config resolves plugin rules per block).
@@ -23,6 +25,8 @@
       'no-unfiltered-item-embed': noUnfilteredItemEmbed,
       'no-raw-currency-aggregation': noRawCurrencyAggregation,
       'no-hardcoded-locale-format': noHardcodedLocaleFormat,
+      'no-gray-palette': noGrayPalette,
+      'no-arbitrary-typography': noArbitraryTypography,
     },
   };
 
@@ -96,6 +100,15 @@
         // down across other P4 slices — like no-untranslated-jsx-text, this
         // surfaces NEW violations in review without failing CI on existing debt.
         'xsuite/no-hardcoded-locale-format': 'warn',
+        // Typography standard (DESIGN.md → Typography, 2026-07-02): the house
+        // neutral is slate — gray-* was swept to zero and stays there (no
+        // baseline)…
+        'xsuite/no-gray-palette': 'error',
+        // …and arbitrary text-[Npx]/tracking-[…] literals are banned (named
+        // scale + text-xxs only; tracking-[0.5em] OTP exception is built into
+        // the rule). Pre-existing offenders are baselined OFF per-file below
+        // and ratchet down via the typography standardization program.
+        'xsuite/no-arbitrary-typography': 'error',
         '@typescript-eslint/no-unused-vars': ['error', {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
@@ -151,6 +164,48 @@
       ],
       plugins: { 'xsuite': xsuitePlugin },
       rules: { 'xsuite/no-raw-style-colors': 'off' },
+    },
+    {
+      // xsuite/no-arbitrary-typography baseline (per-file OFF) — the
+      // typography-arbitrary burndown (DESIGN.md → Typography → Sizes;
+      // docs/typography-audit-2026-07-02.md §3.3). RATCHET-DOWN ONLY:
+      // remove entries as Phases 4–5 of the standardization program sweep
+      // them (cases hotspots + app chrome tokenization); never add files.
+      files: [
+        'src/components/cases/SpaceInsufficientWarningModal.tsx',
+        'src/components/cases/detail/CaseFinancesTab.tsx',
+        'src/components/cases/detail/DeviceDetailsModal.tsx',
+        'src/components/cases/device-form/DeviceComponentsForm.tsx',
+        'src/components/cases/device-form/DeviceDiagnosticForm.tsx',
+        'src/components/cases/device-form/DeviceHistoryForm.tsx',
+        'src/components/customers/CustomerFinancialTab.tsx',
+        'src/components/financial/PaymentHistoryTable.tsx',
+        'src/components/layout/AppLayout.tsx',
+        'src/components/layout/NotificationBell.tsx',
+        'src/components/layout/Sidebar.tsx',
+        'src/components/layout/SidebarNavItem.tsx',
+        'src/components/layout/SidebarSection.tsx',
+        'src/components/settings/documents/TemplateGalleryModal.tsx',
+        'src/components/settings/documents/controls.tsx',
+        'src/components/shared/CommandPalette.tsx',
+        'src/components/stock/StockAlertsDropdown.tsx',
+        'src/components/stock/StockSaleModal.tsx',
+        'src/components/templates/LineItemTemplateFormModal.tsx',
+        'src/components/templates/VariableInsertMenu.tsx',
+        'src/pages/auth/login/FloatingInput.tsx',
+        'src/pages/auth/onboarding/steps/ConfigurationStep.tsx',
+        'src/pages/notifications/NotificationsHistory.tsx',
+        'src/pages/platform-admin/NotificationDLQ.tsx',
+        'src/pages/settings/CategoryDetail.tsx',
+        'src/pages/settings/InventorySettingsPage.tsx',
+        'src/pages/settings/NotificationPreferences.tsx',
+        'src/pages/settings/NotificationTemplatesTab.tsx',
+        'src/pages/settings/SettingsDashboard.tsx',
+        'src/pages/settings/SystemNumbers.tsx',
+        'src/pages/stock/StockLocationsPage.tsx',
+      ],
+      plugins: { 'xsuite': xsuitePlugin },
+      rules: { 'xsuite/no-arbitrary-typography': 'off' },
     },
     {
       // i18n enforcement gate (A0/A3, Country Engine Phase 2): the portal is the
