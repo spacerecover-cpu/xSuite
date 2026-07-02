@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Check, Loader2, Hash, Pencil, AlertCircle } from 'lucide-react';
 import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { useState } from 'react';
@@ -23,6 +23,7 @@ import {
   updateInventorySequence,
   formatNextNumber,
   formatCurrentNumber,
+  fetchMaxSuffixForPrefix,
   INVENTORY_SEQUENCES_QUERY_KEY,
 } from '../../lib/inventory/inventorySequenceService';
 import { logger } from '../../lib/logger';
@@ -38,6 +39,8 @@ interface SequenceEditState {
   prefix: string;
   padding: number;
   resetAnnually: boolean;
+  /** The number the NEXT created item should receive (1-based). */
+  nextNumber: number;
 }
 
 export default function InventorySettingsPage() {
@@ -86,6 +89,7 @@ export default function InventorySettingsPage() {
       prefix: existing?.prefix ?? defaultPrefix,
       padding: existing?.padding ?? defaultPadding,
       resetAnnually: existing?.reset_annually ?? false,
+      nextNumber: (existing?.current_value ?? 0) + 1,
     });
   };
 
@@ -99,6 +103,7 @@ export default function InventorySettingsPage() {
         editModal.prefix,
         editModal.padding,
         editModal.resetAnnually,
+        editModal.nextNumber,
       );
       await queryClient.invalidateQueries({ queryKey: INVENTORY_SEQUENCES_QUERY_KEY });
       toast.success('Inventory sequence updated.');
@@ -112,8 +117,17 @@ export default function InventorySettingsPage() {
   };
 
   const previewNext = editModal
-    ? formatNextNumber(editModal.prefix || 'PREFIX', (editModal.sequence?.current_value ?? 0), editModal.padding)
+    ? formatNextNumber(editModal.prefix || 'PREFIX', editModal.nextNumber - 1, editModal.padding)
     : '';
+
+  // Highest suffix already used with this prefix — warns before re-issuing numbers.
+  const { data: maxUsedSuffix = 0 } = useQuery({
+    queryKey: ['inventory_prefix_max_suffix', editModal?.prefix ?? ''],
+    queryFn: () => fetchMaxSuffixForPrefix(editModal?.prefix ?? ''),
+    enabled: !!editModal && editModal.prefix.trim().length > 0,
+    staleTime: 30_000,
+  });
+  const duplicateRisk = !!editModal && maxUsedSuffix > 0 && editModal.nextNumber <= maxUsedSuffix;
 
   return (
     <div className="min-h-screen p-6">
@@ -340,19 +354,50 @@ export default function InventorySettingsPage() {
                 max={10}
                 className="font-mono"
               />
+            </div>
+
+            <div>
+              <label htmlFor="seq-next" className="block text-sm font-semibold text-slate-700 mb-2">
+                Next Number
+              </label>
+              <Input
+                id="seq-next"
+                type="number"
+                value={editModal.nextNumber}
+                onChange={e =>
+                  setEditModal(prev =>
+                    prev
+                      ? { ...prev, nextNumber: Math.max(1, parseInt(e.target.value) || 1) }
+                      : prev,
+                  )
+                }
+                min={1}
+                className="font-mono"
+              />
               <p className="text-xs text-slate-500 mt-1.5">
-                Preview next number:{' '}
-                <span className="font-semibold font-mono">{previewNext}</span>
+                The next item created will receive{' '}
+                <span className="font-semibold font-mono">{previewNext}</span>. Use this to continue
+                a legacy numbering scheme or re-anchor after an import.
               </p>
+              {duplicateRisk && (
+                <p className="mt-1.5 rounded-md bg-warning-muted px-2 py-1.5 text-xs text-warning">
+                  Numbers up to{' '}
+                  <span className="font-mono font-semibold">
+                    {formatCurrentNumber(editModal.prefix, maxUsedSuffix, editModal.padding)}
+                  </span>{' '}
+                  already exist for this prefix — starting at {editModal.nextNumber} may create
+                  duplicates. Suggested next: {maxUsedSuffix + 1}.
+                </p>
+              )}
             </div>
 
             {editModal.sequence && (
               <div className="rounded-lg bg-slate-50 border border-border p-3 text-xs text-slate-500">
-                <span className="font-semibold text-slate-700">Current:</span>{' '}
+                <span className="font-semibold text-slate-700">Last allocated:</span>{' '}
                 {(editModal.sequence.current_value ?? 0) === 0
-                  ? 'No items allocated yet'
-                  : formatCurrentNumber(editModal.prefix, editModal.sequence.current_value ?? 0, editModal.padding)}
-                {' '}— current value is read-only; numbers are allocated atomically when inventory items are created.
+                  ? 'none yet'
+                  : formatCurrentNumber(editModal.sequence.prefix ?? editModal.prefix, editModal.sequence.current_value ?? 0, editModal.sequence.padding ?? editModal.padding)}
+                {' '}— counters advance atomically as items are created; adjust Next Number above to re-anchor.
               </div>
             )}
 

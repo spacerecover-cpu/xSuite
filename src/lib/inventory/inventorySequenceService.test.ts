@@ -1,5 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { formatNextNumber, formatCurrentNumber } from './inventorySequenceService';
+import { formatNextNumber, formatCurrentNumber, maxNumericSuffix } from './inventorySequenceService';
+
+describe('maxNumericSuffix', () => {
+  it('returns the highest numeric suffix among numbers with the prefix', () => {
+    expect(maxNumericSuffix(['H25-0001', 'H25-0012', 'H25-0007'], 'H25')).toBe(12);
+  });
+
+  it('ignores other prefixes and malformed suffixes; prefix match is case-insensitive', () => {
+    expect(maxNumericSuffix(['SSD-0099', 'h25-0003', 'H25-abc', 'H25-'], 'H25')).toBe(3);
+  });
+
+  it('returns 0 when nothing matches', () => {
+    expect(maxNumericSuffix([], 'H25')).toBe(0);
+    expect(maxNumericSuffix(['SSD-0001'], 'H25')).toBe(0);
+  });
+});
 
 describe('formatNextNumber', () => {
   it('pads to the specified width', () => {

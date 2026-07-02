@@ -18062,6 +18062,7 @@ export type Database = {
       }
       update_number_sequence: {
         Args: {
+          p_current_value?: number
           p_padding: number
           p_prefix: string
           p_reset: boolean
