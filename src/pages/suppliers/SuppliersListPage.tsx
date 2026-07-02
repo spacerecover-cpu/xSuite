@@ -338,7 +338,7 @@ export default function SuppliersListPage() {
                       className="hover:bg-slate-50 transition-colors cursor-pointer"
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="font-semibold text-primary">
+                        <span className="text-sm font-semibold text-primary">
                           {supplier.supplier_number}
                         </span>
                       </td>
@@ -347,7 +347,7 @@ export default function SuppliersListPage() {
                           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cat-5 to-cat-5/80 flex items-center justify-center text-white font-semibold text-sm shadow-md">
                             {supplier.name?.substring(0, 2).toUpperCase()}
                           </div>
-                          <div className="font-medium text-slate-900">
+                          <div className="text-sm font-semibold text-slate-900">
                             {supplier.name}
                           </div>
                         </div>

@@ -544,7 +544,7 @@ export const QuotesListPage: React.FC = () => {
                       </td>
                     )}
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="font-semibold text-primary">
+                      <span className="text-sm font-semibold text-primary">
                         {quote.quote_number}
                       </span>
                     </td>

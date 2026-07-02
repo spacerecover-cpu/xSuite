@@ -530,7 +530,7 @@ export const CompaniesListPage: React.FC = () => {
                       className="hover:bg-slate-50 transition-colors cursor-pointer"
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="font-semibold text-primary">
+                        <span className="text-sm font-semibold text-primary">
                           {company.company_number}
                         </span>
                       </td>
@@ -540,7 +540,7 @@ export const CompaniesListPage: React.FC = () => {
                             {(company.name || company.company_name || '??').substring(0, 2).toUpperCase()}
                           </div>
                           <div>
-                            <div className="font-medium text-slate-900">
+                            <div className="text-sm font-semibold text-slate-900">
                               {company.name || company.company_name}
                             </div>
                             {company.tax_number && (

@@ -491,7 +491,7 @@ export const CustomersListPage: React.FC = () => {
                 placeholder="Search customers..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary"
+                className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
 
@@ -531,6 +531,7 @@ export const CustomersListPage: React.FC = () => {
 
             <Button
               variant="secondary"
+              size="sm"
               onClick={() => setShowFilters(!showFilters)}
               className="flex items-center gap-2 flex-shrink-0"
             >
@@ -725,7 +726,7 @@ export const CustomersListPage: React.FC = () => {
                         </td>
                       )}
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="font-semibold text-primary">
+                        <span className="text-sm font-semibold text-primary">
                           {customer.customer_number}
                         </span>
                       </td>
@@ -738,7 +739,7 @@ export const CustomersListPage: React.FC = () => {
                             size="sm"
                           />
                           <div>
-                            <div className="font-medium text-slate-900">
+                            <div className="text-sm font-semibold text-slate-900">
                               {customer.customer_name}
                             </div>
                           </div>

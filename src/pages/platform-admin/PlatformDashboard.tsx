@@ -228,7 +228,7 @@ export const PlatformDashboard: React.FC = () => {
                   <tr key={tenant.id} className="hover:bg-slate-50">
                     <td className="px-6 py-4">
                       <div>
-                        <p className="font-medium text-slate-900">{tenant.name}</p>
+                        <p className="text-sm font-semibold text-slate-900">{tenant.name}</p>
                         <p className="text-sm text-slate-600">{tenant.slug}</p>
                       </div>
                     </td>

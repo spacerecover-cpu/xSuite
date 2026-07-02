@@ -358,8 +358,9 @@ unsized 16px (F-4). Money-cell weight forks: `font-bold` (`ExpensesList.tsx:682`
 ### F-7 · Buttons — two sizes on the same screen + hand-rolled variants
 `ui/Button` md (default) = **16px** `font-medium` (`Button.tsx:43`); size="sm" = 14px. List screens mix
 them: top-bar actions `size="sm"` (`ExpensesList.tsx:497`) while toolbar buttons take the md default —
-Refresh (`ExpensesList.tsx:574`), More Filters (`CustomersListPage.tsx:532`), ExportButton (composes
-default Button). Hand-rolled buttons meanwhile sit at 14px: filter pills (`ExpensesList.tsx:555`,
+Refresh (`ExpensesList.tsx:574`), More Filters (`CustomersListPage.tsx:532`). *(Erratum 2026-07-02:
+`ExportButton` already passes `size="sm"` — only the two named buttons were md.)* Hand-rolled buttons
+meanwhile sit at 14px: filter pills (`ExpensesList.tsx:555`,
 `CustomersListPage.tsx:501`, `CasesList.tsx:696`, `InvoicesFilterBar.tsx:49–100`), listbox add-new
 (`SearchableSelect.tsx:265`). Also `PortalQuotes.tsx:439,449` restyle buttons inline outside the variant
 system. *(Non-typographic but user-flagged: the Expenses "Refresh" button renders a `Filter` icon —
@@ -753,9 +754,10 @@ and its transaction table is the app's densest deviation: `text-xs` body cells a
 The red-boxed `CUST-4062` and "Faisal Al Badri" are both **F-4**: `CustomersListPage.tsx:728` (number,
 `font-semibold text-primary`, unsized → 16px) and `:741` (name, `font-medium text-slate-900`, unsized →
 16px) inside a 14px table (email/phone cells `text-sm text-slate-700`, `:749,759`). The boxed
-**More Filters + Export CSV** pair is **F-7**: both take the default `md` Button (16px — `:532`;
-`ExportButton` composes the default Button), while the top-bar "Add Customer" is the 14px `size="sm"`
-pattern — so the two button tiers coexist on one screen, mirroring Expenses.
+**More Filters + Export CSV** pair is **F-7**: More Filters takes the default `md` Button (16px —
+`:532`) while Export CSV (`ExportButton`) already passes `size="sm"` *(erratum: the original text said
+both were md)*, and the top-bar "Add Customer" is the 14px `size="sm"` pattern — so the two button
+tiers coexist on one screen, mirroring Expenses.
 
 ---
 

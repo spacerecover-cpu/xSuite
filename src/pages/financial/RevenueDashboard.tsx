@@ -326,7 +326,7 @@ export const RevenueDashboard: React.FC = () => {
                     .map((invoice) => (
                       <tr key={invoice.id} onClick={() => navigate(`/invoices/${invoice.id}`)} className="hover:bg-slate-50 transition-colors cursor-pointer">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="font-semibold text-primary">{invoice.invoice_number ?? '-'}</span>
+                          <span className="text-sm font-semibold text-primary">{invoice.invoice_number ?? '-'}</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{invoice.invoice_date ? formatDate(invoice.invoice_date) : '-'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">{invoice.customer?.customer_name || 'N/A'}</td>
@@ -432,7 +432,7 @@ export const RevenueDashboard: React.FC = () => {
                   caseRevenue.map((c) => (
                     <tr key={c.id} onClick={() => navigate(`/cases/${c.id}`)} className="hover:bg-slate-50 transition-colors cursor-pointer">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="font-semibold text-primary">{c.caseNo}</span>
+                        <span className="text-sm font-semibold text-primary">{c.caseNo}</span>
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-900">{c.title || '-'}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-success text-right">{formatCurrency(c.revenue)}</td>

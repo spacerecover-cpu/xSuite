@@ -188,7 +188,7 @@ export const TenantsListPage: React.FC = () => {
                   <tr key={tenant.id} className="hover:bg-slate-50">
                     <td className="px-6 py-4">
                       <div>
-                        <p className="font-medium text-slate-900">{tenant.name}</p>
+                        <p className="text-sm font-semibold text-slate-900">{tenant.name}</p>
                         {tenant.tenant_code && (
                           <p className="text-xs font-mono font-semibold tabular-nums text-slate-500">
                             {tenant.tenant_code}

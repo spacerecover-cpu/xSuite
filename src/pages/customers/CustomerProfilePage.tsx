@@ -999,7 +999,7 @@ export const CustomerProfilePage: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all ${
+                className={`flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-medium transition-all ${
                   activeTab === tab.id
                     ? 'bg-primary/10 text-primary shadow-sm'
                     : 'text-slate-600 hover:bg-slate-50'

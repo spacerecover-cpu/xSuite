@@ -884,7 +884,7 @@ export const LeaveManagement: React.FC = () => {
                       {filteredRequests.map(req => (
                         <tr key={req.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                           <td className="py-3 px-4">
-                            <div className="font-medium text-slate-900">
+                            <div className="text-sm font-semibold text-slate-900">
                               {req.employee?.first_name} {req.employee?.last_name}
                             </div>
                             {req.employee?.employee_number && (
@@ -904,7 +904,7 @@ export const LeaveManagement: React.FC = () => {
                             <div className="text-xs text-slate-400">to {req.end_date}</div>
                           </td>
                           <td className="py-3 px-4">
-                            <span className="font-semibold text-slate-900">{req.days ?? 0}</span>
+                            <span className="text-sm font-semibold text-slate-900 tabular-nums">{req.days ?? 0}</span>
                             <span className="text-slate-500 text-xs ml-1">day{(req.days ?? 0) !== 1 ? 's' : ''}</span>
                           </td>
                           <td className="py-3 px-4 max-w-[180px]">
@@ -1021,7 +1021,7 @@ export const LeaveManagement: React.FC = () => {
                         return (
                           <tr key={bal.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                             <td className="py-3 px-4">
-                              <div className="font-medium text-slate-900">
+                              <div className="text-sm font-semibold text-slate-900">
                                 {bal.employee?.first_name} {bal.employee?.last_name}
                               </div>
                               {bal.employee?.employee_number && (

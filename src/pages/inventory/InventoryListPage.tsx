@@ -561,7 +561,7 @@ export default function InventoryListPage() {
                     >
                       <td className="px-6 py-4">
                         <div className="space-y-1.5">
-                          <div className="font-semibold text-slate-900">
+                          <div className="text-sm font-semibold text-slate-900">
                             {item.brand?.name || 'Unknown'} {item.model || 'N/A'}
                           </div>
                           {item.item_number && (

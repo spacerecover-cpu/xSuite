@@ -54,7 +54,6 @@ import {
   XCircle,
   Eye,
   FileText,
-  Filter,
   Check,
   X,
   AlertCircle,
@@ -543,7 +542,7 @@ export const ExpensesList: React.FC = () => {
                   placeholder="Search expenses..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
 
@@ -573,10 +572,11 @@ export const ExpensesList: React.FC = () => {
 
               <Button
                 variant="secondary"
+                size="sm"
                 onClick={() => refetch()}
                 className="flex items-center gap-2 flex-shrink-0"
               >
-                <Filter className="w-4 h-4" />
+                <RefreshCw className="w-4 h-4" />
                 Refresh
               </Button>
             </div>
@@ -653,7 +653,7 @@ export const ExpensesList: React.FC = () => {
                       </td>
                     )}
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="font-semibold text-primary">{expense.expense_number ?? '-'}</span>
+                      <span className="text-sm font-semibold text-primary">{expense.expense_number ?? '-'}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
                       {expense.expense_date ? formatDate(expense.expense_date) : '-'}

@@ -167,7 +167,7 @@ const PlanRow: React.FC<{
     <tr className="hover:bg-slate-50 cursor-pointer" onClick={onNavigate}>
       <td className="px-6 py-4">
         <div>
-          <p className="font-medium text-slate-900">{plan.name}</p>
+          <p className="text-sm font-semibold text-slate-900">{plan.name}</p>
           {plan.description && (
             <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{plan.description}</p>
           )}
