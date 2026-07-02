@@ -187,8 +187,24 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={initialData ? 'Edit Account' : 'Add New Account'} size="large" closeOnBackdrop={false}>
-      <form onSubmit={handleSubmit} className="space-y-6">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={initialData ? 'Edit Account' : 'Add New Account'}
+      size="large"
+      closeOnBackdrop={false}
+      footer={
+        <div className="flex items-center justify-end gap-3">
+          <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button type="submit" form="accountForm" disabled={isSubmitting}>
+            {isSubmitting ? 'Saving...' : initialData ? 'Update Account' : 'Create Account'}
+          </Button>
+        </div>
+      }
+    >
+      <form id="accountForm" onSubmit={handleSubmit} className="space-y-6">
         {error && (
           <div className="bg-danger-muted border border-danger/30 rounded-lg p-3 flex items-start gap-2">
             <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
@@ -406,14 +422,6 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
           </label>
         </div>
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : initialData ? 'Update Account' : 'Create Account'}
-          </Button>
-        </div>
       </form>
     </Modal>
   );

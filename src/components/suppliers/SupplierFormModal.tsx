@@ -197,10 +197,27 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={supplier ? 'Edit Supplier' : 'Add New Supplier'} size="lg" closeOnBackdrop={false} initialFocusRef={firstFieldRef}>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="md:col-span-2">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={supplier ? 'Edit Supplier' : 'Add New Supplier'}
+      maxWidth="4xl"
+      closeOnBackdrop={false}
+      initialFocusRef={firstFieldRef}
+      footer={
+        <div className="flex items-center justify-end gap-3">
+          <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button type="submit" form="supplierForm" disabled={loading}>
+            {loading ? 'Saving...' : supplier ? 'Update Supplier' : 'Create Supplier'}
+          </Button>
+        </div>
+      }
+    >
+      <form id="supplierForm" onSubmit={handleSubmit} className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="md:col-span-2 lg:col-span-3">
             <label className="block text-sm font-medium text-slate-700 mb-1">
               <Building2 className="inline w-4 h-4 mr-1" />
               Company Name *
@@ -295,7 +312,7 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
             />
           </div>
 
-          <div className="md:col-span-2">
+          <div className="md:col-span-2 lg:col-span-3">
             <label className="block text-sm font-medium text-slate-700 mb-1">
               <MapPin className="inline w-4 h-4 mr-1" />
               Address
@@ -382,7 +399,7 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
             />
           </div>
 
-          <div className="md:col-span-2">
+          <div className="md:col-span-2 lg:col-span-3">
             <label className="block text-sm font-medium text-slate-700 mb-1">
               <FileText className="inline w-4 h-4 mr-1" />
               Description
@@ -396,7 +413,7 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
             />
           </div>
 
-          <div className="md:col-span-2 border-t pt-4">
+          <div className="md:col-span-2 lg:col-span-3 border-t pt-4">
             <h3 className="text-sm font-semibold text-slate-900 mb-3">
               <User className="inline w-4 h-4 mr-1" />
               Primary Contact Information
@@ -448,7 +465,7 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
             />
           </div>
 
-          <div className="md:col-span-2 border-t pt-4">
+          <div className="md:col-span-2 lg:col-span-3 border-t pt-4">
             <div className="flex gap-6">
               <label className="flex items-center gap-2">
                 <input
@@ -474,15 +491,6 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
               </label>
             </div>
           </div>
-        </div>
-
-        <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={loading}>
-            {loading ? 'Saving...' : supplier ? 'Update Supplier' : 'Create Supplier'}
-          </Button>
         </div>
       </form>
     </Modal>

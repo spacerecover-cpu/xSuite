@@ -227,9 +227,25 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
   const totals = calculateTotals();
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={purchaseOrder ? 'Edit Purchase Order' : 'Create Purchase Order'} size="xl" closeOnBackdrop={false}>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={purchaseOrder ? 'Edit Purchase Order' : 'Create Purchase Order'}
+      maxWidth="5xl"
+      closeOnBackdrop={false}
+      footer={
+        <div className="flex items-center justify-end gap-3">
+          <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button type="submit" form="purchaseOrderForm" disabled={loading}>
+            {loading ? 'Saving...' : purchaseOrder ? 'Update Purchase Order' : 'Create Purchase Order'}
+          </Button>
+        </div>
+      }
+    >
+      <form id="purchaseOrderForm" onSubmit={handleSubmit} className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
               PO Number *
@@ -321,7 +337,7 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
             />
           </div>
 
-          <div className="md:col-span-2">
+          <div className="md:col-span-2 lg:col-span-3">
             <label htmlFor="po-shipping-address" className="block text-sm font-medium text-slate-700 mb-1">
               Shipping Address
             </label>
@@ -452,14 +468,6 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={loading}>
-            {loading ? 'Saving...' : purchaseOrder ? 'Update Purchase Order' : 'Create Purchase Order'}
-          </Button>
-        </div>
       </form>
     </Modal>
   );
