@@ -39,9 +39,12 @@ export const buttonVariants = cva(
         accent: 'bg-accent text-accent-foreground hover:bg-accent/90 focus-visible:ring-accent-foreground',
       },
       size: {
+        // 14px is the platform button size (DESIGN.md → Typography → Type
+        // roles). Vertical padding compensates the smaller line-height so
+        // control heights are unchanged (md 40px, lg 52px) — no layout shift.
         sm: 'px-3 py-1.5 text-sm',
-        md: 'px-4 py-2 text-base',
-        lg: 'px-6 py-3 text-lg',
+        md: 'px-4 py-2.5 text-sm',
+        lg: 'px-6 py-3.5 text-base',
       },
     },
     defaultVariants: {

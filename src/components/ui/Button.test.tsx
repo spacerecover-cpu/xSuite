@@ -12,7 +12,7 @@ describe('Button', () => {
   it('applies primary + md classes by default', () => {
     render(<Button>Go</Button>);
     const btn = screen.getByRole('button');
-    expect(btn).toHaveClass('bg-primary', 'text-primary-foreground', 'px-4', 'py-2', 'text-base');
+    expect(btn).toHaveClass('bg-primary', 'text-primary-foreground', 'px-4', 'py-2.5', 'text-sm');
   });
 
   it('aliases outline -> ghost styling', () => {
@@ -36,7 +36,7 @@ describe('Button', () => {
     const { rerender } = render(<Button size="sm">S</Button>);
     expect(screen.getByRole('button')).toHaveClass('px-3', 'py-1.5', 'text-sm');
     rerender(<Button size="lg">L</Button>);
-    expect(screen.getByRole('button')).toHaveClass('px-6', 'py-3', 'text-lg');
+    expect(screen.getByRole('button')).toHaveClass('px-6', 'py-3.5', 'text-base');
   });
 
   it('lets a conflicting consumer className win over base/size utilities (tailwind-merge)', () => {
