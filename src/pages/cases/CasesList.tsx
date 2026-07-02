@@ -18,7 +18,7 @@ import { useTableViewPrefs } from '../../hooks/useTableViewPrefs';
 import { useListPageSize } from '../../hooks/useListPageSize';
 import { useListSelectionEnabled } from '../../hooks/useListSelectionEnabled';
 import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
-import { statusNamesForBucket, type CaseBucket } from '../../lib/caseLifecycle';
+import { statusNamesForBucket, type CaseBucket, type CaseStatusType } from '../../lib/caseLifecycle';
 import { pageWindow } from '../../lib/pagination';
 import { useStatCardStyle } from '../../hooks/useStatCardStyle';
 import { CaseViewsMenu } from '../../components/cases/CaseViewsMenu';
@@ -83,6 +83,33 @@ type ExportDevice = {
 };
 const exportPrimaryDevice = (r: Record<string, unknown>) =>
   pickPrimaryDevice((r.case_devices as ExportDevice[] | null) ?? undefined);
+
+// Quick-chip tinting by lifecycle type — the same colour language as the
+// bucket cards, resolved through the tenant's status mapping so any imported
+// vocabulary tints correctly. Literal classes for JIT safety; cat-2 actives
+// use a ring+tint (teal-600 solid fails AA under white 14px text).
+const CHIP_STYLE: Partial<Record<CaseStatusType, { idle: string; active: string }>> = {
+  intake: { idle: 'bg-primary/10 text-primary hover:bg-primary/20', active: 'bg-primary text-primary-foreground shadow-md' },
+  diagnosis: { idle: 'bg-warning-muted text-warning hover:bg-warning/20', active: 'bg-warning text-warning-foreground shadow-md' },
+  quoting: { idle: 'bg-cat-6/10 text-cat-6 hover:bg-cat-6/20', active: 'bg-cat-6 text-white shadow-md' },
+  awaiting_approval: { idle: 'bg-cat-6/10 text-cat-6 hover:bg-cat-6/20', active: 'bg-cat-6 text-white shadow-md' },
+  approved: { idle: 'bg-cat-2/10 text-cat-2 hover:bg-cat-2/20', active: 'bg-cat-2/20 text-cat-2 ring-2 ring-cat-2' },
+  recovery: { idle: 'bg-cat-2/10 text-cat-2 hover:bg-cat-2/20', active: 'bg-cat-2/20 text-cat-2 ring-2 ring-cat-2' },
+  qa: { idle: 'bg-cat-2/10 text-cat-2 hover:bg-cat-2/20', active: 'bg-cat-2/20 text-cat-2 ring-2 ring-cat-2' },
+  ready: { idle: 'bg-success-muted text-success hover:bg-success/20', active: 'bg-success text-success-foreground shadow-md' },
+  completed: { idle: 'bg-success-muted text-success hover:bg-success/20', active: 'bg-success text-success-foreground shadow-md' },
+  delivered: { idle: 'bg-success-muted text-success hover:bg-success/20', active: 'bg-success text-success-foreground shadow-md' },
+  cancelled: { idle: 'bg-danger-muted text-danger hover:bg-danger/20', active: 'bg-danger text-danger-foreground shadow-md' },
+};
+const DEFAULT_CHIP_STYLE = {
+  idle: 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+  active: 'bg-primary text-primary-foreground shadow-md',
+};
+
+function statusChipClasses(type: CaseStatusType | undefined, active: boolean): string {
+  const style = (type && CHIP_STYLE[type]) || DEFAULT_CHIP_STYLE;
+  return active ? style.active : style.idle;
+}
 
 export const CasesList: React.FC = () => {
   const navigate = useNavigate();
@@ -644,23 +671,23 @@ export const CasesList: React.FC = () => {
             </div>
 
             <div className="flex-1 flex flex-wrap items-center gap-2">
-              {topStatusChips.map(({ status, total }) => (
-                <button
-                  key={status}
-                  onClick={() => setFilterStatus(filterStatus === status ? 'all' : status)}
-                  aria-pressed={filterStatus === status}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                    filterStatus === status
-                      ? 'bg-primary text-primary-foreground shadow-md'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {status}
-                  <span className={`ml-1.5 text-xs tabular-nums ${filterStatus === status ? 'opacity-80' : 'text-slate-400'}`}>
-                    {total.toLocaleString()}
-                  </span>
-                </button>
-              ))}
+              {topStatusChips.map(({ status, total }) => {
+                const active = filterStatus === status;
+                const type = commandStats?.statusTypeMap.get(status);
+                return (
+                  <button
+                    key={status}
+                    onClick={() => setFilterStatus(active ? 'all' : status)}
+                    aria-pressed={active}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${statusChipClasses(type, active)}`}
+                  >
+                    {status}
+                    <span className={`ml-1.5 text-xs tabular-nums ${active ? 'opacity-80' : 'opacity-60'}`}>
+                      {total.toLocaleString()}
+                    </span>
+                  </button>
+                );
+              })}
               {(filterStatus !== 'all' || filterPriority !== 'all' || bucketFilter !== null) && (
                 <button
                   onClick={() => {
