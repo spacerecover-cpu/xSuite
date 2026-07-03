@@ -50,6 +50,7 @@ import { toEngineData as toPayslipEngineData } from './engine/adapters/payslipAd
 import {
   BUILT_IN_TEMPLATE_CONFIGS,
   resolveTemplateConfig,
+  resolveTemplateConfigWithCountry,
   resolveSecondary,
   type DocumentTemplateConfig,
   type TemplateConfigOverride,
@@ -57,6 +58,9 @@ import {
 import { getDeployedVersionByType, readConfig } from '../documentTemplateService';
 import { resolveBrandingImage, type BrandingImage } from './brandingImage';
 import type { SignatureImagesConfig } from './templateConfig';
+import { countryTemplateOverride, type ComplianceOverrideInputs } from './engine/countryConfig';
+import { resolveComplianceRenderInputs } from './engine/profileResolver';
+import type { TaxDocumentType } from '../regimes/types';
 
 /**
  * Resolve the deployed `signatureImages` config for a generated (legacy-path)
@@ -79,6 +83,28 @@ async function resolveSignatureImagesConfig(
     return cfg.signatureImages;
   } catch (err) {
     console.error(`[PDF Service] ${docType}: signatureImages resolution failed, feature off:`, err);
+    return undefined;
+  }
+}
+
+/** R4: derive the COUNTRY cascade layer for a build path. Financial doc types
+ *  (TaxDocumentType) also take the DocumentComplianceProfile (title ceremony,
+ *  registration band, bilingual, paper); non-financial docs (null) take only
+ *  the formatting facts. Returns undefined when the tenant has no resolvable
+ *  country — the cascade treats undefined as identity, so legacy behavior is
+ *  byte-identical. Resolution failures NEVER break generation (fail-soft). */
+export async function resolveCountryLayer(
+  docType: TaxDocumentType | null,
+): Promise<TemplateConfigOverride | undefined> {
+  try {
+    const compliance = await resolveComplianceRenderInputs();
+    if (!compliance.facts) return undefined;
+    const inputs: ComplianceOverrideInputs | undefined = docType
+      ? { profile: compliance.profile, sellerRegistered: compliance.sellerRegistered, docType }
+      : undefined;
+    return countryTemplateOverride(compliance.facts, inputs);
+  } catch (err) {
+    console.error('[PDF Service] country layer resolution failed, rendering without it:', err);
     return undefined;
   }
 }
@@ -112,8 +138,11 @@ async function buildInvoiceDocumentViaEngine(
     console.error('[PDF Service] Invoice engine: template resolution failed, using built-in default:', err);
   }
 
-  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+  const countryLayer = await resolveCountryLayer('invoice');
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfigWithCountry(
     BUILT_IN_TEMPLATE_CONFIGS.invoice,
+    countryLayer,
     /* theme */ undefined,
     /* docType */ docTypeOverride,
     /* instance */ undefined,
@@ -121,7 +150,7 @@ async function buildInvoiceDocumentViaEngine(
 
   // Bridge the tenant's document-language setting into the resolved config so
   // the engine renders bilingual/RTL when the tenant is configured for it.
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined || countryLayer?.language !== undefined);
 
   const engineData = toEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -154,14 +183,17 @@ async function buildQuoteViaEngine(
     console.error('[PDF Service] Quote engine: template resolution failed, using built-in default:', err);
   }
 
-  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+  const countryLayer = await resolveCountryLayer('quote');
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfigWithCountry(
     BUILT_IN_TEMPLATE_CONFIGS.quote,
+    countryLayer,
     /* theme */ undefined,
     /* docType */ docTypeOverride,
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined || countryLayer?.language !== undefined);
 
   const engineData = toQuoteEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -191,14 +223,17 @@ async function buildPaymentReceiptViaEngine(
     console.error('[PDF Service] Payment receipt engine: template resolution failed, using built-in default:', err);
   }
 
-  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+  const countryLayer = await resolveCountryLayer(null);
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfigWithCountry(
     BUILT_IN_TEMPLATE_CONFIGS.payment_receipt,
+    countryLayer,
     /* theme */ undefined,
     /* docType */ docTypeOverride,
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined || countryLayer?.language !== undefined);
 
   const engineData = toPaymentReceiptEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -227,14 +262,17 @@ async function buildPayslipViaEngine(
     console.error('[PDF Service] Payslip engine: template resolution failed, using built-in default:', err);
   }
 
-  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+  const countryLayer = await resolveCountryLayer(null);
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfigWithCountry(
     BUILT_IN_TEMPLATE_CONFIGS.payslip,
+    countryLayer,
     /* theme */ undefined,
     /* docType */ docTypeOverride,
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined || countryLayer?.language !== undefined);
 
   const engineData = toPayslipEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -271,14 +309,17 @@ async function buildOfficeReceiptViaEngine(
     console.error(`[PDF Service] ${docType} engine: template resolution failed, using built-in default:`, err);
   }
 
-  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+  const countryLayer = await resolveCountryLayer(null);
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfigWithCountry(
     BUILT_IN_TEMPLATE_CONFIGS[docType],
+    countryLayer,
     /* theme */ undefined,
     /* docType */ docTypeOverride,
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined || countryLayer?.language !== undefined);
 
   const engineData = toReceiptEngineData(data, languageAwareConfig, variant);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -336,14 +377,17 @@ async function buildCheckoutFormViaEngine(
     console.error('[PDF Service] Checkout form engine: template resolution failed, using built-in default:', err);
   }
 
-  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+  const countryLayer = await resolveCountryLayer(null);
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfigWithCountry(
     BUILT_IN_TEMPLATE_CONFIGS.checkout_form,
+    countryLayer,
     /* theme */ undefined,
     /* docType */ docTypeOverride,
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined || countryLayer?.language !== undefined);
 
   const engineData = toCheckoutEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -376,14 +420,17 @@ async function buildCaseLabelViaEngine(
     console.error('[PDF Service] Case label engine: template resolution failed, using built-in default:', err);
   }
 
-  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+  const countryLayer = await resolveCountryLayer(null);
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfigWithCountry(
     BUILT_IN_TEMPLATE_CONFIGS.case_label,
+    countryLayer,
     /* theme */ undefined,
     /* docType */ docTypeOverride,
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined || countryLayer?.language !== undefined);
 
   const engineData = toCaseLabelEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -417,14 +464,17 @@ async function buildChainOfCustodyViaEngine(
     console.error('[PDF Service] Chain of custody engine: template resolution failed, using built-in default:', err);
   }
 
-  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+  const countryLayer = await resolveCountryLayer(null);
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfigWithCountry(
     BUILT_IN_TEMPLATE_CONFIGS.chain_of_custody,
+    countryLayer,
     /* theme */ undefined,
     /* docType */ docTypeOverride,
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined || countryLayer?.language !== undefined);
 
   const engineData = toChainOfCustodyEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
