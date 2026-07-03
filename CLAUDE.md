@@ -349,7 +349,7 @@ The schema-drift detector (`scripts/check-schema-drift.sh`) regenerates types an
 | `has_role(role)` | Hierarchical role check |
 | `get_my_role()` | Returns current user's role string |
 | `authenticate_portal_customer(email, password)` | Portal customer auth |
-| `convert_proforma_to_tax_invoice(quote_id)` | Converts quote to invoice |
+| `convert_proforma_invoice_to_tax_invoice(invoice_id, due_date, notes)` | Converts a proforma invoice to a tax invoice (canonical path) |
 | `search_donor_drives(criteria)` | Inventory donor drive search |
 | `log_audit_trail(...)` | Creates audit trail entry |
 | `log_chain_of_custody(...)` | Creates chain of custody entry |
