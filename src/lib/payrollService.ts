@@ -890,53 +890,22 @@ export const payrollService = {
   // BANK FILES
   // ============================================================================
 
-  async generateBankFile(periodId: string, format: 'WPS' | 'ACH' | 'custom' = 'WPS') {
-    const period = await this.getPayrollPeriod(periodId);
-    if (!period) throw new Error('Payroll period not found');
-
-    const records = await this.getPayrollRecords(periodId);
-
-    const { data: nextNumber } = await supabase.rpc('get_next_number', {
-      p_scope: 'payroll_bank_file',
-    });
-
-    const fileContent = this.generateWPSFileContent(records);
-    const fileName = `${nextNumber || `PBF-${Date.now()}`}.txt`;
-
-    const { data: bankFile, error } = await supabase
-      .from('payroll_bank_files')
-      .insert({
-        file_name: fileName,
-        period_id: periodId,
-        file_format: format,
-        total_amount: period.total_net,
-        record_count: records.length,
-        status: 'generated',
-      } as Database['public']['Tables']['payroll_bank_files']['Insert'])
-      .select()
-      .maybeSingle();
-
-    if (error) throw error;
-    return { ...bankFile, file_content: fileContent, file_number: nextNumber || fileName };
+  async generateBankFile(_periodId: string, _format: 'WPS' | 'ACH' | 'custom' = 'WPS'): Promise<never> {
+    // Honest disable (localization Phase 0): the previous writer emitted a
+    // pipe-delimited placeholder with hardcoded 'USD' and 'Bank Muscat' — not WPS
+    // SIF, not NACHA, not BACS; no bank accepts it and it truncated 3-decimal OMR
+    // salaries. Real country bank-file formats arrive with the Phase-6 payroll
+    // packs (PayrollPack.bankFileOps: 'om_wps_sif', 'us_nacha', 'uk_bacs').
+    throw new Error(
+      'Salary bank-file generation is not configured for this tenant yet. The previous export produced a ' +
+      'non-compliant placeholder file (wrong currency, wrong format) and has been disabled. Country-specific ' +
+      'bank formats (WPS SIF, NACHA, BACS) ship with the payroll country packs.',
+    );
   },
 
-  generateWPSFileContent(records: Array<Record<string, unknown>>): string {
-    const lines = records.map((record) => {
-      const employee = record.employee as
-        | { employee_number?: string | null; first_name?: string; last_name?: string; bank_name?: string | null; bank_account_number?: string | null }
-        | null
-        | undefined;
-      const netSalary = typeof record.net_salary === 'number' ? record.net_salary : Number(record.net_salary ?? 0);
-      return [
-        employee?.employee_number || '',
-        employee ? `${employee.first_name ?? ''} ${employee.last_name ?? ''}`.trim() : '',
-        employee?.bank_account_number || '',
-        netSalary.toFixed(2),
-        'USD',
-        employee?.bank_name || 'Bank Muscat',
-      ].join('|');
-    });
-
-    return lines.join('\n');
+  generateWPSFileContent(_records: Array<Record<string, unknown>>): string {
+    throw new Error(
+      'WPS file generation is not configured for this tenant yet — see generateBankFile.',
+    );
   },
 };

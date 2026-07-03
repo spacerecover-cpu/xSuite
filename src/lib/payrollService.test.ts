@@ -4,9 +4,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // (env-throwing on import) and route each table to a thenable builder. The
 // payroll_records rows are mixed-currency so the assertion proves the dashboard
 // totals sum net_salary_base, never the raw native net_salary.
-const { from } = vi.hoisted(() => ({ from: vi.fn() }));
+const { from, rpc } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }));
 vi.mock('./supabaseClient', () => ({
-  supabase: { from, auth: { getUser: vi.fn() } },
+  supabase: { from, rpc, auth: { getUser: vi.fn() } },
   resolveTenantId: vi.fn(),
 }));
 vi.mock('./currencyService', () => ({ resolveRateContext: vi.fn() }));
@@ -29,7 +29,10 @@ function makeQuery(rows: unknown) {
   return builder;
 }
 
-beforeEach(() => from.mockReset());
+beforeEach(() => {
+  from.mockReset();
+  rpc.mockReset();
+});
 
 describe('payrollService.getDashboardStats (D7 — cross-record totals must be base currency)', () => {
   it('sums net_salary_base across mixed-currency payroll records, never the raw native net_salary', async () => {
@@ -131,5 +134,21 @@ describe('statutory social-security guard (Phase 0)', () => {
 
     expect(captured.records![0].total_deductions).toBe(70);  // 1000 * 0.07
     expect(captured.records![0].net_salary).toBe(930);
+  });
+});
+
+describe('bank-file generation is honestly disabled (Phase 0)', () => {
+  it('generateBankFile throws the not-configured error and mints nothing', async () => {
+    await expect(payrollService.generateBankFile('period-1', 'WPS'))
+      .rejects.toThrow(/not configured for this tenant/);
+
+    // No number-sequence RPC call and no payroll_bank_files insert — the
+    // placeholder writer must not run any of its side effects.
+    expect(rpc).not.toHaveBeenCalledWith('get_next_number', expect.anything());
+    expect(from).not.toHaveBeenCalledWith('payroll_bank_files');
+  });
+
+  it('generateWPSFileContent throws the same honest error', () => {
+    expect(() => payrollService.generateWPSFileContent([])).toThrow(/not configured for this tenant/);
   });
 });

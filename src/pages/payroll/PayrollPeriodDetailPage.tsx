@@ -77,23 +77,9 @@ export default function PayrollPeriodDetailPage() {
 
   const handleExportBankFile = async () => {
     try {
-      const bankFile = await payrollService.generateBankFile(id!, 'WPS');
-      if (!bankFile) {
-        toast.error('Failed to generate bank file');
-        return;
-      }
-      const fileContent = payrollService.generateWPSFileContent(records);
-      const blob = new Blob([fileContent], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const safePeriodName = (period?.period_name ?? 'payroll').replace(/\s/g, '_');
-      a.download = `${safePeriodName}_${bankFile.file_name || bankFile.id}.txt`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast.success('Bank file generated successfully');
+      // generateBankFile is honestly disabled (localization Phase 0) — it always
+      // throws until a real country bank-file writer (WPS SIF/NACHA/BACS) lands.
+      await payrollService.generateBankFile(id!, 'WPS');
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'Failed to generate bank file');
     }
