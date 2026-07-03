@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   roundMoney,
+  allocateLargestRemainder,
+  roundMoneyWith,
   convertToBase,
   calculateInvoiceTotals,
   calculateQuoteTotals,
@@ -345,5 +347,62 @@ describe('isReceivableInvoice (shared receivable filter — EXP-014)', () => {
 
   it('parity contract: excluded-status list is exactly void + cancelled', () => {
     expect([...RECEIVABLE_INVOICE_EXCLUDED_STATUSES]).toEqual(['void', 'cancelled']);
+  });
+});
+
+describe('allocateLargestRemainder', () => {
+  it('spec example: OMR 0.100 discount over three equal 100.000 lines → 0.034/0.033/0.033', () => {
+    expect(allocateLargestRemainder(0.1, [100, 100, 100], 3)).toEqual([0.034, 0.033, 0.033]);
+  });
+  it('spec example: inclusive ₹762.71 split across equal CGST/SGST weights → 381.36/381.35', () => {
+    expect(allocateLargestRemainder(762.71, [9, 9], 2)).toEqual([381.36, 381.35]);
+  });
+  it('negative totals mirror positive allocation (credit notes)', () => {
+    expect(allocateLargestRemainder(-0.1, [100, 100, 100], 3)).toEqual([-0.034, -0.033, -0.033]);
+  });
+  it('zero weights degrade to stable equal spread', () => {
+    expect(allocateLargestRemainder(0.05, [0, 0], 2)).toEqual([0.03, 0.02]);
+  });
+  it('empty weights → empty result', () => {
+    expect(allocateLargestRemainder(10, [], 2)).toEqual([]);
+  });
+  it('PROPERTY: sums exactly, parts within one minor unit of exact share, deterministic', () => {
+    let seed = 424242;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+    for (let trial = 0; trial < 500; trial++) {
+      const dp = [0, 2, 3][trial % 3];
+      const n = 1 + Math.floor(rnd() * 7);
+      const weights = Array.from({ length: n }, () => Math.floor(rnd() * 5000) / 10);
+      const total = roundMoney(rnd() * 10000 - 2000, dp);
+      const parts = allocateLargestRemainder(total, weights, dp);
+      const sum = roundMoney(parts.reduce((s, p) => s + p, 0), dp);
+      expect(sum).toBe(total);
+      expect(allocateLargestRemainder(total, weights, dp)).toEqual(parts); // deterministic
+      const weightSum = weights.reduce((s, w) => s + w, 0);
+      if (weightSum > 0) {
+        parts.forEach((p, i) => {
+          const exact = (total * weights[i]) / weightSum;
+          expect(Math.abs(p - exact)).toBeLessThanOrEqual(1 / 10 ** dp + 1e-9);
+        });
+      }
+    }
+  });
+});
+
+describe('roundMoneyWith', () => {
+  const docHalfUp = { mode: 'half_up', level: 'document' } as const;
+  const docHalfEven = { mode: 'half_even', level: 'document' } as const;
+  it('half_up matches the house roundMoney byte-for-byte (Oman parity requirement)', () => {
+    for (const v of [62.5, 62.4999, -2.005, 1.0005, 0.0005, -0.0005, 1250.0625]) {
+      for (const dp of [0, 2, 3]) {
+        expect(roundMoneyWith(v, dp, docHalfUp)).toBe(roundMoney(v, dp));
+      }
+    }
+  });
+  it('half_even rounds exact halves to the even minor unit', () => {
+    expect(roundMoneyWith(0.125, 2, docHalfEven)).toBe(0.12);
+    expect(roundMoneyWith(0.135, 2, docHalfEven)).toBe(0.14);
+    expect(roundMoneyWith(2.5, 0, docHalfEven)).toBe(2);
+    expect(roundMoneyWith(3.5, 0, docHalfEven)).toBe(4);
   });
 });
