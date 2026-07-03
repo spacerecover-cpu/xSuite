@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -13,69 +13,68 @@ import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
 
-type SequenceScope =
-  | 'case'
-  | 'invoice'
-  | 'quote'
-  | 'customer'
-  | 'expense'
-  | 'asset'
-  | 'proforma_invoice'
-  | 'transfer'
-  | 'deposit'
-  | 'company'
-  | 'supplier'
-  | 'stock'
-  | 'purchase_order'
-  | 'employee'
-  | 'user'
-  | 'document'
-  | 'clone_drive'
-  | 'report'
-  | 'report_evaluation'
-  | 'report_service'
-  | 'report_server'
-  | 'report_malware'
-  | 'report_forensic'
-  | 'report_data_destruction'
-  | 'report_prevention';
-
 interface NumberSequence {
   id: string;
-  scope: SequenceScope;
+  scope: string;
   prefix: string;
   padding: number;
   current_value: number;
   reset_annually: boolean;
   created_at: string;
+  format_template: string | null;
+  reset_basis: string | null;
+  fiscal_year_anchor: string | null;
+  max_length: number | null;
 }
 
-const SEQUENCE_CONFIG = [
-  { key: 'case', label: 'Case ID', description: 'Data recovery case tracking', category: 'Operations', color: '#10b981' },
-  { key: 'invoice', label: 'Invoice Number', description: 'Customer invoicing', category: 'Financial', color: 'rgb(var(--color-accent))' },
-  { key: 'quote', label: 'Quote Number', description: 'Price quotations', category: 'Financial', color: '#3b82f6' },
-  { key: 'proforma_invoice', label: 'Proforma Invoice Number', description: 'Advance payment invoices', category: 'Financial', color: '#ec4899' },
-  { key: 'expense', label: 'Expense Number', description: 'Business expense tracking', category: 'Financial', color: '#ef4444' },
-  { key: 'deposit', label: 'Deposit Number', description: 'Bank deposit receipts', category: 'Financial', color: '#f97316' },
-  { key: 'transfer', label: 'Transfer Number', description: 'Bank transfer transactions', category: 'Financial', color: '#f59e0b' },
-  { key: 'customer', label: 'Customer Number', description: 'Individual client IDs', category: 'Business Partners', color: '#06b6d4' },
-  { key: 'company', label: 'Company Number', description: 'Corporate client IDs', category: 'Business Partners', color: '#0ea5e9' },
-  { key: 'supplier', label: 'Supplier Number', description: 'Vendor/supplier IDs', category: 'Business Partners', color: '#14b8a6' },
-  { key: 'asset', label: 'Asset Number', description: 'Company asset tracking', category: 'Inventory', color: 'rgb(var(--color-accent))' },
-  { key: 'clone_drive', label: 'Clone ID', description: 'Physical clone drive resources', category: 'Inventory', color: '#3b82f6' },
-  { key: 'stock', label: 'Stock Number', description: 'Stock item management', category: 'Inventory', color: 'rgb(var(--color-accent))' },
-  { key: 'purchase_order', label: 'Purchase Order Number', description: 'Supplier purchase orders', category: 'Operations', color: '#d946ef' },
-  { key: 'document', label: 'Document Number', description: 'General document tracking', category: 'Operations', color: '#64748b' },
-  { key: 'employee', label: 'Employee Number', description: 'Employee ID numbers', category: 'HR', color: '#22c55e' },
-  { key: 'user', label: 'User Number', description: 'System user IDs', category: 'HR', color: '#84cc16' },
-  { key: 'report_evaluation', label: 'Evaluation Report Number', description: 'Assessment and recovery feasibility reports', category: 'Reports', color: '#3b82f6' },
-  { key: 'report_service', label: 'Service Report Number', description: 'Service work documentation reports', category: 'Reports', color: '#10b981' },
-  { key: 'report_server', label: 'Server Report Number', description: 'Server recovery and RAID reports', category: 'Reports', color: 'rgb(var(--color-accent))' },
-  { key: 'report_malware', label: 'Malware Report Number', description: 'Malware analysis and remediation reports', category: 'Reports', color: '#ef4444' },
-  { key: 'report_forensic', label: 'Forensic Report Number', description: 'Legal forensic investigation reports', category: 'Reports', color: 'rgb(var(--color-accent))' },
-  { key: 'report_data_destruction', label: 'Data Destruction Report Number', description: 'Certified data destruction reports', category: 'Reports', color: '#dc2626' },
-  { key: 'report_prevention', label: 'Prevention Report Number', description: 'Preventative recommendations reports', category: 'Reports', color: '#f59e0b' },
+interface ScopeCard {
+  key: string;
+  label: string;
+  description: string;
+  category: string;
+}
+
+// The REAL numbering vocabulary: every live `number_sequences` scope ∪ every
+// `get_next_number(...)` caller in `src/lib` (verified 2026-07-02). The old
+// SEQUENCE_CONFIG advertised phantom singular scopes (`customer`, `invoice`,
+// `supplier`, `user`, `document`, …) that no code path ever mints. The settings
+// surface now renders this registry unioned with live rows, so unknown live
+// scopes still surface and the phantom cards die.
+export const SCOPE_REGISTRY = [
+  { key: 'case', label: 'Case Number', description: 'Recovery case identifiers', category: 'Operations' },
+  { key: 'invoices', label: 'Tax Invoice Number', description: 'Sequential tax invoices (legal series)', category: 'Financial' },
+  { key: 'proforma_invoices', label: 'Proforma Number', description: 'Proforma series (non-tax)', category: 'Financial' },
+  { key: 'quote', label: 'Quote Number', description: 'Customer quotations', category: 'Financial' },
+  { key: 'payment', label: 'Payment Number', description: 'Payment records', category: 'Financial' },
+  { key: 'expense', label: 'Expense Number', description: 'Expense records', category: 'Financial' },
+  { key: 'customers', label: 'Customer Number', description: 'Individual client IDs', category: 'Business Partners' },
+  { key: 'companies', label: 'Company Number', description: 'Corporate client IDs', category: 'Business Partners' },
+  { key: 'suppliers', label: 'Supplier Number', description: 'Vendor/supplier IDs', category: 'Business Partners' },
+  { key: 'stock', label: 'Stock Number', description: 'Stock item management', category: 'Inventory' },
+  { key: 'stock_adjustment', label: 'Stock Adjustment Number', description: 'Stock adjustment sessions', category: 'Inventory' },
+  { key: 'purchase_orders', label: 'Purchase Order Number', description: 'Supplier purchase orders', category: 'Operations' },
+  { key: 'report_evaluation', label: 'Evaluation Report Number', description: 'Assessment and recovery feasibility reports', category: 'Reports' },
+  { key: 'report_service', label: 'Service Report Number', description: 'Service work documentation reports', category: 'Reports' },
+  { key: 'payroll_bank_file', label: 'Payroll Bank File Number', description: 'Payroll bank-file batches', category: 'HR' },
+] as const;
+
+// Allowed `reset_basis` values are enforced by the DB CHECK in
+// `update_number_sequence` — keep this list in lockstep with it.
+const RESET_BASIS_OPTIONS: { value: string; label: string }[] = [
+  { value: 'never', label: 'No automatic reset' },
+  { value: 'calendar_year', label: 'Reset each calendar year' },
+  { value: 'fiscal_year', label: 'Reset each fiscal year' },
 ];
+
+const emptyForm = () => ({
+  prefix: '',
+  padding: 4,
+  reset_annually: false,
+  format_template: '',
+  reset_basis: 'never',
+  fiscal_year_anchor: '',
+  max_length: '',
+});
 
 export const SystemNumbers: React.FC = () => {
   const navigate = useNavigate();
@@ -83,7 +82,8 @@ export const SystemNumbers: React.FC = () => {
   const toast = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSequence, setEditingSequence] = useState<NumberSequence | null>(null);
-  const [formData, setFormData] = useState({ prefix: '', padding: 4, reset_annually: false });
+  const [formData, setFormData] = useState(emptyForm);
+  const [debouncedTemplate, setDebouncedTemplate] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
@@ -100,14 +100,67 @@ export const SystemNumbers: React.FC = () => {
     },
   });
 
+  // Debounce the template so the preview RPC fires when the admin pauses typing,
+  // not on every keystroke.
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedTemplate(formData.format_template), 350);
+    return () => clearTimeout(handle);
+  }, [formData.format_template]);
+
+  const previewScope = editingSequence?.scope ?? '';
+  const previewTemplate = debouncedTemplate.trim();
+  const {
+    data: previewValue,
+    isFetching: isPreviewFetching,
+    isError: isPreviewError,
+  } = useQuery({
+    queryKey: ['preview_number_format', previewScope, previewTemplate],
+    enabled: isModalOpen && previewScope.length > 0 && previewTemplate.length > 0,
+    retry: false,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('preview_number_format', {
+        p_scope: previewScope,
+        p_format_template: previewTemplate,
+      });
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const updateMutation = useMutation({
-    mutationFn: async ({ scope, prefix, padding, reset_annually }: { scope: string; prefix: string; padding: number; reset_annually: boolean }) => {
+    mutationFn: async ({
+      scope,
+      prefix,
+      padding,
+      reset_annually,
+      format_template,
+      reset_basis,
+      fiscal_year_anchor,
+      max_length,
+    }: {
+      scope: string;
+      prefix: string;
+      padding: number;
+      reset_annually: boolean;
+      format_template: string;
+      reset_basis: string;
+      fiscal_year_anchor: string;
+      max_length: string;
+    }) => {
+      // The DB coalesces NULL args to the stored value, and each optional arg
+      // defaults to NULL, so omitting a field (undefined) is byte-identical to
+      // sending NULL. `strict` forbids `null` against the generated `string`/
+      // `number` arg types, so an empty field maps to `undefined` here.
       const { error } = await supabase
         .rpc('update_number_sequence', {
           p_scope: scope,
           p_prefix: prefix,
           p_padding: padding,
           p_reset: reset_annually,
+          p_format_template: format_template || undefined,
+          p_reset_basis: reset_basis === 'never' ? undefined : reset_basis,
+          p_fiscal_year_anchor: fiscal_year_anchor || undefined,
+          p_max_length: max_length === '' ? undefined : Number(max_length),
         });
 
       if (error) {
@@ -119,7 +172,8 @@ export const SystemNumbers: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['number_sequences'] });
       setIsModalOpen(false);
       setEditingSequence(null);
-      setFormData({ prefix: '', padding: 4, reset_annually: false });
+      setFormData(emptyForm());
+      setDebouncedTemplate('');
 
       toast.success('Number sequence updated successfully');
     },
@@ -131,7 +185,16 @@ export const SystemNumbers: React.FC = () => {
 
   const handleEdit = (sequence: NumberSequence) => {
     setEditingSequence(sequence);
-    setFormData({ prefix: sequence.prefix, padding: sequence.padding, reset_annually: sequence.reset_annually });
+    setFormData({
+      prefix: sequence.prefix,
+      padding: sequence.padding,
+      reset_annually: sequence.reset_annually,
+      format_template: sequence.format_template ?? '',
+      reset_basis: sequence.reset_basis ?? 'never',
+      fiscal_year_anchor: sequence.fiscal_year_anchor ?? '',
+      max_length: sequence.max_length == null ? '' : String(sequence.max_length),
+    });
+    setDebouncedTemplate(sequence.format_template ?? '');
     setIsModalOpen(true);
   };
 
@@ -144,13 +207,18 @@ export const SystemNumbers: React.FC = () => {
       prefix: formData.prefix,
       padding: formData.padding,
       reset_annually: formData.reset_annually,
+      format_template: formData.format_template,
+      reset_basis: formData.reset_basis,
+      fiscal_year_anchor: formData.fiscal_year_anchor,
+      max_length: formData.max_length,
     });
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingSequence(null);
-    setFormData({ prefix: '', padding: 4, reset_annually: false });
+    setFormData(emptyForm());
+    setDebouncedTemplate('');
   };
 
   const formatNumber = (seq: NumberSequence) => {
@@ -163,9 +231,20 @@ export const SystemNumbers: React.FC = () => {
     return seq.prefix + '-' + seq.current_value.toString().padStart(seq.padding, '0');
   };
 
-  const categories = ['All', ...Array.from(new Set(SEQUENCE_CONFIG.map(s => s.category)))];
+  // Registry ∪ live rows: a live scope absent from the registry (e.g. a dynamic
+  // `inventory:<uuid>` sequence) still surfaces as an "Other" card; a registry
+  // entry with no live row renders as "not yet used".
+  const registryKeys = new Set<string>(SCOPE_REGISTRY.map(s => s.key));
+  const scopeCards: ScopeCard[] = [
+    ...SCOPE_REGISTRY.map(s => ({ key: s.key, label: s.label, description: s.description, category: s.category })),
+    ...sequences
+      .filter(seq => !registryKeys.has(seq.scope))
+      .map(seq => ({ key: seq.scope, label: seq.scope, description: '', category: 'Other' })),
+  ];
 
-  const filteredSequenceTypes = SEQUENCE_CONFIG.filter(type => {
+  const categories = ['All', ...Array.from(new Set(scopeCards.map(c => c.category)))];
+
+  const filteredSequenceTypes = scopeCards.filter(type => {
     const matchesSearch = type.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           type.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || type.category === selectedCategory;
@@ -247,12 +326,16 @@ export const SystemNumbers: React.FC = () => {
                   const hasStarted = !!sequence && sequence.current_value > 0;
                   const displaySeq: NumberSequence = sequence || {
                     id: '',
-                    scope: type.key as SequenceScope,
+                    scope: type.key,
                     prefix: type.key.replace(/_/g, '').toUpperCase().slice(0, 4),
                     padding: 4,
                     current_value: 0,
                     reset_annually: false,
                     created_at: '',
+                    format_template: null,
+                    reset_basis: null,
+                    fiscal_year_anchor: null,
+                    max_length: null,
                   };
 
                   return (
@@ -265,7 +348,7 @@ export const SystemNumbers: React.FC = () => {
                           <h3 className="text-sm font-semibold text-slate-900 truncate" title={type.label}>
                             {type.label}
                           </h3>
-                          <Badge variant="custom" color={type.color} size="sm" className="mt-1">
+                          <Badge variant="default" size="sm" className="mt-1">
                             {type.category}
                           </Badge>
                         </div>
@@ -275,7 +358,7 @@ export const SystemNumbers: React.FC = () => {
                           ) : hasRow ? (
                             <Badge variant="secondary" size="sm">Configured</Badge>
                           ) : (
-                            <span className="text-xs font-medium text-slate-400">Not started</span>
+                            <span className="text-xs font-medium text-slate-400">Not yet used</span>
                           )}
                           <button
                             onClick={() => handleEdit(displaySeq)}
@@ -309,7 +392,7 @@ export const SystemNumbers: React.FC = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        title={`Edit ${editingSequence ? SEQUENCE_CONFIG.find(t => t.key === editingSequence.scope)?.label : ''}`}
+        title={`Edit ${editingSequence ? (SCOPE_REGISTRY.find(t => t.key === editingSequence.scope)?.label ?? editingSequence.scope) : ''}`}
       >
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
@@ -342,6 +425,100 @@ export const SystemNumbers: React.FC = () => {
             <p className="text-xs text-slate-500 mt-2">
               Preview: <span className="font-semibold">{formData.prefix}-{(( editingSequence?.current_value ?? 0) + 1).toString().padStart(formData.padding, '0')}</span>
             </p>
+          </div>
+
+          <div className="border-t border-slate-200 pt-5 space-y-5">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">Advanced format</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Optional. Leave the template blank to keep the classic prefix and number format above.
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="format_template" className="block text-sm font-semibold text-slate-700 mb-2">
+                Format Template
+              </label>
+              <Input
+                id="format_template"
+                value={formData.format_template}
+                onChange={(e) => setFormData({ ...formData, format_template: e.target.value })}
+                placeholder="INV/{FY}/{SEQ:4}"
+                className="font-mono"
+              />
+              <p className="text-xs text-slate-500 mt-2">
+                Use <span className="font-mono">{'{SEQ:n}'}</span> for the zero-padded counter and{' '}
+                <span className="font-mono">{'{FY}'}</span> for the fiscal-year label.
+              </p>
+              {formData.format_template.trim().length > 0 && (
+                <p className="text-xs mt-2" aria-live="polite">
+                  {isPreviewError ? (
+                    <span className="text-danger">Template must contain a {'{SEQ:n}'} token.</span>
+                  ) : (
+                    <span className="text-slate-500">
+                      Next number:{' '}
+                      <span className="font-mono font-semibold text-slate-700">
+                        {isPreviewFetching ? '…' : (previewValue ?? '…')}
+                      </span>
+                    </span>
+                  )}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="reset_basis" className="block text-sm font-semibold text-slate-700 mb-2">
+                Reset Basis
+              </label>
+              <select
+                id="reset_basis"
+                value={formData.reset_basis}
+                onChange={(e) => setFormData({ ...formData, reset_basis: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {RESET_BASIS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {formData.reset_basis === 'fiscal_year' && (
+              <div>
+                <label htmlFor="fiscal_year_anchor" className="block text-sm font-semibold text-slate-700 mb-2">
+                  Fiscal Year Start
+                </label>
+                <Input
+                  id="fiscal_year_anchor"
+                  value={formData.fiscal_year_anchor}
+                  onChange={(e) => setFormData({ ...formData, fiscal_year_anchor: e.target.value })}
+                  placeholder="01-01"
+                  className="font-mono"
+                />
+                <p className="text-xs text-slate-500 mt-2">
+                  Month and day the fiscal year begins, as MM-DD (e.g. 04-01 for April 1).
+                </p>
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="max_length" className="block text-sm font-semibold text-slate-700 mb-2">
+                Maximum Length
+              </label>
+              <Input
+                id="max_length"
+                type="number"
+                value={formData.max_length}
+                onChange={(e) => setFormData({ ...formData, max_length: e.target.value })}
+                min="1"
+                placeholder="Optional"
+                className="font-mono"
+              />
+              <p className="text-xs text-slate-500 mt-2">
+                Optional cap on the total generated length; leave blank for no limit.
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
