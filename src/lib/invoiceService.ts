@@ -2,13 +2,15 @@ import { supabase, resolveTenantId } from './supabaseClient';
 import type { Database } from '../types/database.types';
 import { checkRateLimit, RATE_LIMITS } from './rateLimiter';
 import { logAuditTrail } from './auditTrailService';
-import { logInvoiceCreated, logInvoicePayment, logInvoiceStatusChanged } from './chainOfCustodyService';
+import { logInvoiceCreated, logInvoicePayment } from './chainOfCustodyService';
 import { logger } from './logger';
 import { buildInvoiceSearchOr } from './searchResolvers';
 import { sanitizeUuidFields as sanitizeUuids, dropEmptyKeys } from './dataValidation';
 import { sanitizeFilterValue } from './postgrestSanitizer';
-import { calculateInvoiceTotals, calculateInvoiceTotalsBase, convertToBase, roundMoney } from './financialMath';
+import { calculateInvoiceTotalsBase, convertToBase, roundMoney } from './financialMath';
 import { resolveRateContext, getBaseCurrency, getCurrencyDecimals } from './currencyService';
+import type { RateContext } from './currencyService';
+import { computeDocumentTotals, persistDocumentTaxLines, issueTaxDocument } from './taxDocumentService';
 import { deriveInvoiceStatus } from './invoiceStatus';
 import { getInvoiceEditability, RESTRICTED_EDITABLE_FIELDS } from './invoicePermissions';
 import { toDateInputValue } from './format';
@@ -57,6 +59,10 @@ export interface Invoice {
   subtotal?: number;
   tax_rate?: number;
   tax_amount?: number;
+  /** Read by the fiscal-kernel compute path (exclusive default). Persistence of
+   *  the real `invoices.tax_inclusive` column is deferred; live invoices are
+   *  exclusive, so the kernel matches legacy calculateInvoiceTotals. */
+  tax_inclusive?: boolean;
   discount_type?: 'fixed' | 'percentage';
   discount_amount?: number;
   total_amount?: number;
@@ -409,7 +415,12 @@ export const createInvoice = async (invoice: Partial<Invoice>, items: InvoiceIte
   }
 
   const invoiceType: 'proforma' | 'tax_invoice' = invoice.invoice_type ?? 'tax_invoice';
-  const invoiceNumber = await getNextInvoiceNumber(invoiceType);
+  // Tax invoices are numbered at ISSUANCE — issue_tax_document mints the number
+  // in-txn and posts the ledger — so a draft tax invoice carries invoice_number
+  // NULL (the uq_invoices_number_per_tenant partial index is WHERE invoice_number
+  // IS NOT NULL, so NULLs are permitted). Proformas are not tax documents and keep
+  // minting their own PRO- series up front.
+  const invoiceNumber = invoiceType === 'proforma' ? await getNextInvoiceNumber('proforma') : null;
 
   const invoiceTaxRate = invoice.tax_rate || 0;
   const amountPaid = invoice.amount_paid ?? 0;
@@ -425,13 +436,24 @@ export const createInvoice = async (invoice: Partial<Invoice>, items: InvoiceIte
     invoice.exchange_rate ? { rate: invoice.exchange_rate, source: invoice.rate_source as 'manual' | 'provider' | undefined } : null,
   );
 
-  const { subtotal, taxAmount, totalAmount, amountDue } = calculateInvoiceTotals(
-    items,
-    invoice.discount_amount || 0,
-    invoiceTaxRate,
-    amountPaid,
-    rc.documentDecimals,
+  const { computation, subtotal, taxAmount, totalAmount } = await computeDocumentTotals(
+    {
+      items: items.map((i) => ({
+        description: i.description,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        discount_percent: i.discount_percent,
+      })),
+      discountType: null,
+      discountAmount: invoice.discount_amount || 0,
+      taxRate: invoiceTaxRate,
+      documentType: 'invoice',
+      documentDate: invoice.invoice_date || new Date().toISOString().slice(0, 10),
+      taxInclusive: invoice.tax_inclusive ?? false,
+    },
+    rc,
   );
+  const amountDue = roundMoney(totalAmount - amountPaid, rc.documentDecimals);
   const baseTotals = calculateInvoiceTotalsBase(
     { subtotal, taxAmount, totalAmount, amountPaid, amountDue },
     rc.rate,
@@ -451,7 +473,9 @@ export const createInvoice = async (invoice: Partial<Invoice>, items: InvoiceIte
     invoice_type: invoiceType,
     is_proforma: invoiceType === 'proforma',
     case_id: invoice.case_id,
-    status: invoice.status || 'draft',
+    // Tax invoices are created as drafts and made payable only via issueInvoice
+    // (issue_tax_document draft→sent). Proformas honour the caller's status.
+    status: invoiceType === 'tax_invoice' ? 'draft' : (invoice.status || 'draft'),
     subtotal,
     tax_rate: invoiceTaxRate,
     tax_amount: taxAmount,
@@ -480,14 +504,22 @@ export const createInvoice = async (invoice: Partial<Invoice>, items: InvoiceIte
   if (invoiceError) throw invoiceError;
   if (!invoiceData) throw new Error('Invoice insert returned no row');
 
-  const itemsWithInvoiceId: InvoiceLineItemInsert[] = items.map((item, index) => {
-    const itemSubtotal = item.quantity * item.unit_price;
-    const discountPct = item.discount_percent || 0;
-    const discount = itemSubtotal * (discountPct / 100);
-    const taxableAmount = itemSubtotal - discount;
-    const itemTax = roundMoney(taxableAmount * (invoiceTaxRate / 100), rc.documentDecimals);
-    const lineTotal = roundMoney(taxableAmount + itemTax, rc.documentDecimals);
+  // Source each item's tax_amount/total FROM the kernel's per-line component rows
+  // (tagged `idx:<index>`) so the stored line items and the document_tax_lines
+  // snapshot can never diverge. taxableBase is post-line-discount and post-
+  // document-discount allocation; a line's rows share one taxableBase, so take
+  // the first and sum the component tax amounts.
+  const lineAggregate = (index: number): { taxAmount: number; taxableBase: number } => {
+    const rows = computation.lines.filter((l) => l.lineItemId === `idx:${index}`);
+    if (rows.length === 0) return { taxAmount: 0, taxableBase: 0 };
+    return {
+      taxAmount: roundMoney(rows.reduce((s, r) => s + r.taxAmount, 0), rc.documentDecimals),
+      taxableBase: rows[0].taxableBase,
+    };
+  };
 
+  const itemsWithInvoiceId: InvoiceLineItemInsert[] = items.map((item, index) => {
+    const { taxAmount: itemTax, taxableBase } = lineAggregate(index);
     return {
       tenant_id: tenantId,
       invoice_id: invoiceData.id,
@@ -496,17 +528,33 @@ export const createInvoice = async (invoice: Partial<Invoice>, items: InvoiceIte
       unit_price: item.unit_price,
       tax_rate: invoiceTaxRate,
       tax_amount: itemTax,
-      discount: discountPct,
-      total: lineTotal,
+      discount: item.discount_percent || 0,
+      total: roundMoney(taxableBase + itemTax, rc.documentDecimals),
       sort_order: index,
     };
   });
 
-  const { error: itemsError } = await supabase
+  const { data: insertedItems, error: itemsError } = await supabase
     .from('invoice_line_items')
-    .insert(itemsWithInvoiceId);
+    .insert(itemsWithInvoiceId)
+    .select('id, sort_order');
 
   if (itemsError) throw itemsError;
+
+  // Ordered id array aligned to the kernel's `idx:<n>` sentinels (sort_order === n),
+  // so persistDocumentTaxLines relabels each component row to its real line-item id.
+  const insertedItemIds: Array<string | null> = items.map(
+    (_, index) => (insertedItems ?? []).find((r) => r.sort_order === index)?.id ?? null,
+  );
+
+  await persistDocumentTaxLines({
+    tenantId,
+    documentType: 'invoice',
+    documentId: invoiceData.id,
+    computation,
+    rc,
+    lineItemIds: insertedItemIds,
+  });
 
   await logAuditTrail('create', 'invoices', invoiceData.id, {}, { invoice_number: invoiceData.invoice_number, total_amount: totalAmount });
 
@@ -515,7 +563,9 @@ export const createInvoice = async (invoice: Partial<Invoice>, items: InvoiceIte
   try {
     await logInvoiceCreated({
       caseId: invoice.case_id,
-      invoiceNo: invoiceData.invoice_number ?? invoiceNumber,
+      // Draft tax invoices have no number until issuance; fall back to the id so
+      // the creation ledger event still carries a stable reference.
+      invoiceNo: invoiceData.invoice_number ?? invoiceNumber ?? invoiceData.id,
       total: totalAmount,
       subtotal,
       discount: invoice.discount_amount ?? 0,
@@ -588,26 +638,45 @@ export const updateInvoice = async (id: string, invoice: Partial<Invoice>, items
 
     const currencyChanged = invoice.currency !== undefined && invoice.currency !== existing?.currency;
     if (invoice.exchange_rate || currencyChanged) {
-      const rc = await resolveRateContext(
+      const resolved = await resolveRateContext(
         invoice.currency ?? existing?.currency,
         invoice.invoice_date || new Date().toISOString().slice(0, 10),
         invoice.exchange_rate
           ? { rate: invoice.exchange_rate, source: invoice.rate_source as 'manual' | 'provider' | undefined }
           : null,
       );
-      rate = rc.rate;
-      rateSource = rc.rateSource;
-      docCurrency = rc.documentCurrency;
+      rate = resolved.rate;
+      rateSource = resolved.rateSource;
+      docCurrency = resolved.documentCurrency;
     }
 
     const docDecimals = await getCurrencyDecimals(docCurrency ?? baseCurrency);
-    const { subtotal, taxAmount, totalAmount, amountDue } = calculateInvoiceTotals(
-      items,
-      invoice.discount_amount || 0,
-      invoiceTaxRate,
-      amountPaid,
-      docDecimals,
+    const rc: RateContext = {
+      documentCurrency: docCurrency ?? baseCurrency,
+      documentDecimals: docDecimals,
+      baseCurrency,
+      baseDecimals,
+      rate,
+      rateSource: rateSource as RateContext['rateSource'],
+    };
+    const { computation, subtotal, taxAmount, totalAmount } = await computeDocumentTotals(
+      {
+        items: items.map((i) => ({
+          description: i.description,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
+          discount_percent: i.discount_percent,
+        })),
+        discountType: null,
+        discountAmount: invoice.discount_amount || 0,
+        taxRate: invoiceTaxRate,
+        documentType: 'invoice',
+        documentDate: invoice.invoice_date || new Date().toISOString().slice(0, 10),
+        taxInclusive: invoice.tax_inclusive ?? false,
+      },
+      rc,
     );
+    const amountDue = roundMoney(totalAmount - amountPaid, docDecimals);
 
     const baseTotals = calculateInvoiceTotalsBase(
       { subtotal, taxAmount, totalAmount, amountPaid, amountDue },
@@ -635,14 +704,18 @@ export const updateInvoice = async (id: string, invoice: Partial<Invoice>, items
     await supabase.from('invoice_line_items').update({ deleted_at: new Date().toISOString() }).eq('invoice_id', id);
 
     const tenantId = await resolveTenantId();
+    // Same kernel-sourced per-line mapping as createInvoice: tax_amount/total come
+    // from computation.lines so the item rows and document_tax_lines never diverge.
+    const lineAggregate = (index: number): { taxAmount: number; taxableBase: number } => {
+      const rows = computation.lines.filter((l) => l.lineItemId === `idx:${index}`);
+      if (rows.length === 0) return { taxAmount: 0, taxableBase: 0 };
+      return {
+        taxAmount: roundMoney(rows.reduce((s, r) => s + r.taxAmount, 0), docDecimals),
+        taxableBase: rows[0].taxableBase,
+      };
+    };
     const itemsWithInvoiceId: InvoiceLineItemInsert[] = items.map((item, index) => {
-      const itemSubtotal = item.quantity * item.unit_price;
-      const discountPct = item.discount_percent || 0;
-      const discount = itemSubtotal * (discountPct / 100);
-      const taxableAmount = itemSubtotal - discount;
-      const itemTax = roundMoney(taxableAmount * (invoiceTaxRate / 100), docDecimals);
-      const lineTotal = roundMoney(taxableAmount + itemTax, docDecimals);
-
+      const { taxAmount: itemTax, taxableBase } = lineAggregate(index);
       return {
         tenant_id: tenantId,
         invoice_id: id,
@@ -651,17 +724,31 @@ export const updateInvoice = async (id: string, invoice: Partial<Invoice>, items
         unit_price: item.unit_price,
         tax_rate: invoiceTaxRate,
         tax_amount: itemTax,
-        discount: discountPct,
-        total: lineTotal,
+        discount: item.discount_percent || 0,
+        total: roundMoney(taxableBase + itemTax, docDecimals),
         sort_order: index,
       };
     });
 
-    const { error: itemsError } = await supabase
+    const { data: insertedItems, error: itemsError } = await supabase
       .from('invoice_line_items')
-      .insert(itemsWithInvoiceId);
+      .insert(itemsWithInvoiceId)
+      .select('id, sort_order');
 
     if (itemsError) throw itemsError;
+
+    const insertedItemIds: Array<string | null> = items.map(
+      (_, index) => (insertedItems ?? []).find((r) => r.sort_order === index)?.id ?? null,
+    );
+
+    await persistDocumentTaxLines({
+      tenantId,
+      documentType: 'invoice',
+      documentId: id,
+      computation,
+      rc,
+      lineItemIds: insertedItemIds,
+    });
   }
 
   // Defense-in-depth (Issue 2): an edit must never clear the invoice's ownership links.
@@ -686,7 +773,14 @@ export const updateInvoice = async (id: string, invoice: Partial<Invoice>, items
 
 export const deleteInvoice = async (id: string) => {
   const { error } = await supabase.from('invoices').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-  if (error) throw error;
+  if (error) {
+    // Issued tax invoices are immutable at the DB layer (append-only fiscal record);
+    // surface a caller-friendly message instead of the raw trigger error.
+    if (error.message?.includes('immutable') || error.message?.includes('cannot be deleted')) {
+      throw new Error('Issued tax invoices cannot be deleted — void the invoice instead.');
+    }
+    throw error;
+  }
 };
 
 /**
@@ -709,33 +803,13 @@ export const issueInvoice = async (id: string) => {
     throw new Error('Only draft invoices can be issued.');
   }
 
-  const sentAt = new Date().toISOString();
-  const { data, error } = await supabase
-    .from('invoices')
-    .update({ status: 'sent', sent_at: sentAt })
-    .eq('id', id)
-    .eq('status', 'draft')
-    .select()
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error('Invoice was already issued.');
-
-  await logAuditTrail('update', 'invoices', id, { status: 'draft' }, { status: 'sent', sent_at: sentAt });
-
-  if (inv.case_id) {
-    try {
-      await logInvoiceStatusChanged({
-        caseId: inv.case_id,
-        invoiceNo: inv.invoice_number ?? id,
-        oldStatus: 'draft',
-        newStatus: 'sent',
-      });
-    } catch (custodyError) {
-      logger.error('Invoice issued but chain-of-custody event failed:', custodyError);
-    }
-  }
-
-  return data;
+  // Delegate to the issuance RPC: it sets app.issuing, mints the tax-invoice
+  // number in-txn, posts vat_records, writes the custody event, and flips
+  // draft→sent atomically. The number is assigned here (not at creation), so the
+  // legal sequential-numbering guarantee holds even if drafts are abandoned.
+  const result = await issueTaxDocument('invoice', id);
+  if (!result.ok) throw new Error('Invoice issuance failed');
+  return { id, invoice_number: result.document_number, status: 'sent', sent_at: result.issued_at };
 };
 
 export const updateInvoiceStatus = async (
