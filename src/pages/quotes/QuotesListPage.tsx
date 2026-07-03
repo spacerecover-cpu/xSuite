@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { fetchQuotesPage, getQuoteStats, toQuoteEditInitialData } from '../../lib/quotesService';
-import type { QuoteWithDetails } from '../../lib/quotesService';
+import { fetchQuotesPage, getQuoteStats, toQuoteEditInitialData, createQuote as createQuoteService } from '../../lib/quotesService';
+import type { QuoteWithDetails, Quote as QuoteShape, QuoteItem as QuoteItemShape } from '../../lib/quotesService';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
@@ -42,7 +42,6 @@ import { formatDate } from '../../lib/format';
 import { logger } from '../../lib/logger';
 
 type QuoteUpdate = Database['public']['Tables']['quotes']['Update'];
-type QuoteInsert = Database['public']['Tables']['quotes']['Insert'];
 type QuoteItemInsert = Database['public']['Tables']['quote_items']['Insert'];
 
 const toNumber = (value: unknown, fallback = 0): number => {
@@ -788,60 +787,37 @@ export const QuotesListPage: React.FC = () => {
 
               if (itemsError) throw itemsError;
             } else {
-              const { data: nextNumber } = await supabase.rpc('get_next_number', {
-                p_scope: 'quote',
-              });
-
-              const subtotal = items.reduce(
-                (sum, item) => sum + item.quantity * item.unit_price,
-                0
-              );
-              const taxAmount = (subtotal * taxRate) / 100;
-              const discountValue =
-                discountTypeRaw === 'percentage'
-                  ? (subtotal * discountAmountInput) / 100
-                  : discountAmountInput;
-              const total = subtotal + taxAmount - discountValue;
-
-              const insertPayload: Omit<QuoteInsert, 'tenant_id'> = {
-                quote_number: typeof nextNumber === 'string' ? nextNumber : null,
-                case_id: caseIdValue,
+              // Route through quotesService.createQuote — the canonical create path
+              // (mirrors CaseDetail.tsx / InvoicesListPage.tsx). A hand-rolled insert
+              // here previously skipped resolveRateContext, leaving exchange_rate /
+              // rate_source / *_base NULL — exactly what assert_financial_base_integrity()
+              // flags. createQuote also generates the quote number, computes totals via
+              // calculateQuoteTotals/-Base, inserts line items, and logs audit + custody.
+              const newQuote: QuoteShape = {
+                case_id: caseIdValue ?? '',
                 customer_id: customerIdValue,
                 company_id: companyIdValue,
-                status: statusRaw,
-                valid_until: validUntil,
-                subtotal,
-                tax_amount: taxAmount,
-                discount_amount: discountValue,
-                total_amount: total,
+                status: statusRaw as QuoteShape['status'],
+                title: typeof quoteData.title === 'string' ? quoteData.title : undefined,
+                client_reference: typeof quoteData.client_reference === 'string' ? quoteData.client_reference : undefined,
+                valid_until: validUntil ?? undefined,
                 tax_rate: taxRate,
-                terms: termsValue,
-                notes: notesValue,
+                discount_amount: discountAmountInput,
+                discount_type: discountTypeRaw as QuoteShape['discount_type'],
+                bank_account_id: typeof quoteData.bank_account_id === 'string' ? quoteData.bank_account_id : null,
+                terms: termsValue ?? undefined,
+                notes: notesValue ?? undefined,
+                currency: typeof currencyConfig.code === 'string' ? currencyConfig.code : undefined,
               };
 
-              const { data: quote, error } = await supabase
-                .from('quotes')
-                .insert(insertPayload as QuoteInsert)
-                .select()
-                .maybeSingle();
-
-              if (error) throw error;
-              if (!quote) throw new Error('Failed to create quote');
-
-              const itemsToInsert: Array<Omit<QuoteItemInsert, 'tenant_id'>> = items.map((item, index) => ({
-                quote_id: quote.id,
+              const quoteItems: QuoteItemShape[] = items.map((item, index) => ({
                 description: item.description,
                 quantity: item.quantity,
                 unit_price: item.unit_price,
-                total: roundMoney(item.quantity * item.unit_price, currencyConfig.decimalPlaces),
                 sort_order: index,
               }));
 
-              const { error: itemsError } = await supabase
-                .from('quote_items')
-                .insert(itemsToInsert as QuoteItemInsert[]);
-
-              if (itemsError) throw itemsError;
+              await createQuoteService(newQuote, quoteItems);
             }
 
             queryClient.invalidateQueries({ queryKey: ['quotes'] });

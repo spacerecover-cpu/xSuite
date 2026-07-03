@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
-import { assertOnboardableCountry, ProvisionGuardError } from './provisionGuards.ts';
+import { assertOnboardableCountry, assertResidencySupported, ProvisionGuardError, ResidencyNotAvailableError } from './provisionGuards.ts';
 
 const ALLOWED_ORIGINS = [
   'https://xsuite.space',
@@ -200,14 +200,15 @@ Deno.serve(async (req: Request) => {
     // rejected with 422 — never silently provisioned with US defaults.
     const { data: countryData } = await supabase
       .from('geo_countries')
-      .select('name, currency_code, currency_symbol, decimal_places, currency_position, decimal_separator, thousands_separator, timezone, date_format, fiscal_year_start, locale_code, config_status, language_code, tax_system, tax_number_format')
+      .select('name, currency_code, currency_symbol, decimal_places, currency_position, decimal_separator, thousands_separator, timezone, date_format, fiscal_year_start, locale_code, config_status, language_code, tax_system, tax_number_format, requires_local_residency')
       .eq('id', countryId)
       .maybeSingle();
 
     try {
       assertOnboardableCountry(countryData);
+      assertResidencySupported(countryData);
     } catch (guardErr) {
-      if (guardErr instanceof ProvisionGuardError) {
+      if (guardErr instanceof ProvisionGuardError || guardErr instanceof ResidencyNotAvailableError) {
         return new Response(
           JSON.stringify({ error: guardErr.message }),
           { status: guardErr.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

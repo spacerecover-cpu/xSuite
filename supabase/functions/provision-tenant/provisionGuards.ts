@@ -58,3 +58,25 @@ export function assertOnboardableCountry(country: CountryFormattingFields | null
     throw new ProvisionGuardError(422, NOT_AVAILABLE);
   }
 }
+
+/** Owner E6: a residency-mandated country without a matching deployed region must
+ *  fail with an HONEST 422 — never silently place regulated data in global-1. */
+export class ResidencyNotAvailableError extends Error {
+  readonly status = 422;
+  constructor(countryName: string) {
+    super(
+      `${countryName} requires in-country data residency and no matching residency region is deployed yet. ` +
+      'Onboarding is blocked rather than silently storing regulated data in the global region.',
+    );
+    this.name = 'ResidencyNotAvailableError';
+  }
+}
+
+export function assertResidencySupported(
+  country: { name?: string | null; requires_local_residency?: boolean | null },
+  availableRegions: string[] = ['global-1'],
+): void {
+  if (!country?.requires_local_residency) return;
+  if (availableRegions.some((r) => r !== 'global-1')) return;
+  throw new ResidencyNotAvailableError(country.name ?? 'This country');
+}

@@ -4,15 +4,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // (env-throwing on import) and route each table to a thenable builder. The
 // payroll_records rows are mixed-currency so the assertion proves the dashboard
 // totals sum net_salary_base, never the raw native net_salary.
-const { from } = vi.hoisted(() => ({ from: vi.fn() }));
+const { from, rpc } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }));
 vi.mock('./supabaseClient', () => ({
-  supabase: { from, auth: { getUser: vi.fn() } },
+  supabase: { from, rpc, auth: { getUser: vi.fn() } },
   resolveTenantId: vi.fn(),
 }));
 vi.mock('./currencyService', () => ({ resolveRateContext: vi.fn() }));
 vi.mock('./payrollBase', () => ({ buildPayrollBaseColumns: vi.fn(() => ({})) }));
+vi.mock('./logger', () => ({ logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
 import { payrollService } from './payrollService';
+import { logger } from './logger';
 
 /** Thenable query builder: every chainable method returns the builder; awaiting
  *  it (or calling maybeSingle) yields {data}. `rows` is the resolved payload. */
@@ -27,7 +29,10 @@ function makeQuery(rows: unknown) {
   return builder;
 }
 
-beforeEach(() => from.mockReset());
+beforeEach(() => {
+  from.mockReset();
+  rpc.mockReset();
+});
 
 describe('payrollService.getDashboardStats (D7 — cross-record totals must be base currency)', () => {
   it('sums net_salary_base across mixed-currency payroll records, never the raw native net_salary', async () => {
@@ -68,5 +73,82 @@ describe('payrollService.getDashboardStats (D7 — cross-record totals must be b
     const stats = await payrollService.getDashboardStats();
 
     expect(stats.totalPayroll).toBe(70);
+  });
+});
+
+describe('statutory social-security guard (Phase 0)', () => {
+  const baseSettings = {
+    working_days_per_month: 22,
+    working_hours_per_day: 8,
+    overtime_rate_multiplier: { regular: 1.5, weekend: 1.5, holiday: 2 },
+    payment_day: 28,
+  };
+
+  function arrange(
+    socialSecurityRate: number | undefined,
+    captured: { records?: Array<Record<string, unknown>> },
+  ) {
+    vi.spyOn(payrollService, 'getPayrollPeriod').mockResolvedValue(
+      { id: 'period-1', status: 'draft', start_date: '2026-06-01', end_date: '2026-06-30', period_name: 'Jun 2026' } as never,
+    );
+    vi.spyOn(payrollService, 'getPayrollSettings').mockResolvedValue(
+      { ...baseSettings, social_security_rate: socialSecurityRate } as never,
+    );
+    vi.spyOn(payrollService, 'getEmployeeAttendance').mockResolvedValue(
+      { daysWorked: 22, daysAbsent: 0, daysLeave: 0, regularHours: 176, overtimeHours: 0 } as never,
+    );
+    vi.spyOn(payrollService, 'getActiveLoans').mockResolvedValue([] as never);
+    vi.spyOn(payrollService, 'updatePayrollPeriod').mockResolvedValue(undefined as never);
+
+    from.mockImplementation((table: string) => {
+      if (table === 'employees') return makeQuery([{ id: 'emp-1', tenant_id: 't-1', basic_salary: 1000 }]);
+      if (table === 'payroll_records') {
+        return {
+          insert: (rows: Array<Record<string, unknown>>) => {
+            captured.records = rows;
+            return { select: () => Promise.resolve({ data: rows, error: null }) };
+          },
+        } as unknown as ReturnType<typeof makeQuery>;
+      }
+      return makeQuery(null);
+    });
+  }
+
+  it('skips the deduction and warns loudly when no rate is configured', async () => {
+    const captured: { records?: Array<Record<string, unknown>> } = {};
+    arrange(undefined, captured);
+
+    await payrollService.processPayroll('period-1');
+
+    expect(captured.records).toHaveLength(1);
+    expect(captured.records![0].total_deductions).toBe(0);  // no fabricated 7% PASI
+    expect(captured.records![0].net_salary).toBe(1000);
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringMatching(/social-security rate/i));
+  });
+
+  it('applies a configured rate exactly (Omani 0.07 keeps working)', async () => {
+    const captured: { records?: Array<Record<string, unknown>> } = {};
+    arrange(0.07, captured);
+
+    await payrollService.processPayroll('period-1');
+
+    expect(captured.records![0].total_deductions).toBe(70);  // 1000 * 0.07
+    expect(captured.records![0].net_salary).toBe(930);
+  });
+});
+
+describe('bank-file generation is honestly disabled (Phase 0)', () => {
+  it('generateBankFile throws the not-configured error and mints nothing', async () => {
+    await expect(payrollService.generateBankFile('period-1', 'WPS'))
+      .rejects.toThrow(/not configured for this tenant/);
+
+    // No number-sequence RPC call and no payroll_bank_files insert — the
+    // placeholder writer must not run any of its side effects.
+    expect(rpc).not.toHaveBeenCalledWith('get_next_number', expect.anything());
+    expect(from).not.toHaveBeenCalledWith('payroll_bank_files');
+  });
+
+  it('generateWPSFileContent throws the same honest error', () => {
+    expect(() => payrollService.generateWPSFileContent([])).toThrow(/not configured for this tenant/);
   });
 });

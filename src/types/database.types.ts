@@ -11443,7 +11443,7 @@ export type Database = {
           pay_day: number | null
           pay_frequency: string | null
           settings: Json | null
-          social_security_rate: number
+          social_security_rate: number | null
           tax_calculation_method: string | null
           tenant_id: string
           updated_at: string
@@ -11457,7 +11457,7 @@ export type Database = {
           pay_day?: number | null
           pay_frequency?: string | null
           settings?: Json | null
-          social_security_rate?: number
+          social_security_rate?: number | null
           tax_calculation_method?: string | null
           tenant_id: string
           updated_at?: string
@@ -11471,7 +11471,7 @@ export type Database = {
           pay_day?: number | null
           pay_frequency?: string | null
           settings?: Json | null
-          social_security_rate?: number
+          social_security_rate?: number | null
           tax_calculation_method?: string | null
           tenant_id?: string
           updated_at?: string
@@ -17149,6 +17149,10 @@ export type Database = {
       }
       assert_expense_import_allowed: {
         Args: { p_row_count: number }
+        Returns: undefined
+      }
+      assert_financial_base_integrity: {
+        Args: { p_lookback?: string }
         Returns: undefined
       }
       assign_inventory_to_case: {
