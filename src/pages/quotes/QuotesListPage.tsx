@@ -815,6 +815,7 @@ export const QuotesListPage: React.FC = () => {
                 discount_amount: discountValue,
                 total_amount: total,
                 tax_rate: taxRate,
+                currency: typeof currencyConfig.code === 'string' ? currencyConfig.code : null,
                 terms: termsValue,
                 notes: notesValue,
               };
