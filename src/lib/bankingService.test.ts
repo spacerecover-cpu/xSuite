@@ -3,8 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // getAccountBalanceSummary sums bank-account balances across documents; mock the
 // supabase client (env-throwing on import) and feed mixed-currency accounts so the
 // assertion proves base-currency summation, never the raw native balance.
-const { from } = vi.hoisted(() => ({ from: vi.fn() }));
-vi.mock('./supabaseClient', () => ({ supabase: { from }, resolveTenantId: vi.fn() }));
+const { from, getUser, resolveTenantId } = vi.hoisted(() => ({
+  from: vi.fn(), getUser: vi.fn(), resolveTenantId: vi.fn(),
+}));
+vi.mock('./supabaseClient', () => ({ supabase: { from, auth: { getUser } }, resolveTenantId }));
 vi.mock('./logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
 import { bankingService } from './bankingService';
@@ -65,5 +67,57 @@ describe('getAccountBalanceSummary (cross-document balances must be base currenc
     const summary = await bankingService.getAccountBalanceSummary();
 
     expect(summary.totalCashBalance).toBe(70);
+  });
+});
+
+describe('createTransfer — cross-currency guard (Phase 0)', () => {
+  const accountRead = (row: Record<string, unknown> | null) => {
+    const b: Record<string, unknown> = {
+      select: vi.fn(() => b),
+      eq: vi.fn(() => b),
+      maybeSingle: vi.fn().mockResolvedValue({ data: row, error: null }),
+    };
+    return b;
+  };
+
+  beforeEach(() => {
+    getUser.mockResolvedValue({ data: { user: { id: 'u-1' } } });
+    resolveTenantId.mockResolvedValue('t-1');
+  });
+
+  it('throws before inserting when the two accounts have different currencies', async () => {
+    const insert = vi.fn(() => ({
+      select: () => ({ maybeSingle: () => Promise.resolve({ data: { id: 't', status: 'pending' }, error: null }) }),
+    }));
+    from
+      .mockReturnValueOnce(accountRead({ current_balance: 1000, currency: 'OMR' })) // source
+      .mockReturnValueOnce(accountRead({ currency: 'USD' }))                        // destination
+      .mockReturnValue({ insert });                                                // account_transfers — must NOT run
+
+    await expect(
+      bankingService.createTransfer({ amount: 500, from_account_id: 'a', to_account_id: 'b' }),
+    ).rejects.toThrow(/Cross-currency transfers are not supported/);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it('still allows same-currency transfers', async () => {
+    const captured: { row?: Record<string, unknown> } = {};
+    const insert = vi.fn((row: Record<string, unknown>) => {
+      captured.row = row;
+      // Return status 'pending' so the completed-transfer balance-update fan-out is skipped.
+      return { select: () => ({ maybeSingle: () => Promise.resolve({
+        data: { id: 't1', status: 'pending', from_account_id: 'a', to_account_id: 'b', amount: 500 }, error: null,
+      }) }) };
+    });
+    from
+      .mockReturnValueOnce(accountRead({ current_balance: 1000, currency: 'OMR' }))
+      .mockReturnValueOnce(accountRead({ currency: 'OMR' }))
+      .mockReturnValue({ insert });
+
+    const result = await bankingService.createTransfer({ amount: 500, from_account_id: 'a', to_account_id: 'b' });
+
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(captured.row).toMatchObject({ amount: 500, from_account_id: 'a', to_account_id: 'b' });
+    expect(result).toMatchObject({ id: 't1' });
   });
 });

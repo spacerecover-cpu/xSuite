@@ -68,11 +68,13 @@ export const GDPRCompliancePage: React.FC = () => {
     try {
       await gdprService.updateRequestStatus(requestId, 'processing', user!.id);
       const data = await gdprService.exportCustomerData(selectedCustomerId);
-      gdprService.downloadAsJson(data, `gdpr-export-${new Date().toISOString().slice(0, 10)}.json`);
+      gdprService.downloadAsJson(data, `dsr-export-${new Date().toISOString().slice(0, 10)}.json`);
       await gdprService.updateRequestStatus(requestId, 'completed', user!.id);
       queryClient.invalidateQueries({ queryKey: gdprKeys.all });
       toast.success('Data exported successfully');
     } catch (err) {
+      await gdprService.updateRequestStatus(requestId, 'pending', user!.id).catch(() => undefined);
+      queryClient.invalidateQueries({ queryKey: gdprKeys.all });
       toast.error(err instanceof Error ? err.message : 'Export failed');
     }
   };
@@ -96,6 +98,8 @@ export const GDPRCompliancePage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: gdprKeys.all });
       toast.success('Customer data anonymized successfully');
     } catch (err) {
+      await gdprService.updateRequestStatus(requestId, 'pending', user!.id).catch(() => undefined);
+      queryClient.invalidateQueries({ queryKey: gdprKeys.all });
       toast.error(err instanceof Error ? err.message : 'Anonymization failed');
     }
   };

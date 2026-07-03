@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { assertOnboardableCountry, ProvisionGuardError } from './provisionGuards';
+import {
+  assertOnboardableCountry,
+  assertResidencySupported,
+  ProvisionGuardError,
+  ResidencyNotAvailableError,
+} from './provisionGuards';
 
 const READY = {
   name: 'Oman',
@@ -46,5 +51,27 @@ describe('assertOnboardableCountry', () => {
       expect((e as ProvisionGuardError).status).toBe(422);
       expect((e as ProvisionGuardError).message).toMatch(/not yet available/i);
     }
+  });
+});
+
+describe('assertResidencySupported (owner E6 honest 422)', () => {
+  it('throws 422 for a residency-mandated country when only global-1 exists', () => {
+    expect(() =>
+      assertResidencySupported({ name: 'Ruritania', requires_local_residency: true }),
+    ).toThrow(ResidencyNotAvailableError);
+    try {
+      assertResidencySupported({ name: 'Ruritania', requires_local_residency: true });
+    } catch (e) {
+      expect((e as ResidencyNotAvailableError).status).toBe(422);
+    }
+  });
+  it('passes for false/null flags (all 9 live countries today)', () => {
+    expect(() => assertResidencySupported({ name: 'Oman', requires_local_residency: false })).not.toThrow();
+    expect(() => assertResidencySupported({ name: 'Oman', requires_local_residency: null })).not.toThrow();
+  });
+  it('passes when a matching non-global region is available (future regional deploys)', () => {
+    expect(() =>
+      assertResidencySupported({ name: 'Ruritania', requires_local_residency: true }, ['global-1', 'eu-1']),
+    ).not.toThrow();
   });
 });

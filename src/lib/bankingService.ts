@@ -548,11 +548,30 @@ export const bankingService = {
 
     // validate_account_balance RPC does not exist in v1.0.0 schema; do balance
     // check in TS. TODO(B8): replace with server-side RPC when added.
-    const { data: sourceAccount } = await supabase
-      .from('bank_accounts')
-      .select('current_balance')
-      .eq('id', transferData.from_account_id)
-      .maybeSingle();
+    const [{ data: sourceAccount }, { data: destinationAccount }] = await Promise.all([
+      supabase
+        .from('bank_accounts')
+        .select('current_balance, currency')
+        .eq('id', transferData.from_account_id)
+        .maybeSingle(),
+      supabase
+        .from('bank_accounts')
+        .select('currency')
+        .eq('id', transferData.to_account_id)
+        .maybeSingle(),
+    ]);
+
+    // Phase-0 guard: a transfer moves ONE number, so both ledgers must share a
+    // currency. 1000 USD -> OMR previously credited 1000 OMR (wrong by ~2.6x).
+    // Proper FX transfers (snapshotted rate + realized-FX posting) are Phase 2.
+    const fromCurrency = sourceAccount?.currency ?? null;
+    const toCurrency = destinationAccount?.currency ?? null;
+    if (fromCurrency && toCurrency && fromCurrency !== toCurrency) {
+      throw new Error(
+        `Cross-currency transfers are not supported yet: the source account is ${fromCurrency} ` +
+        `and the destination is ${toCurrency}. Use same-currency accounts, or wait for FX transfers (Phase 2).`,
+      );
+    }
 
     if (sourceAccount && (sourceAccount.current_balance ?? 0) < transferData.amount) {
       throw new Error('Insufficient balance in the source account');
