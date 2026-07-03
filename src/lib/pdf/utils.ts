@@ -68,11 +68,19 @@ export function formatCurrency(
  */
 export function formatEngineMoney(
   amount: number,
-  opts: { symbol: string; decimalPlaces: number; position: 'before' | 'after' },
+  opts: {
+    symbol: string;
+    decimalPlaces: number;
+    position: 'before' | 'after';
+    decimalSeparator?: string;
+    thousandsSeparator?: string;
+  },
 ): string {
+  const dec = opts.decimalSeparator ?? '.';
+  const thou = opts.thousandsSeparator ?? ',';
   const [intPart, decPart] = amount.toFixed(opts.decimalPlaces).split('.');
-  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  const formatted = decPart ? `${grouped}.${decPart}` : grouped;
+  const grouped = thou === '' ? intPart : intPart.replace(/\B(?=(\d{3})+(?!\d))/g, thou);
+  const formatted = decPart ? `${grouped}${dec}${decPart}` : grouped;
   return opts.position === 'before' ? `${opts.symbol} ${formatted}` : `${formatted} ${opts.symbol}`;
 }
 
@@ -222,4 +230,33 @@ export function getConditionLabel(condition: string | null | undefined): string 
     unknown: 'Unknown',
   };
   return conditions[condition] || condition;
+}
+
+export interface PartyAddressInput {
+  line1?: string | null;
+  line2?: string | null;
+  city?: string | null;
+  subdivision?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
+  free_text?: string | null;
+}
+
+/** Country-ordered buyer/party address lines. `postalFirst` = the country's
+ *  address_format puts the postal code before the city (EU/JP convention).
+ *  Falls back to the legacy free-text blob when no structured field is set
+ *  (M-I: pre-migration rows keep rendering exactly what they stored). */
+export function formatPartyAddressLines(addr: PartyAddressInput, postalFirst: boolean): string[] {
+  const lines: string[] = [];
+  if (addr.line1?.trim()) lines.push(addr.line1.trim());
+  if (addr.line2?.trim()) lines.push(addr.line2.trim());
+  const cityBits = [addr.city?.trim(), addr.subdivision?.trim()].filter(Boolean).join(', ');
+  const postal = addr.postal_code?.trim() ?? '';
+  const cityLine = postalFirst
+    ? [postal, cityBits].filter(Boolean).join(' ')
+    : [cityBits, postal].filter(Boolean).join(' ');
+  if (cityLine) lines.push(cityLine);
+  if (addr.country?.trim()) lines.push(addr.country.trim());
+  if (lines.length === 0 && addr.free_text?.trim()) lines.push(addr.free_text.trim());
+  return lines;
 }
