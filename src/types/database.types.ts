@@ -3359,6 +3359,7 @@ export type Database = {
           category_id: string | null
           created_at: string
           default_price: number | null
+          default_unit_code: string | null
           description: string | null
           id: string
           is_active: boolean
@@ -3370,6 +3371,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           default_price?: number | null
+          default_unit_code?: string | null
           description?: string | null
           id?: string
           is_active?: boolean
@@ -3381,6 +3383,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           default_price?: number | null
+          default_unit_code?: string | null
           description?: string | null
           id?: string
           is_active?: boolean
@@ -3395,6 +3398,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "catalog_service_categories"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_service_line_items_default_unit_code_fkey"
+            columns: ["default_unit_code"]
+            isOneToOne: false
+            referencedRelation: "master_unit_codes"
+            referencedColumns: ["code"]
           },
         ]
       }
@@ -4553,6 +4563,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "tenants"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_credit_note_items_unit_code"
+            columns: ["unit_code"]
+            isOneToOne: false
+            referencedRelation: "master_unit_codes"
+            referencedColumns: ["code"]
           },
         ]
       }
@@ -8508,6 +8525,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_invoice_line_items_unit_code"
+            columns: ["unit_code"]
+            isOneToOne: false
+            referencedRelation: "master_unit_codes"
+            referencedColumns: ["code"]
+          },
+          {
             foreignKeyName: "invoice_line_items_invoice_id_fkey"
             columns: ["invoice_id"]
             isOneToOne: false
@@ -10532,6 +10556,42 @@ export type Database = {
           name?: string
           sort_order?: number | null
           type?: string | null
+        }
+        Relationships: []
+      }
+      master_unit_codes: {
+        Row: {
+          code: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          labels_i18n: Json
+          scheme: string
+          sort_order: number
+          uqc_code: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          labels_i18n?: Json
+          scheme?: string
+          sort_order?: number
+          uqc_code?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          labels_i18n?: Json
+          scheme?: string
+          sort_order?: number
+          uqc_code?: string | null
         }
         Relationships: []
       }
@@ -13144,6 +13204,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_quote_items_unit_code"
+            columns: ["unit_code"]
+            isOneToOne: false
+            referencedRelation: "master_unit_codes"
+            referencedColumns: ["code"]
+          },
+          {
             foreignKeyName: "quote_items_quote_id_fkey"
             columns: ["quote_id"]
             isOneToOne: false
@@ -14957,6 +15024,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_stock_sale_items_unit_code"
+            columns: ["unit_code"]
+            isOneToOne: false
+            referencedRelation: "master_unit_codes"
+            referencedColumns: ["code"]
+          },
           {
             foreignKeyName: "stock_sale_items_invoice_line_item_id_fkey"
             columns: ["invoice_line_item_id"]
