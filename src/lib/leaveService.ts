@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import type { Database } from '../types/database.types';
+import { currentTenantToday } from './tenantToday';
 
 type LeaveType = Database['public']['Tables']['master_leave_types']['Row'];
 type LeaveTypeInsert = Database['public']['Tables']['master_leave_types']['Insert'];
@@ -157,7 +158,7 @@ export const leaveService = {
       .update({
         status: 'approved',
         reviewed_by: approverId,
-        reviewed_date: new Date().toISOString().split('T')[0],
+        reviewed_date: await currentTenantToday(),
         review_notes: notes ?? null,
         updated_at: new Date().toISOString(),
       })
@@ -175,7 +176,7 @@ export const leaveService = {
       .update({
         status: 'rejected',
         reviewed_by: approverId,
-        reviewed_date: new Date().toISOString().split('T')[0],
+        reviewed_date: await currentTenantToday(),
         review_notes: notes ?? null,
         updated_at: new Date().toISOString(),
       })

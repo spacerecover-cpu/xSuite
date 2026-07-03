@@ -11,6 +11,7 @@ vi.mock('./currencyService', () => ({
   getBaseCurrency: vi.fn(),
   getCurrencyDecimals: vi.fn(),
 }));
+vi.mock('./tenantToday', () => ({ currentTenantToday: vi.fn(() => Promise.resolve('2026-07-01')) }));
 
 import {
   getExpensesByCategory,
@@ -20,7 +21,9 @@ import {
   archiveExpense,
   deleteExpense,
   getExpenseLedgerReconciliation,
+  approveExpense,
 } from './expensesService';
+import { getBaseCurrency, getCurrencyDecimals } from './currencyService';
 
 /** Thenable query builder: select/in/gte/lte are chainable; awaiting yields {data}. */
 function makeQuery(rows: Array<Record<string, unknown>>) {
@@ -201,5 +204,67 @@ describe('archiveExpense / deleteExpense (EXP-018/EXP-006 — admin-gated atomic
     rpc.mockResolvedValueOnce({ data: [], error: null });
     await getExpenseLedgerReconciliation({ dateFrom: '2026-01-01', dateTo: '2026-12-31' });
     expect(rpc).toHaveBeenLastCalledWith('reconcile_expense_ledger', { p_date_from: '2026-01-01', p_date_to: '2026-12-31' });
+  });
+});
+
+describe('expense input-VAT posting (Phase 0 money dimensions)', () => {
+  const expenseReader = (expense: Record<string, unknown>) => {
+    const b: Record<string, unknown> = {
+      select: vi.fn(() => b),
+      eq: vi.fn(() => b),
+      maybeSingle: vi.fn().mockResolvedValue({ data: expense, error: null }),
+    };
+    return b;
+  };
+  const approveUpdate = () => {
+    const b: Record<string, unknown> = {
+      update: vi.fn(() => b),
+      eq: vi.fn(() => b),
+      select: vi.fn(() => b),
+      maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'e1', status: 'approved' }, error: null }),
+    };
+    return b;
+  };
+  const vatInsert = (captured: { payload?: Record<string, unknown> }, error: unknown = null) => ({
+    insert: vi.fn((rows: Array<Record<string, unknown>>) => {
+      captured.payload = rows[0];
+      return Promise.resolve({ error });
+    }),
+  });
+  const pendingExpense = {
+    amount: 100, description: 'x', currency: 'EUR', exchange_rate: 0.41, rate_source: 'manual',
+    amount_base: 41, status: 'pending', created_by: 'u-creator', expense_date: '2026-06-15',
+    tax_amount: 5, tax_amount_base: 2.05,
+  };
+
+  it('posts purchase VAT with currency, frozen rate and base amounts', async () => {
+    vi.mocked(getBaseCurrency).mockResolvedValue('OMR');
+    vi.mocked(getCurrencyDecimals).mockResolvedValue(3);
+    const captured: { payload?: Record<string, unknown> } = {};
+    from
+      .mockReturnValueOnce(expenseReader({ ...pendingExpense }))
+      .mockReturnValueOnce(approveUpdate())
+      .mockReturnValueOnce(vatInsert(captured));
+
+    await approveExpense('e1', 'u-approver');
+
+    expect(captured.payload).toMatchObject({
+      record_type: 'purchase', record_id: 'e1', currency: 'EUR', exchange_rate: 0.41,
+      vat_amount: 5,
+      vat_amount_base: 2.05,     // roundMoney(5 * 0.41, 3)
+      taxable_amount_base: 41,   // roundMoney(100 * 0.41, 3)
+    });
+  });
+
+  it('THROWS when the vat_records insert fails (no more silent input-VAT loss)', async () => {
+    vi.mocked(getBaseCurrency).mockResolvedValue('OMR');
+    vi.mocked(getCurrencyDecimals).mockResolvedValue(3);
+    const captured: { payload?: Record<string, unknown> } = {};
+    from
+      .mockReturnValueOnce(expenseReader({ ...pendingExpense }))
+      .mockReturnValueOnce(approveUpdate())
+      .mockReturnValueOnce(vatInsert(captured, { message: 'boom' }));
+
+    await expect(approveExpense('e1', 'u-approver')).rejects.toMatchObject({ message: 'boom' });
   });
 });

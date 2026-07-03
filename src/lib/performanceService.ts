@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import type { Database } from '../types/database.types';
+import { currentTenantToday } from './tenantToday';
 
 type PerformanceReview = Database['public']['Tables']['performance_reviews']['Row'];
 type PerformanceReviewInsert = Database['public']['Tables']['performance_reviews']['Insert'];
@@ -108,7 +109,7 @@ export async function deleteReview(id: string) {
 export async function submitReview(id: string) {
   return updateReview(id, {
     status: 'submitted',
-    review_date: new Date().toISOString().split('T')[0],
+    review_date: await currentTenantToday(),
   });
 }
 

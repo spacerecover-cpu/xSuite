@@ -4,10 +4,11 @@ import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
-import { formatDate } from '../../lib/format';
+import { formatDate, formatTaxRatePercent } from '../../lib/format';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useConfirm } from '../../hooks/useConfirm';
-import { useTaxConfig } from '../../contexts/TenantConfigContext';
+import { useTaxConfig, useDateTimeConfig } from '../../contexts/TenantConfigContext';
+import { tenantToday, addMonthsIso } from '../../lib/tenantToday';
 import { Input } from '../../components/ui/Input';
 import { VATReturnModal } from '../../components/financial/VATReturnModal';
 import { KpiRow } from '../../components/templates/KpiRow';
@@ -72,6 +73,7 @@ export const VATAuditPage: React.FC = () => {
   const { formatCurrency } = useCurrency();
   const confirm = useConfirm();
   const taxConfig = useTaxConfig();
+  const { timezone } = useDateTimeConfig();
   const [activeTab, setActiveTab] = useState<'vat' | 'audit'>('vat');
   const [searchTerm, setSearchTerm] = useState('');
   const [recordTypeFilter, setRecordTypeFilter] = useState<string>('all');
@@ -80,22 +82,13 @@ export const VATAuditPage: React.FC = () => {
 
   const getDateFromFilter = () => {
     if (dateRange === 'all') return undefined;
-    const now = new Date();
-    let startDate: Date;
+    const today = tenantToday(timezone);
     switch (dateRange) {
-      case 'month':
-        startDate = new Date(now.setMonth(now.getMonth() - 1));
-        break;
-      case 'quarter':
-        startDate = new Date(now.setMonth(now.getMonth() - 3));
-        break;
-      case 'year':
-        startDate = new Date(now.setFullYear(now.getFullYear() - 1));
-        break;
-      default:
-        return undefined;
+      case 'month':   return addMonthsIso(today, -1);
+      case 'quarter': return addMonthsIso(today, -3);
+      case 'year':    return addMonthsIso(today, -12);
+      default:        return undefined;
     }
-    return startDate.toISOString().split('T')[0];
   };
 
   const { data: vatRecords = [], isLoading: vatLoading } = useQuery({
@@ -288,7 +281,7 @@ export const VATAuditPage: React.FC = () => {
                   {
                     tone: 'neutral',
                     label: 'Tax Rate',
-                    value: `${(taxConfig.defaultRate * 100).toFixed(2)}%`,
+                    value: formatTaxRatePercent(taxConfig.defaultRate),
                     sub: taxConfig.label || 'VAT',
                     icon: FileCheck,
                   },
@@ -465,7 +458,7 @@ export const VATAuditPage: React.FC = () => {
                               {formatCurrency(record.vat_amount)}
                             </td>
                             <td className="py-3 px-4 text-center text-sm text-slate-600">
-                              {(record.vat_rate * 100).toFixed(2)}%
+                              {formatTaxRatePercent(record.vat_rate)}
                             </td>
                             <td className="py-3 px-4 text-sm text-slate-600">
                               {record.tax_period || '-'}

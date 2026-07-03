@@ -31,6 +31,7 @@ export interface TaxConfig {
   numberLabel: string;
   numberFormat: string | null;
   numberPlaceholder: string | null;
+  /** PERCENT convention: 5 = 5% (never a fraction 0.05). Divide by 100 only inside money math. */
   defaultRate: number;
   invoiceRequired: boolean;
 }

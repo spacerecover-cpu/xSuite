@@ -7,7 +7,8 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { supabase } from '../../lib/supabaseClient';
 import { useCurrency } from '../../hooks/useCurrency';
-import { useTaxConfig } from '../../contexts/TenantConfigContext';
+import { useTaxConfig, useDateTimeConfig } from '../../contexts/TenantConfigContext';
+import { tenantToday, addDaysIso } from '../../lib/tenantToday';
 import { resolveDefaultRate, resolveTaxLabel } from './taxFieldConfig';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
@@ -79,6 +80,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
 }) => {
   const { currencyFormat } = useCurrency();
   const taxConfig = useTaxConfig();
+  const { timezone } = useDateTimeConfig();
   const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
@@ -91,9 +93,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
 
   // Calculate default valid_until date (30 days from now)
   const getDefaultValidUntil = () => {
-    const date = new Date();
-    date.setDate(date.getDate() + 30);
-    return date.toISOString().split('T')[0];
+    return addDaysIso(tenantToday(timezone), 30);
   };
 
   interface QuoteFormState {

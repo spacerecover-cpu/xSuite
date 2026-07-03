@@ -11,6 +11,7 @@ import {
   formatCurrencyWithConfig,
   renderCurrencyToken,
   toDateInputValue,
+  formatTaxRatePercent,
 } from './format';
 import type { CurrencyConfig } from '../types/tenantConfig';
 import { REQUIRED_SENTINEL } from '../types/tenantConfig';
@@ -266,5 +267,17 @@ describe('toDateInputValue (timestamptz -> yyyy-MM-dd for <input type="date">)',
 
   it('returns empty string for an unparseable value rather than throwing', () => {
     expect(toDateInputValue('not-a-date')).toBe('');
+  });
+});
+
+describe('formatTaxRatePercent', () => {
+  it('renders stored-percent rates directly — 5 means 5%, never 500%', () => {
+    expect(formatTaxRatePercent(5)).toBe('5.00%');
+    expect(formatTaxRatePercent(20)).toBe('20.00%');
+    expect(formatTaxRatePercent(8.875)).toBe('8.88%');
+  });
+  it('treats null/undefined as 0', () => {
+    expect(formatTaxRatePercent(null)).toBe('0.00%');
+    expect(formatTaxRatePercent(undefined)).toBe('0.00%');
   });
 });

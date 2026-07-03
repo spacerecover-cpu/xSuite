@@ -5,6 +5,8 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Wallet, Banknote } from 'lucide-react';
 import { bankingService } from '../../lib/bankingService';
+import { useDateTimeConfig } from '../../contexts/TenantConfigContext';
+import { tenantToday } from '../../lib/tenantToday';
 
 export interface ExpensePaymentTarget {
   id: string;
@@ -35,8 +37,9 @@ export const ExpensePaymentModal: React.FC<ExpensePaymentModalProps> = ({
   onConfirm,
   isSubmitting = false,
 }) => {
+  const { timezone } = useDateTimeConfig();
   const [bankAccountId, setBankAccountId] = useState('');
-  const [paidAt, setPaidAt] = useState(new Date().toISOString().split('T')[0]);
+  const [paidAt, setPaidAt] = useState(() => tenantToday(timezone));
   const [reference, setReference] = useState('');
 
   const expenseCurrency = expense?.currency ?? 'USD';
@@ -57,7 +60,7 @@ export const ExpensePaymentModal: React.FC<ExpensePaymentModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setBankAccountId('');
-      setPaidAt(new Date().toISOString().split('T')[0]);
+      setPaidAt(tenantToday(timezone));
       setReference('');
     }
   }, [isOpen, expense?.id]);

@@ -207,6 +207,14 @@ export const formatPercent = (value: number): string => {
   return `${formatNumber(value * 100, 2)}%`;
 };
 
+/**
+ * Tax rates are stored as PERCENT platform-wide (5 = 5%, 20 = 20%) — proven by the
+ * live geo values (OM default_tax_rate 5.00, GB 20.00) and the registry max(100).
+ * NEVER multiply by 100 before rendering; that is the '500.00%' compliance-page bug.
+ */
+export const formatTaxRatePercent = (rate: number | null | undefined): string =>
+  `${Number(rate ?? 0).toFixed(2)}%`;
+
 export const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;

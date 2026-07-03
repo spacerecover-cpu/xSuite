@@ -9,6 +9,10 @@ export interface VATRecord {
   tax_period?: string | null;
   created_at?: string;
   deleted_at?: string | null;
+  vat_amount_base?: number | null;
+  taxable_amount_base?: number | null;
+  currency?: string | null;
+  exchange_rate?: number | null;
 }
 
 export interface VATReturn {
@@ -109,7 +113,7 @@ export const calculateVATForPeriod = async (
   const endMonth = periodEnd.slice(0, 7);
   const { data: records, error } = await supabase
     .from('vat_records')
-    .select('record_type, vat_amount, tax_period, created_at')
+    .select('record_type, vat_amount, vat_amount_base, tax_period, created_at')
     .is('deleted_at', null)
     .or(
       `and(tax_period.gte.${startMonth},tax_period.lte.${endMonth}),` +
@@ -121,8 +125,8 @@ export const calculateVATForPeriod = async (
   const sales = records?.filter(r => r.record_type === 'sale') || [];
   const purchases = records?.filter(r => r.record_type === 'purchase') || [];
 
-  const totalOutputVAT = sales.reduce((sum, r) => sum + (r.vat_amount || 0), 0);
-  const totalInputVAT = purchases.reduce((sum, r) => sum + (r.vat_amount || 0), 0);
+  const totalOutputVAT = sales.reduce((sum, r) => sum + (r.vat_amount_base ?? r.vat_amount ?? 0), 0);
+  const totalInputVAT = purchases.reduce((sum, r) => sum + (r.vat_amount_base ?? r.vat_amount ?? 0), 0);
   const netVAT = totalOutputVAT - totalInputVAT;
 
   return {

@@ -13,6 +13,7 @@ import { deriveInvoiceStatus } from './invoiceStatus';
 import { getInvoiceEditability, RESTRICTED_EDITABLE_FIELDS } from './invoicePermissions';
 import { toDateInputValue } from './format';
 import { getTenantConfig } from './tenantConfigService';
+import { currentTenantToday } from './tenantToday';
 
 type InvoiceInsert = Database['public']['Tables']['invoices']['Insert'];
 type InvoiceUpdate = Database['public']['Tables']['invoices']['Update'];
@@ -826,7 +827,7 @@ export const convertQuoteToInvoice = async (
     customer_id: quote.customer_id,
     company_id: quote.company_id,
     invoice_type: invoiceType,
-    invoice_date: new Date().toISOString().split('T')[0],
+    invoice_date: await currentTenantToday(),
     due_date: dueDate,
     status: 'draft',
     discount_amount: quote.discount_amount ?? 0,

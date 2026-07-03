@@ -3,6 +3,8 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Receipt, Calendar, FileText, DollarSign } from 'lucide-react';
+import { useDateTimeConfig } from '../../contexts/TenantConfigContext';
+import { tenantToday, addDaysIso } from '../../lib/tenantToday';
 
 interface ConvertToInvoiceModalProps {
   isOpen: boolean;
@@ -29,10 +31,10 @@ export const ConvertToInvoiceModal: React.FC<ConvertToInvoiceModalProps> = ({
   quote,
   isConverting = false,
 }) => {
+  const { timezone } = useDateTimeConfig();
+
   const getDefaultDueDate = () => {
-    const date = new Date();
-    date.setDate(date.getDate() + 30);
-    return date.toISOString().split('T')[0];
+    return addDaysIso(tenantToday(timezone), 30);
   };
 
   const [invoiceType, setInvoiceType] = useState<'proforma' | 'tax_invoice'>('proforma');

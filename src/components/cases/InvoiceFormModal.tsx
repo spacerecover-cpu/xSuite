@@ -7,7 +7,8 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { supabase } from '../../lib/supabaseClient';
 import { useCurrency } from '../../hooks/useCurrency';
-import { useTaxConfig } from '../../contexts/TenantConfigContext';
+import { useTaxConfig, useDateTimeConfig } from '../../contexts/TenantConfigContext';
+import { tenantToday } from '../../lib/tenantToday';
 import { resolveDefaultRate, resolveTaxLabel } from './taxFieldConfig';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
@@ -105,6 +106,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
 }) => {
   const { currencyFormat } = useCurrency();
   const taxConfig = useTaxConfig();
+  const { timezone } = useDateTimeConfig();
   const toast = useToast();
   const caseSelectId = useId();
   const statusId = useId();
@@ -124,8 +126,8 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
   const [invoiceData, setInvoiceData] = useState({
     invoice_type: initialData?.invoice_type || 'tax_invoice',
     title: initialData?.title || '',
-    invoice_date: initialData?.invoice_date || new Date().toISOString().split('T')[0],
-    due_date: initialData?.due_date || new Date().toISOString().split('T')[0],
+    invoice_date: initialData?.invoice_date || tenantToday(timezone),
+    due_date: initialData?.due_date || tenantToday(timezone),
     status: initialData?.status || 'draft',
     terms_and_conditions: initialData?.terms_and_conditions || '',
     notes: initialData?.notes || '',
@@ -195,8 +197,8 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
       setInvoiceData({
         invoice_type: initialData.invoice_type || 'tax_invoice',
         title: initialData.title || '',
-        invoice_date: initialData.invoice_date || new Date().toISOString().split('T')[0],
-        due_date: initialData.due_date || new Date().toISOString().split('T')[0],
+        invoice_date: initialData.invoice_date || tenantToday(timezone),
+        due_date: initialData.due_date || tenantToday(timezone),
         status: initialData.status || 'draft',
         terms_and_conditions: initialData.terms_and_conditions || '',
         notes: initialData.notes || '',

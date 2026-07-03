@@ -3,6 +3,7 @@ import type { Database, Json } from '../types/database.types';
 import { resolveRateContext } from './currencyService';
 import { buildPayrollBaseColumns } from './payrollBase';
 import { baseAmount } from './financialMath';
+import { currentTenantToday } from './tenantToday';
 
 type PayrollPeriod = Database['public']['Tables']['payroll_periods']['Row'];
 type PayrollPeriodInsert = Database['public']['Tables']['payroll_periods']['Insert'];
@@ -731,7 +732,7 @@ export const payrollService = {
         remaining_amount: newRemainingAmount,
         paid_installments: newPaidInstallments,
         status: isCompleted ? 'completed' : loan.status,
-        end_date: isCompleted ? new Date().toISOString().split('T')[0] : loan.end_date,
+        end_date: isCompleted ? await currentTenantToday() : loan.end_date,
       })
       .eq('id', repayment.loan_id);
 

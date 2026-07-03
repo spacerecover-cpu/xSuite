@@ -7021,6 +7021,7 @@ export type Database = {
           decimal_places: number
           decimal_separator: string
           default_tax_rate: number
+          deleted_at: string | null
           digit_grouping: string
           fiscal_year_start: string
           id: string
@@ -7071,6 +7072,7 @@ export type Database = {
           decimal_places?: number
           decimal_separator?: string
           default_tax_rate?: number
+          deleted_at?: string | null
           digit_grouping?: string
           fiscal_year_start?: string
           id?: string
@@ -7121,6 +7123,7 @@ export type Database = {
           decimal_places?: number
           decimal_separator?: string
           default_tax_rate?: number
+          deleted_at?: string | null
           digit_grouping?: string
           fiscal_year_start?: string
           id?: string
@@ -16070,22 +16073,22 @@ export type Database = {
           country_config_version?: number | null
           country_id?: string | null
           created_at?: string
-          currency_code?: string
-          currency_symbol?: string
+          currency_code: string
+          currency_symbol: string
           current_period_end?: string | null
           current_period_start?: string | null
           data_residency_region?: string
-          date_format?: string
-          decimal_places?: number
-          default_tax_rate?: number
+          date_format: string
+          decimal_places: number
+          default_tax_rate: number
           deleted_at?: string | null
           domain?: string | null
           feature_flags?: Json
           features?: Json
-          fiscal_year_start?: string
+          fiscal_year_start: string
           id?: string
           limits?: Json
-          locale_code?: string
+          locale_code: string
           metadata?: Json
           name: string
           paypal_customer_id?: string | null
@@ -16097,15 +16100,15 @@ export type Database = {
           slug: string
           status?: string
           subscription_status?: string | null
-          tax_label?: string
+          tax_label: string
           tax_number?: string | null
-          tax_number_label?: string
-          tax_system?: string
+          tax_number_label: string
+          tax_system: string
           tenant_code?: string | null
           theme?: string
-          timezone?: string
+          timezone: string
           trial_ends_at?: string | null
-          ui_language?: string
+          ui_language: string
           updated_at?: string
         }
         Update: {
@@ -16642,38 +16645,50 @@ export type Database = {
       vat_records: {
         Row: {
           created_at: string
+          currency: string | null
           deleted_at: string | null
+          exchange_rate: number | null
           id: string
           record_id: string
           record_type: string
           tax_period: string | null
+          taxable_amount_base: number | null
           tenant_id: string
           updated_at: string
           vat_amount: number
+          vat_amount_base: number | null
           vat_rate: number
         }
         Insert: {
           created_at?: string
+          currency?: string | null
           deleted_at?: string | null
+          exchange_rate?: number | null
           id?: string
           record_id: string
           record_type: string
           tax_period?: string | null
+          taxable_amount_base?: number | null
           tenant_id: string
           updated_at?: string
           vat_amount: number
+          vat_amount_base?: number | null
           vat_rate: number
         }
         Update: {
           created_at?: string
+          currency?: string | null
           deleted_at?: string | null
+          exchange_rate?: number | null
           id?: string
           record_id?: string
           record_type?: string
           tax_period?: string | null
+          taxable_amount_base?: number | null
           tenant_id?: string
           updated_at?: string
           vat_amount?: number
+          vat_amount_base?: number | null
           vat_rate?: number
         }
         Relationships: [

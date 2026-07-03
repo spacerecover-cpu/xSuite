@@ -20,6 +20,8 @@ import {
 import { logger } from '../../lib/logger';
 import { useToast } from '../../hooks/useToast';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useDateTimeConfig } from '../../contexts/TenantConfigContext';
+import { tenantToday } from '../../lib/tenantToday';
 
 interface ExpenseFormModalProps {
   isOpen: boolean;
@@ -38,8 +40,9 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
 }) => {
   const toast = useToast();
   const { currencyFormat } = useCurrency();
+  const { timezone } = useDateTimeConfig();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
+  const [expenseDate, setExpenseDate] = useState(() => tenantToday(timezone));
   const [amount, setAmount] = useState<number>(0);
   const [description, setDescription] = useState('');
   const [vendorName, setVendorName] = useState('');
@@ -100,7 +103,7 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
       setExpenseDate(
         initialData.expense_date
           ? initialData.expense_date.slice(0, 10)
-          : new Date().toISOString().split('T')[0],
+          : tenantToday(timezone),
       );
       setAmount(initialData.amount || 0);
       setDescription(initialData.description || '');
@@ -118,7 +121,7 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
   }, [initialData, preselectedCaseId, currencyFormat.currencyCode]);
 
   const resetForm = () => {
-    setExpenseDate(new Date().toISOString().split('T')[0]);
+    setExpenseDate(tenantToday(timezone));
     setAmount(0);
     setDescription('');
     setVendorName('');
