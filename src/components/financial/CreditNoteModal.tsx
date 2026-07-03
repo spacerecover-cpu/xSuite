@@ -6,6 +6,7 @@ import { useCurrency } from '../../hooks/useCurrency';
 import { useToast } from '../../hooks/useToast';
 import { issueCreditNote, applyCreditNote } from '../../lib/creditNoteService';
 import { logger } from '../../lib/logger';
+import { allocateLargestRemainder } from '../../lib/financialMath';
 import { FileMinus, AlertTriangle, CheckCircle } from 'lucide-react';
 
 interface CreditNoteModalProps {
@@ -38,6 +39,16 @@ const REASON_OPTIONS: { value: string; label: string }[] = [
 
 const num = (v: number | null | undefined) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
+/** Reverse the invoice's VAT in proportion to the credited share, using the
+ *  sanctioned splitter so the credited + remaining VAT sum exactly to the
+ *  invoice VAT (no ad-hoc proration — xsuite/no-adhoc-money-allocation). */
+export function proratedVat(creditAmount: number, invoiceTax: number, invoiceTotal: number, decimals: number): number {
+  if (invoiceTotal <= 0 || invoiceTax === 0) return 0;
+  const remaining = invoiceTotal - creditAmount;
+  const [creditedShare] = allocateLargestRemainder(invoiceTax, [creditAmount, Math.max(0, remaining)], decimals);
+  return creditedShare;
+}
+
 export const CreditNoteModal: React.FC<CreditNoteModalProps> = ({ isOpen, onClose, invoice, onSaved }) => {
   const { formatCurrency, currencyFormat } = useCurrency();
   const toast = useToast();
@@ -58,7 +69,7 @@ export const CreditNoteModal: React.FC<CreditNoteModalProps> = ({ isOpen, onClos
       : Math.max(0, total - num(invoice.amount_paid) - num(invoice.credited_amount)),
   );
   // Reverse the invoice's VAT in proportion to the credited share of the total.
-  const taxAmount = total > 0 ? roundMoney((amount * num(invoice.tax_amount)) / total) : 0;
+  const taxAmount = proratedVat(amount, num(invoice.tax_amount), total, currencyFormat.decimalPlaces);
   const balanceAfter = roundMoney(balance - amount);
   const exceedsBalance = amount > balance + 1e-9;
   const settlesInFull = !exceedsBalance && amount > 0 && balanceAfter <= 0;
