@@ -690,14 +690,6 @@ export const LeaveManagement: React.FC = () => {
         actions={
           <>
             <Button
-              onClick={() => { invalidateAll(); }}
-              variant="secondary"
-              size="sm"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
-            <Button
               onClick={() => setShowRequestModal(true)}
               size="sm"
               className="bg-primary hover:bg-primary/90 text-primary-foreground focus:ring-primary"

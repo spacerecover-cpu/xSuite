@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { fetchQuotesPage, getQuoteStats, toQuoteEditInitialData, createQuote as createQuoteService } from '../../lib/quotesService';
+import { fetchQuotesPage, getQuoteStats, toQuoteEditInitialData, createQuote as createQuoteService, updateQuoteStatus } from '../../lib/quotesService';
 import type { QuoteWithDetails, Quote as QuoteShape, QuoteItem as QuoteItemShape } from '../../lib/quotesService';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -117,7 +117,7 @@ export const QuotesListPage: React.FC = () => {
     retry: 2,
   });
 
-  const { data: quotesPage, isLoading, error: quotesError } = useQuery({
+  const { data: quotesPage, isLoading, error: quotesError, refetch: refetchQuotes } = useQuery({
     queryKey: ['quotes', statusFilter, debouncedSearch, page, pageSize],
     queryFn: () =>
       fetchQuotesPage({
@@ -265,7 +265,7 @@ export const QuotesListPage: React.FC = () => {
             <p className="text-lg font-semibold">Error Loading Quotes</p>
             <p className="text-sm text-slate-600 mt-2">{(quotesError as Error)?.message || 'Failed to load quotes'}</p>
           </div>
-          <Button onClick={() => window.location.reload()} className="mt-4">
+          <Button onClick={() => refetchQuotes()} className="mt-4">
             Retry
           </Button>
         </div>
@@ -640,14 +640,7 @@ export const QuotesListPage: React.FC = () => {
                               if (!ok) return;
                               try {
                                 setSendingQuoteId(quoteId);
-                                const { error } = await supabase
-                                  .from('quotes')
-                                  .update({
-                                    status: 'sent',
-                                  })
-                                  .eq('id', quoteId);
-
-                                if (error) throw error;
+                                await updateQuoteStatus(quoteId, 'sent');
 
                                 queryClient.invalidateQueries({ queryKey: ['quotes'] });
                                 queryClient.invalidateQueries({ queryKey: ['quote_stats'] });

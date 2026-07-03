@@ -363,13 +363,6 @@ export const CasesList: React.FC = () => {
     refetch();
   };
 
-  const handleRefresh = () => {
-    setPendingChanges(0);
-    refetch();
-    queryClient.invalidateQueries({ queryKey: ['cases_count'] });
-    queryClient.invalidateQueries({ queryKey: [CASE_COMMAND_STATS_KEY] });
-  };
-
   const totalPages = Math.ceil((totalCountData || 0) / casesPerPage);
   const startIndex = (currentPage - 1) * casesPerPage + 1;
   const endIndex = Math.min(currentPage * casesPerPage, totalCountData || 0);
@@ -592,7 +585,7 @@ export const CasesList: React.FC = () => {
       selection.clear();
       refetch();
       queryClient.invalidateQueries({ queryKey: ['cases_count'] });
-      queryClient.invalidateQueries({ queryKey: ['cases_stats'] });
+      queryClient.invalidateQueries({ queryKey: [CASE_COMMAND_STATS_KEY] });
     } catch (err) {
       toast.error((err as Error).message || 'Failed to archive cases');
     } finally {
@@ -626,15 +619,6 @@ export const CasesList: React.FC = () => {
         }
         actions={
           <>
-            <Button
-              onClick={handleRefresh}
-              variant="secondary"
-              disabled={isFetching}
-              title="Refresh cases list"
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
-              {isFetching ? 'Refreshing...' : 'Refresh'}
-            </Button>
             <Button onClick={handleCreateCase}>
               <Plus className="w-4 h-4 mr-2" />
               Create Case

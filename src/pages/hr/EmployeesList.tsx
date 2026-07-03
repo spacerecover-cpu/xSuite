@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Search, Users, RefreshCw } from 'lucide-react';
+import { Plus, Search, Users } from 'lucide-react';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { useListPageSize } from '../../hooks/useListPageSize';
@@ -23,7 +23,6 @@ type StatusFilter = 'all' | 'active' | 'on_leave';
 
 export const EmployeesList: React.FC = () => {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -92,11 +91,6 @@ export const EmployeesList: React.FC = () => {
       };
     },
   });
-
-  const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['employees'] });
-    queryClient.invalidateQueries({ queryKey: ['employee_stats'] });
-  };
 
   const toolbar = (
     <div className="bg-white rounded-2xl shadow-lg border border-slate-200 mb-6">
@@ -199,15 +193,6 @@ export const EmployeesList: React.FC = () => {
       title="Employees"
       headerActions={
         <div className="flex gap-2">
-          <Button
-            onClick={handleRefresh}
-            variant="secondary"
-            disabled={loading}
-            title="Refresh employees list"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            {loading ? 'Refreshing...' : 'Refresh'}
-          </Button>
           <Button>
             <Plus className="w-4 h-4 mr-2" />
             Add Employee

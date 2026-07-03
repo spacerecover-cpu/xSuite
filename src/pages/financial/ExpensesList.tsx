@@ -569,16 +569,6 @@ export const ExpensesList: React.FC = () => {
                   </button>
                 ))}
               </div>
-
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => refetch()}
-                className="flex items-center gap-2 flex-shrink-0"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Refresh
-              </Button>
             </div>
           </div>
         </div>
