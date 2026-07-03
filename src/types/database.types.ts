@@ -4068,6 +4068,8 @@ export type Database = {
       companies: {
         Row: {
           address: string | null
+          address_line1: string | null
+          address_line2: string | null
           city_id: string | null
           company_name: string | null
           company_number: string | null
@@ -4087,7 +4089,9 @@ export type Database = {
           name: string
           notes: string | null
           phone: string | null
+          postal_code: string | null
           registration_number: string | null
+          subdivision_id: string | null
           tax_number: string | null
           tenant_id: string
           updated_at: string
@@ -4096,6 +4100,8 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
           city_id?: string | null
           company_name?: string | null
           company_number?: string | null
@@ -4115,7 +4121,9 @@ export type Database = {
           name: string
           notes?: string | null
           phone?: string | null
+          postal_code?: string | null
           registration_number?: string | null
+          subdivision_id?: string | null
           tax_number?: string | null
           tenant_id: string
           updated_at?: string
@@ -4124,6 +4132,8 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
           city_id?: string | null
           company_name?: string | null
           company_number?: string | null
@@ -4143,7 +4153,9 @@ export type Database = {
           name?: string
           notes?: string | null
           phone?: string | null
+          postal_code?: string | null
           registration_number?: string | null
+          subdivision_id?: string | null
           tax_number?: string | null
           tenant_id?: string
           updated_at?: string
@@ -4170,6 +4182,13 @@ export type Database = {
             columns: ["industry_id"]
             isOneToOne: false
             referencedRelation: "master_industries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companies_subdivision_id_fkey"
+            columns: ["subdivision_id"]
+            isOneToOne: false
+            referencedRelation: "geo_subdivisions"
             referencedColumns: ["id"]
           },
           {
@@ -4928,6 +4947,8 @@ export type Database = {
       customers_enhanced: {
         Row: {
           address: string | null
+          address_line1: string | null
+          address_line2: string | null
           city_id: string | null
           company_name: string | null
           country_id: string | null
@@ -4952,10 +4973,12 @@ export type Database = {
           portal_last_login: string | null
           portal_locked_until: string | null
           portal_password_hash: string | null
+          postal_code: string | null
           preferred_language: string | null
           profile_photo_url: string | null
           referred_by: string | null
           source: string | null
+          subdivision_id: string | null
           tax_number: string | null
           tenant_id: string
           total_cases: number | null
@@ -4966,6 +4989,8 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
           city_id?: string | null
           company_name?: string | null
           country_id?: string | null
@@ -4990,10 +5015,12 @@ export type Database = {
           portal_last_login?: string | null
           portal_locked_until?: string | null
           portal_password_hash?: string | null
+          postal_code?: string | null
           preferred_language?: string | null
           profile_photo_url?: string | null
           referred_by?: string | null
           source?: string | null
+          subdivision_id?: string | null
           tax_number?: string | null
           tenant_id: string
           total_cases?: number | null
@@ -5004,6 +5031,8 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
           city_id?: string | null
           company_name?: string | null
           country_id?: string | null
@@ -5028,10 +5057,12 @@ export type Database = {
           portal_last_login?: string | null
           portal_locked_until?: string | null
           portal_password_hash?: string | null
+          postal_code?: string | null
           preferred_language?: string | null
           profile_photo_url?: string | null
           referred_by?: string | null
           source?: string | null
+          subdivision_id?: string | null
           tax_number?: string | null
           tenant_id?: string
           total_cases?: number | null
@@ -5067,6 +5098,13 @@ export type Database = {
             columns: ["industry_id"]
             isOneToOne: false
             referencedRelation: "master_industries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_enhanced_subdivision_id_fkey"
+            columns: ["subdivision_id"]
+            isOneToOne: false
+            referencedRelation: "geo_subdivisions"
             referencedColumns: ["id"]
           },
           {
@@ -15817,6 +15855,8 @@ export type Database = {
       suppliers: {
         Row: {
           address: string | null
+          address_line1: string | null
+          address_line2: string | null
           bank_account: string | null
           bank_branch: string | null
           bank_name: string | null
@@ -15838,8 +15878,10 @@ export type Database = {
           outstanding_balance: number | null
           payment_terms_id: string | null
           phone: string | null
+          postal_code: string | null
           rating: number | null
           registration_number: string | null
+          subdivision_id: string | null
           supplier_number: string | null
           tax_number: string | null
           tenant_id: string
@@ -15849,6 +15891,8 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
           bank_account?: string | null
           bank_branch?: string | null
           bank_name?: string | null
@@ -15870,8 +15914,10 @@ export type Database = {
           outstanding_balance?: number | null
           payment_terms_id?: string | null
           phone?: string | null
+          postal_code?: string | null
           rating?: number | null
           registration_number?: string | null
+          subdivision_id?: string | null
           supplier_number?: string | null
           tax_number?: string | null
           tenant_id: string
@@ -15881,6 +15927,8 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
           bank_account?: string | null
           bank_branch?: string | null
           bank_name?: string | null
@@ -15902,8 +15950,10 @@ export type Database = {
           outstanding_balance?: number | null
           payment_terms_id?: string | null
           phone?: string | null
+          postal_code?: string | null
           rating?: number | null
           registration_number?: string | null
+          subdivision_id?: string | null
           supplier_number?: string | null
           tax_number?: string | null
           tenant_id?: string
@@ -15938,6 +15988,13 @@ export type Database = {
             columns: ["payment_terms_id"]
             isOneToOne: false
             referencedRelation: "master_supplier_payment_terms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "suppliers_subdivision_id_fkey"
+            columns: ["subdivision_id"]
+            isOneToOne: false
+            referencedRelation: "geo_subdivisions"
             referencedColumns: ["id"]
           },
           {
