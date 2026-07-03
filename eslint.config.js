@@ -13,6 +13,8 @@
   import noHardcodedLocaleFormat from './eslint-rules/no-hardcoded-locale-format.js';
   import noGrayPalette from './eslint-rules/no-gray-palette.js';
   import noArbitraryTypography from './eslint-rules/no-arbitrary-typography.js';
+  import noCountryBranchingOutsideRegimes from './eslint-rules/no-country-branching-outside-regimes.js';
+  import noAdhocMoneyAllocation from './eslint-rules/no-adhoc-money-allocation.js';
 
   // Hoisted so the main config and the fixed-surface override below share one
   // identical xsuite plugin object (flat config resolves plugin rules per block).
@@ -27,6 +29,8 @@
       'no-hardcoded-locale-format': noHardcodedLocaleFormat,
       'no-gray-palette': noGrayPalette,
       'no-arbitrary-typography': noArbitraryTypography,
+      'no-country-branching-outside-regimes': noCountryBranchingOutsideRegimes,
+      'no-adhoc-money-allocation': noAdhocMoneyAllocation,
     },
   };
 
@@ -109,6 +113,13 @@
         // the rule). Pre-existing offenders are baselined OFF per-file below
         // and ratchet down via the typography standardization program.
         'xsuite/no-arbitrary-typography': 'error',
+        // Phase-1 fiscal-kernel non-negotiables (localization plan Task 23):
+        // statutory country branching (`countryCode === 'XX'`) belongs in a
+        // regime plugin under src/lib/regimes/** (exempted below), never inline;
+        // and document-amount splits must use allocateLargestRemainder so parts
+        // sum exactly to the whole (no ad-hoc `(a*b)/c` proration).
+        'xsuite/no-country-branching-outside-regimes': 'error',
+        'xsuite/no-adhoc-money-allocation': 'error',
         '@typescript-eslint/no-unused-vars': ['error', {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
@@ -176,5 +187,13 @@
       ],
       plugins: { 'xsuite': xsuitePlugin },
       rules: { 'xsuite/no-untranslated-jsx-text': 'error' },
+    },
+    {
+      // Regime plugins are the ONE sanctioned home for statutory country
+      // branching — the rule exempts them so each regime can key off its own
+      // ISO country code while every other surface stays data-driven.
+      files: ['src/lib/regimes/**'],
+      plugins: { 'xsuite': xsuitePlugin },
+      rules: { 'xsuite/no-country-branching-outside-regimes': 'off' },
     }
   );
