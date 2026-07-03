@@ -23,7 +23,8 @@
     "check:signup-smoke": "vitest run --config vitest.config.scripts.ts scripts/country-engine/signup-smoke.test.ts",
     "check:provisioning-ghost-scalars": "vitest run --config vitest.config.scripts.ts scripts/country-engine/provisioning-ghost-scalars.test.ts",
     "check:vat-contra-reversal": "vitest run --config vitest.config.scripts.ts scripts/financial/vat-contra-reversal.test.ts",
-    "check:parity-replay": "vitest run --config vitest.config.scripts.ts scripts/localization/parity-replay.test.ts"
+    "check:parity-replay": "vitest run --config vitest.config.scripts.ts scripts/localization/parity-replay.test.ts",
+    "check:bypass-suite": "vitest run --config vitest.config.scripts.ts scripts/localization/bypass-suite.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
