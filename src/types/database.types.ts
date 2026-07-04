@@ -19106,6 +19106,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      refresh_pack_staleness: { Args: never; Returns: undefined }
       reject_quote: {
         Args: { p_quote_id: string; p_reason?: string }
         Returns: undefined
