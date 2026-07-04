@@ -56,6 +56,9 @@ const resources = {
         zoomOut: 'Zoom out',
         zoomIn: 'Zoom in',
         cropFailed: 'Could not crop the image. Please try again.',
+        addressLine1: 'Address line 1',
+        addressLine2: 'Address line 2',
+        stateRegion: 'State / Region',
         chipInput: {
           placeholder: 'Enter email and press Enter',
           invalidEmail: 'Please enter a valid email address',
@@ -586,6 +589,9 @@ const resources = {
         zoomOut: 'تصغير',
         zoomIn: 'تكبير',
         cropFailed: 'تعذّر اقتصاص الصورة. حاول مرة أخرى.',
+        addressLine1: 'العنوان (السطر الأول)',
+        addressLine2: 'العنوان (السطر الثاني)',
+        stateRegion: 'المحافظة / المنطقة',
         chipInput: {
           placeholder: 'أدخل البريد الإلكتروني واضغط Enter',
           invalidEmail: 'يرجى إدخال عنوان بريد إلكتروني صالح',
