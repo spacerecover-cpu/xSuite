@@ -1,6 +1,6 @@
 import React, { useId, useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Minus, Plus, Trash2, ShoppingCart } from 'lucide-react';
+import { Search, Minus, Plus, Trash2, ShoppingCart, AlertCircle } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -17,6 +17,9 @@ import {
   type StockSaleCreateData,
   type StockSerialNumber,
 } from '../../lib/stockService';
+import { computeStockSaleTax } from '../../lib/tax/assembleStockSaleContext';
+import type { TaxComputation, TaxableLine } from '../../lib/regimes/types';
+import { resolveRateContext } from '../../lib/currencyService';
 import { stockKeys } from '../../lib/queryKeys';
 import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
@@ -81,7 +84,7 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
   onSuccess,
 }) => {
   const toast = useToast();
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, currencyFormat } = useCurrency();
   const paymentMethodFieldId = useId();
   const notesFieldId = useId();
 
@@ -89,6 +92,11 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
   const [filteredItems, setFilteredItems] = useState<StockItemWithCategory[]>([]);
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<CartLine[]>([]);
+
+  const [taxComputation, setTaxComputation] = useState<TaxComputation | null>(null);
+  const [taxComputeFailed, setTaxComputeFailed] = useState(false);
+  const [saleCurrency, setSaleCurrency] = useState<string | null>(null);
+  const [packPinned, setPackPinned] = useState(false);
 
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [customerSearch, setCustomerSearch] = useState('');
@@ -126,8 +134,30 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
       setDiscountValue('');
       setPaymentMethod('cash');
       setNotes('');
+      setTaxComputation(null);
+      setTaxComputeFailed(false);
+      setSaleCurrency(null);
     }
   }, [isOpen, customerId, caseId, loadItems]);
+
+  // A pack-pinned tenant (an activated country compliance pack) must not check out
+  // with unknown tax — a failed kernel computation blocks Create. An unpinned tenant
+  // has no statutory tax requirement yet, so Create stays available on failure.
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('tenants')
+        .select('country_pack_version')
+        .limit(1)
+        .maybeSingle();
+      if (!cancelled) setPackPinned(!!data?.country_pack_version);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     const lower = search.toLowerCase();
@@ -267,7 +297,51 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
     return 0;
   })();
 
-  const total = subtotal - discountAmount;
+  // Debounced kernel tax preview: recomputes on cart/discount changes so the panel
+  // shows the same component rows and total the record_stock_sale RPC will persist.
+  useEffect(() => {
+    if (cart.length === 0) {
+      setTaxComputation(null);
+      setTaxComputeFailed(false);
+      setSaleCurrency(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const lines: TaxableLine[] = cart.map((l) => ({
+          lineItemId: null,
+          description: l.item.name,
+          quantity: l.quantity,
+          unitPrice: l.unit_price,
+          lineDiscount: 0,
+          unitCode: null,
+          itemCode: null,
+          treatment: 'standard',
+          treatmentReasonCode: null,
+        }));
+        const [comp, rc] = await Promise.all([
+          computeStockSaleTax({ lines, documentDiscount: discountAmount, taxInclusive: false }),
+          resolveRateContext(undefined, new Date().toISOString().slice(0, 10), null),
+        ]);
+        if (cancelled) return;
+        setTaxComputation(comp);
+        setSaleCurrency(rc.baseCurrency);
+        setTaxComputeFailed(false);
+      } catch {
+        if (cancelled) return;
+        setTaxComputation(null);
+        setSaleCurrency(null);
+        setTaxComputeFailed(true);
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [cart, discountAmount]);
+
+  const total = subtotal - discountAmount + (taxComputation?.totals.taxTotal ?? 0);
 
   const selectedIds = cart.map((l) => l.item.id);
 
@@ -278,6 +352,10 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
     }
     if (cart.length === 0) {
       toast.error('Cart is empty');
+      return;
+    }
+    if (taxComputeFailed && packPinned) {
+      toast.error('Tax could not be computed');
       return;
     }
 
@@ -291,6 +369,9 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
         notes: notes || null,
         discount_type: discountType === 'none' ? null : discountType,
         discount_value: discountType !== 'none' ? parseFloat(discountValue) || null : null,
+        tax_inclusive: false,
+        taxComputation,
+        currency: saleCurrency ?? currencyFormat.currencyCode,
         items: cart.map((l) => ({
           stock_item_id: l.item.id,
           quantity: l.quantity,
@@ -481,6 +562,20 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
                 )}
               </div>
 
+              {taxComputation?.rollups.map((r) => (
+                <div key={r.componentCode} className="flex justify-between text-sm text-slate-600">
+                  <span>{r.componentLabel}</span>
+                  <span>{formatAmount(r.taxAmount)}</span>
+                </div>
+              ))}
+
+              {taxComputeFailed && (
+                <div className="bg-danger-muted border border-danger/30 rounded-lg p-2 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-danger flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-danger">Tax could not be computed</p>
+                </div>
+              )}
+
               <div className="flex justify-between text-base font-bold text-slate-900 pt-1 border-t border-slate-200">
                 <span>Total</span>
                 <span>{formatAmount(total)}</span>
@@ -556,7 +651,7 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
           <div className="pt-2 border-t border-slate-200">
             <Button
               onClick={handleSubmit}
-              disabled={submitting || cart.length === 0 || !selectedCustomerId}
+              disabled={submitting || cart.length === 0 || !selectedCustomerId || (taxComputeFailed && packPinned)}
               className="w-full gap-2"
             >
               <ShoppingCart className="w-4 h-4" />
