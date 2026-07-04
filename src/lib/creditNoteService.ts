@@ -23,6 +23,11 @@ export interface CreditNoteItemInput {
   description?: string;
   quantity?: number;
   unit_price?: number;
+  unit_code?: string | null;
+  unit_label?: string | null;
+  item_code?: string | null;
+  tax_treatment?: string;
+  treatment_reason_code?: string | null;
   discount?: number;
   tax_rate?: number;
   tax_amount?: number;
