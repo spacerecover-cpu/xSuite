@@ -112,16 +112,15 @@ describe('createStockSale (Task 26: kernel tax parity — p_tax_lines threading)
       items: [{ stock_item_id: 'item-1', quantity: 2, unit_price: 5 }],
     });
 
-    expect(rpc).toHaveBeenCalledWith('record_stock_sale', expect.objectContaining({
-      p_tax_lines: expect.arrayContaining([
-        expect.objectContaining({
-          line_item_id: null,
-          component_label: 'VAT',
-          regime_key: 'simple_vat',
-          plugin_version: '1.0.0',
-        }),
-      ]),
-    }));
+    const call = rpc.mock.calls.find((c) => c[0] === 'record_stock_sale');
+    const taxLines = (call![1] as { p_tax_lines: Array<{ line_item_id: string | null; tax_amount: number }> }).p_tax_lines;
+    // Regression (whole-branch review CRITICAL): send ONLY the document-level rollups, never
+    // [...lines, ...rollups]. Both carry line_item_id:null for POS, so threading both would let
+    // record_stock_sale's `line_item_id IS NULL` header/ledger filter double-count the tax.
+    expect(taxLines).toHaveLength(taxComputation.rollups.length); // 1, not 2
+    expect(taxLines.every((l) => l.line_item_id === null)).toBe(true);
+    expect(taxLines.reduce((s, l) => s + l.tax_amount, 0)).toBe(0.5); // rollup total, NOT doubled 1.0
+    expect(taxLines[0]).toMatchObject({ component_label: 'VAT', regime_key: 'simple_vat', plugin_version: '1.0.0' });
   });
 
   it('sends p_tax_lines: null when no taxComputation is supplied (backward compatible)', async () => {

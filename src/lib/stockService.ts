@@ -564,8 +564,13 @@ export async function createStockSale(data: StockSaleCreateData): Promise<StockS
       tax_treatment: item.tax_treatment ?? 'standard',
       treatment_reason_code: item.treatment_reason_code ?? null,
     })),
+    // POS threads ONLY the document-level rollups (line_item_id null). Unlike invoices —
+    // where persistDocumentTaxLines relabels per-line rows with real UUIDs so only rollups
+    // are null — the kernel's POS per-line rows keep lineItemId:null, which would collide
+    // with record_stock_sale's `line_item_id IS NULL` header/ledger filter and double-count
+    // the tax. Rollups alone give the correct header total + one vat_records row per component.
     p_tax_lines: data.taxComputation
-      ? [...data.taxComputation.lines, ...data.taxComputation.rollups].map((l, i) => ({
+      ? data.taxComputation.rollups.map((l, i) => ({
           line_item_id: l.lineItemId,
           component_code: l.componentCode,
           component_label: l.componentLabel,

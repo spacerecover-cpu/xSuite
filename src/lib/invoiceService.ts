@@ -370,6 +370,11 @@ export const fetchInvoiceById = async (id: string): Promise<InvoiceWithDetails |
     discount_percent: it.discount ?? 0,
     line_total: it.total,
     sort_order: it.sort_order ?? 0,
+    // Hydrate the unit/item-code compliance fields on edit (mirrors quotesService.fetchQuoteById);
+    // without this, opening an invoice for edit blanks them and updateInvoice writes null.
+    unit_code: it.unit_code ?? null,
+    unit_label: it.unit_label ?? null,
+    item_code: it.item_code ?? null,
   }));
 
   return {
