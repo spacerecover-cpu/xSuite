@@ -253,6 +253,9 @@ export function toEngineData(
         });
       }
     } else if (storedTax !== 0 || (invoiceData.tax_rate ?? 0) > 0) {
+      // 0/0 suppression: a document with no rollups AND zero stored tax AND zero
+      // rate (untaxed / out-of-scope) emits NO tax row — showing "VAT 0" on an
+      // untaxed document is noise, and there is no component to name.
       // Legacy / backfilled document with no tax_lines: ONE row from the STORED
       // header tax_amount (NEVER a recompute). The English label honours the
       // country tax label; the Arabic secondary keeps the standard VAT term so it

@@ -217,10 +217,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
 
   const createMutation = useMutation({
     mutationFn: async (customer: typeof formData) => {
-      // Built as an intermediate variable (not an inline literal) so the
-      // structured address fields can ride along on `createCustomer`'s
-      // existing `CreateCustomerInput` without widening that service's type —
-      // `customers_enhanced` already has the columns (WP-1 Task 3).
+      // The structured address fields (WP-1 Task 3) are declared on
+      // `CreateCustomerInput`; createCustomer spreads them into the insert.
       const payload = {
         customer_name: customer.customer_name,
         email: customer.email || null,

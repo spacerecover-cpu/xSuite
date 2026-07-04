@@ -371,7 +371,7 @@ BEGIN
 
   -- (e) vat_records: one row per non-zero rollup component, base currency,
   -- tenant-local tax_period of the tax point (never created_at).
-  v_tax_point := COALESCE(v_inv.supply_date, (now() AT TIME ZONE v_tz)::date);
+  v_tax_point := COALESCE(v_inv.supply_date, (now() AT TIME ZONE COALESCE(v_tz,'UTC'))::date);
   v_period := to_char(v_tax_point, 'YYYY-MM');
   FOR v_r IN
     SELECT * FROM document_tax_lines

@@ -7,7 +7,7 @@ vi.mock('./supabaseClient', () => {
   const chain = (table: string) => {
     const result = { data: rows[table] ?? [], error: null };
     const self: Record<string, unknown> = {};
-    for (const m of ['select', 'eq', 'order']) {
+    for (const m of ['select', 'eq', 'is', 'order']) {
       self[m] = vi.fn((...args: unknown[]) => {
         calls.push({ method: m, args });
         return self;
@@ -30,7 +30,7 @@ beforeEach(() => {
 });
 
 describe('listSubdivisions', () => {
-  it('filters by country_id and is_active, orders by sort_order, and maps rows to {id, code, name, subdivision_type}', async () => {
+  it('filters by country_id, is_active and deleted_at, orders by sort_order, and maps rows to {id, code, name, subdivision_type}', async () => {
     const result = await listSubdivisions('om-uuid');
 
     expect(result).toEqual([
@@ -41,6 +41,8 @@ describe('listSubdivisions', () => {
     const eqCalls = calls.filter((c) => c.method === 'eq');
     expect(eqCalls).toContainEqual({ method: 'eq', args: ['country_id', 'om-uuid'] });
     expect(eqCalls).toContainEqual({ method: 'eq', args: ['is_active', true] });
+    // Soft-deleted subdivisions must be excluded even if still is_active.
+    expect(calls).toContainEqual({ method: 'is', args: ['deleted_at', null] });
 
     const orderCall = calls.find((c) => c.method === 'order');
     expect(orderCall?.args[0]).toBe('sort_order');

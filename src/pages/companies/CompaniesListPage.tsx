@@ -221,10 +221,8 @@ export const CompaniesListPage: React.FC = () => {
 
   const createMutation = useMutation({
     mutationFn: async (company: typeof formData) => {
-      // Built as an intermediate variable (not an inline literal) so the
-      // structured address fields can ride along on `createCompany`'s
-      // existing `CreateCompanyInput` without widening that service's type —
-      // `companies` already has the columns (WP-1 Task 3).
+      // The structured address fields (WP-1 Task 3) are declared on
+      // `CreateCompanyInput`; createCompany spreads them into the insert.
       const payload = {
         name: company.company_name,
         company_name: company.company_name,

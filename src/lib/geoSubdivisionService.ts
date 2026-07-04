@@ -16,6 +16,7 @@ export async function listSubdivisions(countryId: string): Promise<Subdivision[]
     .select('id, code, name, subdivision_type')
     .eq('country_id', countryId)
     .eq('is_active', true)
+    .is('deleted_at', null)
     .order('sort_order');
   if (error) throw error;
   return data ?? [];
