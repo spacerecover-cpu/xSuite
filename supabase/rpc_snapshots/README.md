@@ -17,3 +17,4 @@ of sync (OWNER RULING #1, Localization Phase 2 WP-5).
 | snapshot | applied migration (manifest) |
 |---|---|
 | `phase2_requirement_gate_and_snapshots.sql` | `20260704062125 phase2_requirement_gate_and_snapshots` |
+| `phase2_record_stock_sale_tax.sql` | `20260704083618 phase2_record_stock_sale_tax` |

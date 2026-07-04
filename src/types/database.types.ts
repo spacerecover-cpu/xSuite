@@ -15182,8 +15182,10 @@ export type Database = {
           status: string | null
           subtotal: number | null
           subtotal_base: number | null
-          tax_amount: number | null
+          tax_amount: number
           tax_amount_base: number | null
+          tax_inclusive: boolean
+          tax_regime_key: string | null
           tenant_id: string
           total_amount: number | null
           total_amount_base: number | null
@@ -15211,8 +15213,10 @@ export type Database = {
           status?: string | null
           subtotal?: number | null
           subtotal_base?: number | null
-          tax_amount?: number | null
+          tax_amount?: number
           tax_amount_base?: number | null
+          tax_inclusive?: boolean
+          tax_regime_key?: string | null
           tenant_id: string
           total_amount?: number | null
           total_amount_base?: number | null
@@ -15240,8 +15244,10 @@ export type Database = {
           status?: string | null
           subtotal?: number | null
           subtotal_base?: number | null
-          tax_amount?: number | null
+          tax_amount?: number
           tax_amount_base?: number | null
+          tax_inclusive?: boolean
+          tax_regime_key?: string | null
           tenant_id?: string
           total_amount?: number | null
           total_amount_base?: number | null
@@ -18769,7 +18775,7 @@ export type Database = {
         }
       }
       record_stock_sale: {
-        Args: { p_items: Json; p_sale: Json }
+        Args: { p_items: Json; p_sale: Json; p_tax_lines?: Json }
         Returns: {
           case_id: string | null
           created_at: string
@@ -18792,8 +18798,10 @@ export type Database = {
           status: string | null
           subtotal: number | null
           subtotal_base: number | null
-          tax_amount: number | null
+          tax_amount: number
           tax_amount_base: number | null
+          tax_inclusive: boolean
+          tax_regime_key: string | null
           tenant_id: string
           total_amount: number | null
           total_amount_base: number | null
