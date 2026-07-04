@@ -18,7 +18,10 @@ const { rpcMock } = vi.hoisted(() => ({
 }));
 vi.mock('./supabaseClient', () => ({ supabase: { rpc: rpcMock } }));
 
-import { buildTaxableLines, matchFormRate, totalsFromComputation, dryRunIssueTaxDocument } from './taxDocumentService';
+import {
+  buildTaxableLines, matchFormRate, totalsFromComputation, dryRunIssueTaxDocument,
+  classifyRequirementFailures, parseRequirementFailures,
+} from './taxDocumentService';
 
 const rc: RateContext = { documentCurrency: 'OMR', documentDecimals: 3, baseCurrency: 'OMR', baseDecimals: 3, rate: 1, rateSource: 'derived' };
 const omVat: GeoCountryTaxRateRow = {
@@ -80,5 +83,34 @@ describe('dryRunIssueTaxDocument', () => {
   it('throws the RPC error instead of swallowing it', async () => {
     rpcMock.mockResolvedValueOnce({ data: null, error: new Error('rpc boom') });
     await expect(dryRunIssueTaxDocument('credit_note', 'cn-1')).rejects.toThrow('rpc boom');
+  });
+});
+
+describe('classifyRequirementFailures', () => {
+  it('returns block when any failure is a block', () => {
+    expect(classifyRequirementFailures([
+      { field_key: 'buyer_tax_number', level: 'block', message: 'Buyer VATIN required.' },
+      { field_key: 'buyer_address', level: 'warn', message: 'Buyer address expected.' },
+    ])).toEqual({ kind: 'block', messages: ['Buyer VATIN required.'] });
+  });
+  it('returns confirm with the warn messages when only warns exist', () => {
+    expect(classifyRequirementFailures([
+      { field_key: 'buyer_address', level: 'warn', message: 'Buyer address expected.' },
+    ])).toEqual({ kind: 'confirm', messages: ['Buyer address expected.'] });
+  });
+  it('returns proceed for a clean dry-run', () => {
+    expect(classifyRequirementFailures([])).toEqual({ kind: 'proceed', messages: [] });
+  });
+});
+
+describe('parseRequirementFailures', () => {
+  it('extracts the jsonb payload from a P0403 REQUIREMENTS_NOT_MET message', () => {
+    const msg = 'REQUIREMENTS_NOT_MET: [{"field_key":"seller_tax_number","level":"block","message":"Seller VATIN required."}]';
+    expect(parseRequirementFailures(msg)).toEqual([
+      { field_key: 'seller_tax_number', level: 'block', message: 'Seller VATIN required.' },
+    ]);
+  });
+  it('returns [] when the message carries no parseable payload', () => {
+    expect(parseRequirementFailures('some unrelated error')).toEqual([]);
   });
 });

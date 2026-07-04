@@ -5,6 +5,8 @@ import { Input } from '../ui/Input';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useToast } from '../../hooks/useToast';
 import { issueCreditNote, applyCreditNote } from '../../lib/creditNoteService';
+import { RequirementFailuresPanel } from './RequirementFailuresPanel';
+import { parseRequirementFailures, type RequirementFailure } from '../../lib/taxDocumentService';
 import { logger } from '../../lib/logger';
 import { allocateLargestRemainder } from '../../lib/financialMath';
 import { FileMinus, AlertTriangle, CheckCircle } from 'lucide-react';
@@ -56,6 +58,7 @@ export const CreditNoteModal: React.FC<CreditNoteModalProps> = ({ isOpen, onClos
   const [reasonCode, setReasonCode] = useState('discount');
   const [reasonNotes, setReasonNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [requirementFailures, setRequirementFailures] = useState<RequirementFailure[]>([]);
 
   const roundMoney = (n: number) => {
     const f = Math.pow(10, currencyFormat.decimalPlaces);
@@ -79,6 +82,7 @@ export const CreditNoteModal: React.FC<CreditNoteModalProps> = ({ isOpen, onClos
     setAmount(0);
     setReasonCode('discount');
     setReasonNotes('');
+    setRequirementFailures([]);
     onClose();
   };
 
@@ -86,6 +90,7 @@ export const CreditNoteModal: React.FC<CreditNoteModalProps> = ({ isOpen, onClos
     e.preventDefault();
     if (!canSubmit) return;
     setIsSubmitting(true);
+    setRequirementFailures([]);
     try {
       const creditNote = await issueCreditNote(
         {
@@ -108,7 +113,15 @@ export const CreditNoteModal: React.FC<CreditNoteModalProps> = ({ isOpen, onClos
       handleClose();
     } catch (err) {
       logger.error('Error issuing credit note:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to issue credit note');
+      // The DB gate (issue_credit_note) raises P0403 when a statutory field is
+      // unmet — surface it in the panel (modal stays open) instead of a bare toast.
+      const failures = parseRequirementFailures(err instanceof Error ? err.message : String(err));
+      if (failures.length > 0) {
+        setRequirementFailures(failures);
+        toast.error('Issuance blocked — resolve the required fields first.');
+      } else {
+        toast.error(err instanceof Error ? err.message : 'Failed to issue credit note');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -218,6 +231,8 @@ export const CreditNoteModal: React.FC<CreditNoteModalProps> = ({ isOpen, onClos
             This credit settles the invoice in full.
           </p>
         )}
+
+        <RequirementFailuresPanel failures={requirementFailures} />
 
         <div className="flex justify-end gap-3 pt-4 border-t border-border">
           <Button type="button" variant="secondary" onClick={handleClose} disabled={isSubmitting}>

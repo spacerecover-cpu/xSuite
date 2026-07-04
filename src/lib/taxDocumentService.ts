@@ -252,3 +252,33 @@ export async function dryRunIssueTaxDocument(
     trace: d.trace ?? null,
   };
 }
+
+/** Turn a dry-run's requirement failures into an issuance decision: any `block`
+ *  stops issuance; otherwise `warn`s require an explicit confirmation; a clean
+ *  set proceeds. Pure — the UI renders the panel and dialog off this. */
+export function classifyRequirementFailures(
+  failures: RequirementFailure[],
+): { kind: 'block' | 'confirm' | 'proceed'; messages: string[] } {
+  const blocks = failures.filter((f) => f.level === 'block');
+  if (blocks.length > 0) return { kind: 'block', messages: blocks.map((f) => f.message) };
+  const warns = failures.filter((f) => f.level === 'warn');
+  if (warns.length > 0) return { kind: 'confirm', messages: warns.map((f) => f.message) };
+  return { kind: 'proceed', messages: [] };
+}
+
+/** Recover the requirement-failure payload from a raised P0403 error so the UI
+ *  can render the panel even when the gate fires inside the DB (no dry-run — e.g.
+ *  credit notes, or a race where the draft changed between dry-run and issue). */
+export function parseRequirementFailures(errorMessage: string): RequirementFailure[] {
+  const marker = 'REQUIREMENTS_NOT_MET:';
+  const idx = errorMessage.indexOf(marker);
+  if (idx === -1) return [];
+  const jsonStart = errorMessage.indexOf('[', idx);
+  if (jsonStart === -1) return [];
+  try {
+    const parsed = JSON.parse(errorMessage.slice(jsonStart)) as unknown;
+    return Array.isArray(parsed) ? (parsed as RequirementFailure[]) : [];
+  } catch {
+    return [];
+  }
+}
