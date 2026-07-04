@@ -18256,6 +18256,15 @@ export type Database = {
         }
         Returns: string
       }
+      evaluate_document_requirements: {
+        Args: {
+          p_as_of: string
+          p_country_id: string
+          p_doc_type: string
+          p_facts: Json
+        }
+        Returns: Json
+      }
       export_customer_data: { Args: { p_customer_id: string }; Returns: Json }
       generate_next_number: { Args: { p_scope: string }; Returns: string }
       get_accessible_modules: {
