@@ -1,5 +1,4 @@
 import React from 'react';
-import { RefreshCw } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { PageHeader } from '../shared/PageHeader';
 
@@ -20,8 +19,6 @@ interface FinancialModuleHeaderProps {
     onClick: () => void;
     icon?: React.ReactNode;
   };
-  onRefresh?: () => void;
-  isRefreshing?: boolean;
   /** @deprecated The icon now uses the primary token; ignored. */
   iconBgColor?: string;
 }
@@ -37,8 +34,6 @@ export const FinancialModuleHeader: React.FC<FinancialModuleHeaderProps> = ({
   title,
   description,
   primaryAction,
-  onRefresh,
-  isRefreshing = false,
 }) => {
   return (
     <PageHeader
@@ -47,12 +42,6 @@ export const FinancialModuleHeader: React.FC<FinancialModuleHeaderProps> = ({
       description={description}
       actions={
         <>
-          {onRefresh && (
-            <Button onClick={onRefresh} variant="secondary" size="sm" disabled={isRefreshing} title="Refresh data">
-              <RefreshCw className={`w-4 h-4 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              {isRefreshing ? 'Refreshing…' : 'Refresh'}
-            </Button>
-          )}
           {primaryAction && (
             <Button size="sm" onClick={primaryAction.onClick}>
               {primaryAction.icon && <span className="mr-1.5">{primaryAction.icon}</span>}

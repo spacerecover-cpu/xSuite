@@ -29,6 +29,7 @@ import { setPrimaryDevice } from '../../lib/deviceService';
 import { logger } from '../../lib/logger';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
+import { CASE_COMMAND_STATS_KEY } from '../../hooks/useCaseCommandStats';
 import type { Database } from '../../types/database.types';
 
 type CasesInsert = Database['public']['Tables']['cases']['Insert'];
@@ -484,7 +485,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
     onSuccess: (newCase) => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
       queryClient.invalidateQueries({ queryKey: ['cases_count'] });
-      queryClient.invalidateQueries({ queryKey: ['cases_stats'] });
+      queryClient.invalidateQueries({ queryKey: [CASE_COMMAND_STATS_KEY] });
       setCreatedCase({ id: newCase.id, case_no: newCase.case_no ?? newCase.case_number ?? '' });
       setShowSuccessModal(true);
     },

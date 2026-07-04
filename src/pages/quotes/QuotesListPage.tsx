@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { fetchQuotesPage, getQuoteStats, toQuoteEditInitialData, createQuote as createQuoteService } from '../../lib/quotesService';
+import { fetchQuotesPage, getQuoteStats, toQuoteEditInitialData, createQuote as createQuoteService, updateQuoteStatus } from '../../lib/quotesService';
 import type { QuoteWithDetails, Quote as QuoteShape, QuoteItem as QuoteItemShape } from '../../lib/quotesService';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -14,7 +14,6 @@ import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
 import { roundMoney } from '../../lib/financialMath';
 import { supabase } from '../../lib/supabaseClient';
 import { EmptyState } from '../../components/shared/EmptyState';
-import { ExportButton } from '../../components/shared/ExportButton';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { useListPageSize } from '../../hooks/useListPageSize';
@@ -117,7 +116,7 @@ export const QuotesListPage: React.FC = () => {
     retry: 2,
   });
 
-  const { data: quotesPage, isLoading, error: quotesError } = useQuery({
+  const { data: quotesPage, isLoading, error: quotesError, refetch: refetchQuotes } = useQuery({
     queryKey: ['quotes', statusFilter, debouncedSearch, page, pageSize],
     queryFn: () =>
       fetchQuotesPage({
@@ -265,7 +264,7 @@ export const QuotesListPage: React.FC = () => {
             <p className="text-lg font-semibold">Error Loading Quotes</p>
             <p className="text-sm text-slate-600 mt-2">{(quotesError as Error)?.message || 'Failed to load quotes'}</p>
           </div>
-          <Button onClick={() => window.location.reload()} className="mt-4">
+          <Button onClick={() => refetchQuotes()} className="mt-4">
             Retry
           </Button>
         </div>
@@ -401,35 +400,6 @@ export const QuotesListPage: React.FC = () => {
               )}
             </Button>
 
-            <ExportButton
-              filename="quotes"
-              columns={[
-                { key: 'quote_number', label: 'Quote #' },
-                { key: 'quote_date', label: 'Date' },
-                { key: 'valid_until', label: 'Valid Until' },
-                {
-                  key: (r) => (r.customers_enhanced as { customer_name?: string } | null)?.customer_name,
-                  label: 'Customer',
-                },
-                { key: 'subtotal', label: 'Subtotal' },
-                { key: 'tax_amount', label: 'Tax' },
-                { key: 'total_amount', label: 'Total' },
-                { key: 'status', label: 'Status' },
-              ]}
-              getRows={async () => {
-                let q = supabase
-                  .from('quotes')
-                  .select('quote_number, quote_date, valid_until, subtotal, tax_amount, total_amount, status, customers_enhanced:customer_id(customer_name)')
-                  .is('deleted_at', null);
-                if (debouncedSearch) {
-                  q = q.ilike('quote_number', `%${debouncedSearch}%`);
-                }
-                if (statusFilter !== 'all') q = q.eq('status', statusFilter);
-                const { data, error } = await q.order('quote_date', { ascending: false, nullsFirst: false });
-                if (error) throw error;
-                return data ?? [];
-              }}
-            />
           </div>
 
           {showFilters && (
@@ -640,14 +610,7 @@ export const QuotesListPage: React.FC = () => {
                               if (!ok) return;
                               try {
                                 setSendingQuoteId(quoteId);
-                                const { error } = await supabase
-                                  .from('quotes')
-                                  .update({
-                                    status: 'sent',
-                                  })
-                                  .eq('id', quoteId);
-
-                                if (error) throw error;
+                                await updateQuoteStatus(quoteId, 'sent');
 
                                 queryClient.invalidateQueries({ queryKey: ['quotes'] });
                                 queryClient.invalidateQueries({ queryKey: ['quote_stats'] });

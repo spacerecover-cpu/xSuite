@@ -35,7 +35,7 @@ const SidebarLayoutPreview: React.FC<{ side: SidebarPosition }> = ({ side }) => 
 );
 
 export const UserProfile: React.FC = () => {
-  const { profile, user } = useAuth();
+  const { profile, user, refreshProfile } = useAuth();
   const { position, setPosition } = useSidebarPreferences();
   const toast = useToast();
   const [editing, setEditing] = useState(false);
@@ -70,7 +70,7 @@ export const UserProfile: React.FC = () => {
 
       toast.success('Profile updated successfully');
       setEditing(false);
-      window.location.reload();
+      await refreshProfile();
     } catch (error) {
       logger.error('Error updating profile:', error);
       toast.error('Failed to update profile');
