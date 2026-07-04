@@ -18438,6 +18438,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      format_sequence_number: {
+        Args: { p_value: number; p_width: number }
+        Returns: string
+      }
       generate_next_number: { Args: { p_scope: string }; Returns: string }
       get_accessible_modules: {
         Args: never
