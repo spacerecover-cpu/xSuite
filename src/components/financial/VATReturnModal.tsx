@@ -1,275 +1,151 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
-import { calculateVATForPeriod, VATSummary } from '../../lib/vatService';
+import { composeReturnForDate, fileReturn, type ComposedReturnPreview } from '../../lib/tax/taxReturnService';
+import { useAuth } from '../../contexts/AuthContext';
 import { useCurrency } from '../../hooks/useCurrency';
-import { calendarQuarterBounds, quarterOf } from '../../lib/vatPeriods';
-import { tenantToday } from '../../lib/tenantToday';
-import { useDateTimeConfig } from '../../contexts/TenantConfigContext';
-import {
-  Calendar,
-  Calculator,
-  TrendingUp,
-  TrendingDown,
-  FileCheck,
-  Save,
-  Send,
-} from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Save, Send } from 'lucide-react';
 import { logger } from '../../lib/logger';
 
 interface VATReturnModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (
-    data: {
-      period_start: string;
-      period_end: string;
-      output_vat: number;
-      input_vat: number;
-      net_vat: number;
-      status: 'draft' | 'review';
-    }
-  ) => Promise<void>;
+  onFiled: () => void;
 }
 
-export const VATReturnModal: React.FC<VATReturnModalProps> = ({
-  isOpen,
-  onClose,
-  onSave,
-}) => {
+/** Steps a tenant-local YYYY-MM-DD back one calendar day with pure string/int
+ *  math — no Date -> toISOString UTC round-trip (the double-declared-month bug). */
+function previousDay(isoDate: string): string {
+  const y = Number(isoDate.slice(0, 4));
+  const m = Number(isoDate.slice(5, 7));
+  const d = Number(isoDate.slice(8, 10));
+  if (d > 1) return `${isoDate.slice(0, 8)}${String(d - 1).padStart(2, '0')}`;
+  const pm = m === 1 ? 12 : m - 1;
+  const py = m === 1 ? y - 1 : y;
+  const lastDay = new Date(Date.UTC(py, pm, 0)).getUTCDate();
+  return `${py}-${String(pm).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+}
+
+/** Steps forward past the current period end to land in the next period. */
+function nextDay(isoDate: string): string {
+  const y = Number(isoDate.slice(0, 4));
+  const m = Number(isoDate.slice(5, 7));
+  const d = Number(isoDate.slice(8, 10));
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  if (d < lastDay) return `${isoDate.slice(0, 8)}${String(d + 1).padStart(2, '0')}`;
+  const nm = m === 12 ? 1 : m + 1;
+  const ny = m === 12 ? y + 1 : y;
+  return `${ny}-${String(nm).padStart(2, '0')}-01`;
+}
+
+export const VATReturnModal: React.FC<VATReturnModalProps> = ({ isOpen, onClose, onFiled }) => {
+  const { profile } = useAuth();
   const { formatCurrency } = useCurrency();
-  const { timezone } = useDateTimeConfig();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [periodStart, setPeriodStart] = useState('');
-  const [periodEnd, setPeriodEnd] = useState('');
-  const [summary, setSummary] = useState<VATSummary | null>(null);
-  const [isCalculating, setIsCalculating] = useState(false);
-  const firstFieldRef = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<ComposedReturnPreview | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const compose = useCallback(async (forDate?: string) => {
+    if (!profile?.tenant_id) return;
+    setLoading(true);
+    setError(null);
+    try {
+      setPreview(await composeReturnForDate(profile.tenant_id, forDate));
+    } catch (e) {
+      logger.error('Error composing return:', e);
+      setError(e instanceof Error ? e.message : 'Failed to compose the return');
+      setPreview(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [profile?.tenant_id]);
 
   useEffect(() => {
-    const { year, quarter } = quarterOf(tenantToday(timezone));
-    const bounds = calendarQuarterBounds(year, quarter);
-    setPeriodStart(bounds.periodStart);
-    setPeriodEnd(bounds.periodEnd);
-  }, [isOpen, timezone]);
+    if (isOpen) void compose(undefined);
+    else setPreview(null);
+  }, [isOpen, compose]);
 
-  const handleCalculate = async () => {
-    if (!periodStart || !periodEnd) return;
-
-    setIsCalculating(true);
+  const handleFile = async (status: 'draft' | 'review') => {
+    if (!preview) return;
+    setSubmitting(true);
+    setError(null);
     try {
-      const result = await calculateVATForPeriod(periodStart, periodEnd);
-      setSummary(result);
-    } catch (error) {
-      logger.error('Error calculating VAT:', error);
+      await fileReturn(preview, status);
+      onFiled();
+      onClose();
+    } catch (e) {
+      logger.error('Error filing VAT return:', e);
+      setError(e instanceof Error ? e.message : 'Failed to file the return');
     } finally {
-      setIsCalculating(false);
+      setSubmitting(false);
     }
   };
-
-  useEffect(() => {
-    if (periodStart && periodEnd && isOpen) {
-      handleCalculate();
-    }
-  }, [periodStart, periodEnd, isOpen]);
-
-  const handleSubmit = async (submitForReview: boolean = false) => {
-    if (!summary) return;
-
-    setIsSubmitting(true);
-    try {
-      await onSave({
-        period_start: periodStart,
-        period_end: periodEnd,
-        output_vat: summary.totalOutputVAT,
-        input_vat: summary.totalInputVAT,
-        net_vat: summary.netVAT,
-        status: submitForReview ? 'review' : 'draft',
-      });
-      handleClose();
-    } catch (error) {
-      logger.error('Error saving VAT return:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleClose = () => {
-    setSummary(null);
-    onClose();
-  };
-
-  const setQuarterPeriod = (quarter: number, year: number) => {
-    const bounds = calendarQuarterBounds(year, quarter as 1 | 2 | 3 | 4);
-    setPeriodStart(bounds.periodStart);
-    setPeriodEnd(bounds.periodEnd);
-  };
-
-  const currentYear = quarterOf(tenantToday(timezone)).year;
-  const quarters = [
-    { label: 'Q1', quarter: 1 },
-    { label: 'Q2', quarter: 2 },
-    { label: 'Q3', quarter: 3 },
-    { label: 'Q4', quarter: 4 },
-  ];
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Create VAT Return" size="lg" initialFocusRef={firstFieldRef}>
+    <Modal isOpen={isOpen} onClose={onClose} title="File Tax Return" size="lg">
       <div className="space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Quick Select Period
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {quarters.map(({ label, quarter }) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => setQuarterPeriod(quarter, currentYear)}
-                className="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
-              >
-                {label} {currentYear}
-              </button>
-            ))}
-            {quarters.map(({ label, quarter }) => (
-              <button
-                key={`prev-${label}`}
-                type="button"
-                onClick={() => setQuarterPeriod(quarter, currentYear - 1)}
-                className="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-slate-500"
-              >
-                {label} {currentYear - 1}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="vat-period-start" className="block text-sm font-medium text-slate-700 mb-1">
-              Period Start
-            </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <Input
-                ref={firstFieldRef}
-                id="vat-period-start"
-                type="date"
-                value={periodStart}
-                onChange={(e) => setPeriodStart(e.target.value)}
-                className="pl-10"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="vat-period-end" className="block text-sm font-medium text-slate-700 mb-1">
-              Period End
-            </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <Input
-                id="vat-period-end"
-                type="date"
-                value={periodEnd}
-                onChange={(e) => setPeriodEnd(e.target.value)}
-                className="pl-10"
-                required
-              />
-            </div>
-          </div>
-        </div>
-
-        {isCalculating ? (
-          <div className="p-8 text-center">
-            <div className="inline-block w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
-            <p className="text-slate-500 mt-3">Calculating VAT...</p>
-          </div>
-        ) : summary ? (
-          <div className="bg-slate-50 rounded-xl p-6 space-y-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Calculator className="w-5 h-5 text-primary" />
-              <h3 className="font-semibold text-slate-900">VAT Summary</h3>
-              <span className="text-sm text-slate-500 ml-auto">
-                {summary.recordCount} records found
+        <div className="flex items-center justify-between rounded-lg border border-border bg-surface-muted px-4 py-3">
+          <Button
+            variant="secondary"
+            size="sm"
+            aria-label="Previous period"
+            disabled={loading || !preview}
+            onClick={() => preview && void compose(previousDay(preview.periodStart))}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Calendar className="h-4 w-4 text-primary" />
+            {preview ? (
+              <span>
+                <span>{preview.periodStart}</span>
+                <span className="mx-1 text-slate-500">→</span>
+                <span>{preview.periodEnd}</span>
+                <span className="ml-2 text-xs uppercase text-slate-500">{preview.filingFrequency}</span>
               </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white rounded-lg p-4 border border-success/30">
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp className="w-4 h-4 text-success" />
-                  <span className="text-sm font-medium text-success">Output VAT (Sales)</span>
-                </div>
-                <p className="text-lg font-bold text-success">
-                  {formatCurrency(summary.totalOutputVAT)}
-                </p>
-              </div>
-
-              <div className="bg-white rounded-lg p-4 border border-danger/30">
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingDown className="w-4 h-4 text-danger" />
-                  <span className="text-sm font-medium text-danger">Input VAT (Purchases)</span>
-                </div>
-                <p className="text-lg font-bold text-danger">
-                  {formatCurrency(summary.totalInputVAT)}
-                </p>
-              </div>
-            </div>
-
-            <div className={`rounded-lg p-4 border ${
-              summary.netVAT >= 0
-                ? 'bg-info-muted border-info/30'
-                : 'bg-warning-muted border-warning/30'
-            }`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <FileCheck className={`w-5 h-5 ${
-                    summary.netVAT >= 0 ? 'text-info' : 'text-warning'
-                  }`} />
-                  <span className="font-medium text-slate-900">
-                    Net VAT {summary.netVAT >= 0 ? 'Payable' : 'Reclaimable'}
-                  </span>
-                </div>
-                <p className={`text-2xl font-bold ${
-                  summary.netVAT >= 0 ? 'text-info' : 'text-warning'
-                }`}>
-                  {formatCurrency(Math.abs(summary.netVAT))}
-                </p>
-              </div>
-            </div>
+            ) : (
+              <span className="text-slate-500">{loading ? 'Composing…' : 'No period'}</span>
+            )}
           </div>
-        ) : (
-          <div className="p-8 text-center bg-slate-50 rounded-xl">
-            <Calculator className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500">Select a period to calculate VAT</p>
+          <Button
+            variant="secondary"
+            size="sm"
+            aria-label="Next period"
+            disabled={loading || !preview}
+            onClick={() => preview && void compose(nextDay(preview.periodEnd))}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {error && (
+          <div className="rounded-lg border border-danger bg-danger-muted px-4 py-3 text-sm text-danger">
+            {error}
           </div>
         )}
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-          <Button type="button" variant="secondary" onClick={handleClose}>
-            Cancel
+        {preview && (
+          <div className="divide-y divide-border rounded-lg border border-border">
+            {preview.composed.boxes.map((box) => (
+              <div key={box.boxCode} className="flex items-center justify-between px-4 py-3">
+                <div>
+                  <div className="text-sm font-medium">{box.boxLabel}</div>
+                  <div className="text-xs text-slate-500">{box.boxCode}</div>
+                </div>
+                <div className="text-sm font-semibold tabular-nums">{formatCurrency(box.amountBase)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" onClick={onClose} disabled={submitting}>Cancel</Button>
+          <Button variant="secondary" onClick={() => void handleFile('draft')} disabled={!preview || submitting}>
+            <Save className="mr-2 h-4 w-4" /> Save as Draft
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => handleSubmit(false)}
-            disabled={isSubmitting || !summary}
-            className="flex items-center gap-2"
-          >
-            <Save className="w-4 h-4" />
-            Save as Draft
-          </Button>
-          <Button
-            type="button"
-            onClick={() => handleSubmit(true)}
-            disabled={isSubmitting || !summary}
-            className="flex items-center gap-2"
-          >
-            <Send className="w-4 h-4" />
-            {isSubmitting ? 'Saving...' : 'Submit for Review'}
+          <Button onClick={() => void handleFile('review')} disabled={!preview || submitting}>
+            <Send className="mr-2 h-4 w-4" /> Submit for Review
           </Button>
         </div>
       </div>

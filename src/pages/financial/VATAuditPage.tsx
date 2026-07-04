@@ -14,7 +14,6 @@ import { VATReturnModal } from '../../components/financial/VATReturnModal';
 import { KpiRow } from '../../components/templates/KpiRow';
 import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import {
-  createVATReturn,
   updateVATReturnStatus,
   fetchVATRecords,
   fetchVATReturns,
@@ -113,22 +112,6 @@ export const VATAuditPage: React.FC = () => {
   const { data: _vatStats } = useQuery({
     queryKey: ['vat_stats'],
     queryFn: () => getVATStats(),
-  });
-
-  const createVATReturnMutation = useMutation({
-    mutationFn: (data: {
-      period_start: string;
-      period_end: string;
-      output_vat: number;
-      input_vat: number;
-      net_vat: number;
-      status: 'draft' | 'review';
-    }) => createVATReturn(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vat_returns'] });
-      queryClient.invalidateQueries({ queryKey: ['vat_stats'] });
-      setShowVATReturnModal(false);
-    },
   });
 
   const submitVATReturnMutation = useMutation({
@@ -568,8 +551,10 @@ export const VATAuditPage: React.FC = () => {
       <VATReturnModal
         isOpen={showVATReturnModal}
         onClose={() => setShowVATReturnModal(false)}
-        onSave={async (data) => {
-          await createVATReturnMutation.mutateAsync(data);
+        onFiled={() => {
+          queryClient.invalidateQueries({ queryKey: ['vat_returns'] });
+          queryClient.invalidateQueries({ queryKey: ['vat_records'] });
+          queryClient.invalidateQueries({ queryKey: ['vat_stats'] });
         }}
       />
     </div>
