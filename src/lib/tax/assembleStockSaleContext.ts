@@ -1,7 +1,7 @@
 import { supabase } from '../supabaseClient';
 import { registerAllRegimePlugins } from '../regimes/register';
 import { resolveTaxStrategy } from '../regimes/registry';
-import type { TaxableLine, TaxComputation, TaxContext, RoundingPolicy, ScaleSystem } from '../regimes/types';
+import type { TaxableLine, TaxComputation, TaxContext, RoundingPolicy, ScaleSystem, GeoCountryTaxRateRow, LegalEntityTaxRegistrationRow } from '../regimes/types';
 import { resolveRateContext } from '../currencyService';
 import { tenantToday } from '../tenantToday';
 
@@ -69,7 +69,7 @@ export async function computeStockSaleTax(input: StockSaleTaxInput): Promise<Tax
       countryId: seller.country_id,
       subdivisionId: seller.subdivision_id ?? null,
       taxIdentifier: seller.tax_identifier ?? null,
-      registrations: regs ?? [],
+      registrations: (regs ?? []) as LegalEntityTaxRegistrationRow[],
     },
     buyer: { taxNumber: null, countryId: null, subdivisionId: null, isBusiness: false, addressSnapshot: null },
     taxPointDate,
@@ -78,7 +78,7 @@ export async function computeStockSaleTax(input: StockSaleTaxInput): Promise<Tax
     documentDiscount: input.documentDiscount,
     taxInclusive: input.taxInclusive,
     rateContext,
-    rates: rates ?? [],
+    rates: (rates ?? []) as GeoCountryTaxRateRow[],
     roundingPolicy,
     scaleSystem,
   };

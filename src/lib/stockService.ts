@@ -1,5 +1,5 @@
 import { supabase, getTenantId } from './supabaseClient';
-import type { Database } from '../types/database.types';
+import type { Database, Json } from '../types/database.types';
 import { sanitizeFilterValue } from './postgrestSanitizer';
 import { baseAmount } from './financialMath';
 import type { TaxComputation } from './regimes/types';
@@ -586,7 +586,7 @@ export async function createStockSale(data: StockSaleCreateData): Promise<StockS
           regime_key: data.taxComputation!.trace.regimeKey,
           plugin_version: data.taxComputation!.trace.pluginVersion,
           pack_version_id: data.taxComputation!.trace.packVersionId,
-          rule_trace: i === 0 ? data.taxComputation!.trace : null,
+          rule_trace: (i === 0 ? data.taxComputation!.trace : null) as unknown as Json,
           sequence: l.sequence,
         }))
       : null,
