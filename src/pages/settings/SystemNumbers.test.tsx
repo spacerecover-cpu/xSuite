@@ -1,6 +1,65 @@
 // src/pages/settings/SystemNumbers.test.tsx
-import { describe, it, expect } from 'vitest';
-import { SCOPE_REGISTRY } from './SystemNumbers';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import React from 'react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
+import { HeaderSlotProvider } from '../../contexts/HeaderSlotContext';
+
+// Two live rows: one legacy (no template) and one fiscal-template row. The
+// template row proves the card badge must NOT render the classic PREFIX-0001
+// form (it would be a lie — the real next number is templated), and the legacy
+// row is the one whose edit modal drives the live preview_number_format RPC.
+const h = vi.hoisted(() => {
+  const rows = [
+    {
+      id: 's1', scope: 'invoices', prefix: 'INVO', padding: 4, current_value: 10192,
+      reset_annually: false, format_template: null, reset_basis: null,
+      fiscal_year_anchor: null, max_length: null, created_at: '2026-01-01',
+    },
+    {
+      id: 's2', scope: 'case', prefix: 'CASE', padding: 4, current_value: 42,
+      reset_annually: false, format_template: 'CASE/{FY}/{SEQ:4}', reset_basis: 'fiscal_year',
+      fiscal_year_anchor: '04-01', max_length: null, created_at: '2026-01-01',
+    },
+  ];
+  const rpc = vi.fn((name: string) =>
+    name === 'preview_number_format'
+      ? Promise.resolve({ data: 'INV/2026-27/0001', error: null })
+      : Promise.resolve({ data: null, error: null }),
+  );
+  return { rows, rpc };
+});
+
+vi.mock('../../lib/supabaseClient', () => ({
+  supabase: {
+    rpc: (...a: unknown[]) => h.rpc(...(a as [string])),
+    from: () => ({
+      select: () => ({
+        order: () => Promise.resolve({ data: h.rows, error: null }),
+      }),
+    }),
+  },
+}));
+
+import { SystemNumbers, SCOPE_REGISTRY } from './SystemNumbers';
+
+function renderPage() {
+  return render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <HeaderSlotProvider>
+        <MemoryRouter>
+          <SystemNumbers />
+        </MemoryRouter>
+      </HeaderSlotProvider>
+    </QueryClientProvider>,
+  );
+}
+
+function cardFor(name: string): HTMLElement {
+  const heading = screen.getByRole('heading', { name });
+  return heading.closest('.rounded-lg') as HTMLElement;
+}
 
 describe('SystemNumbers scope registry', () => {
   it('contains every real get_next_number caller scope and no phantoms', () => {
@@ -15,5 +74,53 @@ describe('SystemNumbers scope registry', () => {
     for (const phantom of ['customer', 'company', 'supplier', 'purchase_order', 'invoice', 'user', 'document']) {
       expect(keys).not.toContain(phantom);
     }
+  });
+});
+
+describe('SystemNumbers fiscal fields (P3)', () => {
+  beforeEach(() => h.rpc.mockClear());
+
+  it('edit modal exposes format template / reset basis / fiscal anchor and previews via preview_number_format', async () => {
+    renderPage();
+
+    // Open the (legacy, empty-template) invoices sequence's edit modal.
+    const invoicesHeading = await screen.findByRole('heading', { name: 'Tax Invoice Number' });
+    const invoicesCard = invoicesHeading.closest('.rounded-lg') as HTMLElement;
+    fireEvent.click(within(invoicesCard).getByRole('button', { name: /edit sequence/i }));
+
+    // Typing a format template drives a LIVE server-side preview, not a
+    // client-side '-' reimplementation. fireEvent.change (not userEvent.type)
+    // so the literal { } template tokens land verbatim in the field value.
+    const template = screen.getByLabelText(/format template/i);
+    fireEvent.change(template, { target: { value: 'INV/{FY}/{SEQ:4}' } });
+    await waitFor(
+      () =>
+        expect(h.rpc).toHaveBeenCalledWith('preview_number_format', {
+          p_scope: 'invoices',
+          p_format_template: 'INV/{FY}/{SEQ:4}',
+        }),
+      { timeout: 3000 },
+    );
+
+    // Reset basis select is always present; the fiscal-year anchor field
+    // appears only once the basis is fiscal_year.
+    const resetBasis = screen.getByLabelText(/reset basis/i);
+    expect(resetBasis).toBeInTheDocument();
+    fireEvent.change(resetBasis, { target: { value: 'fiscal_year' } });
+    expect(screen.getByLabelText(/fiscal year start/i)).toBeInTheDocument();
+  });
+
+  it('shows a templated indicator on a template row card instead of a legacy PREFIX-0000 next number', async () => {
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'Case Number' });
+    const caseCard = cardFor('Case Number');
+    // The template row must not advertise the classic hyphenated next number.
+    expect(within(caseCard).queryByText('CASE-0043')).toBeNull();
+    expect(within(caseCard).getByText(/templated/i)).toBeInTheDocument();
+
+    // A legacy (no-template) row still renders its classic next number.
+    const invoicesCard = cardFor('Tax Invoice Number');
+    expect(within(invoicesCard).getByText('INVO-10193')).toBeInTheDocument();
   });
 });
