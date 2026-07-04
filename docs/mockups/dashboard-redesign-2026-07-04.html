@@ -1,0 +1,618 @@
+<title>xSuite Dashboard — Redesign Concept</title>
+<style>
+  :root{
+    --navy:#162660; --navy-2:#1d327a; --navy-3:#0e1a45;
+    --sec:#D0E6FD; --accent:#F1E4D1;
+    --surface:#ffffff; --muted:#F8FAFC; --ground:#EEF2F7;
+    --border:#E2E8F0; --border-soft:#EDF1F6;
+    --ink-1:#0f172a; --ink-2:#334155; --ink-3:#475569; --ink-4:#64748b; --ink-5:#94a3b8;
+    --success:#059669; --success-bg:#D1FAE5;
+    --warning:#B45309; --warning-base:#D97706; --warning-bg:#FEF3C7;
+    --danger:#DC2626; --danger-bg:#FEE2E2;
+    --info:#0284C7; --info-bg:#E0F2FE;
+    --c1:#0891b2; --c2:#ea580c; --c3:#0d9488; --c4:#be185d;
+    --shadow-sm:0 1px 2px rgba(15,23,42,.06);
+    --shadow-md:0 2px 8px rgba(15,23,42,.08);
+    --r:10px;
+    color-scheme: light;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html,body{background:var(--ground)}
+  body{
+    font-family:'Inter','SF Pro Text',-apple-system,'Segoe UI',system-ui,sans-serif;
+    color:var(--ink-2); font-size:14px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .num{font-variant-numeric:tabular-nums}
+
+  /* ---------- concept bar ---------- */
+  .concept-bar{max-width:1560px; margin:0 auto; padding:20px 24px 12px;
+    display:flex; align-items:baseline; gap:14px; flex-wrap:wrap}
+  .concept-bar h1{font-size:16px; font-weight:700; color:var(--ink-1); letter-spacing:-.01em}
+  .concept-bar p{font-size:12.5px; color:var(--ink-4)}
+  .concept-bar .tag{font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em;
+    background:var(--navy); color:#fff; border-radius:4px; padding:3px 8px}
+
+  /* ---------- app frame ---------- */
+  .frame-scroll{overflow-x:auto; padding:0 24px 40px}
+  .frame{min-width:1280px; max-width:1560px; margin:0 auto;
+    background:var(--muted); border:1px solid var(--border); border-radius:14px;
+    overflow:hidden; box-shadow:0 12px 40px rgba(15,23,42,.12);
+    display:grid; grid-template-columns:56px 1fr; grid-template-rows:52px 1fr}
+
+  /* sidebar */
+  .side{grid-row:1 / 3; background:var(--navy-3); display:flex; flex-direction:column; align-items:center;
+    padding:14px 0; gap:6px}
+  .side .logo{width:32px; height:32px; border-radius:8px; display:grid; place-items:center;
+    background:linear-gradient(135deg,var(--navy-2),var(--navy)); color:#fff;
+    font-weight:800; font-size:15px; margin-bottom:10px}
+  .side a{width:36px; height:36px; border-radius:8px; display:grid; place-items:center;
+    color:#7d8bb8; text-decoration:none}
+  .side a:hover{background:rgba(255,255,255,.08); color:#fff}
+  .side a.on{background:rgba(255,255,255,.14); color:#fff}
+  .side svg{width:17px; height:17px}
+  .side .spacer{flex:1}
+  .side .avatar-sm{width:30px; height:30px; border-radius:50%; background:var(--sec);
+    color:var(--navy); font-size:11px; font-weight:700; display:grid; place-items:center}
+
+  /* topbar */
+  .topbar{grid-column:2; display:flex; align-items:center; gap:16px;
+    background:var(--surface); border-bottom:1px solid var(--border); padding:0 20px; height:52px}
+  .crumb{font-size:13px; color:var(--ink-4)}
+  .crumb b{color:var(--ink-1); font-weight:600}
+  .search{margin-left:auto; display:flex; align-items:center; gap:8px;
+    background:var(--muted); border:1px solid var(--border); border-radius:8px;
+    padding:6px 10px; width:240px; color:var(--ink-5); font-size:13px}
+  .search kbd{margin-left:auto; font-family:inherit; font-size:10px; background:#fff;
+    border:1px solid var(--border); border-radius:4px; padding:1px 5px; color:var(--ink-4)}
+  .iconbtn{position:relative; width:34px; height:34px; border-radius:8px; display:grid;
+    place-items:center; color:var(--ink-3)}
+  .iconbtn:hover{background:var(--muted)}
+  .iconbtn .dot{position:absolute; top:5px; right:5px; min-width:15px; height:15px;
+    border-radius:8px; background:var(--danger); color:#fff; font-size:9px; font-weight:700;
+    display:grid; place-items:center; padding:0 3px}
+  .avatar{width:32px; height:32px; border-radius:50%; background:var(--navy); color:#fff;
+    font-size:11.5px; font-weight:700; display:grid; place-items:center}
+
+  main{grid-column:2; padding:18px 20px 26px; display:flex; flex-direction:column; gap:16px}
+
+  /* ---------- command strip ---------- */
+  .command{border-radius:12px; padding:18px 22px; color:#fff;
+    background:linear-gradient(115deg,var(--navy-3) 0%,var(--navy) 46%,var(--navy-2) 100%);
+    display:flex; align-items:center; gap:28px; flex-wrap:wrap}
+  .command .hello .eyebrow{font-size:10px; font-weight:700; text-transform:uppercase;
+    letter-spacing:.12em; color:#9db4e8}
+  .command .hello h2{font-size:20px; font-weight:700; letter-spacing:-.01em; margin-top:2px}
+  .command .hello p{font-size:12.5px; color:#b9c6ea; margin-top:2px}
+  .command .live{display:flex; gap:0; margin-left:auto}
+  .command .live div{padding:0 22px; border-left:1px solid rgba(255,255,255,.14)}
+  .command .live div:first-child{border-left:0}
+  .command .live b{display:block; font-size:19px; font-weight:700; letter-spacing:-.01em}
+  .command .live span{font-size:11px; color:#9db4e8}
+  .command .acts{display:flex; gap:8px}
+  .btn{display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:500;
+    border-radius:8px; padding:8px 13px; text-decoration:none; cursor:pointer; border:0}
+  .btn svg{width:14px; height:14px}
+  .btn-light{background:#fff; color:var(--navy)}
+  .btn-ghost{background:rgba(255,255,255,.12); color:#fff; border:1px solid rgba(255,255,255,.22)}
+
+  /* ---------- attention queue ---------- */
+  .sec-label{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.1em;
+    color:var(--ink-4); display:flex; align-items:center; gap:8px}
+  .sec-label .line{flex:1; height:1px; background:var(--border)}
+  .attn{display:grid; grid-template-columns:repeat(4,1fr); gap:12px}
+  .attn a{position:relative; display:block; background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--r); padding:13px 14px 13px 18px; text-decoration:none; color:inherit;
+    box-shadow:var(--shadow-sm); overflow:hidden}
+  .attn a:hover{box-shadow:var(--shadow-md); border-color:#cbd5e1}
+  .attn a::before{content:''; position:absolute; left:0; top:0; bottom:0; width:4px}
+  .attn .danger::before{background:var(--danger)} .attn .warning::before{background:var(--warning-base)}
+  .attn .info::before{background:var(--info)}
+  .attn .head{display:flex; align-items:center; gap:7px; font-size:11px; font-weight:700;
+    text-transform:uppercase; letter-spacing:.07em}
+  .attn .danger .head{color:var(--danger)} .attn .warning .head{color:var(--warning)}
+  .attn .info .head{color:var(--info)}
+  .attn .head svg{width:13px; height:13px}
+  .attn .big{font-size:24px; font-weight:800; color:var(--ink-1); letter-spacing:-.02em; margin-top:4px}
+  .attn .big small{font-size:12.5px; font-weight:500; color:var(--ink-4); letter-spacing:0}
+  .attn .sub{font-size:12px; color:var(--ink-4); margin-top:2px}
+  .attn .cta{font-size:11.5px; font-weight:600; color:var(--navy); margin-top:8px; display:inline-block}
+
+  /* ---------- KPI band ---------- */
+  .kpis{display:grid; grid-template-columns:repeat(6,1fr); gap:12px}
+  .kpi{background:var(--surface); border:1px solid var(--border); border-radius:var(--r);
+    padding:12px 14px; box-shadow:var(--shadow-sm)}
+  .kpi .lab{font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-4)}
+  .kpi .val{font-size:21px; font-weight:800; color:var(--ink-1); letter-spacing:-.02em; margin-top:3px}
+  .kpi .val small{font-size:11px; font-weight:600; color:var(--ink-4)}
+  .kpi .delta{display:inline-flex; align-items:center; gap:3px; font-size:11px; font-weight:700;
+    border-radius:5px; padding:1px 6px; margin-top:6px}
+  .kpi .up{color:var(--success); background:var(--success-bg)}
+  .kpi .down{color:var(--danger); background:var(--danger-bg)}
+  .kpi .flat{color:var(--ink-3); background:var(--muted)}
+  .kpi .delta svg{width:10px; height:10px}
+  .kpi .spark{margin-top:8px}
+  .kpi .note{font-size:10.5px; color:var(--ink-5); margin-top:6px}
+
+  /* ---------- cards ---------- */
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--r);
+    box-shadow:var(--shadow-sm)}
+  .card .chead{display:flex; align-items:center; gap:10px; padding:13px 16px 0}
+  .card .chead h3{font-size:14px; font-weight:700; color:var(--ink-1); letter-spacing:-.01em}
+  .card .chead .hint{font-size:11.5px; color:var(--ink-5)}
+  .card .chead .right{margin-left:auto; display:flex; align-items:center; gap:6px}
+  .pillset{display:flex; background:var(--muted); border:1px solid var(--border); border-radius:7px; padding:2px}
+  .pillset span{font-size:11px; font-weight:600; color:var(--ink-4); padding:3px 9px; border-radius:5px; cursor:pointer}
+  .pillset .on{background:#fff; color:var(--ink-1); box-shadow:var(--shadow-sm)}
+  .link{font-size:12px; font-weight:600; color:var(--navy); text-decoration:none}
+  .cbody{padding:12px 16px 16px}
+
+  /* ---------- pipeline ---------- */
+  .flowbar{display:flex; height:14px; border-radius:7px; overflow:hidden; gap:2px; background:var(--ground)}
+  .flowbar i{display:block}
+  .stages{display:grid; grid-template-columns:repeat(7,1fr); gap:10px; margin-top:14px}
+  .stage{border-left:1px solid var(--border-soft); padding-left:10px}
+  .stage:first-child{border-left:0; padding-left:0}
+  .stage .sw{width:8px; height:8px; border-radius:2px; display:inline-block; margin-right:6px; vertical-align:1px}
+  .stage .nm{font-size:11px; font-weight:600; color:var(--ink-3)}
+  .stage .ct{font-size:19px; font-weight:800; color:var(--ink-1); letter-spacing:-.02em; margin-top:2px}
+  .stage .stuck{display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:600;
+    color:var(--warning); background:var(--warning-bg); border-radius:5px; padding:1px 6px; margin-top:5px}
+  .stage .ok{display:inline-flex; font-size:10.5px; font-weight:600; color:var(--ink-5); margin-top:5px}
+  .callout{display:flex; align-items:center; gap:9px; margin-top:14px; font-size:12px;
+    background:var(--info-bg); border:1px solid #bae0f7; color:#075985; border-radius:8px; padding:8px 12px}
+  .callout svg{width:14px; height:14px; flex:none}
+  .callout b{font-weight:700}
+
+  /* ---------- layout cols ---------- */
+  .cols{display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:16px; align-items:start}
+  .stack{display:flex; flex-direction:column; gap:16px; min-width:0}
+  .half{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+
+  /* ---------- legends & charts ---------- */
+  .legend{display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:var(--ink-3)}
+  .legend i{width:9px; height:9px; border-radius:2.5px; display:inline-block; margin-right:5px; vertical-align:-.5px}
+  .chart-note{font-size:11px; color:var(--ink-5); margin-top:8px}
+
+  /* grouped bar chart (divs) */
+  .bars{display:flex; align-items:flex-end; gap:0; height:150px; border-bottom:1px solid var(--border);
+    position:relative; margin-top:12px}
+  .bars .grid{position:absolute; inset:0; display:flex; flex-direction:column; justify-content:space-between; pointer-events:none}
+  .bars .grid i{border-top:1px solid var(--border-soft); font-size:9.5px; color:var(--ink-5);
+    padding-left:2px; line-height:0; height:0}
+  .bars .grid i span{position:relative; top:-7px; background:var(--surface); padding-right:4px}
+  .bgroup{flex:1; display:flex; align-items:flex-end; justify-content:center; gap:3px; height:100%;
+    position:relative; z-index:1}
+  .bar{width:16px; border-radius:4px 4px 0 0; position:relative; cursor:default}
+  .bar:hover{filter:brightness(1.08)}
+  .bar .tip{display:none; position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%);
+    background:var(--ink-1); color:#fff; font-size:10.5px; font-weight:600; white-space:nowrap;
+    border-radius:6px; padding:4px 8px; z-index:5}
+  .bar:hover .tip{display:block}
+  .baxis{display:flex; margin-top:6px}
+  .baxis span{flex:1; text-align:center; font-size:10.5px; color:var(--ink-4)}
+
+  /* stacked outcome rows */
+  .orow{display:grid; grid-template-columns:88px 1fr 52px; align-items:center; gap:10px; margin-top:10px}
+  .orow:first-of-type{margin-top:12px}
+  .orow .nm{font-size:12px; font-weight:600; color:var(--ink-2)}
+  .orow .track{display:flex; gap:2px; height:16px; border-radius:5px; overflow:hidden}
+  .orow .track i{position:relative; cursor:default}
+  .orow .track i:hover{filter:brightness(1.08)}
+  .orow .track .tip{display:none; position:absolute; bottom:calc(100% + 5px); left:50%; transform:translateX(-50%);
+    background:var(--ink-1); color:#fff; font-size:10.5px; font-weight:600; white-space:nowrap;
+    border-radius:6px; padding:3px 7px; z-index:5}
+  .orow .track i:hover .tip{display:block}
+  .orow .pct{font-size:12px; font-weight:700; color:var(--ink-1); text-align:right}
+
+  /* workload */
+  .wrow{display:grid; grid-template-columns:176px 1fr 132px; gap:12px; align-items:center;
+    padding:9px 0; border-top:1px solid var(--border-soft)}
+  .wrow:first-of-type{border-top:0; padding-top:2px}
+  .wrow .who{display:flex; align-items:center; gap:9px}
+  .wrow .pfp{width:28px; height:28px; border-radius:50%; display:grid; place-items:center;
+    font-size:10px; font-weight:700; color:var(--navy); background:var(--sec)}
+  .wrow .who b{font-size:12.5px; font-weight:600; color:var(--ink-1); display:block; line-height:1.25; white-space:nowrap}
+  .wrow .who span{font-size:10.5px; color:var(--ink-5)}
+  .wtrack{height:8px; border-radius:4px; background:var(--ground); overflow:hidden}
+  .wtrack i{display:block; height:100%; border-radius:4px; background:var(--navy)}
+  .wtrack .full{background:var(--warning-base)}
+  .wmeta{font-size:11px; color:var(--ink-4); text-align:right}
+  .wmeta b{color:var(--ink-1); font-weight:700}
+  .wmeta .cap{display:inline-flex; align-items:center; gap:4px; color:var(--warning); font-weight:600}
+
+  /* ---------- rail ---------- */
+  .feed{list-style:none}
+  .feed li{display:flex; gap:10px; padding:9px 0; border-top:1px solid var(--border-soft)}
+  .feed li:first-child{border-top:0; padding-top:2px}
+  .feed .ic{width:26px; height:26px; border-radius:7px; display:grid; place-items:center; flex:none; margin-top:1px}
+  .feed .ic svg{width:13px; height:13px}
+  .feed .tx{min-width:0}
+  .feed .tx p{font-size:12px; color:var(--ink-2); line-height:1.45}
+  .feed .tx p b{font-weight:600; color:var(--ink-1)}
+  .feed .tx .mono{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-size:11px;
+    color:var(--ink-3); background:var(--muted); border:1px solid var(--border-soft);
+    border-radius:4px; padding:0 4px}
+  .feed .tx time{font-size:10.5px; color:var(--ink-5)}
+  .ic.success{background:var(--success-bg); color:var(--success)}
+  .ic.info{background:var(--info-bg); color:var(--info)}
+  .ic.warning{background:var(--warning-bg); color:var(--warning)}
+  .ic.brand{background:var(--sec); color:var(--navy)}
+
+  .aging .arow{display:grid; grid-template-columns:52px 1fr 78px; gap:10px; align-items:center; margin-top:9px}
+  .aging .arow:first-of-type{margin-top:12px}
+  .aging .nm{font-size:11.5px; font-weight:600; color:var(--ink-3)}
+  .aging .track{height:10px; background:var(--ground); border-radius:5px; overflow:hidden}
+  .aging .track i{display:block; height:100%; border-radius:5px}
+  .aging .amt{font-size:11.5px; font-weight:700; color:var(--ink-1); text-align:right}
+  .aging .flag{color:var(--danger)}
+  .aging .foot{display:flex; justify-content:space-between; margin-top:12px; padding-top:10px;
+    border-top:1px solid var(--border-soft); font-size:11.5px; color:var(--ink-4)}
+  .aging .foot b{color:var(--ink-1)}
+
+  .fups li{display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--border-soft); list-style:none}
+  .fups li:first-child{border-top:0; padding-top:2px}
+  .fups .t{font-size:10.5px; font-weight:700; color:var(--navy); background:var(--sec);
+    border-radius:5px; padding:2px 6px; flex:none}
+  .fups p{font-size:12px; color:var(--ink-2); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .fups p b{font-weight:600; color:var(--ink-1)}
+
+  .badge{display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700;
+    border-radius:5px; padding:1px 7px}
+  .badge.success{color:var(--success); background:var(--success-bg)}
+  .badge.warning{color:var(--warning); background:var(--warning-bg)}
+
+  svg text{font-family:inherit}
+  @media (prefers-reduced-motion:no-preference){
+    .attn a,.kpi,.card{transition:box-shadow .15s ease, border-color .15s ease}
+  }
+</style>
+
+<header class="concept-bar">
+  <span class="tag">Concept</span>
+  <h1>xSuite Dashboard — redesign mockup</h1>
+  <p>Owner view · Royal theme tokens · every widget maps to a stage of the recovery lifecycle</p>
+</header>
+
+<div class="frame-scroll">
+<div class="frame">
+
+  <!-- ============ sidebar ============ -->
+  <nav class="side" aria-label="Primary">
+    <div class="logo">x</div>
+    <a href="#" class="on" title="Dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg></a>
+    <a href="#" title="Cases"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg></a>
+    <a href="#" title="Devices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.5 5h13l3.5 7v5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></svg></a>
+    <a href="#" title="Customers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></a>
+    <a href="#" title="Finance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></a>
+    <a href="#" title="Inventory"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></a>
+    <a href="#" title="Reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></a>
+    <div class="spacer"></div>
+    <a href="#" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></a>
+    <div class="avatar-sm">NZ</div>
+  </nav>
+
+  <!-- ============ topbar ============ -->
+  <div class="topbar">
+    <span class="crumb">Space Data Recovery › <b>Dashboard</b></span>
+    <div class="search"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Search cases, devices, customers…<kbd>Ctrl K</kbd></div>
+    <div class="iconbtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="dot num">3</span></div>
+    <div class="avatar">NZ</div>
+  </div>
+
+  <main>
+
+    <!-- ============ command strip ============ -->
+    <section class="command">
+      <div class="hello">
+        <div class="eyebrow">Saturday · July 4, 2026 · 18:42 GST</div>
+        <h2>Good evening, Nitin</h2>
+        <p>Muscat HQ · Owner · Everything below is live as of 2 min ago</p>
+      </div>
+      <div class="live num" role="group" aria-label="Live lab status">
+        <div><b>214</b><span>devices in custody</span></div>
+        <div><b>9<small style="font-size:12px; color:#9db4e8">/12</small></b><span>benches active</span></div>
+        <div><b>3</b><span>inbound couriers</span></div>
+        <div><b>17</b><span>imaging jobs running</span></div>
+      </div>
+      <div class="acts">
+        <a class="btn btn-light" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Case</a>
+        <a class="btn btn-ghost" href="#">Intake Device</a>
+        <a class="btn btn-ghost" href="#">Record Payment</a>
+      </div>
+    </section>
+
+    <!-- ============ attention queue ============ -->
+    <div class="sec-label">Needs your attention<span class="line"></span></div>
+    <section class="attn">
+      <a href="#" class="danger">
+        <div class="head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>SLA at risk</div>
+        <div class="big num">7 <small>cases breach &lt; 24 h</small></div>
+        <div class="sub">3 priority-1 · oldest: CASE-2481 (RAID-6, hospital)</div>
+        <span class="cta">Triage now →</span>
+      </a>
+      <a href="#" class="warning">
+        <div class="head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Quotes stalled &gt; 3 d</div>
+        <div class="big num">23 <small>awaiting customer</small></div>
+        <div class="sub num">OMR 9,840.000 recovery value on hold</div>
+        <span class="cta">Send reminders →</span>
+      </a>
+      <a href="#" class="info">
+        <div class="head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Data ready, unpaid</div>
+        <div class="big num">12 <small>releases gated</small></div>
+        <div class="sub num">OMR 4,321.500 collectable before checkout</div>
+        <span class="cta">Review releases →</span>
+      </a>
+      <a href="#" class="warning">
+        <div class="head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>QA sign-off pending</div>
+        <div class="big num">41 <small>verifications</small></div>
+        <div class="sub">5 waiting &gt; 48 h · 2 hash checks outstanding</div>
+        <span class="cta">Open QA queue →</span>
+      </a>
+    </section>
+
+    <!-- ============ KPI band ============ -->
+    <section class="kpis">
+      <div class="kpi">
+        <div class="lab">Active in workflow</div>
+        <div class="val num">661</div>
+        <span class="delta up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>4.1% wk</span>
+        <div class="spark"><svg width="100%" height="26" viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,19 12,17 24,20 36,14 48,15 60,11 72,13 84,8 100,6" fill="none" stroke="#0891b2" stroke-width="2" stroke-linecap="round"/><circle cx="100" cy="6" r="2.4" fill="#0891b2"/></svg></div>
+        <div class="note num">of 1,448 open cases</div>
+      </div>
+      <div class="kpi">
+        <div class="lab">New intakes · 7 d</div>
+        <div class="val num">52</div>
+        <span class="delta up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>12% wk</span>
+        <div class="spark"><svg width="100%" height="26" viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,20 12,18 24,19 36,15 48,17 60,12 72,14 84,10 100,8" fill="none" stroke="#0891b2" stroke-width="2" stroke-linecap="round"/><circle cx="100" cy="8" r="2.4" fill="#0891b2"/></svg></div>
+        <div class="note num">68 devices · 9 multi-drive jobs</div>
+      </div>
+      <div class="kpi">
+        <div class="lab">Recovery success · 30 d</div>
+        <div class="val num">87.3<small>%</small></div>
+        <span class="delta up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>1.2 pt</span>
+        <div class="spark"><svg width="100%" height="26" viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,14 12,15 24,12 36,13 48,10 60,12 72,9 84,10 100,7" fill="none" stroke="#0d9488" stroke-width="2" stroke-linecap="round"/><circle cx="100" cy="7" r="2.4" fill="#0d9488"/></svg></div>
+        <div class="note">full + partial, verified at QA</div>
+      </div>
+      <div class="kpi">
+        <div class="lab">Median turnaround</div>
+        <div class="val num">6.4<small> days</small></div>
+        <span class="delta up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>0.8 d faster</span>
+        <div class="spark"><svg width="100%" height="26" viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,8 12,10 24,9 36,13 48,12 60,15 72,14 84,17 100,18" fill="none" stroke="#0d9488" stroke-width="2" stroke-linecap="round"/><circle cx="100" cy="18" r="2.4" fill="#0d9488"/></svg></div>
+        <div class="note">intake → verified delivery</div>
+      </div>
+      <div class="kpi">
+        <div class="lab">Revenue · MTD</div>
+        <div class="val num" style="font-size:18px">OMR 21,048.500</div>
+        <span class="delta up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>8% vs Jun</span>
+        <div class="spark"><svg width="100%" height="26" viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,21 12,19 24,16 36,17 48,13 60,14 72,10 84,9 100,5" fill="none" stroke="#0891b2" stroke-width="2" stroke-linecap="round"/><circle cx="100" cy="5" r="2.4" fill="#0891b2"/></svg></div>
+        <div class="note num">invoiced OMR 24,110 · 87% collected</div>
+      </div>
+      <div class="kpi">
+        <div class="lab">Outstanding AR</div>
+        <div class="val num" style="font-size:18px">OMR 23,512.750</div>
+        <span class="delta down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>3.2% wk</span>
+        <div class="spark"><svg width="100%" height="26" viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,12 12,13 24,11 36,14 48,12 60,15 72,13 84,12 100,10" fill="none" stroke="#be185d" stroke-width="2" stroke-linecap="round"/><circle cx="100" cy="10" r="2.4" fill="#be185d"/></svg></div>
+        <div class="note num">OMR 3,845 aged &gt; 90 d</div>
+      </div>
+    </section>
+
+    <!-- ============ pipeline ============ -->
+    <section class="card">
+      <div class="chead">
+        <h3>Recovery pipeline</h3>
+        <span class="hint num">661 cases in active flow · condensed from the 16-stage lifecycle</span>
+        <div class="right"><a class="link" href="#">Open case board →</a></div>
+      </div>
+      <div class="cbody">
+        <div class="flowbar" role="img" aria-label="Pipeline distribution: Intake 86, Diagnosis 124, Awaiting approval 97, Recovery 212, QA 41, Ready to deliver 63, Awaiting payment 38">
+          <i style="flex:86; background:#0891b2"></i>
+          <i style="flex:124; background:#0d9488"></i>
+          <i style="flex:97; background:#ea580c"></i>
+          <i style="flex:212; background:#162660"></i>
+          <i style="flex:41; background:#be185d"></i>
+          <i style="flex:63; background:#059669"></i>
+          <i style="flex:38; background:#94a3b8"></i>
+        </div>
+        <div class="stages num">
+          <div class="stage"><span class="sw" style="background:#0891b2"></span><span class="nm">Intake</span><div class="ct">86</div><span class="ok">custody logged ✓</span></div>
+          <div class="stage"><span class="sw" style="background:#0d9488"></span><span class="nm">Diagnosis</span><div class="ct">124</div><span class="stuck">18 &gt; 7 d</span></div>
+          <div class="stage"><span class="sw" style="background:#ea580c"></span><span class="nm">Awaiting approval</span><div class="ct">97</div><span class="stuck">23 &gt; 3 d</span></div>
+          <div class="stage"><span class="sw" style="background:#162660"></span><span class="nm">Recovery</span><div class="ct">212</div><span class="stuck">11 need donor</span></div>
+          <div class="stage"><span class="sw" style="background:#be185d"></span><span class="nm">QA / Verify</span><div class="ct">41</div><span class="stuck">5 &gt; 48 h</span></div>
+          <div class="stage"><span class="sw" style="background:#059669"></span><span class="nm">Ready to deliver</span><div class="ct">63</div><span class="ok">51 customer notified</span></div>
+          <div class="stage"><span class="sw" style="background:#94a3b8"></span><span class="nm">Awaiting payment</span><div class="ct">38</div><span class="stuck">12 gate release</span></div>
+        </div>
+        <div class="callout">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span><b class="num">787 open cases have had no activity for 30+ days.</b> They inflate "Active Cases" and hide real workload — review for closure, archive, or follow-up. <a class="link" href="#" style="color:inherit; text-decoration:underline">Start backlog review →</a></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ two-column zone ============ -->
+    <div class="cols">
+      <div class="stack">
+
+        <!-- intake vs completed trend -->
+        <section class="card">
+          <div class="chead">
+            <h3>Case flow — intake vs completed</h3>
+            <div class="right">
+              <div class="legend"><span><i style="background:#0891b2"></i>Intake</span><span><i style="background:#0d9488"></i>Completed</span></div>
+              <div class="pillset"><span>30 d</span><span class="on">12 wk</span><span>12 m</span></div>
+            </div>
+          </div>
+          <div class="cbody">
+            <svg width="100%" height="210" viewBox="0 0 580 210" preserveAspectRatio="none" role="img"
+                 aria-label="Weekly intake versus completed cases over 12 weeks. Intake rises from 38 to 51; completed rises from 32 to 50. Gap is narrowing.">
+              <!-- grid -->
+              <g stroke="#EDF1F6" stroke-width="1">
+                <line x1="32" y1="10" x2="568" y2="10"/><line x1="32" y1="51.5" x2="568" y2="51.5"/>
+                <line x1="32" y1="93" x2="568" y2="93"/><line x1="32" y1="134.5" x2="568" y2="134.5"/>
+                <line x1="32" y1="176" x2="568" y2="176"/>
+              </g>
+              <g fill="#94a3b8" font-size="9.5" text-anchor="end">
+                <text x="26" y="13">60</text><text x="26" y="54.5">50</text><text x="26" y="96">40</text>
+                <text x="26" y="137.5">30</text><text x="26" y="179">20</text>
+              </g>
+              <g fill="#94a3b8" font-size="9.5" text-anchor="middle">
+                <text x="36" y="194">Apr 13</text><text x="177" y="194">May 4</text>
+                <text x="318" y="194">May 25</text><text x="459" y="194">Jun 15</text><text x="547" y="194">Jun 29</text>
+              </g>
+              <!-- completed area -->
+              <polygon fill="#0d9488" opacity="0.07" points="36,126.2 82.4,109.6 128.7,97.2 175.1,105.5 221.5,84.7 267.8,76.4 314.2,93 360.5,64 406.9,80.6 453.3,68.1 499.6,59.8 546,51.5 546,176 36,176"/>
+              <!-- completed line -->
+              <polyline fill="none" stroke="#0d9488" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                points="36,126.2 82.4,109.6 128.7,97.2 175.1,105.5 221.5,84.7 267.8,76.4 314.2,93 360.5,64 406.9,80.6 453.3,68.1 499.6,59.8 546,51.5"/>
+              <!-- intake line -->
+              <polyline fill="none" stroke="#0891b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                points="36,101.3 82.4,84.7 128.7,113.8 175.1,76.4 221.5,59.8 267.8,88.9 314.2,68.1 360.5,43.2 406.9,72.3 453.3,55.7 499.6,34.9 546,47.4"/>
+              <!-- endpoint markers + direct labels -->
+              <circle cx="546" cy="47.4" r="3.5" fill="#0891b2" stroke="#fff" stroke-width="1.5"><title>Intake, wk of Jun 29: 51 cases</title></circle>
+              <circle cx="546" cy="51.5" r="3.5" fill="#0d9488" stroke="#fff" stroke-width="1.5"><title>Completed, wk of Jun 29: 50 cases</title></circle>
+              <text x="556" y="44" font-size="10.5" font-weight="700" fill="#0891b2">51</text>
+              <text x="556" y="62" font-size="10.5" font-weight="700" fill="#0d9488">50</text>
+            </svg>
+            <div class="chart-note">Completions caught up to intake in the last two weeks — the pipeline stopped growing for the first time this quarter.</div>
+          </div>
+        </section>
+
+        <div class="half">
+          <!-- revenue -->
+          <section class="card">
+            <div class="chead">
+              <h3>Revenue — invoiced vs collected</h3>
+              <div class="right"><div class="legend"><span><i style="background:#0891b2"></i>Invoiced</span><span><i style="background:#0d9488"></i>Collected</span></div></div>
+            </div>
+            <div class="cbody">
+              <div class="bars" role="img" aria-label="Monthly invoiced versus collected revenue, January to June, in thousands of OMR. Values shown in tooltips; collection rate holds near 90%.">
+                <div class="grid" aria-hidden="true"><i><span class="num">24k</span></i><i><span class="num">16k</span></i><i><span class="num">8k</span></i><i></i></div>
+                <div class="bgroup"><div class="bar" style="height:67.5%; background:#0891b2"><span class="tip num">Jan · invoiced 16,200</span></div><div class="bar" style="height:62.1%; background:#0d9488"><span class="tip num">Jan · collected 14,900</span></div></div>
+                <div class="bgroup"><div class="bar" style="height:61.7%; background:#0891b2"><span class="tip num">Feb · invoiced 14,800</span></div><div class="bar" style="height:56.7%; background:#0d9488"><span class="tip num">Feb · collected 13,600</span></div></div>
+                <div class="bgroup"><div class="bar" style="height:77.1%; background:#0891b2"><span class="tip num">Mar · invoiced 18,500</span></div><div class="bar" style="height:70.0%; background:#0d9488"><span class="tip num">Mar · collected 16,800</span></div></div>
+                <div class="bgroup"><div class="bar" style="height:71.2%; background:#0891b2"><span class="tip num">Apr · invoiced 17,100</span></div><div class="bar" style="height:63.3%; background:#0d9488"><span class="tip num">Apr · collected 15,200</span></div></div>
+                <div class="bgroup"><div class="bar" style="height:80.8%; background:#0891b2"><span class="tip num">May · invoiced 19,400</span></div><div class="bar" style="height:73.3%; background:#0d9488"><span class="tip num">May · collected 17,600</span></div></div>
+                <div class="bgroup"><div class="bar" style="height:87.5%; background:#0891b2"><span class="tip num">Jun · invoiced 21,000</span></div><div class="bar" style="height:76.2%; background:#0d9488"><span class="tip num">Jun · collected 18,300</span></div></div>
+              </div>
+              <div class="baxis num"><span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span></div>
+              <div class="chart-note num">Collection rate 89.4% (6-mo avg) · best month: Jun OMR 21,000 invoiced</div>
+            </div>
+          </section>
+
+          <!-- outcomes by device type -->
+          <section class="card">
+            <div class="chead">
+              <h3>Recovery outcomes by device · 90 d</h3>
+              <div class="right"><div class="legend"><span><i style="background:#059669"></i>Full</span><span><i style="background:#D97706"></i>Partial</span><span><i style="background:#DC2626"></i>Unrecoverable</span></div></div>
+            </div>
+            <div class="cbody">
+              <div class="orow"><span class="nm">HDD <span style="color:#94a3b8; font-weight:500" class="num">· 148</span></span>
+                <div class="track"><i style="flex:78; background:#059669"><span class="tip">Full 78%</span></i><i style="flex:14; background:#D97706"><span class="tip">Partial 14%</span></i><i style="flex:8; background:#DC2626"><span class="tip">Unrecoverable 8%</span></i></div>
+                <span class="pct num">78%</span></div>
+              <div class="orow"><span class="nm">RAID / NAS <span style="color:#94a3b8; font-weight:500" class="num">· 37</span></span>
+                <div class="track"><i style="flex:84; background:#059669"><span class="tip">Full 84%</span></i><i style="flex:11; background:#D97706"><span class="tip">Partial 11%</span></i><i style="flex:5; background:#DC2626"><span class="tip">Unrecoverable 5%</span></i></div>
+                <span class="pct num">84%</span></div>
+              <div class="orow"><span class="nm">Flash / Mobile <span style="color:#94a3b8; font-weight:500" class="num">· 61</span></span>
+                <div class="track"><i style="flex:69; background:#059669"><span class="tip">Full 69%</span></i><i style="flex:19; background:#D97706"><span class="tip">Partial 19%</span></i><i style="flex:12; background:#DC2626"><span class="tip">Unrecoverable 12%</span></i></div>
+                <span class="pct num">69%</span></div>
+              <div class="orow"><span class="nm">SSD <span style="color:#94a3b8; font-weight:500" class="num">· 44</span></span>
+                <div class="track"><i style="flex:62; background:#059669"><span class="tip">Full 62%</span></i><i style="flex:21; background:#D97706"><span class="tip">Partial 21%</span></i><i style="flex:17; background:#DC2626"><span class="tip">Unrecoverable 17%</span></i></div>
+                <span class="pct num">62%</span></div>
+              <div class="chart-note">SSD full-recovery rate is 16 pt below HDD — controller-locked NVMe drives are the main driver. Consider adjusting SSD quote language.</div>
+            </div>
+          </section>
+        </div>
+
+        <!-- engineer workload -->
+        <section class="card">
+          <div class="chead">
+            <h3>Engineer workload</h3>
+            <span class="hint">active case assignments vs bench capacity</span>
+            <div class="right"><a class="link" href="#">Manage assignments →</a></div>
+          </div>
+          <div class="cbody">
+            <div class="wrow"><div class="who"><span class="pfp">MA</span><div><b>Marcus Adeyemi</b><span>Cleanroom · Sr. engineer</span></div></div>
+              <div class="wtrack"><i class="full" style="width:100%"></i></div>
+              <div class="wmeta num"><span class="cap"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>at capacity</span> <b>16</b>/16</div></div>
+            <div class="wrow"><div class="who"><span class="pfp">AH</span><div><b>Ahmed Al-Habsi</b><span>Cleanroom · HDD</span></div></div>
+              <div class="wtrack"><i style="width:87.5%"></i></div>
+              <div class="wmeta num"><b>14</b>/16 · 3 imaging</div></div>
+            <div class="wrow"><div class="who"><span class="pfp">PN</span><div><b>Priya Nair</b><span>Logical · RAID/NAS</span></div></div>
+              <div class="wtrack"><i style="width:75%"></i></div>
+              <div class="wmeta num"><b>12</b>/16 · 2 in QA</div></div>
+            <div class="wrow"><div class="who"><span class="pfp">KR</span><div><b>Khalid Al-Rawahi</b><span>Flash / mobile</span></div></div>
+              <div class="wtrack"><i style="width:68.75%"></i></div>
+              <div class="wmeta num"><b>11</b>/16</div></div>
+            <div class="wrow"><div class="who"><span class="pfp">SF</span><div><b>Sara Farsi</b><span>Logical · file systems</span></div></div>
+              <div class="wtrack"><i style="width:56.25%"></i></div>
+              <div class="wmeta num"><b>9</b>/16 · back Mon</div></div>
+            <div class="chart-note">Marcus is at capacity with 4 P1 cases — the 11 recovery-stage cases waiting on donors could shift to Sara when parts arrive.</div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ============ right rail ============ -->
+      <div class="stack">
+
+        <section class="card">
+          <div class="chead"><h3>Today in the lab</h3><div class="right"><a class="link" href="#">Custody log →</a></div></div>
+          <div class="cbody">
+            <ul class="feed">
+              <li><span class="ic success"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+                <div class="tx"><p><b>Integrity check passed</b> — SHA-256 verified on <span class="mono">CASE-2481-D3</span> clone</p><time>18:21 · Priya N.</time></div></li>
+              <li><span class="ic brand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.5 5h13l3.5 7v5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></svg></span>
+                <div class="tx"><p><b>Donor match found</b> — WD Blue PCB rev-C for <span class="mono">CASE-2497</span>, bin B-14</p><time>17:48 · auto-match</time></div></li>
+              <li><span class="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>
+                <div class="tx"><p><b>Device received</b> — 12-drive Synology array, <span class="mono">CASE-2503</span> · custody initialized, 12 labels printed</p><time>16:05 · front desk</time></div></li>
+              <li><span class="ic warning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+                <div class="tx"><p><b>Imaging stalled</b> — head instability on <span class="mono">CASE-2466-D1</span> at 71%, re-queued for head swap</p><time>15:32 · Ahmed A.</time></div></li>
+              <li><span class="ic success"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+                <div class="tx"><p><b>Data released</b> — <span class="mono">CASE-2439</span> checked out after payment, transfer signed by customer</p><time>14:10 · custody transfer</time></div></li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="card aging">
+          <div class="chead"><h3>Receivables aging</h3><div class="right"><a class="link" href="#">Invoices →</a></div></div>
+          <div class="cbody">
+            <div class="arow"><span class="nm num">0–30 d</span><div class="track"><i style="width:100%; background:#162660"></i></div><span class="amt num">12,410</span></div>
+            <div class="arow"><span class="nm num">31–60 d</span><div class="track"><i style="width:42%; background:#3d55a3"></i></div><span class="amt num">5,187</span></div>
+            <div class="arow"><span class="nm num">61–90 d</span><div class="track"><i style="width:17%; background:#7a8cc4"></i></div><span class="amt num">2,071</span></div>
+            <div class="arow"><span class="nm num">&gt; 90 d</span><div class="track"><i style="width:31%; background:#DC2626"></i></div><span class="amt num flag">3,845 ⚠</span></div>
+            <div class="foot num"><span>Total outstanding</span><b>OMR 23,512.750</b></div>
+            <div class="chart-note num">4 invoices make up 82% of the &gt;90 d bucket — two belong to one corporate account.</div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="chead"><h3>Quote performance · 30 d</h3></div>
+          <div class="cbody">
+            <div style="display:flex; gap:0; text-align:center">
+              <div style="flex:1; border-right:1px solid var(--border-soft)"><div class="num" style="font-size:20px; font-weight:800; color:var(--ink-1)">71%</div><div style="font-size:10.5px; color:var(--ink-4)">approval rate</div></div>
+              <div style="flex:1; border-right:1px solid var(--border-soft)"><div class="num" style="font-size:20px; font-weight:800; color:var(--ink-1)">1.9 d</div><div style="font-size:10.5px; color:var(--ink-4)">median decision</div></div>
+              <div style="flex:1"><div class="num" style="font-size:20px; font-weight:800; color:var(--ink-1)">428</div><div style="font-size:10.5px; color:var(--ink-4)">avg value (OMR)</div></div>
+            </div>
+            <div class="chart-note">Approval drops to 44% when the quote goes out more than 4 days after diagnosis — speed is the lever.</div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="chead"><h3>Follow-ups due</h3><span class="badge warning num">4 today</span><div class="right"><a class="link" href="#">All →</a></div></div>
+          <div class="cbody">
+            <ul class="fups">
+              <li><span class="t">09:00</span><p><b>Gulf Medical LLC</b> — RAID quote decision (CASE-2481)</p></li>
+              <li><span class="t">11:30</span><p><b>R. Al-Balushi</b> — confirm file-list review received</p></li>
+              <li><span class="t">14:00</span><p><b>Muscat Chambers</b> — NDA renewal before intake</p></li>
+              <li><span class="t">16:00</span><p><b>TechServe Oman</b> — collect 3 verified devices</p></li>
+            </ul>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+  </main>
+</div>
+</div>
