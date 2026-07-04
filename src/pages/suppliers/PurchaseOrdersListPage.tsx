@@ -4,7 +4,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Button } from '../../components/ui/Button';
 import { DataTable, type Column } from '../../components/shared/DataTable';
-import { ExportButton } from '../../components/shared/ExportButton';
 import { Badge } from '../../components/ui/Badge';
 import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
 import { KpiRow } from '../../components/templates/KpiRow';
@@ -293,42 +292,6 @@ export default function PurchaseOrdersListPage() {
                 </option>
               ))}
             </select>
-
-            <ExportButton
-              filename="purchase-orders"
-              columns={[
-                { key: 'po_number', label: 'PO #' },
-                { key: 'order_date', label: 'Order Date' },
-                { key: 'expected_delivery_date', label: 'Expected' },
-                { key: 'received_at', label: 'Received' },
-                {
-                  key: (r) => (r.suppliers as { name?: string } | null)?.name,
-                  label: 'Supplier',
-                },
-                { key: 'currency', label: 'Currency' },
-                { key: 'subtotal', label: 'Subtotal' },
-                { key: 'tax_amount', label: 'Tax' },
-                { key: 'shipping_cost', label: 'Shipping' },
-                { key: 'total_amount', label: 'Total' },
-                {
-                  key: (r) => (r.master_purchase_order_statuses as { name?: string } | null)?.name,
-                  label: 'Status',
-                },
-              ]}
-              getRows={async () => {
-                let q = supabase
-                  .from('purchase_orders')
-                  .select('po_number, order_date, expected_delivery_date, received_at, currency, subtotal, tax_amount, shipping_cost, total_amount, suppliers:supplier_id(name), master_purchase_order_statuses:status_id(name)')
-                  .is('deleted_at', null);
-                if (searchQuery) {
-                  q = q.ilike('po_number', `%${searchQuery}%`);
-                }
-                if (statusFilter !== 'all') q = q.eq('status_id', statusFilter);
-                const { data, error } = await q.order('order_date', { ascending: false, nullsFirst: false });
-                if (error) throw error;
-                return data ?? [];
-              }}
-            />
           </div>
         </div>
       }

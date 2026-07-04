@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Plus, Search, Filter, Truck, Mail, Phone, MapPin } from 'lucide-react';
 import { EmptyState } from '../../components/shared/EmptyState';
-import { ExportButton } from '../../components/shared/ExportButton';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
@@ -216,44 +215,6 @@ export default function SuppliersListPage() {
               )}
             </Button>
 
-            <ExportButton
-              filename="suppliers"
-              columns={[
-                { key: 'supplier_number', label: 'Supplier #' },
-                { key: 'name', label: 'Name' },
-                { key: 'contact_person', label: 'Contact' },
-                { key: 'email', label: 'Email' },
-                { key: 'phone', label: 'Phone' },
-                { key: 'tax_number', label: 'Tax #' },
-                {
-                  key: 'is_active',
-                  label: 'Active',
-                  format: (v) => (v ? 'yes' : 'no'),
-                },
-                {
-                  key: (r) => (r.master_supplier_categories as { name?: string } | null)?.name,
-                  label: 'Category',
-                },
-              ]}
-              getRows={async () => {
-                // Filters map to real columns: search → name/email/supplier_number ilike;
-                // statusFilter (active/inactive) → is_active; categoryFilter → category_id.
-                let q = supabase
-                  .from('suppliers')
-                  .select('supplier_number, name, contact_person, email, phone, tax_number, is_active, master_supplier_categories:category_id(name)')
-                  .is('deleted_at', null);
-                if (searchTerm) {
-                  const s = sanitizeFilterValue(searchTerm);
-                  q = q.or(`name.ilike.%${s}%,supplier_number.ilike.%${s}%,email.ilike.%${s}%`);
-                }
-                if (statusFilter === 'active') q = q.eq('is_active', true);
-                if (statusFilter === 'inactive') q = q.eq('is_active', false);
-                if (categoryFilter !== 'all') q = q.eq('category_id', categoryFilter);
-                const { data, error } = await q.order('name', { ascending: true });
-                if (error) throw error;
-                return data ?? [];
-              }}
-            />
           </div>
 
           {showFilters && (

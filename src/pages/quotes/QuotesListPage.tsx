@@ -14,7 +14,6 @@ import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
 import { roundMoney } from '../../lib/financialMath';
 import { supabase } from '../../lib/supabaseClient';
 import { EmptyState } from '../../components/shared/EmptyState';
-import { ExportButton } from '../../components/shared/ExportButton';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { useListPageSize } from '../../hooks/useListPageSize';
@@ -401,35 +400,6 @@ export const QuotesListPage: React.FC = () => {
               )}
             </Button>
 
-            <ExportButton
-              filename="quotes"
-              columns={[
-                { key: 'quote_number', label: 'Quote #' },
-                { key: 'quote_date', label: 'Date' },
-                { key: 'valid_until', label: 'Valid Until' },
-                {
-                  key: (r) => (r.customers_enhanced as { customer_name?: string } | null)?.customer_name,
-                  label: 'Customer',
-                },
-                { key: 'subtotal', label: 'Subtotal' },
-                { key: 'tax_amount', label: 'Tax' },
-                { key: 'total_amount', label: 'Total' },
-                { key: 'status', label: 'Status' },
-              ]}
-              getRows={async () => {
-                let q = supabase
-                  .from('quotes')
-                  .select('quote_number, quote_date, valid_until, subtotal, tax_amount, total_amount, status, customers_enhanced:customer_id(customer_name)')
-                  .is('deleted_at', null);
-                if (debouncedSearch) {
-                  q = q.ilike('quote_number', `%${debouncedSearch}%`);
-                }
-                if (statusFilter !== 'all') q = q.eq('status', statusFilter);
-                const { data, error } = await q.order('quote_date', { ascending: false, nullsFirst: false });
-                if (error) throw error;
-                return data ?? [];
-              }}
-            />
           </div>
 
           {showFilters && (

@@ -13,7 +13,6 @@ import { useCurrency } from '../../hooks/useCurrency';
 import { useConfirm } from '../../hooks/useConfirm';
 import { supabase } from '../../lib/supabaseClient';
 import { EmptyState } from '../../components/shared/EmptyState';
-import { ExportButton } from '../../components/shared/ExportButton';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
 import { downloadCSV } from '../../lib/csvExport';
@@ -67,7 +66,6 @@ export const InvoicesListPage: React.FC<unknown> = () => {
     pageSize,
   });
   const invoices = list.rows;
-  const debouncedSearch = list.debouncedSearch;
 
   // Command-palette deep-link: /invoices?new=1 opens the create modal.
   useEffect(() => {
@@ -247,39 +245,6 @@ export const InvoicesListPage: React.FC<unknown> = () => {
       title="Invoices"
       headerActions={
         <>
-          <ExportButton
-            filename="invoices"
-            columns={[
-              { key: 'invoice_number', label: 'Invoice #' },
-              { key: 'invoice_date', label: 'Date' },
-              { key: 'due_date', label: 'Due' },
-              { key: 'invoice_type', label: 'Type' },
-              {
-                key: (r) => (r.customers_enhanced as { customer_name?: string } | null)?.customer_name,
-                label: 'Customer',
-              },
-              { key: 'subtotal', label: 'Subtotal' },
-              { key: 'tax_amount', label: 'Tax' },
-              { key: 'total_amount', label: 'Total' },
-              { key: 'amount_paid', label: 'Paid' },
-              { key: 'balance_due', label: 'Balance' },
-              { key: 'status', label: 'Status' },
-            ]}
-            getRows={async () => {
-              let q = supabase
-                .from('invoices')
-                .select('invoice_number, invoice_date, due_date, invoice_type, subtotal, tax_amount, total_amount, amount_paid, balance_due, status, customers_enhanced:customer_id(customer_name)')
-                .is('deleted_at', null);
-              if (debouncedSearch) {
-                q = q.ilike('invoice_number', `%${debouncedSearch}%`);
-              }
-              if (statusFilter !== 'all') q = q.eq('status', statusFilter);
-              if (typeFilter !== 'all') q = q.eq('invoice_type', typeFilter);
-              const { data, error } = await q.order('invoice_date', { ascending: false, nullsFirst: false });
-              if (error) throw error;
-              return data ?? [];
-            }}
-          />
           <Button size="sm" onClick={() => setShowInvoiceModal(true)}>
             <Plus className="w-4 h-4 mr-1.5" />
             Create Invoice

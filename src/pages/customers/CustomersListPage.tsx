@@ -14,7 +14,6 @@ import { PhoneInput } from '../../components/ui/PhoneInput';
 import { SearchableSelect } from '../../components/ui/SearchableSelect';
 import { CustomerAvatar } from '../../components/ui/CustomerAvatar';
 import { Plus, Search, Filter, Mail, Phone, Building2, MapPin, Users, UserCheck, Clock, Archive, Download, ShieldCheck } from 'lucide-react';
-import { ExportButton } from '../../components/shared/ExportButton';
 import { KpiRow } from '../../components/templates/KpiRow';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
@@ -542,47 +541,6 @@ export const CustomersListPage: React.FC = () => {
               )}
             </Button>
 
-            <ExportButton
-              filename="customers"
-              columns={[
-                { key: 'customer_number', label: 'Customer #' },
-                { key: 'customer_name', label: 'Name' },
-                { key: 'email', label: 'Email' },
-                { key: 'mobile_number', label: 'Mobile' },
-                { key: 'phone', label: 'Phone' },
-                { key: 'address', label: 'Address' },
-                {
-                  key: (r) => (r.customer_groups as { name?: string } | null)?.name,
-                  label: 'Group',
-                },
-                {
-                  key: 'portal_enabled',
-                  label: 'Portal Enabled',
-                  format: (v) => (v ? 'yes' : 'no'),
-                },
-                {
-                  key: 'created_at',
-                  label: 'Created',
-                  format: (v) => (v ? new Date(v as string).toISOString().slice(0, 10) : ''),
-                },
-              ]}
-              getRows={async () => {
-                let q = supabase
-                  .from('customers_enhanced')
-                  .select('customer_number, customer_name, email, mobile_number, phone, address, portal_enabled, created_at, customer_groups:customer_group_id(name)')
-                  .is('deleted_at', null);
-                if (searchTerm) {
-                  const s = sanitizeFilterValue(searchTerm);
-                  q = q.or(`customer_name.ilike.%${s}%,customer_number.ilike.%${s}%,email.ilike.%${s}%,mobile_number.ilike.%${s}%`);
-                }
-                if (filterGroup !== 'all') q = q.eq('customer_group_id', filterGroup);
-                if (filterPortal === 'enabled') q = q.eq('portal_enabled', true);
-                if (filterPortal === 'disabled') q = q.eq('portal_enabled', false);
-                const { data, error } = await q.order('created_at', { ascending: false });
-                if (error) throw error;
-                return data ?? [];
-              }}
-            />
           </div>
 
           {showFilters && (
