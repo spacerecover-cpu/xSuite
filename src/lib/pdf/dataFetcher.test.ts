@@ -3,10 +3,26 @@ import type { CurrencyConfig } from '../../types/tenantConfig';
 
 // dataFetcher imports the Supabase client at module load; stub it so the pure
 // transform functions can be tested in isolation (they never touch the network).
+// `supabase` is a plain mutable object so `fetchDocumentTaxLines` tests can
+// swap in a query-chain mock per-test without fighting vi.mock hoisting.
 vi.mock('../supabaseClient', () => ({ supabase: {} }));
 vi.mock('../companySettingsService', () => ({ getOrCreateCompanySettings: vi.fn() }));
 
-import { toQuoteData, toInvoiceData, toCaseData, toPaymentReceiptData, toPayslipData, toQuoteItems, toInvoiceItems, currencyToBlock } from './dataFetcher';
+import { supabase } from '../supabaseClient';
+import { toQuoteData, toInvoiceData, toCaseData, toPaymentReceiptData, toPayslipData, toQuoteItems, toInvoiceItems, currencyToBlock, fetchDocumentTaxLines } from './dataFetcher';
+
+// Wires supabase.from('document_tax_lines').select(...).eq(...).eq(...).is(...).order(...)
+// to resolve with `result`, and returns the spies so callers can assert on args.
+function mockDocumentTaxLinesQuery(result: { data: unknown[] | null; error: unknown }) {
+  const order = vi.fn().mockResolvedValue(result);
+  const is = vi.fn(() => ({ order }));
+  const eq2 = vi.fn(() => ({ is }));
+  const eq1 = vi.fn(() => ({ eq: eq2 }));
+  const select = vi.fn(() => ({ eq: eq1 }));
+  const from = vi.fn(() => ({ select }));
+  (supabase as unknown as { from: typeof from }).from = from;
+  return { from, select, eq1, eq2, is, order };
+}
 
 // A real non-USD resolved currency (Oman). Phase 1's whole point: the document
 // currency block is sourced from the resolved Country Engine CurrencyConfig, so a
@@ -69,7 +85,15 @@ describe('currencyToBlock — resolved CurrencyConfig → document currency bloc
       currency_symbol: 'ر.ع.',
       currency_position: 'before',
       decimal_places: 3,
+      decimal_separator: '.',
+      thousands_separator: ',',
     });
+  });
+
+  it('threads the decimal/thousands separators from the resolved config', () => {
+    const block = currencyToBlock({ ...OMR, decimalSeparator: ',', thousandsSeparator: '.' });
+    expect(block.decimal_separator).toBe(',');
+    expect(block.thousands_separator).toBe('.');
   });
 
   it('honors an after-position config', () => {
@@ -161,6 +185,16 @@ describe('toQuoteData — customer/company contract (regression: customer info s
     const result = toQuoteData(QUOTE_ROW, { currency: OMR });
     expect(result.customer).toBeUndefined();
   });
+
+  it('threads the statutory quote_date (distinct from created_at)', () => {
+    const result = toQuoteData({ ...QUOTE_ROW, quote_date: '2026-07-02' }, { currency: OMR });
+    expect(result.quote_date).toBe('2026-07-02');
+  });
+
+  it('defaults quote_date to null when the row has none (pre-migration rows)', () => {
+    const result = toQuoteData(QUOTE_ROW, { currency: OMR });
+    expect(result.quote_date).toBeNull();
+  });
 });
 
 describe('toInvoiceData — customer/company/bank contract', () => {
@@ -205,10 +239,134 @@ describe('toInvoiceData — customer/company/bank contract', () => {
 
 });
 
+describe('toInvoiceData compliance fields', () => {
+  it('threads snapshot columns and tax lines through', () => {
+    const data = toInvoiceData(
+      {
+        id: 'i1', invoice_number: 'INVO-1', invoice_type: 'tax_invoice',
+        buyer_tax_number: 'OM222', buyer_tax_number_label: 'VATIN',
+        seller_tax_number: 'OM111', supply_date: '2026-07-01', reverse_charge: false,
+        notations: [{ code: 'ZERO_RATED', text: 'Zero-rated supply (EXPORT_SERVICES).' }],
+      } as Parameters<typeof toInvoiceData>[0],
+      {
+        currency: { code: 'OMR', symbol: 'ر.ع.', decimalPlaces: 3, position: 'after',
+          decimalSeparator: '.', thousandsSeparator: ',' } as never,
+        items: [],
+        taxLines: [{
+          line_item_id: null, component_code: 'VAT', component_label: 'VAT 5%',
+          rate: 5, taxable_base: 100, tax_amount: 5, tax_treatment: 'standard',
+          treatment_reason_code: null, sequence: 0, backfilled: false, rule_trace: null,
+        }],
+      },
+    );
+    expect(data.buyer_tax_number).toBe('OM222');
+    expect(data.seller_tax_number).toBe('OM111');
+    expect(data.supply_date).toBe('2026-07-01');
+    expect(data.tax_lines).toHaveLength(1);
+    expect(data.accounting_locales?.decimal_separator).toBe('.');
+  });
+
+  it('defaults snapshot columns to null/false/[] when the row has none (backward-compatible)', () => {
+    const data = toInvoiceData(INVOICE_ROW, { currency: OMR, items: [] });
+    expect(data.buyer_tax_number).toBeNull();
+    expect(data.seller_tax_number).toBeNull();
+    expect(data.supply_date).toBeNull();
+    expect(data.reverse_charge).toBe(false);
+    expect(data.notations).toBeNull();
+    expect(data.tax_lines).toEqual([]);
+  });
+});
+
+describe('toQuoteData/toInvoiceData — buyer identity + structured address on the party blocks', () => {
+  it('maps tax_number and the embedded subdivision name onto the quote customer block', () => {
+    const result = toQuoteData(QUOTE_ROW, {
+      currency: OMR,
+      customer: {
+        id: 'cust1', customer_name: 'Buyer LLC', tax_number: 'OM999',
+        address_line1: 'Street 1', address_line2: 'Building 2', postal_code: '111',
+        subdivision: { name: 'Muscat' },
+      },
+    });
+    expect(result.customer?.tax_number).toBe('OM999');
+    expect(result.customer?.address_line1).toBe('Street 1');
+    expect(result.customer?.address_line2).toBe('Building 2');
+    expect(result.customer?.postal_code).toBe('111');
+    expect(result.customer?.subdivision_name).toBe('Muscat');
+  });
+
+  it('maps tax_number and the embedded subdivision name onto the invoice company block', () => {
+    const result = toInvoiceData(INVOICE_ROW, {
+      currency: OMR,
+      company: {
+        id: 'co1', company_name: 'Acme LLC', tax_number: 'OM888',
+        address_line1: 'Street 9', postal_code: '222', subdivision: { name: 'Salalah' },
+      },
+    });
+    expect(result.company?.tax_number).toBe('OM888');
+    expect(result.company?.address_line1).toBe('Street 9');
+    expect(result.company?.subdivision_name).toBe('Salalah');
+  });
+
+  it('leaves tax_number/subdivision_name undefined when the row has neither (no silent leak)', () => {
+    const result = toQuoteData(QUOTE_ROW, { currency: OMR, customer: { id: 'c', customer_name: 'Plain' } });
+    expect(result.customer?.tax_number).toBeUndefined();
+    expect(result.customer?.subdivision_name).toBeUndefined();
+  });
+});
+
+describe('fetchDocumentTaxLines', () => {
+  const ROW = {
+    line_item_id: 'li1', component_code: 'VAT', component_label: 'VAT 5%',
+    rate: '5', taxable_base: '100', tax_amount: '5', tax_treatment: 'standard',
+    treatment_reason_code: null, sequence: 1, backfilled: false, rule_trace: null,
+  };
+
+  it('returns rows mapped from document_tax_lines with numeric coercion', async () => {
+    mockDocumentTaxLinesQuery({ data: [ROW], error: null });
+    const rows = await fetchDocumentTaxLines('invoice', 'inv-1');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].rate).toBe(5);
+    expect(rows[0].taxable_base).toBe(100);
+    expect(rows[0].tax_amount).toBe(5);
+    expect(typeof rows[0].rate).toBe('number');
+  });
+
+  it('queries by document_type/document_id, excludes soft-deleted rows, and orders by sequence', async () => {
+    const spies = mockDocumentTaxLinesQuery({ data: [ROW], error: null });
+    await fetchDocumentTaxLines('quote', 'q-1');
+    expect(spies.from).toHaveBeenCalledWith('document_tax_lines');
+    expect(spies.eq1).toHaveBeenCalledWith('document_type', 'quote');
+    expect(spies.eq2).toHaveBeenCalledWith('document_id', 'q-1');
+    expect(spies.is).toHaveBeenCalledWith('deleted_at', null);
+    expect(spies.order).toHaveBeenCalledWith('sequence');
+  });
+
+  it('returns [] when there are no tax lines for the document', async () => {
+    mockDocumentTaxLinesQuery({ data: [], error: null });
+    expect(await fetchDocumentTaxLines('credit_note', 'cn-1')).toEqual([]);
+  });
+
+  it('returns [] when the query resolves with null data', async () => {
+    mockDocumentTaxLinesQuery({ data: null, error: null });
+    expect(await fetchDocumentTaxLines('stock_sale', 'ss-1')).toEqual([]);
+  });
+
+  it('throws when the query errors', async () => {
+    mockDocumentTaxLinesQuery({ data: null, error: new Error('boom') });
+    await expect(fetchDocumentTaxLines('invoice', 'inv-1')).rejects.toThrow('boom');
+  });
+});
+
 describe('line-item mappers (replace the old as-unknown-as array casts)', () => {
   it('toQuoteItems maps fields and defaults nullable numerics to 0', () => {
     const result = toQuoteItems([{ id: 'qi1', description: 'Imaging', quantity: 2, unit_price: 75 }]);
-    expect(result[0]).toEqual({ id: 'qi1', description: 'Imaging', quantity: 2, unit_price: 75 });
+    expect(result[0]).toEqual({ id: 'qi1', description: 'Imaging', quantity: 2, unit_price: 75, unit_label: null, item_code: null });
+  });
+
+  it('toQuoteItems threads unit_label/item_code from the row (statutory columns)', () => {
+    const result = toQuoteItems([{ id: 'qi1', description: 'Imaging', quantity: 2, unit_price: 75, unit_label: 'Piece', item_code: '998713' }]);
+    expect(result[0].unit_label).toBe('Piece');
+    expect(result[0].item_code).toBe('998713');
   });
 
   it('toInvoiceItems computes line_total from quantity*unit_price (no DB column) and maps tax_rate', () => {

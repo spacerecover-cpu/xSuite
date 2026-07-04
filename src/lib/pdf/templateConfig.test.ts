@@ -15,6 +15,7 @@ const ALL_DOC_TYPES: TemplateDocumentType[] = [
   'case_label',
   'quote',
   'invoice',
+  'credit_note',
   'payment_receipt',
   'payslip',
   'chain_of_custody',
@@ -39,7 +40,7 @@ describe('BUILT_IN_TEMPLATE_CONFIGS', () => {
     }
   });
 
-  it('exposes exactly the 11 supported document types', () => {
+  it('exposes exactly the 12 supported document types', () => {
     expect(Object.keys(BUILT_IN_TEMPLATE_CONFIGS).sort()).toEqual([...ALL_DOC_TYPES].sort());
   });
 

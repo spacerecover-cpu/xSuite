@@ -31,6 +31,11 @@ export interface QuoteItem {
   description: string;
   quantity: number;
   unit_price: number;
+  unit_code?: string | null;
+  unit_label?: string | null;
+  item_code?: string | null;
+  tax_treatment?: string;
+  treatment_reason_code?: string | null;
   /** Caller-facing alias for `total` (DB column). Maps both ways. */
   line_total?: number;
   sort_order?: number;
@@ -323,6 +328,9 @@ export const fetchQuoteById = async (id: string): Promise<QuoteWithDetails | nul
     description: it.description,
     quantity: it.quantity ?? 0,
     unit_price: it.unit_price,
+    unit_code: it.unit_code,
+    unit_label: it.unit_label,
+    item_code: it.item_code,
     line_total: it.total,
     sort_order: it.sort_order ?? 0,
   }));
@@ -493,6 +501,11 @@ export const createQuote = async (quote: Quote, items: QuoteItem[]) => {
         description: item.description.trim(),
         quantity: item.quantity,
         unit_price: item.unit_price,
+        unit_code: item.unit_code ?? null,
+        unit_label: item.unit_label ?? null,
+        item_code: item.item_code ?? null,
+        tax_treatment: item.tax_treatment ?? 'standard',
+        treatment_reason_code: item.treatment_reason_code ?? null,
         total,
         sort_order: index,
       };
@@ -635,6 +648,11 @@ export const updateQuote = async (id: string, quote: Partial<Quote>, items?: Quo
         description: item.description,
         quantity: item.quantity,
         unit_price: item.unit_price,
+        unit_code: item.unit_code ?? null,
+        unit_label: item.unit_label ?? null,
+        item_code: item.item_code ?? null,
+        tax_treatment: item.tax_treatment ?? 'standard',
+        treatment_reason_code: item.treatment_reason_code ?? null,
         total,
         sort_order: index,
       };
@@ -869,6 +887,9 @@ export const duplicateQuote = async (sourceId: string) => {
       description: item.description,
       quantity: item.quantity,
       unit_price: item.unit_price,
+      unit_code: item.unit_code,
+      unit_label: item.unit_label,
+      item_code: item.item_code,
     })) ?? [];
 
   return createQuote(newQuote, items);

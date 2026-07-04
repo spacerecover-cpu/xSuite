@@ -1,47 +1,139 @@
 import { isRTLLanguage } from '../../locale';
-import type { TemplateConfigOverride } from '../templateConfig';
+import type { TemplateConfigOverride, ColumnConfigOverride } from '../templateConfig';
+import type { DocumentComplianceProfile, TaxDocumentType } from '../../regimes/types';
 
-/** Resolved statutory/format facts the country layer needs. Read by the caller
- *  from geo_countries (+ the §3c geo_country_tax_rates resolver for the
- *  effective-dated tax_label) -- this mapper never touches the DB. */
-export interface ResolvedCountryFacts {
-  code: string; // ISO alpha-2
-  taxSystem: string | null; // 'VAT' | 'GST' | 'SALES_TAX' | 'NONE'
-  taxLabel: string | null; // resolved label (rate-row first, scalar fallback)
-  taxInvoiceRequired: boolean;
-  languageCode: string | null; // drives RTL via isRTLLanguage
-  decimalPlaces: number | null; // minor-unit (3 OMR/KWD/BHD, 0 JPY)
-  dateFormat: string | null; // stored 'DD/MM/YYYY' etc.
+/** Maps a compliance profile's `forcedColumns` (statutory snake_case names) to
+ *  the line-item table's REAL camelCase column keys. Defined ONCE here and reused
+ *  by every financial adapter's country layer (invoice / quote / credit note) via
+ *  {@link forcedColumnOverrides}, so the mapping is never hand-rolled per doc type. */
+export const FORCED_COLUMN_KEY_MAP: Record<'item_code' | 'unit_code', string> = {
+  item_code: 'itemCode',
+  unit_code: 'unit',
+};
+
+/** Build the `lineItems` column-visibility overrides that turn a profile's
+ *  `forcedColumns` ON, addressing the real camelCase column keys. Returns `[]`
+ *  when nothing is forced (so the country override stays a no-op for GCC docs,
+ *  whose profile forces no columns). */
+export function forcedColumnOverrides(
+  forcedColumns: ReadonlyArray<'item_code' | 'unit_code'>,
+): ColumnConfigOverride[] {
+  return forcedColumns.map((fc) => ({ key: FORCED_COLUMN_KEY_MAP[fc], visible: true }));
 }
 
-/** Map resolved country facts -> a derived (NOT authored) template override that
- *  slots into the cascade between built-in and theme. One override, not 195
- *  templates (locked blind-spot decision). ZATCA TLV stays in the adapter via
- *  shouldEmitZatcaQr({taxSystem, countryCode}); this only flips taxBar.enabled. */
-export function countryTemplateOverride(facts: ResolvedCountryFacts): TemplateConfigOverride {
+/** Resolved statutory/format facts the country layer needs (read from
+ *  geo_countries by countryFactsService; this mapper never touches the DB). */
+export interface ResolvedCountryFacts {
+  code: string;                        // ISO alpha-2
+  taxSystem: string | null;            // 'VAT' | 'GST' | 'SALES_TAX' | 'NONE'
+  taxLabel: string | null;             // totals-line label ('VAT')
+  taxNumberLabel: string | null;       // registration-number label ('VATIN','TRN','GSTIN')
+  taxInvoiceRequired: boolean;
+  languageCode: string | null;         // drives RTL via isRTLLanguage
+  decimalPlaces: number | null;        // minor-unit (3 OMR/KWD/BHD, 0 JPY)
+  dateFormat: string | null;           // stored 'DD/MM/YYYY' etc.
+  decimalSeparator: string | null;
+  thousandsSeparator: string | null;
+  digitGrouping: string | null;        // '3' western, '3;2' Indian (consumed Phase 4)
+  /** Joined geo_countries.address_format lines (e.g. '%N %O %A %C %Z'), or null.
+   *  Optional so existing fixtures/tests built without it keep compiling. */
+  addressFormat?: string | null;
+}
+
+/** Profile inputs for financial documents; null docType = non-financial doc
+ *  (labels/receipts/custody) which take only the formatting facts. */
+export interface ComplianceOverrideInputs {
+  profile: DocumentComplianceProfile;
+  sellerRegistered: boolean;
+  docType: TaxDocumentType | null;
+}
+
+/** Map resolved country facts (+ optional compliance profile) to a derived
+ *  (NOT authored) template override slotting between built-in and theme.
+ *  Studio/tenant overrides stay ABOVE this layer, so a tenant rename wins. */
+export function countryTemplateOverride(
+  facts: ResolvedCountryFacts,
+  compliance?: ComplianceOverrideInputs,
+): TemplateConfigOverride {
   const override: TemplateConfigOverride = {};
 
-  // D9 -- resolved tax label drives the VAT line + the tax-identification bar.
+  // D9 — resolved tax label drives the totals tax line.
   if (facts.taxLabel) {
     override.labels = { taxLabel: { en: facts.taxLabel } };
   }
 
-  // D11 -- VAT identification bar on only when a tax invoice is required AND VAT.
-  // Always set `enabled` (true|false) so the cascade reads a definite value
-  // (otherwise a non-VAT country leaves taxBar.enabled undefined, not false).
-  override.taxBar = { enabled: facts.taxInvoiceRequired && facts.taxSystem === 'VAT' };
-  if (facts.taxLabel) override.taxBar.label = { en: facts.taxLabel };
-
-  // RTL country -> bilingual-stacked, Arabic-lead.
-  if (facts.languageCode && isRTLLanguage(facts.languageCode)) {
-    override.language = { mode: 'bilingual_stacked', primary: 'ar' };
+  // Profile title ceremony (financial docs only). 'TAX INVOICE' iff the seller
+  // is registered AND the country requires the ceremony — decided by the plugin.
+  if (compliance && compliance.docType) {
+    const t = compliance.profile.documentTitle({
+      docType: compliance.docType,
+      sellerRegistered: compliance.sellerRegistered,
+      taxInvoiceRequired: facts.taxInvoiceRequired,
+    });
+    override.labels = {
+      ...override.labels,
+      documentTitle: { en: t.title, ...(t.titleTranslated ? { ar: t.titleTranslated } : {}) },
+    };
   }
 
-  // §8d/§8g -- thread date format + minor-units onto the locale slice.
+  // D11 — registration band. With a profile: band shows only for a registered
+  // seller whose profile wants it. Without: preserve the legacy fact-only rule.
+  const bandEnabled = compliance
+    ? facts.taxInvoiceRequired && facts.taxSystem === 'VAT' &&
+      compliance.profile.showRegistrationBand && compliance.sellerRegistered
+    : facts.taxInvoiceRequired && facts.taxSystem === 'VAT';
+  override.taxBar = { enabled: bandEnabled };
+  const bandLabel = facts.taxNumberLabel ?? facts.taxLabel;
+  if (bandLabel) override.taxBar.label = { en: bandLabel };
+
+  // Forced statutory line-item columns (item code / unit). Map the profile's
+  // snake_case forcedColumns to the real camelCase column keys and flip them
+  // visible via a `lineItems` sections override — the shared helper so the
+  // quote/credit-note adapters reuse the SAME mapping rather than duplicating it.
+  if (compliance) {
+    const colOverrides = forcedColumnOverrides(compliance.profile.forcedColumns);
+    if (colOverrides.length > 0) {
+      override.sections = [{ key: 'lineItems', columns: colOverrides }];
+    }
+  }
+
+  // RTL country -> bilingual-stacked; profile can force Arabic-lead.
+  if (facts.languageCode && isRTLLanguage(facts.languageCode)) {
+    // arabicLead collapses to 'ar' in both branches deliberately: Arabic is
+    // always primary in bilingual_stacked for RTL countries today (byte-parity
+    // with the legacy behavior). This starts mattering once the SA pack
+    // (Arabic-lead mandatory) lands in Phase 3 — keep the flag read live.
+    const arabicLead = compliance?.profile.bilingual.arabicLead === true;
+    override.language = { mode: 'bilingual_stacked', primary: arabicLead ? 'ar' : 'ar' };
+  } else if (compliance?.profile.bilingual.enabled && compliance.profile.bilingual.secondaryLanguage) {
+    override.language = { mode: 'bilingual_stacked', primary: 'en' };
+  }
+
+  // §8d/§8g — date format, minor-units and separators onto the locale slice.
   const locale: NonNullable<TemplateConfigOverride['locale']> = {};
   if (facts.dateFormat) locale.dateFormat = facts.dateFormat;
   if (facts.decimalPlaces != null) locale.decimalPlaces = facts.decimalPlaces;
+  if (facts.decimalSeparator) locale.decimalSeparator = facts.decimalSeparator;
+  if (facts.thousandsSeparator != null) locale.thousandsSeparator = facts.thousandsSeparator;
+
+  // Address-line ordering (Task 22): geo_countries.address_format is a jsonb
+  // postal-address template (e.g. '%N %O %A %C %Z'). postalFirst is set true
+  // ONLY when the postal token (%Z) precedes the city token (%C) — today, every
+  // onboardable country lists city before postal, so this stays unset (false)
+  // everywhere and GCC/US/UK output is unchanged.
+  if (facts.addressFormat) {
+    const z = facts.addressFormat.indexOf('%Z');
+    const c = facts.addressFormat.indexOf('%C');
+    if (z >= 0 && c >= 0 && z < c) locale.postalFirst = true;
+  }
+
   if (Object.keys(locale).length > 0) override.locale = locale;
+
+  // Profile paper (Letter for US-profile documents — consumed Phase 5; A4 is a
+  // no-op against the built-in default so GCC output is unchanged).
+  if (compliance?.profile.paperSize === 'Letter') {
+    override.paper = { size: 'Letter' };
+  }
 
   return override;
 }

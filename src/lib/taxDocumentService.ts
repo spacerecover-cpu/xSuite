@@ -25,14 +25,32 @@ export interface DocumentTotalsInput {
   taxInclusive?: boolean;
 }
 
+export interface RequirementFailure {
+  field_key: string;
+  level: 'block' | 'warn';
+  message: string;
+}
+
 export interface IssueTaxDocumentResult {
   ok: boolean;
   document_number: string | null;
   issued_at: string | null;
   vat_record_ids: string[];
   einvoice_submission_id: string | null;
-  requirement_failures: Array<{ field_key: string; level: 'block' | 'warn'; message: string }>;
+  requirement_failures: RequirementFailure[];
   trace: RuleTrace | null;
+}
+
+/** The dry-run choke-point shape (Phase 2, Task 18): computed lines/totals/
+ *  trace and requirement failures WITHOUT the issuance side effects
+ *  (`document_number`/`issued_at`/`vat_record_ids`/`einvoice_submission_id`
+ *  stay unset because nothing is minted or written on a dry run). */
+export interface DryRunResult {
+  ok: boolean;
+  tax_lines: unknown[];
+  totals: Record<string, unknown>;
+  requirement_failures: RequirementFailure[];
+  trace: unknown;
 }
 
 /** Item rows → kernel TaxableLines. lineItemId carries an 'idx:<n>' sentinel
@@ -211,4 +229,56 @@ export async function issueTaxDocument(
   });
   if (error) throw error;
   return data as unknown as IssueTaxDocumentResult;
+}
+
+/** Dry-run the issuance choke point: returns the computed component lines,
+ *  totals, explain trace and requirement failures WITHOUT minting a number or
+ *  writing anything. Powers pre-issue validation UI and the explain drawer.
+ *  `requirement_failures` defaults to `[]` because the live RPC predates
+ *  Task 18 (WP-5) — it doesn't return that key yet. */
+export async function dryRunIssueTaxDocument(
+  docType: 'quote' | 'invoice' | 'credit_note', docId: string,
+): Promise<DryRunResult> {
+  const { data, error } = await supabase.rpc('issue_tax_document', {
+    p_doc_type: docType, p_doc_id: docId, p_dry_run: true,
+  });
+  if (error) throw error;
+  const d = (data ?? {}) as Record<string, unknown>;
+  return {
+    ok: d.ok === true,
+    tax_lines: (d.tax_lines as unknown[]) ?? [],
+    totals: (d.totals as Record<string, unknown>) ?? {},
+    requirement_failures: (d.requirement_failures as RequirementFailure[]) ?? [],
+    trace: d.trace ?? null,
+  };
+}
+
+/** Turn a dry-run's requirement failures into an issuance decision: any `block`
+ *  stops issuance; otherwise `warn`s require an explicit confirmation; a clean
+ *  set proceeds. Pure — the UI renders the panel and dialog off this. */
+export function classifyRequirementFailures(
+  failures: RequirementFailure[],
+): { kind: 'block' | 'confirm' | 'proceed'; messages: string[] } {
+  const blocks = failures.filter((f) => f.level === 'block');
+  if (blocks.length > 0) return { kind: 'block', messages: blocks.map((f) => f.message) };
+  const warns = failures.filter((f) => f.level === 'warn');
+  if (warns.length > 0) return { kind: 'confirm', messages: warns.map((f) => f.message) };
+  return { kind: 'proceed', messages: [] };
+}
+
+/** Recover the requirement-failure payload from a raised P0403 error so the UI
+ *  can render the panel even when the gate fires inside the DB (no dry-run — e.g.
+ *  credit notes, or a race where the draft changed between dry-run and issue). */
+export function parseRequirementFailures(errorMessage: string): RequirementFailure[] {
+  const marker = 'REQUIREMENTS_NOT_MET:';
+  const idx = errorMessage.indexOf(marker);
+  if (idx === -1) return [];
+  const jsonStart = errorMessage.indexOf('[', idx);
+  if (jsonStart === -1) return [];
+  try {
+    const parsed = JSON.parse(errorMessage.slice(jsonStart)) as unknown;
+    return Array.isArray(parsed) ? (parsed as RequirementFailure[]) : [];
+  } catch {
+    return [];
+  }
 }

@@ -3359,6 +3359,7 @@ export type Database = {
           category_id: string | null
           created_at: string
           default_price: number | null
+          default_unit_code: string | null
           description: string | null
           id: string
           is_active: boolean
@@ -3370,6 +3371,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           default_price?: number | null
+          default_unit_code?: string | null
           description?: string | null
           id?: string
           is_active?: boolean
@@ -3381,6 +3383,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           default_price?: number | null
+          default_unit_code?: string | null
           description?: string | null
           id?: string
           is_active?: boolean
@@ -3395,6 +3398,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "catalog_service_categories"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_service_line_items_default_unit_code_fkey"
+            columns: ["default_unit_code"]
+            isOneToOne: false
+            referencedRelation: "master_unit_codes"
+            referencedColumns: ["code"]
           },
         ]
       }
@@ -4058,6 +4068,8 @@ export type Database = {
       companies: {
         Row: {
           address: string | null
+          address_line1: string | null
+          address_line2: string | null
           city_id: string | null
           company_name: string | null
           company_number: string | null
@@ -4077,7 +4089,9 @@ export type Database = {
           name: string
           notes: string | null
           phone: string | null
+          postal_code: string | null
           registration_number: string | null
+          subdivision_id: string | null
           tax_number: string | null
           tenant_id: string
           updated_at: string
@@ -4086,6 +4100,8 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
           city_id?: string | null
           company_name?: string | null
           company_number?: string | null
@@ -4105,7 +4121,9 @@ export type Database = {
           name: string
           notes?: string | null
           phone?: string | null
+          postal_code?: string | null
           registration_number?: string | null
+          subdivision_id?: string | null
           tax_number?: string | null
           tenant_id: string
           updated_at?: string
@@ -4114,6 +4132,8 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
           city_id?: string | null
           company_name?: string | null
           company_number?: string | null
@@ -4133,7 +4153,9 @@ export type Database = {
           name?: string
           notes?: string | null
           phone?: string | null
+          postal_code?: string | null
           registration_number?: string | null
+          subdivision_id?: string | null
           tax_number?: string | null
           tenant_id?: string
           updated_at?: string
@@ -4160,6 +4182,13 @@ export type Database = {
             columns: ["industry_id"]
             isOneToOne: false
             referencedRelation: "master_industries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companies_subdivision_id_fkey"
+            columns: ["subdivision_id"]
+            isOneToOne: false
+            referencedRelation: "geo_subdivisions"
             referencedColumns: ["id"]
           },
           {
@@ -4554,6 +4583,13 @@ export type Database = {
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_credit_note_items_unit_code"
+            columns: ["unit_code"]
+            isOneToOne: false
+            referencedRelation: "master_unit_codes"
+            referencedColumns: ["code"]
+          },
         ]
       }
       credit_notes: {
@@ -4911,6 +4947,8 @@ export type Database = {
       customers_enhanced: {
         Row: {
           address: string | null
+          address_line1: string | null
+          address_line2: string | null
           city_id: string | null
           company_name: string | null
           country_id: string | null
@@ -4935,10 +4973,12 @@ export type Database = {
           portal_last_login: string | null
           portal_locked_until: string | null
           portal_password_hash: string | null
+          postal_code: string | null
           preferred_language: string | null
           profile_photo_url: string | null
           referred_by: string | null
           source: string | null
+          subdivision_id: string | null
           tax_number: string | null
           tenant_id: string
           total_cases: number | null
@@ -4949,6 +4989,8 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
           city_id?: string | null
           company_name?: string | null
           country_id?: string | null
@@ -4973,10 +5015,12 @@ export type Database = {
           portal_last_login?: string | null
           portal_locked_until?: string | null
           portal_password_hash?: string | null
+          postal_code?: string | null
           preferred_language?: string | null
           profile_photo_url?: string | null
           referred_by?: string | null
           source?: string | null
+          subdivision_id?: string | null
           tax_number?: string | null
           tenant_id: string
           total_cases?: number | null
@@ -4987,6 +5031,8 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
           city_id?: string | null
           company_name?: string | null
           country_id?: string | null
@@ -5011,10 +5057,12 @@ export type Database = {
           portal_last_login?: string | null
           portal_locked_until?: string | null
           portal_password_hash?: string | null
+          postal_code?: string | null
           preferred_language?: string | null
           profile_photo_url?: string | null
           referred_by?: string | null
           source?: string | null
+          subdivision_id?: string | null
           tax_number?: string | null
           tenant_id?: string
           total_cases?: number | null
@@ -5050,6 +5098,13 @@ export type Database = {
             columns: ["industry_id"]
             isOneToOne: false
             referencedRelation: "master_industries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_enhanced_subdivision_id_fkey"
+            columns: ["subdivision_id"]
+            isOneToOne: false
+            referencedRelation: "geo_subdivisions"
             referencedColumns: ["id"]
           },
           {
@@ -8508,6 +8563,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_invoice_line_items_unit_code"
+            columns: ["unit_code"]
+            isOneToOne: false
+            referencedRelation: "master_unit_codes"
+            referencedColumns: ["code"]
+          },
+          {
             foreignKeyName: "invoice_line_items_invoice_id_fkey"
             columns: ["invoice_id"]
             isOneToOne: false
@@ -9744,6 +9806,66 @@ export type Database = {
         }
         Relationships: []
       }
+      master_document_requirements: {
+        Row: {
+          condition: Json | null
+          country_id: string
+          created_at: string
+          deleted_at: string | null
+          doc_type: string
+          effective_from: string
+          field_key: string
+          id: string
+          level: string
+          message_i18n: Json
+          pack_version_id: string | null
+          sort_order: number
+        }
+        Insert: {
+          condition?: Json | null
+          country_id: string
+          created_at?: string
+          deleted_at?: string | null
+          doc_type: string
+          effective_from?: string
+          field_key: string
+          id?: string
+          level: string
+          message_i18n?: Json
+          pack_version_id?: string | null
+          sort_order?: number
+        }
+        Update: {
+          condition?: Json | null
+          country_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          doc_type?: string
+          effective_from?: string
+          field_key?: string
+          id?: string
+          level?: string
+          message_i18n?: Json
+          pack_version_id?: string | null
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "master_document_requirements_country_id_fkey"
+            columns: ["country_id"]
+            isOneToOne: false
+            referencedRelation: "geo_countries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "master_document_requirements_pack_version_id_fkey"
+            columns: ["pack_version_id"]
+            isOneToOne: false
+            referencedRelation: "master_country_pack_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       master_einvoice_regimes: {
         Row: {
           adapter_key: string
@@ -10532,6 +10654,42 @@ export type Database = {
           name?: string
           sort_order?: number | null
           type?: string | null
+        }
+        Relationships: []
+      }
+      master_unit_codes: {
+        Row: {
+          code: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          labels_i18n: Json
+          scheme: string
+          sort_order: number
+          uqc_code: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          labels_i18n?: Json
+          scheme?: string
+          sort_order?: number
+          uqc_code?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          labels_i18n?: Json
+          scheme?: string
+          sort_order?: number
+          uqc_code?: string | null
         }
         Relationships: []
       }
@@ -13144,6 +13302,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_quote_items_unit_code"
+            columns: ["unit_code"]
+            isOneToOne: false
+            referencedRelation: "master_unit_codes"
+            referencedColumns: ["code"]
+          },
+          {
             foreignKeyName: "quote_items_quote_id_fkey"
             columns: ["quote_id"]
             isOneToOne: false
@@ -14958,6 +15123,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_stock_sale_items_unit_code"
+            columns: ["unit_code"]
+            isOneToOne: false
+            referencedRelation: "master_unit_codes"
+            referencedColumns: ["code"]
+          },
+          {
             foreignKeyName: "stock_sale_items_invoice_line_item_id_fkey"
             columns: ["invoice_line_item_id"]
             isOneToOne: false
@@ -15010,8 +15182,10 @@ export type Database = {
           status: string | null
           subtotal: number | null
           subtotal_base: number | null
-          tax_amount: number | null
+          tax_amount: number
           tax_amount_base: number | null
+          tax_inclusive: boolean
+          tax_regime_key: string | null
           tenant_id: string
           total_amount: number | null
           total_amount_base: number | null
@@ -15039,8 +15213,10 @@ export type Database = {
           status?: string | null
           subtotal?: number | null
           subtotal_base?: number | null
-          tax_amount?: number | null
+          tax_amount?: number
           tax_amount_base?: number | null
+          tax_inclusive?: boolean
+          tax_regime_key?: string | null
           tenant_id: string
           total_amount?: number | null
           total_amount_base?: number | null
@@ -15068,8 +15244,10 @@ export type Database = {
           status?: string | null
           subtotal?: number | null
           subtotal_base?: number | null
-          tax_amount?: number | null
+          tax_amount?: number
           tax_amount_base?: number | null
+          tax_inclusive?: boolean
+          tax_regime_key?: string | null
           tenant_id?: string
           total_amount?: number | null
           total_amount_base?: number | null
@@ -15683,6 +15861,8 @@ export type Database = {
       suppliers: {
         Row: {
           address: string | null
+          address_line1: string | null
+          address_line2: string | null
           bank_account: string | null
           bank_branch: string | null
           bank_name: string | null
@@ -15704,8 +15884,10 @@ export type Database = {
           outstanding_balance: number | null
           payment_terms_id: string | null
           phone: string | null
+          postal_code: string | null
           rating: number | null
           registration_number: string | null
+          subdivision_id: string | null
           supplier_number: string | null
           tax_number: string | null
           tenant_id: string
@@ -15715,6 +15897,8 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
           bank_account?: string | null
           bank_branch?: string | null
           bank_name?: string | null
@@ -15736,8 +15920,10 @@ export type Database = {
           outstanding_balance?: number | null
           payment_terms_id?: string | null
           phone?: string | null
+          postal_code?: string | null
           rating?: number | null
           registration_number?: string | null
+          subdivision_id?: string | null
           supplier_number?: string | null
           tax_number?: string | null
           tenant_id: string
@@ -15747,6 +15933,8 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
           bank_account?: string | null
           bank_branch?: string | null
           bank_name?: string | null
@@ -15768,8 +15956,10 @@ export type Database = {
           outstanding_balance?: number | null
           payment_terms_id?: string | null
           phone?: string | null
+          postal_code?: string | null
           rating?: number | null
           registration_number?: string | null
+          subdivision_id?: string | null
           supplier_number?: string | null
           tax_number?: string | null
           tenant_id?: string
@@ -15804,6 +15994,13 @@ export type Database = {
             columns: ["payment_terms_id"]
             isOneToOne: false
             referencedRelation: "master_supplier_payment_terms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "suppliers_subdivision_id_fkey"
+            columns: ["subdivision_id"]
+            isOneToOne: false
+            referencedRelation: "geo_subdivisions"
             referencedColumns: ["id"]
           },
           {
@@ -18065,6 +18262,15 @@ export type Database = {
         }
         Returns: string
       }
+      evaluate_document_requirements: {
+        Args: {
+          p_as_of: string
+          p_country_id: string
+          p_doc_type: string
+          p_facts: Json
+        }
+        Returns: Json
+      }
       export_customer_data: { Args: { p_customer_id: string }; Returns: Json }
       generate_next_number: { Args: { p_scope: string }; Returns: string }
       get_accessible_modules: {
@@ -18569,7 +18775,7 @@ export type Database = {
         }
       }
       record_stock_sale: {
-        Args: { p_items: Json; p_sale: Json }
+        Args: { p_items: Json; p_sale: Json; p_tax_lines?: Json }
         Returns: {
           case_id: string | null
           created_at: string
@@ -18592,8 +18798,10 @@ export type Database = {
           status: string | null
           subtotal: number | null
           subtotal_base: number | null
-          tax_amount: number | null
+          tax_amount: number
           tax_amount_base: number | null
+          tax_inclusive: boolean
+          tax_regime_key: string | null
           tenant_id: string
           total_amount: number | null
           total_amount_base: number | null

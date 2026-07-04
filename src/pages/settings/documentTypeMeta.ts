@@ -14,6 +14,7 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   FileText,
+  FileMinus,
   Receipt,
   FileSignature,
   ClipboardCheck,
@@ -50,6 +51,7 @@ export const DOC_CATEGORIES: { id: DocCategory; label: string; description: stri
 export const DOC_TYPE_LABELS: Record<TemplateDocumentType, string> = {
   invoice: 'Invoice',
   quote: 'Quotation',
+  credit_note: 'Credit note',
   payment_receipt: 'Payment receipt',
   office_receipt: 'Office check-in receipt',
   customer_copy: 'Customer check-in copy',
@@ -85,6 +87,13 @@ export const DOCUMENT_TYPES: DocumentTypeMeta[] = [
     label: DOC_TYPE_LABELS.payment_receipt,
     description: 'Receipt confirming a payment received against an invoice.',
     icon: Receipt,
+    category: 'financial',
+  },
+  {
+    type: 'credit_note',
+    label: DOC_TYPE_LABELS.credit_note,
+    description: 'Credit note issued to reduce or refund a prior invoice.',
+    icon: FileMinus,
     category: 'financial',
   },
   {

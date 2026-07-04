@@ -4,16 +4,13 @@ import { buildOfficeReceiptDocument } from './documents/OfficeReceiptDocument';
 import { buildCustomerCopyDocument } from './documents/CustomerCopyDocument';
 import { buildCheckoutFormDocument } from './documents/CheckoutFormDocument';
 import { buildCaseLabelDocument } from './documents/CaseLabelDocument';
-import { buildQuoteDocument } from './documents/QuoteDocument';
-import { buildInvoiceDocument } from './documents/InvoiceDocument';
-import { buildCreditNoteDocument } from './documents/CreditNoteDocument';
 import { buildPaymentReceiptDocument } from './documents/PaymentReceiptDocument';
 import { buildPayslipDocument } from './documents/PayslipDocument';
 import { buildChainOfCustodyDocument } from './documents/ChainOfCustodyDocument';
 import { loadImageAsBase64 } from './utils';
 import { logPDFGeneration } from './loggingService';
 import { withTimeout, createTranslationContext, ctxFromLanguageConfig } from './translationContext';
-import type { DocumentType, InvoiceDocumentData, QuoteDocumentData, PaymentReceiptDocumentData, PayslipDocumentData, ChainOfCustodyDocumentData, ReceiptData, TranslationContext } from './types';
+import type { DocumentType, InvoiceDocumentData, QuoteDocumentData, CreditNoteDocumentData, PaymentReceiptDocumentData, PayslipDocumentData, ChainOfCustodyDocumentData, ReceiptData, TranslationContext } from './types';
 import { type LanguageCode } from '../documentTranslations';
 import type { TDocumentDefinitions } from 'pdfmake/interfaces';
 import { isPdfEngineEnabled } from './engine/featureFlag';
@@ -41,6 +38,7 @@ async function renderWithQr(
 }
 import { toEngineData } from './engine/adapters/invoiceAdapter';
 import { toEngineData as toQuoteEngineData } from './engine/adapters/quoteAdapter';
+import { toCreditNoteEngineData } from './engine/adapters/creditNoteAdapter';
 import { toEngineData as toPaymentReceiptEngineData } from './engine/adapters/paymentReceiptAdapter';
 import { toEngineData as toReceiptEngineData, type ReceiptVariant } from './engine/adapters/receiptAdapter';
 import { toEngineData as toCheckoutEngineData } from './engine/adapters/checkoutAdapter';
@@ -50,6 +48,7 @@ import { toEngineData as toPayslipEngineData } from './engine/adapters/payslipAd
 import {
   BUILT_IN_TEMPLATE_CONFIGS,
   resolveTemplateConfig,
+  resolveTemplateConfigWithCountry,
   resolveSecondary,
   type DocumentTemplateConfig,
   type TemplateConfigOverride,
@@ -57,6 +56,9 @@ import {
 import { getDeployedVersionByType, readConfig } from '../documentTemplateService';
 import { resolveBrandingImage, type BrandingImage } from './brandingImage';
 import type { SignatureImagesConfig } from './templateConfig';
+import { countryTemplateOverride, type ComplianceOverrideInputs } from './engine/countryConfig';
+import { resolveComplianceRenderInputs } from './engine/profileResolver';
+import type { TaxDocumentType } from '../regimes/types';
 
 /**
  * Resolve the deployed `signatureImages` config for a generated (legacy-path)
@@ -83,11 +85,33 @@ async function resolveSignatureImagesConfig(
   }
 }
 
+/** R4: derive the COUNTRY cascade layer for a build path. Financial doc types
+ *  (TaxDocumentType) also take the DocumentComplianceProfile (title ceremony,
+ *  registration band, bilingual, paper); non-financial docs (null) take only
+ *  the formatting facts. Returns undefined when the tenant has no resolvable
+ *  country — the cascade treats undefined as identity, so legacy behavior is
+ *  byte-identical. Resolution failures NEVER break generation (fail-soft). */
+export async function resolveCountryLayer(
+  docType: TaxDocumentType | null,
+): Promise<TemplateConfigOverride | undefined> {
+  try {
+    const compliance = await resolveComplianceRenderInputs();
+    if (!compliance.facts) return undefined;
+    const inputs: ComplianceOverrideInputs | undefined = docType
+      ? { profile: compliance.profile, sellerRegistered: compliance.sellerRegistered, docType }
+      : undefined;
+    return countryTemplateOverride(compliance.facts, inputs);
+  } catch (err) {
+    console.error('[PDF Service] country layer resolution failed, rendering without it:', err);
+    return undefined;
+  }
+}
+
 /**
  * Build the invoice pdfmake doc-definition via the NEW config-driven engine.
  *
- * Flag-guarded: this is only reached when `isPdfEngineEnabled('invoice')` is
- * true. It resolves the tenant's deployed invoice template (if any) as the
+ * UNCONDITIONAL: the engine is the sole invoice render path (the legacy builder
+ * was deleted in Task 10). It resolves the tenant's deployed invoice template (if any) as the
  * doc-type cascade layer over the built-in 'invoice' default, normalizes the
  * invoice data through the adapter, and assembles via `renderTemplate`. With no
  * tenant template seeded it falls back to the built-in config, so the path
@@ -112,8 +136,11 @@ async function buildInvoiceDocumentViaEngine(
     console.error('[PDF Service] Invoice engine: template resolution failed, using built-in default:', err);
   }
 
-  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+  const countryLayer = await resolveCountryLayer('invoice');
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfigWithCountry(
     BUILT_IN_TEMPLATE_CONFIGS.invoice,
+    countryLayer,
     /* theme */ undefined,
     /* docType */ docTypeOverride,
     /* instance */ undefined,
@@ -121,7 +148,7 @@ async function buildInvoiceDocumentViaEngine(
 
   // Bridge the tenant's document-language setting into the resolved config so
   // the engine renders bilingual/RTL when the tenant is configured for it.
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined || countryLayer?.language !== undefined);
 
   const engineData = toEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -131,7 +158,8 @@ async function buildInvoiceDocumentViaEngine(
 /**
  * Build the quote pdfmake doc-definition via the NEW config-driven engine.
  *
- * Flag-guarded: only reached when `isPdfEngineEnabled('quote')` is true. Mirrors
+ * UNCONDITIONAL: the engine is the sole quote render path (the legacy builder
+ * was deleted in Task 10). Mirrors
  * {@link buildInvoiceDocumentViaEngine}: resolve the tenant's deployed quote
  * template (if any) as the doc-type cascade layer over the built-in 'quote'
  * default, normalize through the quote adapter, and assemble via
@@ -154,18 +182,67 @@ async function buildQuoteViaEngine(
     console.error('[PDF Service] Quote engine: template resolution failed, using built-in default:', err);
   }
 
-  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+  const countryLayer = await resolveCountryLayer('quote');
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfigWithCountry(
     BUILT_IN_TEMPLATE_CONFIGS.quote,
+    countryLayer,
     /* theme */ undefined,
     /* docType */ docTypeOverride,
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined || countryLayer?.language !== undefined);
 
   const engineData = toQuoteEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
   return renderWithQr(languageAwareConfig, engineData, ctxFromLanguageConfig(languageAwareConfig.language), logoBase64, qrCodeBase64);
+}
+
+/**
+ * Build the credit-note pdfmake doc-definition via the config-driven engine.
+ *
+ * UNCONDITIONAL: credit notes have no legacy feature flag — `generateCreditNote`
+ * always routes through here, alongside invoice/quote which became unconditional
+ * in Task 10 (the legacy builders were deleted). Mirrors
+ * {@link buildQuoteViaEngine}: resolve the tenant's deployed 'credit_note'
+ * template (if any) as the doc-type cascade layer over the built-in
+ * 'credit_note' default, apply the country layer (which sets the TAX CREDIT
+ * NOTE / CREDIT NOTE title ceremony per `gcc_tax_invoice`/`generic_invoice`),
+ * normalize through the credit-note adapter, and assemble via `renderTemplate`.
+ * No QR image is resolved — `generateCreditNote` has never loaded one, and the
+ * built-in config has no `qr` section, so `renderTemplate` (not `renderWithQr`)
+ * is the correct call here, matching current (no-QR) behavior byte-for-byte.
+ */
+async function buildCreditNoteViaEngine(
+  data: CreditNoteDocumentData,
+  logoBase64: string | null,
+): Promise<TDocumentDefinitions> {
+  let docTypeOverride: TemplateConfigOverride | undefined;
+  try {
+    const deployed = await getDeployedVersionByType('credit_note');
+    if (deployed) {
+      docTypeOverride = readConfig(deployed.config);
+    }
+  } catch (err) {
+    console.error('[PDF Service] Credit-note engine: template resolution failed, using built-in default:', err);
+  }
+
+  const countryLayer = await resolveCountryLayer('credit_note');
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfigWithCountry(
+    BUILT_IN_TEMPLATE_CONFIGS.credit_note,
+    countryLayer,
+    /* theme */ undefined,
+    /* docType */ docTypeOverride,
+    /* instance */ undefined,
+  );
+
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined || countryLayer?.language !== undefined);
+
+  const engineData = toCreditNoteEngineData(data, languageAwareConfig);
+  await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
+  return renderTemplate(languageAwareConfig, engineData, ctxFromLanguageConfig(languageAwareConfig.language), logoBase64);
 }
 
 /**
@@ -191,14 +268,17 @@ async function buildPaymentReceiptViaEngine(
     console.error('[PDF Service] Payment receipt engine: template resolution failed, using built-in default:', err);
   }
 
-  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+  const countryLayer = await resolveCountryLayer(null);
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfigWithCountry(
     BUILT_IN_TEMPLATE_CONFIGS.payment_receipt,
+    countryLayer,
     /* theme */ undefined,
     /* docType */ docTypeOverride,
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined || countryLayer?.language !== undefined);
 
   const engineData = toPaymentReceiptEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -227,14 +307,17 @@ async function buildPayslipViaEngine(
     console.error('[PDF Service] Payslip engine: template resolution failed, using built-in default:', err);
   }
 
-  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+  const countryLayer = await resolveCountryLayer(null);
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfigWithCountry(
     BUILT_IN_TEMPLATE_CONFIGS.payslip,
+    countryLayer,
     /* theme */ undefined,
     /* docType */ docTypeOverride,
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined || countryLayer?.language !== undefined);
 
   const engineData = toPayslipEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -271,14 +354,17 @@ async function buildOfficeReceiptViaEngine(
     console.error(`[PDF Service] ${docType} engine: template resolution failed, using built-in default:`, err);
   }
 
-  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+  const countryLayer = await resolveCountryLayer(null);
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfigWithCountry(
     BUILT_IN_TEMPLATE_CONFIGS[docType],
+    countryLayer,
     /* theme */ undefined,
     /* docType */ docTypeOverride,
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined || countryLayer?.language !== undefined);
 
   const engineData = toReceiptEngineData(data, languageAwareConfig, variant);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -336,14 +422,17 @@ async function buildCheckoutFormViaEngine(
     console.error('[PDF Service] Checkout form engine: template resolution failed, using built-in default:', err);
   }
 
-  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+  const countryLayer = await resolveCountryLayer(null);
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfigWithCountry(
     BUILT_IN_TEMPLATE_CONFIGS.checkout_form,
+    countryLayer,
     /* theme */ undefined,
     /* docType */ docTypeOverride,
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined || countryLayer?.language !== undefined);
 
   const engineData = toCheckoutEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -376,14 +465,17 @@ async function buildCaseLabelViaEngine(
     console.error('[PDF Service] Case label engine: template resolution failed, using built-in default:', err);
   }
 
-  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+  const countryLayer = await resolveCountryLayer(null);
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfigWithCountry(
     BUILT_IN_TEMPLATE_CONFIGS.case_label,
+    countryLayer,
     /* theme */ undefined,
     /* docType */ docTypeOverride,
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined || countryLayer?.language !== undefined);
 
   const engineData = toCaseLabelEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -417,14 +509,17 @@ async function buildChainOfCustodyViaEngine(
     console.error('[PDF Service] Chain of custody engine: template resolution failed, using built-in default:', err);
   }
 
-  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfig(
+  const countryLayer = await resolveCountryLayer(null);
+
+  const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfigWithCountry(
     BUILT_IN_TEMPLATE_CONFIGS.chain_of_custody,
+    countryLayer,
     /* theme */ undefined,
     /* docType */ docTypeOverride,
     /* instance */ undefined,
   );
 
-  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined);
+  const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined || countryLayer?.language !== undefined);
 
   const engineData = toChainOfCustodyEngineData(data, languageAwareConfig);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
@@ -766,11 +861,7 @@ export async function generateQuote(quoteId: string, download: boolean = true): 
         : Promise.resolve(null),
     ]);
 
-    const qrCodeCaption = data.companySettings.branding?.qr_code_quote_caption || 'Scan to approve this quote';
-
-    const docDefinition = isPdfEngineEnabled('quote')
-      ? await buildQuoteViaEngine(data, ctx, logoBase64, qrCodeBase64)
-      : buildQuoteDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+    const docDefinition = await buildQuoteViaEngine(data, ctx, logoBase64, qrCodeBase64);
 
     const filename = `Quote_${data.quoteData.quote_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 
@@ -868,11 +959,7 @@ export async function generateInvoice(invoiceId: string, download: boolean = tru
         : Promise.resolve(null),
     ]);
 
-    const qrCodeCaption = data.companySettings.branding?.qr_code_invoice_caption || 'Scan to pay this invoice';
-
-    const docDefinition = isPdfEngineEnabled('invoice')
-      ? await buildInvoiceDocumentViaEngine(data, ctx, logoBase64, qrCodeBase64)
-      : buildInvoiceDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+    const docDefinition = await buildInvoiceDocumentViaEngine(data, ctx, logoBase64, qrCodeBase64);
 
     const invoiceType = data.invoiceData.invoice_type === 'proforma' ? 'Proforma' : 'Tax';
     const filename = `${invoiceType}_Invoice_${data.invoiceData.invoice_number}_${new Date().toISOString().split('T')[0]}.pdf`;
@@ -943,13 +1030,14 @@ export async function generateCreditNote(creditNoteId: string, download: boolean
       fontSource = 'fallback';
     }
 
-    const ctx = createTranslationContext(mode, languageCode);
-
     const logoBase64 = data.companySettings.branding?.logo_url
       ? await withTimeout(loadImageAsBase64(data.companySettings.branding.logo_url), 5000, 'Logo loading timeout')
       : null;
 
-    const docDefinition = buildCreditNoteDocument(data, ctx, logoBase64);
+    // UNCONDITIONAL: credit notes always route through the engine (no ternary,
+    // no feature flag). The legacy pdfmake builder was deleted in Task 10 after
+    // final legacy↔engine parity, so the engine is the sole render path.
+    const docDefinition = await buildCreditNoteViaEngine(data, logoBase64);
     const filename = `Credit_Note_${data.creditNoteData.credit_note_number || 'draft'}_${new Date().toISOString().split('T')[0]}.pdf`;
 
     if (download) {
@@ -1456,11 +1544,7 @@ export async function generateQuoteAsBlob(quoteId: string): Promise<PDFBlobResul
         : Promise.resolve(null),
     ]);
 
-    const qrCodeCaption = data.companySettings.branding?.qr_code_quote_caption || 'Scan to approve this quote';
-
-    const docDefinition = isPdfEngineEnabled('quote')
-      ? await buildQuoteViaEngine(data, ctx, logoBase64, qrCodeBase64)
-      : buildQuoteDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+    const docDefinition = await buildQuoteViaEngine(data, ctx, logoBase64, qrCodeBase64);
     const filename = `Quote_${data.quoteData.quote_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 
     return new Promise((resolve) => {
@@ -1501,11 +1585,7 @@ export async function generateInvoiceAsBlob(invoiceId: string): Promise<PDFBlobR
         : Promise.resolve(null),
     ]);
 
-    const qrCodeCaption = data.companySettings.branding?.qr_code_invoice_caption || 'Scan to pay this invoice';
-
-    const docDefinition = isPdfEngineEnabled('invoice')
-      ? await buildInvoiceDocumentViaEngine(data, ctx, logoBase64, qrCodeBase64)
-      : buildInvoiceDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
+    const docDefinition = await buildInvoiceDocumentViaEngine(data, ctx, logoBase64, qrCodeBase64);
     const invoiceType = data.invoiceData.invoice_type === 'proforma' ? 'Proforma' : 'Tax';
     const filename = `${invoiceType}_Invoice_${data.invoiceData.invoice_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 

@@ -14,6 +14,7 @@
 import type {
   ChainOfCustodyDocumentData,
   CompanySettingsData,
+  CreditNoteDocumentData,
   InvoiceDocumentData,
   PayslipDocumentData,
   PaymentReceiptDocumentData,
@@ -28,6 +29,7 @@ import type { EngineDocData } from './types';
 
 import { toEngineData as invoiceToEngine } from './adapters/invoiceAdapter';
 import { toEngineData as quoteToEngine } from './adapters/quoteAdapter';
+import { toCreditNoteEngineData as creditNoteToEngine } from './adapters/creditNoteAdapter';
 import { toEngineData as paymentReceiptToEngine } from './adapters/paymentReceiptAdapter';
 import { toEngineData as receiptToEngine } from './adapters/receiptAdapter';
 import { toEngineData as checkoutToEngine } from './adapters/checkoutAdapter';
@@ -130,6 +132,33 @@ export function sampleQuoteData(): QuoteDocumentData {
         { description: 'Donor drive sourcing', quantity: 2, unit_price: 250 },
       ],
       accounting_locales: SAMPLE_LOCALE,
+    },
+    companySettings: SAMPLE_COMPANY,
+  };
+}
+
+export function sampleCreditNoteData(): CreditNoteDocumentData {
+  return {
+    creditNoteData: {
+      credit_note_number: 'CN-2026-0007',
+      credit_note_date: '2026-06-18',
+      credit_type: 'refund',
+      status: 'issued',
+      reason_code: 'unsuccessful_recovery',
+      reason_notes: 'RAID rebuild could not recover the customer data; fee refunded in full.',
+      subtotal: 400,
+      tax_rate: 5,
+      tax_amount: 20,
+      total_amount: 420,
+      applied_amount: 0,
+      invoice_number: 'INV-0042',
+      customer_name: 'Jane Client',
+      company_name: 'Client Holdings LLC',
+      case_no: 'CASE-0007',
+      currency_symbol: 'AED',
+      currency_position: 'after',
+      decimal_places: 2,
+      items: [{ description: 'RAID-5 recovery attempt (refunded)', quantity: 1, unit_price: 400, line_total: 400 }],
     },
     companySettings: SAMPLE_COMPANY,
   };
@@ -349,6 +378,8 @@ export function buildPreviewEngineData(
       return invoiceToEngine(withCompany(sampleInvoiceData(), companySettings), config);
     case 'quote':
       return quoteToEngine(withCompany(sampleQuoteData(), companySettings), config);
+    case 'credit_note':
+      return creditNoteToEngine(withCompany(sampleCreditNoteData(), companySettings), config);
     case 'payment_receipt':
       return paymentReceiptToEngine(withCompany(samplePaymentReceiptData(), companySettings), config);
     case 'office_receipt':

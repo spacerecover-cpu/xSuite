@@ -12,7 +12,8 @@
 
 import type { InvoiceDocumentData } from '../../types';
 import type { DocumentTemplateConfig, ColumnConfig, TotalsLineKey } from '../../templateConfig';
-import { formatDate, safeString, formatEngineMoney } from '../../utils';
+import { formatDate, safeString, formatEngineMoney, formatPartyAddressLines } from '../../utils';
+import { fmtDateWithConfig } from '../../configDate';
 import { amountInWordsAr, amountInWordsEn } from '../amountInWords';
 import { buildZatcaTlvBase64 } from '../zatcaQr';
 import { shouldEmitZatcaQr } from '../einvoiceRouting';
@@ -24,10 +25,14 @@ import type {
   ResolvedColumn,
 } from '../types';
 
-/** Default column alignments by column key (parity with the hand-written builder). */
+/** Default column alignments by column key (parity with the hand-written builder).
+ *  `itemCode` / `unit` are the optional statutory columns (hidden until a profile's
+ *  forcedColumns flips them on) — centered like the quantity column. */
 const COLUMN_ALIGN: Record<string, 'left' | 'center' | 'right'> = {
   description: 'left',
   quantity: 'center',
+  itemCode: 'center',
+  unit: 'center',
   unitPrice: 'right',
   lineTotal: 'right',
 };
@@ -72,12 +77,24 @@ export function toEngineData(
 ): EngineDocData {
   const { invoiceData, companySettings } = invoice;
 
-  // ---- Currency formatter (locale-driven, matches the builder) -------------
-  const currencySymbol = invoiceData.accounting_locales?.currency_symbol || 'USD';
-  const decimalPlaces = invoiceData.accounting_locales?.decimal_places ?? 2;
+  // ---- Currency formatter (config.locale-driven; never fabricate a currency) -
+  // Country-Engine sourced symbol (via currencyToBlock); an empty symbol prints
+  // the bare grouped number rather than a wrong 'USD'. decimalPlaces / separators
+  // prefer the resolved country locale, then the document's accounting_locales.
+  const currencySymbol = invoiceData.accounting_locales?.currency_symbol || '';
+  const decimalPlaces = config.locale?.decimalPlaces ?? invoiceData.accounting_locales?.decimal_places ?? 2;
   const currencyPosition = invoiceData.accounting_locales?.currency_position || 'after';
   const money = (amount: number): string =>
-    formatEngineMoney(amount, { symbol: currencySymbol, decimalPlaces, position: currencyPosition });
+    formatEngineMoney(amount, {
+      symbol: currencySymbol,
+      decimalPlaces,
+      position: currencyPosition,
+      decimalSeparator: config.locale?.decimalSeparator ?? invoiceData.accounting_locales?.decimal_separator,
+      thousandsSeparator: config.locale?.thousandsSeparator ?? invoiceData.accounting_locales?.thousands_separator,
+    });
+  // Country/tenant date format (falls back to the neutral 'dd MMM yyyy' default
+  // when no locale is threaded, so un-wired call sites are byte-identical).
+  const docDate = (d: string | null | undefined): string => fmtDateWithConfig(d, config.locale);
 
   // ---- Title ---------------------------------------------------------------
   const isProforma = invoiceData.invoice_type === 'proforma';
@@ -110,6 +127,48 @@ export function toEngineData(
   if (customerEmail) toRows.push({ label: { en: 'Email:', ar: 'البريد:' }, value: customerEmail });
   if (invoiceData.client_reference) toRows.push({ label: { en: 'Reference:', ar: 'المرجع:' }, value: invoiceData.client_reference });
 
+  // Buyer VATIN/TRN — prefer the issuance snapshot (frozen at issue time), then
+  // the live customer/company registration. The label is the snapshot label, then
+  // the country tax-bar label, then a neutral default.
+  const buyerTaxNumber =
+    invoiceData.buyer_tax_number ??
+    invoiceData.customer?.tax_number ??
+    invoiceData.company?.tax_number ??
+    null;
+  if (buyerTaxNumber) {
+    const taxLabel = invoiceData.buyer_tax_number_label ?? config.taxBar?.label?.en ?? 'Tax No';
+    toRows.push({ label: { en: `${taxLabel}:`, ar: `${taxLabel}:` }, value: buyerTaxNumber });
+  }
+
+  // Buyer address — the frozen snapshot (subdivision already resolved to a NAME
+  // by issue_tax_document) wins; otherwise the live customer fields. GCC prints
+  // street-first (postal-first countries ride the Task 22 address_format wiring).
+  const snapshotAddr = invoiceData.buyer_address as Record<string, string | null> | null;
+  const addressLines = formatPartyAddressLines(
+    snapshotAddr
+      ? {
+          line1: snapshotAddr.line1,
+          line2: snapshotAddr.line2,
+          city: snapshotAddr.city,
+          subdivision: snapshotAddr.subdivision,
+          postal_code: snapshotAddr.postal_code,
+          free_text: snapshotAddr.free_text,
+        }
+      : {
+          line1: invoiceData.customer?.address_line1,
+          line2: invoiceData.customer?.address_line2,
+          city: invoiceData.customer?.city,
+          subdivision: invoiceData.customer?.subdivision_name,
+          postal_code: invoiceData.customer?.postal_code,
+          free_text: undefined,
+        },
+    config.locale?.postalFirst ?? false,
+  );
+  addressLines.forEach((line, i) => {
+    // The 'Address:' label leads only the first line; continuation rows are blank.
+    toRows.push({ label: i === 0 ? { en: 'Address:', ar: 'العنوان:' } : { en: '', ar: '' }, value: line });
+  });
+
   const to: PartyBlock = {
     title: config.labels?.parties ?? { en: 'Customer Information', ar: 'معلومات العميل' },
     name: customerName,
@@ -119,10 +178,15 @@ export function toEngineData(
   // ---- Meta (invoice details) ----------------------------------------------
   const meta: EngineDocData['meta'] = [
     { label: { en: 'Invoice No:', ar: 'رقم الفاتورة:' }, value: invoiceData.invoice_number || 'Draft' },
-    { label: { en: 'Invoice Date:', ar: 'تاريخ الفاتورة:' }, value: formatDate(invoiceData.invoice_date, 'dd MMM yyyy') },
+    { label: { en: 'Invoice Date:', ar: 'تاريخ الفاتورة:' }, value: docDate(invoiceData.invoice_date) },
   ];
   if (invoiceData.due_date) {
-    meta.push({ label: { en: 'Due Date:', ar: 'تاريخ الاستحقاق:' }, value: formatDate(invoiceData.due_date, 'dd MMM yyyy') });
+    meta.push({ label: { en: 'Due Date:', ar: 'تاريخ الاستحقاق:' }, value: docDate(invoiceData.due_date) });
+  }
+  // Supply (tax-point) date — a statutory field distinct from the invoice date.
+  // Shown only when it differs, matching the paper document.
+  if (invoiceData.supply_date && invoiceData.supply_date !== invoiceData.invoice_date) {
+    meta.push({ label: { en: 'Supply Date:', ar: 'تاريخ التوريد:' }, value: docDate(invoiceData.supply_date) });
   }
   if (invoiceData.cases?.case_no) {
     meta.push({ label: { en: 'Job ID:', ar: 'رقم المهمة:' }, value: invoiceData.cases.case_no });
@@ -134,20 +198,30 @@ export function toEngineData(
     (item) => ({
       description: safeString(item.description),
       quantity: String(item.quantity),
+      unit: safeString(item.unit_label ?? ''),
+      itemCode: safeString(item.item_code ?? ''),
       unitPrice: money(item.unit_price),
-      lineTotal: money(item.line_total || item.quantity * item.unit_price),
+      lineTotal: money(item.line_total ?? item.quantity * item.unit_price),
     }),
   );
 
-  // ---- Totals (math mirrored from the builder) -----------------------------
-  const subtotal = invoiceData.subtotal || 0;
-  const discountAmount = invoiceData.discount_amount || 0;
+  // ---- Totals: STORED header figures; tax rows from document_tax_lines rollups
+  // The printed figure MUST equal the ledger figure — NO render-time recompute.
+  // `??` (never `||`) on every stored money field so a legitimate stored ZERO
+  // (e.g. a fully-credited invoice) is honored instead of triggering a fallback.
+  const subtotal = invoiceData.subtotal ?? 0;
+  const discountAmount = invoiceData.discount_amount ?? 0;
   const discountedSubtotal = subtotal - discountAmount;
-  const taxRate = invoiceData.tax_rate || 0;
-  const taxAmount = (discountedSubtotal * taxRate) / 100;
-  const totalAmount = discountedSubtotal + taxAmount;
-  const amountPaid = invoiceData.amount_paid || 0;
-  const balanceDue = totalAmount - amountPaid;
+  const storedTax = invoiceData.tax_amount ?? 0;
+  const totalAmount = invoiceData.total_amount ?? (discountedSubtotal + storedTax);
+  const amountPaid = invoiceData.amount_paid ?? 0;
+  const balanceDue = invoiceData.balance_due ?? (totalAmount - amountPaid);
+  // Document-level rollup rows (one per tax component). Defensively re-sorted
+  // by `sequence` — fetchDocumentTaxLines already DB-orders, but AD-3 says
+  // "ordered by sequence" literally, so the adapter does not trust caller order.
+  const rollups = (invoiceData.tax_lines ?? [])
+    .filter((l) => l.line_item_id === null)
+    .sort((a, b) => a.sequence - b.sequence);
 
   const lines = totalsLines(config);
   const on = (key: string): boolean => lines[key] !== false; // default-on unless explicitly false
@@ -169,7 +243,24 @@ export function toEngineData(
     totals.push({ ...tl('netAmount', 'Net Amount:', 'صافي المبلغ:'), value: money(discountedSubtotal) });
   }
   if (on('vat')) {
-    totals.push({ ...tl('tax', `VAT ${taxRate}%:`, `ضريبة القيمة المضافة ${taxRate}%:`), value: money(taxAmount) });
+    if (rollups.length > 0) {
+      // One row per FROZEN component: its stored label + its STORED tax_amount.
+      for (const r of rollups) {
+        totals.push({
+          key: 'tax',
+          label: { en: `${r.component_label}:`, ar: `${r.component_label}:` },
+          value: money(r.tax_amount),
+        });
+      }
+    } else if (storedTax !== 0 || (invoiceData.tax_rate ?? 0) > 0) {
+      // Legacy / backfilled document with no tax_lines: ONE row from the STORED
+      // header tax_amount (NEVER a recompute). The English label honours the
+      // country tax label; the Arabic secondary keeps the standard VAT term so it
+      // still resolves into every bilingual language via the translation table.
+      const label = config.labels?.taxLabel?.en ?? 'VAT';
+      const rate = invoiceData.tax_rate != null ? ` ${invoiceData.tax_rate}%` : '';
+      totals.push({ ...tl('tax', `${label}${rate}:`, `ضريبة القيمة المضافة${rate}:`), value: money(storedTax) });
+    }
   }
   if (on('total')) {
     totals.push({ ...tl('total', 'Total:', 'الإجمالي:'), value: money(totalAmount), emphasis: true });
@@ -195,12 +286,13 @@ export function toEngineData(
   }
 
   // ---- Tax Summary (opt-in VAT/GST breakdown) ------------------------------
-  // Single-rate today (the invoice carries one tax_rate); structured for multi-
-  // rate. Emitted only when the tenant turns it on, so the section is a no-op
-  // otherwise.
+  // One row per FROZEN component rollup (STORED base + tax); falls back to a
+  // single row from the header tax_rate + stored tax when the document carries no
+  // tax_lines. Emitted only when the tenant turns it on — a no-op otherwise.
   const tsCfg = config.taxSummary;
+  const taxRateDisplay = invoiceData.tax_rate ?? 0;
   const taxSummary =
-    tsCfg?.show && taxRate > 0
+    tsCfg?.show && (rollups.length > 0 || taxRateDisplay > 0)
       ? {
           title: { en: tsCfg.title?.trim() || 'Tax Summary', ar: 'ملخص الضريبة' },
           columns: {
@@ -208,16 +300,22 @@ export function toEngineData(
             taxable: { en: 'Taxable Amount', ar: 'المبلغ الخاضع للضريبة' },
             tax: { en: 'Tax Amount', ar: 'مبلغ الضريبة' },
           },
-          rows: [{ rate: `${taxRate}%`, taxable: money(discountedSubtotal), tax: money(taxAmount) }],
-          total: { label: { en: 'Total', ar: 'الإجمالي' }, taxable: money(discountedSubtotal), tax: money(taxAmount) },
+          rows:
+            rollups.length > 0
+              ? rollups.map((r) => ({ rate: `${r.rate}%`, taxable: money(r.taxable_base), tax: money(r.tax_amount) }))
+              : [{ rate: `${taxRateDisplay}%`, taxable: money(discountedSubtotal), tax: money(storedTax) }],
+          // Total row uses the STORED header figures (net taxable + stored tax) —
+          // never a re-sum of the component bases, which would double-count a
+          // shared base (e.g. CGST + SGST both levied on the same amount).
+          total: { label: { en: 'Total', ar: 'الإجمالي' }, taxable: money(discountedSubtotal), tax: money(storedTax) },
           ...(tsCfg.showAmountInWords
             ? {
                 amountInWords:
                   config.language.mode === 'ar'
-                    ? amountInWordsAr(taxAmount, currencySymbol, decimalPlaces)
+                    ? amountInWordsAr(storedTax, currencySymbol, decimalPlaces)
                     : config.language.mode.startsWith('bilingual')
-                      ? `${amountInWordsEn(taxAmount, currencySymbol, decimalPlaces)}  ·  ${amountInWordsAr(taxAmount, currencySymbol, decimalPlaces)}`
-                      : amountInWordsEn(taxAmount, currencySymbol, decimalPlaces),
+                      ? `${amountInWordsEn(storedTax, currencySymbol, decimalPlaces)}  ·  ${amountInWordsAr(storedTax, currencySymbol, decimalPlaces)}`
+                      : amountInWordsEn(storedTax, currencySymbol, decimalPlaces),
               }
             : {}),
         }
@@ -235,6 +333,17 @@ export function toEngineData(
   }
   if (invoiceData.notes) {
     termsBlocks.push({ title: { en: 'Notes', ar: 'ملاحظات' }, body: invoiceData.notes });
+  }
+  // Statutory notations (zero-rating / reverse-charge notices) — frozen at
+  // issuance and rendered VERBATIM as their own notice stack. Bilingual modes
+  // print the frozen translation beneath the English text.
+  const notations = invoiceData.notations ?? [];
+  if (notations.length > 0) {
+    const isBilingual = config.language.mode !== 'en';
+    const body = notations
+      .map((n) => (isBilingual && n.textTranslated ? `${n.text}\n${n.textTranslated}` : n.text))
+      .join('\n');
+    termsBlocks.push({ title: { en: 'Notices', ar: 'إشعارات' }, body });
   }
   const terms: EngineDocData['terms'] =
     termsBlocks.length > 0
@@ -293,6 +402,13 @@ export function toEngineData(
   // tax bar still gates whether the seller VAT identification is present at all.
   // Rendered natively by the QR surfaces (pdfmake `qr`), so no QR dependency.
   const sellerCountryCode = normalizeSaudi(companySettings.location?.country);
+  // Seller registration number for the printed band + QR: the STAMPED
+  // `seller_tax_number` (legal_entities-sourced snapshot) wins over the live
+  // `company_settings` value, so the printed band matches the Task 14 preview.
+  const sellerVatNumber = invoiceData.seller_tax_number ?? companySettings.basic_info?.vat_number ?? null;
+  const identity = sellerVatNumber
+    ? { ...companySettings, basic_info: { ...companySettings.basic_info, vat_number: sellerVatNumber } }
+    : companySettings;
   // The tax bar is the entity's VAT/GST identification opt-in; within it the
   // applicable system is VAT (the only ZATCA-eligible system in scope).
   const taxSystem = config.taxBar?.enabled ? 'VAT' : null;
@@ -300,8 +416,10 @@ export function toEngineData(
   if (config.taxBar?.enabled && shouldEmitZatcaQr({ taxSystem, countryCode: sellerCountryCode })) {
     const sellerName =
       companySettings.basic_info?.legal_name || companySettings.basic_info?.company_name || '';
+    // Feed the SAME stamped number to the QR so the QR and the band agree; a
+    // manual tax-bar override still wins for the band's displayed value.
     const vatNumber =
-      (config.taxBar.source === 'manual' ? config.taxBar.value : companySettings.basic_info?.vat_number) || '';
+      (config.taxBar.source === 'manual' ? config.taxBar.value : sellerVatNumber) || '';
     if (sellerName && vatNumber) {
       const timestamp = invoiceData.invoice_date
         ? new Date(invoiceData.invoice_date).toISOString()
@@ -311,7 +429,7 @@ export function toEngineData(
         vatNumber,
         timestamp,
         total: totalAmount.toFixed(2),
-        vatAmount: taxAmount.toFixed(2),
+        vatAmount: storedTax.toFixed(2),
       });
     }
   }
@@ -322,11 +440,11 @@ export function toEngineData(
   // the tax bar is enabled (handled by the QR surfaces' precedence).
   const qrPayload = zatcaPayload
     ? null
-    : `INVOICE:${invoiceData.invoice_number || 'Draft'} TOTAL:${money(totalAmount)} DATE:${formatDate(invoiceData.invoice_date, 'dd MMM yyyy')}`;
+    : `INVOICE:${invoiceData.invoice_number || 'Draft'} TOTAL:${money(totalAmount)} DATE:${docDate(invoiceData.invoice_date)}`;
 
   return {
     documentTitle,
-    identity: companySettings,
+    identity,
     parties: { to },
     meta,
     lineItems: { columns, rows },

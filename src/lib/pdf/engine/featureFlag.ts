@@ -7,12 +7,13 @@
  * Only the literal string `'true'` on the matching env var opts a document type
  * into the engine — any other value (unset, `'false'`, `'1'`, …) stays OFF.
  *
- * `'invoice'` (the M3 pilot), `'quote'`, `'payment_receipt'`, the three case
+ * NOTE: `'invoice'`, `'quote'`, and `'credit_note'` no longer appear here — they
+ * render EXCLUSIVELY through the engine (their legacy builders were deleted in
+ * Task 10), so there is no flag to gate. `'payment_receipt'`, the three case
  * documents `'office_receipt'`, `'customer_copy'`, and `'checkout_form'`, the
  * `'case_label'` and `'chain_of_custody'` documents, the `'payslip'` +
  * `'stock_label'` documents, and the `'report'` (case report) document each have
  * a wired engine branch, driven by
- * `VITE_PDF_ENGINE_INVOICE`, `VITE_PDF_ENGINE_QUOTE`,
  * `VITE_PDF_ENGINE_PAYMENT_RECEIPT`, `VITE_PDF_ENGINE_OFFICE_RECEIPT`,
  * `VITE_PDF_ENGINE_CUSTOMER_COPY`, `VITE_PDF_ENGINE_CHECKOUT_FORM`,
  * `VITE_PDF_ENGINE_CASE_LABEL`, `VITE_PDF_ENGINE_CHAIN_OF_CUSTODY`,
@@ -27,8 +28,6 @@
 
 /** Env var name per supported document type. Absent types are never enabled. */
 const FLAG_ENV_BY_TYPE: Record<string, string> = {
-  invoice: 'VITE_PDF_ENGINE_INVOICE',
-  quote: 'VITE_PDF_ENGINE_QUOTE',
   payment_receipt: 'VITE_PDF_ENGINE_PAYMENT_RECEIPT',
   office_receipt: 'VITE_PDF_ENGINE_OFFICE_RECEIPT',
   customer_copy: 'VITE_PDF_ENGINE_CUSTOMER_COPY',

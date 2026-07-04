@@ -35,6 +35,7 @@ function collectText(node: unknown, out: string[]): void {
 const MARKERS: Record<TemplateDocumentType, string> = {
   invoice: 'RAID-5 logical recovery (4 × 4TB)',
   quote: 'RAID-5 logical recovery',
+  credit_note: 'RAID-5 recovery attempt (refunded)',
   payment_receipt: 'RCPT-2026-0042',
   office_receipt: 'Seagate',
   customer_copy: 'Seagate',

@@ -1,17 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import { countryTemplateOverride, type ResolvedCountryFacts } from './countryConfig';
+import { gccTaxInvoiceProfile } from '../../regimes/gcc_tax_invoice';
 
 const OMAN: ResolvedCountryFacts = {
-  code: 'OM', taxSystem: 'VAT', taxLabel: 'VAT', taxInvoiceRequired: true,
+  code: 'OM', taxSystem: 'VAT', taxLabel: 'VAT', taxNumberLabel: null, taxInvoiceRequired: true,
   languageCode: 'ar', decimalPlaces: 3, dateFormat: 'DD/MM/YYYY',
+  decimalSeparator: null, thousandsSeparator: null, digitGrouping: null,
 };
 const UK: ResolvedCountryFacts = {
-  code: 'GB', taxSystem: 'VAT', taxLabel: 'VAT', taxInvoiceRequired: true,
+  code: 'GB', taxSystem: 'VAT', taxLabel: 'VAT', taxNumberLabel: null, taxInvoiceRequired: true,
   languageCode: 'en', decimalPlaces: 2, dateFormat: 'DD/MM/YYYY',
+  decimalSeparator: null, thousandsSeparator: null, digitGrouping: null,
 };
 const US: ResolvedCountryFacts = {
-  code: 'US', taxSystem: 'SALES_TAX', taxLabel: 'Sales Tax', taxInvoiceRequired: false,
+  code: 'US', taxSystem: 'SALES_TAX', taxLabel: 'Sales Tax', taxNumberLabel: null, taxInvoiceRequired: false,
   languageCode: 'en', decimalPlaces: 2, dateFormat: 'MM/DD/YYYY',
+  decimalSeparator: null, thousandsSeparator: null, digitGrouping: null,
 };
 
 describe('countryTemplateOverride (§8b)', () => {
@@ -40,5 +44,61 @@ describe('countryTemplateOverride (§8b)', () => {
   });
   it('threads decimal places onto config.locale for money/amountInWords (D13)', () => {
     expect(countryTemplateOverride(OMAN).locale?.decimalPlaces).toBe(3);
+  });
+});
+
+const omFacts: ResolvedCountryFacts = {
+  code: 'OM', taxSystem: 'VAT', taxLabel: 'VAT', taxNumberLabel: 'VATIN',
+  taxInvoiceRequired: true, languageCode: 'ar', decimalPlaces: 3,
+  dateFormat: 'DD/MM/YYYY', decimalSeparator: '.', thousandsSeparator: ',', digitGrouping: '3',
+};
+
+describe('countryTemplateOverride + DocumentComplianceProfile', () => {
+  it('derives the profile title for a registered seller', () => {
+    const o = countryTemplateOverride(omFacts, {
+      profile: gccTaxInvoiceProfile, sellerRegistered: true, docType: 'invoice',
+    });
+    expect(o.labels?.documentTitle).toEqual({ en: 'TAX INVOICE', ar: 'فاتورة ضريبية' });
+  });
+
+  it('derives plain INVOICE for an unregistered seller and disables the band', () => {
+    const o = countryTemplateOverride(omFacts, {
+      profile: gccTaxInvoiceProfile, sellerRegistered: false, docType: 'invoice',
+    });
+    expect(o.labels?.documentTitle).toEqual({ en: 'INVOICE', ar: 'فاتورة' });
+    expect(o.taxBar?.enabled).toBe(false);
+  });
+
+  it('labels the tax bar with taxNumberLabel (TRN/VATIN), not the tax-system label', () => {
+    const o = countryTemplateOverride(omFacts, {
+      profile: gccTaxInvoiceProfile, sellerRegistered: true, docType: 'invoice',
+    });
+    expect(o.taxBar).toMatchObject({ enabled: true, label: { en: 'VATIN' } });
+  });
+
+  it('threads the separator facts onto the locale slice', () => {
+    const o = countryTemplateOverride(omFacts);
+    expect(o.locale).toMatchObject({
+      dateFormat: 'DD/MM/YYYY', decimalPlaces: 3,
+      decimalSeparator: '.', thousandsSeparator: ',',
+    });
+  });
+
+  it('keeps the legacy no-compliance behavior byte-identical for existing callers', () => {
+    const o = countryTemplateOverride(omFacts);
+    expect(o.labels?.documentTitle).toBeUndefined();          // profile absent → no title override
+    expect(o.taxBar?.enabled).toBe(true);                     // D11 rule unchanged
+    expect(o.language).toEqual({ mode: 'bilingual_stacked', primary: 'ar' });
+  });
+});
+
+describe('countryTemplateOverride address ordering', () => {
+  it('sets locale.postalFirst=true when the postal token precedes the city token', () => {
+    const override = countryTemplateOverride({ ...omFacts, addressFormat: '%N %O %A %Z %C' });
+    expect(override.locale?.postalFirst).toBe(true);
+  });
+  it('leaves postalFirst unset when the template lists city before postal (GCC/US/UK)', () => {
+    const override = countryTemplateOverride({ ...omFacts, addressFormat: '%N %O %A %C %Z' });
+    expect(override.locale?.postalFirst).toBeUndefined();
   });
 });

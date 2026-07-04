@@ -17,6 +17,7 @@ import { formatCurrency, formatBaseEquivalent } from '../../lib/format';
 import { listTemplates, recordTemplateUsage } from '../../lib/documentTemplatesService';
 import { htmlToPlainText } from '../../lib/sanitizeHtml';
 import { templateKeys } from '../../lib/queryKeys';
+import { listUnitCodes, type UnitCode } from '../../lib/unitCodesService';
 
 interface LineItemTemplate {
   id: string;
@@ -32,7 +33,9 @@ interface QuoteLineItem {
   description: string;
   quantity: number;
   unit_price: number;
-  unit?: string;
+  unit_code?: string | null;
+  unit_label?: string | null;
+  item_code?: string | null;
 }
 
 interface QuoteFormModalProps {
@@ -216,7 +219,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
 
   const [lineItems, setLineItems] = useState<QuoteLineItem[]>(
     asLineItems(initialData?.quote_items) ?? [
-      { description: '', quantity: 1, unit_price: 0, unit: 'Service' },
+      { description: '', quantity: 1, unit_price: 0, unit_code: null, unit_label: null, item_code: null },
     ]
   );
 
@@ -225,12 +228,18 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
     if (items) {
       setLineItems(items);
     } else {
-      setLineItems([{ description: '', quantity: 1, unit_price: 0, unit: 'Service' }]);
+      setLineItems([{ description: '', quantity: 1, unit_price: 0, unit_code: null, unit_label: null, item_code: null }]);
     }
     // Re-seed only when the edited document changes — keying on object identity
     // re-fired on every parent re-render and clobbered edits / quote-import items.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData?.id]);
+
+  const [unitCodes, setUnitCodes] = useState<UnitCode[]>([]);
+
+  useEffect(() => {
+    listUnitCodes().then(setUnitCodes).catch(() => setUnitCodes([]));
+  }, []);
 
   const { data: lineItemTemplates = [], isLoading: catalogLoading } = useQuery<LineItemTemplate[]>({
     queryKey: ['quote_line_item_templates'],
@@ -304,7 +313,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
   });
 
   const addLineItem = () => {
-    setLineItems([...lineItems, { description: '', quantity: 1, unit_price: 0, unit: 'Service' }]);
+    setLineItems([...lineItems, { description: '', quantity: 1, unit_price: 0, unit_code: null, unit_label: null, item_code: null }]);
   };
 
   const removeLineItem = (index: number) => {
@@ -313,7 +322,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
     }
   };
 
-  const updateLineItem = (index: number, field: keyof QuoteLineItem, value: string | number) => {
+  const updateLineItem = (index: number, field: keyof QuoteLineItem, value: string | number | null) => {
     const updated = [...lineItems];
     updated[index] = { ...updated[index], [field]: value };
     setLineItems(updated);
@@ -324,7 +333,8 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
       description: `${template.name}${template.description ? ' - ' + template.description : ''}`,
       quantity: 1,
       unit_price: template.default_price,
-      unit: template.unit_of_measure,
+      unit_code: null,
+      unit_label: template.unit_of_measure ?? null,
     };
     setLineItems([...lineItems, newItem]);
     setShowCatalog(false);
@@ -584,7 +594,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
             {lineItems.map((item, index) => (
               <div key={index} className="flex gap-2 items-start p-2 bg-slate-50 rounded-lg border border-slate-200">
                 <div className="flex-1 grid grid-cols-12 gap-2">
-                  <div className="col-span-4">
+                  <div className="col-span-3">
                     <input
                       type="text"
                       placeholder="Describe the service or item"
@@ -595,11 +605,31 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                     />
                   </div>
                   <div className="col-span-2">
+                    <select
+                      aria-label="Unit"
+                      value={item.unit_code ?? ''}
+                      onChange={(e) => {
+                        const code = e.target.value || null;
+                        const unit = unitCodes.find((u) => u.code === code);
+                        const updated = [...lineItems];
+                        updated[index] = { ...updated[index], unit_code: code, unit_label: unit?.label ?? null };
+                        setLineItems(updated);
+                      }}
+                      className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-success focus:border-success"
+                    >
+                      <option value="">—</option>
+                      {unitCodes.map((u) => (
+                        <option key={u.code} value={u.code}>{u.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
                     <input
                       type="text"
-                      placeholder="Unit"
-                      value={item.unit || ''}
-                      onChange={(e) => updateLineItem(index, 'unit', e.target.value)}
+                      placeholder="HSN/SAC"
+                      aria-label="Item code"
+                      value={item.item_code ?? ''}
+                      onChange={(e) => updateLineItem(index, 'item_code', e.target.value || null)}
                       className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-success focus:border-success"
                     />
                   </div>
@@ -617,7 +647,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                       required
                     />
                   </div>
-                  <div className="col-span-4">
+                  <div className="col-span-3">
                     <input
                       type="number"
                       placeholder="Price"

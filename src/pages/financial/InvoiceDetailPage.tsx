@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchInvoiceById, convertProformaToTaxInvoice, getConversionHistory, updateInvoice, toInvoiceEditInitialData, getPaymentHistory, issueInvoice } from '../../lib/invoiceService';
@@ -28,6 +28,12 @@ import { logger } from '../../lib/logger';
 import { supabase } from '../../lib/supabaseClient';
 import type { PaymentReceipt } from '../../lib/bankingService';
 import { receiptsService } from '../../lib/receiptsService';
+import {
+  dryRunIssueTaxDocument, classifyRequirementFailures, parseRequirementFailures,
+  type RequirementFailure,
+} from '../../lib/taxDocumentService';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { RequirementFailuresPanel } from '../../components/financial/RequirementFailuresPanel';
 
 const statusConfig = {
   draft: { label: 'Draft', color: 'secondary', icon: FileText },
@@ -75,6 +81,12 @@ export const InvoiceDetailPage: React.FC = () => {
   const [editingInvoice, setEditingInvoice] = useState<InvoiceWithDetails | null>(null);
   const [showConversionHistoryModal, setShowConversionHistoryModal] = useState(false);
   const [conversionHistory, setConversionHistory] = useState<Array<Record<string, unknown>>>([]);
+  const [requirementFailures, setRequirementFailures] = useState<RequirementFailure[]>([]);
+  const [showIssueWarnConfirm, setShowIssueWarnConfirm] = useState(false);
+  const [issueWarnMessages, setIssueWarnMessages] = useState<string[]>([]);
+  const [isIssuing, setIsIssuing] = useState(false);
+  // Synchronous re-entry guard so a double-click can't fire two concurrent dry-runs.
+  const issueBusyRef = useRef(false);
 
   const { data: invoice, isLoading } = useQuery({
     queryKey: ['invoice', id],
@@ -130,16 +142,57 @@ export const InvoiceDetailPage: React.FC = () => {
     }
   };
 
-  const handleIssueInvoice = async () => {
+  // The authoritative issue call — the DB requirement gate re-checks atomically.
+  // A P0403 (blocked) rejection is recovered into the panel (defense in depth).
+  const performIssue = async () => {
     if (!id) return;
+    setIsIssuing(true);
     try {
       await issueInvoice(id);
       toast.success('Invoice issued — payments can now be recorded');
+      setRequirementFailures([]);
+      setShowIssueWarnConfirm(false);
       queryClient.invalidateQueries({ queryKey: ['invoice', id] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
     } catch (error) {
       logger.error('Error issuing invoice:', error);
+      const failures = parseRequirementFailures(error instanceof Error ? error.message : String(error));
+      if (failures.length > 0) {
+        setRequirementFailures(failures);
+        setShowIssueWarnConfirm(false);
+        toast.error('Issuance blocked — resolve the required fields first.');
+      } else {
+        // A non-gate failure (race, transient) — close the now-stale confirm dialog.
+        setShowIssueWarnConfirm(false);
+        toast.error(error instanceof Error ? error.message : 'Failed to issue invoice');
+      }
+    } finally {
+      setIsIssuing(false);
+    }
+  };
+
+  const handleIssueInvoice = async () => {
+    if (!id || issueBusyRef.current || showIssueWarnConfirm) return;
+    issueBusyRef.current = true;
+    try {
+      const dry = await dryRunIssueTaxDocument('invoice', id);
+      setRequirementFailures(dry.requirement_failures);
+      const decision = classifyRequirementFailures(dry.requirement_failures);
+      if (decision.kind === 'block') {
+        toast.error('Issuance blocked — resolve the required fields first.');
+        return;
+      }
+      if (decision.kind === 'confirm') {
+        setIssueWarnMessages(decision.messages);
+        setShowIssueWarnConfirm(true);
+        return;
+      }
+      await performIssue();
+    } catch (error) {
+      logger.error('Error checking issuance requirements:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to issue invoice');
+    } finally {
+      issueBusyRef.current = false;
     }
   };
 
@@ -766,6 +819,7 @@ export const InvoiceDetailPage: React.FC = () => {
               {/* v1.0.0: no `proforma_invoice_id` column. The proforma quote_id is in `converted_from_quote_id` (B8 to wire navigation). */}
             </div>
           )}
+          <RequirementFailuresPanel failures={requirementFailures} />
         </>
       }
     >
@@ -882,6 +936,16 @@ export const InvoiceDetailPage: React.FC = () => {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        isOpen={showIssueWarnConfirm}
+        onClose={() => setShowIssueWarnConfirm(false)}
+        onConfirm={() => void performIssue()}
+        title="Review before issuing"
+        message={issueWarnMessages.join(' ')}
+        confirmText="Issue anyway"
+        variant="warning"
+        isLoading={isIssuing}
+      />
     </DetailPageTemplate>
   );
 };

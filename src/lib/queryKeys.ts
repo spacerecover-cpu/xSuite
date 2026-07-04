@@ -58,6 +58,13 @@ export const documentInstanceKeys = {
   sections: (id: string) => [...documentInstanceKeys.all, 'sections', id] as const,
 };
 
+export const documentComplianceKeys = {
+  all: ['documentCompliance'] as const,
+  inputs: () => [...documentComplianceKeys.all, 'inputs'] as const,
+  taxLines: (docType: string, documentId: string | null) =>
+    [...documentComplianceKeys.all, 'taxLines', docType, documentId] as const,
+};
+
 export const inventoryKeys = {
   all: ['inventory'] as const,
   lists: () => [...inventoryKeys.all, 'list'] as const,

@@ -1,16 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { TaxComputation } from './regimes/types';
 
 // getStockStats/getSalesReport/getTodaysSales each wrap a supabase query; mock the
 // client (env-throwing on import) and feed mixed-currency rows so the assertions
-// prove base-currency summation, never the raw native sum.
-const { from } = vi.hoisted(() => ({ from: vi.fn() }));
+// prove base-currency summation, never the raw native sum. createStockSale exercises
+// the rpc leg (record_stock_sale) — same hoisted mock, distinct fn.
+const { from, rpc } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }));
 vi.mock('./supabaseClient', () => ({
-  supabase: { from },
+  supabase: { from, rpc },
   getTenantId: () => 'tenant-1',
 }));
 vi.mock('./postgrestSanitizer', () => ({ sanitizeFilterValue: (v: string) => v }));
 
-import { getStockStats, getSalesReport, getTodaysSales } from './stockService';
+import { getStockStats, getSalesReport, getTodaysSales, createStockSale } from './stockService';
 
 /**
  * Thenable query builder: every chained filter returns the builder; awaiting it
@@ -79,5 +81,57 @@ describe('getTodaysSales (cross-document revenue total must be base currency)', 
     const summary = await getTodaysSales();
 
     expect(summary.revenue).toBe(88);
+  });
+});
+
+describe('createStockSale (Task 26: kernel tax parity — p_tax_lines threading)', () => {
+  beforeEach(() => rpc.mockReset());
+
+  const taxComputation: TaxComputation = {
+    lines: [{
+      lineItemId: null, componentCode: 'VAT', componentLabel: 'VAT', jurisdictionRef: null,
+      rate: 5, taxableBase: 10, taxAmount: 0.5, taxTreatment: 'standard', treatmentReasonCode: null, sequence: 0,
+    }],
+    rollups: [{
+      lineItemId: null, componentCode: 'VAT', componentLabel: 'VAT', jurisdictionRef: null,
+      rate: 5, taxableBase: 10, taxAmount: 0.5, taxTreatment: 'standard', treatmentReasonCode: null, sequence: 0,
+    }],
+    totals: { taxableBase: 10, taxTotal: 0.5, grandTotal: 10.5, roundingAdjustment: null },
+    expectedWithholding: null,
+    notations: [],
+    trace: { regimeKey: 'simple_vat', pluginVersion: '1.0.0', packVersionId: null, schemeMode: 'single', steps: [] },
+  };
+
+  it('passes p_tax_lines with a rollup (line_item_id null) carrying component_label/regime_key/plugin_version', async () => {
+    rpc.mockResolvedValue({ data: { id: 'sale-1' }, error: null });
+
+    await createStockSale({
+      customer_id: 'cust-1',
+      currency: 'OMR',
+      taxComputation,
+      items: [{ stock_item_id: 'item-1', quantity: 2, unit_price: 5 }],
+    });
+
+    const call = rpc.mock.calls.find((c) => c[0] === 'record_stock_sale');
+    const taxLines = (call![1] as { p_tax_lines: Array<{ line_item_id: string | null; tax_amount: number }> }).p_tax_lines;
+    // Regression (whole-branch review CRITICAL): send ONLY the document-level rollups, never
+    // [...lines, ...rollups]. Both carry line_item_id:null for POS, so threading both would let
+    // record_stock_sale's `line_item_id IS NULL` header/ledger filter double-count the tax.
+    expect(taxLines).toHaveLength(taxComputation.rollups.length); // 1, not 2
+    expect(taxLines.every((l) => l.line_item_id === null)).toBe(true);
+    expect(taxLines.reduce((s, l) => s + l.tax_amount, 0)).toBe(0.5); // rollup total, NOT doubled 1.0
+    expect(taxLines[0]).toMatchObject({ component_label: 'VAT', regime_key: 'simple_vat', plugin_version: '1.0.0' });
+  });
+
+  it('sends p_tax_lines: null when no taxComputation is supplied (backward compatible)', async () => {
+    rpc.mockResolvedValue({ data: { id: 'sale-2' }, error: null });
+
+    await createStockSale({
+      customer_id: 'cust-1',
+      currency: 'OMR',
+      items: [{ stock_item_id: 'item-1', quantity: 1, unit_price: 5 }],
+    });
+
+    expect(rpc).toHaveBeenCalledWith('record_stock_sale', expect.objectContaining({ p_tax_lines: null }));
   });
 });

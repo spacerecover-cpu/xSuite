@@ -71,7 +71,7 @@ const initialData = {
   discount_amount: 20,
   discount_type: 'fixed',
   bank_account_id: null,
-  invoice_line_items: [{ description: 'SSD Data Recovery', quantity: 1, unit_price: 260, unit: 'Service' }],
+  invoice_line_items: [{ description: 'SSD Data Recovery', quantity: 1, unit_price: 260, unit_code: null, unit_label: null }],
   currency: 'OMR',
 };
 

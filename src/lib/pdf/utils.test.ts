@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCapacity, formatEngineMoney } from './utils';
+import { formatCapacity, formatEngineMoney, formatPartyAddressLines } from './utils';
 
 describe('formatEngineMoney', () => {
   // Regression: adapters used a bare `toFixed()` that dropped the thousands
@@ -42,5 +42,47 @@ describe('formatCapacity', () => {
     expect(formatCapacity(undefined)).toBe('-');
     expect(formatCapacity('')).toBe('-');
     expect(formatCapacity('   ')).toBe('-');
+  });
+});
+
+describe('formatEngineMoney separators', () => {
+  it('defaults to comma-grouping dot-decimal (legacy byte-parity)', () => {
+    expect(formatEngineMoney(2000000.5, { symbol: 'OMR', decimalPlaces: 3, position: 'after' }))
+      .toBe('2,000,000.500 OMR');
+  });
+  it('renders continental EU shape from explicit separators', () => {
+    expect(formatEngineMoney(1234567.89, {
+      symbol: '€', decimalPlaces: 2, position: 'before',
+      decimalSeparator: ',', thousandsSeparator: '.',
+    })).toBe('€ 1.234.567,89');
+  });
+  it('supports empty thousands separator', () => {
+    expect(formatEngineMoney(1234.5, {
+      symbol: 'X', decimalPlaces: 2, position: 'after', thousandsSeparator: '',
+    })).toBe('1234.50 X');
+  });
+});
+
+describe('formatPartyAddressLines', () => {
+  const addr = {
+    line1: 'Bldg 12, Way 3015', line2: 'Al Khuwair', city: 'Muscat',
+    subdivision: 'Muscat', postal_code: '133', country: 'Oman', free_text: null,
+  };
+  it('street-first order (GCC/US)', () => {
+    expect(formatPartyAddressLines(addr, false)).toEqual([
+      'Bldg 12, Way 3015', 'Al Khuwair', 'Muscat, Muscat 133', 'Oman',
+    ]);
+  });
+  it('postal-first order (EU/JP city line)', () => {
+    expect(formatPartyAddressLines(addr, true)).toEqual([
+      'Bldg 12, Way 3015', 'Al Khuwair', '133 Muscat, Muscat', 'Oman',
+    ]);
+  });
+  it('falls back to free text when no structured fields exist (M-I legacy rows)', () => {
+    expect(formatPartyAddressLines({ free_text: 'PO Box 1, Ruwi, Muscat' }, false))
+      .toEqual(['PO Box 1, Ruwi, Muscat']);
+  });
+  it('returns [] when nothing is present', () => {
+    expect(formatPartyAddressLines({}, false)).toEqual([]);
   });
 });

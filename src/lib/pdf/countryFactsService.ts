@@ -17,19 +17,32 @@ export async function getResolvedCountryFacts(
 
   const { data } = await supabase
     .from('geo_countries')
-    .select('code, tax_system, tax_label, tax_invoice_required, language_code, decimal_places, date_format')
+    .select('code, tax_system, tax_label, tax_number_label, tax_invoice_required, language_code, decimal_places, date_format, decimal_separator, thousands_separator, digit_grouping, address_format')
     .eq('id', countryId)
     .maybeSingle();
 
   if (!data) return null;
 
+  // address_format is jsonb shaped `{"lines": ["%N","%O","%A","%C %Z"]}` (a
+  // postal-address template, not a postal_first string). Join the lines into
+  // one token string so the country layer can locate %Z vs %C by index.
+  const af = data.address_format as { lines?: unknown } | null;
+  const addressFormat = af && Array.isArray(af.lines)
+    ? (af.lines as unknown[]).filter((l): l is string => typeof l === 'string').join(' ')
+    : null;
+
   return {
     code: data.code,
     taxSystem: data.tax_system ?? null,
     taxLabel: data.tax_label ?? null,
+    taxNumberLabel: data.tax_number_label ?? null,
     taxInvoiceRequired: !!data.tax_invoice_required,
     languageCode: data.language_code ?? null,
     decimalPlaces: data.decimal_places ?? null,
     dateFormat: data.date_format ?? null,
+    decimalSeparator: data.decimal_separator ?? null,
+    thousandsSeparator: data.thousands_separator ?? null,
+    digitGrouping: data.digit_grouping ?? null,
+    addressFormat,
   };
 }

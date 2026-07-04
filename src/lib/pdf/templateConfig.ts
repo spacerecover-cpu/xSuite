@@ -589,6 +589,13 @@ export interface LocaleConfig {
   dateFormat?: string;
   groupingStyle?: 'standard' | 'indian';
   decimalPlaces?: number;
+  /** Country decimal separator ('.' or ','); absent = engine default '.'. */
+  decimalSeparator?: string;
+  /** Country thousands separator (',', '.', ' ', or '' for none). */
+  thousandsSeparator?: string;
+  /** Country address_format lists the postal code before the city (Task 22).
+   *  Absent/false = today's city-then-postal ordering (GCC/US/UK unchanged). */
+  postalFirst?: boolean;
 }
 
 /**
@@ -664,6 +671,7 @@ export type TemplateDocumentType =
   | 'case_label'
   | 'quote'
   | 'invoice'
+  | 'credit_note'
   | 'payment_receipt'
   | 'payslip'
   | 'chain_of_custody'
@@ -774,11 +782,16 @@ const ENGLISH_ONLY: LanguageConfig = {
   primary: 'en',
 };
 
-/** Standard line-item table columns used by quote / invoice. */
+/** Standard line-item table columns used by quote / invoice.
+ *  `itemCode` / `unit` are hidden by default (visible:false) and flipped on by a
+ *  compliance profile's `forcedColumns` (via `forcedColumnOverrides` in the
+ *  country layer) or a tenant Studio toggle — GCC hides them, India shows them. */
 function lineItemColumns(): ColumnConfig[] {
   return [
     { key: 'description', visible: true, label: { en: 'Description', ar: 'الوصف' }, width: 220 },
     { key: 'quantity', visible: true, label: { en: 'Qty', ar: 'الكمية' }, width: 40 },
+    { key: 'itemCode', visible: false, label: { en: 'Code', ar: 'الرمز' }, width: 50 },
+    { key: 'unit', visible: false, label: { en: 'Unit', ar: 'الوحدة' }, width: 45 },
     { key: 'unitPrice', visible: true, label: { en: 'Unit Price', ar: 'سعر الوحدة' } },
     { key: 'lineTotal', visible: true, label: { en: 'Total', ar: 'المجموع' } },
   ];
@@ -897,6 +910,38 @@ function defaultFor(docType: TemplateDocumentType): DocumentTemplateConfig {
         ...base,
         sections: financialSections(),
         labels: { documentTitle: { en: 'QUOTATION', ar: 'عرض أسعار' } },
+        layout: { partiesMetaSideBySide: true },
+      };
+    case 'credit_note':
+      // A credit note is a simpler statutory document than an invoice/quote: no
+      // tax bar / tax summary / payment history / bank / signature / QR sections
+      // (CreditNoteData carries no bank_accounts and the legacy builder never
+      // resolves a QR image for it either) — just the identity + customer/
+      // credit-note-details header, the credited line items, the STORED totals,
+      // and the Reason box (via `terms`). Mirrors the legacy two-column
+      // Customer Information | Credit Note Details layout from
+      // `documents/CreditNoteDocument.ts`.
+      return {
+        ...base,
+        sections: [
+          section('header', 0),
+          section('parties', 1),
+          section('meta', 2),
+          section('lineItems', 3, { columns: lineItemColumns() }),
+          section('totals', 4, {
+            lines: {
+              subtotal: true,
+              tax: true,
+              total: true,
+              amountPaid: false,
+              balanceDue: false,
+              amountInWords: false,
+            },
+          }),
+          section('terms', 5),
+          section('footer', 6),
+        ],
+        labels: { documentTitle: { en: 'CREDIT NOTE', ar: 'إشعار دائن' } },
         layout: { partiesMetaSideBySide: true },
       };
     case 'payment_receipt':
@@ -1094,6 +1139,7 @@ export const BUILT_IN_TEMPLATE_CONFIGS: Record<TemplateDocumentType, DocumentTem
   case_label: defaultFor('case_label'),
   quote: defaultFor('quote'),
   invoice: defaultFor('invoice'),
+  credit_note: defaultFor('credit_note'),
   payment_receipt: defaultFor('payment_receipt'),
   payslip: defaultFor('payslip'),
   chain_of_custody: defaultFor('chain_of_custody'),

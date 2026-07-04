@@ -11,6 +11,7 @@ import type {
   QuoteItemData,
   InvoiceData,
   InvoiceDocumentData,
+  CreditNoteData,
   CreditNoteDocumentData,
   InvoicePaymentLine,
   InvoiceItemData,
@@ -81,10 +82,12 @@ function toCustomerBlock(src: unknown): NonNullable<QuoteData['customer']> | und
     mobile_number: optStr(r.mobile_number),
     // DB column is `phone`; the type historically called it `phone_number`.
     phone_number: optStr(r.phone_number) ?? optStr(r.phone),
+    tax_number: optStr(r.tax_number),
     address_line1: optStr(r.address_line1) ?? optStr(r.address),
     address_line2: optStr(r.address_line2),
     city: optStr(r.city),
     postal_code: optStr(r.postal_code),
+    subdivision_name: optStr(pickRecord(r.subdivision)?.name),
     country: optStr(r.country),
   };
 }
@@ -98,10 +101,12 @@ function toCompanyBlock(src: unknown): NonNullable<InvoiceData['company']> | und
     company_name: reqStr(r.company_name) || reqStr(r.name),
     email: optStr(r.email),
     phone_number: optStr(r.phone_number) ?? optStr(r.phone),
+    tax_number: optStr(r.tax_number),
     address_line1: optStr(r.address_line1) ?? optStr(r.address),
     address_line2: optStr(r.address_line2),
     city: optStr(r.city),
     postal_code: optStr(r.postal_code),
+    subdivision_name: optStr(pickRecord(r.subdivision)?.name),
     country: optStr(r.country),
   };
 }
@@ -161,7 +166,52 @@ export function currencyToBlock(c: CurrencyConfig): NonNullable<QuoteData['accou
     currency_symbol: renderCurrencyToken(c),
     currency_position: c.position,
     decimal_places: c.decimalPlaces,
+    decimal_separator: c.decimalSeparator,
+    thousands_separator: c.thousandsSeparator,
   };
+}
+
+/**
+ * One row of the Phase 1 `document_tax_lines` ledger for a document. Rollup
+ * rows (`line_item_id IS NULL`) and per-line rows both come back, ordered by
+ * `sequence`; consumers filter for the shape they need. Numeric columns are
+ * coerced with `Number(...)` because Postgres `numeric` can arrive as a string
+ * over PostgREST regardless of the generated TS type.
+ */
+export interface DocumentTaxLineRow {
+  line_item_id: string | null;
+  component_code: string;
+  component_label: string;
+  rate: number;
+  taxable_base: number;
+  tax_amount: number;
+  tax_treatment: string;
+  treatment_reason_code: string | null;
+  sequence: number;
+  backfilled: boolean;
+  rule_trace: unknown;
+}
+
+export async function fetchDocumentTaxLines(
+  documentType: 'quote' | 'invoice' | 'credit_note' | 'stock_sale',
+  documentId: string,
+): Promise<DocumentTaxLineRow[]> {
+  const { data, error } = await supabase
+    .from('document_tax_lines')
+    .select('line_item_id, component_code, component_label, rate, taxable_base, tax_amount, tax_treatment, treatment_reason_code, sequence, backfilled, rule_trace')
+    .eq('document_type', documentType)
+    .eq('document_id', documentId)
+    .is('deleted_at', null)
+    .order('sequence');
+
+  if (error) throw error;
+
+  return (data ?? []).map((r) => ({
+    ...r,
+    rate: Number(r.rate),
+    taxable_base: Number(r.taxable_base),
+    tax_amount: Number(r.tax_amount),
+  }));
 }
 
 function toIdName(src: unknown): { id: string; name: string } | undefined {
@@ -185,6 +235,8 @@ export function toQuoteItems(rows: Partial<QuoteItemsRow>[] | null | undefined):
     description: row.description ?? '',
     quantity: row.quantity ?? 0,
     unit_price: row.unit_price ?? 0,
+    unit_label: row.unit_label ?? null,
+    item_code: row.item_code ?? null,
   }));
 }
 
@@ -199,6 +251,8 @@ export function toInvoiceItems(rows: Partial<InvoiceLineItemsRow>[] | null | und
       unit_price,
       tax_rate: row.tax_rate ?? 0,
       line_total: quantity * unit_price,
+      unit_label: row.unit_label ?? null,
+      item_code: row.item_code ?? null,
     };
   });
 }
@@ -440,6 +494,7 @@ export function toQuoteData(
     customerAssociatedCompany?: unknown;
     items?: QuoteItemData[] | null;
     bankAccounts?: unknown;
+    taxLines?: DocumentTaxLineRow[] | null;
   },
 ): QuoteData {
   // Built field-by-field from the typed row (no `as unknown as`): a renamed or
@@ -452,6 +507,7 @@ export function toQuoteData(
     company_id: quoteRow.company_id ?? undefined,
     status: quoteRow.status ?? '',
     title: '',
+    quote_date: quoteRow.quote_date ?? null,
     valid_until: quoteRow.valid_until ?? undefined,
     subtotal: quoteRow.subtotal ?? 0,
     tax_rate: quoteRow.tax_rate ?? 0,
@@ -463,6 +519,14 @@ export function toQuoteData(
     created_at: quoteRow.created_at ?? '',
     created_by: quoteRow.created_by ?? undefined,
     terms_and_conditions: optStr(quoteRow.terms),
+    buyer_tax_number: quoteRow.buyer_tax_number ?? null,
+    buyer_tax_number_label: quoteRow.buyer_tax_number_label ?? null,
+    buyer_address: (quoteRow.buyer_address as Record<string, unknown> | null) ?? null,
+    seller_tax_number: quoteRow.seller_tax_number ?? null,
+    supply_date: quoteRow.supply_date ?? null,
+    reverse_charge: quoteRow.reverse_charge ?? false,
+    notations: (quoteRow.notations as QuoteData['notations']) ?? null,
+    tax_lines: extras.taxLines ?? [],
     customer: toCustomerBlock(extras.customer),
     company: toCompanyBlock(extras.company),
     cases: toCaseRef(quoteRow.cases),
@@ -475,13 +539,14 @@ export function toQuoteData(
 }
 
 export async function fetchQuoteData(quoteId: string): Promise<QuoteDocumentData> {
-  const [quoteResult, settingsResult] = await Promise.all([
+  const [quoteResult, settingsResult, taxLines] = await Promise.all([
     fetchQuoteDetails(quoteId),
     fetchCompanySettings(),
+    fetchDocumentTaxLines('quote', quoteId),
   ]);
 
   return {
-    quoteData: quoteResult,
+    quoteData: { ...quoteResult, tax_lines: taxLines },
     companySettings: settingsResult,
   };
 }
@@ -510,14 +575,14 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
     quoteRow.customer_id
       ? supabase
           .from('customers_enhanced')
-          .select('id, customer_name, email, mobile_number, phone, address')
+          .select('id, customer_name, email, mobile_number, phone, address, tax_number, address_line1, address_line2, postal_code, subdivision:geo_subdivisions!subdivision_id ( name )')
           .eq('id', quoteRow.customer_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
     quoteRow.company_id
       ? supabase
           .from('companies')
-          .select('id, name, company_name, email, phone, address')
+          .select('id, name, company_name, email, phone, address, tax_number, address_line1, address_line2, postal_code, subdivision:geo_subdivisions!subdivision_id ( name )')
           .eq('id', quoteRow.company_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -586,6 +651,7 @@ export function toInvoiceData(
     company?: unknown;
     customerAssociatedCompany?: unknown;
     items?: InvoiceItemData[] | null;
+    taxLines?: DocumentTaxLineRow[] | null;
   },
 ): InvoiceData {
   // Built field-by-field from the typed row (no `as unknown as`): column drift is
@@ -613,6 +679,14 @@ export function toInvoiceData(
     notes: invoiceRow.notes ?? undefined,
     created_at: invoiceRow.created_at ?? '',
     created_by: invoiceRow.created_by ?? undefined,
+    buyer_tax_number: invoiceRow.buyer_tax_number ?? null,
+    buyer_tax_number_label: invoiceRow.buyer_tax_number_label ?? null,
+    buyer_address: (invoiceRow.buyer_address as Record<string, unknown> | null) ?? null,
+    seller_tax_number: invoiceRow.seller_tax_number ?? null,
+    supply_date: invoiceRow.supply_date ?? null,
+    reverse_charge: invoiceRow.reverse_charge ?? false,
+    notations: (invoiceRow.notations as InvoiceData['notations']) ?? null,
+    tax_lines: extras.taxLines ?? [],
     customer: toCustomerBlock(extras.customer),
     company: toCompanyBlock(extras.company),
     cases: toCaseRef(invoiceRow.cases),
@@ -624,14 +698,15 @@ export function toInvoiceData(
 }
 
 export async function fetchInvoiceData(invoiceId: string): Promise<InvoiceDocumentData> {
-  const [invoiceResult, settingsResult, paymentHistory] = await Promise.all([
+  const [invoiceResult, settingsResult, paymentHistory, taxLines] = await Promise.all([
     fetchInvoiceDetails(invoiceId),
     fetchCompanySettings(),
     fetchInvoicePaymentHistory(invoiceId),
+    fetchDocumentTaxLines('invoice', invoiceId),
   ]);
 
   return {
-    invoiceData: invoiceResult,
+    invoiceData: { ...invoiceResult, tax_lines: taxLines },
     companySettings: settingsResult,
     paymentHistory,
   };
@@ -655,7 +730,7 @@ export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditN
   // Related records fetched separately (mirrors fetchInvoiceDetails — no embed/alias drift).
   // Currency from the Country Engine (single source), not accounting_locales.
   const cfg = await getTenantConfig(cnRow.tenant_id);
-  const [settings, invoiceRes, customerRes, companyRes, caseRes, itemsRes] = await Promise.all([
+  const [settings, invoiceRes, customerRes, companyRes, caseRes, itemsRes, taxLines] = await Promise.all([
     fetchCompanySettings(),
     cnRow.invoice_id
       ? supabase.from('invoices').select('invoice_number').eq('id', cnRow.invoice_id).maybeSingle()
@@ -664,7 +739,7 @@ export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditN
       ? supabase.from('customers_enhanced').select('customer_name').eq('id', cnRow.customer_id).maybeSingle()
       : Promise.resolve({ data: null }),
     cnRow.company_id
-      ? supabase.from('companies').select('company_name, name').eq('id', cnRow.company_id).maybeSingle()
+      ? supabase.from('companies').select('company_name, name, tax_number, address_line1, address_line2, postal_code, subdivision:geo_subdivisions!subdivision_id ( name )').eq('id', cnRow.company_id).maybeSingle()
       : Promise.resolve({ data: null }),
     cnRow.case_id
       ? supabase.from('cases').select('case_no').eq('id', cnRow.case_id).maybeSingle()
@@ -675,6 +750,7 @@ export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditN
       .eq('credit_note_id', creditNoteId)
       .is('deleted_at', null)
       .order('sort_order', { ascending: true }),
+    fetchDocumentTaxLines('credit_note', creditNoteId),
   ]);
 
   const invoice = invoiceRes.data as { invoice_number?: string | null } | null;
@@ -710,6 +786,14 @@ export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditN
         unit_price: typeof it.unit_price === 'number' ? it.unit_price : 0,
         line_total: typeof it.total === 'number' ? it.total : 0,
       })),
+      buyer_tax_number: cnRow.buyer_tax_number ?? null,
+      buyer_tax_number_label: cnRow.buyer_tax_number_label ?? null,
+      buyer_address: (cnRow.buyer_address as Record<string, unknown> | null) ?? null,
+      seller_tax_number: cnRow.seller_tax_number ?? null,
+      supply_date: cnRow.supply_date ?? null,
+      reverse_charge: cnRow.reverse_charge ?? false,
+      notations: (cnRow.notations as CreditNoteData['notations']) ?? null,
+      tax_lines: taxLines,
     },
     companySettings: settings,
   };
@@ -769,14 +853,14 @@ async function fetchInvoiceDetails(invoiceId: string): Promise<InvoiceData> {
     invoiceRow.customer_id
       ? supabase
           .from('customers_enhanced')
-          .select('id, customer_name, email, mobile_number, phone, address')
+          .select('id, customer_name, email, mobile_number, phone, address, tax_number, address_line1, address_line2, postal_code, subdivision:geo_subdivisions!subdivision_id ( name )')
           .eq('id', invoiceRow.customer_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
     invoiceRow.company_id
       ? supabase
           .from('companies')
-          .select('id, name, company_name, email, phone, address')
+          .select('id, name, company_name, email, phone, address, tax_number, address_line1, address_line2, postal_code, subdivision:geo_subdivisions!subdivision_id ( name )')
           .eq('id', invoiceRow.company_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),

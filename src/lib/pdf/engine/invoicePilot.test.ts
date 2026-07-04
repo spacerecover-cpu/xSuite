@@ -14,8 +14,9 @@ import { BUILT_IN_TEMPLATE_CONFIGS, resolveTemplateConfig } from '../templateCon
 // domain knowledge) → renderTemplate (the config-driven assembler). We walk the
 // pdfmake content tree and assert the header/line-items/totals content is
 // present, that line-item and total VALUES match the synthetic input exactly,
-// and that bilingual mode surfaces the Arabic title. Plus a guard that the
-// feature flag defaults OFF (so production keeps the legacy builder).
+// and that bilingual mode surfaces the Arabic title. Plus a guard that invoice
+// and quote have NO engine flag — they render exclusively through the engine
+// (their legacy builders were deleted in Task 10).
 //
 // All inputs are synthetic — no DB, no font loading, no real records.
 // ---------------------------------------------------------------------------
@@ -236,14 +237,15 @@ describe('invoice pilot — engine renders a complete, valid invoice', () => {
   });
 });
 
-describe('isPdfEngineEnabled — defaults OFF', () => {
-  it("returns false for 'invoice' when the env flag is unset", () => {
-    // The test env does not set VITE_PDF_ENGINE_INVOICE, so the legacy path
-    // must be the default. This is the production-safety guard.
+describe('isPdfEngineEnabled — invoice/quote have no flag (engine is unconditional)', () => {
+  it("returns false for 'invoice' — its flag was removed in Task 10", () => {
+    // invoice renders EXCLUSIVELY through the engine now (the legacy builder was
+    // deleted), so there is no VITE_PDF_ENGINE_INVOICE flag entry. This guards
+    // that nobody re-introduces a flag for a doc type that is unconditional.
     expect(isPdfEngineEnabled('invoice')).toBe(false);
   });
 
-  it('returns false for an unknown document type', () => {
+  it("returns false for 'quote' and for an unknown document type", () => {
     expect(isPdfEngineEnabled('quote')).toBe(false);
     expect(isPdfEngineEnabled('not_a_real_type')).toBe(false);
   });

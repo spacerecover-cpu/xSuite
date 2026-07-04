@@ -56,6 +56,9 @@ const resources = {
         zoomOut: 'Zoom out',
         zoomIn: 'Zoom in',
         cropFailed: 'Could not crop the image. Please try again.',
+        addressLine1: 'Address line 1',
+        addressLine2: 'Address line 2',
+        stateRegion: 'State / Region',
         chipInput: {
           placeholder: 'Enter email and press Enter',
           invalidEmail: 'Please enter a valid email address',
@@ -520,6 +523,18 @@ const resources = {
         expired: 'Expired',
         banner: 'Banner',
       },
+      financial: {
+        requirementFailures: {
+          blockingSingular: '{{count}} issue blocking issuance',
+          blockingPlural: '{{count}} issues blocking issuance',
+          reviewBeforeIssuing: 'Review before issuing',
+        },
+        taxTrace: {
+          title: 'How was this computed?',
+          backfilledBadge: 'Reconstructed history — backfilled from the stored header figure, not engine-computed',
+          noTrace: 'No trace recorded for this document.',
+        },
+      },
     },
   },
   ar: {
@@ -574,6 +589,9 @@ const resources = {
         zoomOut: 'تصغير',
         zoomIn: 'تكبير',
         cropFailed: 'تعذّر اقتصاص الصورة. حاول مرة أخرى.',
+        addressLine1: 'العنوان (السطر الأول)',
+        addressLine2: 'العنوان (السطر الثاني)',
+        stateRegion: 'المحافظة / المنطقة',
         chipInput: {
           placeholder: 'أدخل البريد الإلكتروني واضغط Enter',
           invalidEmail: 'يرجى إدخال عنوان بريد إلكتروني صالح',
@@ -1049,6 +1067,18 @@ const resources = {
         scheduled: 'مجدول',
         expired: 'منتهي',
         banner: 'شريط',
+      },
+      financial: {
+        requirementFailures: {
+          blockingSingular: '{{count}} مشكلة تمنع الإصدار',
+          blockingPlural: '{{count}} مشاكل تمنع الإصدار',
+          reviewBeforeIssuing: 'مراجعة قبل الإصدار',
+        },
+        taxTrace: {
+          title: 'كيف تم حساب هذا؟',
+          backfilledBadge: 'سجل معاد إنشاؤه — تمت تعبئته من الرقم الإجمالي المخزَّن، وليس محسوبًا بواسطة المحرك',
+          noTrace: 'لا يوجد سجل تتبع لهذا المستند.',
+        },
       },
     },
   },

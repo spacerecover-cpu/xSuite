@@ -34,6 +34,11 @@ export interface InvoiceItem {
   description: string;
   quantity: number;
   unit_price: number;
+  unit_code?: string | null;
+  unit_label?: string | null;
+  item_code?: string | null;
+  tax_treatment?: string;
+  treatment_reason_code?: string | null;
   tax_rate?: number;
   discount_percent?: number;
   line_total?: number;
@@ -365,6 +370,11 @@ export const fetchInvoiceById = async (id: string): Promise<InvoiceWithDetails |
     discount_percent: it.discount ?? 0,
     line_total: it.total,
     sort_order: it.sort_order ?? 0,
+    // Hydrate the unit/item-code compliance fields on edit (mirrors quotesService.fetchQuoteById);
+    // without this, opening an invoice for edit blanks them and updateInvoice writes null.
+    unit_code: it.unit_code ?? null,
+    unit_label: it.unit_label ?? null,
+    item_code: it.item_code ?? null,
   }));
 
   return {
@@ -526,6 +536,11 @@ export const createInvoice = async (invoice: Partial<Invoice>, items: InvoiceIte
       description: item.description,
       quantity: item.quantity,
       unit_price: item.unit_price,
+      unit_code: item.unit_code ?? null,
+      unit_label: item.unit_label ?? null,
+      item_code: item.item_code ?? null,
+      tax_treatment: item.tax_treatment ?? 'standard',
+      treatment_reason_code: item.treatment_reason_code ?? null,
       tax_rate: invoiceTaxRate,
       tax_amount: itemTax,
       discount: item.discount_percent || 0,
@@ -722,6 +737,11 @@ export const updateInvoice = async (id: string, invoice: Partial<Invoice>, items
         description: item.description,
         quantity: item.quantity,
         unit_price: item.unit_price,
+        unit_code: item.unit_code ?? null,
+        unit_label: item.unit_label ?? null,
+        item_code: item.item_code ?? null,
+        tax_treatment: item.tax_treatment ?? 'standard',
+        treatment_reason_code: item.treatment_reason_code ?? null,
         tax_rate: invoiceTaxRate,
         tax_amount: itemTax,
         discount: item.discount_percent || 0,
@@ -916,6 +936,9 @@ export const convertQuoteToInvoice = async (
     description: item.description,
     quantity: item.quantity ?? 0,
     unit_price: item.unit_price,
+    unit_code: item.unit_code,
+    unit_label: item.unit_label,
+    item_code: item.item_code,
     tax_rate: quote.tax_rate ?? 0,
   }));
 

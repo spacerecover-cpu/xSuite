@@ -205,6 +205,7 @@ const financialFor = (docType: TemplateDocumentType): TemplatePreset[] =>
 export const TEMPLATE_PRESETS: Record<TemplateDocumentType, TemplatePreset[]> = {
   invoice: [...financialFor('invoice'), fromRecipe('invoice', GCC_INVOICE)],
   quote: financialFor('quote'),
+  credit_note: financialFor('credit_note'),
   payment_receipt: [
     fromRecipe('payment_receipt', FINANCIAL_RECIPES[0]),
     fromRecipe('payment_receipt', FINANCIAL_RECIPES[1]),

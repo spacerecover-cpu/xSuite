@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { getNextCaseNumber } from '../../lib/caseService';
@@ -11,6 +11,12 @@ import { Dialog } from '../../components/ui/Dialog';
 import { formatDate } from '../../lib/format';
 import { quotesService } from '../../lib/quotesService';
 import { invoiceService } from '../../lib/invoiceService';
+import {
+  dryRunIssueTaxDocument, classifyRequirementFailures, parseRequirementFailures,
+  type RequirementFailure,
+} from '../../lib/taxDocumentService';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { RequirementFailuresPanel } from '../../components/financial/RequirementFailuresPanel';
 import { useCurrency } from '../../hooks/useCurrency';
 import { CaseStageBanner } from '../../components/cases/detail/CaseStageBanner';
 import type { CasePhase } from '../../lib/caseStateMachineService';
@@ -154,6 +160,15 @@ export const CaseDetail: React.FC = () => {
   // Header quick action — opens the templated WhatsApp handoff modal (renders
   // a tenant template with case context, logs to case_communications).
   const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
+  const [issueRequirementFailures, setIssueRequirementFailures] = useState<RequirementFailure[]>([]);
+  const [showIssueBlockModal, setShowIssueBlockModal] = useState(false);
+  const [showIssueWarnConfirm, setShowIssueWarnConfirm] = useState(false);
+  const [issueWarnMessages, setIssueWarnMessages] = useState<string[]>([]);
+  const [isIssuing, setIsIssuing] = useState(false);
+  const [pendingIssue, setPendingIssue] = useState<{ id: string; invoice_number?: string | null } | null>(null);
+  // Synchronous re-entry guard: per-invoice Issue buttons share page-level modal
+  // state, so a second click mid-dry-run could otherwise stack two dialogs.
+  const issueBusyRef = useRef(false);
   const handleWhatsApp = () => {
     setWhatsAppModalOpen(true);
   };
@@ -201,15 +216,58 @@ export const CaseDetail: React.FC = () => {
     })();
   };
 
+  // The authoritative issue call — the DB requirement gate re-checks atomically;
+  // a P0403 (blocked) rejection is recovered into the panel (defense in depth).
+  const performIssueInvoice = async (invoice: { id: string; invoice_number?: string | null }) => {
+    setIsIssuing(true);
+    try {
+      await invoiceService.issueInvoice(invoice.id);
+      toast.success(`Invoice ${invoice.invoice_number ?? ''} issued — payments can now be recorded`.trim());
+      setIssueRequirementFailures([]);
+      setShowIssueWarnConfirm(false);
+      queryClient.invalidateQueries({ queryKey: ['invoices', 'case', id] });
+      queryClient.invalidateQueries({ queryKey: ['case_financial_summary', id] });
+    } catch (e) {
+      const failures = parseRequirementFailures((e as Error).message ?? String(e));
+      if (failures.length > 0) {
+        setIssueRequirementFailures(failures);
+        setShowIssueWarnConfirm(false);
+        setShowIssueBlockModal(true);
+        toast.error('Issuance blocked — resolve the required fields first.');
+      } else {
+        // A non-gate failure (race, transient) — close the now-stale confirm dialog.
+        setShowIssueWarnConfirm(false);
+        toast.error((e as Error).message || 'Failed to issue invoice');
+      }
+    } finally {
+      setIsIssuing(false);
+    }
+  };
+
   const handleIssueInvoice = (invoice: { id: string; invoice_number?: string | null }): void => {
+    if (issueBusyRef.current || showIssueWarnConfirm || showIssueBlockModal) return;
+    issueBusyRef.current = true;
     void (async () => {
       try {
-        await invoiceService.issueInvoice(invoice.id);
-        toast.success(`Invoice ${invoice.invoice_number ?? ''} issued — payments can now be recorded`.trim());
-        queryClient.invalidateQueries({ queryKey: ['invoices', 'case', id] });
-        queryClient.invalidateQueries({ queryKey: ['case_financial_summary', id] });
+        const dry = await dryRunIssueTaxDocument('invoice', invoice.id);
+        setIssueRequirementFailures(dry.requirement_failures);
+        const decision = classifyRequirementFailures(dry.requirement_failures);
+        if (decision.kind === 'block') {
+          setShowIssueBlockModal(true);
+          toast.error('Issuance blocked — resolve the required fields first.');
+          return;
+        }
+        if (decision.kind === 'confirm') {
+          setPendingIssue(invoice);
+          setIssueWarnMessages(decision.messages);
+          setShowIssueWarnConfirm(true);
+          return;
+        }
+        await performIssueInvoice(invoice);
       } catch (e) {
         toast.error((e as Error).message || 'Failed to issue invoice');
+      } finally {
+        issueBusyRef.current = false;
       }
     })();
   };
@@ -1339,6 +1397,29 @@ export const CaseDetail: React.FC = () => {
         </>
       )}
 
+      <Modal
+        isOpen={showIssueBlockModal}
+        onClose={() => setShowIssueBlockModal(false)}
+        title="Cannot issue invoice"
+        size="md"
+      >
+        <div className="space-y-4">
+          <RequirementFailuresPanel failures={issueRequirementFailures} />
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={() => setShowIssueBlockModal(false)}>Close</Button>
+          </div>
+        </div>
+      </Modal>
+      <ConfirmDialog
+        isOpen={showIssueWarnConfirm}
+        onClose={() => setShowIssueWarnConfirm(false)}
+        onConfirm={() => { if (pendingIssue) void performIssueInvoice(pendingIssue); }}
+        title="Review before issuing"
+        message={issueWarnMessages.join(' ')}
+        confirmText="Issue anyway"
+        variant="warning"
+        isLoading={isIssuing}
+      />
     </DetailPageTemplate>
   );
 };

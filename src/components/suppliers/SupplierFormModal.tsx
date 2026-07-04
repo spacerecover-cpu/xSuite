@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useId } from 'react';
-import { Building2, Mail, Phone, MapPin, FileText, User, Truck, CheckCircle } from 'lucide-react';
+import { Building2, Mail, Phone, MapPin, FileText, User, Truck, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { AddressFields, type AddressValue } from '../ui/AddressFields';
 import { supabase, resolveTenantId } from '../../lib/supabaseClient';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
@@ -15,6 +16,10 @@ interface SupplierData {
   email?: string;
   phone?: string;
   address?: string;
+  address_line1?: string;
+  address_line2?: string;
+  subdivision_id?: string | null;
+  postal_code?: string;
   city?: string;
   state?: string;
   zip_code?: string;
@@ -48,6 +53,7 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Array<{ id: string; name: string; is_active?: boolean }>>([]);
   const [paymentTerms, setPaymentTerms] = useState<Array<{ id: string; name: string; days: number | null; is_active?: boolean }>>([]);
+  const [addressNotesCollapsed, setAddressNotesCollapsed] = useState(true);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -55,6 +61,10 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
     email: '',
     phone: '',
     address: '',
+    address_line1: '',
+    address_line2: '',
+    subdivision_id: null as string | null,
+    postal_code: '',
     city: '',
     state: '',
     zip_code: '',
@@ -83,6 +93,10 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
           email: supplier.email || '',
           phone: supplier.phone || '',
           address: supplier.address || '',
+          address_line1: supplier.address_line1 || '',
+          address_line2: supplier.address_line2 || '',
+          subdivision_id: supplier.subdivision_id ?? null,
+          postal_code: supplier.postal_code || '',
           city: supplier.city || '',
           state: supplier.state || '',
           zip_code: supplier.zip_code || '',
@@ -132,6 +146,13 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
     }
   };
 
+  const addressValue: AddressValue = {
+    address_line1: formData.address_line1,
+    address_line2: formData.address_line2,
+    subdivision_id: formData.subdivision_id,
+    postal_code: formData.postal_code,
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -150,6 +171,10 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
         email: formData.email || null,
         phone: formData.phone || null,
         address: composeSupplierAddress(formData),
+        address_line1: formData.address_line1 || null,
+        address_line2: formData.address_line2 || null,
+        subdivision_id: formData.subdivision_id,
+        postal_code: formData.postal_code || null,
         website: formData.website || null,
         tax_number: formData.tax_id || null,
         category_id: formData.category_id || null,
@@ -317,11 +342,29 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
               <MapPin className="inline w-4 h-4 mr-1" />
               Address
             </label>
-            <Input
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              placeholder="Street address"
+            <AddressFields
+              value={addressValue}
+              onChange={(next) => setFormData((f) => ({ ...f, ...next }))}
+              countryId={null}
             />
+          </div>
+
+          <div className="md:col-span-2 lg:col-span-3">
+            <button
+              type="button"
+              onClick={() => setAddressNotesCollapsed((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors py-0.5"
+            >
+              {addressNotesCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+              Additional address notes
+            </button>
+            {!addressNotesCollapsed && (
+              <Input
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                placeholder="Street address (legacy free-text; folded into the composed address on save)"
+              />
+            )}
           </div>
 
           <div>

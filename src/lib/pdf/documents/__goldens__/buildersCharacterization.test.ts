@@ -1,26 +1,24 @@
 import { describe, it, expect } from 'vitest';
 import type { TDocumentDefinitions, Content } from 'pdfmake/interfaces';
 import type {
-  InvoiceDocumentData,
-  QuoteDocumentData,
   ReceiptData,
   ChainOfCustodyDocumentData,
   TranslationContext,
 } from '../../types';
 import { createTranslationContext } from '../../translationContext';
-import { buildInvoiceDocument } from '../InvoiceDocument';
-import { buildQuoteDocument } from '../QuoteDocument';
 import { buildOfficeReceiptDocument } from '../OfficeReceiptDocument';
 import { buildChainOfCustodyDocument } from '../ChainOfCustodyDocument';
 
 // ---------------------------------------------------------------------------
-// Characterization (golden) tests for the current pdfmake builders.
+// Characterization (golden) tests for the remaining pdfmake builders.
 //
 // Purpose: PIN the *current* structural output of the representative document
-// builders BEFORE the planned template-engine refactor (see
-// docs/superpowers/specs/2026-06-13-pdf-template-engine-design.md, M2/M9).
-// When the 11 imperative builders are later replaced by the config-driven
-// `renderTemplate()` assembler, these snapshots must either stay byte-identical
+// builders that STILL have a legacy path (office receipt + chain of custody).
+// The invoice and quote builders that this file also characterized were DELETED
+// in Task 10 — they now render exclusively through the config-driven engine, so
+// their goldens live in the engine parity/golden suites, not here.
+// When a remaining imperative builder is later replaced by the config-driven
+// `renderTemplate()` assembler, its snapshot must either stay byte-identical
 // (pure refactor — the goal) or change in a reviewed, intentional way.
 //
 // We deliberately do NOT JSON.stringify the raw TDocumentDefinitions: it carries
@@ -140,131 +138,7 @@ const companySettings = {
   online_presence: {
     website: 'https://acme.test',
   },
-} satisfies InvoiceDocumentData['companySettings'];
-
-const invoiceFixture: InvoiceDocumentData = {
-  invoiceData: {
-    id: 'inv-1',
-    invoice_number: 'INVO-0042',
-    invoice_type: 'tax_invoice',
-    invoice_date: '2026-06-01',
-    due_date: '2026-06-15',
-    status: 'sent',
-    client_reference: 'PO-7788',
-    subtotal: 1000,
-    tax_rate: 5,
-    tax_amount: 50,
-    discount_amount: 0,
-    total_amount: 1050,
-    amount_paid: 400,
-    balance_due: 650,
-    payment_terms: 'Net 14 days.',
-    notes: 'Thank you for your business.',
-    created_at: '2026-06-01T09:00:00.000Z',
-    customer: {
-      id: 'cust-1',
-      customer_name: 'Jane Client',
-      email: 'jane@client.test',
-      mobile_number: '+968 9999 0000',
-    },
-    cases: {
-      id: 'case-1',
-      case_no: 'CASE-0042',
-    },
-    bank_accounts: {
-      id: 'bank-1',
-      account_name: 'Acme Data Recovery LLC',
-      bank_name: 'Bank Muscat',
-      account_number: '0123456789',
-      iban: 'OM00 0000 0000 0000 0000 00',
-      swift_code: 'BMUSOMRX',
-    },
-    invoice_line_items: [
-      {
-        id: 'li-1',
-        description: 'RAID-5 logical recovery (4 drives)',
-        quantity: 1,
-        unit_price: 1000,
-        tax_rate: 5,
-        line_total: 1000,
-      },
-    ],
-    accounting_locales: {
-      currency_symbol: 'OMR',
-      currency_position: 'after',
-      decimal_places: 3,
-    },
-  },
-  companySettings,
-  paymentHistory: [
-    {
-      payment_date: '2026-06-05',
-      amount: 400,
-      method: 'Bank Transfer',
-      reference: 'TXN-0001',
-      transaction_id: 'TXN-0001',
-      status: 'completed',
-      recorded_by: 'Accounts',
-      notes: null,
-      doc_number: 'RCPT-0007',
-      source: 'receipt',
-      running_balance: 650,
-    },
-  ],
-};
-
-const quoteFixture: QuoteDocumentData = {
-  quoteData: {
-    id: 'q-1',
-    quote_number: 'QUOT-0042',
-    status: 'sent',
-    title: 'RAID-5 Recovery Quote',
-    valid_until: '2026-06-30',
-    client_reference: 'REQ-5566',
-    subtotal: 1000,
-    tax_rate: 5,
-    tax_amount: 50,
-    discount_amount: 100,
-    discount_type: 'amount',
-    total_amount: 945,
-    terms_and_conditions: 'Quote valid for 30 days.',
-    notes: 'No data, no recovery fee.',
-    created_at: '2026-06-01T09:00:00.000Z',
-    customer: {
-      id: 'cust-1',
-      customer_name: 'Jane Client',
-      email: 'jane@client.test',
-      mobile_number: '+968 9999 0000',
-    },
-    cases: {
-      id: 'case-1',
-      case_no: 'CASE-0042',
-    },
-    bank_accounts: {
-      id: 'bank-1',
-      account_name: 'Acme Data Recovery LLC',
-      bank_name: 'Bank Muscat',
-      account_number: '0123456789',
-      iban: 'OM00 0000 0000 0000 0000 00',
-      swift_code: 'BMUSOMRX',
-    },
-    quote_items: [
-      {
-        id: 'qi-1',
-        description: 'RAID-5 logical recovery (4 drives)',
-        quantity: 1,
-        unit_price: 1000,
-        line_total: 1000,
-      },
-    ],
-    accounting_locales: {
-      currency_symbol: 'OMR',
-      currency_position: 'after',
-      decimal_places: 3,
-    },
-  },
-  companySettings,
-};
+} satisfies ReceiptData['companySettings'];
 
 const officeReceiptFixture: ReceiptData = {
   caseData: {
@@ -345,32 +219,11 @@ const chainOfCustodyFixture: ChainOfCustodyDocumentData = {
 };
 
 describe('PDF builder characterization (golden snapshots)', () => {
-  it('buildInvoiceDocument — static shape + footer', () => {
-    expect(characterize(buildInvoiceDocument(invoiceFixture, ctx))).toMatchSnapshot();
-  });
-
-  it('buildQuoteDocument — static shape + footer', () => {
-    expect(characterize(buildQuoteDocument(quoteFixture, ctx))).toMatchSnapshot();
-  });
-
   it('buildOfficeReceiptDocument — static shape + footer', () => {
     expect(characterize(buildOfficeReceiptDocument(officeReceiptFixture, ctx))).toMatchSnapshot();
   });
 
   it('buildChainOfCustodyDocument — static shape + footer', () => {
     expect(characterize(buildChainOfCustodyDocument(chainOfCustodyFixture, ctx))).toMatchSnapshot();
-  });
-});
-
-describe('legacy builder logo — svg routing', () => {
-  it('renders an svg logo as an svg node, not an image', () => {
-    const markup =
-      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>';
-    const svg = 'data:image/svg+xml;base64,' + Buffer.from(markup, 'utf-8').toString('base64');
-    const def = JSON.stringify(buildInvoiceDocument(invoiceFixture, ctx, svg));
-    // The decoded svg markup only reaches the output when routed through
-    // buildLogoNode as an { svg } node; the raw data-url must NOT appear as an image.
-    expect(def).toContain(JSON.stringify(markup));
-    expect(def).not.toContain(`"image":${JSON.stringify(svg)}`);
   });
 });

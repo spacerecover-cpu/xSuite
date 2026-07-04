@@ -2,6 +2,7 @@ import { supabase, getTenantId } from './supabaseClient';
 import type { Database } from '../types/database.types';
 import { sanitizeFilterValue } from './postgrestSanitizer';
 import { baseAmount } from './financialMath';
+import type { TaxComputation } from './regimes/types';
 
 function requireTenantId(): string {
   const tid = getTenantId();
@@ -66,6 +67,12 @@ export interface StockSaleCreateData {
   notes?: string | null;
   discount_type?: string | null;
   discount_value?: number | null;
+  tax_inclusive?: boolean;
+  /** Kernel output computed client-side (Task 26: computeStockSaleTax) — threaded into
+   *  p_tax_lines so document_tax_lines + vat_records get written, parity with invoices. */
+  taxComputation?: TaxComputation | null;
+  /** Tenant base currency stamped on every p_tax_lines[].currency (POS is base-currency-only). */
+  currency: string;
   items: Array<{
     stock_item_id: string;
     quantity: number;
@@ -74,6 +81,11 @@ export interface StockSaleCreateData {
     serial_number?: string | null;
     warranty_start_date?: string | null;
     warranty_end_date?: string | null;
+    unit_code?: string | null;
+    unit_label?: string | null;
+    item_code?: string | null;
+    tax_treatment?: string | null;
+    treatment_reason_code?: string | null;
   }>;
 }
 
@@ -537,6 +549,8 @@ export async function createStockSale(data: StockSaleCreateData): Promise<StockS
       payment_method: data.payment_method ?? null,
       discount_type: data.discount_type ?? null,
       discount_value: data.discount_value ?? null,
+      tax_inclusive: data.tax_inclusive ?? false,
+      tax_regime_key: data.taxComputation?.trace.regimeKey ?? null,
     },
     p_items: data.items.map((item) => ({
       stock_item_id: item.stock_item_id,
@@ -544,7 +558,38 @@ export async function createStockSale(data: StockSaleCreateData): Promise<StockS
       unit_price: item.unit_price,
       cost_price: item.cost_price ?? null,
       serial_number: item.serial_number ?? null,
+      unit_code: item.unit_code ?? null,
+      unit_label: item.unit_label ?? null,
+      item_code: item.item_code ?? null,
+      tax_treatment: item.tax_treatment ?? 'standard',
+      treatment_reason_code: item.treatment_reason_code ?? null,
     })),
+    // POS threads ONLY the document-level rollups (line_item_id null). Unlike invoices —
+    // where persistDocumentTaxLines relabels per-line rows with real UUIDs so only rollups
+    // are null — the kernel's POS per-line rows keep lineItemId:null, which would collide
+    // with record_stock_sale's `line_item_id IS NULL` header/ledger filter and double-count
+    // the tax. Rollups alone give the correct header total + one vat_records row per component.
+    p_tax_lines: data.taxComputation
+      ? data.taxComputation.rollups.map((l, i) => ({
+          line_item_id: l.lineItemId,
+          component_code: l.componentCode,
+          component_label: l.componentLabel,
+          jurisdiction_ref: l.jurisdictionRef,
+          rate: l.rate,
+          taxable_base: l.taxableBase,
+          tax_amount: l.taxAmount,
+          currency: data.currency,
+          exchange_rate: 1,
+          tax_amount_base: l.taxAmount,
+          tax_treatment: l.taxTreatment,
+          treatment_reason_code: l.treatmentReasonCode,
+          regime_key: data.taxComputation!.trace.regimeKey,
+          plugin_version: data.taxComputation!.trace.pluginVersion,
+          pack_version_id: data.taxComputation!.trace.packVersionId,
+          rule_trace: i === 0 ? data.taxComputation!.trace : null,
+          sequence: l.sequence,
+        }))
+      : null,
   });
   if (error) throw error;
   if (!sale) throw new Error('Failed to create stock sale');

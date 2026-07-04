@@ -8,7 +8,8 @@ import React from 'react';
 import { User, Building2, FileText } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { formatDate, cleanBankFieldValue, formatCurrencyWithConfig } from '../../lib/format';
-import { useCurrencyConfig, useTaxConfig } from '../../contexts/TenantConfigContext';
+import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
+import { useDocumentCompliance } from '../../hooks/useDocumentCompliance';
 
 interface CompanySettings {
   basic_info?: {
@@ -95,9 +96,15 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
   elementId = 'print-frame',
 }) => {
   const currencyConfig = useCurrencyConfig();
-  const taxConfig = useTaxConfig();
   const formatMoney = (n: number | null | undefined): string =>
     formatCurrencyWithConfig(n ?? 0, currencyConfig);
+  // Same choke point (countryTemplateOverride) the pdfmake adapter reads, so the
+  // preview title/band/tax rows can never structurally diverge from print (AD-2).
+  const compliance = useDocumentCompliance(
+    'invoice',
+    invoice?.id ?? null,
+    { taxRate: invoice?.tax_rate ?? null, taxAmount: invoice?.tax_amount ?? 0 },
+  );
 
   if (!invoice) return null;
 
@@ -112,14 +119,14 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
   const customerEmail = invoice.customers_enhanced?.email || invoice.customers?.email || invoice.companies?.email || 'N/A';
   const customerPhone = invoice.customers_enhanced?.mobile_number || invoice.customers?.mobile_number || invoice.companies?.phone_number || 'N/A';
 
-  // Recalculate correct tax amount based on proper billing rules
-  // Discount should be applied to subtotal first, then VAT calculated on discounted amount
   const subtotal = invoice.subtotal || 0;
   const discountAmount = invoice.discount_amount || 0;
   const discountedSubtotal = subtotal - discountAmount;
-  const taxRate = invoice.tax_rate || 0;
-  const correctTaxAmount = (discountedSubtotal * taxRate) / 100;
-  const correctTotalAmount = discountedSubtotal + correctTaxAmount;
+  // Tax rows come from document_tax_lines (via useDocumentCompliance) — no
+  // render-time (subtotal - discount) * rate recompute (AD-3).
+  // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency: summing this ONE document's own tax-component rows, not a cross-document rollup
+  const taxTotal = compliance.taxRows.reduce((sum, row) => sum + row.amount, 0);
+  const totalAmount = invoice.total_amount ?? (discountedSubtotal + taxTotal);
 
   return (
     <div id={elementId}>
@@ -150,11 +157,11 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
               <h3 className="font-bold text-slate-900 text-sm mb-0.5">
                 {companySettings?.basic_info?.company_name || 'Company Name'}
               </h3>
-              {(companySettings?.basic_info?.registration_number || companySettings?.basic_info?.vat_number) && (
+              {(companySettings?.basic_info?.registration_number || compliance.taxBandLabel) && (
                 <p className="text-slate-600 leading-tight">
                   {companySettings?.basic_info?.registration_number && `Reg No: ${companySettings.basic_info.registration_number}`}
-                  {companySettings?.basic_info?.registration_number && companySettings?.basic_info?.vat_number && ' | '}
-                  {companySettings?.basic_info?.vat_number && `VAT No: ${companySettings.basic_info.vat_number}`}
+                  {companySettings?.basic_info?.registration_number && compliance.taxBandLabel && ' | '}
+                  {compliance.taxBandLabel && `${compliance.taxBandLabel}: ${compliance.sellerTaxNumber ?? companySettings?.basic_info?.vat_number ?? ''}`}
                 </p>
               )}
               <div className="mt-1 space-y-0">
@@ -193,7 +200,9 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
           <h2 className="text-lg font-bold text-slate-900 mb-2">
             {invoice.invoice_type === 'proforma'
               ? t('proformaInvoice', 'PROFORMA INVOICE')
-              : t('taxInvoice', 'TAX INVOICE')}
+              : compliance.title.ar
+                ? `${compliance.title.en} | ${compliance.title.ar}`
+                : compliance.title.en}
           </h2>
           <div className="flex justify-center mt-1 hide-in-pdf">
             <div className="flex gap-2">
@@ -339,19 +348,23 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
                 </span>
               </div>
             )}
-            <div className="flex justify-between text-sm" style={{ marginBottom: '12px' }}>
-              <span className="text-slate-700 font-medium">
-                {taxConfig.label} {invoice.tax_rate || 0}%:
-              </span>
-              <span className="font-semibold text-slate-900 text-right">
-                {formatMoney(correctTaxAmount)}
-              </span>
-            </div>
+            {compliance.taxRows.map((row, index) => (
+              <div
+                key={`${row.label}-${index}`}
+                className="flex justify-between text-sm"
+                style={index === compliance.taxRows.length - 1 ? { marginBottom: '12px' } : undefined}
+              >
+                <span className="text-slate-700 font-medium">{row.label}:</span>
+                <span className="font-semibold text-slate-900 text-right">
+                  {formatMoney(row.amount)}
+                </span>
+              </div>
+            ))}
             <div className="total-row-band">
               <div className="total-row-band-inner">
                 <span className="total-label">{t('total', 'Total')} | الإجمالي:</span>
                 <span className="total-amount">
-                  {formatMoney(correctTotalAmount)}
+                  {formatMoney(totalAmount)}
                 </span>
               </div>
             </div>
@@ -366,7 +379,7 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
                 <div className="flex justify-between text-sm">
                   <span className="text-orange-700 font-medium">{t('balanceDue', 'Balance Due')}:</span>
                   <span className="font-bold text-orange-600 text-right">
-                    {formatMoney(correctTotalAmount - invoice.amount_paid)}
+                    {formatMoney(totalAmount - invoice.amount_paid)}
                   </span>
                 </div>
               </>

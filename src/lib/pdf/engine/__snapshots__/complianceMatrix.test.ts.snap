@@ -1,0 +1,7281 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Phase 2 compliance matrix > 'AE' invoice — title ceremony, band, component row, bilingual > AE-invoice 1`] = `
+{
+  "bank": {
+    "rows": [
+      {
+        "label": {
+          "ar": "اسم الحساب:",
+          "en": "Account Name:",
+        },
+        "value": "Acme Data Recovery LLC",
+      },
+      {
+        "label": {
+          "ar": "رقم الحساب:",
+          "en": "Account No:",
+        },
+        "value": "0123456789",
+      },
+      {
+        "label": {
+          "ar": "البنك:",
+          "en": "Bank:",
+        },
+        "value": "First National Bank",
+      },
+      {
+        "label": {
+          "ar": "الآيبان:",
+          "en": "IBAN:",
+        },
+        "value": "AE12 0000 0000 0123 4567 89",
+      },
+      {
+        "label": {
+          "ar": "سويفت:",
+          "en": "SWIFT:",
+        },
+        "value": "FNBKAEXX",
+      },
+    ],
+    "title": {
+      "ar": "تفاصيل البنك",
+      "en": "Bank Account",
+    },
+  },
+  "documentTitle": {
+    "ar": "فاتورة ضريبية",
+    "en": "TAX INVOICE",
+  },
+  "identity": {
+    "basic_info": {
+      "company_name": "Acme Data Recovery",
+      "legal_name": "Acme Data Recovery LLC",
+      "vat_number": "SELLER-AE",
+    },
+    "branding": {
+      "brand_tagline": "Recovered. Verified. Delivered.",
+    },
+    "contact_info": {
+      "email_general": "lab@acme.test",
+      "phone_primary": "+971 4 123 4567",
+    },
+    "location": {
+      "address_line1": "12 Lab Street",
+      "city": "Dubai",
+      "country": "United Arab Emirates",
+    },
+    "online_presence": {
+      "website": "https://acme.test",
+    },
+  },
+  "lineItems": {
+    "columns": [
+      {
+        "align": "left",
+        "key": "description",
+        "label": {
+          "ar": "الوصف",
+          "en": "Description",
+        },
+        "visible": true,
+        "width": 220,
+      },
+      {
+        "align": "center",
+        "key": "quantity",
+        "label": {
+          "ar": "الكمية",
+          "en": "Qty",
+        },
+        "visible": true,
+        "width": 40,
+      },
+      {
+        "align": "center",
+        "key": "itemCode",
+        "label": {
+          "ar": "الرمز",
+          "en": "Code",
+        },
+        "visible": false,
+        "width": 50,
+      },
+      {
+        "align": "center",
+        "key": "unit",
+        "label": {
+          "ar": "الوحدة",
+          "en": "Unit",
+        },
+        "visible": false,
+        "width": 45,
+      },
+      {
+        "align": "right",
+        "key": "unitPrice",
+        "label": {
+          "ar": "سعر الوحدة",
+          "en": "Unit Price",
+        },
+        "visible": true,
+      },
+      {
+        "align": "right",
+        "key": "lineTotal",
+        "label": {
+          "ar": "المجموع",
+          "en": "Total",
+        },
+        "visible": true,
+      },
+    ],
+    "rows": [
+      {
+        "description": "RAID-5 logical recovery",
+        "itemCode": "-",
+        "lineTotal": "1,000.00 AED",
+        "quantity": "1",
+        "unit": "-",
+        "unitPrice": "1,000.00 AED",
+      },
+      {
+        "description": "Donor drive sourcing",
+        "itemCode": "-",
+        "lineTotal": "500.00 AED",
+        "quantity": "2",
+        "unit": "-",
+        "unitPrice": "250.00 AED",
+      },
+    ],
+  },
+  "meta": [
+    {
+      "label": {
+        "ar": "رقم الفاتورة:",
+        "en": "Invoice No:",
+      },
+      "value": "INV-2026-0042",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الفاتورة:",
+        "en": "Invoice Date:",
+      },
+      "value": "13/06/2026",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الاستحقاق:",
+        "en": "Due Date:",
+      },
+      "value": "27/06/2026",
+    },
+    {
+      "label": {
+        "ar": "رقم المهمة:",
+        "en": "Job ID:",
+      },
+      "value": "CASE-0007",
+    },
+  ],
+  "parties": {
+    "to": {
+      "name": "Jane Client",
+      "rows": [
+        {
+          "label": {
+            "ar": "الهاتف:",
+            "en": "Phone:",
+          },
+          "value": "+971 50 123 4567",
+        },
+        {
+          "label": {
+            "ar": "البريد:",
+            "en": "Email:",
+          },
+          "value": "jane@client.test",
+        },
+        {
+          "label": {
+            "ar": "المرجع:",
+            "en": "Reference:",
+          },
+          "value": "PO-9001",
+        },
+      ],
+      "title": {
+        "ar": "معلومات العميل",
+        "en": "Customer Information",
+      },
+    },
+  },
+  "paymentHistory": {
+    "columns": {
+      "amount": {
+        "ar": "المبلغ",
+        "en": "Amount",
+      },
+      "balance": {
+        "ar": "الرصيد",
+        "en": "Balance",
+      },
+      "date": {
+        "ar": "التاريخ",
+        "en": "Date",
+      },
+      "document": {
+        "ar": "المستند",
+        "en": "Document",
+      },
+      "method": {
+        "ar": "الطريقة",
+        "en": "Method",
+      },
+      "recordedBy": {
+        "ar": "سجلها",
+        "en": "Recorded By",
+      },
+      "reference": {
+        "ar": "المرجع",
+        "en": "Reference",
+      },
+    },
+    "rows": [
+      {
+        "amount": "300.00 AED",
+        "date": "14/06/2026",
+        "document": "RCPT-0001",
+        "method": "Bank Transfer",
+        "recordedBy": "Alex Accounts",
+        "reference": "TRX-1001",
+        "runningBalance": "1,170.00 AED",
+      },
+      {
+        "amount": "170.00 AED",
+        "date": "15/06/2026",
+        "document": "RCPT-0002",
+        "method": "Cash",
+        "recordedBy": "Alex Accounts",
+        "reference": "CASH-9",
+        "runningBalance": "1,000.00 AED",
+      },
+    ],
+    "title": {
+      "ar": "سجل الدفعات",
+      "en": "Payment History",
+    },
+  },
+  "qrCaption": "Scan to verify this invoice",
+  "qrPayload": "INVOICE:INV-2026-0042 TOTAL:1,512.00 AED DATE:13/06/2026",
+  "signatures": [
+    {
+      "ar": "التوقيع المعتمد",
+      "en": "Authorized Signature",
+    },
+    {
+      "ar": "توقيع العميل",
+      "en": "Customer Signature",
+    },
+  ],
+  "taxSummary": undefined,
+  "terms": {
+    "blocks": [
+      {
+        "body": "Net 14 days from the invoice date.",
+        "format": "html",
+        "title": {
+          "ar": "شروط الفاتورة",
+          "en": "Invoice Terms",
+        },
+      },
+      {
+        "body": "Thank you for trusting our lab with your data recovery.",
+        "title": {
+          "ar": "ملاحظات",
+          "en": "Notes",
+        },
+      },
+    ],
+    "title": {
+      "ar": "شروط الفاتورة",
+      "en": "Invoice Terms",
+    },
+  },
+  "totals": [
+    {
+      "key": "subtotal",
+      "label": {
+        "ar": "المجموع الفرعي:",
+        "en": "Subtotal:",
+      },
+      "value": "1,440.00 AED",
+    },
+    {
+      "key": "discount",
+      "label": {
+        "ar": "الخصم:",
+        "en": "Discount:",
+      },
+      "value": "- 100.00 AED",
+    },
+    {
+      "key": "netAmount",
+      "label": {
+        "ar": "صافي المبلغ:",
+        "en": "Net Amount:",
+      },
+      "value": "1,340.00 AED",
+    },
+    {
+      "key": "tax",
+      "label": {
+        "ar": "VAT 5%:",
+        "en": "VAT 5%:",
+      },
+      "value": "72.00 AED",
+    },
+    {
+      "emphasis": true,
+      "key": "total",
+      "label": {
+        "ar": "الإجمالي:",
+        "en": "Total:",
+      },
+      "value": "1,512.00 AED",
+    },
+    {
+      "key": "amountPaid",
+      "label": {
+        "ar": "المبلغ المدفوع:",
+        "en": "Amount Paid:",
+      },
+      "value": "470.00 AED",
+    },
+    {
+      "key": "balanceDue",
+      "label": {
+        "ar": "الرصيد المستحق:",
+        "en": "Balance Due:",
+      },
+      "value": "1,000.00 AED",
+    },
+  ],
+  "zatcaPayload": null,
+}
+`;
+
+exports[`Phase 2 compliance matrix > 'AE' quote resolves QUOTATION + component rows > AE-quote 1`] = `
+{
+  "bank": {
+    "rows": [
+      {
+        "label": {
+          "ar": "اسم الحساب:",
+          "en": "Account Name:",
+        },
+        "value": "Acme Data Recovery LLC",
+      },
+      {
+        "label": {
+          "ar": "رقم الحساب:",
+          "en": "Account No:",
+        },
+        "value": "0123456789",
+      },
+      {
+        "label": {
+          "ar": "البنك:",
+          "en": "Bank:",
+        },
+        "value": "First National Bank",
+      },
+      {
+        "label": {
+          "ar": "الآيبان:",
+          "en": "IBAN:",
+        },
+        "value": "AE12 0000 0000 0123 4567 89",
+      },
+      {
+        "label": {
+          "ar": "سويفت:",
+          "en": "SWIFT:",
+        },
+        "value": "FNBKAEXX",
+      },
+    ],
+    "title": {
+      "ar": "تفاصيل البنك",
+      "en": "Bank Account",
+    },
+  },
+  "documentTitle": {
+    "ar": "عرض سعر",
+    "en": "QUOTATION",
+  },
+  "identity": {
+    "basic_info": {
+      "company_name": "Acme Data Recovery",
+      "legal_name": "Acme Data Recovery LLC",
+    },
+    "branding": {
+      "brand_tagline": "Recovered. Verified. Delivered.",
+    },
+    "contact_info": {
+      "email_general": "lab@acme.test",
+      "phone_primary": "+971 4 123 4567",
+    },
+    "location": {
+      "address_line1": "12 Lab Street",
+      "city": "Dubai",
+      "country": "United Arab Emirates",
+    },
+    "online_presence": {
+      "website": "https://acme.test",
+    },
+  },
+  "lineItems": {
+    "columns": [
+      {
+        "align": "left",
+        "key": "description",
+        "label": {
+          "ar": "الوصف",
+          "en": "Description",
+        },
+        "visible": true,
+        "width": 220,
+      },
+      {
+        "align": "center",
+        "key": "quantity",
+        "label": {
+          "ar": "الكمية",
+          "en": "Qty",
+        },
+        "visible": true,
+        "width": 40,
+      },
+      {
+        "align": "center",
+        "key": "itemCode",
+        "label": {
+          "ar": "الرمز",
+          "en": "Code",
+        },
+        "visible": false,
+        "width": 50,
+      },
+      {
+        "align": "center",
+        "key": "unit",
+        "label": {
+          "ar": "الوحدة",
+          "en": "Unit",
+        },
+        "visible": false,
+        "width": 45,
+      },
+      {
+        "align": "right",
+        "key": "unitPrice",
+        "label": {
+          "ar": "سعر الوحدة",
+          "en": "Unit Price",
+        },
+        "visible": true,
+      },
+      {
+        "align": "right",
+        "key": "lineTotal",
+        "label": {
+          "ar": "المجموع",
+          "en": "Total",
+        },
+        "visible": true,
+      },
+    ],
+    "rows": [
+      {
+        "description": "RAID-5 logical recovery",
+        "itemCode": "-",
+        "lineTotal": "1,000.00 AED",
+        "quantity": "1",
+        "unit": "-",
+        "unitPrice": "1,000.00 AED",
+      },
+      {
+        "description": "Donor drive sourcing",
+        "itemCode": "-",
+        "lineTotal": "500.00 AED",
+        "quantity": "2",
+        "unit": "-",
+        "unitPrice": "250.00 AED",
+      },
+    ],
+  },
+  "meta": [
+    {
+      "label": {
+        "ar": "رقم العرض:",
+        "en": "Quote No:",
+      },
+      "value": "QUO-2026-0042",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الإنشاء:",
+        "en": "Created Date:",
+      },
+      "value": "13/06/2026",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الانتهاء:",
+        "en": "Expiry Date:",
+      },
+      "value": "13/07/2026",
+    },
+    {
+      "label": {
+        "ar": "رقم المهمة:",
+        "en": "Job ID:",
+      },
+      "value": "CASE-0007",
+    },
+  ],
+  "parties": {
+    "to": {
+      "name": "Jane Client",
+      "rows": [
+        {
+          "label": {
+            "ar": "الهاتف:",
+            "en": "Phone:",
+          },
+          "value": "+971 50 123 4567",
+        },
+        {
+          "label": {
+            "ar": "البريد:",
+            "en": "Email:",
+          },
+          "value": "jane@client.test",
+        },
+        {
+          "label": {
+            "ar": "المرجع:",
+            "en": "Reference:",
+          },
+          "value": "PO-9001",
+        },
+      ],
+      "title": {
+        "ar": "معلومات العميل",
+        "en": "Customer Information",
+      },
+    },
+  },
+  "paymentHistory": null,
+  "qrCaption": "Scan to verify this quote",
+  "qrPayload": "QUOTE:QUO-2026-0042 TOTAL:1,512.00 AED VALID:13/07/2026",
+  "signatures": [
+    {
+      "ar": "التوقيع المعتمد",
+      "en": "Authorized Signature",
+    },
+    {
+      "ar": "موافقة العميل",
+      "en": "Customer Acceptance",
+    },
+  ],
+  "taxSummary": undefined,
+  "terms": {
+    "blocks": [
+      {
+        "body": "Quote valid for 30 days. 50% advance required to begin.",
+        "title": {
+          "ar": "شروط العرض",
+          "en": "Quote Terms",
+        },
+      },
+      {
+        "body": "Diagnostics are non-destructive.",
+        "title": {
+          "ar": "ملاحظات",
+          "en": "Notes",
+        },
+      },
+    ],
+    "title": {
+      "ar": "شروط العرض",
+      "en": "Quote Terms",
+    },
+  },
+  "totals": [
+    {
+      "key": "subtotal",
+      "label": {
+        "ar": "المجموع الفرعي:",
+        "en": "Subtotal:",
+      },
+      "value": "1,440.00 AED",
+    },
+    {
+      "key": "discount",
+      "label": {
+        "ar": "الخصم:",
+        "en": "Discount:",
+      },
+      "value": "- 100.00 AED",
+    },
+    {
+      "key": "netAmount",
+      "label": {
+        "ar": "صافي المبلغ:",
+        "en": "Net Amount:",
+      },
+      "value": "1,340.00 AED",
+    },
+    {
+      "key": "tax",
+      "label": {
+        "ar": "VAT 5%:",
+        "en": "VAT 5%:",
+      },
+      "value": "72.00 AED",
+    },
+    {
+      "emphasis": true,
+      "key": "total",
+      "label": {
+        "ar": "الإجمالي:",
+        "en": "Total:",
+      },
+      "value": "1,512.00 AED",
+    },
+  ],
+}
+`;
+
+exports[`Phase 2 compliance matrix > 'BH' invoice — title ceremony, band, component row, bilingual > BH-invoice 1`] = `
+{
+  "bank": {
+    "rows": [
+      {
+        "label": {
+          "ar": "اسم الحساب:",
+          "en": "Account Name:",
+        },
+        "value": "Acme Data Recovery LLC",
+      },
+      {
+        "label": {
+          "ar": "رقم الحساب:",
+          "en": "Account No:",
+        },
+        "value": "0123456789",
+      },
+      {
+        "label": {
+          "ar": "البنك:",
+          "en": "Bank:",
+        },
+        "value": "First National Bank",
+      },
+      {
+        "label": {
+          "ar": "الآيبان:",
+          "en": "IBAN:",
+        },
+        "value": "AE12 0000 0000 0123 4567 89",
+      },
+      {
+        "label": {
+          "ar": "سويفت:",
+          "en": "SWIFT:",
+        },
+        "value": "FNBKAEXX",
+      },
+    ],
+    "title": {
+      "ar": "تفاصيل البنك",
+      "en": "Bank Account",
+    },
+  },
+  "documentTitle": {
+    "ar": "فاتورة ضريبية",
+    "en": "TAX INVOICE",
+  },
+  "identity": {
+    "basic_info": {
+      "company_name": "Acme Data Recovery",
+      "legal_name": "Acme Data Recovery LLC",
+      "vat_number": "SELLER-BH",
+    },
+    "branding": {
+      "brand_tagline": "Recovered. Verified. Delivered.",
+    },
+    "contact_info": {
+      "email_general": "lab@acme.test",
+      "phone_primary": "+971 4 123 4567",
+    },
+    "location": {
+      "address_line1": "12 Lab Street",
+      "city": "Dubai",
+      "country": "United Arab Emirates",
+    },
+    "online_presence": {
+      "website": "https://acme.test",
+    },
+  },
+  "lineItems": {
+    "columns": [
+      {
+        "align": "left",
+        "key": "description",
+        "label": {
+          "ar": "الوصف",
+          "en": "Description",
+        },
+        "visible": true,
+        "width": 220,
+      },
+      {
+        "align": "center",
+        "key": "quantity",
+        "label": {
+          "ar": "الكمية",
+          "en": "Qty",
+        },
+        "visible": true,
+        "width": 40,
+      },
+      {
+        "align": "center",
+        "key": "itemCode",
+        "label": {
+          "ar": "الرمز",
+          "en": "Code",
+        },
+        "visible": false,
+        "width": 50,
+      },
+      {
+        "align": "center",
+        "key": "unit",
+        "label": {
+          "ar": "الوحدة",
+          "en": "Unit",
+        },
+        "visible": false,
+        "width": 45,
+      },
+      {
+        "align": "right",
+        "key": "unitPrice",
+        "label": {
+          "ar": "سعر الوحدة",
+          "en": "Unit Price",
+        },
+        "visible": true,
+      },
+      {
+        "align": "right",
+        "key": "lineTotal",
+        "label": {
+          "ar": "المجموع",
+          "en": "Total",
+        },
+        "visible": true,
+      },
+    ],
+    "rows": [
+      {
+        "description": "RAID-5 logical recovery",
+        "itemCode": "-",
+        "lineTotal": "1,000.000 AED",
+        "quantity": "1",
+        "unit": "-",
+        "unitPrice": "1,000.000 AED",
+      },
+      {
+        "description": "Donor drive sourcing",
+        "itemCode": "-",
+        "lineTotal": "500.000 AED",
+        "quantity": "2",
+        "unit": "-",
+        "unitPrice": "250.000 AED",
+      },
+    ],
+  },
+  "meta": [
+    {
+      "label": {
+        "ar": "رقم الفاتورة:",
+        "en": "Invoice No:",
+      },
+      "value": "INV-2026-0042",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الفاتورة:",
+        "en": "Invoice Date:",
+      },
+      "value": "13/06/2026",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الاستحقاق:",
+        "en": "Due Date:",
+      },
+      "value": "27/06/2026",
+    },
+    {
+      "label": {
+        "ar": "رقم المهمة:",
+        "en": "Job ID:",
+      },
+      "value": "CASE-0007",
+    },
+  ],
+  "parties": {
+    "to": {
+      "name": "Jane Client",
+      "rows": [
+        {
+          "label": {
+            "ar": "الهاتف:",
+            "en": "Phone:",
+          },
+          "value": "+971 50 123 4567",
+        },
+        {
+          "label": {
+            "ar": "البريد:",
+            "en": "Email:",
+          },
+          "value": "jane@client.test",
+        },
+        {
+          "label": {
+            "ar": "المرجع:",
+            "en": "Reference:",
+          },
+          "value": "PO-9001",
+        },
+      ],
+      "title": {
+        "ar": "معلومات العميل",
+        "en": "Customer Information",
+      },
+    },
+  },
+  "paymentHistory": {
+    "columns": {
+      "amount": {
+        "ar": "المبلغ",
+        "en": "Amount",
+      },
+      "balance": {
+        "ar": "الرصيد",
+        "en": "Balance",
+      },
+      "date": {
+        "ar": "التاريخ",
+        "en": "Date",
+      },
+      "document": {
+        "ar": "المستند",
+        "en": "Document",
+      },
+      "method": {
+        "ar": "الطريقة",
+        "en": "Method",
+      },
+      "recordedBy": {
+        "ar": "سجلها",
+        "en": "Recorded By",
+      },
+      "reference": {
+        "ar": "المرجع",
+        "en": "Reference",
+      },
+    },
+    "rows": [
+      {
+        "amount": "300.000 AED",
+        "date": "14/06/2026",
+        "document": "RCPT-0001",
+        "method": "Bank Transfer",
+        "recordedBy": "Alex Accounts",
+        "reference": "TRX-1001",
+        "runningBalance": "1,170.000 AED",
+      },
+      {
+        "amount": "170.000 AED",
+        "date": "15/06/2026",
+        "document": "RCPT-0002",
+        "method": "Cash",
+        "recordedBy": "Alex Accounts",
+        "reference": "CASH-9",
+        "runningBalance": "1,000.000 AED",
+      },
+    ],
+    "title": {
+      "ar": "سجل الدفعات",
+      "en": "Payment History",
+    },
+  },
+  "qrCaption": "Scan to verify this invoice",
+  "qrPayload": "INVOICE:INV-2026-0042 TOTAL:1,512.000 AED DATE:13/06/2026",
+  "signatures": [
+    {
+      "ar": "التوقيع المعتمد",
+      "en": "Authorized Signature",
+    },
+    {
+      "ar": "توقيع العميل",
+      "en": "Customer Signature",
+    },
+  ],
+  "taxSummary": undefined,
+  "terms": {
+    "blocks": [
+      {
+        "body": "Net 14 days from the invoice date.",
+        "format": "html",
+        "title": {
+          "ar": "شروط الفاتورة",
+          "en": "Invoice Terms",
+        },
+      },
+      {
+        "body": "Thank you for trusting our lab with your data recovery.",
+        "title": {
+          "ar": "ملاحظات",
+          "en": "Notes",
+        },
+      },
+    ],
+    "title": {
+      "ar": "شروط الفاتورة",
+      "en": "Invoice Terms",
+    },
+  },
+  "totals": [
+    {
+      "key": "subtotal",
+      "label": {
+        "ar": "المجموع الفرعي:",
+        "en": "Subtotal:",
+      },
+      "value": "1,440.000 AED",
+    },
+    {
+      "key": "discount",
+      "label": {
+        "ar": "الخصم:",
+        "en": "Discount:",
+      },
+      "value": "- 100.000 AED",
+    },
+    {
+      "key": "netAmount",
+      "label": {
+        "ar": "صافي المبلغ:",
+        "en": "Net Amount:",
+      },
+      "value": "1,340.000 AED",
+    },
+    {
+      "key": "tax",
+      "label": {
+        "ar": "VAT 5%:",
+        "en": "VAT 5%:",
+      },
+      "value": "72.000 AED",
+    },
+    {
+      "emphasis": true,
+      "key": "total",
+      "label": {
+        "ar": "الإجمالي:",
+        "en": "Total:",
+      },
+      "value": "1,512.000 AED",
+    },
+    {
+      "key": "amountPaid",
+      "label": {
+        "ar": "المبلغ المدفوع:",
+        "en": "Amount Paid:",
+      },
+      "value": "470.000 AED",
+    },
+    {
+      "key": "balanceDue",
+      "label": {
+        "ar": "الرصيد المستحق:",
+        "en": "Balance Due:",
+      },
+      "value": "1,000.000 AED",
+    },
+  ],
+  "zatcaPayload": null,
+}
+`;
+
+exports[`Phase 2 compliance matrix > 'BH' quote resolves QUOTATION + component rows > BH-quote 1`] = `
+{
+  "bank": {
+    "rows": [
+      {
+        "label": {
+          "ar": "اسم الحساب:",
+          "en": "Account Name:",
+        },
+        "value": "Acme Data Recovery LLC",
+      },
+      {
+        "label": {
+          "ar": "رقم الحساب:",
+          "en": "Account No:",
+        },
+        "value": "0123456789",
+      },
+      {
+        "label": {
+          "ar": "البنك:",
+          "en": "Bank:",
+        },
+        "value": "First National Bank",
+      },
+      {
+        "label": {
+          "ar": "الآيبان:",
+          "en": "IBAN:",
+        },
+        "value": "AE12 0000 0000 0123 4567 89",
+      },
+      {
+        "label": {
+          "ar": "سويفت:",
+          "en": "SWIFT:",
+        },
+        "value": "FNBKAEXX",
+      },
+    ],
+    "title": {
+      "ar": "تفاصيل البنك",
+      "en": "Bank Account",
+    },
+  },
+  "documentTitle": {
+    "ar": "عرض سعر",
+    "en": "QUOTATION",
+  },
+  "identity": {
+    "basic_info": {
+      "company_name": "Acme Data Recovery",
+      "legal_name": "Acme Data Recovery LLC",
+    },
+    "branding": {
+      "brand_tagline": "Recovered. Verified. Delivered.",
+    },
+    "contact_info": {
+      "email_general": "lab@acme.test",
+      "phone_primary": "+971 4 123 4567",
+    },
+    "location": {
+      "address_line1": "12 Lab Street",
+      "city": "Dubai",
+      "country": "United Arab Emirates",
+    },
+    "online_presence": {
+      "website": "https://acme.test",
+    },
+  },
+  "lineItems": {
+    "columns": [
+      {
+        "align": "left",
+        "key": "description",
+        "label": {
+          "ar": "الوصف",
+          "en": "Description",
+        },
+        "visible": true,
+        "width": 220,
+      },
+      {
+        "align": "center",
+        "key": "quantity",
+        "label": {
+          "ar": "الكمية",
+          "en": "Qty",
+        },
+        "visible": true,
+        "width": 40,
+      },
+      {
+        "align": "center",
+        "key": "itemCode",
+        "label": {
+          "ar": "الرمز",
+          "en": "Code",
+        },
+        "visible": false,
+        "width": 50,
+      },
+      {
+        "align": "center",
+        "key": "unit",
+        "label": {
+          "ar": "الوحدة",
+          "en": "Unit",
+        },
+        "visible": false,
+        "width": 45,
+      },
+      {
+        "align": "right",
+        "key": "unitPrice",
+        "label": {
+          "ar": "سعر الوحدة",
+          "en": "Unit Price",
+        },
+        "visible": true,
+      },
+      {
+        "align": "right",
+        "key": "lineTotal",
+        "label": {
+          "ar": "المجموع",
+          "en": "Total",
+        },
+        "visible": true,
+      },
+    ],
+    "rows": [
+      {
+        "description": "RAID-5 logical recovery",
+        "itemCode": "-",
+        "lineTotal": "1,000.000 AED",
+        "quantity": "1",
+        "unit": "-",
+        "unitPrice": "1,000.000 AED",
+      },
+      {
+        "description": "Donor drive sourcing",
+        "itemCode": "-",
+        "lineTotal": "500.000 AED",
+        "quantity": "2",
+        "unit": "-",
+        "unitPrice": "250.000 AED",
+      },
+    ],
+  },
+  "meta": [
+    {
+      "label": {
+        "ar": "رقم العرض:",
+        "en": "Quote No:",
+      },
+      "value": "QUO-2026-0042",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الإنشاء:",
+        "en": "Created Date:",
+      },
+      "value": "13/06/2026",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الانتهاء:",
+        "en": "Expiry Date:",
+      },
+      "value": "13/07/2026",
+    },
+    {
+      "label": {
+        "ar": "رقم المهمة:",
+        "en": "Job ID:",
+      },
+      "value": "CASE-0007",
+    },
+  ],
+  "parties": {
+    "to": {
+      "name": "Jane Client",
+      "rows": [
+        {
+          "label": {
+            "ar": "الهاتف:",
+            "en": "Phone:",
+          },
+          "value": "+971 50 123 4567",
+        },
+        {
+          "label": {
+            "ar": "البريد:",
+            "en": "Email:",
+          },
+          "value": "jane@client.test",
+        },
+        {
+          "label": {
+            "ar": "المرجع:",
+            "en": "Reference:",
+          },
+          "value": "PO-9001",
+        },
+      ],
+      "title": {
+        "ar": "معلومات العميل",
+        "en": "Customer Information",
+      },
+    },
+  },
+  "paymentHistory": null,
+  "qrCaption": "Scan to verify this quote",
+  "qrPayload": "QUOTE:QUO-2026-0042 TOTAL:1,512.000 AED VALID:13/07/2026",
+  "signatures": [
+    {
+      "ar": "التوقيع المعتمد",
+      "en": "Authorized Signature",
+    },
+    {
+      "ar": "موافقة العميل",
+      "en": "Customer Acceptance",
+    },
+  ],
+  "taxSummary": undefined,
+  "terms": {
+    "blocks": [
+      {
+        "body": "Quote valid for 30 days. 50% advance required to begin.",
+        "title": {
+          "ar": "شروط العرض",
+          "en": "Quote Terms",
+        },
+      },
+      {
+        "body": "Diagnostics are non-destructive.",
+        "title": {
+          "ar": "ملاحظات",
+          "en": "Notes",
+        },
+      },
+    ],
+    "title": {
+      "ar": "شروط العرض",
+      "en": "Quote Terms",
+    },
+  },
+  "totals": [
+    {
+      "key": "subtotal",
+      "label": {
+        "ar": "المجموع الفرعي:",
+        "en": "Subtotal:",
+      },
+      "value": "1,440.000 AED",
+    },
+    {
+      "key": "discount",
+      "label": {
+        "ar": "الخصم:",
+        "en": "Discount:",
+      },
+      "value": "- 100.000 AED",
+    },
+    {
+      "key": "netAmount",
+      "label": {
+        "ar": "صافي المبلغ:",
+        "en": "Net Amount:",
+      },
+      "value": "1,340.000 AED",
+    },
+    {
+      "key": "tax",
+      "label": {
+        "ar": "VAT 5%:",
+        "en": "VAT 5%:",
+      },
+      "value": "72.000 AED",
+    },
+    {
+      "emphasis": true,
+      "key": "total",
+      "label": {
+        "ar": "الإجمالي:",
+        "en": "Total:",
+      },
+      "value": "1,512.000 AED",
+    },
+  ],
+}
+`;
+
+exports[`Phase 2 compliance matrix > 'GB' invoice — title ceremony, band, component row, bilingual > GB-invoice 1`] = `
+{
+  "bank": {
+    "rows": [
+      {
+        "label": {
+          "ar": "اسم الحساب:",
+          "en": "Account Name:",
+        },
+        "value": "Acme Data Recovery LLC",
+      },
+      {
+        "label": {
+          "ar": "رقم الحساب:",
+          "en": "Account No:",
+        },
+        "value": "0123456789",
+      },
+      {
+        "label": {
+          "ar": "البنك:",
+          "en": "Bank:",
+        },
+        "value": "First National Bank",
+      },
+      {
+        "label": {
+          "ar": "الآيبان:",
+          "en": "IBAN:",
+        },
+        "value": "AE12 0000 0000 0123 4567 89",
+      },
+      {
+        "label": {
+          "ar": "سويفت:",
+          "en": "SWIFT:",
+        },
+        "value": "FNBKAEXX",
+      },
+    ],
+    "title": {
+      "ar": "تفاصيل البنك",
+      "en": "Bank Account",
+    },
+  },
+  "documentTitle": {
+    "ar": "فاتورة ضريبية",
+    "en": "TAX INVOICE",
+  },
+  "identity": {
+    "basic_info": {
+      "company_name": "Acme Data Recovery",
+      "legal_name": "Acme Data Recovery LLC",
+      "vat_number": "SELLER-GB",
+    },
+    "branding": {
+      "brand_tagline": "Recovered. Verified. Delivered.",
+    },
+    "contact_info": {
+      "email_general": "lab@acme.test",
+      "phone_primary": "+971 4 123 4567",
+    },
+    "location": {
+      "address_line1": "12 Lab Street",
+      "city": "Dubai",
+      "country": "United Arab Emirates",
+    },
+    "online_presence": {
+      "website": "https://acme.test",
+    },
+  },
+  "lineItems": {
+    "columns": [
+      {
+        "align": "left",
+        "key": "description",
+        "label": {
+          "ar": "الوصف",
+          "en": "Description",
+        },
+        "visible": true,
+        "width": 220,
+      },
+      {
+        "align": "center",
+        "key": "quantity",
+        "label": {
+          "ar": "الكمية",
+          "en": "Qty",
+        },
+        "visible": true,
+        "width": 40,
+      },
+      {
+        "align": "center",
+        "key": "itemCode",
+        "label": {
+          "ar": "الرمز",
+          "en": "Code",
+        },
+        "visible": false,
+        "width": 50,
+      },
+      {
+        "align": "center",
+        "key": "unit",
+        "label": {
+          "ar": "الوحدة",
+          "en": "Unit",
+        },
+        "visible": false,
+        "width": 45,
+      },
+      {
+        "align": "right",
+        "key": "unitPrice",
+        "label": {
+          "ar": "سعر الوحدة",
+          "en": "Unit Price",
+        },
+        "visible": true,
+      },
+      {
+        "align": "right",
+        "key": "lineTotal",
+        "label": {
+          "ar": "المجموع",
+          "en": "Total",
+        },
+        "visible": true,
+      },
+    ],
+    "rows": [
+      {
+        "description": "RAID-5 logical recovery",
+        "itemCode": "-",
+        "lineTotal": "1,000.00 AED",
+        "quantity": "1",
+        "unit": "-",
+        "unitPrice": "1,000.00 AED",
+      },
+      {
+        "description": "Donor drive sourcing",
+        "itemCode": "-",
+        "lineTotal": "500.00 AED",
+        "quantity": "2",
+        "unit": "-",
+        "unitPrice": "250.00 AED",
+      },
+    ],
+  },
+  "meta": [
+    {
+      "label": {
+        "ar": "رقم الفاتورة:",
+        "en": "Invoice No:",
+      },
+      "value": "INV-2026-0042",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الفاتورة:",
+        "en": "Invoice Date:",
+      },
+      "value": "13/06/2026",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الاستحقاق:",
+        "en": "Due Date:",
+      },
+      "value": "27/06/2026",
+    },
+    {
+      "label": {
+        "ar": "رقم المهمة:",
+        "en": "Job ID:",
+      },
+      "value": "CASE-0007",
+    },
+  ],
+  "parties": {
+    "to": {
+      "name": "Jane Client",
+      "rows": [
+        {
+          "label": {
+            "ar": "الهاتف:",
+            "en": "Phone:",
+          },
+          "value": "+971 50 123 4567",
+        },
+        {
+          "label": {
+            "ar": "البريد:",
+            "en": "Email:",
+          },
+          "value": "jane@client.test",
+        },
+        {
+          "label": {
+            "ar": "المرجع:",
+            "en": "Reference:",
+          },
+          "value": "PO-9001",
+        },
+      ],
+      "title": {
+        "ar": "معلومات العميل",
+        "en": "Customer Information",
+      },
+    },
+  },
+  "paymentHistory": {
+    "columns": {
+      "amount": {
+        "ar": "المبلغ",
+        "en": "Amount",
+      },
+      "balance": {
+        "ar": "الرصيد",
+        "en": "Balance",
+      },
+      "date": {
+        "ar": "التاريخ",
+        "en": "Date",
+      },
+      "document": {
+        "ar": "المستند",
+        "en": "Document",
+      },
+      "method": {
+        "ar": "الطريقة",
+        "en": "Method",
+      },
+      "recordedBy": {
+        "ar": "سجلها",
+        "en": "Recorded By",
+      },
+      "reference": {
+        "ar": "المرجع",
+        "en": "Reference",
+      },
+    },
+    "rows": [
+      {
+        "amount": "300.00 AED",
+        "date": "14/06/2026",
+        "document": "RCPT-0001",
+        "method": "Bank Transfer",
+        "recordedBy": "Alex Accounts",
+        "reference": "TRX-1001",
+        "runningBalance": "1,170.00 AED",
+      },
+      {
+        "amount": "170.00 AED",
+        "date": "15/06/2026",
+        "document": "RCPT-0002",
+        "method": "Cash",
+        "recordedBy": "Alex Accounts",
+        "reference": "CASH-9",
+        "runningBalance": "1,000.00 AED",
+      },
+    ],
+    "title": {
+      "ar": "سجل الدفعات",
+      "en": "Payment History",
+    },
+  },
+  "qrCaption": "Scan to verify this invoice",
+  "qrPayload": "INVOICE:INV-2026-0042 TOTAL:1,512.00 AED DATE:13/06/2026",
+  "signatures": [
+    {
+      "ar": "التوقيع المعتمد",
+      "en": "Authorized Signature",
+    },
+    {
+      "ar": "توقيع العميل",
+      "en": "Customer Signature",
+    },
+  ],
+  "taxSummary": undefined,
+  "terms": {
+    "blocks": [
+      {
+        "body": "Net 14 days from the invoice date.",
+        "format": "html",
+        "title": {
+          "ar": "شروط الفاتورة",
+          "en": "Invoice Terms",
+        },
+      },
+      {
+        "body": "Thank you for trusting our lab with your data recovery.",
+        "title": {
+          "ar": "ملاحظات",
+          "en": "Notes",
+        },
+      },
+    ],
+    "title": {
+      "ar": "شروط الفاتورة",
+      "en": "Invoice Terms",
+    },
+  },
+  "totals": [
+    {
+      "key": "subtotal",
+      "label": {
+        "ar": "المجموع الفرعي:",
+        "en": "Subtotal:",
+      },
+      "value": "1,440.00 AED",
+    },
+    {
+      "key": "discount",
+      "label": {
+        "ar": "الخصم:",
+        "en": "Discount:",
+      },
+      "value": "- 100.00 AED",
+    },
+    {
+      "key": "netAmount",
+      "label": {
+        "ar": "صافي المبلغ:",
+        "en": "Net Amount:",
+      },
+      "value": "1,340.00 AED",
+    },
+    {
+      "key": "tax",
+      "label": {
+        "ar": "VAT 5%:",
+        "en": "VAT 5%:",
+      },
+      "value": "72.00 AED",
+    },
+    {
+      "emphasis": true,
+      "key": "total",
+      "label": {
+        "ar": "الإجمالي:",
+        "en": "Total:",
+      },
+      "value": "1,512.00 AED",
+    },
+    {
+      "key": "amountPaid",
+      "label": {
+        "ar": "المبلغ المدفوع:",
+        "en": "Amount Paid:",
+      },
+      "value": "470.00 AED",
+    },
+    {
+      "key": "balanceDue",
+      "label": {
+        "ar": "الرصيد المستحق:",
+        "en": "Balance Due:",
+      },
+      "value": "1,000.00 AED",
+    },
+  ],
+  "zatcaPayload": null,
+}
+`;
+
+exports[`Phase 2 compliance matrix > 'GB' quote resolves QUOTATION + component rows > GB-quote 1`] = `
+{
+  "bank": {
+    "rows": [
+      {
+        "label": {
+          "ar": "اسم الحساب:",
+          "en": "Account Name:",
+        },
+        "value": "Acme Data Recovery LLC",
+      },
+      {
+        "label": {
+          "ar": "رقم الحساب:",
+          "en": "Account No:",
+        },
+        "value": "0123456789",
+      },
+      {
+        "label": {
+          "ar": "البنك:",
+          "en": "Bank:",
+        },
+        "value": "First National Bank",
+      },
+      {
+        "label": {
+          "ar": "الآيبان:",
+          "en": "IBAN:",
+        },
+        "value": "AE12 0000 0000 0123 4567 89",
+      },
+      {
+        "label": {
+          "ar": "سويفت:",
+          "en": "SWIFT:",
+        },
+        "value": "FNBKAEXX",
+      },
+    ],
+    "title": {
+      "ar": "تفاصيل البنك",
+      "en": "Bank Account",
+    },
+  },
+  "documentTitle": {
+    "ar": "عرض أسعار",
+    "en": "QUOTATION",
+  },
+  "identity": {
+    "basic_info": {
+      "company_name": "Acme Data Recovery",
+      "legal_name": "Acme Data Recovery LLC",
+    },
+    "branding": {
+      "brand_tagline": "Recovered. Verified. Delivered.",
+    },
+    "contact_info": {
+      "email_general": "lab@acme.test",
+      "phone_primary": "+971 4 123 4567",
+    },
+    "location": {
+      "address_line1": "12 Lab Street",
+      "city": "Dubai",
+      "country": "United Arab Emirates",
+    },
+    "online_presence": {
+      "website": "https://acme.test",
+    },
+  },
+  "lineItems": {
+    "columns": [
+      {
+        "align": "left",
+        "key": "description",
+        "label": {
+          "ar": "الوصف",
+          "en": "Description",
+        },
+        "visible": true,
+        "width": 220,
+      },
+      {
+        "align": "center",
+        "key": "quantity",
+        "label": {
+          "ar": "الكمية",
+          "en": "Qty",
+        },
+        "visible": true,
+        "width": 40,
+      },
+      {
+        "align": "center",
+        "key": "itemCode",
+        "label": {
+          "ar": "الرمز",
+          "en": "Code",
+        },
+        "visible": false,
+        "width": 50,
+      },
+      {
+        "align": "center",
+        "key": "unit",
+        "label": {
+          "ar": "الوحدة",
+          "en": "Unit",
+        },
+        "visible": false,
+        "width": 45,
+      },
+      {
+        "align": "right",
+        "key": "unitPrice",
+        "label": {
+          "ar": "سعر الوحدة",
+          "en": "Unit Price",
+        },
+        "visible": true,
+      },
+      {
+        "align": "right",
+        "key": "lineTotal",
+        "label": {
+          "ar": "المجموع",
+          "en": "Total",
+        },
+        "visible": true,
+      },
+    ],
+    "rows": [
+      {
+        "description": "RAID-5 logical recovery",
+        "itemCode": "-",
+        "lineTotal": "1,000.00 AED",
+        "quantity": "1",
+        "unit": "-",
+        "unitPrice": "1,000.00 AED",
+      },
+      {
+        "description": "Donor drive sourcing",
+        "itemCode": "-",
+        "lineTotal": "500.00 AED",
+        "quantity": "2",
+        "unit": "-",
+        "unitPrice": "250.00 AED",
+      },
+    ],
+  },
+  "meta": [
+    {
+      "label": {
+        "ar": "رقم العرض:",
+        "en": "Quote No:",
+      },
+      "value": "QUO-2026-0042",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الإنشاء:",
+        "en": "Created Date:",
+      },
+      "value": "13/06/2026",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الانتهاء:",
+        "en": "Expiry Date:",
+      },
+      "value": "13/07/2026",
+    },
+    {
+      "label": {
+        "ar": "رقم المهمة:",
+        "en": "Job ID:",
+      },
+      "value": "CASE-0007",
+    },
+  ],
+  "parties": {
+    "to": {
+      "name": "Jane Client",
+      "rows": [
+        {
+          "label": {
+            "ar": "الهاتف:",
+            "en": "Phone:",
+          },
+          "value": "+971 50 123 4567",
+        },
+        {
+          "label": {
+            "ar": "البريد:",
+            "en": "Email:",
+          },
+          "value": "jane@client.test",
+        },
+        {
+          "label": {
+            "ar": "المرجع:",
+            "en": "Reference:",
+          },
+          "value": "PO-9001",
+        },
+      ],
+      "title": {
+        "ar": "معلومات العميل",
+        "en": "Customer Information",
+      },
+    },
+  },
+  "paymentHistory": null,
+  "qrCaption": "Scan to verify this quote",
+  "qrPayload": "QUOTE:QUO-2026-0042 TOTAL:1,512.00 AED VALID:13/07/2026",
+  "signatures": [
+    {
+      "ar": "التوقيع المعتمد",
+      "en": "Authorized Signature",
+    },
+    {
+      "ar": "موافقة العميل",
+      "en": "Customer Acceptance",
+    },
+  ],
+  "taxSummary": undefined,
+  "terms": {
+    "blocks": [
+      {
+        "body": "Quote valid for 30 days. 50% advance required to begin.",
+        "title": {
+          "ar": "شروط العرض",
+          "en": "Quote Terms",
+        },
+      },
+      {
+        "body": "Diagnostics are non-destructive.",
+        "title": {
+          "ar": "ملاحظات",
+          "en": "Notes",
+        },
+      },
+    ],
+    "title": {
+      "ar": "شروط العرض",
+      "en": "Quote Terms",
+    },
+  },
+  "totals": [
+    {
+      "key": "subtotal",
+      "label": {
+        "ar": "المجموع الفرعي:",
+        "en": "Subtotal:",
+      },
+      "value": "1,440.00 AED",
+    },
+    {
+      "key": "discount",
+      "label": {
+        "ar": "الخصم:",
+        "en": "Discount:",
+      },
+      "value": "- 100.00 AED",
+    },
+    {
+      "key": "netAmount",
+      "label": {
+        "ar": "صافي المبلغ:",
+        "en": "Net Amount:",
+      },
+      "value": "1,340.00 AED",
+    },
+    {
+      "key": "tax",
+      "label": {
+        "ar": "VAT 5%:",
+        "en": "VAT 5%:",
+      },
+      "value": "72.00 AED",
+    },
+    {
+      "emphasis": true,
+      "key": "total",
+      "label": {
+        "ar": "الإجمالي:",
+        "en": "Total:",
+      },
+      "value": "1,512.00 AED",
+    },
+  ],
+}
+`;
+
+exports[`Phase 2 compliance matrix > 'KW' invoice — title ceremony, band, component row, bilingual > KW-invoice 1`] = `
+{
+  "bank": {
+    "rows": [
+      {
+        "label": {
+          "ar": "اسم الحساب:",
+          "en": "Account Name:",
+        },
+        "value": "Acme Data Recovery LLC",
+      },
+      {
+        "label": {
+          "ar": "رقم الحساب:",
+          "en": "Account No:",
+        },
+        "value": "0123456789",
+      },
+      {
+        "label": {
+          "ar": "البنك:",
+          "en": "Bank:",
+        },
+        "value": "First National Bank",
+      },
+      {
+        "label": {
+          "ar": "الآيبان:",
+          "en": "IBAN:",
+        },
+        "value": "AE12 0000 0000 0123 4567 89",
+      },
+      {
+        "label": {
+          "ar": "سويفت:",
+          "en": "SWIFT:",
+        },
+        "value": "FNBKAEXX",
+      },
+    ],
+    "title": {
+      "ar": "تفاصيل البنك",
+      "en": "Bank Account",
+    },
+  },
+  "documentTitle": {
+    "ar": "فاتورة ضريبية",
+    "en": "INVOICE",
+  },
+  "identity": {
+    "basic_info": {
+      "company_name": "Acme Data Recovery",
+      "legal_name": "Acme Data Recovery LLC",
+      "vat_number": "SELLER-KW",
+    },
+    "branding": {
+      "brand_tagline": "Recovered. Verified. Delivered.",
+    },
+    "contact_info": {
+      "email_general": "lab@acme.test",
+      "phone_primary": "+971 4 123 4567",
+    },
+    "location": {
+      "address_line1": "12 Lab Street",
+      "city": "Dubai",
+      "country": "United Arab Emirates",
+    },
+    "online_presence": {
+      "website": "https://acme.test",
+    },
+  },
+  "lineItems": {
+    "columns": [
+      {
+        "align": "left",
+        "key": "description",
+        "label": {
+          "ar": "الوصف",
+          "en": "Description",
+        },
+        "visible": true,
+        "width": 220,
+      },
+      {
+        "align": "center",
+        "key": "quantity",
+        "label": {
+          "ar": "الكمية",
+          "en": "Qty",
+        },
+        "visible": true,
+        "width": 40,
+      },
+      {
+        "align": "center",
+        "key": "itemCode",
+        "label": {
+          "ar": "الرمز",
+          "en": "Code",
+        },
+        "visible": false,
+        "width": 50,
+      },
+      {
+        "align": "center",
+        "key": "unit",
+        "label": {
+          "ar": "الوحدة",
+          "en": "Unit",
+        },
+        "visible": false,
+        "width": 45,
+      },
+      {
+        "align": "right",
+        "key": "unitPrice",
+        "label": {
+          "ar": "سعر الوحدة",
+          "en": "Unit Price",
+        },
+        "visible": true,
+      },
+      {
+        "align": "right",
+        "key": "lineTotal",
+        "label": {
+          "ar": "المجموع",
+          "en": "Total",
+        },
+        "visible": true,
+      },
+    ],
+    "rows": [
+      {
+        "description": "RAID-5 logical recovery",
+        "itemCode": "-",
+        "lineTotal": "1,000.000 AED",
+        "quantity": "1",
+        "unit": "-",
+        "unitPrice": "1,000.000 AED",
+      },
+      {
+        "description": "Donor drive sourcing",
+        "itemCode": "-",
+        "lineTotal": "500.000 AED",
+        "quantity": "2",
+        "unit": "-",
+        "unitPrice": "250.000 AED",
+      },
+    ],
+  },
+  "meta": [
+    {
+      "label": {
+        "ar": "رقم الفاتورة:",
+        "en": "Invoice No:",
+      },
+      "value": "INV-2026-0042",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الفاتورة:",
+        "en": "Invoice Date:",
+      },
+      "value": "13/06/2026",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الاستحقاق:",
+        "en": "Due Date:",
+      },
+      "value": "27/06/2026",
+    },
+    {
+      "label": {
+        "ar": "رقم المهمة:",
+        "en": "Job ID:",
+      },
+      "value": "CASE-0007",
+    },
+  ],
+  "parties": {
+    "to": {
+      "name": "Jane Client",
+      "rows": [
+        {
+          "label": {
+            "ar": "الهاتف:",
+            "en": "Phone:",
+          },
+          "value": "+971 50 123 4567",
+        },
+        {
+          "label": {
+            "ar": "البريد:",
+            "en": "Email:",
+          },
+          "value": "jane@client.test",
+        },
+        {
+          "label": {
+            "ar": "المرجع:",
+            "en": "Reference:",
+          },
+          "value": "PO-9001",
+        },
+      ],
+      "title": {
+        "ar": "معلومات العميل",
+        "en": "Customer Information",
+      },
+    },
+  },
+  "paymentHistory": {
+    "columns": {
+      "amount": {
+        "ar": "المبلغ",
+        "en": "Amount",
+      },
+      "balance": {
+        "ar": "الرصيد",
+        "en": "Balance",
+      },
+      "date": {
+        "ar": "التاريخ",
+        "en": "Date",
+      },
+      "document": {
+        "ar": "المستند",
+        "en": "Document",
+      },
+      "method": {
+        "ar": "الطريقة",
+        "en": "Method",
+      },
+      "recordedBy": {
+        "ar": "سجلها",
+        "en": "Recorded By",
+      },
+      "reference": {
+        "ar": "المرجع",
+        "en": "Reference",
+      },
+    },
+    "rows": [
+      {
+        "amount": "300.000 AED",
+        "date": "14/06/2026",
+        "document": "RCPT-0001",
+        "method": "Bank Transfer",
+        "recordedBy": "Alex Accounts",
+        "reference": "TRX-1001",
+        "runningBalance": "1,170.000 AED",
+      },
+      {
+        "amount": "170.000 AED",
+        "date": "15/06/2026",
+        "document": "RCPT-0002",
+        "method": "Cash",
+        "recordedBy": "Alex Accounts",
+        "reference": "CASH-9",
+        "runningBalance": "1,000.000 AED",
+      },
+    ],
+    "title": {
+      "ar": "سجل الدفعات",
+      "en": "Payment History",
+    },
+  },
+  "qrCaption": "Scan to verify this invoice",
+  "qrPayload": "INVOICE:INV-2026-0042 TOTAL:1,440.000 AED DATE:13/06/2026",
+  "signatures": [
+    {
+      "ar": "التوقيع المعتمد",
+      "en": "Authorized Signature",
+    },
+    {
+      "ar": "توقيع العميل",
+      "en": "Customer Signature",
+    },
+  ],
+  "taxSummary": undefined,
+  "terms": {
+    "blocks": [
+      {
+        "body": "Net 14 days from the invoice date.",
+        "format": "html",
+        "title": {
+          "ar": "شروط الفاتورة",
+          "en": "Invoice Terms",
+        },
+      },
+      {
+        "body": "Thank you for trusting our lab with your data recovery.",
+        "title": {
+          "ar": "ملاحظات",
+          "en": "Notes",
+        },
+      },
+    ],
+    "title": {
+      "ar": "شروط الفاتورة",
+      "en": "Invoice Terms",
+    },
+  },
+  "totals": [
+    {
+      "key": "subtotal",
+      "label": {
+        "ar": "المجموع الفرعي:",
+        "en": "Subtotal:",
+      },
+      "value": "1,440.000 AED",
+    },
+    {
+      "key": "discount",
+      "label": {
+        "ar": "الخصم:",
+        "en": "Discount:",
+      },
+      "value": "- 100.000 AED",
+    },
+    {
+      "key": "netAmount",
+      "label": {
+        "ar": "صافي المبلغ:",
+        "en": "Net Amount:",
+      },
+      "value": "1,340.000 AED",
+    },
+    {
+      "emphasis": true,
+      "key": "total",
+      "label": {
+        "ar": "الإجمالي:",
+        "en": "Total:",
+      },
+      "value": "1,440.000 AED",
+    },
+    {
+      "key": "amountPaid",
+      "label": {
+        "ar": "المبلغ المدفوع:",
+        "en": "Amount Paid:",
+      },
+      "value": "470.000 AED",
+    },
+    {
+      "key": "balanceDue",
+      "label": {
+        "ar": "الرصيد المستحق:",
+        "en": "Balance Due:",
+      },
+      "value": "1,000.000 AED",
+    },
+  ],
+  "zatcaPayload": null,
+}
+`;
+
+exports[`Phase 2 compliance matrix > 'KW' quote resolves QUOTATION + component rows > KW-quote 1`] = `
+{
+  "bank": {
+    "rows": [
+      {
+        "label": {
+          "ar": "اسم الحساب:",
+          "en": "Account Name:",
+        },
+        "value": "Acme Data Recovery LLC",
+      },
+      {
+        "label": {
+          "ar": "رقم الحساب:",
+          "en": "Account No:",
+        },
+        "value": "0123456789",
+      },
+      {
+        "label": {
+          "ar": "البنك:",
+          "en": "Bank:",
+        },
+        "value": "First National Bank",
+      },
+      {
+        "label": {
+          "ar": "الآيبان:",
+          "en": "IBAN:",
+        },
+        "value": "AE12 0000 0000 0123 4567 89",
+      },
+      {
+        "label": {
+          "ar": "سويفت:",
+          "en": "SWIFT:",
+        },
+        "value": "FNBKAEXX",
+      },
+    ],
+    "title": {
+      "ar": "تفاصيل البنك",
+      "en": "Bank Account",
+    },
+  },
+  "documentTitle": {
+    "ar": "عرض أسعار",
+    "en": "QUOTATION",
+  },
+  "identity": {
+    "basic_info": {
+      "company_name": "Acme Data Recovery",
+      "legal_name": "Acme Data Recovery LLC",
+    },
+    "branding": {
+      "brand_tagline": "Recovered. Verified. Delivered.",
+    },
+    "contact_info": {
+      "email_general": "lab@acme.test",
+      "phone_primary": "+971 4 123 4567",
+    },
+    "location": {
+      "address_line1": "12 Lab Street",
+      "city": "Dubai",
+      "country": "United Arab Emirates",
+    },
+    "online_presence": {
+      "website": "https://acme.test",
+    },
+  },
+  "lineItems": {
+    "columns": [
+      {
+        "align": "left",
+        "key": "description",
+        "label": {
+          "ar": "الوصف",
+          "en": "Description",
+        },
+        "visible": true,
+        "width": 220,
+      },
+      {
+        "align": "center",
+        "key": "quantity",
+        "label": {
+          "ar": "الكمية",
+          "en": "Qty",
+        },
+        "visible": true,
+        "width": 40,
+      },
+      {
+        "align": "center",
+        "key": "itemCode",
+        "label": {
+          "ar": "الرمز",
+          "en": "Code",
+        },
+        "visible": false,
+        "width": 50,
+      },
+      {
+        "align": "center",
+        "key": "unit",
+        "label": {
+          "ar": "الوحدة",
+          "en": "Unit",
+        },
+        "visible": false,
+        "width": 45,
+      },
+      {
+        "align": "right",
+        "key": "unitPrice",
+        "label": {
+          "ar": "سعر الوحدة",
+          "en": "Unit Price",
+        },
+        "visible": true,
+      },
+      {
+        "align": "right",
+        "key": "lineTotal",
+        "label": {
+          "ar": "المجموع",
+          "en": "Total",
+        },
+        "visible": true,
+      },
+    ],
+    "rows": [
+      {
+        "description": "RAID-5 logical recovery",
+        "itemCode": "-",
+        "lineTotal": "1,000.000 AED",
+        "quantity": "1",
+        "unit": "-",
+        "unitPrice": "1,000.000 AED",
+      },
+      {
+        "description": "Donor drive sourcing",
+        "itemCode": "-",
+        "lineTotal": "500.000 AED",
+        "quantity": "2",
+        "unit": "-",
+        "unitPrice": "250.000 AED",
+      },
+    ],
+  },
+  "meta": [
+    {
+      "label": {
+        "ar": "رقم العرض:",
+        "en": "Quote No:",
+      },
+      "value": "QUO-2026-0042",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الإنشاء:",
+        "en": "Created Date:",
+      },
+      "value": "13/06/2026",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الانتهاء:",
+        "en": "Expiry Date:",
+      },
+      "value": "13/07/2026",
+    },
+    {
+      "label": {
+        "ar": "رقم المهمة:",
+        "en": "Job ID:",
+      },
+      "value": "CASE-0007",
+    },
+  ],
+  "parties": {
+    "to": {
+      "name": "Jane Client",
+      "rows": [
+        {
+          "label": {
+            "ar": "الهاتف:",
+            "en": "Phone:",
+          },
+          "value": "+971 50 123 4567",
+        },
+        {
+          "label": {
+            "ar": "البريد:",
+            "en": "Email:",
+          },
+          "value": "jane@client.test",
+        },
+        {
+          "label": {
+            "ar": "المرجع:",
+            "en": "Reference:",
+          },
+          "value": "PO-9001",
+        },
+      ],
+      "title": {
+        "ar": "معلومات العميل",
+        "en": "Customer Information",
+      },
+    },
+  },
+  "paymentHistory": null,
+  "qrCaption": "Scan to verify this quote",
+  "qrPayload": "QUOTE:QUO-2026-0042 TOTAL:1,440.000 AED VALID:13/07/2026",
+  "signatures": [
+    {
+      "ar": "التوقيع المعتمد",
+      "en": "Authorized Signature",
+    },
+    {
+      "ar": "موافقة العميل",
+      "en": "Customer Acceptance",
+    },
+  ],
+  "taxSummary": undefined,
+  "terms": {
+    "blocks": [
+      {
+        "body": "Quote valid for 30 days. 50% advance required to begin.",
+        "title": {
+          "ar": "شروط العرض",
+          "en": "Quote Terms",
+        },
+      },
+      {
+        "body": "Diagnostics are non-destructive.",
+        "title": {
+          "ar": "ملاحظات",
+          "en": "Notes",
+        },
+      },
+    ],
+    "title": {
+      "ar": "شروط العرض",
+      "en": "Quote Terms",
+    },
+  },
+  "totals": [
+    {
+      "key": "subtotal",
+      "label": {
+        "ar": "المجموع الفرعي:",
+        "en": "Subtotal:",
+      },
+      "value": "1,440.000 AED",
+    },
+    {
+      "key": "discount",
+      "label": {
+        "ar": "الخصم:",
+        "en": "Discount:",
+      },
+      "value": "- 100.000 AED",
+    },
+    {
+      "key": "netAmount",
+      "label": {
+        "ar": "صافي المبلغ:",
+        "en": "Net Amount:",
+      },
+      "value": "1,340.000 AED",
+    },
+    {
+      "emphasis": true,
+      "key": "total",
+      "label": {
+        "ar": "الإجمالي:",
+        "en": "Total:",
+      },
+      "value": "1,440.000 AED",
+    },
+  ],
+}
+`;
+
+exports[`Phase 2 compliance matrix > 'OM' invoice — title ceremony, band, component row, bilingual > OM-invoice 1`] = `
+{
+  "bank": {
+    "rows": [
+      {
+        "label": {
+          "ar": "اسم الحساب:",
+          "en": "Account Name:",
+        },
+        "value": "Acme Data Recovery LLC",
+      },
+      {
+        "label": {
+          "ar": "رقم الحساب:",
+          "en": "Account No:",
+        },
+        "value": "0123456789",
+      },
+      {
+        "label": {
+          "ar": "البنك:",
+          "en": "Bank:",
+        },
+        "value": "First National Bank",
+      },
+      {
+        "label": {
+          "ar": "الآيبان:",
+          "en": "IBAN:",
+        },
+        "value": "AE12 0000 0000 0123 4567 89",
+      },
+      {
+        "label": {
+          "ar": "سويفت:",
+          "en": "SWIFT:",
+        },
+        "value": "FNBKAEXX",
+      },
+    ],
+    "title": {
+      "ar": "تفاصيل البنك",
+      "en": "Bank Account",
+    },
+  },
+  "documentTitle": {
+    "ar": "فاتورة ضريبية",
+    "en": "TAX INVOICE",
+  },
+  "identity": {
+    "basic_info": {
+      "company_name": "Acme Data Recovery",
+      "legal_name": "Acme Data Recovery LLC",
+      "vat_number": "SELLER-OM",
+    },
+    "branding": {
+      "brand_tagline": "Recovered. Verified. Delivered.",
+    },
+    "contact_info": {
+      "email_general": "lab@acme.test",
+      "phone_primary": "+971 4 123 4567",
+    },
+    "location": {
+      "address_line1": "12 Lab Street",
+      "city": "Dubai",
+      "country": "United Arab Emirates",
+    },
+    "online_presence": {
+      "website": "https://acme.test",
+    },
+  },
+  "lineItems": {
+    "columns": [
+      {
+        "align": "left",
+        "key": "description",
+        "label": {
+          "ar": "الوصف",
+          "en": "Description",
+        },
+        "visible": true,
+        "width": 220,
+      },
+      {
+        "align": "center",
+        "key": "quantity",
+        "label": {
+          "ar": "الكمية",
+          "en": "Qty",
+        },
+        "visible": true,
+        "width": 40,
+      },
+      {
+        "align": "center",
+        "key": "itemCode",
+        "label": {
+          "ar": "الرمز",
+          "en": "Code",
+        },
+        "visible": false,
+        "width": 50,
+      },
+      {
+        "align": "center",
+        "key": "unit",
+        "label": {
+          "ar": "الوحدة",
+          "en": "Unit",
+        },
+        "visible": false,
+        "width": 45,
+      },
+      {
+        "align": "right",
+        "key": "unitPrice",
+        "label": {
+          "ar": "سعر الوحدة",
+          "en": "Unit Price",
+        },
+        "visible": true,
+      },
+      {
+        "align": "right",
+        "key": "lineTotal",
+        "label": {
+          "ar": "المجموع",
+          "en": "Total",
+        },
+        "visible": true,
+      },
+    ],
+    "rows": [
+      {
+        "description": "RAID-5 logical recovery",
+        "itemCode": "-",
+        "lineTotal": "1,000.000 AED",
+        "quantity": "1",
+        "unit": "-",
+        "unitPrice": "1,000.000 AED",
+      },
+      {
+        "description": "Donor drive sourcing",
+        "itemCode": "-",
+        "lineTotal": "500.000 AED",
+        "quantity": "2",
+        "unit": "-",
+        "unitPrice": "250.000 AED",
+      },
+    ],
+  },
+  "meta": [
+    {
+      "label": {
+        "ar": "رقم الفاتورة:",
+        "en": "Invoice No:",
+      },
+      "value": "INV-2026-0042",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الفاتورة:",
+        "en": "Invoice Date:",
+      },
+      "value": "13/06/2026",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الاستحقاق:",
+        "en": "Due Date:",
+      },
+      "value": "27/06/2026",
+    },
+    {
+      "label": {
+        "ar": "رقم المهمة:",
+        "en": "Job ID:",
+      },
+      "value": "CASE-0007",
+    },
+  ],
+  "parties": {
+    "to": {
+      "name": "Jane Client",
+      "rows": [
+        {
+          "label": {
+            "ar": "الهاتف:",
+            "en": "Phone:",
+          },
+          "value": "+971 50 123 4567",
+        },
+        {
+          "label": {
+            "ar": "البريد:",
+            "en": "Email:",
+          },
+          "value": "jane@client.test",
+        },
+        {
+          "label": {
+            "ar": "المرجع:",
+            "en": "Reference:",
+          },
+          "value": "PO-9001",
+        },
+      ],
+      "title": {
+        "ar": "معلومات العميل",
+        "en": "Customer Information",
+      },
+    },
+  },
+  "paymentHistory": {
+    "columns": {
+      "amount": {
+        "ar": "المبلغ",
+        "en": "Amount",
+      },
+      "balance": {
+        "ar": "الرصيد",
+        "en": "Balance",
+      },
+      "date": {
+        "ar": "التاريخ",
+        "en": "Date",
+      },
+      "document": {
+        "ar": "المستند",
+        "en": "Document",
+      },
+      "method": {
+        "ar": "الطريقة",
+        "en": "Method",
+      },
+      "recordedBy": {
+        "ar": "سجلها",
+        "en": "Recorded By",
+      },
+      "reference": {
+        "ar": "المرجع",
+        "en": "Reference",
+      },
+    },
+    "rows": [
+      {
+        "amount": "300.000 AED",
+        "date": "14/06/2026",
+        "document": "RCPT-0001",
+        "method": "Bank Transfer",
+        "recordedBy": "Alex Accounts",
+        "reference": "TRX-1001",
+        "runningBalance": "1,170.000 AED",
+      },
+      {
+        "amount": "170.000 AED",
+        "date": "15/06/2026",
+        "document": "RCPT-0002",
+        "method": "Cash",
+        "recordedBy": "Alex Accounts",
+        "reference": "CASH-9",
+        "runningBalance": "1,000.000 AED",
+      },
+    ],
+    "title": {
+      "ar": "سجل الدفعات",
+      "en": "Payment History",
+    },
+  },
+  "qrCaption": "Scan to verify this invoice",
+  "qrPayload": "INVOICE:INV-2026-0042 TOTAL:1,512.000 AED DATE:13/06/2026",
+  "signatures": [
+    {
+      "ar": "التوقيع المعتمد",
+      "en": "Authorized Signature",
+    },
+    {
+      "ar": "توقيع العميل",
+      "en": "Customer Signature",
+    },
+  ],
+  "taxSummary": undefined,
+  "terms": {
+    "blocks": [
+      {
+        "body": "Net 14 days from the invoice date.",
+        "format": "html",
+        "title": {
+          "ar": "شروط الفاتورة",
+          "en": "Invoice Terms",
+        },
+      },
+      {
+        "body": "Thank you for trusting our lab with your data recovery.",
+        "title": {
+          "ar": "ملاحظات",
+          "en": "Notes",
+        },
+      },
+    ],
+    "title": {
+      "ar": "شروط الفاتورة",
+      "en": "Invoice Terms",
+    },
+  },
+  "totals": [
+    {
+      "key": "subtotal",
+      "label": {
+        "ar": "المجموع الفرعي:",
+        "en": "Subtotal:",
+      },
+      "value": "1,440.000 AED",
+    },
+    {
+      "key": "discount",
+      "label": {
+        "ar": "الخصم:",
+        "en": "Discount:",
+      },
+      "value": "- 100.000 AED",
+    },
+    {
+      "key": "netAmount",
+      "label": {
+        "ar": "صافي المبلغ:",
+        "en": "Net Amount:",
+      },
+      "value": "1,340.000 AED",
+    },
+    {
+      "key": "tax",
+      "label": {
+        "ar": "VAT 5%:",
+        "en": "VAT 5%:",
+      },
+      "value": "72.000 AED",
+    },
+    {
+      "emphasis": true,
+      "key": "total",
+      "label": {
+        "ar": "الإجمالي:",
+        "en": "Total:",
+      },
+      "value": "1,512.000 AED",
+    },
+    {
+      "key": "amountPaid",
+      "label": {
+        "ar": "المبلغ المدفوع:",
+        "en": "Amount Paid:",
+      },
+      "value": "470.000 AED",
+    },
+    {
+      "key": "balanceDue",
+      "label": {
+        "ar": "الرصيد المستحق:",
+        "en": "Balance Due:",
+      },
+      "value": "1,000.000 AED",
+    },
+  ],
+  "zatcaPayload": null,
+}
+`;
+
+exports[`Phase 2 compliance matrix > 'OM' quote resolves QUOTATION + component rows > OM-quote 1`] = `
+{
+  "bank": {
+    "rows": [
+      {
+        "label": {
+          "ar": "اسم الحساب:",
+          "en": "Account Name:",
+        },
+        "value": "Acme Data Recovery LLC",
+      },
+      {
+        "label": {
+          "ar": "رقم الحساب:",
+          "en": "Account No:",
+        },
+        "value": "0123456789",
+      },
+      {
+        "label": {
+          "ar": "البنك:",
+          "en": "Bank:",
+        },
+        "value": "First National Bank",
+      },
+      {
+        "label": {
+          "ar": "الآيبان:",
+          "en": "IBAN:",
+        },
+        "value": "AE12 0000 0000 0123 4567 89",
+      },
+      {
+        "label": {
+          "ar": "سويفت:",
+          "en": "SWIFT:",
+        },
+        "value": "FNBKAEXX",
+      },
+    ],
+    "title": {
+      "ar": "تفاصيل البنك",
+      "en": "Bank Account",
+    },
+  },
+  "documentTitle": {
+    "ar": "عرض سعر",
+    "en": "QUOTATION",
+  },
+  "identity": {
+    "basic_info": {
+      "company_name": "Acme Data Recovery",
+      "legal_name": "Acme Data Recovery LLC",
+    },
+    "branding": {
+      "brand_tagline": "Recovered. Verified. Delivered.",
+    },
+    "contact_info": {
+      "email_general": "lab@acme.test",
+      "phone_primary": "+971 4 123 4567",
+    },
+    "location": {
+      "address_line1": "12 Lab Street",
+      "city": "Dubai",
+      "country": "United Arab Emirates",
+    },
+    "online_presence": {
+      "website": "https://acme.test",
+    },
+  },
+  "lineItems": {
+    "columns": [
+      {
+        "align": "left",
+        "key": "description",
+        "label": {
+          "ar": "الوصف",
+          "en": "Description",
+        },
+        "visible": true,
+        "width": 220,
+      },
+      {
+        "align": "center",
+        "key": "quantity",
+        "label": {
+          "ar": "الكمية",
+          "en": "Qty",
+        },
+        "visible": true,
+        "width": 40,
+      },
+      {
+        "align": "center",
+        "key": "itemCode",
+        "label": {
+          "ar": "الرمز",
+          "en": "Code",
+        },
+        "visible": false,
+        "width": 50,
+      },
+      {
+        "align": "center",
+        "key": "unit",
+        "label": {
+          "ar": "الوحدة",
+          "en": "Unit",
+        },
+        "visible": false,
+        "width": 45,
+      },
+      {
+        "align": "right",
+        "key": "unitPrice",
+        "label": {
+          "ar": "سعر الوحدة",
+          "en": "Unit Price",
+        },
+        "visible": true,
+      },
+      {
+        "align": "right",
+        "key": "lineTotal",
+        "label": {
+          "ar": "المجموع",
+          "en": "Total",
+        },
+        "visible": true,
+      },
+    ],
+    "rows": [
+      {
+        "description": "RAID-5 logical recovery",
+        "itemCode": "-",
+        "lineTotal": "1,000.000 AED",
+        "quantity": "1",
+        "unit": "-",
+        "unitPrice": "1,000.000 AED",
+      },
+      {
+        "description": "Donor drive sourcing",
+        "itemCode": "-",
+        "lineTotal": "500.000 AED",
+        "quantity": "2",
+        "unit": "-",
+        "unitPrice": "250.000 AED",
+      },
+    ],
+  },
+  "meta": [
+    {
+      "label": {
+        "ar": "رقم العرض:",
+        "en": "Quote No:",
+      },
+      "value": "QUO-2026-0042",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الإنشاء:",
+        "en": "Created Date:",
+      },
+      "value": "13/06/2026",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الانتهاء:",
+        "en": "Expiry Date:",
+      },
+      "value": "13/07/2026",
+    },
+    {
+      "label": {
+        "ar": "رقم المهمة:",
+        "en": "Job ID:",
+      },
+      "value": "CASE-0007",
+    },
+  ],
+  "parties": {
+    "to": {
+      "name": "Jane Client",
+      "rows": [
+        {
+          "label": {
+            "ar": "الهاتف:",
+            "en": "Phone:",
+          },
+          "value": "+971 50 123 4567",
+        },
+        {
+          "label": {
+            "ar": "البريد:",
+            "en": "Email:",
+          },
+          "value": "jane@client.test",
+        },
+        {
+          "label": {
+            "ar": "المرجع:",
+            "en": "Reference:",
+          },
+          "value": "PO-9001",
+        },
+      ],
+      "title": {
+        "ar": "معلومات العميل",
+        "en": "Customer Information",
+      },
+    },
+  },
+  "paymentHistory": null,
+  "qrCaption": "Scan to verify this quote",
+  "qrPayload": "QUOTE:QUO-2026-0042 TOTAL:1,512.000 AED VALID:13/07/2026",
+  "signatures": [
+    {
+      "ar": "التوقيع المعتمد",
+      "en": "Authorized Signature",
+    },
+    {
+      "ar": "موافقة العميل",
+      "en": "Customer Acceptance",
+    },
+  ],
+  "taxSummary": undefined,
+  "terms": {
+    "blocks": [
+      {
+        "body": "Quote valid for 30 days. 50% advance required to begin.",
+        "title": {
+          "ar": "شروط العرض",
+          "en": "Quote Terms",
+        },
+      },
+      {
+        "body": "Diagnostics are non-destructive.",
+        "title": {
+          "ar": "ملاحظات",
+          "en": "Notes",
+        },
+      },
+    ],
+    "title": {
+      "ar": "شروط العرض",
+      "en": "Quote Terms",
+    },
+  },
+  "totals": [
+    {
+      "key": "subtotal",
+      "label": {
+        "ar": "المجموع الفرعي:",
+        "en": "Subtotal:",
+      },
+      "value": "1,440.000 AED",
+    },
+    {
+      "key": "discount",
+      "label": {
+        "ar": "الخصم:",
+        "en": "Discount:",
+      },
+      "value": "- 100.000 AED",
+    },
+    {
+      "key": "netAmount",
+      "label": {
+        "ar": "صافي المبلغ:",
+        "en": "Net Amount:",
+      },
+      "value": "1,340.000 AED",
+    },
+    {
+      "key": "tax",
+      "label": {
+        "ar": "VAT 5%:",
+        "en": "VAT 5%:",
+      },
+      "value": "72.000 AED",
+    },
+    {
+      "emphasis": true,
+      "key": "total",
+      "label": {
+        "ar": "الإجمالي:",
+        "en": "Total:",
+      },
+      "value": "1,512.000 AED",
+    },
+  ],
+}
+`;
+
+exports[`Phase 2 compliance matrix > 'QA' invoice — title ceremony, band, component row, bilingual > QA-invoice 1`] = `
+{
+  "bank": {
+    "rows": [
+      {
+        "label": {
+          "ar": "اسم الحساب:",
+          "en": "Account Name:",
+        },
+        "value": "Acme Data Recovery LLC",
+      },
+      {
+        "label": {
+          "ar": "رقم الحساب:",
+          "en": "Account No:",
+        },
+        "value": "0123456789",
+      },
+      {
+        "label": {
+          "ar": "البنك:",
+          "en": "Bank:",
+        },
+        "value": "First National Bank",
+      },
+      {
+        "label": {
+          "ar": "الآيبان:",
+          "en": "IBAN:",
+        },
+        "value": "AE12 0000 0000 0123 4567 89",
+      },
+      {
+        "label": {
+          "ar": "سويفت:",
+          "en": "SWIFT:",
+        },
+        "value": "FNBKAEXX",
+      },
+    ],
+    "title": {
+      "ar": "تفاصيل البنك",
+      "en": "Bank Account",
+    },
+  },
+  "documentTitle": {
+    "ar": "فاتورة ضريبية",
+    "en": "INVOICE",
+  },
+  "identity": {
+    "basic_info": {
+      "company_name": "Acme Data Recovery",
+      "legal_name": "Acme Data Recovery LLC",
+      "vat_number": "SELLER-QA",
+    },
+    "branding": {
+      "brand_tagline": "Recovered. Verified. Delivered.",
+    },
+    "contact_info": {
+      "email_general": "lab@acme.test",
+      "phone_primary": "+971 4 123 4567",
+    },
+    "location": {
+      "address_line1": "12 Lab Street",
+      "city": "Dubai",
+      "country": "United Arab Emirates",
+    },
+    "online_presence": {
+      "website": "https://acme.test",
+    },
+  },
+  "lineItems": {
+    "columns": [
+      {
+        "align": "left",
+        "key": "description",
+        "label": {
+          "ar": "الوصف",
+          "en": "Description",
+        },
+        "visible": true,
+        "width": 220,
+      },
+      {
+        "align": "center",
+        "key": "quantity",
+        "label": {
+          "ar": "الكمية",
+          "en": "Qty",
+        },
+        "visible": true,
+        "width": 40,
+      },
+      {
+        "align": "center",
+        "key": "itemCode",
+        "label": {
+          "ar": "الرمز",
+          "en": "Code",
+        },
+        "visible": false,
+        "width": 50,
+      },
+      {
+        "align": "center",
+        "key": "unit",
+        "label": {
+          "ar": "الوحدة",
+          "en": "Unit",
+        },
+        "visible": false,
+        "width": 45,
+      },
+      {
+        "align": "right",
+        "key": "unitPrice",
+        "label": {
+          "ar": "سعر الوحدة",
+          "en": "Unit Price",
+        },
+        "visible": true,
+      },
+      {
+        "align": "right",
+        "key": "lineTotal",
+        "label": {
+          "ar": "المجموع",
+          "en": "Total",
+        },
+        "visible": true,
+      },
+    ],
+    "rows": [
+      {
+        "description": "RAID-5 logical recovery",
+        "itemCode": "-",
+        "lineTotal": "1,000.00 AED",
+        "quantity": "1",
+        "unit": "-",
+        "unitPrice": "1,000.00 AED",
+      },
+      {
+        "description": "Donor drive sourcing",
+        "itemCode": "-",
+        "lineTotal": "500.00 AED",
+        "quantity": "2",
+        "unit": "-",
+        "unitPrice": "250.00 AED",
+      },
+    ],
+  },
+  "meta": [
+    {
+      "label": {
+        "ar": "رقم الفاتورة:",
+        "en": "Invoice No:",
+      },
+      "value": "INV-2026-0042",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الفاتورة:",
+        "en": "Invoice Date:",
+      },
+      "value": "13/06/2026",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الاستحقاق:",
+        "en": "Due Date:",
+      },
+      "value": "27/06/2026",
+    },
+    {
+      "label": {
+        "ar": "رقم المهمة:",
+        "en": "Job ID:",
+      },
+      "value": "CASE-0007",
+    },
+  ],
+  "parties": {
+    "to": {
+      "name": "Jane Client",
+      "rows": [
+        {
+          "label": {
+            "ar": "الهاتف:",
+            "en": "Phone:",
+          },
+          "value": "+971 50 123 4567",
+        },
+        {
+          "label": {
+            "ar": "البريد:",
+            "en": "Email:",
+          },
+          "value": "jane@client.test",
+        },
+        {
+          "label": {
+            "ar": "المرجع:",
+            "en": "Reference:",
+          },
+          "value": "PO-9001",
+        },
+      ],
+      "title": {
+        "ar": "معلومات العميل",
+        "en": "Customer Information",
+      },
+    },
+  },
+  "paymentHistory": {
+    "columns": {
+      "amount": {
+        "ar": "المبلغ",
+        "en": "Amount",
+      },
+      "balance": {
+        "ar": "الرصيد",
+        "en": "Balance",
+      },
+      "date": {
+        "ar": "التاريخ",
+        "en": "Date",
+      },
+      "document": {
+        "ar": "المستند",
+        "en": "Document",
+      },
+      "method": {
+        "ar": "الطريقة",
+        "en": "Method",
+      },
+      "recordedBy": {
+        "ar": "سجلها",
+        "en": "Recorded By",
+      },
+      "reference": {
+        "ar": "المرجع",
+        "en": "Reference",
+      },
+    },
+    "rows": [
+      {
+        "amount": "300.00 AED",
+        "date": "14/06/2026",
+        "document": "RCPT-0001",
+        "method": "Bank Transfer",
+        "recordedBy": "Alex Accounts",
+        "reference": "TRX-1001",
+        "runningBalance": "1,170.00 AED",
+      },
+      {
+        "amount": "170.00 AED",
+        "date": "15/06/2026",
+        "document": "RCPT-0002",
+        "method": "Cash",
+        "recordedBy": "Alex Accounts",
+        "reference": "CASH-9",
+        "runningBalance": "1,000.00 AED",
+      },
+    ],
+    "title": {
+      "ar": "سجل الدفعات",
+      "en": "Payment History",
+    },
+  },
+  "qrCaption": "Scan to verify this invoice",
+  "qrPayload": "INVOICE:INV-2026-0042 TOTAL:1,440.00 AED DATE:13/06/2026",
+  "signatures": [
+    {
+      "ar": "التوقيع المعتمد",
+      "en": "Authorized Signature",
+    },
+    {
+      "ar": "توقيع العميل",
+      "en": "Customer Signature",
+    },
+  ],
+  "taxSummary": undefined,
+  "terms": {
+    "blocks": [
+      {
+        "body": "Net 14 days from the invoice date.",
+        "format": "html",
+        "title": {
+          "ar": "شروط الفاتورة",
+          "en": "Invoice Terms",
+        },
+      },
+      {
+        "body": "Thank you for trusting our lab with your data recovery.",
+        "title": {
+          "ar": "ملاحظات",
+          "en": "Notes",
+        },
+      },
+    ],
+    "title": {
+      "ar": "شروط الفاتورة",
+      "en": "Invoice Terms",
+    },
+  },
+  "totals": [
+    {
+      "key": "subtotal",
+      "label": {
+        "ar": "المجموع الفرعي:",
+        "en": "Subtotal:",
+      },
+      "value": "1,440.00 AED",
+    },
+    {
+      "key": "discount",
+      "label": {
+        "ar": "الخصم:",
+        "en": "Discount:",
+      },
+      "value": "- 100.00 AED",
+    },
+    {
+      "key": "netAmount",
+      "label": {
+        "ar": "صافي المبلغ:",
+        "en": "Net Amount:",
+      },
+      "value": "1,340.00 AED",
+    },
+    {
+      "emphasis": true,
+      "key": "total",
+      "label": {
+        "ar": "الإجمالي:",
+        "en": "Total:",
+      },
+      "value": "1,440.00 AED",
+    },
+    {
+      "key": "amountPaid",
+      "label": {
+        "ar": "المبلغ المدفوع:",
+        "en": "Amount Paid:",
+      },
+      "value": "470.00 AED",
+    },
+    {
+      "key": "balanceDue",
+      "label": {
+        "ar": "الرصيد المستحق:",
+        "en": "Balance Due:",
+      },
+      "value": "1,000.00 AED",
+    },
+  ],
+  "zatcaPayload": null,
+}
+`;
+
+exports[`Phase 2 compliance matrix > 'QA' quote resolves QUOTATION + component rows > QA-quote 1`] = `
+{
+  "bank": {
+    "rows": [
+      {
+        "label": {
+          "ar": "اسم الحساب:",
+          "en": "Account Name:",
+        },
+        "value": "Acme Data Recovery LLC",
+      },
+      {
+        "label": {
+          "ar": "رقم الحساب:",
+          "en": "Account No:",
+        },
+        "value": "0123456789",
+      },
+      {
+        "label": {
+          "ar": "البنك:",
+          "en": "Bank:",
+        },
+        "value": "First National Bank",
+      },
+      {
+        "label": {
+          "ar": "الآيبان:",
+          "en": "IBAN:",
+        },
+        "value": "AE12 0000 0000 0123 4567 89",
+      },
+      {
+        "label": {
+          "ar": "سويفت:",
+          "en": "SWIFT:",
+        },
+        "value": "FNBKAEXX",
+      },
+    ],
+    "title": {
+      "ar": "تفاصيل البنك",
+      "en": "Bank Account",
+    },
+  },
+  "documentTitle": {
+    "ar": "عرض أسعار",
+    "en": "QUOTATION",
+  },
+  "identity": {
+    "basic_info": {
+      "company_name": "Acme Data Recovery",
+      "legal_name": "Acme Data Recovery LLC",
+    },
+    "branding": {
+      "brand_tagline": "Recovered. Verified. Delivered.",
+    },
+    "contact_info": {
+      "email_general": "lab@acme.test",
+      "phone_primary": "+971 4 123 4567",
+    },
+    "location": {
+      "address_line1": "12 Lab Street",
+      "city": "Dubai",
+      "country": "United Arab Emirates",
+    },
+    "online_presence": {
+      "website": "https://acme.test",
+    },
+  },
+  "lineItems": {
+    "columns": [
+      {
+        "align": "left",
+        "key": "description",
+        "label": {
+          "ar": "الوصف",
+          "en": "Description",
+        },
+        "visible": true,
+        "width": 220,
+      },
+      {
+        "align": "center",
+        "key": "quantity",
+        "label": {
+          "ar": "الكمية",
+          "en": "Qty",
+        },
+        "visible": true,
+        "width": 40,
+      },
+      {
+        "align": "center",
+        "key": "itemCode",
+        "label": {
+          "ar": "الرمز",
+          "en": "Code",
+        },
+        "visible": false,
+        "width": 50,
+      },
+      {
+        "align": "center",
+        "key": "unit",
+        "label": {
+          "ar": "الوحدة",
+          "en": "Unit",
+        },
+        "visible": false,
+        "width": 45,
+      },
+      {
+        "align": "right",
+        "key": "unitPrice",
+        "label": {
+          "ar": "سعر الوحدة",
+          "en": "Unit Price",
+        },
+        "visible": true,
+      },
+      {
+        "align": "right",
+        "key": "lineTotal",
+        "label": {
+          "ar": "المجموع",
+          "en": "Total",
+        },
+        "visible": true,
+      },
+    ],
+    "rows": [
+      {
+        "description": "RAID-5 logical recovery",
+        "itemCode": "-",
+        "lineTotal": "1,000.00 AED",
+        "quantity": "1",
+        "unit": "-",
+        "unitPrice": "1,000.00 AED",
+      },
+      {
+        "description": "Donor drive sourcing",
+        "itemCode": "-",
+        "lineTotal": "500.00 AED",
+        "quantity": "2",
+        "unit": "-",
+        "unitPrice": "250.00 AED",
+      },
+    ],
+  },
+  "meta": [
+    {
+      "label": {
+        "ar": "رقم العرض:",
+        "en": "Quote No:",
+      },
+      "value": "QUO-2026-0042",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الإنشاء:",
+        "en": "Created Date:",
+      },
+      "value": "13/06/2026",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الانتهاء:",
+        "en": "Expiry Date:",
+      },
+      "value": "13/07/2026",
+    },
+    {
+      "label": {
+        "ar": "رقم المهمة:",
+        "en": "Job ID:",
+      },
+      "value": "CASE-0007",
+    },
+  ],
+  "parties": {
+    "to": {
+      "name": "Jane Client",
+      "rows": [
+        {
+          "label": {
+            "ar": "الهاتف:",
+            "en": "Phone:",
+          },
+          "value": "+971 50 123 4567",
+        },
+        {
+          "label": {
+            "ar": "البريد:",
+            "en": "Email:",
+          },
+          "value": "jane@client.test",
+        },
+        {
+          "label": {
+            "ar": "المرجع:",
+            "en": "Reference:",
+          },
+          "value": "PO-9001",
+        },
+      ],
+      "title": {
+        "ar": "معلومات العميل",
+        "en": "Customer Information",
+      },
+    },
+  },
+  "paymentHistory": null,
+  "qrCaption": "Scan to verify this quote",
+  "qrPayload": "QUOTE:QUO-2026-0042 TOTAL:1,440.00 AED VALID:13/07/2026",
+  "signatures": [
+    {
+      "ar": "التوقيع المعتمد",
+      "en": "Authorized Signature",
+    },
+    {
+      "ar": "موافقة العميل",
+      "en": "Customer Acceptance",
+    },
+  ],
+  "taxSummary": undefined,
+  "terms": {
+    "blocks": [
+      {
+        "body": "Quote valid for 30 days. 50% advance required to begin.",
+        "title": {
+          "ar": "شروط العرض",
+          "en": "Quote Terms",
+        },
+      },
+      {
+        "body": "Diagnostics are non-destructive.",
+        "title": {
+          "ar": "ملاحظات",
+          "en": "Notes",
+        },
+      },
+    ],
+    "title": {
+      "ar": "شروط العرض",
+      "en": "Quote Terms",
+    },
+  },
+  "totals": [
+    {
+      "key": "subtotal",
+      "label": {
+        "ar": "المجموع الفرعي:",
+        "en": "Subtotal:",
+      },
+      "value": "1,440.00 AED",
+    },
+    {
+      "key": "discount",
+      "label": {
+        "ar": "الخصم:",
+        "en": "Discount:",
+      },
+      "value": "- 100.00 AED",
+    },
+    {
+      "key": "netAmount",
+      "label": {
+        "ar": "صافي المبلغ:",
+        "en": "Net Amount:",
+      },
+      "value": "1,340.00 AED",
+    },
+    {
+      "emphasis": true,
+      "key": "total",
+      "label": {
+        "ar": "الإجمالي:",
+        "en": "Total:",
+      },
+      "value": "1,440.00 AED",
+    },
+  ],
+}
+`;
+
+exports[`Phase 2 compliance matrix > 'SA' invoice — title ceremony, band, component row, bilingual > SA-invoice 1`] = `
+{
+  "bank": {
+    "rows": [
+      {
+        "label": {
+          "ar": "اسم الحساب:",
+          "en": "Account Name:",
+        },
+        "value": "Acme Data Recovery LLC",
+      },
+      {
+        "label": {
+          "ar": "رقم الحساب:",
+          "en": "Account No:",
+        },
+        "value": "0123456789",
+      },
+      {
+        "label": {
+          "ar": "البنك:",
+          "en": "Bank:",
+        },
+        "value": "First National Bank",
+      },
+      {
+        "label": {
+          "ar": "الآيبان:",
+          "en": "IBAN:",
+        },
+        "value": "AE12 0000 0000 0123 4567 89",
+      },
+      {
+        "label": {
+          "ar": "سويفت:",
+          "en": "SWIFT:",
+        },
+        "value": "FNBKAEXX",
+      },
+    ],
+    "title": {
+      "ar": "تفاصيل البنك",
+      "en": "Bank Account",
+    },
+  },
+  "documentTitle": {
+    "ar": "فاتورة ضريبية",
+    "en": "TAX INVOICE",
+  },
+  "identity": {
+    "basic_info": {
+      "company_name": "Acme Data Recovery",
+      "legal_name": "Acme Data Recovery LLC",
+      "vat_number": "SELLER-SA",
+    },
+    "branding": {
+      "brand_tagline": "Recovered. Verified. Delivered.",
+    },
+    "contact_info": {
+      "email_general": "lab@acme.test",
+      "phone_primary": "+971 4 123 4567",
+    },
+    "location": {
+      "address_line1": "12 Lab Street",
+      "city": "Dubai",
+      "country": "United Arab Emirates",
+    },
+    "online_presence": {
+      "website": "https://acme.test",
+    },
+  },
+  "lineItems": {
+    "columns": [
+      {
+        "align": "left",
+        "key": "description",
+        "label": {
+          "ar": "الوصف",
+          "en": "Description",
+        },
+        "visible": true,
+        "width": 220,
+      },
+      {
+        "align": "center",
+        "key": "quantity",
+        "label": {
+          "ar": "الكمية",
+          "en": "Qty",
+        },
+        "visible": true,
+        "width": 40,
+      },
+      {
+        "align": "center",
+        "key": "itemCode",
+        "label": {
+          "ar": "الرمز",
+          "en": "Code",
+        },
+        "visible": false,
+        "width": 50,
+      },
+      {
+        "align": "center",
+        "key": "unit",
+        "label": {
+          "ar": "الوحدة",
+          "en": "Unit",
+        },
+        "visible": false,
+        "width": 45,
+      },
+      {
+        "align": "right",
+        "key": "unitPrice",
+        "label": {
+          "ar": "سعر الوحدة",
+          "en": "Unit Price",
+        },
+        "visible": true,
+      },
+      {
+        "align": "right",
+        "key": "lineTotal",
+        "label": {
+          "ar": "المجموع",
+          "en": "Total",
+        },
+        "visible": true,
+      },
+    ],
+    "rows": [
+      {
+        "description": "RAID-5 logical recovery",
+        "itemCode": "-",
+        "lineTotal": "1,000.00 AED",
+        "quantity": "1",
+        "unit": "-",
+        "unitPrice": "1,000.00 AED",
+      },
+      {
+        "description": "Donor drive sourcing",
+        "itemCode": "-",
+        "lineTotal": "500.00 AED",
+        "quantity": "2",
+        "unit": "-",
+        "unitPrice": "250.00 AED",
+      },
+    ],
+  },
+  "meta": [
+    {
+      "label": {
+        "ar": "رقم الفاتورة:",
+        "en": "Invoice No:",
+      },
+      "value": "INV-2026-0042",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الفاتورة:",
+        "en": "Invoice Date:",
+      },
+      "value": "13/06/2026",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الاستحقاق:",
+        "en": "Due Date:",
+      },
+      "value": "27/06/2026",
+    },
+    {
+      "label": {
+        "ar": "رقم المهمة:",
+        "en": "Job ID:",
+      },
+      "value": "CASE-0007",
+    },
+  ],
+  "parties": {
+    "to": {
+      "name": "Jane Client",
+      "rows": [
+        {
+          "label": {
+            "ar": "الهاتف:",
+            "en": "Phone:",
+          },
+          "value": "+971 50 123 4567",
+        },
+        {
+          "label": {
+            "ar": "البريد:",
+            "en": "Email:",
+          },
+          "value": "jane@client.test",
+        },
+        {
+          "label": {
+            "ar": "المرجع:",
+            "en": "Reference:",
+          },
+          "value": "PO-9001",
+        },
+      ],
+      "title": {
+        "ar": "معلومات العميل",
+        "en": "Customer Information",
+      },
+    },
+  },
+  "paymentHistory": {
+    "columns": {
+      "amount": {
+        "ar": "المبلغ",
+        "en": "Amount",
+      },
+      "balance": {
+        "ar": "الرصيد",
+        "en": "Balance",
+      },
+      "date": {
+        "ar": "التاريخ",
+        "en": "Date",
+      },
+      "document": {
+        "ar": "المستند",
+        "en": "Document",
+      },
+      "method": {
+        "ar": "الطريقة",
+        "en": "Method",
+      },
+      "recordedBy": {
+        "ar": "سجلها",
+        "en": "Recorded By",
+      },
+      "reference": {
+        "ar": "المرجع",
+        "en": "Reference",
+      },
+    },
+    "rows": [
+      {
+        "amount": "300.00 AED",
+        "date": "14/06/2026",
+        "document": "RCPT-0001",
+        "method": "Bank Transfer",
+        "recordedBy": "Alex Accounts",
+        "reference": "TRX-1001",
+        "runningBalance": "1,170.00 AED",
+      },
+      {
+        "amount": "170.00 AED",
+        "date": "15/06/2026",
+        "document": "RCPT-0002",
+        "method": "Cash",
+        "recordedBy": "Alex Accounts",
+        "reference": "CASH-9",
+        "runningBalance": "1,000.00 AED",
+      },
+    ],
+    "title": {
+      "ar": "سجل الدفعات",
+      "en": "Payment History",
+    },
+  },
+  "qrCaption": "Scan to verify this invoice",
+  "qrPayload": "INVOICE:INV-2026-0042 TOTAL:1,512.00 AED DATE:13/06/2026",
+  "signatures": [
+    {
+      "ar": "التوقيع المعتمد",
+      "en": "Authorized Signature",
+    },
+    {
+      "ar": "توقيع العميل",
+      "en": "Customer Signature",
+    },
+  ],
+  "taxSummary": undefined,
+  "terms": {
+    "blocks": [
+      {
+        "body": "Net 14 days from the invoice date.",
+        "format": "html",
+        "title": {
+          "ar": "شروط الفاتورة",
+          "en": "Invoice Terms",
+        },
+      },
+      {
+        "body": "Thank you for trusting our lab with your data recovery.",
+        "title": {
+          "ar": "ملاحظات",
+          "en": "Notes",
+        },
+      },
+    ],
+    "title": {
+      "ar": "شروط الفاتورة",
+      "en": "Invoice Terms",
+    },
+  },
+  "totals": [
+    {
+      "key": "subtotal",
+      "label": {
+        "ar": "المجموع الفرعي:",
+        "en": "Subtotal:",
+      },
+      "value": "1,440.00 AED",
+    },
+    {
+      "key": "discount",
+      "label": {
+        "ar": "الخصم:",
+        "en": "Discount:",
+      },
+      "value": "- 100.00 AED",
+    },
+    {
+      "key": "netAmount",
+      "label": {
+        "ar": "صافي المبلغ:",
+        "en": "Net Amount:",
+      },
+      "value": "1,340.00 AED",
+    },
+    {
+      "key": "tax",
+      "label": {
+        "ar": "VAT 5%:",
+        "en": "VAT 5%:",
+      },
+      "value": "72.00 AED",
+    },
+    {
+      "emphasis": true,
+      "key": "total",
+      "label": {
+        "ar": "الإجمالي:",
+        "en": "Total:",
+      },
+      "value": "1,512.00 AED",
+    },
+    {
+      "key": "amountPaid",
+      "label": {
+        "ar": "المبلغ المدفوع:",
+        "en": "Amount Paid:",
+      },
+      "value": "470.00 AED",
+    },
+    {
+      "key": "balanceDue",
+      "label": {
+        "ar": "الرصيد المستحق:",
+        "en": "Balance Due:",
+      },
+      "value": "1,000.00 AED",
+    },
+  ],
+  "zatcaPayload": null,
+}
+`;
+
+exports[`Phase 2 compliance matrix > 'SA' quote resolves QUOTATION + component rows > SA-quote 1`] = `
+{
+  "bank": {
+    "rows": [
+      {
+        "label": {
+          "ar": "اسم الحساب:",
+          "en": "Account Name:",
+        },
+        "value": "Acme Data Recovery LLC",
+      },
+      {
+        "label": {
+          "ar": "رقم الحساب:",
+          "en": "Account No:",
+        },
+        "value": "0123456789",
+      },
+      {
+        "label": {
+          "ar": "البنك:",
+          "en": "Bank:",
+        },
+        "value": "First National Bank",
+      },
+      {
+        "label": {
+          "ar": "الآيبان:",
+          "en": "IBAN:",
+        },
+        "value": "AE12 0000 0000 0123 4567 89",
+      },
+      {
+        "label": {
+          "ar": "سويفت:",
+          "en": "SWIFT:",
+        },
+        "value": "FNBKAEXX",
+      },
+    ],
+    "title": {
+      "ar": "تفاصيل البنك",
+      "en": "Bank Account",
+    },
+  },
+  "documentTitle": {
+    "ar": "عرض سعر",
+    "en": "QUOTATION",
+  },
+  "identity": {
+    "basic_info": {
+      "company_name": "Acme Data Recovery",
+      "legal_name": "Acme Data Recovery LLC",
+    },
+    "branding": {
+      "brand_tagline": "Recovered. Verified. Delivered.",
+    },
+    "contact_info": {
+      "email_general": "lab@acme.test",
+      "phone_primary": "+971 4 123 4567",
+    },
+    "location": {
+      "address_line1": "12 Lab Street",
+      "city": "Dubai",
+      "country": "United Arab Emirates",
+    },
+    "online_presence": {
+      "website": "https://acme.test",
+    },
+  },
+  "lineItems": {
+    "columns": [
+      {
+        "align": "left",
+        "key": "description",
+        "label": {
+          "ar": "الوصف",
+          "en": "Description",
+        },
+        "visible": true,
+        "width": 220,
+      },
+      {
+        "align": "center",
+        "key": "quantity",
+        "label": {
+          "ar": "الكمية",
+          "en": "Qty",
+        },
+        "visible": true,
+        "width": 40,
+      },
+      {
+        "align": "center",
+        "key": "itemCode",
+        "label": {
+          "ar": "الرمز",
+          "en": "Code",
+        },
+        "visible": false,
+        "width": 50,
+      },
+      {
+        "align": "center",
+        "key": "unit",
+        "label": {
+          "ar": "الوحدة",
+          "en": "Unit",
+        },
+        "visible": false,
+        "width": 45,
+      },
+      {
+        "align": "right",
+        "key": "unitPrice",
+        "label": {
+          "ar": "سعر الوحدة",
+          "en": "Unit Price",
+        },
+        "visible": true,
+      },
+      {
+        "align": "right",
+        "key": "lineTotal",
+        "label": {
+          "ar": "المجموع",
+          "en": "Total",
+        },
+        "visible": true,
+      },
+    ],
+    "rows": [
+      {
+        "description": "RAID-5 logical recovery",
+        "itemCode": "-",
+        "lineTotal": "1,000.00 AED",
+        "quantity": "1",
+        "unit": "-",
+        "unitPrice": "1,000.00 AED",
+      },
+      {
+        "description": "Donor drive sourcing",
+        "itemCode": "-",
+        "lineTotal": "500.00 AED",
+        "quantity": "2",
+        "unit": "-",
+        "unitPrice": "250.00 AED",
+      },
+    ],
+  },
+  "meta": [
+    {
+      "label": {
+        "ar": "رقم العرض:",
+        "en": "Quote No:",
+      },
+      "value": "QUO-2026-0042",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الإنشاء:",
+        "en": "Created Date:",
+      },
+      "value": "13/06/2026",
+    },
+    {
+      "label": {
+        "ar": "تاريخ الانتهاء:",
+        "en": "Expiry Date:",
+      },
+      "value": "13/07/2026",
+    },
+    {
+      "label": {
+        "ar": "رقم المهمة:",
+        "en": "Job ID:",
+      },
+      "value": "CASE-0007",
+    },
+  ],
+  "parties": {
+    "to": {
+      "name": "Jane Client",
+      "rows": [
+        {
+          "label": {
+            "ar": "الهاتف:",
+            "en": "Phone:",
+          },
+          "value": "+971 50 123 4567",
+        },
+        {
+          "label": {
+            "ar": "البريد:",
+            "en": "Email:",
+          },
+          "value": "jane@client.test",
+        },
+        {
+          "label": {
+            "ar": "المرجع:",
+            "en": "Reference:",
+          },
+          "value": "PO-9001",
+        },
+      ],
+      "title": {
+        "ar": "معلومات العميل",
+        "en": "Customer Information",
+      },
+    },
+  },
+  "paymentHistory": null,
+  "qrCaption": "Scan to verify this quote",
+  "qrPayload": "QUOTE:QUO-2026-0042 TOTAL:1,512.00 AED VALID:13/07/2026",
+  "signatures": [
+    {
+      "ar": "التوقيع المعتمد",
+      "en": "Authorized Signature",
+    },
+    {
+      "ar": "موافقة العميل",
+      "en": "Customer Acceptance",
+    },
+  ],
+  "taxSummary": undefined,
+  "terms": {
+    "blocks": [
+      {
+        "body": "Quote valid for 30 days. 50% advance required to begin.",
+        "title": {
+          "ar": "شروط العرض",
+          "en": "Quote Terms",
+        },
+      },
+      {
+        "body": "Diagnostics are non-destructive.",
+        "title": {
+          "ar": "ملاحظات",
+          "en": "Notes",
+        },
+      },
+    ],
+    "title": {
+      "ar": "شروط العرض",
+      "en": "Quote Terms",
+    },
+  },
+  "totals": [
+    {
+      "key": "subtotal",
+      "label": {
+        "ar": "المجموع الفرعي:",
+        "en": "Subtotal:",
+      },
+      "value": "1,440.00 AED",
+    },
+    {
+      "key": "discount",
+      "label": {
+        "ar": "الخصم:",
+        "en": "Discount:",
+      },
+      "value": "- 100.00 AED",
+    },
+    {
+      "key": "netAmount",
+      "label": {
+        "ar": "صافي المبلغ:",
+        "en": "Net Amount:",
+      },
+      "value": "1,340.00 AED",
+    },
+    {
+      "key": "tax",
+      "label": {
+        "ar": "VAT 5%:",
+        "en": "VAT 5%:",
+      },
+      "value": "72.00 AED",
+    },
+    {
+      "emphasis": true,
+      "key": "total",
+      "label": {
+        "ar": "الإجمالي:",
+        "en": "Total:",
+      },
+      "value": "1,512.00 AED",
+    },
+  ],
+}
+`;
+
+exports[`Phase 2 compliance matrix > OM RTL bilingual PDF content tree snapshot > OM-invoice-rtl-content 1`] = `
+[
+  {
+    "margin": [
+      0,
+      0,
+      0,
+      12,
+    ],
+    "stack": [
+      {
+        "alignment": "center",
+        "bold": true,
+        "color": "#1e293b",
+        "fontSize": 16.8,
+        "text": "Acme Data Recovery LLC",
+      },
+      {
+        "alignment": "center",
+        "color": "#64748b",
+        "fontSize": 9.6,
+        "lineHeight": 1.1,
+        "margin": [
+          0,
+          2,
+          0,
+          0,
+        ],
+        "text": "12 Lab Street, Dubai, United Arab Emirates",
+      },
+      {
+        "alignment": "center",
+        "color": "#64748b",
+        "fontSize": 9.6,
+        "lineHeight": 1.1,
+        "margin": [
+          0,
+          0,
+          0,
+          0,
+        ],
+        "text": "Tel: +971 4 123 4567",
+      },
+      {
+        "alignment": "center",
+        "color": "#64748b",
+        "fontSize": 9.6,
+        "lineHeight": 1.1,
+        "margin": [
+          0,
+          0,
+          0,
+          0,
+        ],
+        "text": "Email: lab@acme.test",
+      },
+    ],
+  },
+  {
+    "canvas": [
+      {
+        "lineColor": "#162660",
+        "lineWidth": 0.5,
+        "type": "line",
+        "x1": 0,
+        "x2": 525,
+        "y1": 0,
+        "y2": 0,
+      },
+    ],
+    "margin": [
+      0,
+      0,
+      0,
+      12,
+    ],
+  },
+  {
+    "alignment": "center",
+    "bold": true,
+    "color": "#1E3A5F",
+    "fontSize": 19.2,
+    "margin": [
+      0,
+      0,
+      0,
+      6,
+    ],
+    "text": "فاتورة ضريبية
+TAX INVOICE",
+  },
+  {
+    "layout": {
+      "hLineColor": [Function],
+      "hLineWidth": [Function],
+      "vLineColor": [Function],
+      "vLineWidth": [Function],
+    },
+    "margin": [
+      0,
+      0,
+      0,
+      8,
+    ],
+    "table": {
+      "body": [
+        [
+          {
+            "columnGap": 6,
+            "columns": [
+              {
+                "height": 13,
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  0,
+                ],
+                "svg": "<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M 14 2 L 6 2 C 4.9 2 4 2.9 4 4 L 4 20 C 4 21.1 4.9 22 6 22 L 18 22 C 19.1 22 20 21.1 20 20 L 20 8 Z" fill="none" stroke="#4A5568" stroke-width="2"/>
+    <path d="M 14 2 L 14 8 L 20 8" fill="none" stroke="#4A5568" stroke-width="2"/>
+    <line x1="8" y1="13" x2="16" y2="13" stroke="#4A5568" stroke-width="2"/>
+    <line x1="8" y1="17" x2="16" y2="17" stroke="#4A5568" stroke-width="2"/>
+  </svg>",
+                "width": 13,
+              },
+              {
+                "color": "#162660",
+                "style": "bilingualHeader",
+                "text": "Details",
+                "width": "auto",
+              },
+              {
+                "text": "",
+                "width": "*",
+              },
+              {
+                "alignment": "right",
+                "color": "#162660",
+                "style": "bilingualHeader",
+                "text": "التفاصيل",
+                "width": "auto",
+              },
+            ],
+            "fillColor": "#f8fafc",
+            "margin": [
+              6,
+              4,
+              6,
+              4,
+            ],
+          },
+          {
+            "columnGap": 6,
+            "columns": [
+              {
+                "height": 13,
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  0,
+                ],
+                "svg": "<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="7" r="4" fill="none" stroke="#4A5568" stroke-width="2"/>
+    <path d="M 5 20 C 5 16 8 14 12 14 C 16 14 19 16 19 20" fill="none" stroke="#4A5568" stroke-width="2"/>
+  </svg>",
+                "width": 13,
+              },
+              {
+                "color": "#162660",
+                "style": "bilingualHeader",
+                "text": "Customer Information",
+                "width": "auto",
+              },
+              {
+                "text": "",
+                "width": "*",
+              },
+              {
+                "alignment": "right",
+                "color": "#162660",
+                "style": "bilingualHeader",
+                "text": "العميل معلومات",
+                "width": "auto",
+              },
+            ],
+            "fillColor": "#f8fafc",
+            "margin": [
+              6,
+              4,
+              6,
+              4,
+            ],
+          },
+        ],
+        [
+          {
+            "margin": [
+              8,
+              5,
+              8,
+              6,
+            ],
+            "stack": [
+              {
+                "columns": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 9.6,
+                    "text": "رقم الفاتورة:
+Invoice No:",
+                    "width": 150,
+                  },
+                  {
+                    "color": "#1e293b",
+                    "fontSize": 10.8,
+                    "text": "INV-2026-0042",
+                    "width": "*",
+                  },
+                ],
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  2,
+                ],
+              },
+              {
+                "columns": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 9.6,
+                    "text": "تاريخ الفاتورة:
+Invoice Date:",
+                    "width": 150,
+                  },
+                  {
+                    "color": "#1e293b",
+                    "fontSize": 10.8,
+                    "text": "13/06/2026",
+                    "width": "*",
+                  },
+                ],
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  2,
+                ],
+              },
+              {
+                "columns": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 9.6,
+                    "text": "تاريخ الاستحقاق:
+Due Date:",
+                    "width": 150,
+                  },
+                  {
+                    "color": "#1e293b",
+                    "fontSize": 10.8,
+                    "text": "27/06/2026",
+                    "width": "*",
+                  },
+                ],
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  2,
+                ],
+              },
+              {
+                "columns": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 9.6,
+                    "text": "رقم المهمة:
+Job ID:",
+                    "width": 150,
+                  },
+                  {
+                    "color": "#1e293b",
+                    "fontSize": 10.8,
+                    "text": "CASE-0007",
+                    "width": "*",
+                  },
+                ],
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  2,
+                ],
+              },
+            ],
+          },
+          {
+            "margin": [
+              8,
+              5,
+              8,
+              6,
+            ],
+            "stack": [
+              {
+                "columns": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 9.6,
+                    "text": "الاسم:
+Name:",
+                    "width": 150,
+                  },
+                  {
+                    "color": "#1e293b",
+                    "fontSize": 10.8,
+                    "text": "Jane Client",
+                    "width": "*",
+                  },
+                ],
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  2,
+                ],
+              },
+              {
+                "columns": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 9.6,
+                    "text": "الهاتف:
+Phone:",
+                    "width": 150,
+                  },
+                  {
+                    "color": "#1e293b",
+                    "fontSize": 10.8,
+                    "text": "+971 50 123 4567",
+                    "width": "*",
+                  },
+                ],
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  2,
+                ],
+              },
+              {
+                "columns": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 9.6,
+                    "text": "البريد:
+Email:",
+                    "width": 150,
+                  },
+                  {
+                    "color": "#1e293b",
+                    "fontSize": 10.8,
+                    "text": "jane@client.test",
+                    "width": "*",
+                  },
+                ],
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  2,
+                ],
+              },
+              {
+                "columns": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 9.6,
+                    "text": "المرجع:
+Reference:",
+                    "width": 150,
+                  },
+                  {
+                    "color": "#1e293b",
+                    "fontSize": 10.8,
+                    "text": "PO-9001",
+                    "width": "*",
+                  },
+                ],
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  2,
+                ],
+              },
+            ],
+          },
+        ],
+      ],
+      "widths": [
+        "*",
+        "*",
+      ],
+    },
+  },
+  {
+    "stack": [
+      {
+        "columnGap": 6,
+        "columns": [
+          {
+            "text": "",
+            "width": 0,
+          },
+          {
+            "style": "bilingualHeader",
+            "text": "Line Items",
+            "width": "auto",
+          },
+          {
+            "text": "",
+            "width": "*",
+          },
+          {
+            "alignment": "right",
+            "style": "bilingualHeader",
+            "text": "البنود",
+            "width": "auto",
+          },
+        ],
+        "margin": [
+          0,
+          4,
+          0,
+          5,
+        ],
+      },
+      {
+        "layout": {
+          "hLineColor": [Function],
+          "hLineWidth": [Function],
+          "vLineColor": [Function],
+          "vLineWidth": [Function],
+        },
+        "margin": [
+          0,
+          0,
+          0,
+          8,
+        ],
+        "table": {
+          "body": [
+            [
+              {
+                "alignment": "left",
+                "color": "#1e293b",
+                "fillColor": "#F1F5F9",
+                "style": "tableHeader",
+                "text": "المجموع
+Total",
+              },
+              {
+                "alignment": "left",
+                "color": "#1e293b",
+                "fillColor": "#F1F5F9",
+                "style": "tableHeader",
+                "text": "سعر الوحدة
+Unit Price",
+              },
+              {
+                "alignment": "center",
+                "color": "#1e293b",
+                "fillColor": "#F1F5F9",
+                "style": "tableHeader",
+                "text": "الكمية
+Qty",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fillColor": "#F1F5F9",
+                "style": "tableHeader",
+                "text": "الوصف
+Description",
+              },
+            ],
+            [
+              {
+                "style": "tableCell",
+                "text": "1,000.000 AED",
+              },
+              {
+                "style": "tableCell",
+                "text": "1,000.000 AED",
+              },
+              {
+                "style": "tableCellCenter",
+                "text": "1",
+              },
+              {
+                "style": "tableCellRight",
+                "text": "RAID-5 logical recovery",
+              },
+            ],
+            [
+              {
+                "style": "tableCell",
+                "text": "500.000 AED",
+              },
+              {
+                "style": "tableCell",
+                "text": "250.000 AED",
+              },
+              {
+                "style": "tableCellCenter",
+                "text": "2",
+              },
+              {
+                "style": "tableCellRight",
+                "text": "Donor drive sourcing",
+              },
+            ],
+          ],
+          "headerRows": 1,
+          "widths": [
+            "*",
+            "*",
+            40,
+            220,
+          ],
+        },
+      },
+    ],
+  },
+  {
+    "layout": {
+      "fillColor": [Function],
+      "hLineColor": [Function],
+      "hLineWidth": [Function],
+      "vLineColor": [Function],
+      "vLineWidth": [Function],
+    },
+    "margin": [
+      280,
+      8,
+      0,
+      8,
+    ],
+    "table": {
+      "body": [
+        [
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#64748b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": [
+              {
+                "font": "Tajawal",
+                "text": "المجموع الفرعي:",
+              },
+              {
+                "font": "Roboto",
+                "text": " | ",
+              },
+              {
+                "font": "Roboto",
+                "text": "Subtotal:",
+              },
+            ],
+          },
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#1e293b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": "1,440.000 AED",
+          },
+        ],
+        [
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#64748b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": [
+              {
+                "font": "Tajawal",
+                "text": "الخصم:",
+              },
+              {
+                "font": "Roboto",
+                "text": " | ",
+              },
+              {
+                "font": "Roboto",
+                "text": "Discount:",
+              },
+            ],
+          },
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#1e293b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": "- 100.000 AED",
+          },
+        ],
+        [
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#64748b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": [
+              {
+                "font": "Tajawal",
+                "text": "صافي المبلغ:",
+              },
+              {
+                "font": "Roboto",
+                "text": " | ",
+              },
+              {
+                "font": "Roboto",
+                "text": "Net Amount:",
+              },
+            ],
+          },
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#1e293b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": "1,340.000 AED",
+          },
+        ],
+        [
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#64748b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": [
+              {
+                "font": "Tajawal",
+                "text": "VAT 5%:",
+              },
+              {
+                "font": "Roboto",
+                "text": " | ",
+              },
+              {
+                "font": "Roboto",
+                "text": "VAT 5%:",
+              },
+            ],
+          },
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#1e293b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": "72.000 AED",
+          },
+        ],
+        [
+          {
+            "alignment": "right",
+            "bold": true,
+            "color": "#1e293b",
+            "fontSize": 12.6,
+            "margin": [
+              0,
+              5,
+              8,
+              5,
+            ],
+            "text": [
+              {
+                "font": "Tajawal",
+                "text": "الإجمالي:",
+              },
+              {
+                "font": "Roboto",
+                "text": " | ",
+              },
+              {
+                "font": "Roboto",
+                "text": "Total:",
+              },
+            ],
+          },
+          {
+            "alignment": "right",
+            "bold": true,
+            "color": "#162660",
+            "fontSize": 14.4,
+            "margin": [
+              0,
+              5,
+              8,
+              5,
+            ],
+            "text": "1,512.000 AED",
+          },
+        ],
+        [
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#64748b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": [
+              {
+                "font": "Tajawal",
+                "text": "المبلغ المدفوع:",
+              },
+              {
+                "font": "Roboto",
+                "text": " | ",
+              },
+              {
+                "font": "Roboto",
+                "text": "Amount Paid:",
+              },
+            ],
+          },
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#1e293b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": "470.000 AED",
+          },
+        ],
+        [
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#64748b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": [
+              {
+                "font": "Tajawal",
+                "text": "الرصيد المستحق:",
+              },
+              {
+                "font": "Roboto",
+                "text": " | ",
+              },
+              {
+                "font": "Roboto",
+                "text": "Balance Due:",
+              },
+            ],
+          },
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#1e293b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": "1,000.000 AED",
+          },
+        ],
+      ],
+      "widths": [
+        "*",
+        "auto",
+      ],
+    },
+  },
+  {
+    "margin": [
+      0,
+      10,
+      0,
+      0,
+    ],
+    "stack": [
+      {
+        "bold": true,
+        "color": "#1e293b",
+        "fontSize": 12,
+        "margin": [
+          0,
+          0,
+          0,
+          4,
+        ],
+        "text": "سجل الدفعات
+Payment History",
+      },
+      {
+        "layout": {
+          "fillColor": [Function],
+          "hLineColor": [Function],
+          "hLineWidth": [Function],
+          "vLineWidth": [Function],
+        },
+        "table": {
+          "body": [
+            [
+              {
+                "alignment": "left",
+                "bold": true,
+                "color": "#64748b",
+                "fontSize": 9.6,
+                "text": "الرصيد
+Balance",
+              },
+              {
+                "alignment": "left",
+                "bold": true,
+                "color": "#64748b",
+                "fontSize": 9.6,
+                "text": "المبلغ
+Amount",
+              },
+              {
+                "alignment": "right",
+                "bold": true,
+                "color": "#64748b",
+                "fontSize": 9.6,
+                "text": "سجلها
+Recorded By",
+              },
+              {
+                "alignment": "right",
+                "bold": true,
+                "color": "#64748b",
+                "fontSize": 9.6,
+                "text": "المرجع
+Reference",
+              },
+              {
+                "alignment": "right",
+                "bold": true,
+                "color": "#64748b",
+                "fontSize": 9.6,
+                "text": "الطريقة
+Method",
+              },
+              {
+                "alignment": "right",
+                "bold": true,
+                "color": "#64748b",
+                "fontSize": 9.6,
+                "text": "المستند
+Document",
+              },
+              {
+                "alignment": "right",
+                "bold": true,
+                "color": "#64748b",
+                "fontSize": 9.6,
+                "text": "التاريخ
+Date",
+              },
+            ],
+            [
+              {
+                "alignment": "left",
+                "bold": true,
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "1,170.000 AED",
+              },
+              {
+                "alignment": "left",
+                "color": "#22c55e",
+                "fontSize": 9.6,
+                "text": "300.000 AED",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "Alex Accounts",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "TRX-1001",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "Bank Transfer",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "RCPT-0001",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "14/06/2026",
+              },
+            ],
+            [
+              {
+                "alignment": "left",
+                "bold": true,
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "1,000.000 AED",
+              },
+              {
+                "alignment": "left",
+                "color": "#22c55e",
+                "fontSize": 9.6,
+                "text": "170.000 AED",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "Alex Accounts",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "CASH-9",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "Cash",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "RCPT-0002",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "15/06/2026",
+              },
+            ],
+          ],
+          "headerRows": 1,
+          "widths": [
+            "auto",
+            "auto",
+            "auto",
+            "*",
+            "auto",
+            "auto",
+            "auto",
+          ],
+        },
+      },
+    ],
+  },
+  {
+    "margin": [
+      0,
+      8,
+      0,
+      0,
+    ],
+    "stack": [
+      {
+        "layout": {
+          "hLineColor": [Function],
+          "hLineWidth": [Function],
+          "vLineColor": [Function],
+          "vLineWidth": [Function],
+        },
+        "table": {
+          "body": [
+            [
+              {
+                "columnGap": 6,
+                "columns": [
+                  {
+                    "text": "",
+                    "width": 0,
+                  },
+                  {
+                    "color": "#162660",
+                    "style": "bilingualHeader",
+                    "text": "Invoice Terms",
+                    "width": "auto",
+                  },
+                  {
+                    "text": "",
+                    "width": "*",
+                  },
+                  {
+                    "alignment": "right",
+                    "color": "#162660",
+                    "style": "bilingualHeader",
+                    "text": "الفاتورة شروط",
+                    "width": "auto",
+                  },
+                ],
+                "fillColor": "#f8fafc",
+                "margin": [
+                  6,
+                  4,
+                  6,
+                  4,
+                ],
+              },
+            ],
+            [
+              {
+                "margin": [
+                  8,
+                  5,
+                  8,
+                  6,
+                ],
+                "stack": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 10.8,
+                    "lineHeight": 1.3,
+                    "stack": [
+                      {
+                        "text": "Net 14 days from the invoice date.",
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          ],
+          "widths": [
+            "*",
+          ],
+        },
+      },
+      {
+        "margin": [
+          0,
+          4,
+          0,
+          0,
+        ],
+        "text": "",
+      },
+      {
+        "layout": {
+          "hLineColor": [Function],
+          "hLineWidth": [Function],
+          "vLineColor": [Function],
+          "vLineWidth": [Function],
+        },
+        "table": {
+          "body": [
+            [
+              {
+                "columnGap": 6,
+                "columns": [
+                  {
+                    "text": "",
+                    "width": 0,
+                  },
+                  {
+                    "color": "#162660",
+                    "style": "bilingualHeader",
+                    "text": "Notes",
+                    "width": "auto",
+                  },
+                  {
+                    "text": "",
+                    "width": "*",
+                  },
+                  {
+                    "alignment": "right",
+                    "color": "#162660",
+                    "style": "bilingualHeader",
+                    "text": "ملاحظات",
+                    "width": "auto",
+                  },
+                ],
+                "fillColor": "#f8fafc",
+                "margin": [
+                  6,
+                  4,
+                  6,
+                  4,
+                ],
+              },
+            ],
+            [
+              {
+                "margin": [
+                  8,
+                  5,
+                  8,
+                  6,
+                ],
+                "stack": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 10.8,
+                    "lineHeight": 1.3,
+                    "text": "Thank you for trusting our lab with your data recovery.",
+                  },
+                ],
+              },
+            ],
+          ],
+          "widths": [
+            "*",
+          ],
+        },
+      },
+    ],
+  },
+  {
+    "margin": [
+      0,
+      8,
+      0,
+      0,
+    ],
+    "stack": [
+      {
+        "columns": [
+          {
+            "stack": [
+              {
+                "layout": {
+                  "hLineColor": [Function],
+                  "hLineWidth": [Function],
+                  "vLineColor": [Function],
+                  "vLineWidth": [Function],
+                },
+                "table": {
+                  "body": [
+                    [
+                      {
+                        "columnGap": 6,
+                        "columns": [
+                          {
+                            "color": "#162660",
+                            "style": "bilingualHeader",
+                            "text": "Bank Account",
+                            "width": "auto",
+                          },
+                          {
+                            "text": "",
+                            "width": "*",
+                          },
+                          {
+                            "alignment": "right",
+                            "color": "#162660",
+                            "style": "bilingualHeader",
+                            "text": "البنك تفاصيل",
+                            "width": "auto",
+                          },
+                        ],
+                        "fillColor": "#f8fafc",
+                        "margin": [
+                          6,
+                          4,
+                          6,
+                          4,
+                        ],
+                      },
+                    ],
+                    [
+                      {
+                        "margin": [
+                          6,
+                          3,
+                          6,
+                          4,
+                        ],
+                        "stack": [
+                          {
+                            "color": "#1e293b",
+                            "fontSize": 10.8,
+                            "margin": [
+                              0,
+                              0.5,
+                              0,
+                              0.5,
+                            ],
+                            "text": "Account Name: Acme Data Recovery LLC",
+                          },
+                          {
+                            "color": "#1e293b",
+                            "fontSize": 10.8,
+                            "margin": [
+                              0,
+                              0.5,
+                              0,
+                              0.5,
+                            ],
+                            "text": "Account No: 0123456789",
+                          },
+                          {
+                            "color": "#1e293b",
+                            "fontSize": 10.8,
+                            "margin": [
+                              0,
+                              0.5,
+                              0,
+                              0.5,
+                            ],
+                            "text": "Bank: First National Bank",
+                          },
+                          {
+                            "color": "#1e293b",
+                            "fontSize": 10.8,
+                            "margin": [
+                              0,
+                              0.5,
+                              0,
+                              0.5,
+                            ],
+                            "text": "IBAN: AE12 0000 0000 0123 4567 89",
+                          },
+                          {
+                            "color": "#1e293b",
+                            "fontSize": 10.8,
+                            "margin": [
+                              0,
+                              0.5,
+                              0,
+                              0.5,
+                            ],
+                            "text": "SWIFT: FNBKAEXX",
+                          },
+                        ],
+                      },
+                    ],
+                  ],
+                  "widths": [
+                    "auto",
+                  ],
+                },
+              },
+            ],
+            "width": "auto",
+          },
+          {
+            "text": "",
+            "width": "*",
+          },
+        ],
+      },
+    ],
+  },
+]
+`;
+
+exports[`Phase 2 compliance matrix > SA RTL bilingual PDF content tree snapshot > SA-invoice-rtl-content 1`] = `
+[
+  {
+    "margin": [
+      0,
+      0,
+      0,
+      12,
+    ],
+    "stack": [
+      {
+        "alignment": "center",
+        "bold": true,
+        "color": "#1e293b",
+        "fontSize": 16.8,
+        "text": "Acme Data Recovery LLC",
+      },
+      {
+        "alignment": "center",
+        "color": "#64748b",
+        "fontSize": 9.6,
+        "lineHeight": 1.1,
+        "margin": [
+          0,
+          2,
+          0,
+          0,
+        ],
+        "text": "12 Lab Street, Dubai, United Arab Emirates",
+      },
+      {
+        "alignment": "center",
+        "color": "#64748b",
+        "fontSize": 9.6,
+        "lineHeight": 1.1,
+        "margin": [
+          0,
+          0,
+          0,
+          0,
+        ],
+        "text": "Tel: +971 4 123 4567",
+      },
+      {
+        "alignment": "center",
+        "color": "#64748b",
+        "fontSize": 9.6,
+        "lineHeight": 1.1,
+        "margin": [
+          0,
+          0,
+          0,
+          0,
+        ],
+        "text": "Email: lab@acme.test",
+      },
+    ],
+  },
+  {
+    "canvas": [
+      {
+        "lineColor": "#162660",
+        "lineWidth": 0.5,
+        "type": "line",
+        "x1": 0,
+        "x2": 525,
+        "y1": 0,
+        "y2": 0,
+      },
+    ],
+    "margin": [
+      0,
+      0,
+      0,
+      12,
+    ],
+  },
+  {
+    "alignment": "center",
+    "bold": true,
+    "color": "#1E3A5F",
+    "fontSize": 19.2,
+    "margin": [
+      0,
+      0,
+      0,
+      6,
+    ],
+    "text": "فاتورة ضريبية
+TAX INVOICE",
+  },
+  {
+    "layout": {
+      "hLineColor": [Function],
+      "hLineWidth": [Function],
+      "vLineColor": [Function],
+      "vLineWidth": [Function],
+    },
+    "margin": [
+      0,
+      0,
+      0,
+      8,
+    ],
+    "table": {
+      "body": [
+        [
+          {
+            "columnGap": 6,
+            "columns": [
+              {
+                "height": 13,
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  0,
+                ],
+                "svg": "<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M 14 2 L 6 2 C 4.9 2 4 2.9 4 4 L 4 20 C 4 21.1 4.9 22 6 22 L 18 22 C 19.1 22 20 21.1 20 20 L 20 8 Z" fill="none" stroke="#4A5568" stroke-width="2"/>
+    <path d="M 14 2 L 14 8 L 20 8" fill="none" stroke="#4A5568" stroke-width="2"/>
+    <line x1="8" y1="13" x2="16" y2="13" stroke="#4A5568" stroke-width="2"/>
+    <line x1="8" y1="17" x2="16" y2="17" stroke="#4A5568" stroke-width="2"/>
+  </svg>",
+                "width": 13,
+              },
+              {
+                "color": "#162660",
+                "style": "bilingualHeader",
+                "text": "Details",
+                "width": "auto",
+              },
+              {
+                "text": "",
+                "width": "*",
+              },
+              {
+                "alignment": "right",
+                "color": "#162660",
+                "style": "bilingualHeader",
+                "text": "التفاصيل",
+                "width": "auto",
+              },
+            ],
+            "fillColor": "#f8fafc",
+            "margin": [
+              6,
+              4,
+              6,
+              4,
+            ],
+          },
+          {
+            "columnGap": 6,
+            "columns": [
+              {
+                "height": 13,
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  0,
+                ],
+                "svg": "<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="7" r="4" fill="none" stroke="#4A5568" stroke-width="2"/>
+    <path d="M 5 20 C 5 16 8 14 12 14 C 16 14 19 16 19 20" fill="none" stroke="#4A5568" stroke-width="2"/>
+  </svg>",
+                "width": 13,
+              },
+              {
+                "color": "#162660",
+                "style": "bilingualHeader",
+                "text": "Customer Information",
+                "width": "auto",
+              },
+              {
+                "text": "",
+                "width": "*",
+              },
+              {
+                "alignment": "right",
+                "color": "#162660",
+                "style": "bilingualHeader",
+                "text": "العميل معلومات",
+                "width": "auto",
+              },
+            ],
+            "fillColor": "#f8fafc",
+            "margin": [
+              6,
+              4,
+              6,
+              4,
+            ],
+          },
+        ],
+        [
+          {
+            "margin": [
+              8,
+              5,
+              8,
+              6,
+            ],
+            "stack": [
+              {
+                "columns": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 9.6,
+                    "text": "رقم الفاتورة:
+Invoice No:",
+                    "width": 150,
+                  },
+                  {
+                    "color": "#1e293b",
+                    "fontSize": 10.8,
+                    "text": "INV-2026-0042",
+                    "width": "*",
+                  },
+                ],
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  2,
+                ],
+              },
+              {
+                "columns": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 9.6,
+                    "text": "تاريخ الفاتورة:
+Invoice Date:",
+                    "width": 150,
+                  },
+                  {
+                    "color": "#1e293b",
+                    "fontSize": 10.8,
+                    "text": "13/06/2026",
+                    "width": "*",
+                  },
+                ],
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  2,
+                ],
+              },
+              {
+                "columns": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 9.6,
+                    "text": "تاريخ الاستحقاق:
+Due Date:",
+                    "width": 150,
+                  },
+                  {
+                    "color": "#1e293b",
+                    "fontSize": 10.8,
+                    "text": "27/06/2026",
+                    "width": "*",
+                  },
+                ],
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  2,
+                ],
+              },
+              {
+                "columns": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 9.6,
+                    "text": "رقم المهمة:
+Job ID:",
+                    "width": 150,
+                  },
+                  {
+                    "color": "#1e293b",
+                    "fontSize": 10.8,
+                    "text": "CASE-0007",
+                    "width": "*",
+                  },
+                ],
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  2,
+                ],
+              },
+            ],
+          },
+          {
+            "margin": [
+              8,
+              5,
+              8,
+              6,
+            ],
+            "stack": [
+              {
+                "columns": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 9.6,
+                    "text": "الاسم:
+Name:",
+                    "width": 150,
+                  },
+                  {
+                    "color": "#1e293b",
+                    "fontSize": 10.8,
+                    "text": "Jane Client",
+                    "width": "*",
+                  },
+                ],
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  2,
+                ],
+              },
+              {
+                "columns": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 9.6,
+                    "text": "الهاتف:
+Phone:",
+                    "width": 150,
+                  },
+                  {
+                    "color": "#1e293b",
+                    "fontSize": 10.8,
+                    "text": "+971 50 123 4567",
+                    "width": "*",
+                  },
+                ],
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  2,
+                ],
+              },
+              {
+                "columns": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 9.6,
+                    "text": "البريد:
+Email:",
+                    "width": 150,
+                  },
+                  {
+                    "color": "#1e293b",
+                    "fontSize": 10.8,
+                    "text": "jane@client.test",
+                    "width": "*",
+                  },
+                ],
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  2,
+                ],
+              },
+              {
+                "columns": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 9.6,
+                    "text": "المرجع:
+Reference:",
+                    "width": 150,
+                  },
+                  {
+                    "color": "#1e293b",
+                    "fontSize": 10.8,
+                    "text": "PO-9001",
+                    "width": "*",
+                  },
+                ],
+                "margin": [
+                  0,
+                  0,
+                  0,
+                  2,
+                ],
+              },
+            ],
+          },
+        ],
+      ],
+      "widths": [
+        "*",
+        "*",
+      ],
+    },
+  },
+  {
+    "stack": [
+      {
+        "columnGap": 6,
+        "columns": [
+          {
+            "text": "",
+            "width": 0,
+          },
+          {
+            "style": "bilingualHeader",
+            "text": "Line Items",
+            "width": "auto",
+          },
+          {
+            "text": "",
+            "width": "*",
+          },
+          {
+            "alignment": "right",
+            "style": "bilingualHeader",
+            "text": "البنود",
+            "width": "auto",
+          },
+        ],
+        "margin": [
+          0,
+          4,
+          0,
+          5,
+        ],
+      },
+      {
+        "layout": {
+          "hLineColor": [Function],
+          "hLineWidth": [Function],
+          "vLineColor": [Function],
+          "vLineWidth": [Function],
+        },
+        "margin": [
+          0,
+          0,
+          0,
+          8,
+        ],
+        "table": {
+          "body": [
+            [
+              {
+                "alignment": "left",
+                "color": "#1e293b",
+                "fillColor": "#F1F5F9",
+                "style": "tableHeader",
+                "text": "المجموع
+Total",
+              },
+              {
+                "alignment": "left",
+                "color": "#1e293b",
+                "fillColor": "#F1F5F9",
+                "style": "tableHeader",
+                "text": "سعر الوحدة
+Unit Price",
+              },
+              {
+                "alignment": "center",
+                "color": "#1e293b",
+                "fillColor": "#F1F5F9",
+                "style": "tableHeader",
+                "text": "الكمية
+Qty",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fillColor": "#F1F5F9",
+                "style": "tableHeader",
+                "text": "الوصف
+Description",
+              },
+            ],
+            [
+              {
+                "style": "tableCell",
+                "text": "1,000.00 AED",
+              },
+              {
+                "style": "tableCell",
+                "text": "1,000.00 AED",
+              },
+              {
+                "style": "tableCellCenter",
+                "text": "1",
+              },
+              {
+                "style": "tableCellRight",
+                "text": "RAID-5 logical recovery",
+              },
+            ],
+            [
+              {
+                "style": "tableCell",
+                "text": "500.00 AED",
+              },
+              {
+                "style": "tableCell",
+                "text": "250.00 AED",
+              },
+              {
+                "style": "tableCellCenter",
+                "text": "2",
+              },
+              {
+                "style": "tableCellRight",
+                "text": "Donor drive sourcing",
+              },
+            ],
+          ],
+          "headerRows": 1,
+          "widths": [
+            "*",
+            "*",
+            40,
+            220,
+          ],
+        },
+      },
+    ],
+  },
+  {
+    "layout": {
+      "fillColor": [Function],
+      "hLineColor": [Function],
+      "hLineWidth": [Function],
+      "vLineColor": [Function],
+      "vLineWidth": [Function],
+    },
+    "margin": [
+      280,
+      8,
+      0,
+      8,
+    ],
+    "table": {
+      "body": [
+        [
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#64748b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": [
+              {
+                "font": "Tajawal",
+                "text": "المجموع الفرعي:",
+              },
+              {
+                "font": "Roboto",
+                "text": " | ",
+              },
+              {
+                "font": "Roboto",
+                "text": "Subtotal:",
+              },
+            ],
+          },
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#1e293b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": "1,440.00 AED",
+          },
+        ],
+        [
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#64748b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": [
+              {
+                "font": "Tajawal",
+                "text": "الخصم:",
+              },
+              {
+                "font": "Roboto",
+                "text": " | ",
+              },
+              {
+                "font": "Roboto",
+                "text": "Discount:",
+              },
+            ],
+          },
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#1e293b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": "- 100.00 AED",
+          },
+        ],
+        [
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#64748b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": [
+              {
+                "font": "Tajawal",
+                "text": "صافي المبلغ:",
+              },
+              {
+                "font": "Roboto",
+                "text": " | ",
+              },
+              {
+                "font": "Roboto",
+                "text": "Net Amount:",
+              },
+            ],
+          },
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#1e293b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": "1,340.00 AED",
+          },
+        ],
+        [
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#64748b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": [
+              {
+                "font": "Tajawal",
+                "text": "VAT 5%:",
+              },
+              {
+                "font": "Roboto",
+                "text": " | ",
+              },
+              {
+                "font": "Roboto",
+                "text": "VAT 5%:",
+              },
+            ],
+          },
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#1e293b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": "72.00 AED",
+          },
+        ],
+        [
+          {
+            "alignment": "right",
+            "bold": true,
+            "color": "#1e293b",
+            "fontSize": 12.6,
+            "margin": [
+              0,
+              5,
+              8,
+              5,
+            ],
+            "text": [
+              {
+                "font": "Tajawal",
+                "text": "الإجمالي:",
+              },
+              {
+                "font": "Roboto",
+                "text": " | ",
+              },
+              {
+                "font": "Roboto",
+                "text": "Total:",
+              },
+            ],
+          },
+          {
+            "alignment": "right",
+            "bold": true,
+            "color": "#162660",
+            "fontSize": 14.4,
+            "margin": [
+              0,
+              5,
+              8,
+              5,
+            ],
+            "text": "1,512.00 AED",
+          },
+        ],
+        [
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#64748b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": [
+              {
+                "font": "Tajawal",
+                "text": "المبلغ المدفوع:",
+              },
+              {
+                "font": "Roboto",
+                "text": " | ",
+              },
+              {
+                "font": "Roboto",
+                "text": "Amount Paid:",
+              },
+            ],
+          },
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#1e293b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": "470.00 AED",
+          },
+        ],
+        [
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#64748b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": [
+              {
+                "font": "Tajawal",
+                "text": "الرصيد المستحق:",
+              },
+              {
+                "font": "Roboto",
+                "text": " | ",
+              },
+              {
+                "font": "Roboto",
+                "text": "Balance Due:",
+              },
+            ],
+          },
+          {
+            "alignment": "right",
+            "bold": false,
+            "color": "#1e293b",
+            "fontSize": 10.8,
+            "margin": [
+              0,
+              2.5,
+              8,
+              2.5,
+            ],
+            "text": "1,000.00 AED",
+          },
+        ],
+      ],
+      "widths": [
+        "*",
+        "auto",
+      ],
+    },
+  },
+  {
+    "margin": [
+      0,
+      10,
+      0,
+      0,
+    ],
+    "stack": [
+      {
+        "bold": true,
+        "color": "#1e293b",
+        "fontSize": 12,
+        "margin": [
+          0,
+          0,
+          0,
+          4,
+        ],
+        "text": "سجل الدفعات
+Payment History",
+      },
+      {
+        "layout": {
+          "fillColor": [Function],
+          "hLineColor": [Function],
+          "hLineWidth": [Function],
+          "vLineWidth": [Function],
+        },
+        "table": {
+          "body": [
+            [
+              {
+                "alignment": "left",
+                "bold": true,
+                "color": "#64748b",
+                "fontSize": 9.6,
+                "text": "الرصيد
+Balance",
+              },
+              {
+                "alignment": "left",
+                "bold": true,
+                "color": "#64748b",
+                "fontSize": 9.6,
+                "text": "المبلغ
+Amount",
+              },
+              {
+                "alignment": "right",
+                "bold": true,
+                "color": "#64748b",
+                "fontSize": 9.6,
+                "text": "سجلها
+Recorded By",
+              },
+              {
+                "alignment": "right",
+                "bold": true,
+                "color": "#64748b",
+                "fontSize": 9.6,
+                "text": "المرجع
+Reference",
+              },
+              {
+                "alignment": "right",
+                "bold": true,
+                "color": "#64748b",
+                "fontSize": 9.6,
+                "text": "الطريقة
+Method",
+              },
+              {
+                "alignment": "right",
+                "bold": true,
+                "color": "#64748b",
+                "fontSize": 9.6,
+                "text": "المستند
+Document",
+              },
+              {
+                "alignment": "right",
+                "bold": true,
+                "color": "#64748b",
+                "fontSize": 9.6,
+                "text": "التاريخ
+Date",
+              },
+            ],
+            [
+              {
+                "alignment": "left",
+                "bold": true,
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "1,170.00 AED",
+              },
+              {
+                "alignment": "left",
+                "color": "#22c55e",
+                "fontSize": 9.6,
+                "text": "300.00 AED",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "Alex Accounts",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "TRX-1001",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "Bank Transfer",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "RCPT-0001",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "14/06/2026",
+              },
+            ],
+            [
+              {
+                "alignment": "left",
+                "bold": true,
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "1,000.00 AED",
+              },
+              {
+                "alignment": "left",
+                "color": "#22c55e",
+                "fontSize": 9.6,
+                "text": "170.00 AED",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "Alex Accounts",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "CASH-9",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "Cash",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "RCPT-0002",
+              },
+              {
+                "alignment": "right",
+                "color": "#1e293b",
+                "fontSize": 9.6,
+                "text": "15/06/2026",
+              },
+            ],
+          ],
+          "headerRows": 1,
+          "widths": [
+            "auto",
+            "auto",
+            "auto",
+            "*",
+            "auto",
+            "auto",
+            "auto",
+          ],
+        },
+      },
+    ],
+  },
+  {
+    "margin": [
+      0,
+      8,
+      0,
+      0,
+    ],
+    "stack": [
+      {
+        "layout": {
+          "hLineColor": [Function],
+          "hLineWidth": [Function],
+          "vLineColor": [Function],
+          "vLineWidth": [Function],
+        },
+        "table": {
+          "body": [
+            [
+              {
+                "columnGap": 6,
+                "columns": [
+                  {
+                    "text": "",
+                    "width": 0,
+                  },
+                  {
+                    "color": "#162660",
+                    "style": "bilingualHeader",
+                    "text": "Invoice Terms",
+                    "width": "auto",
+                  },
+                  {
+                    "text": "",
+                    "width": "*",
+                  },
+                  {
+                    "alignment": "right",
+                    "color": "#162660",
+                    "style": "bilingualHeader",
+                    "text": "الفاتورة شروط",
+                    "width": "auto",
+                  },
+                ],
+                "fillColor": "#f8fafc",
+                "margin": [
+                  6,
+                  4,
+                  6,
+                  4,
+                ],
+              },
+            ],
+            [
+              {
+                "margin": [
+                  8,
+                  5,
+                  8,
+                  6,
+                ],
+                "stack": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 10.8,
+                    "lineHeight": 1.3,
+                    "stack": [
+                      {
+                        "text": "Net 14 days from the invoice date.",
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          ],
+          "widths": [
+            "*",
+          ],
+        },
+      },
+      {
+        "margin": [
+          0,
+          4,
+          0,
+          0,
+        ],
+        "text": "",
+      },
+      {
+        "layout": {
+          "hLineColor": [Function],
+          "hLineWidth": [Function],
+          "vLineColor": [Function],
+          "vLineWidth": [Function],
+        },
+        "table": {
+          "body": [
+            [
+              {
+                "columnGap": 6,
+                "columns": [
+                  {
+                    "text": "",
+                    "width": 0,
+                  },
+                  {
+                    "color": "#162660",
+                    "style": "bilingualHeader",
+                    "text": "Notes",
+                    "width": "auto",
+                  },
+                  {
+                    "text": "",
+                    "width": "*",
+                  },
+                  {
+                    "alignment": "right",
+                    "color": "#162660",
+                    "style": "bilingualHeader",
+                    "text": "ملاحظات",
+                    "width": "auto",
+                  },
+                ],
+                "fillColor": "#f8fafc",
+                "margin": [
+                  6,
+                  4,
+                  6,
+                  4,
+                ],
+              },
+            ],
+            [
+              {
+                "margin": [
+                  8,
+                  5,
+                  8,
+                  6,
+                ],
+                "stack": [
+                  {
+                    "color": "#64748b",
+                    "fontSize": 10.8,
+                    "lineHeight": 1.3,
+                    "text": "Thank you for trusting our lab with your data recovery.",
+                  },
+                ],
+              },
+            ],
+          ],
+          "widths": [
+            "*",
+          ],
+        },
+      },
+    ],
+  },
+  {
+    "margin": [
+      0,
+      8,
+      0,
+      0,
+    ],
+    "stack": [
+      {
+        "columns": [
+          {
+            "stack": [
+              {
+                "layout": {
+                  "hLineColor": [Function],
+                  "hLineWidth": [Function],
+                  "vLineColor": [Function],
+                  "vLineWidth": [Function],
+                },
+                "table": {
+                  "body": [
+                    [
+                      {
+                        "columnGap": 6,
+                        "columns": [
+                          {
+                            "color": "#162660",
+                            "style": "bilingualHeader",
+                            "text": "Bank Account",
+                            "width": "auto",
+                          },
+                          {
+                            "text": "",
+                            "width": "*",
+                          },
+                          {
+                            "alignment": "right",
+                            "color": "#162660",
+                            "style": "bilingualHeader",
+                            "text": "البنك تفاصيل",
+                            "width": "auto",
+                          },
+                        ],
+                        "fillColor": "#f8fafc",
+                        "margin": [
+                          6,
+                          4,
+                          6,
+                          4,
+                        ],
+                      },
+                    ],
+                    [
+                      {
+                        "margin": [
+                          6,
+                          3,
+                          6,
+                          4,
+                        ],
+                        "stack": [
+                          {
+                            "color": "#1e293b",
+                            "fontSize": 10.8,
+                            "margin": [
+                              0,
+                              0.5,
+                              0,
+                              0.5,
+                            ],
+                            "text": "Account Name: Acme Data Recovery LLC",
+                          },
+                          {
+                            "color": "#1e293b",
+                            "fontSize": 10.8,
+                            "margin": [
+                              0,
+                              0.5,
+                              0,
+                              0.5,
+                            ],
+                            "text": "Account No: 0123456789",
+                          },
+                          {
+                            "color": "#1e293b",
+                            "fontSize": 10.8,
+                            "margin": [
+                              0,
+                              0.5,
+                              0,
+                              0.5,
+                            ],
+                            "text": "Bank: First National Bank",
+                          },
+                          {
+                            "color": "#1e293b",
+                            "fontSize": 10.8,
+                            "margin": [
+                              0,
+                              0.5,
+                              0,
+                              0.5,
+                            ],
+                            "text": "IBAN: AE12 0000 0000 0123 4567 89",
+                          },
+                          {
+                            "color": "#1e293b",
+                            "fontSize": 10.8,
+                            "margin": [
+                              0,
+                              0.5,
+                              0,
+                              0.5,
+                            ],
+                            "text": "SWIFT: FNBKAEXX",
+                          },
+                        ],
+                      },
+                    ],
+                  ],
+                  "widths": [
+                    "auto",
+                  ],
+                },
+              },
+            ],
+            "width": "auto",
+          },
+          {
+            "text": "",
+            "width": "*",
+          },
+        ],
+      },
+    ],
+  },
+]
+`;

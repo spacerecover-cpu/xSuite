@@ -20,6 +20,7 @@ import { templateKeys } from '../../lib/queryKeys';
 import { sanitizeHtml } from '../../lib/sanitizeHtml';
 import { RichTextEditor } from '../ui/RichTextEditor';
 import { resolveInvoiceTermsHtml, resolveTermsHtmlFromContent } from '../../lib/invoiceTermsService';
+import { listUnitCodes, type UnitCode } from '../../lib/unitCodesService';
 
 interface LineItemTemplate {
   id: string;
@@ -27,6 +28,7 @@ interface LineItemTemplate {
   description: string | null;
   default_price: number | null;
   item_category: string | null;
+  default_unit_code: string | null;
 }
 
 interface InvoiceLineItem {
@@ -34,7 +36,9 @@ interface InvoiceLineItem {
   description: string;
   quantity: number;
   unit_price: number;
-  unit?: string;
+  unit_code?: string | null;
+  unit_label?: string | null;
+  item_code?: string | null;
 }
 
 interface InvoiceInitialData {
@@ -217,7 +221,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
 
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>(
     initialData?.invoice_line_items || [
-      { description: '', quantity: 1, unit_price: 0, unit: 'Service' },
+      { description: '', quantity: 1, unit_price: 0, unit_code: null, unit_label: null, item_code: null },
     ]
   );
 
@@ -225,18 +229,24 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
     if (initialData?.invoice_line_items) {
       setLineItems(initialData.invoice_line_items);
     } else {
-      setLineItems([{ description: '', quantity: 1, unit_price: 0, unit: 'Service' }]);
+      setLineItems([{ description: '', quantity: 1, unit_price: 0, unit_code: null, unit_label: null, item_code: null }]);
     }
     // Re-seed only when the edited document changes (see QuoteFormModal note).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [(initialData as { id?: string } | undefined)?.id]);
+
+  const [unitCodes, setUnitCodes] = useState<UnitCode[]>([]);
+
+  useEffect(() => {
+    listUnitCodes().then(setUnitCodes).catch(() => setUnitCodes([]));
+  }, []);
 
   const { data: lineItemTemplates = [], isLoading: catalogLoading } = useQuery<LineItemTemplate[]>({
     queryKey: ['invoice_line_item_templates'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('catalog_service_line_items')
-        .select('id, name, description, default_price, catalog_service_categories(name)')
+        .select('id, name, description, default_price, default_unit_code, catalog_service_categories(name)')
         .eq('is_active', true)
         .order('sort_order')
         .order('name');
@@ -248,6 +258,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
         description: row.description,
         default_price: row.default_price,
         item_category: row.catalog_service_categories?.name ?? null,
+        default_unit_code: row.default_unit_code ?? null,
       }));
     },
     enabled: isOpen,
@@ -383,7 +394,9 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
         description: item.description,
         quantity: item.quantity ?? 1,
         unit_price: item.unit_price,
-        unit: 'Service',
+        unit_code: item.unit_code ?? null,
+        unit_label: item.unit_label ?? null,
+        item_code: item.item_code ?? null,
       }));
       setLineItems(items);
     }
@@ -405,7 +418,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
   };
 
   const addLineItem = () => {
-    setLineItems([...lineItems, { description: '', quantity: 1, unit_price: 0, unit: 'Service' }]);
+    setLineItems([...lineItems, { description: '', quantity: 1, unit_price: 0, unit_code: null, unit_label: null, item_code: null }]);
   };
 
   const removeLineItem = (index: number) => {
@@ -414,7 +427,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
     }
   };
 
-  const updateLineItem = (index: number, field: keyof InvoiceLineItem, value: string | number) => {
+  const updateLineItem = (index: number, field: keyof InvoiceLineItem, value: string | number | null) => {
     const updated = [...lineItems];
     updated[index] = { ...updated[index], [field]: value };
     setLineItems(updated);
@@ -425,7 +438,8 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
       description: `${template.name}${template.description ? ' - ' + template.description : ''}`,
       quantity: 1,
       unit_price: template.default_price ?? 0,
-      unit: 'Service',
+      unit_code: template.default_unit_code ?? null,
+      unit_label: null,
     };
     setLineItems([...lineItems, newItem]);
     setShowCatalog(false);
@@ -797,7 +811,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
             {lineItems.map((item, index) => (
               <div key={index} className="flex gap-2 items-start p-2 bg-slate-50 rounded-lg border border-slate-200">
                 <div className="flex-1 grid grid-cols-12 gap-2">
-                  <div className="col-span-4">
+                  <div className="col-span-3">
                     <input
                       type="text"
                       placeholder="Describe the service or item"
@@ -808,11 +822,31 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                     />
                   </div>
                   <div className="col-span-2">
+                    <select
+                      aria-label="Unit"
+                      value={item.unit_code ?? ''}
+                      onChange={(e) => {
+                        const code = e.target.value || null;
+                        const unit = unitCodes.find((u) => u.code === code);
+                        const updated = [...lineItems];
+                        updated[index] = { ...updated[index], unit_code: code, unit_label: unit?.label ?? null };
+                        setLineItems(updated);
+                      }}
+                      className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    >
+                      <option value="">—</option>
+                      {unitCodes.map((u) => (
+                        <option key={u.code} value={u.code}>{u.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
                     <input
                       type="text"
-                      placeholder="Unit"
-                      value={item.unit || ''}
-                      onChange={(e) => updateLineItem(index, 'unit', e.target.value)}
+                      placeholder="HSN/SAC"
+                      aria-label="Item code"
+                      value={item.item_code ?? ''}
+                      onChange={(e) => updateLineItem(index, 'item_code', e.target.value || null)}
                       className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                     />
                   </div>
@@ -830,7 +864,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                       required
                     />
                   </div>
-                  <div className="col-span-4">
+                  <div className="col-span-3">
                     <input
                       type="number"
                       placeholder="Price"
