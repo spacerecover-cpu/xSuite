@@ -13,6 +13,9 @@ const { createCompanySpy, createCustomerSpy } = vi.hoisted(() => ({
 
 vi.mock('../../lib/companyService', () => ({ createCompany: createCompanySpy }));
 vi.mock('../../lib/customerService', () => ({ createCustomer: createCustomerSpy }));
+vi.mock('../../lib/geoSubdivisionService', () => ({
+  listSubdivisions: vi.fn(async () => []),
+}));
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ profile: { id: 'user-1', tenant_id: 'tenant-1' } }),
@@ -102,6 +105,28 @@ describe('CustomerFormModal — inline Add New Company', () => {
     // Sub-modal closes on success.
     await waitFor(() =>
       expect(screen.queryByPlaceholderText('Enter company name')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('persists structured address fields alongside the legacy address blob', async () => {
+    const user = userEvent.setup();
+    createCustomerSpy.mockResolvedValue({ id: 'cust-1' });
+    renderModal();
+
+    await user.type(screen.getByLabelText(/customer name/i), 'Jane Doe');
+    await user.type(screen.getByLabelText('Address line 1'), 'Bldg 12');
+    await user.type(screen.getByLabelText('Postal Code'), '133');
+    await user.click(screen.getByRole('button', { name: /create customer/i }));
+
+    await waitFor(() =>
+      expect(createCustomerSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          address_line1: 'Bldg 12',
+          address_line2: null,
+          subdivision_id: null,
+          postal_code: '133',
+        }),
+      ),
     );
   });
 });

@@ -9,6 +9,7 @@ import { Modal } from '../ui/Modal';
 import { PhoneInput } from '../ui/PhoneInput';
 import { UsageLimitGuard } from '../shared/UsageLimitGuard';
 import { SearchableSelect } from '../ui/SearchableSelect';
+import { AddressFields, type AddressValue } from '../ui/AddressFields';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   User,
@@ -20,7 +21,6 @@ import {
   ChevronUp,
   Plus,
   Loader2,
-  Globe,
   StickyNote,
   Shield,
 } from 'lucide-react';
@@ -97,6 +97,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false);
   const [showAltPhone, setShowAltPhone] = useState(false);
   const [settingsCollapsed, setSettingsCollapsed] = useState(true);
+  const [addressNotesCollapsed, setAddressNotesCollapsed] = useState(true);
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const customerNameRef = useRef<HTMLInputElement>(null);
@@ -110,6 +111,10 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     country_id: '',
     city_id: '',
     address: '',
+    address_line1: '',
+    address_line2: '',
+    subdivision_id: null as string | null,
+    postal_code: '',
     portal_enabled: true,
     notes: '',
     company_id: '',
@@ -211,8 +216,12 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   };
 
   const createMutation = useMutation({
-    mutationFn: async (customer: typeof formData) =>
-      createCustomer({
+    mutationFn: async (customer: typeof formData) => {
+      // Built as an intermediate variable (not an inline literal) so the
+      // structured address fields can ride along on `createCustomer`'s
+      // existing `CreateCustomerInput` without widening that service's type —
+      // `customers_enhanced` already has the columns (WP-1 Task 3).
+      const payload = {
         customer_name: customer.customer_name,
         email: customer.email || null,
         mobile_number: customer.mobile_number || null,
@@ -221,11 +230,17 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         country_id: customer.country_id || null,
         city_id: customer.city_id || null,
         address: customer.address || null,
+        address_line1: customer.address_line1 || null,
+        address_line2: customer.address_line2 || null,
+        subdivision_id: customer.subdivision_id,
+        postal_code: customer.postal_code || null,
         portal_enabled: customer.portal_enabled,
         notes: customer.notes || null,
         created_by: profile?.id,
         company_id: customer.company_id || null,
-      }),
+      };
+      return createCustomer(payload);
+    },
     onSuccess: (newCustomer) => {
       queryClient.invalidateQueries({ queryKey: ['customers_enhanced'] });
       queryClient.invalidateQueries({ queryKey: ['customers_for_cases'] });
@@ -258,6 +273,10 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       country_id: defaultCountryId,
       city_id: '',
       address: '',
+      address_line1: '',
+      address_line2: '',
+      subdivision_id: null,
+      postal_code: '',
       portal_enabled: true,
       notes: '',
       company_id: '',
@@ -266,6 +285,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     setTouched({});
     setShowAltPhone(false);
     setSettingsCollapsed(true);
+    setAddressNotesCollapsed(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -296,6 +316,13 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       }));
     }
   }, [isOpen, companySettings]);
+
+  const addressValue: AddressValue = {
+    address_line1: formData.address_line1,
+    address_line2: formData.address_line2,
+    subdivision_id: formData.subdivision_id,
+    postal_code: formData.postal_code,
+  };
 
   return (
     <>
@@ -426,13 +453,31 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 />
               </div>
 
-              <Input
-                label="Address"
-                value={formData.address}
-                onChange={(e) => handleFieldChange('address', e.target.value)}
-                placeholder="Street address"
-                leftIcon={<Globe className="w-4 h-4" />}
+              <AddressFields
+                value={addressValue}
+                onChange={(next) => setFormData((f) => ({ ...f, ...next }))}
+                countryId={formData.country_id || null}
               />
+
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setAddressNotesCollapsed((prev) => !prev)}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors py-0.5"
+                >
+                  {addressNotesCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+                  Additional address notes
+                </button>
+                {!addressNotesCollapsed && (
+                  <textarea
+                    value={formData.address}
+                    onChange={(e) => handleFieldChange('address', e.target.value)}
+                    rows={2}
+                    className="mt-1.5 w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm resize-none transition-shadow bg-white"
+                    placeholder="Legacy free-text address notes"
+                  />
+                )}
+              </div>
             </div>
           </div>
 

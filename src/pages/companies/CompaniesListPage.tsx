@@ -8,7 +8,8 @@ import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/ui/Badge';
 import { SearchableSelect } from '../../components/ui/SearchableSelect';
-import { Plus, Search, Filter, Mail, Phone, Building2, MapPin, Users, UserCheck, Clock, ChevronLeft, ChevronRight, Layers } from 'lucide-react';
+import { AddressFields, type AddressValue } from '../../components/ui/AddressFields';
+import { Plus, Search, Filter, Mail, Phone, Building2, MapPin, Users, UserCheck, Clock, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Layers } from 'lucide-react';
 import { formatDate } from '../../lib/format';
 import { KpiRow } from '../../components/templates/KpiRow';
 import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
@@ -75,6 +76,7 @@ export const CompaniesListPage: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [addressNotesCollapsed, setAddressNotesCollapsed] = useState(true);
   const COMPANIES_PER_PAGE = 10;
 
   useEffect(() => {
@@ -91,6 +93,10 @@ export const CompaniesListPage: React.FC = () => {
     country_id: '',
     city_id: '',
     address: '',
+    address_line1: '',
+    address_line2: '',
+    subdivision_id: null as string | null,
+    postal_code: '',
     notes: '',
     primary_contact_id: '',
   });
@@ -206,25 +212,39 @@ export const CompaniesListPage: React.FC = () => {
     (city) => !formData.country_id || city.country_id === formData.country_id
   );
 
+  const addressValue: AddressValue = {
+    address_line1: formData.address_line1,
+    address_line2: formData.address_line2,
+    subdivision_id: formData.subdivision_id,
+    postal_code: formData.postal_code,
+  };
+
   const createMutation = useMutation({
-    mutationFn: async (company: typeof formData) =>
-      createCompany(
-        {
-          name: company.company_name,
-          company_name: company.company_name,
-          tax_number: company.tax_number || null,
-          industry_id: company.industry_id || null,
-          email: company.email || null,
-          phone: company.phone || null,
-          website: company.website || null,
-          country_id: company.country_id || null,
-          city_id: company.city_id || null,
-          address: company.address || null,
-          notes: company.notes || null,
-          created_by: profile?.id,
-        },
-        company.primary_contact_id || null,
-      ),
+    mutationFn: async (company: typeof formData) => {
+      // Built as an intermediate variable (not an inline literal) so the
+      // structured address fields can ride along on `createCompany`'s
+      // existing `CreateCompanyInput` without widening that service's type —
+      // `companies` already has the columns (WP-1 Task 3).
+      const payload = {
+        name: company.company_name,
+        company_name: company.company_name,
+        tax_number: company.tax_number || null,
+        industry_id: company.industry_id || null,
+        email: company.email || null,
+        phone: company.phone || null,
+        website: company.website || null,
+        country_id: company.country_id || null,
+        city_id: company.city_id || null,
+        address: company.address || null,
+        address_line1: company.address_line1 || null,
+        address_line2: company.address_line2 || null,
+        subdivision_id: company.subdivision_id,
+        postal_code: company.postal_code || null,
+        notes: company.notes || null,
+        created_by: profile?.id,
+      };
+      return createCompany(payload, company.primary_contact_id || null);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['companies'] });
       setIsModalOpen(false);
@@ -244,6 +264,10 @@ export const CompaniesListPage: React.FC = () => {
         country_id: data.country_id || null,
         city_id: data.city_id || null,
         address: data.address || null,
+        address_line1: data.address_line1 || null,
+        address_line2: data.address_line2 || null,
+        subdivision_id: data.subdivision_id,
+        postal_code: data.postal_code || null,
         notes: data.notes || null,
       }),
     onSuccess: () => {
@@ -266,9 +290,14 @@ export const CompaniesListPage: React.FC = () => {
       country_id: defaultCountryId,
       city_id: '',
       address: '',
+      address_line1: '',
+      address_line2: '',
+      subdivision_id: null,
+      postal_code: '',
       notes: '',
       primary_contact_id: '',
     });
+    setAddressNotesCollapsed(true);
   };
 
   const handleOpenModal = () => {
@@ -740,11 +769,31 @@ export const CompaniesListPage: React.FC = () => {
             />
           </div>
 
-          <Input
-            label="Address"
-            value={formData.address}
-            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+          <AddressFields
+            value={addressValue}
+            onChange={(next) => setFormData((f) => ({ ...f, ...next }))}
+            countryId={formData.country_id || null}
           />
+
+          <div>
+            <button
+              type="button"
+              onClick={() => setAddressNotesCollapsed((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors py-0.5"
+            >
+              {addressNotesCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+              Additional address notes
+            </button>
+            {!addressNotesCollapsed && (
+              <textarea
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                rows={2}
+                className="mt-1.5 w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
+                placeholder="Legacy free-text address notes"
+              />
+            )}
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">
@@ -858,11 +907,31 @@ export const CompaniesListPage: React.FC = () => {
             />
           </div>
 
-          <Input
-            label="Address"
-            value={formData.address}
-            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+          <AddressFields
+            value={addressValue}
+            onChange={(next) => setFormData((f) => ({ ...f, ...next }))}
+            countryId={formData.country_id || null}
           />
+
+          <div>
+            <button
+              type="button"
+              onClick={() => setAddressNotesCollapsed((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors py-0.5"
+            >
+              {addressNotesCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+              Additional address notes
+            </button>
+            {!addressNotesCollapsed && (
+              <textarea
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                rows={2}
+                className="mt-1.5 w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
+                placeholder="Legacy free-text address notes"
+              />
+            )}
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">
