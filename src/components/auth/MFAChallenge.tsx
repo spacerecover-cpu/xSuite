@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ShieldCheck, Loader2, AlertCircle } from 'lucide-react';
 import { mfaService } from '../../lib/mfaService';
 import { AuthBackground } from './shared/AuthBackground';
+import { GlowPanel } from './shared/GlowPanel';
 
 interface MFAChallengeProps {
   onVerified: () => void;
@@ -77,7 +78,7 @@ export const MFAChallenge: React.FC<MFAChallengeProps> = ({ onVerified, onCancel
     <div className="relative min-h-dvh flex items-center justify-center overflow-hidden">
       <AuthBackground />
       <div className="relative z-10 max-w-md w-full mx-4">
-        <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-slate-950/60 p-8">
+        <GlowPanel padding="p-8">
           <div className="text-center mb-6">
             <div className="w-16 h-16 bg-white/10 ring-1 ring-white/15 rounded-full flex items-center justify-center mx-auto mb-4">
               <ShieldCheck className="w-8 h-8 text-sky-300" aria-hidden="true" />
@@ -134,7 +135,7 @@ export const MFAChallenge: React.FC<MFAChallengeProps> = ({ onVerified, onCancel
               Verify
             </button>
           </div>
-        </div>
+        </GlowPanel>
       </div>
     </div>
   );

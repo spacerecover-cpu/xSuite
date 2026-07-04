@@ -18,12 +18,12 @@ export const TrustBadges = () => {
       initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
       animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.7 }}
-      className="flex flex-wrap items-center gap-2.5"
+      className="inline-flex items-center rounded-xl border border-white/10 bg-white/[0.04] px-1.5 py-1 divide-x divide-white/10 rtl:divide-x-reverse"
     >
       {BADGES.map(({ key, icon: Icon }) => (
         <span
           key={key}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.05] border border-white/10 text-slate-400 text-xs"
+          className="flex items-center gap-2 px-3.5 py-1.5 text-slate-400 text-xs whitespace-nowrap"
         >
           <Icon size={13} aria-hidden="true" />
           {t(`auth.trust.${key}`)}

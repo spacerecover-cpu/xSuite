@@ -15,4 +15,11 @@ if (!('ResizeObserver' in globalThis)) {
   (globalThis as { ResizeObserver?: unknown }).ResizeObserver = ResizeObserverStub;
 }
 
+// jsdom's getContext() logs a noisy "Not implemented" error on every call.
+// Decorative canvases (AuthWaveField) already null-guard the context; return
+// null quietly so auth-page tests don't spam the console.
+if (typeof HTMLCanvasElement !== 'undefined') {
+  HTMLCanvasElement.prototype.getContext = (() => null) as typeof HTMLCanvasElement.prototype.getContext;
+}
+
 afterEach(cleanup);

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Fingerprint, Layers, Users, FileCheck } from 'lucide-react';
+import { ShieldCheck, Fingerprint, Layers, Users, FileCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 const CAPABILITIES: { key: string; icon: LucideIcon }[] = [
@@ -21,27 +21,38 @@ export const BrandShowcase = () => {
   });
 
   return (
-    <div className="max-w-xl">
+    <div className="max-w-2xl">
       <motion.div {...enter(0.05)}>
-        <h1 className="font-display-auth text-5xl xl:text-6xl font-bold text-white leading-[1.08] tracking-tight whitespace-pre-line">
-          {t('auth.headline')}
+        <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-sky-400/25 bg-sky-400/[0.06] text-sky-200 text-xs font-medium">
+          <ShieldCheck className="w-3.5 h-3.5 text-sky-300" aria-hidden="true" />
+          {t('auth.trustedBadge')}
+        </span>
+      </motion.div>
+
+      <motion.div {...enter(0.15)}>
+        <h1 className="mt-6 font-display-auth text-5xl xl:text-6xl font-bold leading-[1.08] tracking-tight">
+          <span className="text-white">{t('auth.headlineLead')}</span>
+          <br />
+          <span className="bg-gradient-to-r from-sky-400 via-blue-400 to-violet-500 bg-clip-text text-transparent">
+            {t('auth.headlineAccent')}
+          </span>
         </h1>
-        <div aria-hidden="true" className="mt-6 h-1 w-24 rounded-full bg-gradient-to-r from-sky-400 to-sky-400/0" />
         <p className="text-slate-400 mt-6 text-lg leading-relaxed max-w-md">
           {t('auth.subheadline')}
         </p>
       </motion.div>
 
-      <ul className="mt-10 space-y-4">
-        {CAPABILITIES.map(({ key, icon: Icon }, i) => (
-          <motion.li key={key} {...enter(0.25 + i * 0.08)} className="flex items-center gap-3.5">
-            <span className="w-9 h-9 rounded-lg bg-white/[0.06] ring-1 ring-white/10 flex items-center justify-center flex-shrink-0">
-              <Icon className="w-[18px] h-[18px] text-sky-300" strokeWidth={1.75} aria-hidden="true" />
-            </span>
-            <span className="text-slate-300 text-sm">{t(`auth.capability.${key}`)}</span>
-          </motion.li>
+      <motion.ul
+        {...enter(0.3)}
+        className="mt-10 grid grid-cols-2 sm:grid-cols-4 divide-x divide-white/10 rtl:divide-x-reverse"
+      >
+        {CAPABILITIES.map(({ key, icon: Icon }) => (
+          <li key={key} className="flex flex-col items-center gap-2.5 px-3 text-center">
+            <Icon className="w-6 h-6 text-sky-300" strokeWidth={1.6} aria-hidden="true" />
+            <span className="text-slate-300 text-xs leading-snug">{t(`auth.capability.${key}`)}</span>
+          </li>
         ))}
-      </ul>
+      </motion.ul>
     </div>
   );
 };

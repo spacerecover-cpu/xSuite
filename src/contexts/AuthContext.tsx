@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
+import { hasStoredAuthSession, resetSessionPersistence } from '../lib/authStorage';
 import { mfaService } from '../lib/mfaService';
 import { rolePermissionsService } from '../lib/rolePermissionsService';
 import { logger, setSentryUser } from '../lib/logger';
@@ -170,6 +171,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       (async () => {
         if (!mounted) return;
+        // Ghost-session guard: GoTrue's BroadcastChannel forwards auth events
+        // cross-tab WITH the session object. In sessionStorage ("don't
+        // remember me") mode a second tab can't read that session from
+        // storage — acting on the broadcast would unlock the UI while REST
+        // calls fall back to the anon key and fail RLS. Locally-originated
+        // events always pass (GoTrue saves before it notifies).
+        if (session?.user && !hasStoredAuthSession()) return;
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
@@ -220,6 +228,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // different user on the same device can't inherit them (H6, L5).
           rolePermissionsService.clearCache();
           localStorage.removeItem('tenant_id');
+          // Back to the default so out-of-band session creation (recovery
+          // links, future OAuth) lands persistent unless the user opts out
+          // again at the next sign-in.
+          resetSessionPersistence();
           setLoading(false);
         }
       })().catch((e) => logger.error('Auth state change handler failed:', e));

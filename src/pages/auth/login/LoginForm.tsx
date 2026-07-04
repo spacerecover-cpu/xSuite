@@ -2,10 +2,13 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Mail, Lock, Eye, EyeOff, Loader2, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2, ChevronRight, ArrowRight, ArrowLeft } from 'lucide-react';
+import { XLogo } from '../../../components/auth/shared/XLogo';
 import { AuthTextField } from '../../../components/auth/shared/AuthTextField';
 import { AuthAlert } from '../../../components/auth/shared/AuthAlert';
+import { AUTH_PRIMARY_BUTTON } from '../../../components/auth/shared/authStyles';
 import { useResetRequest } from '../../../components/auth/shared/useResetRequest';
+import { setSessionPersistence } from '../../../lib/authStorage';
 
 interface LoginFormProps {
   onSubmit: (email: string, password: string) => Promise<void>;
@@ -20,11 +23,15 @@ export const LoginForm = ({ onSubmit, error, loading }: LoginFormProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [shakeKey, setShakeKey] = useState(0);
   const resetRequest = useResetRequest();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Must land in storage BEFORE signInWithPassword saves the session — the
+    // adapter reads the flag lazily on every write (see lib/authStorage.ts).
+    setSessionPersistence(remember);
     await onSubmit(email, password);
     setShakeKey(prev => prev + 1);
   };
@@ -44,8 +51,13 @@ export const LoginForm = ({ onSubmit, error, loading }: LoginFormProps) => {
       <AnimatePresence mode="wait" initial={false}>
         {view === 'signin' ? (
           <motion.div key="signin" {...viewMotion} transition={{ duration: 0.2 }}>
-            <h1 className="text-xl font-semibold text-white">{t('auth.welcomeBack')}</h1>
-            <p className="mt-1 text-sm text-slate-400 mb-6">{t('auth.signInSubtitle')}</p>
+            <div className="text-center mb-7">
+              <span className="inline-flex w-14 h-14 rounded-2xl bg-white/[0.06] ring-1 ring-white/15 items-center justify-center shadow-lg shadow-slate-950/40">
+                <XLogo size={30} />
+              </span>
+              <h1 className="mt-4 text-2xl font-semibold text-white">{t('auth.welcomeBack')}</h1>
+              <p className="mt-1 text-sm text-slate-400">{t('auth.signInSubtitle')}</p>
+            </div>
 
             {error && (
               <motion.div
@@ -90,29 +102,36 @@ export const LoginForm = ({ onSubmit, error, loading }: LoginFormProps) => {
                 }
               />
 
-              <div className="flex justify-end">
+              <div className="flex items-center justify-between gap-3">
+                <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
+                    className="w-4 h-4 rounded border-white/20 bg-white/[0.06] text-sky-500 focus:ring-sky-400/50 focus:ring-offset-0"
+                  />
+                  {t('auth.rememberMe')}
+                </label>
                 <button
                   type="button"
                   onClick={() => { resetRequest.reset(); setView('forgot'); }}
-                  className="text-sm text-secondary hover:text-white font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded"
+                  className="text-sm text-sky-300 hover:text-sky-200 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded"
                 >
                   {t('auth.forgotPassword')}
                 </button>
               </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                aria-busy={loading}
-                className="w-full py-3.5 bg-white text-slate-900 font-medium text-sm rounded-xl shadow-lg shadow-sky-950/40 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
+              <button type="submit" disabled={loading} aria-busy={loading} className={AUTH_PRIMARY_BUTTON}>
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 motion-safe:animate-spin" aria-hidden="true" />
                     {t('auth.signingIn')}
                   </>
                 ) : (
-                  t('auth.signInCta')
+                  <>
+                    {t('auth.signInCta')}
+                    <ArrowRight className="w-4 h-4 rtl:rotate-180" aria-hidden="true" />
+                  </>
                 )}
               </button>
             </form>
@@ -121,7 +140,7 @@ export const LoginForm = ({ onSubmit, error, loading }: LoginFormProps) => {
               {t('auth.newToXsuite')}{' '}
               <Link
                 to="/signup/tenant"
-                className="text-secondary font-medium hover:text-white transition-colors inline-flex items-center gap-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded"
+                className="text-sky-300 font-medium hover:text-sky-200 transition-colors inline-flex items-center gap-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded"
               >
                 {t('auth.createYourLab')}
                 <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180" aria-hidden="true" />
@@ -160,7 +179,7 @@ export const LoginForm = ({ onSubmit, error, loading }: LoginFormProps) => {
                   type="submit"
                   disabled={resetRequest.status === 'sending'}
                   aria-busy={resetRequest.status === 'sending'}
-                  className="w-full py-3.5 bg-white text-slate-900 font-medium text-sm rounded-xl shadow-lg shadow-sky-950/40 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className={AUTH_PRIMARY_BUTTON}
                 >
                   {resetRequest.status === 'sending' ? (
                     <>

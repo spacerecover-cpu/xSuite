@@ -1,4 +1,5 @@
 import { useReducedMotion, motion } from 'framer-motion';
+import { AuthWaveField } from './AuthWaveField';
 
 const PARTICLES = Array.from({ length: 10 }, (_, i) => ({
   id: i,
@@ -33,6 +34,14 @@ export const AuthBackground = () => {
 
       {/* Depth vignette */}
       <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-slate-950/70" />
+
+      {/* 3D particle wave — mounted after the vignette so it isn't washed out */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[38%] [mask-image:linear-gradient(to_top,black_55%,transparent)] [-webkit-mask-image:linear-gradient(to_top,black_55%,transparent)]"
+      >
+        <AuthWaveField />
+      </div>
 
       {/* Scanning beam — one slow horizontal sweep */}
       {!shouldReduceMotion && (

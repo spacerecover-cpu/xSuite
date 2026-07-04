@@ -8,6 +8,7 @@ import { MFAChallenge } from '../../components/auth/MFAChallenge';
 import { AuthShell } from '../../components/auth/shared/AuthShell';
 import { AuthTextField } from '../../components/auth/shared/AuthTextField';
 import { AuthAlert } from '../../components/auth/shared/AuthAlert';
+import { AUTH_PRIMARY_BUTTON } from '../../components/auth/shared/authStyles';
 import { PasswordStrengthMeter } from '../../components/auth/shared/PasswordStrengthMeter';
 import { validatePassword } from '../../components/auth/shared/passwordPolicy';
 import { useResetRequest } from '../../components/auth/shared/useResetRequest';
@@ -152,7 +153,7 @@ export const ResetPassword = () => {
                   type="submit"
                   disabled={resetRequest.status === 'sending'}
                   aria-busy={resetRequest.status === 'sending'}
-                  className="w-full py-3 bg-white text-slate-900 font-medium text-sm rounded-xl hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className={AUTH_PRIMARY_BUTTON}
                 >
                   {resetRequest.status === 'sending' ? (
                     <>
@@ -246,7 +247,7 @@ export const ResetPassword = () => {
                 type="submit"
                 disabled={submitting}
                 aria-busy={submitting}
-                className="w-full py-3.5 bg-white text-slate-900 font-medium text-sm rounded-xl shadow-lg shadow-sky-950/40 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className={AUTH_PRIMARY_BUTTON}
               >
                 {submitting ? (
                   <>

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database.types';
+import { authStorageAdapter, AUTH_STORAGE_KEY } from './authStorage';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -18,6 +19,12 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
+    // Real "Remember me": sessions route to localStorage (persist) or
+    // sessionStorage (die with the browser) per the user's login choice.
+    // storageKey matches supabase-js's own default so pre-existing sessions
+    // keep working. See src/lib/authStorage.ts.
+    storage: authStorageAdapter,
+    storageKey: AUTH_STORAGE_KEY,
   },
   db: {
     schema: 'public',
