@@ -34,6 +34,10 @@ export interface CreateCompanyInput {
   country_id?: string | null;
   city_id?: string | null;
   address?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  subdivision_id?: string | null;
+  postal_code?: string | null;
   notes?: string | null;
   created_by?: string | null;
 }
@@ -63,6 +67,7 @@ export async function createCompany(
     industry_id: uuidOrNull(input.industry_id),
     country_id: uuidOrNull(input.country_id),
     city_id: uuidOrNull(input.city_id),
+    subdivision_id: uuidOrNull(input.subdivision_id),
     created_by: uuidOrNull(input.created_by),
   }) as CompanyInsert;
 

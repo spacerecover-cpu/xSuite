@@ -39,6 +39,15 @@ describe('countryTemplateOverride (§8b)', () => {
   it('keeps English LTR for a non-RTL country (no language override)', () => {
     expect(countryTemplateOverride(UK).language).toBeUndefined();
   });
+  it('LTR country + a bilingual-enabled profile → bilingual_stacked, English-primary (else-if branch)', () => {
+    // GB (languageCode en, not RTL) with a profile whose bilingual is enabled AND carries a
+    // secondaryLanguage exercises the LTR-bilingual branch — dead until such a regime ships,
+    // so this pins its behavior in advance: stacked layout, English as the primary language.
+    const ov = countryTemplateOverride(UK, {
+      profile: gccTaxInvoiceProfile, sellerRegistered: true, docType: 'invoice',
+    });
+    expect(ov.language).toEqual({ mode: 'bilingual_stacked', primary: 'en' });
+  });
   it('threads the country date format onto config.locale (§8d hand-off)', () => {
     expect(countryTemplateOverride(UK).locale?.dateFormat).toBe('DD/MM/YYYY');
   });

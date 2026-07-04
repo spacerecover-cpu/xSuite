@@ -16,6 +16,10 @@ export interface CreateCustomerInput {
   country_id?: string | null;
   city_id?: string | null;
   address?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  subdivision_id?: string | null;
+  postal_code?: string | null;
   portal_enabled?: boolean;
   notes?: string | null;
   created_by?: string | null;
