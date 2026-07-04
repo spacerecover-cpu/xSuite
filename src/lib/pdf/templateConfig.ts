@@ -779,11 +779,16 @@ const ENGLISH_ONLY: LanguageConfig = {
   primary: 'en',
 };
 
-/** Standard line-item table columns used by quote / invoice. */
+/** Standard line-item table columns used by quote / invoice.
+ *  `itemCode` / `unit` are hidden by default (visible:false) and flipped on by a
+ *  compliance profile's `forcedColumns` (via `forcedColumnOverrides` in the
+ *  country layer) or a tenant Studio toggle — GCC hides them, India shows them. */
 function lineItemColumns(): ColumnConfig[] {
   return [
     { key: 'description', visible: true, label: { en: 'Description', ar: 'الوصف' }, width: 220 },
     { key: 'quantity', visible: true, label: { en: 'Qty', ar: 'الكمية' }, width: 40 },
+    { key: 'itemCode', visible: false, label: { en: 'Code', ar: 'الرمز' }, width: 50 },
+    { key: 'unit', visible: false, label: { en: 'Unit', ar: 'الوحدة' }, width: 45 },
     { key: 'unitPrice', visible: true, label: { en: 'Unit Price', ar: 'سعر الوحدة' } },
     { key: 'lineTotal', visible: true, label: { en: 'Total', ar: 'المجموع' } },
   ];

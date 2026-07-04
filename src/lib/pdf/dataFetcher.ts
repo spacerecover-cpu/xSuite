@@ -249,6 +249,8 @@ export function toInvoiceItems(rows: Partial<InvoiceLineItemsRow>[] | null | und
       unit_price,
       tax_rate: row.tax_rate ?? 0,
       line_total: quantity * unit_price,
+      unit_label: row.unit_label ?? null,
+      item_code: row.item_code ?? null,
     };
   });
 }

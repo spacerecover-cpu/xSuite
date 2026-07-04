@@ -272,6 +272,11 @@ export interface InvoiceItemData {
   tax_rate: number;
   discount_percent?: number;
   line_total: number;
+  /** Unit-of-measure display label (e.g. "Piece"); snapshotted per line. Drives
+   *  the optional `unit` line-item column (hidden unless a profile forces it). */
+  unit_label?: string | null;
+  /** Statutory item code (HSN/SAC etc.); drives the optional `itemCode` column. */
+  item_code?: string | null;
 }
 
 export interface InvoiceData {

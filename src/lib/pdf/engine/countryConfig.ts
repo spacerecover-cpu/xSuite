@@ -1,6 +1,25 @@
 import { isRTLLanguage } from '../../locale';
-import type { TemplateConfigOverride } from '../templateConfig';
+import type { TemplateConfigOverride, ColumnConfigOverride } from '../templateConfig';
 import type { DocumentComplianceProfile, TaxDocumentType } from '../../regimes/types';
+
+/** Maps a compliance profile's `forcedColumns` (statutory snake_case names) to
+ *  the line-item table's REAL camelCase column keys. Defined ONCE here and reused
+ *  by every financial adapter's country layer (invoice / quote / credit note) via
+ *  {@link forcedColumnOverrides}, so the mapping is never hand-rolled per doc type. */
+export const FORCED_COLUMN_KEY_MAP: Record<'item_code' | 'unit_code', string> = {
+  item_code: 'itemCode',
+  unit_code: 'unit',
+};
+
+/** Build the `lineItems` column-visibility overrides that turn a profile's
+ *  `forcedColumns` ON, addressing the real camelCase column keys. Returns `[]`
+ *  when nothing is forced (so the country override stays a no-op for GCC docs,
+ *  whose profile forces no columns). */
+export function forcedColumnOverrides(
+  forcedColumns: ReadonlyArray<'item_code' | 'unit_code'>,
+): ColumnConfigOverride[] {
+  return forcedColumns.map((fc) => ({ key: FORCED_COLUMN_KEY_MAP[fc], visible: true }));
+}
 
 /** Resolved statutory/format facts the country layer needs (read from
  *  geo_countries by countryFactsService; this mapper never touches the DB). */
@@ -63,6 +82,17 @@ export function countryTemplateOverride(
   override.taxBar = { enabled: bandEnabled };
   const bandLabel = facts.taxNumberLabel ?? facts.taxLabel;
   if (bandLabel) override.taxBar.label = { en: bandLabel };
+
+  // Forced statutory line-item columns (item code / unit). Map the profile's
+  // snake_case forcedColumns to the real camelCase column keys and flip them
+  // visible via a `lineItems` sections override — the shared helper so the
+  // quote/credit-note adapters reuse the SAME mapping rather than duplicating it.
+  if (compliance) {
+    const colOverrides = forcedColumnOverrides(compliance.profile.forcedColumns);
+    if (colOverrides.length > 0) {
+      override.sections = [{ key: 'lineItems', columns: colOverrides }];
+    }
+  }
 
   // RTL country -> bilingual-stacked; profile can force Arabic-lead.
   if (facts.languageCode && isRTLLanguage(facts.languageCode)) {
