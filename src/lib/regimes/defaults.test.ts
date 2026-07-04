@@ -30,9 +30,18 @@ describe('default regime plugins (the ~80% data-only path)', () => {
   it('generic_invoice: TAX INVOICE only when registered AND required', () => {
     const p = resolveDocumentProfile('generic_invoice');
     expect(p.documentTitle({ docType: 'invoice', sellerRegistered: true, taxInvoiceRequired: true }))
-      .toEqual({ title: 'TAX INVOICE', titleTranslated: null });
-    expect(p.documentTitle({ docType: 'invoice', sellerRegistered: false, taxInvoiceRequired: true }).title).toBe('INVOICE');
-    expect(p.documentTitle({ docType: 'quote', sellerRegistered: true, taxInvoiceRequired: true }).title).toBe('QUOTATION');
+      .toEqual({ title: 'TAX INVOICE', titleTranslated: 'فاتورة ضريبية' });
+    // A non-registered / non-required seller issues a plain INVOICE — its Arabic must be
+    // 'فاتورة' (invoice), NOT the base config's 'فاتورة ضريبية' (tax invoice). generic_invoice
+    // supplies its own Arabic so a non-VAT (KW/QA) bilingual doc doesn't borrow the tax title.
+    expect(p.documentTitle({ docType: 'invoice', sellerRegistered: false, taxInvoiceRequired: false }))
+      .toEqual({ title: 'INVOICE', titleTranslated: 'فاتورة' });
+    expect(p.documentTitle({ docType: 'quote', sellerRegistered: true, taxInvoiceRequired: true }))
+      .toEqual({ title: 'QUOTATION', titleTranslated: 'عرض أسعار' });
+    expect(p.documentTitle({ docType: 'credit_note', sellerRegistered: true, taxInvoiceRequired: true }))
+      .toEqual({ title: 'CREDIT NOTE', titleTranslated: 'إشعار دائن' });
+    expect(p.documentTitle({ docType: 'stock_sale', sellerRegistered: true, taxInvoiceRequired: true }))
+      .toEqual({ title: 'SALES RECEIPT', titleTranslated: 'إيصال مبيعات' });
     expect(p.requiresTaxInvoiceCeremony).toBe(true);
     expect(p.forcedColumns).toEqual([]);
   });

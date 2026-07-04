@@ -2032,7 +2032,7 @@ exports[`Phase 2 compliance matrix > 'KW' invoice — title ceremony, band, comp
     },
   },
   "documentTitle": {
-    "ar": "فاتورة ضريبية",
+    "ar": "فاتورة",
     "en": "INVOICE",
   },
   "identity": {
@@ -3340,7 +3340,7 @@ exports[`Phase 2 compliance matrix > 'QA' invoice — title ceremony, band, comp
     },
   },
   "documentTitle": {
-    "ar": "فاتورة ضريبية",
+    "ar": "فاتورة",
     "en": "INVOICE",
   },
   "identity": {

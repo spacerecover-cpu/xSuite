@@ -82,6 +82,9 @@ describe('Phase 2 compliance matrix', () => {
 
     // 1. Title ceremony — only VAT + required countries claim TAX INVOICE.
     expect(data.documentTitle.en).toBe(c.taxSystem === 'VAT' && c.taxInvoiceRequired ? 'TAX INVOICE' : 'INVOICE');
+    // 1b. Bilingual title must PAIR correctly — a non-VAT (KW/QA) 'INVOICE' must not borrow the
+    // base config's Arabic 'فاتورة ضريبية' (=TAX INVOICE); its Arabic is 'فاتورة' (invoice).
+    expect(data.documentTitle.ar).toBe(c.taxSystem === 'VAT' && c.taxInvoiceRequired ? 'فاتورة ضريبية' : 'فاتورة');
     // 2. Band — enabled + labelled for VAT countries; disabled for KW/QA.
     expect(config.taxBar?.enabled).toBe(c.taxSystem === 'VAT');
     if (c.taxSystem === 'VAT') expect(config.taxBar?.label?.en).toBe(c.taxNumberLabel);
