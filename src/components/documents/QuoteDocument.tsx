@@ -8,6 +8,7 @@ import React from 'react';
 import { User, Building2, FileText } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { formatDate, cleanBankFieldValue } from '../../lib/format';
+import { useDocumentCompliance } from '../../hooks/useDocumentCompliance';
 
 interface CompanySettings {
   basic_info?: {
@@ -87,6 +88,14 @@ export const QuoteDocument: React.FC<QuoteDocumentProps> = ({
   t,
   elementId = 'print-frame',
 }) => {
+  // Same choke point (countryTemplateOverride) the pdfmake adapter reads, so the
+  // preview title/band/tax rows can never structurally diverge from print (AD-2).
+  const compliance = useDocumentCompliance(
+    'quote',
+    quote?.id ?? null,
+    { taxRate: quote?.tax_rate ?? null, taxAmount: quote?.tax_amount ?? 0 },
+  );
+
   if (!quote) return null;
 
   const customerAssociatedCompany = quote.customer_associated_company;
@@ -95,16 +104,16 @@ export const QuoteDocument: React.FC<QuoteDocumentProps> = ({
   const customerEmail = quote.customers?.email || quote.companies?.email || 'N/A';
   const customerPhone = quote.customers?.mobile_number || quote.companies?.phone_number || 'N/A';
 
-  // Recalculate correct tax amount based on proper billing rules
-  // Discount should be applied to subtotal first, then VAT calculated on discounted amount
   const subtotal = quote.subtotal || 0;
   const discountAmount = quote.discount_amount || 0;
   const discountType = quote.discount_type || 'amount';
   const discountValue = discountType === 'percentage' ? (subtotal * discountAmount) / 100 : discountAmount;
   const discountedSubtotal = subtotal - discountValue;
-  const taxRate = quote.tax_rate || 0;
-  const correctTaxAmount = (discountedSubtotal * taxRate) / 100;
-  const correctTotalAmount = discountedSubtotal + correctTaxAmount;
+  // Tax rows come from document_tax_lines (via useDocumentCompliance) — no
+  // render-time (subtotal - discount) * rate recompute (AD-3).
+  // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency: summing this ONE document's own tax-component rows, not a cross-document rollup
+  const taxTotal = compliance.taxRows.reduce((sum, row) => sum + row.amount, 0);
+  const totalAmount = quote.total_amount ?? (discountedSubtotal + taxTotal);
 
   return (
     <div id={elementId}>
@@ -135,11 +144,11 @@ export const QuoteDocument: React.FC<QuoteDocumentProps> = ({
               <h3 className="font-bold text-slate-900 text-sm mb-0.5">
                 {companySettings?.basic_info?.company_name || 'Company Name'}
               </h3>
-              {(companySettings?.basic_info?.registration_number || companySettings?.basic_info?.vat_number) && (
+              {(companySettings?.basic_info?.registration_number || compliance.taxBandLabel) && (
                 <p className="text-slate-600 leading-tight">
                   {companySettings?.basic_info?.registration_number && `Reg No: ${companySettings.basic_info.registration_number}`}
-                  {companySettings?.basic_info?.registration_number && companySettings?.basic_info?.vat_number && ' | '}
-                  {companySettings?.basic_info?.vat_number && `VAT No: ${companySettings.basic_info.vat_number}`}
+                  {companySettings?.basic_info?.registration_number && compliance.taxBandLabel && ' | '}
+                  {compliance.taxBandLabel && `${compliance.taxBandLabel}: ${compliance.sellerTaxNumber ?? companySettings?.basic_info?.vat_number ?? ''}`}
                 </p>
               )}
               <div className="space-y-0.5">
@@ -176,7 +185,9 @@ export const QuoteDocument: React.FC<QuoteDocumentProps> = ({
         {/* Document Title */}
         <div className="text-center">
           <h2 className="text-lg font-bold text-slate-900 mb-2">
-            {t('quotation', 'QUOTATION')}
+            {compliance.title.ar
+              ? `${compliance.title.en} | ${compliance.title.ar}`
+              : compliance.title.en}
           </h2>
           <div className="flex justify-center mt-1 hide-in-pdf">
             <Badge variant="custom" color={getStatusColor(quote.status)}>
@@ -327,19 +338,23 @@ export const QuoteDocument: React.FC<QuoteDocumentProps> = ({
                 </span>
               </div>
             )}
-            <div className="flex justify-between text-sm" style={{ marginBottom: '12px' }}>
-              <span className="text-slate-700 font-medium">
-                VAT {quote.tax_rate || 0}% | ضريبة القيمة المضافة:
-              </span>
-              <span className="font-semibold text-slate-900 text-right">
-                {currencyFormat.currencySymbol} {correctTaxAmount.toFixed(currencyFormat.decimalPlaces)}
-              </span>
-            </div>
+            {compliance.taxRows.map((row, index) => (
+              <div
+                key={`${row.label}-${index}`}
+                className="flex justify-between text-sm"
+                style={index === compliance.taxRows.length - 1 ? { marginBottom: '12px' } : undefined}
+              >
+                <span className="text-slate-700 font-medium">{row.label}:</span>
+                <span className="font-semibold text-slate-900 text-right">
+                  {currencyFormat.currencySymbol} {row.amount.toFixed(currencyFormat.decimalPlaces)}
+                </span>
+              </div>
+            ))}
             <div className="total-row-band">
               <div className="total-row-band-inner">
                 <span className="total-label">{t('total', 'Total')} | الإجمالي:</span>
                 <span className="total-amount">
-                  {currencyFormat.currencySymbol} {correctTotalAmount.toFixed(currencyFormat.decimalPlaces)}
+                  {currencyFormat.currencySymbol} {totalAmount.toFixed(currencyFormat.decimalPlaces)}
                 </span>
               </div>
             </div>
