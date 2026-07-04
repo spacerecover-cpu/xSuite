@@ -32,7 +32,6 @@ import {
   XCircle,
   CheckCircle,
   AlertCircle,
-  Download,
   MoreVertical,
   Printer,
   TrendingUp,
@@ -234,69 +233,6 @@ export const PaymentsList: React.FC = () => {
     setShowReceiptModal(true);
   };
 
-  const handleExportToCSV = async () => {
-    // Export ALL rows matching the active filters (not just the current page).
-    let query = supabase
-      .from('payments')
-      .select(`
-        payment_number, payment_date, amount, reference, status,
-        customer:customers_enhanced(customer_name),
-        payment_method:master_payment_methods(name)
-      `)
-      .order('payment_date', { ascending: false });
-
-    if (searchTerm) {
-      const s = sanitizeFilterValue(searchTerm);
-      query = query.or(await buildPaymentSearchOr(s));
-    }
-    if (statusFilter !== 'all') query = query.eq('status', statusFilter);
-    if (paymentMethodFilter !== 'all') query = query.eq('payment_method_id', paymentMethodFilter);
-    if (dateFilter !== 'all') {
-      const now = new Date();
-      let startDate: Date;
-      switch (dateFilter) {
-        case 'today': startDate = new Date(now.setHours(0, 0, 0, 0)); break;
-        case 'week': startDate = new Date(now.setDate(now.getDate() - 7)); break;
-        case 'month': startDate = new Date(now.setMonth(now.getMonth() - 1)); break;
-        case 'year': startDate = new Date(now.setFullYear(now.getFullYear() - 1)); break;
-        default: startDate = new Date(0);
-      }
-      query = query.gte('payment_date', startDate.toISOString().split('T')[0]);
-    }
-
-    const { data, error } = await query;
-    if (error) {
-      toast.error('Failed to export payments');
-      return;
-    }
-
-    const headers = ['Payment #', 'Date', 'Customer', 'Amount', 'Method', 'Reference', 'Status'];
-    const rows = (data ?? []).map((p: any) => [
-      p.payment_number,
-      p.payment_date ? formatDate(p.payment_date) : '',
-      p.customer?.customer_name || 'N/A',
-      p.amount,
-      p.payment_method?.name || 'N/A',
-      p.reference || '',
-      p.status,
-    ]);
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `payments_${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-  };
-
   const handleClearFilters = () => {
     setSearchTerm('');
     setStatusFilter('all');
@@ -426,15 +362,6 @@ export const PaymentsList: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-2 flex-shrink-0">
-                <Button
-                  variant="secondary"
-                  onClick={handleExportToCSV}
-                  className="flex items-center gap-2"
-                  disabled={totalPaymentsCount === 0}
-                >
-                  <Download className="w-4 h-4" />
-                  Export CSV
-                </Button>
                 <Button
                   variant="secondary"
                   onClick={() => setShowAnalytics(!showAnalytics)}

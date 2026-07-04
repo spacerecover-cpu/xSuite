@@ -22,7 +22,6 @@ import {
   Smartphone,
   TrendingUp,
   TrendingDown,
-  RefreshCw,
   ArrowLeftRight,
   Receipt,
   DollarSign,
@@ -51,7 +50,7 @@ export const BankingPage: React.FC = () => {
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
   const [deletingAccount, setDeletingAccount] = useState<BankAccount | null>(null);
 
-  const { data: accounts = [], isLoading: accountsLoading, refetch: refetchAccounts } = useQuery({
+  const { data: accounts = [], isLoading: accountsLoading } = useQuery({
     queryKey: ['bank_accounts', accountFilter],
     queryFn: async () => {
       const filters: Record<string, string> = {};
@@ -231,10 +230,6 @@ export const BankingPage: React.FC = () => {
         icon={Landmark}
         actions={
           <>
-            <Button onClick={() => refetchAccounts()} variant="secondary" size="sm" title="Refresh">
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
             <Button onClick={() => setShowTransferModal(true)} variant="secondary" size="sm">
               <ArrowLeftRight className="w-4 h-4 mr-2" />
               Transfer

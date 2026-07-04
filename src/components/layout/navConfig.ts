@@ -37,6 +37,7 @@ import {
   Banknote,
   CalendarClock,
   SlidersHorizontal,
+  Database,
 } from 'lucide-react';
 
 /** Live badge counters surfaced by `useSidebarBadges`. */
@@ -111,6 +112,12 @@ export const NAV_SECTIONS: NavSectionConfig[] = [
       { to: '/banking', icon: Landmark, label: 'Banking' },
       { to: '/vat-audit', icon: FileCheck, label: 'VAT & Audit' },
       { to: '/reports', icon: BarChart3, label: 'Financial Reports' },
+      // No entry in ROUTE_TO_MODULE_KEY for a settings sub-route, and the
+      // System section (which owns /settings) is isAdmin-gated — so `accounts`
+      // (in FINANCE_ROLES, passes the /settings/import-export route guard)
+      // would otherwise have no nav path there at all. Piggyback on the
+      // 'invoices' module key already granted to whoever sees this section.
+      { to: '/settings/import-export', icon: Database, label: 'Import / Export', moduleKey: 'invoices' },
     ],
   },
   {
