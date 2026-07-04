@@ -235,6 +235,8 @@ export function toQuoteItems(rows: Partial<QuoteItemsRow>[] | null | undefined):
     description: row.description ?? '',
     quantity: row.quantity ?? 0,
     unit_price: row.unit_price ?? 0,
+    unit_label: row.unit_label ?? null,
+    item_code: row.item_code ?? null,
   }));
 }
 
@@ -505,6 +507,7 @@ export function toQuoteData(
     company_id: quoteRow.company_id ?? undefined,
     status: quoteRow.status ?? '',
     title: '',
+    quote_date: quoteRow.quote_date ?? null,
     valid_until: quoteRow.valid_until ?? undefined,
     subtotal: quoteRow.subtotal ?? 0,
     tax_rate: quoteRow.tax_rate ?? 0,

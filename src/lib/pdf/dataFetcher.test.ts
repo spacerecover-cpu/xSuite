@@ -185,6 +185,16 @@ describe('toQuoteData — customer/company contract (regression: customer info s
     const result = toQuoteData(QUOTE_ROW, { currency: OMR });
     expect(result.customer).toBeUndefined();
   });
+
+  it('threads the statutory quote_date (distinct from created_at)', () => {
+    const result = toQuoteData({ ...QUOTE_ROW, quote_date: '2026-07-02' }, { currency: OMR });
+    expect(result.quote_date).toBe('2026-07-02');
+  });
+
+  it('defaults quote_date to null when the row has none (pre-migration rows)', () => {
+    const result = toQuoteData(QUOTE_ROW, { currency: OMR });
+    expect(result.quote_date).toBeNull();
+  });
 });
 
 describe('toInvoiceData — customer/company/bank contract', () => {
@@ -350,7 +360,13 @@ describe('fetchDocumentTaxLines', () => {
 describe('line-item mappers (replace the old as-unknown-as array casts)', () => {
   it('toQuoteItems maps fields and defaults nullable numerics to 0', () => {
     const result = toQuoteItems([{ id: 'qi1', description: 'Imaging', quantity: 2, unit_price: 75 }]);
-    expect(result[0]).toEqual({ id: 'qi1', description: 'Imaging', quantity: 2, unit_price: 75 });
+    expect(result[0]).toEqual({ id: 'qi1', description: 'Imaging', quantity: 2, unit_price: 75, unit_label: null, item_code: null });
+  });
+
+  it('toQuoteItems threads unit_label/item_code from the row (statutory columns)', () => {
+    const result = toQuoteItems([{ id: 'qi1', description: 'Imaging', quantity: 2, unit_price: 75, unit_label: 'Piece', item_code: '998713' }]);
+    expect(result[0].unit_label).toBe('Piece');
+    expect(result[0].item_code).toBe('998713');
   });
 
   it('toInvoiceItems computes line_total from quantity*unit_price (no DB column) and maps tax_rate', () => {

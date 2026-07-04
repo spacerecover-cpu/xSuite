@@ -146,6 +146,11 @@ export interface QuoteItemData {
   quantity: number;
   unit_price: number;
   line_total?: number;
+  /** Unit-of-measure display label (e.g. "Piece"); snapshotted per line. Drives
+   *  the optional `unit` line-item column (hidden unless a profile forces it). */
+  unit_label?: string | null;
+  /** Statutory item code (HSN/SAC etc.); drives the optional `itemCode` column. */
+  item_code?: string | null;
 }
 
 /** One row of `document_tax_lines` for a document (Phase 1 tax ledger). Rollup
@@ -183,6 +188,10 @@ export interface QuoteData {
   company_id?: string;
   status: string;
   title: string;
+  /** Statutory quote-issuance date (distinct from `created_at`); mirrors
+   *  `InvoiceData.invoice_date`. Null on pre-migration rows (M-I fallback to
+   *  `created_at` at the adapter). */
+  quote_date?: string | null;
   valid_until?: string;
   client_reference?: string;
   subtotal: number;

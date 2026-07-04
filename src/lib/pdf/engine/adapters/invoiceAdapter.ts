@@ -216,8 +216,12 @@ export function toEngineData(
   const totalAmount = invoiceData.total_amount ?? (discountedSubtotal + storedTax);
   const amountPaid = invoiceData.amount_paid ?? 0;
   const balanceDue = invoiceData.balance_due ?? (totalAmount - amountPaid);
-  // Document-level rollup rows (one per tax component), ordered by sequence.
-  const rollups = (invoiceData.tax_lines ?? []).filter((l) => l.line_item_id === null);
+  // Document-level rollup rows (one per tax component). Defensively re-sorted
+  // by `sequence` — fetchDocumentTaxLines already DB-orders, but AD-3 says
+  // "ordered by sequence" literally, so the adapter does not trust caller order.
+  const rollups = (invoiceData.tax_lines ?? [])
+    .filter((l) => l.line_item_id === null)
+    .sort((a, b) => a.sequence - b.sequence);
 
   const lines = totalsLines(config);
   const on = (key: string): boolean => lines[key] !== false; // default-on unless explicitly false

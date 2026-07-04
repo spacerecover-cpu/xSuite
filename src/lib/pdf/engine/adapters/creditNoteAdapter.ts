@@ -26,10 +26,14 @@ import { formatEngineMoney, safeString } from '../../utils';
 import { fmtDateWithConfig } from '../../configDate';
 import type { EngineDocData, LabelText, PartyBlock, ResolvedColumn } from '../types';
 
-/** Default column alignments by column key (parity with invoice/quote). */
+/** Default column alignments by column key (parity with invoice/quote).
+ *  `itemCode` / `unit` are the optional statutory columns (hidden until a
+ *  profile's forcedColumns flips them on) — centered like the quantity column. */
 const COLUMN_ALIGN: Record<string, 'left' | 'center' | 'right'> = {
   description: 'left',
   quantity: 'center',
+  itemCode: 'center',
+  unit: 'center',
   unitPrice: 'right',
   lineTotal: 'right',
 };
@@ -39,8 +43,14 @@ function resolveColumns(config: DocumentTemplateConfig): ColumnConfig[] {
   return lineItems?.columns ?? [];
 }
 
-// TODO(Task 12): use the shared forcedColumns helper once it lands — this
-// mirrors today's (pre-forcedColumns) invoiceAdapter column handling exactly.
+// The shared `forcedColumnOverrides()` helper (countryConfig.ts, landed in
+// Task 12) is doc-type-agnostic: `resolveCountryLayer('credit_note')` →
+// `countryTemplateOverride()` already flips the `itemCode`/`unit` columns
+// visible on `config.sections.lineItems` for a profile that forces them,
+// exactly like invoice/quote — reused, not duplicated, at the config-resolution
+// layer, so there is no adapter-local forcedColumns handling to write here. This
+// function only needs the matching alignment entries (above) so a forced column
+// renders centered like every other financial doc type.
 function toResolvedColumns(cols: ColumnConfig[]): ResolvedColumn[] {
   return cols.map((c) => ({
     key: c.key,
