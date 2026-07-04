@@ -1,43 +1,95 @@
-# Session Handoff — 2026-07-04 (Localization Phase 2 — 24/28, WP-1..WP-7 COMPLETE)
+# Session Handoff — 2026-07-04 — Localization Phase 3: WP-1/2/3 DONE (WP-4→7 remain)
 
-## What I was doing
-Executing **Localization Phase 2 (Document Compliance)** from `docs/superpowers/plans/2026-07-02-localization-phase2-document-compliance.md` (28 tasks, 9 WPs) via subagent-driven-development. This session took it from 16/28 → **24/28**: completed **WP-5 (the most delicate package — replaced two live financial RPCs)**, **WP-6 (structured addresses)**, and **WP-7 (unit/item-code persistence)**. Checkpointing at the WP-7/WP-8 boundary because **WP-8 Task 25 is the next delicate live-RPC replacement (`record_stock_sale` DROP+CREATE) and deserves fresh context** — same reasoning that produced the 16/28 checkpoint before WP-5.
+## What this session did
+Executed **Localization Phase 3 — Returns, Numbering Value & Publish Governance** from
+`docs/superpowers/plans/2026-07-02-localization-phase3-returns-numbering-governance.md`
+(32 tasks, 7 work packages). This session took it from "WP-1 implemented but unreviewed"
+to **WP-1 verified + WP-2 complete + WP-3 complete**, and caught+fixed a live legal-numbering bug.
+
+Method (keep using it): I personally own every LIVE migration (reconcile-against-live: capture
+`pg_get_functiondef` first, edit only intended lines, apply, then rolled-back DO-block probes);
+UI/test tasks fan out via `Workflow` (implement → adversarial review → conditional fix); a
+whole-branch adversarial review runs per WP. tsc re-verified UN-PIPED by me each task (subagents
+have falsely reported tsc 0 before). Migrations apply to the canonical DB `ssmbegiyjivrcwgcqutu`.
 
 ## Current status
-- **Branch:** `feat/localization-phase2-document-compliance` (base `main` 9fbde50). **HEAD = c423679.** LOCAL ONLY — **nothing pushed** (local-first; push only when the owner asks in the moment).
-- **24 of 28 tasks COMPLETE + reviewed. tsc 0 (verified un-piped each task), full suite ~2439 green** (1 = known typst `.node` PDF-hash LOAD-FLAKE, passes 5/5 in isolation — never fail a task on it).
-  - **WP-5 (COMPLETE)** — Task 17+18 (3595915, **migration `20260704062125 phase2_requirement_gate_and_snapshots` LIVE**): `evaluate_document_requirements` + `issue_tax_document` v2 + `issue_credit_note` gate — unskippable requirement gate (block→P0403), dry-run `requirement_failures`, buyer/seller/supply/reverse_charge/notations issuance snapshots. Reconciled against live `pg_get_functiondef` (v_inv/v_tax_point/v_cn — NOT the plan's names); trigger-safe (no double-post, atomic w/ v1.2.0 custody event); 3 independent adversarial reviews APPROVED; end-to-end probed on the live OM pack-pinned tenant (rolled-back). Task 19 (a141da2): pre-issue dry-run UI + P0403 recovery on InvoiceDetailPage/CaseDetail/CreditNoteModal; independent review APPROVED after 1 fix loop (re-entry guard + stale-dialog close). Source snapshot at `supabase/rpc_snapshots/` + drift tests (`src/lib/regimes/gcc_tax_invoice/issuanceGateDrift.test.ts`, OWNER RULING #1, mutation-checked).
-  - **WP-6 (COMPLETE)** — Task 20 (cc3c508: geoSubdivisionService + AddressFields), Task 21 (a50c32c: structured address on customer/company/supplier forms, legacy blob preserved), Task 22 (272e760 + parity 3c40cda: country-ordered address rendering). **⚠️ Task 22 has an OWNER-RATIFICATION item — see below.**
-  - **WP-7 (COMPLETE)** — Task 23 (f6882e7: unitCodesService + unit/item-code persistence — fixed the createQuote silent-drop; unit survives quote→invoice), Task 24 (c423679: unit `<select>` + item-code field on Invoice/Quote forms; `unit: 'Service'` literal removed everywhere).
+- **Branch: `feat/p3-fiscal-numbering` (WP-3 tip) @ `fd50755`.** It STACKS the whole phase:
+  `feat/p3-returns-schema` (WP-1) → `feat/p3-gcc-return` (WP-2) → `feat/p3-fiscal-numbering` (WP-3).
+  All three pushed to origin this session. Base = `ebb7781` (a local-only PRE-REQ tsc fix that fixed
+  3 errors #366 leaked; it rides along on the branch and merges via the branch PR — **do NOT push main**).
+- **tsc 0 (own un-piped run), all WP tests green, working tree clean** (only `.claude/settings.local.json`,
+  harness-owned, left untouched). Every Phase-3 migration is LIVE on `ssmbegiyjivrcwgcqutu`.
+- **⚠️ The authoritative task-by-task ledger `.superpowers/sdd/progress.md` is GITIGNORED** — it does
+  NOT travel with the push. If you're on a new machine, THIS file + `git log` + the plan are your map.
 
-## Next step (resume here — the SDD ledger `.superpowers/sdd/progress.md` is the authoritative map; trust it + `git log` over recollection)
-**WP-8 (Tasks 25–26, migration #5) — the last delicate migration. Base c423679.**
-1. **Task 25 — DELICATE, apply the Task-18 playbook.** `record_stock_sale(p_sale jsonb, p_items jsonb)` → v2 with a 3rd arg `p_tax_lines jsonb DEFAULT NULL`; the plan says **DROP + CREATE** (arg-count change). MUST: (a) **capture live `pg_get_functiondef('record_stock_sale')` FIRST** and edit by anchored insertion — a blind repo paste reverted prior migrations (Phase 0/1 lesson, and this session's WP-5 confirmed the plan's variable-name/structure assumptions are often WRONG vs live); (b) probe the FULL column sets of `vat_records` + `document_tax_lines` + `stock_sales`/`stock_sale_items` before writing INSERTs; (c) add `stock_sales.tax_amount numeric(19,4) NOT NULL DEFAULT 0`, `tax_inclusive boolean NOT NULL DEFAULT false`, `tax_regime_key text`; (d) get the composed SQL **adversarially reviewed before applying** (3 lenses worked well for Task 18); (e) end-to-end probe in a **rolled-back tx** — insert-probes on tenant tables need `SET LOCAL app.bypass_tenant_guard='true'` AND, for anything hitting `log_chain_of_custody`, a `SET LOCAL request.jwt.claims='{"sub":"b4b86e5d-de36-4059-9237-0018157c9f1d","tenant_id":"4803501b-87a1-4a0e-abbe-8d7d45eeb4fc","role":"authenticated"}'` session so `get_current_tenant_id()` resolves (that user = the OM demo tenant owner). Then regen types + manifest + update ALL callers (`stockService`/`record_stock_sale` caller — grep) for the new arg. **Task 25 DROP the 2-arg overload before Task 26.**
-2. **Task 26** — `computeStockSaleTax` + `StockSaleModal` tax UI (mirrors the invoice/quote tax flow); add automated throw-path tests (not just hand-run SQL).
-Then **WP-9** (Task 27 GCC-6+UK compliance matrix + RTL snapshots — **assert the LIVE `geo_countries.tax_number_label` values: OM=TRN? NO — LIVE is 'VAT Number' for OM/AE/SA/BH; KW/QA tax_system=NONE**; Task 28 M-I guards — make guard-3 a real assertion, not a null===null tautology), then **whole-branch review** (dispatch on the most capable model, package via `scripts/review-package MERGE_BASE HEAD`) + **superpowers:finishing-a-development-branch**.
+## Commit stack (origin/main 459b36b → HEAD fd50755, 12 commits incl. PRE-REQ)
+```
+fd50755 test(numbering): P3 regression probe pack (recorded evidence)          # WP-3 T13
+2270b1c fix(db): min-width padding — no LPAD truncation of legal numbers        # WP-3 LPAD fix
+ac4ce1d feat(settings): SystemNumbers fiscal-template fields + live preview     # WP-3 T12
+1e80940 feat(db): master_numbering_policies + apply_country_numbering_policy    # WP-3 T10+T11
+5b498fb feat(vat): return drill-down + reconciliation badge                     # WP-2 T9
+5c4285d feat(vat): VATReturnModal files through composer + file_vat_return      # WP-2 T8
+5116feb fix(vat): drill-down + quarterly summary on tax_period dimension        # WP-2 T7
+a988572 feat(tax): taxReturnService                                             # WP-2 T6
+a2a8dc9 feat(regimes): gcc_return ReturnComposer                                # WP-2 T5
+ea63c44 feat(country): filing keys + trigger parity                             # WP-2 T4
+6c7661f feat(db): P3 WP-1 returns schema + file_vat_return                      # WP-1 T1-3
+ebb7781 fix(types): boundary-cast tax columns (PRE-REQ, local-only base)
+```
 
-## ⚠️ OPEN OWNER DECISION (asked 2026-07-04, owner away — I proceeded with the recommended default)
-**Task 22 plan-vs-schema conflict.** The plan derived `postalFirst` from `geo_countries.address_format` as a **string** via `.startsWith('postal_first')` (OM assumed null). **LIVE reality: `address_format` is JSONB** `{"lines":["%N","%O","%A","%C %Z"]}` templates — all 58 countries populated, 0 nulls/strings; the plan's code is uncompilable. I implemented **Option A (schema-correct, no migration)**: derive `postalFirst=true` only when the `%Z` token precedes `%C` in the joined template → **false for ALL onboardable countries (GCC/US/UK) → PDF output UNCHANGED**. Both invoice + quote adapters now config-driven. **Owner: ratify Option A, or prefer (B) defer to a later phase / (C) add a dedicated boolean column.** No output changes either way today.
+## What shipped, by WP
+- **WP-1 (verified):** `tax_return_lines`, `vat_returns` regime cols, `file_vat_return` RPC
+  (re-derives boxes from `vat_records.vat_amount_base` by `tax_period`, rejects divergence/overlap).
+  Seam resolved: output box fully sourced by issue_tax_document/credit-note-contra/record_stock_sale
+  (all `record_type='sale'`); input box has no writer yet (fail-loud via divergence guard).
+- **WP-2 (complete):** registry filing keys (`tax.filing_frequency`/`period_anchor`/`return_composer`)
+  + trigger parity; `gcc_return` composer (3-box, month-aligned anchors, base==jurisdiction guard);
+  `taxReturnService` (config→composer→subledger→file); vatService drill-down + quarterly summary onto
+  `tax_period`; VATReturnModal rewrite (no UTC quarter math); VATReturnDetailModal + reconciliation badge.
+  **Live rolled-back proof: return files from subledger, `reconciled=t`.**
+- **WP-3 (complete):** `master_numbering_policies` global table + GCC seeds; `apply_country_numbering_policy`
+  (non-destructive NULL→value fill); SystemNumbers fiscal UI (plan was STALE — Phase-1 already built the
+  fields+preview; workflow added the missing test + fixed a lying legacy badge → 'Templated'); regression probe pack.
 
-## Carry-forward MINORS for the whole-branch review (accumulated; none blocking)
-- Task 18/CN gate uses `CURRENT_DATE` not tenant-local `v_tax_point` (plan-mandated Edit D; date-boundary precision only, CN seeds unconditional).
-- `issue_credit_note` RETURNS the pre-stamp `v_cn` (Edit D UPDATEs after RETURNING) — callers needing the stamped snapshot must re-fetch (Task 11 dataFetcher does).
-- `issue_tax_document` quote path never evaluates requirements (no quote seeds; defensible) — the dry-run explain surface returns `[]` for quotes.
-- `zero_rated` notation `LIMIT 1` has no ORDER BY (plan-mandated, mirrors profile `break`).
-- The `rpc_snapshots/` snapshot must be updated in lockstep with any future re-sign of these RPCs (README + drift tests enforce it for notation/blocks).
-- Task 20 `listSubdivisions` filters `is_active` but not `deleted_at` (plan-faithful; global master data).
-- Task 21: `CreateCustomerInput`/`CreateCompanyInput` service-input interfaces don't declare the 4 address fields (passed via intermediate-const to bypass TS excess-property check; works via `...input` spread → insert, VERIFIED reaches the DB, but the input types should ideally declare them — needs touching customerService/companyService, out of Task 21's file scope). CustomerFormModal is create-only; CompaniesListPage edit modal has no caller today; SupplierData edit-hydrate needs SupplierProfilePage to pass the fields (later task); supplier form country is free-text (no geo FK) → subdivision hidden.
-- Task 22: `postalFirst` via `%Z`/`%C` token position is a lossy read of the richer `lines` template (sufficient for the boolean this phase).
-- Page-level toast/dialog strings across Task 19/21/24 are hardcoded English (the ~2000-string t() instrumentation is a separately-deferred program; reusable components ARE i18n'd).
+## Two catches worth remembering
+1. **Plan-drift trap (WP-2 T4):** the plan's `validate_country_config_overrides` trigger migration assumed
+   `statutory_keys` held 1 key and would REPLACE with 4 — LIVE held **11** (P1/P2 grew it). A verbatim paste
+   would have DELETED 10 jurisdiction locks. Reconcile-against-live caught it → additive 11→14. **Every
+   plan migration in WP-4→7 must be reconciled against live before applying — the plan drifts.**
+2. **LIVE LPAD invoice-number truncation bug (fixed, owner-approved):** `LPAD(v,width)` TRUNCATES longer
+   values → `get_next_number` (the invoice-minting path) rendered 10193 as '1019' at padding 4 (Risk #8,
+   duplicate legal numbers). OM `invoices` counter=10192 was already in the truncation zone. Fixed via new
+   `format_sequence_number(bigint,int)` min-width helper (migration `phase3_fix_lpad_sequence_truncation`).
 
-## ⚠️ HARD RULE (standing)
-Local-first: NO push / gh pr create / remote change until the owner explicitly asks in the moment. Applying **additive** migrations (incl. DROP FUNCTION to re-sign) to the canonical DB `ssmbegiyjivrcwgcqutu` via `mcp__supabase__apply_migration` is the established in-scope workflow when executing an owner-authorized migration plan; git push/PR is separately gated.
+## Carry-forwards (all MINOR / config-time / unreachable-today — none block; fix in a follow-up pass)
+- WP-2: dead vatService helpers `createVATRecordFromInvoice`/`FromPurchase` (no tax_period/base, 0 callers)
+  — recommend delete. Legacy `createVATReturn`/`createVATReturnFromPeriod` still exported (returns w/o
+  tax_return_lines show spurious "NOT reconciled"). `file_vat_return` trusts `p_tax_periods` for the SUM but
+  stores `period_start/end` separately (fine for contiguous gcc_return; harden for future composers).
+- WP-3: **F1** preview_number_format renders `{FY}` as fiscal `YYYY-YY` always, but get_next_number renders
+  bare `YYYY` for calendar_year/never → preview lies for those bases (fix: mirror the reset_basis branch in
+  preview). **F2** `update_number_sequence` COALESCE has no clear-sentinel → UI can't unset a template/reset_basis.
+  Same LPAD-truncation class in `assign_receipt_number`/`assign_tenant_code`/`data_migration_finalize` (unfixed).
+- OM data: `resolved_country_config` has null filing keys → getFilingConfig falls back to coded defaults
+  (correct GCC); a later OM pack republish should set them explicitly. OM `invoices` prefix='INVO' vs historical
+  imported "TAX INVOICE####" = data-import mismatch (orthogonal to the LPAD fix).
+- Oman reconciliation "real" (nonzero) proof needs SEEDED issued invoices — vat_records is 0 rows live.
 
-## Plan progress
-- Phase 0 (#359) + Phase 1 (#361) MERGED. resync fix = PR #363. Phase 2 = this branch, **24/28** (WP-1..WP-7 done; WP-8 migration + WP-9 tests remain).
-- Phases 3–6 plans exist, not started.
+## HOW TO RESUME (next session → WP-4)
+1. `git checkout feat/p3-fiscal-numbering` (or your pushed tip); `git pull` if continuing elsewhere.
+2. Re-read the plan WP-4 section (`### Task 14`…`Task 18`, ~lines 2022-2804) — **11 publish-governance RPCs**:
+   pack authoring RPCs + gate helpers (T14), `publish_country_pack` 4-part machine gate (T15), pg_cron
+   staleness monitor (T16), publish→resync no-op probe (T17), capability manifest sync (T18).
+3. Cut `feat/p3-publish-governance` **from `feat/p3-fiscal-numbering`** (keep stacking — cross-WP type deps).
+4. RECONCILE every migration against live first (the plan drifts — see catch #1). Own live DDL yourself;
+   fan out any TS/UI via Workflow; whole-branch review per WP.
+5. Then **WP-5** (Country Authoring Studio UI, 7 tasks T19-25), **WP-6** (CLDR import, T26),
+   **WP-7** (AE/SA pack publish + zatca_ph1 + retire einvoiceRouting, T27-32).
+   ⚠️ **WP-7 needs a SECOND platform-admin account** (different `auth.uid()`) for dual-control publish —
+   line it up before starting (via `user-management` edge fn / platform-admin flow).
 
-## Reusable facts (verified live this session)
-- OM pack-pinned tenant `4803501b-87a1-4a0e-abbe-8d7d45eeb4fc` (pack v1); primary legal_entities.tax_identifier='OM1100000000' (seller VATIN present → gate doesn't block legit issuance); owner profile `b4b86e5d-de36-4059-9237-0018157c9f1d`.
-- `get_current_tenant_id()` reads profiles by auth.uid() then falls back to `request.jwt.claims->>'tenant_id'`; set both in probe sessions.
-- Triggers on invoices: enforce_issued_invoice_immutability (whitelist EXCLUDES snapshot cols → stamp must precede the flip), post_invoice_vat_record (backstop, suppressed by app.issuing='true'), assert_document_tax_integrity (deferred), enforce_invoice_balance. On credit_notes: post_credit_note_vat_record (posts on INSERT or →void only; NO immutability trigger).
+## Standing rules
+- Local-first was released this session (owner asked to push). If continuing: commit locally, push when asked.
+- Reconcile-against-live on EVERY migration. Re-verify tsc UN-PIPED. Do NOT git-add `.superpowers/` (gitignored)
+  or `.claude/settings.local.json`. Never push `main` — PRs squash-merge; don't reuse a merged branch name.

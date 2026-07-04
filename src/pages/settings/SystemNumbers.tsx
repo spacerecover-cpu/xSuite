@@ -222,6 +222,10 @@ export const SystemNumbers: React.FC = () => {
   };
 
   const formatNumber = (seq: NumberSequence) => {
+    // Template rows are rendered server-side (see the edit-modal live preview);
+    // reusing the legacy prefix+padding form here would advertise a next number
+    // the DB will never mint, so surface a neutral marker instead of a lie.
+    if (seq.format_template) return 'Templated';
     const nextNum = seq.current_value + 1;
     return seq.prefix + '-' + nextNum.toString().padStart(seq.padding, '0');
   };

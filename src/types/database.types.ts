@@ -10316,6 +10316,63 @@ export type Database = {
           },
         ]
       }
+      master_numbering_policies: {
+        Row: {
+          country_id: string
+          created_at: string
+          deleted_at: string | null
+          fiscal_year_anchor: string | null
+          format_template: string | null
+          id: string
+          max_length: number | null
+          pack_version_id: string | null
+          reset_basis: string
+          scope: string
+          updated_at: string | null
+        }
+        Insert: {
+          country_id: string
+          created_at?: string
+          deleted_at?: string | null
+          fiscal_year_anchor?: string | null
+          format_template?: string | null
+          id?: string
+          max_length?: number | null
+          pack_version_id?: string | null
+          reset_basis?: string
+          scope: string
+          updated_at?: string | null
+        }
+        Update: {
+          country_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          fiscal_year_anchor?: string | null
+          format_template?: string | null
+          id?: string
+          max_length?: number | null
+          pack_version_id?: string | null
+          reset_basis?: string
+          scope?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "master_numbering_policies_country_id_fkey"
+            columns: ["country_id"]
+            isOneToOne: false
+            referencedRelation: "geo_countries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "master_numbering_policies_pack_version_id_fkey"
+            columns: ["pack_version_id"]
+            isOneToOne: false
+            referencedRelation: "master_country_pack_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       master_payment_methods: {
         Row: {
           created_at: string
@@ -18081,6 +18138,10 @@ export type Database = {
         Args: { p_customer_id: string }
         Returns: undefined
       }
+      apply_country_numbering_policy: {
+        Args: { p_tenant_id: string }
+        Returns: number
+      }
       apply_credit_note: {
         Args: { p_allocations: Json; p_credit_note_id: string }
         Returns: {
@@ -18376,6 +18437,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      format_sequence_number: {
+        Args: { p_value: number; p_width: number }
+        Returns: string
       }
       generate_next_number: { Args: { p_scope: string }; Returns: string }
       get_accessible_modules: {
