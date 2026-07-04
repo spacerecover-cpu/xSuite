@@ -9,24 +9,10 @@ import { MultiSelectDropdown } from '../../ui/MultiSelectDropdown';
 import { EngineerSelector } from '../EngineerSelector';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
-import { getAllowedTransitions } from '@/lib/caseStateMachineService';
-import { buildCaseStatusOptions, type StatusOptionGroup } from '@/lib/caseStatusOptions';
-import { useTenantFeatures } from '../../../contexts/TenantConfigContext';
 import type { Database } from '../../../types/database.types';
 
 type CaseRow = Database['public']['Tables']['cases']['Row'];
 type CaseDeviceRow = Database['public']['Tables']['case_devices']['Row'];
-
-// Optgroup labels + render order for the status picker. Hoisted (static) so they
-// are not rebuilt each render.
-const STATUS_GROUP_LABELS: Record<StatusOptionGroup, string> = {
-  current: 'Current',
-  lateral: 'Within this stage',
-  advance: 'Move to',
-  cancel: 'Cancel case',
-  reopen: 'Reopen case',
-};
-const STATUS_CHANGE_GROUPS: StatusOptionGroup[] = ['lateral', 'advance', 'cancel', 'reopen'];
 
 type GeoNameEmbed = { name: string | null } | null;
 type NamedRefEmbed = { id: string; name: string | null } | null;
@@ -176,21 +162,10 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
     },
   });
 
-  // The status picker must only offer moves the state machine accepts: the
-  // current status, its same-phase siblings (intra-phase moves), and the
-  // role-filtered cross-phase transitions for the current phase. The old "offer
-  // every status" dropdown produced HTTP 400s from transition_case_status on any
-  // same-phase or non-adjacent pick.
-  const currentStatus = caseStatuses.find((s) => s.name === caseData.status) ?? null;
-
-  const { isEnabled: isFeatureOn } = useTenantFeatures();
-  const qaEnabled = isFeatureOn('workflow.stage.qa');
-
-  const { data: allowedTransitions = [] } = useQuery({
-    queryKey: ['case_allowed_transitions', currentStatus?.id ?? null, profile?.role ?? null, qaEnabled],
-    queryFn: () => getAllowedTransitions(currentStatus?.id ?? null, profile?.role ?? null, { qaEnabled }),
-    enabled: !!currentStatus?.id && !!profile?.role,
-  });
+  // The Status field is a free-form manual override: it lists every active
+  // status and sets any of them via set_case_status (all-staff, no sequence
+  // gates). Case history records each change. `caseStatuses` (ordered by
+  // sort_order) is the flat option source.
 
   const { data: deviceTypes = [] } = useQuery({
     queryKey: ['device_types'],
@@ -276,13 +251,6 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
       .join(', ');
   };
 
-  const statusChangeOptions = buildCaseStatusOptions({
-    current: currentStatus,
-    allActiveStatuses: caseStatuses,
-    allowedTransitions,
-    qaEnabled,
-  });
-  const hasStatusChangeTargets = statusChangeOptions.some((o) => o.group !== 'current');
   const priorityOptions = casePriorities.map(priority => ({ value: priority.name.toLowerCase(), label: priority.name }));
 
   const handleCancelEdit = () => {
@@ -404,30 +372,15 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
                     aria-label="Change case status"
                     autoFocus
                   >
-                    {/* Keep the current value selectable even if it isn't in the
-                        reachable set, so the field never renders blank. */}
-                    {caseData.status && !statusChangeOptions.some((o) => o.value === caseData.status) && (
+                    {/* Free-form manual override: every active status, flat. Keep
+                        a legacy/inactive current value selectable so the field
+                        never renders blank. */}
+                    {caseData.status && !caseStatuses.some((s) => s.name === caseData.status) && (
                       <option value={caseData.status}>{caseData.status}</option>
                     )}
-                    {statusChangeOptions
-                      .filter((o) => o.group === 'current')
-                      .map((o) => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    {STATUS_CHANGE_GROUPS.map((g) => {
-                      const groupOpts = statusChangeOptions.filter((o) => o.group === g);
-                      if (groupOpts.length === 0) return null;
-                      return (
-                        <optgroup key={g} label={STATUS_GROUP_LABELS[g]}>
-                          {groupOpts.map((o) => (
-                            <option key={o.value} value={o.value}>{o.label}</option>
-                          ))}
-                        </optgroup>
-                      );
-                    })}
-                    {!hasStatusChangeTargets && (
-                      <option value="__none__" disabled>No status changes available from here</option>
-                    )}
+                    {caseStatuses.map((s) => (
+                      <option key={s.id} value={s.name}>{s.name}</option>
+                    ))}
                   </select>
                 )}
               </div>

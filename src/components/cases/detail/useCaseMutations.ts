@@ -109,11 +109,13 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
   });
 
   const updateCaseStatusMutation = useMutation({
-    // The state-machine guard trigger blocks direct UPDATE cases.status,
-    // so this mutation now routes through transition_case_status RPC which
-    // validates the phase edge + role allowlist, writes case_job_history,
-    // and emits notification_events. Caller still passes the status NAME
-    // (legacy API surface) — we resolve to status_id internally.
+    // The Overview Status picker is a free-form MANUAL OVERRIDE: it routes
+    // through set_case_status, which lets any non-viewer staff set a case to
+    // any status with no sequence/evidence gates (the guided Stage Banner keeps
+    // the gated transition_case_status path). set_case_status still writes
+    // case_job_history + emits notification_events, and the guard trigger blocks
+    // direct UPDATEs, so this remains the sanctioned write path. Caller passes
+    // the status NAME (legacy API surface) — we resolve to status_id internally.
     mutationFn: async (newStatus: string) => {
       const caseId = requireCaseId(id);
 
@@ -130,12 +132,12 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
         throw new Error(`Unknown case status: ${newStatus}`);
       }
 
-      const { data, error } = await supabase.rpc('transition_case_status', {
+      const { data, error } = await supabase.rpc('set_case_status', {
         p_case_id: caseId,
         p_to_status_id: target.id,
       });
       if (error) {
-        logger.error('transition_case_status failed', error, { caseId, newStatus });
+        logger.error('set_case_status failed', error, { caseId, newStatus });
         throw error;
       }
       return data;

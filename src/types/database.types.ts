@@ -19143,6 +19143,14 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      set_case_status: {
+        Args: {
+          p_case_id: string
+          p_notes?: string
+          p_to_status_id: string
+        }
+        Returns: Json
+      }
       set_customer_portal_password: {
         Args: { p_customer_id: string; p_password_hash: string }
         Returns: undefined
