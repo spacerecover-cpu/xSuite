@@ -5,12 +5,15 @@ export const genericInvoice: DocumentComplianceProfile = {
   key: 'generic_invoice',
   version: '1.0.0',
   documentTitle({ docType, sellerRegistered, taxInvoiceRequired }) {
-    if (docType === 'quote') return { title: 'QUOTATION', titleTranslated: null };
-    if (docType === 'credit_note') return { title: 'CREDIT NOTE', titleTranslated: null };
-    if (docType === 'stock_sale') return { title: 'SALES RECEIPT', titleTranslated: null };
+    // Supply Arabic titles so a bilingual (e.g. KW/QA) document doesn't fall back to the base
+    // config's 'فاتورة ضريبية' (TAX INVOICE) for a plain 'INVOICE' — mergeLabels keeps the base
+    // ar when the override omits it, which would pair English 'INVOICE' with Arabic 'TAX INVOICE'.
+    if (docType === 'quote') return { title: 'QUOTATION', titleTranslated: 'عرض أسعار' };
+    if (docType === 'credit_note') return { title: 'CREDIT NOTE', titleTranslated: 'إشعار دائن' };
+    if (docType === 'stock_sale') return { title: 'SALES RECEIPT', titleTranslated: 'إيصال مبيعات' };
     return sellerRegistered && taxInvoiceRequired
-      ? { title: 'TAX INVOICE', titleTranslated: null }
-      : { title: 'INVOICE', titleTranslated: null };
+      ? { title: 'TAX INVOICE', titleTranslated: 'فاتورة ضريبية' }
+      : { title: 'INVOICE', titleTranslated: 'فاتورة' };
   },
   requiresTaxInvoiceCeremony: true,
   showRegistrationBand: true,
