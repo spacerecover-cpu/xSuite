@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
+import { cn } from '../../lib/utils';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { buildCaseSearchOr } from '../../lib/caseSearch';
 import { Button } from '../../components/ui/Button';
@@ -84,31 +85,33 @@ type ExportDevice = {
 const exportPrimaryDevice = (r: Record<string, unknown>) =>
   pickPrimaryDevice((r.case_devices as ExportDevice[] | null) ?? undefined);
 
-// Quick-chip tinting by lifecycle type — the same colour language as the
-// bucket cards, resolved through the tenant's status mapping so any imported
-// vocabulary tints correctly. Literal classes for JIT safety; cat-2 actives
-// use a ring+tint (teal-600 solid fails AA under white 14px text).
-const CHIP_STYLE: Partial<Record<CaseStatusType, { idle: string; active: string }>> = {
-  intake: { idle: 'bg-primary/10 text-primary hover:bg-primary/20', active: 'bg-primary text-primary-foreground shadow-md' },
-  diagnosis: { idle: 'bg-warning-muted text-warning hover:bg-warning/20', active: 'bg-warning text-warning-foreground shadow-md' },
-  quoting: { idle: 'bg-cat-6/10 text-cat-6 hover:bg-cat-6/20', active: 'bg-cat-6 text-white shadow-md' },
-  awaiting_approval: { idle: 'bg-cat-6/10 text-cat-6 hover:bg-cat-6/20', active: 'bg-cat-6 text-white shadow-md' },
-  approved: { idle: 'bg-cat-2/10 text-cat-2 hover:bg-cat-2/20', active: 'bg-cat-2/20 text-cat-2 ring-2 ring-cat-2' },
-  recovery: { idle: 'bg-cat-2/10 text-cat-2 hover:bg-cat-2/20', active: 'bg-cat-2/20 text-cat-2 ring-2 ring-cat-2' },
-  qa: { idle: 'bg-cat-2/10 text-cat-2 hover:bg-cat-2/20', active: 'bg-cat-2/20 text-cat-2 ring-2 ring-cat-2' },
-  ready: { idle: 'bg-success-muted text-success hover:bg-success/20', active: 'bg-success text-success-foreground shadow-md' },
-  delivered: { idle: 'bg-info-muted text-info hover:bg-info/20', active: 'bg-info text-info-foreground shadow-md' },
-  closed: { idle: 'bg-slate-100 text-slate-600 hover:bg-slate-200', active: 'bg-slate-600 text-white shadow-md' },
-  cancelled: { idle: 'bg-danger-muted text-danger hover:bg-danger/20', active: 'bg-danger text-danger-foreground shadow-md' },
+// Quick-chip colour language: a small status dot carries the lifecycle hue
+// (the same palette as the bucket cards above), so a row of chips reads as
+// quiet accents on neutral pills instead of saturated fills competing with the
+// cards. Only the active (filtering) chip tints its whole pill in its own hue.
+// Resolved through the tenant's status mapping so imported vocabulary tints
+// correctly. Literal classes for JIT safety.
+const CHIP_STYLE: Partial<Record<CaseStatusType, { dot: string; active: string }>> = {
+  intake: { dot: 'bg-primary', active: 'border-primary bg-primary/10 text-primary' },
+  diagnosis: { dot: 'bg-warning', active: 'border-warning bg-warning-muted text-warning' },
+  quoting: { dot: 'bg-cat-6', active: 'border-cat-6 bg-cat-6/10 text-cat-6' },
+  awaiting_approval: { dot: 'bg-cat-6', active: 'border-cat-6 bg-cat-6/10 text-cat-6' },
+  approved: { dot: 'bg-cat-2', active: 'border-cat-2 bg-cat-2/10 text-cat-2' },
+  recovery: { dot: 'bg-cat-2', active: 'border-cat-2 bg-cat-2/10 text-cat-2' },
+  qa: { dot: 'bg-cat-2', active: 'border-cat-2 bg-cat-2/10 text-cat-2' },
+  ready: { dot: 'bg-success', active: 'border-success bg-success-muted text-success' },
+  delivered: { dot: 'bg-info', active: 'border-info bg-info-muted text-info' },
+  closed: { dot: 'bg-slate-400', active: 'border-slate-400 bg-slate-100 text-slate-700' },
+  cancelled: { dot: 'bg-danger', active: 'border-danger bg-danger-muted text-danger' },
 };
-const DEFAULT_CHIP_STYLE = {
-  idle: 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-  active: 'bg-primary text-primary-foreground shadow-md',
-};
+const DEFAULT_CHIP_STYLE = { dot: 'bg-slate-400', active: 'border-primary bg-primary/10 text-primary' };
 
-function statusChipClasses(type: CaseStatusType | undefined, active: boolean): string {
-  const style = (type && CHIP_STYLE[type]) || DEFAULT_CHIP_STYLE;
-  return active ? style.active : style.idle;
+// Neutral resting pill — the hue lives only in the dot until the chip is active.
+const IDLE_CHIP_CLASS =
+  'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50';
+
+function chipStyleFor(type: CaseStatusType | undefined) {
+  return (type && CHIP_STYLE[type]) || DEFAULT_CHIP_STYLE;
 }
 
 export const CasesList: React.FC = () => {
@@ -652,19 +655,25 @@ export const CasesList: React.FC = () => {
               />
             </div>
 
-            <div className="flex-1 flex flex-wrap items-center gap-2">
+            <div className="flex-1 flex flex-wrap items-center gap-1.5">
               {topStatusChips.map(({ status, total }) => {
                 const active = filterStatus === status;
                 const type = commandStats?.statusTypeMap.get(status);
+                const style = chipStyleFor(type);
                 return (
                   <button
                     key={status}
                     onClick={() => setFilterStatus(active ? 'all' : status)}
                     aria-pressed={active}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${statusChipClasses(type, active)}`}
+                    title={active ? `Clear ${status} filter` : `Filter by ${status}`}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      active ? style.active : IDLE_CHIP_CLASS,
+                    )}
                   >
-                    {status}
-                    <span className={`ml-1.5 text-xs tabular-nums ${active ? 'opacity-80' : 'opacity-60'}`}>
+                    <span className={cn('h-2 w-2 shrink-0 rounded-full', style.dot)} aria-hidden="true" />
+                    <span>{status}</span>
+                    <span className={cn('tabular-nums', active ? 'opacity-70' : 'text-slate-400')}>
                       {total.toLocaleString()}
                     </span>
                   </button>
@@ -677,9 +686,9 @@ export const CasesList: React.FC = () => {
                     setFilterPriority('all');
                     setBucketFilter(null);
                   }}
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-200 text-slate-700 hover:bg-slate-300 transition-all"
+                  className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  Clear All
+                  Clear all
                 </button>
               )}
             </div>
