@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
-import { hasStoredAuthSession, resetSessionPersistence } from '../lib/authStorage';
+import { authStorageAdapter, AUTH_STORAGE_KEY, hasStoredAuthSession, resetSessionPersistence } from '../lib/authStorage';
+import { watchInactivity } from '../lib/inactivity';
 import { mfaService } from '../lib/mfaService';
 import { rolePermissionsService } from '../lib/rolePermissionsService';
 import { logger, setSentryUser } from '../lib/logger';
@@ -44,6 +45,19 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// A profile-fetch failure that means "the server rejects this session's
+// token" (as opposed to a transient network/RLS hiccup). PostgREST answers
+// JWT problems with 401 + code PGRST301. When sessionRecovery could not fix
+// it with a forced refresh, the session is dead — retrying or showing the
+// error card just strands the user on it until they clear site data.
+const isAuthDeadError = (err: unknown): boolean => {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { code?: unknown; message?: unknown; status?: unknown };
+  if (e.code === 'PGRST301') return true;
+  if (e.status === 401) return true;
+  return typeof e.message === 'string' && /\bJWT\b/.test(e.message);
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -75,6 +89,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // the PendingApprovalScreen poll — can't surface 'error' / clear loading in
   // the window before SIGNED_OUT lands, which is what still flashed the card.
   const signingOut = useRef(false);
+
+  const performSignOut = useCallback(async (scope: 'global' | 'local') => {
+    // Invalidate any in-flight profile fetch and show the auth skeleton until
+    // the SIGNED_OUT event redirects. Clearing `profile` while `user` is still
+    // set and `loading` is false is what flashed the Profile Error card.
+    authEpoch.current++;
+    userInitiatedSignOut.current = true;
+    signingOut.current = true;
+    setLoading(true);
+    profileCache.current = null;
+    setProfile(null);
+    setProfileStatus('loading');
+    setMfaPending(false);
+    rolePermissionsService.clearCache();
+    localStorage.removeItem('tenant_id');
+    try {
+      // signOut REPORTS failure via its return value (it does not throw), and
+      // auth-js skips the local session removal when the /logout round-trip
+      // fails on a network error — ignoring the result left the dead session
+      // in storage with the UI half torn down. Fall back to a local-only
+      // sign-out, and as a last resort clear the stored session by hand.
+      let { error } = await supabase.auth.signOut({ scope });
+      if (error && scope === 'global') {
+        logger.error('Global sign out failed; retrying with local scope:', error);
+        ({ error } = await supabase.auth.signOut({ scope: 'local' }));
+      }
+      if (error) {
+        logger.error('Local sign out failed; clearing the stored session directly:', error);
+        authStorageAdapter.removeItem(AUTH_STORAGE_KEY);
+        window.location.replace('/login');
+      }
+    } catch (e) {
+      logger.error('Sign out error:', e);
+      authStorageAdapter.removeItem(AUTH_STORAGE_KEY);
+      window.location.replace('/login');
+    }
+  }, []);
 
   const fetchProfile = useCallback(async (userId: string, force = false) => {
     // Boot fires this twice (getSession() resolution AND the INITIAL_SESSION
@@ -132,13 +183,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
       if (isStale()) return;
+      if (isAuthDeadError(lastError)) {
+        // The server rejects this session's token and the sessionRecovery
+        // fetch layer could not refresh it — the persisted session is dead.
+        // Eject to the login page with the session-expired breadcrumb instead
+        // of stranding the user on the Profile Error card with a session that
+        // only clearing site data would remove.
+        logger.error('Profile fetch failed with a dead session token; ejecting to login:', lastError);
+        localStorage.setItem('auth_session_expired', '1');
+        await performSignOut('local');
+        return;
+      }
       logger.error('Error fetching profile (after retries):', lastError);
       setProfileStatus('error');
     } finally {
       profileFetchInFlight.current = null;
       if (!isStale()) setLoading(false);
     }
-  }, []);
+  }, [performSignOut]);
 
   const checkMFAStatus = useCallback(async () => {
     // Recomputed on every session establishment (boot, sign-in, refresh) — not
@@ -300,55 +362,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) throw error;
   }, []);
 
-  const signOut = useCallback(async () => {
-    // Invalidate any in-flight profile fetch and show the auth skeleton until
-    // the SIGNED_OUT event redirects. Clearing `profile` while `user` is still
-    // set and `loading` is false is what flashed the Profile Error card.
-    authEpoch.current++;
-    userInitiatedSignOut.current = true;
-    signingOut.current = true;
-    setLoading(true);
-    profileCache.current = null;
-    setProfile(null);
-    setProfileStatus('loading');
-    setMfaPending(false);
-    rolePermissionsService.clearCache();
-    localStorage.removeItem('tenant_id');
-    try {
-      await supabase.auth.signOut();
-    } catch (e) {
-      logger.error('Sign out error:', e);
-      setLoading(false);
-    }
-  }, []);
+  const signOut = useCallback(() => performSignOut('global'), [performSignOut]);
 
   // Auto sign-out after inactivity. Keyed on user?.id (not the user object) so
   // an hourly TOKEN_REFRESHED — which mints a new User identity for the same
-  // person — doesn't reset the idle clock (L2). Placed after signOut so it can
-  // depend on the stable callback.
+  // person — doesn't reset the idle clock (L2). watchInactivity tracks
+  // activity across ALL tabs (shared localStorage stamp) and sees inner-panel
+  // scrolling / mouse movement, so a background tab can no longer sign out a
+  // session the user is actively working in. The eject is LOCAL scope: one
+  // idle browser must not revoke the user's sessions on every other device.
   useEffect(() => {
     if (!user?.id) return;
 
-    const INACTIVITY_LIMIT = 30 * 60 * 1000;
-    let lastActivity = Date.now();
-
-    const resetTimer = () => { lastActivity = Date.now(); };
-    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'] as const;
-    events.forEach(e => window.addEventListener(e, resetTimer));
-
-    const interval = setInterval(() => {
-      if (Date.now() - lastActivity >= INACTIVITY_LIMIT) {
-        clearInterval(interval);
-        events.forEach(e => window.removeEventListener(e, resetTimer));
-        void signOut();
-      }
-    }, 60_000);
-
-    return () => {
-      clearInterval(interval);
-      events.forEach(e => window.removeEventListener(e, resetTimer));
-    };
-  }, [user?.id, signOut]);
+    return watchInactivity({
+      limitMs: 30 * 60 * 1000,
+      onIdle: () => {
+        // Breadcrumb so the login page explains the eject instead of
+        // silently dropping the user at a blank form.
+        localStorage.setItem('auth_session_expired', '1');
+        void performSignOut('local');
+      },
+    });
+  }, [user?.id, performSignOut]);
 
   // Memoized so the context only changes when auth state actually changes —
   // 59 files consume useAuth(), so an unstable value re-renders most of the app.

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
@@ -72,6 +72,22 @@ describe('ProtectedRoute', () => {
     setAuth({ profile: null, profileStatus: 'error' });
     renderRoute();
     expect(screen.getByText('Profile Error')).toBeInTheDocument();
+  });
+
+  it('the Profile Error card offers recovery actions instead of dead-ending the user', () => {
+    // Reported bug: the card had no actions at all, so a user with a dead
+    // session was stranded — no retry, no way back to login — until they
+    // cleared site data (the "only works in incognito" report).
+    const refreshProfile = vi.fn();
+    const signOut = vi.fn();
+    setAuth({ profile: null, profileStatus: 'error', refreshProfile, signOut });
+    renderRoute();
+
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    expect(refreshProfile).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /log in again/i }));
+    expect(signOut).toHaveBeenCalled();
   });
 
   it('renders the protected content when approved', () => {

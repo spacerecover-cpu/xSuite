@@ -9,8 +9,13 @@ let needsMFAImpl: () => Promise<boolean> = async () => false;
 // Real supabase.auth.signOut() fires SIGNED_OUT only after a network round-trip;
 // let tests suppress it to exercise the window between signOut() and SIGNED_OUT.
 let autoFireSignedOut = true;
-const signOutMock = vi.fn(async () => {
-  if (autoFireSignedOut) authStateCb?.('SIGNED_OUT', null);
+// Real signOut REPORTS failure via its return value (it does not throw). A
+// queue of results lets tests fail the global call and pass the local one.
+let signOutResults: Array<{ error: unknown }> = [];
+const signOutMock = vi.fn(async (_opts?: { scope?: string }) => {
+  const result = signOutResults.shift() ?? { error: null };
+  if (autoFireSignedOut && !result.error) authStateCb?.('SIGNED_OUT', null);
+  return result;
 });
 
 vi.mock('../lib/supabaseClient', () => ({
@@ -21,10 +26,17 @@ vi.mock('../lib/supabaseClient', () => ({
         authStateCb = cb;
         return { data: { subscription: { unsubscribe: vi.fn() } } };
       }),
-      signOut: () => signOutMock(),
+      signOut: (opts?: { scope?: string }) => signOutMock(opts),
     },
     from: () => ({ select: () => ({ eq: () => ({ maybeSingle: () => maybeSingleImpl() }) }) }),
   },
+}));
+let idleOptions: { limitMs: number; onIdle: () => void } | null = null;
+vi.mock('../lib/inactivity', () => ({
+  watchInactivity: vi.fn((opts: { limitMs: number; onIdle: () => void }) => {
+    idleOptions = opts;
+    return vi.fn();
+  }),
 }));
 vi.mock('../lib/mfaService', () => ({ mfaService: { needsMFAVerification: () => needsMFAImpl() } }));
 const clearPermissionCache = vi.fn();
@@ -57,6 +69,8 @@ describe('AuthContext', () => {
     maybeSingleImpl = async () => ({ data: null, error: null });
     needsMFAImpl = async () => false;
     autoFireSignedOut = true;
+    signOutResults = [];
+    idleOptions = null;
     signOutMock.mockClear();
     clearPermissionCache.mockClear();
     setSentryUser.mockClear();
@@ -193,6 +207,71 @@ describe('AuthContext', () => {
     // Without the force bypass the in-flight dedupe would drop this and calls
     // would stay at 1.
     await waitFor(() => expect(calls).toBe(2));
+  });
+
+  it('ejects to login (local sign-out + breadcrumb) when the profile fetch dies on a rejected JWT, instead of stranding on the error card', async () => {
+    localStorage.removeItem('auth_session_expired');
+    // Every attempt 401s with PostgREST's JWT error — the session is dead and
+    // sessionRecovery could not refresh it. The old behavior stranded the user
+    // on the actionless "Profile Error" card with the dead session persisted,
+    // recoverable only by clearing site data (the reported incognito-only bug).
+    maybeSingleImpl = async () => ({
+      data: null,
+      error: { code: 'PGRST301', message: 'JWT expired' },
+    });
+    render(<AuthProvider><Harness /></AuthProvider>);
+
+    await waitFor(
+      () => expect(signOutMock).toHaveBeenCalledWith({ scope: 'local' }),
+      { timeout: 4000 },
+    );
+    expect(localStorage.getItem('auth_session_expired')).toBe('1');
+    expect(state()).not.toContain('error');
+    localStorage.removeItem('auth_session_expired');
+  });
+
+  it('still surfaces profileStatus="error" for non-auth failures (no eject)', async () => {
+    maybeSingleImpl = async () => ({ data: null, error: new Error('boom') });
+    render(<AuthProvider><Harness /></AuthProvider>);
+
+    await waitFor(() => expect(state()).toContain('error'), { timeout: 4000 });
+    expect(signOutMock).not.toHaveBeenCalled();
+  });
+
+  it('falls back to a local sign-out when the global sign-out reports an error (it does not throw)', async () => {
+    maybeSingleImpl = async () => ({ data: APPROVED, error: null });
+    render(<AuthProvider><Harness /></AuthProvider>);
+    await waitFor(() => expect(state()).toBe('approved|false|yes'));
+
+    // Old code ignored the returned error entirely: the /logout round-trip
+    // failing left the dead session in storage and the app torn down half-way.
+    signOutResults = [{ error: { message: 'fetch failed' } }, { error: null }];
+    fireEvent.click(screen.getByText('logout'));
+
+    await waitFor(() => expect(signOutMock).toHaveBeenCalledTimes(2));
+    expect(signOutMock.mock.calls[0][0]).toEqual({ scope: 'global' });
+    expect(signOutMock.mock.calls[1][0]).toEqual({ scope: 'local' });
+  });
+
+  it('signs out with LOCAL scope on inactivity — one idle browser must not revoke the user\'s sessions on every device', async () => {
+    localStorage.removeItem('auth_session_expired');
+    maybeSingleImpl = async () => ({ data: APPROVED, error: null });
+    render(<AuthProvider><Harness /></AuthProvider>);
+    await waitFor(() => expect(state()).toBe('approved|false|yes'));
+
+    expect(idleOptions).not.toBeNull();
+    expect(idleOptions!.limitMs).toBe(30 * 60 * 1000);
+
+    await act(async () => {
+      idleOptions!.onIdle();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(signOutMock).toHaveBeenCalledWith({ scope: 'local' }));
+    expect(signOutMock).not.toHaveBeenCalledWith({ scope: 'global' });
+    // Breadcrumb so the login page says "session expired" instead of a silent eject.
+    expect(localStorage.getItem('auth_session_expired')).toBe('1');
+    localStorage.removeItem('auth_session_expired');
   });
 
   it('stamps Sentry with the user on profile load and clears it on sign-out (M8)', async () => {

@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { LogOut, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { PendingApprovalScreen } from './PendingApprovalScreen';
 import { MFAChallenge } from './auth/MFAChallenge';
 import { PasswordChangeModal } from './users/PasswordChangeModal';
+import { Button } from './ui/Button';
 
 interface ProtectedRouteProps {
   /** Omit to use the guard as a pathless layout route — children render via <Outlet/>. */
@@ -45,8 +47,18 @@ const AuthLoadingSkeleton = () => (
 );
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
-  const { user, profile, loading, profileStatus, mfaPending, passwordResetRequired, recoveryPending, completeMFAChallenge, signOut } = useAuth();
+  const { user, profile, loading, profileStatus, mfaPending, passwordResetRequired, recoveryPending, completeMFAChallenge, signOut, refreshProfile } = useAuth();
   const location = useLocation();
+  const [isRetrying, setIsRetrying] = useState(false);
+
+  const retryProfile = async () => {
+    setIsRetrying(true);
+    try {
+      await refreshProfile();
+    } finally {
+      setIsRetrying(false);
+    }
+  };
 
   if (loading) {
     return <AuthLoadingSkeleton />;
@@ -104,8 +116,22 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
           </div>
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Profile Error</h1>
           <p className="text-slate-600 mb-6">
-            There was an error loading your profile. Please try logging in again or contact support.
+            There was an error loading your profile. Please try again, or log in again to start a
+            fresh session. Contact support if the problem persists.
           </p>
+          {/* Recovery actions — this card used to be a dead end: no retry and
+              no way back to login, which stranded users on a dead session
+              until they cleared site data. */}
+          <div className="space-y-3">
+            <Button variant="primary" className="w-full" onClick={() => void retryProfile()} disabled={isRetrying}>
+              <RefreshCw className={`w-4 h-4 mr-2 ${isRetrying ? 'animate-spin' : ''}`} />
+              {isRetrying ? 'Retrying…' : 'Try Again'}
+            </Button>
+            <Button variant="ghost" className="w-full" onClick={() => void signOut()}>
+              <LogOut className="w-4 h-4 mr-2" />
+              Log In Again
+            </Button>
+          </div>
         </div>
       </div>
     );

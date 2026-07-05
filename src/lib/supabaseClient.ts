@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database.types';
 import { authStorageAdapter, AUTH_STORAGE_KEY } from './authStorage';
+import { bindSessionRecoveryClient, createSessionRecoveryFetch } from './sessionRecovery';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -33,8 +34,14 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     headers: {
       'X-Client-Info': 'xsuite-web',
     },
+    // Self-heals server-rejected JWTs (401 → forced refresh → one retry) so a
+    // dead persisted session can never strand the app in a permanent 401 loop.
+    // See src/lib/sessionRecovery.ts.
+    fetch: createSessionRecoveryFetch(supabaseAnonKey),
   },
 });
+
+bindSessionRecoveryClient(supabase);
 
 export const getTenantId = (): string | null => {
   return localStorage.getItem('tenant_id');
