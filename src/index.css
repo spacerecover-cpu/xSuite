@@ -30,6 +30,67 @@
   --color-accent-foreground: 40 11 8;
 }
 
+/* Midnight Aurora — the premium dark theme. Carries the auth zone's
+   owner-approved navy / electric-blue / violet identity app-wide. Unlike the
+   light themes it also rebinds the surface, border, status and neutral-ramp
+   variables (light defaults live in the :root block below). Every pair is
+   WCAG-validated — matrix in
+   docs/superpowers/plans/2026-07-05-midnight-aurora-theme.md. */
+:root[data-theme="midnight"] {
+  color-scheme: dark;
+
+  --color-primary: 46 107 232;          /* electric blue #2E6BE8; white fg 4.79:1 */
+  --color-primary-foreground: 255 255 255;
+  --color-secondary: 109 74 227;        /* aurora violet #6D4AE3; white fg 5.62:1 */
+  --color-secondary-foreground: 255 255 255;
+  --color-accent: 34 29 71;             /* dark violet SURFACE #221D47 */
+  --color-accent-foreground: 201 194 248;
+
+  --color-surface: 17 27 50;            /* card #111B32 */
+  --color-surface-muted: 10 17 31;      /* page #0A111F */
+  --color-border: 33 48 82;             /* #213052 */
+
+  /* Status re-anchored for dark surfaces — hue/meaning preserved.
+     text-on-muted >= 4.5:1; white-on-fill >= the light themes' own ratios. */
+  --color-success: 13 162 113;
+  --color-success-muted: 9 41 31;
+  --color-warning: 226 140 11;
+  --color-warning-muted: 61 43 10;
+  --color-danger: 226 78 68;
+  --color-danger-muted: 47 12 15;
+  --color-info: 30 155 215;
+  --color-info-muted: 8 41 57;
+
+  /* Only the two DARK identity hues re-anchor for legibility on navy
+     (blue-800 / slate-600 are ~2:1 on the card otherwise). Chart data hues
+     (chartCategorical) intentionally stay fixed. */
+  --color-cat-7: 94 134 232;
+  --color-cat-8: 147 165 193;
+
+  /* Neutral ramp rebind — roles documented in the :root block below. */
+  --nb-card: 17 27 50;
+  --nb-page: 10 17 31;
+  --nb-raised: 22 34 60;
+  --nb-strong: 31 45 78;
+  --nb-inset: 42 58 96;
+  --nb-dim: 45 60 94;
+  --nb-dark: 13 21 38;
+  --nb-deep: 4 8 18;
+  --nt-900: 237 242 250;
+  --nt-800: 226 233 246;
+  --nt-700: 201 212 232;
+  --nt-600: 166 181 210;
+  --nt-500: 132 150 182;
+  --nt-400: 97 113 149;
+  --nt-300: 122 138 168;
+  --ne-soft: 23 35 62;
+  --ne-base: 33 48 82;
+  --ne-strong: 45 62 100;
+
+  --scrollbar-thumb: 45 62 100;
+  --scrollbar-thumb-hover: 61 82 128;
+}
+
 :root {
   --color-surface: 255 255 255;
   --color-surface-muted: 248 250 252;
@@ -64,12 +125,50 @@
   --color-cat-6: 190 24 93;    /* pink-700   #be185d */
   --color-cat-7: 30 64 175;    /* blue-800   #1e40af */
   --color-cat-8: 71 85 105;    /* slate-600  #475569 */
+
+  /* Neutral ramp — the var-backed layer behind Tailwind's white/slate
+     utilities (wired PER UTILITY in tailwind.config.js; DESIGN.md → Color →
+     Neutral ramp). In the light themes these bind to the EXACT Tailwind v3.4
+     values, so nothing shifts visually; the midnight theme rebinds them to
+     its navy scale. Roles:
+       --nb-*  backgrounds — card(bg-white) page(bg-slate-50)
+               raised(bg-slate-100) strong(bg-slate-200) inset(bg-slate-300)
+               dim(bg-slate-700) dark(bg-slate-800) deep(bg-slate-900)
+       --nt-*  text ink — text-slate-300..900
+       --ne-*  edges — soft(slate-100) base(slate-200) strong(slate-300) */
+  --nb-card: 255 255 255;
+  --nb-page: 248 250 252;
+  --nb-raised: 241 245 249;
+  --nb-strong: 226 232 240;
+  --nb-inset: 203 213 225;
+  --nb-dim: 51 65 85;
+  --nb-dark: 30 41 59;
+  --nb-deep: 15 23 42;
+  --nt-900: 15 23 42;
+  --nt-800: 30 41 59;
+  --nt-700: 51 65 85;
+  --nt-600: 71 85 105;
+  --nt-500: 100 116 139;
+  --nt-400: 148 163 184;
+  --nt-300: 203 213 225;
+  --ne-soft: 241 245 249;
+  --ne-base: 226 232 240;
+  --ne-strong: 203 213 225;
+
+  /* Fixed dark ink for saturated fills (amber/lime KPI tiles, colored pill
+     tabs). Deliberately NOT themed — on a vivid gradient the ink must stay
+     dark in every theme. Exposed as text-ink-dark / bg-ink-dark. */
+  --color-ink-dark: 15 23 42;
+
+  /* Themed scrollbar (light themes keep the original slate-300/400 pair). */
+  --scrollbar-thumb: 203 213 225;
+  --scrollbar-thumb-hover: 148 163 184;
 }
 
 @layer base {
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgb(203 213 225) transparent;
+    scrollbar-color: rgb(var(--scrollbar-thumb)) transparent;
   }
 
   *::-webkit-scrollbar {
@@ -82,12 +181,20 @@
   }
 
   *::-webkit-scrollbar-thumb {
-    background-color: rgb(203 213 225);
+    background-color: rgb(var(--scrollbar-thumb));
     border-radius: 3px;
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background-color: rgb(148 163 184);
+    background-color: rgb(var(--scrollbar-thumb-hover));
+  }
+
+  /* Tailwind's ring-offset color defaults to #fff, which paints a white halo
+     around focused controls on the dark theme. Rebind the default to the card
+     surface under midnight; explicit ring-offset-* color utilities still win
+     (they live in the utilities layer, which comes later). */
+  :root[data-theme="midnight"] * {
+    --tw-ring-offset-color: rgb(var(--nb-card));
   }
 }
 
@@ -142,5 +249,90 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* Chart CHROME under midnight — axis text, grid lines, tooltip frame and
+   legend must stay legible on navy cards. Data hues (chartCategorical /
+   src/lib/chartTheme.ts) intentionally stay fixed; this restyles only the
+   frame. SVG presentation attributes have CSS specificity 0, so these rules
+   win without touching any chart call-site. The default recharts tooltip
+   sets inline styles, hence the !importants. */
+:root[data-theme="midnight"] .recharts-text,
+:root[data-theme="midnight"] .recharts-cartesian-axis-tick-value,
+:root[data-theme="midnight"] .recharts-polar-angle-axis-tick-value,
+:root[data-theme="midnight"] .recharts-polar-radius-axis-tick-value,
+:root[data-theme="midnight"] .recharts-label {
+  fill: rgb(var(--nt-500));
+}
+
+:root[data-theme="midnight"] .recharts-cartesian-grid line,
+:root[data-theme="midnight"] .recharts-cartesian-axis line,
+:root[data-theme="midnight"] .recharts-polar-grid-angle line,
+:root[data-theme="midnight"] .recharts-polar-grid-concentric path,
+:root[data-theme="midnight"] .recharts-reference-line line {
+  stroke: rgb(var(--ne-base));
+}
+
+:root[data-theme="midnight"] .recharts-default-tooltip {
+  background-color: rgb(var(--nb-card)) !important;
+  border-color: rgb(var(--ne-strong)) !important;
+}
+
+:root[data-theme="midnight"] .recharts-tooltip-label,
+:root[data-theme="midnight"] .recharts-default-tooltip .recharts-tooltip-item {
+  color: rgb(var(--nt-700)) !important;
+}
+
+:root[data-theme="midnight"] .recharts-legend-item-text {
+  color: rgb(var(--nt-600)) !important;
+}
+
+/* Printing from the dark theme must never print navy pages: force the light
+   (Royal) bindings back for print media. PDFs are a separate, non-themed
+   pipeline and are unaffected. This block outranks the midnight block above
+   by source order (equal specificity). */
+@media print {
+  :root[data-theme="midnight"] {
+    color-scheme: light;
+    --color-primary: 22 38 96;
+    --color-primary-foreground: 255 255 255;
+    --color-secondary: 208 230 253;
+    --color-secondary-foreground: 22 38 96;
+    --color-accent: 241 228 209;
+    --color-accent-foreground: 22 38 96;
+    --color-surface: 255 255 255;
+    --color-surface-muted: 248 250 252;
+    --color-border: 226 232 240;
+    --color-success: 5 150 105;
+    --color-success-muted: 209 250 229;
+    --color-warning: 217 119 6;
+    --color-warning-muted: 254 243 199;
+    --color-danger: 220 38 38;
+    --color-danger-muted: 254 226 226;
+    --color-info: 2 132 199;
+    --color-info-muted: 224 242 254;
+    --color-cat-7: 30 64 175;
+    --color-cat-8: 71 85 105;
+    --nb-card: 255 255 255;
+    --nb-page: 248 250 252;
+    --nb-raised: 241 245 249;
+    --nb-strong: 226 232 240;
+    --nb-inset: 203 213 225;
+    --nb-dim: 51 65 85;
+    --nb-dark: 30 41 59;
+    --nb-deep: 15 23 42;
+    --nt-900: 15 23 42;
+    --nt-800: 30 41 59;
+    --nt-700: 51 65 85;
+    --nt-600: 71 85 105;
+    --nt-500: 100 116 139;
+    --nt-400: 148 163 184;
+    --nt-300: 203 213 225;
+    --ne-soft: 241 245 249;
+    --ne-base: 226 232 240;
+    --ne-strong: 203 213 225;
+    --scrollbar-thumb: 203 213 225;
+    --scrollbar-thumb-hover: 148 163 184;
   }
 }

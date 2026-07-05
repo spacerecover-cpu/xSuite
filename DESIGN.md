@@ -29,7 +29,7 @@
 - **Direction:** Industrial / utilitarian, refined. Function-first and data-dense, with a restrained brand accent.
 - **Decoration level:** Minimal-to-intentional. Typography and a tight token palette do the work. **Token-driven gradients are a sanctioned emphasis tool** — use them for KPI tiles, hero bands, and command strips. They MUST be built from semantic tokens or the `cat-*` palette (so they re-theme per tenant and respect the purple/indigo + raw-hex bans); keep them tasteful and avoid noisy blobs or texture.
 - **Mood:** Quiet authority. The UI gets out of the way so custody, money, and recovery state are unambiguous.
-- **Theming:** Three tenant-selectable themes share one structure and one neutral/status layer — only the brand hue changes. See **Color → Themes**.
+- **Theming:** Four tenant-selectable themes share one structure. The three light themes (Royal, Burgundy, Scarlet) change only the brand hue over one shared neutral/status layer; the premium dark theme (**Midnight Aurora**) additionally rebinds the surface, border, status and neutral-ramp variables. See **Color → Themes** and **Color → Neutral ramp**.
 
 ## Typography
 Fonts load via Google Fonts in `index.html` (CSP allows `fonts.googleapis.com` / `fonts.gstatic.com`). Family tokens are defined in `tailwind.config.js` (`fontFamily`); the default `sans` is set to Inter so unclassed elements inherit it via Tailwind Preflight (`html`).
@@ -117,35 +117,48 @@ titles down to ops sizes.
 ## Color
 Every brand/status token is an **RGB triplet** CSS variable (e.g. `--color-primary: 22 38 96`) so Tailwind's `<alpha-value>` opacity syntax works. The 14 semantic tokens are wired in `tailwind.config.js`; values live in `src/index.css`. **Use semantic tokens only — never raw Tailwind brand colors or hex in `src/`.**
 
-### Themes (brand layer — only these three vars change per theme)
-`src/index.css` — `:root[data-theme="…"]`. Default theme is **Royal**.
+### Themes (brand layer)
+`src/index.css` — `:root[data-theme="…"]`. Default theme is **Royal**. The three
+light themes change only these six brand vars; **Midnight Aurora** (`midnight`,
+the flagship premium dark theme, matching the sign-in experience) additionally
+rebinds surface/border/status/neutral-ramp vars — see the subsections below.
+Every Midnight pair is WCAG-validated (matrix:
+`docs/superpowers/plans/2026-07-05-midnight-aurora-theme.md`).
 
-| Token | Royal (default) | Burgundy | Scarlet |
-|---|---|---|---|
-| `primary` | `#162660` (22 38 96) | `#6C131F` (108 19 31) | `#DC2626` (220 38 38) |
-| `primary-foreground` | `#FFFFFF` | `#FFFFFF` | `#FFFFFF` |
-| `secondary` | `#D0E6FD` (208 230 253) | `#A14B58` (161 75 88) | `#C92925` (201 41 37) |
-| `secondary-foreground` | `#162660` | `#FFFFFF` | `#FFFFFF` |
-| `accent` | `#F1E4D1` (241 228 209) | `#FFECEA` (255 236 234) | `#F9E7C9` (249 231 201) |
-| `accent-foreground` | `#162660` | `#6C131F` | `#280B08` |
+| Token | Royal (default) | Burgundy | Scarlet | Midnight Aurora |
+|---|---|---|---|---|
+| `primary` | `#162660` (22 38 96) | `#6C131F` (108 19 31) | `#DC2626` (220 38 38) | `#2E6BE8` (46 107 232) |
+| `primary-foreground` | `#FFFFFF` | `#FFFFFF` | `#FFFFFF` | `#FFFFFF` |
+| `secondary` | `#D0E6FD` (208 230 253) | `#A14B58` (161 75 88) | `#C92925` (201 41 37) | `#6D4AE3` (109 74 227) |
+| `secondary-foreground` | `#162660` | `#FFFFFF` | `#FFFFFF` | `#FFFFFF` |
+| `accent` | `#F1E4D1` (241 228 209) | `#FFECEA` (255 236 234) | `#F9E7C9` (249 231 201) | `#221D47` (34 29 71) |
+| `accent-foreground` | `#162660` | `#6C131F` | `#280B08` | `#C9C2F8` (201 194 248) |
 
-### Surface & line (constant across themes)
-`src/index.css` — constant `:root` block.
+Midnight's violet `secondary`/`accent` is the app-wide extension of the auth
+zone's owner-approved blue→violet identity (2026-07-05). The purple/indigo/
+violet **class** ban stands unchanged everywhere — theme *token values* are the
+only sanctioned channel for this hue, so it re-themes away on light themes.
 
-| Token | Hex | RGB |
+### Surface & line (constant across the light themes; Midnight rebinds)
+`src/index.css` — constant `:root` block; `:root[data-theme="midnight"]` overrides.
+
+| Token | Light themes | Midnight |
 |---|---|---|
-| `surface` | `#FFFFFF` | 255 255 255 |
-| `surface-muted` | `#F8FAFC` | 248 250 252 |
-| `border` | `#E2E8F0` | 226 232 240 |
-| `ring` (focus) | follows `primary` | `var(--color-primary)` |
+| `surface` | `#FFFFFF` 255 255 255 | `#111B32` 17 27 50 |
+| `surface-muted` | `#F8FAFC` 248 250 252 | `#0A111F` 10 17 31 |
+| `border` | `#E2E8F0` 226 232 240 | `#213052` 33 48 82 |
+| `ring` (focus) | follows `primary` | follows `primary` |
 
-### Status (constant across themes — meaning is fixed, never theme it)
-| Role | Base | Foreground | Muted (bg) |
+### Status (meaning is fixed — never theme the HUE)
+Constant across the light themes; Midnight re-anchors the same hues for dark
+surfaces (text-on-muted ≥ 4.5:1; white-on-fill ≥ the light themes' own ratios).
+
+| Role | Light base / muted | Midnight base / muted | Foreground |
 |---|---|---|---|
-| `success` | `#059669` | `#FFFFFF` | `#D1FAE5` |
-| `warning` | `#D97706` | `#FFFFFF` | `#FEF3C7` |
-| `danger` | `#DC2626` | `#FFFFFF` | `#FEE2E2` |
-| `info` | `#0284C7` | `#FFFFFF` | `#E0F2FE` |
+| `success` | `#059669` / `#D1FAE5` | `#0DA271` / `#09291F` | `#FFFFFF` |
+| `warning` | `#D97706` / `#FEF3C7` | `#E28C0B` / `#3D2B0A` | `#FFFFFF` |
+| `danger` | `#DC2626` / `#FEE2E2` | `#E24E44` / `#2F0C0F` | `#FFFFFF` |
+| `info` | `#0284C7` / `#E0F2FE` | `#1E9BD7` / `#082939` | `#FFFFFF` |
 
 ### Categorical (identity) palette — `cat-1` … `cat-8`
 For **distinct identity** color where status/brand tokens don't apply: per-module
@@ -158,9 +171,43 @@ etc. is a bug (it falsely signals status). Use these instead.
   comparable. They **mirror `chartCategorical`** in `src/lib/chartTheme.ts` (cyan,
   teal, lime, yellow, orange, pink, blue-800, slate). Values: `src/index.css`
   (`--color-cat-1` … `--color-cat-8`); wired in `tailwind.config.js`.
+  **Single sanctioned exception:** Midnight re-anchors only the two DARK hues —
+  `cat-7` → `#5E86E8`, `cat-8` → `#93A5C1` — because blue-800/slate-600 text sits
+  near 2:1 on the navy card. UI vars only; `chartCategorical` (SVG data fills)
+  stays byte-identical so charts remain comparable across tenants.
 - **Never use for status.** Status meaning lives only in `success/warning/danger/info`.
 - **Muted background:** use alpha, e.g. `bg-cat-1/10` with `text-cat-1` (mirrors the
   `*-muted` pattern). Proof-of-concept consumer: `InventoryInsightsHeader.tsx`.
+
+### Neutral ramp (var-backed `white`/`slate` utilities) — added 2026-07-05
+The Tailwind neutral utilities are **semantic roles**, remapped **per utility**
+to CSS variables in `tailwind.config.js` so the whole app re-skins under
+`data-theme="midnight"` with zero call-site churn. On the light themes the vars
+bind to the **exact Tailwind v3.4 values** (pixel-identical). Vars live in
+`src/index.css` (`--nb-*` backgrounds, `--nt-*` text ink, `--ne-*` edges).
+
+| Utility | Role | Light | Midnight |
+|---|---|---|---|
+| `bg-white` | card surface | `#FFFFFF` | `#111B32` |
+| `bg-slate-50` | page background | `#F8FAFC` | `#0A111F` |
+| `bg-slate-100/200/300` | raised / strong / inset fills | Tailwind values | `#16223C` / `#1F2D4E` / `#2A3A60` |
+| `bg-slate-700/800/900` | dark-chrome fills (tooltips, scrims, media) | Tailwind values | `#2D3C5E` / `#0D1526` / `#040812` |
+| `text-slate-900…300` | ink ramp (headings → decorative) | Tailwind values | inverted: `#EDF2FA` … `#7A8AA8` |
+| `border/divide/ring-slate-100/200/300` | edges | Tailwind values | `#17233E` / `#213052` / `#2D3E64` |
+| bare `border` (DEFAULT) | edge | `#E2E8F0` (was gray-200 — drift, fixed) | `#213052` |
+
+Rules:
+- **`text-white` and `text-slate-50..200` are ink-on-dark/colored fills — they stay literal in every theme.** Never use them on light surfaces.
+- **`bg-white` MEANS "card"** and `bg-slate-50` MEANS "page" — pick by role, not by literal color, exactly as before; the ramp keeps the meaning.
+- **`ink-dark`** (`--color-ink-dark`, constant `#0F172A`) is the dark ink for
+  saturated fills (amber/lime KPI tiles, colored pills). Use `text-ink-dark` /
+  `bg-ink-dark/NN` there — **never `text-slate-900`**, which inverts on midnight.
+- Scrollbars follow `--scrollbar-thumb(-hover)`; Tailwind's ring-offset default
+  is rebound to the card surface under midnight; `@media print` forces the
+  light bindings back so the dark theme never prints navy pages.
+- Chart **chrome** (axis/grid/tooltip/legend) re-skins under midnight via
+  scoped CSS in `index.css`; chart **data hues** stay fixed (see Non-Themed
+  Surfaces).
 
 ### Banned in `src/` (enforced by `eslint-rules`)
 - `purple-*`, `indigo-*`, `violet-*` (any shade) → use `accent` or `secondary`.
@@ -177,7 +224,7 @@ etc. is a bug (it falsely signals status). Use these instead.
 ## Non-Themed Surfaces (intentionally fixed — do NOT wire to the theme)
 These read from constants, never from CSS variables. This is by design so output stays comparable across tenants/themes.
 
-- **Charts:** `src/lib/chartTheme.ts` — `chartCategorical` (8 hues), `chartAxis` `#64748b`, `chartGrid`/`chartTooltipBorder` `#e2e8f0`. Data-vis neutral; never theme charts.
+- **Charts:** `src/lib/chartTheme.ts` — `chartCategorical` (8 hues), `chartAxis` `#64748b`, `chartGrid`/`chartTooltipBorder` `#e2e8f0`. Data-vis neutral; never theme the DATA hues. **Precision (2026-07-05):** the chart *chrome* — axis text, grid lines, tooltip frame, legend text — is re-skinned for legibility under `data-theme="midnight"` via scoped CSS in `src/index.css` (constants file untouched); the data hues stay fixed in every theme.
 - **Categorical UI palette:** `cat-1`…`cat-8` (`src/index.css`, `tailwind.config.js`) — the screen-side mirror of `chartCategorical`, for identity color in UI (see **Color → Categorical (identity) palette**). Fixed across themes by design.
 - **PDFs:** `src/lib/pdf/styles.ts` — `PDF_COLORS` (primary `#162660` = fixed Royal-brand navy, text `#1E293B`, …), font `Roboto`. One fixed color for all tenants by design (a themed invoice would look alarming). Device-role badge colors (patient/backup/donor/spare) are fixed.
 - **Device icons:** `src/lib/deviceIconMapper.ts` — fixed SVG hexes. Intentional.
@@ -354,6 +401,7 @@ Captured 2026-06-01 from a code audit; drifts #1–#3 resolved 2026-06-02. **A 2
 ## Decisions Log
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-07-05 | **Midnight Aurora (4th theme, premium dark) + var-backed neutral ramp.** Added `data-theme="midnight"` (navy surfaces `#0A111F`/`#111B32`, electric-blue `primary #2E6BE8`, aurora-violet `secondary #6D4AE3`, dark-violet `accent` surface) and remapped the `white`/`slate` utilities per-utility onto CSS vars (`--nb-*`/`--nt-*`/`--ne-*`) so ~7,000 neutral call-sites re-skin with zero churn — light themes bind to the exact Tailwind values (pixel-identical). New constant `ink-dark` token for ink-on-saturated-fills (GradientStatCard light tiles migrated); status + `cat-7`/`cat-8` re-anchored for dark with hue/meaning preserved (all pairs WCAG-validated, matrix in the plan doc); chart chrome re-skins via scoped CSS (data hues fixed); `@media print` forces light bindings; scrollbars/ring-offset/`color-scheme` themed; bare-`border` DEFAULT rebound from gray-200 (latent drift) to the slate-200 edge token. `main.tsx` anti-flash whitelist now derives from `THEMES` (hardcoded 3-theme list = wrong-theme flash regression, fixed). DB: `tenants.theme` CHECK gains `'midnight'` (pending migration in `docs/migrations-pending/`). | Owner asked for the new login page's premium navy/blue/violet identity as a flagship app-wide theme plus a theme-system hardening pass. The login design language was already owner-approved for auth (2026-07-04); routing the violet through theme *tokens* keeps the purple/indigo/violet class ban fully enforced. Per-utility var remap chosen over a ~400-file class rewrite: zero call-site churn, pixel-stable light themes, and future themes (incl. dark) become pure CSS additions. |
 | 2026-06-01 | Initial DESIGN.md created by codifying the live system (not proposing a new one) | xSuite has a locked theme/token system; goal is consistency, so the doc documents and enforces what exists. Source: `src/index.css`, `tailwind.config.js`, `src/lib/chartTheme.ts`, `src/lib/pdf/styles.ts`, `index.html`. |
 | 2026-06-01 | Logged 3 known deviations rather than silently "documenting them away" | A consistency contract must reflect reality; drift is tracked for fixing, not normalized. |
 | 2026-06-02 | Resolved drift #1: `glow-blue*` → `glow-primary*`, derived from `--color-primary` | The only consumer (`StepContainer` onboarding icon) is otherwise all-`primary`; a fixed blue-500 glow clashed and ignored the theme. Token-derived glow now themes across Royal/Burgundy/Scarlet. |

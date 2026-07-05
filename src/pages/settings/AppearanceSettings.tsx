@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Check, Loader2, Languages, LayoutGrid } from 'lucide-react';
+import { ChevronLeft, Check, Loader2, Languages, LayoutGrid, Sparkles } from 'lucide-react';
 import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLocale } from '../../contexts/LocaleContext';
@@ -23,6 +23,15 @@ interface ThemeOption {
   primaryHex: string;
   secondaryHex: string;
   accentHex: string;
+  /** Dark themes render the mini preview on their own dark surfaces (the
+   *  light default shows the slate-50 box) and pick their own accent ink. */
+  preview?: {
+    bgHex: string;
+    borderHex: string;
+    accentTextHex: string;
+  };
+  /** Small flagship marker next to the theme name. */
+  badge?: string;
 }
 
 const THEME_OPTIONS: readonly ThemeOption[] = [
@@ -49,6 +58,17 @@ const THEME_OPTIONS: readonly ThemeOption[] = [
     primaryHex: '#DC2626',
     secondaryHex: '#C92925',
     accentHex: '#F9E7C9',
+  },
+  {
+    id: 'midnight',
+    name: 'Midnight Aurora',
+    description:
+      'Flagship premium dark theme — deep navy surfaces with an electric-blue and violet aurora accent. Matches the new sign-in experience.',
+    primaryHex: '#2E6BE8',
+    secondaryHex: '#6D4AE3',
+    accentHex: '#221D47',
+    preview: { bgHex: '#0A111F', borderHex: '#213052', accentTextHex: '#C9C2F8' },
+    badge: 'Premium',
   },
 ] as const;
 
@@ -132,7 +152,7 @@ export const AppearanceSettings: React.FC = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {THEME_OPTIONS.map((option) => {
           const isActive = theme === option.id;
           const isPending = pendingTheme === option.id;
@@ -170,6 +190,12 @@ export const AppearanceSettings: React.FC = () => {
                     />
                   </div>
                   <span className="font-semibold text-slate-900">{option.name}</span>
+                  {option.badge && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xxs font-semibold uppercase tracking-wider text-primary">
+                      <Sparkles className="w-3 h-3" aria-hidden="true" />
+                      {option.badge}
+                    </span>
+                  )}
                 </div>
                 <span
                   className={[
@@ -188,13 +214,30 @@ export const AppearanceSettings: React.FC = () => {
                 </span>
               </div>
 
-              <div className="rounded-lg bg-slate-50 border border-slate-100 p-4 mb-4 space-y-3">
+              <div
+                className={[
+                  'rounded-lg border p-4 mb-4 space-y-3',
+                  option.preview ? '' : 'bg-slate-50 border-slate-100',
+                ].join(' ')}
+                style={
+                  option.preview
+                    ? { backgroundColor: option.preview.bgHex, borderColor: option.preview.borderHex }
+                    : undefined
+                }
+              >
                 <span
                   className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium shadow-sm"
-                  style={{
-                    backgroundColor: option.primaryHex,
-                    color: '#fff',
-                  }}
+                  style={
+                    option.preview
+                      ? {
+                          background: `linear-gradient(135deg, ${option.primaryHex}, ${option.secondaryHex})`,
+                          color: '#fff',
+                        }
+                      : {
+                          backgroundColor: option.primaryHex,
+                          color: '#fff',
+                        }
+                  }
                 >
                   Save Changes
                 </span>
@@ -213,7 +256,7 @@ export const AppearanceSettings: React.FC = () => {
                   className="h-6 rounded-md flex items-center px-2 text-xs"
                   style={{
                     backgroundColor: option.accentHex,
-                    color: option.primaryHex,
+                    color: option.preview?.accentTextHex ?? option.primaryHex,
                   }}
                 >
                   Accent surface
@@ -369,8 +412,8 @@ export const AppearanceSettings: React.FC = () => {
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 border border-slate-100 p-3">
-                    <div className="rounded-lg bg-gradient-to-br from-warning to-warning/85 px-2.5 py-1.5 text-slate-900">
-                      <span className="block text-xxs font-semibold uppercase tracking-wider text-slate-900/80">
+                    <div className="rounded-lg bg-gradient-to-br from-warning to-warning/85 px-2.5 py-1.5 text-ink-dark">
+                      <span className="block text-xxs font-semibold uppercase tracking-wider text-ink-dark/80">
                         In Diagnosis
                       </span>
                       <span className="block text-sm font-bold tabular-nums">31</span>

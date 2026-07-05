@@ -477,22 +477,23 @@ Sequences are tracked in `number_sequences` and audited in `number_sequences_aud
 > In QA/design review, flag any code that deviates from `DESIGN.md`. Do not extend
 > the token vocabulary without updating `DESIGN.md` first.
 
-xSuite supports three tenant-selectable themes — Royal (default), Burgundy, Scarlet — selected per-tenant from Settings → Appearance (admin-gated). Active theme propagates through CSS variables; nothing rebuilds.
+xSuite supports four tenant-selectable themes — Royal (default), Burgundy, Scarlet (light), and **Midnight Aurora** (`midnight`, flagship premium dark) — selected per-tenant from Settings → Appearance (admin-gated). Active theme propagates through CSS variables; nothing rebuilds.
 
 ### Architecture
-- **Storage**: `tenants.theme text NOT NULL DEFAULT 'royal' CHECK (theme IN ('royal','burgundy','scarlet'))`.
-- **CSS vars**: defined in `src/index.css` under `:root[data-theme="royal|burgundy|scarlet"]` blocks plus a constant `:root` block for status/surface tokens. Each var stores an RGB triplet (e.g. `--color-primary: 22 38 96`) so Tailwind's `<alpha-value>` opacity syntax keeps working.
-- **Tailwind palette**: `tailwind.config.js` `theme.extend.colors` exposes the 14 semantic tokens via `rgb(var(--color-x) / <alpha-value>)`. Tailwind's built-in `gray/slate/zinc/white/black` palette stays available for utility neutrals.
+- **Storage**: `tenants.theme text NOT NULL DEFAULT 'royal' CHECK (theme IN ('royal','burgundy','scarlet','midnight'))`.
+- **CSS vars**: defined in `src/index.css` under `:root[data-theme="royal|burgundy|scarlet|midnight"]` blocks plus a `:root` block holding status/surface tokens **and the neutral-ramp defaults**. Each var stores an RGB triplet (e.g. `--color-primary: 22 38 96`) so Tailwind's `<alpha-value>` opacity syntax keeps working. The light themes override only the six brand vars; `midnight` additionally rebinds surface/border/status/cat-7/cat-8 and the neutral ramp, sets `color-scheme: dark`, re-skins chart *chrome* via scoped `.recharts-*` CSS, and is forced back to light bindings under `@media print`.
+- **Neutral ramp (v1.5.0)**: the `white`/`slate` utilities are remapped **per utility** in `tailwind.config.js` to `--nb-*` (backgrounds) / `--nt-*` (text ink) / `--ne-*` (edges) vars — light themes bind them to the exact Tailwind values (pixel-identical), so `bg-white` semantically means "card" and `text-slate-900` means "heading ink" in every theme. `text-white` / `text-slate-50..200` are ink-on-dark and stay literal. `ink-dark` is the constant dark ink for saturated fills (never `text-slate-900` there — it inverts on midnight). See `DESIGN.md → Color → Neutral ramp`.
 - **DOM application**: `ThemeContext` (`src/contexts/ThemeContext.tsx`) reads the active theme from `TenantConfigContext` and writes `document.documentElement.dataset.theme`. Also persists a `xsuite_theme_hint` to `localStorage`.
-- **Anti-flash**: `src/main.tsx` synchronously reads the localStorage hint and sets `data-theme` before `createRoot()` so returning visitors don't see a Royal-default paint. CSP forbids inline scripts in `index.html`, so the module-script approach is the only option.
+- **Anti-flash**: `src/main.tsx` synchronously reads the localStorage hint and sets `data-theme` before `createRoot()` so returning visitors don't see a Royal-default paint. The whitelist derives from `THEMES` (never hardcode the list — a missing entry = wrong-theme flash). CSP forbids inline scripts in `index.html`, so the module-script approach is the only option.
 - **Mutation**: `src/lib/tenantThemeService.ts` `updateTenantTheme(tenantId, theme)`. `ThemeContext` optimistically applies the theme to the DOM, then calls the service, then refreshes the tenant config.
-- **Picker UI**: `src/pages/settings/AppearanceSettings.tsx` — three mini-preview cards (swatches + sample button + accent strip). Active card uses `border-primary` so the picker re-themes reactively.
+- **Picker UI**: `src/pages/settings/AppearanceSettings.tsx` — mini-preview cards (swatches + sample button + accent strip); dark themes carry a `preview` block (own dark surfaces) and a flagship badge. Active card uses `border-primary` so the picker re-themes reactively.
 
 ### Token vocabulary (locked)
 14 role-based tokens, each with foreground and (for status) muted variants:
 - Brand: `primary`, `primary-foreground`, `secondary`, `secondary-foreground`, `accent`, `accent-foreground`
 - Surface: `surface`, `surface-muted`, `border`, `ring`
-- Status (constant across themes): `success`, `success-foreground`, `success-muted`, `warning`, `warning-foreground`, `warning-muted`, `danger`, `danger-foreground`, `danger-muted`, `info`, `info-foreground`, `info-muted`
+- Status (hue/meaning fixed; midnight re-anchors values for dark): `success`, `success-foreground`, `success-muted`, `warning`, `warning-foreground`, `warning-muted`, `danger`, `danger-foreground`, `danger-muted`, `info`, `info-foreground`, `info-muted`
+- Plus (v1.5.0): `ink-dark` (constant dark ink for saturated fills) and the internal neutral-ramp vars (`--nb-*`/`--nt-*`/`--ne-*`) behind the `white`/`slate` utilities.
 
 Do NOT invent new tokens. If a color need doesn't fit, ask before extending the vocabulary.
 
@@ -500,15 +501,16 @@ Do NOT invent new tokens. If a color need doesn't fit, ask before extending the 
 - Never write `bg-blue-600`, `text-purple-*`, or any brand hex like `#1E5BB8` / `#8b5cf6` / `#6366f1` / `#a855f7` / `#4A5568` / `#6A7A8A` in new code. Use semantic tokens.
 - `bg-purple-*`, `bg-indigo-*`, `bg-violet-*` (any shade) are BANNED. Use `bg-accent` or `bg-secondary`.
 - PDFs do NOT theme. `src/lib/deviceIconMapper.ts` SVG strings and `src/lib/pdf/styles.ts` `PDF_COLORS` are intentionally fixed.
-- Charts use `src/lib/chartTheme.ts` (`chartCategorical`, `chartAxis`, `chartGrid`, `chartTooltipBorder`) — also intentionally not themed.
+- Charts: `src/lib/chartTheme.ts` data hues are intentionally not themed; chart *chrome* (axis/grid/tooltip/legend) re-skins under `midnight` via scoped CSS in `src/index.css` only.
+- On saturated fills use `text-ink-dark`, never `text-slate-900` (the slate ink ramp inverts under midnight).
 - The `*Copy.tsx` shadow tree under `src/` was removed in the theme-migration Phase 0 and must not be re-introduced. Do not commit `* - Copy.{ts,tsx}` files.
 - Tailwind v3.4 only — do NOT upgrade to v4 without a separate plan.
 
-### Adding a fourth theme
-1. Add a new value to the `tenants.theme` CHECK constraint and to the `Theme` union in `src/types/tenantConfig.ts` / `THEMES` array.
-2. Append a `:root[data-theme="new"]` block to `src/index.css` with the same six `--color-primary` / `-secondary` / `-accent` (+ foreground) triplets.
-3. Add an option to `THEME_OPTIONS` in `src/pages/settings/AppearanceSettings.tsx` (name, description, primary/secondary/accent swatches).
-4. No component changes required — the token system propagates automatically.
+### Adding a fifth theme
+1. Add the new value to the `tenants.theme` CHECK constraint (migration via `mcp__supabase__apply_migration`) and to the `Theme` union / `THEMES` array in `src/types/tenantConfig.ts` (the `main.tsx` anti-flash whitelist follows `THEMES` automatically).
+2. Append a `:root[data-theme="new"]` block to `src/index.css` with the six `--color-primary` / `-secondary` / `-accent` (+ foreground) triplets. **Light theme**: stop there. **Dark theme**: also rebind `--color-surface(-muted)`/`--color-border`, the status bases+muteds, `--color-cat-7/8` if needed, the full `--nb-*`/`--nt-*`/`--ne-*` neutral ramp, scrollbar vars, `color-scheme: dark`, chart-chrome CSS, and a `@media print` light-force block — mirror the `midnight` block, and WCAG-validate every pair.
+3. Add an option to `THEME_OPTIONS` in `src/pages/settings/AppearanceSettings.tsx` (name, description, swatches; add a `preview` block for dark themes).
+4. No component changes required — the token system + neutral ramp propagate automatically.
 
 ---
 
@@ -634,6 +636,16 @@ const formatted = formatCurrencyWithConfig(amount, currency);
 - **Re-Recovery**: `cases.parent_case_id` (self-FK) + `case_origin` (`new`/`re_recovery`). A "Start Re-Recovery" action (`createReRecoveryCase`, reuses `duplicateCase`) creates a NEW linked case at intake with fresh custody, cross-linking both cases in `case_job_history`; the original's history is preserved. Admin reopen edges kept for same-case continuation.
 - **No Solution — Future Follow-up**: new terminal-but-revisitable phase **`no_solution`** + status "No Solution — Future Follow-up" (phase CHECKs widened to 13). Structured reason catalog **`master_case_no_solution_reasons`** (global; unsupported firmware/controller, no method, media damage, tool unavailable, other) + `cases.no_solution_reason_id` + `no_solution_notes`. Edges: recovery/diagnosis→no_solution (`no_solution_reason` gate, enforced in `transition_case_status` v4), no_solution→recovery/diagnosis (admin reopen), no_solution→closed. "Mark No Solution" flow captures the reason and schedules a `case_follow_ups` review (default +6 mo). New `no_solution` bucket in the Cases command center + `TERMINAL_TYPES`.
 - `database.types.ts` regenerated (`cases.parent_case_id`/`case_origin`/`no_solution_reason_id`/`no_solution_notes`, `master_case_no_solution_reasons`, `set_case_status`).
+
+### Version 1.5.0 — Midnight Aurora Theme & Var-Backed Neutral Ramp
+**Date**: 2026-07-05
+**Migration**: `add_midnight_theme` (**PENDING** — SQL in `docs/migrations-pending/2026-07-05-add-midnight-theme.sql`; apply via `mcp__supabase__apply_migration` then record in the manifest. Until applied, picking Midnight fails the CHECK and the UI reverts safely.)
+
+- **4th tenant theme `midnight` ("Midnight Aurora")** — flagship premium dark theme carrying the 2026-07-04 auth-zone identity app-wide: navy surfaces (`#0A111F` page / `#111B32` card), electric-blue `primary #2E6BE8`, aurora-violet `secondary #6D4AE3`, dark-violet `accent` surface. All pairs WCAG-validated (matrix: `docs/superpowers/plans/2026-07-05-midnight-aurora-theme.md`). The purple/indigo/violet *class* ban is unchanged — the hue ships only as theme token values.
+- **Neutral ramp architecture**: `white`/`slate` Tailwind utilities remapped per-utility to CSS vars (`--nb-*`/`--nt-*`/`--ne-*`) in `tailwind.config.js`; light themes bind to exact Tailwind values (pixel-identical), midnight rebinds the ramp — ~7,000 neutral call-sites re-theme with zero churn. New constant `ink-dark` token for ink on saturated fills (`GradientStatCard`/vivid previews migrated off `text-slate-900`). Bare-`border` DEFAULT rebound from gray-200 (latent drift) to the slate-200 edge var.
+- **Dark-surface systems**: status bases+muteds and `cat-7`/`cat-8` re-anchored under midnight (hue/meaning preserved; `chartCategorical` untouched); chart chrome re-skinned via scoped `.recharts-*` CSS; themed scrollbars; ring-offset default rebound; `color-scheme: dark`; `@media print` forces light bindings.
+- **Theme-system bug fixes**: `main.tsx` anti-flash whitelist hardcoded 3 themes (new themes flashed Royal) — now derives from `THEMES`; `AppearanceSettings` gains the Midnight card (dark `preview` surfaces + Premium badge, grid `md:2 xl:4`).
+- No `database.types.ts` change (CHECK constraints are not represented in generated types).
 
 ### Future Migration Guidelines
 

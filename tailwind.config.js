@@ -1,8 +1,107 @@
 /** @type {import('tailwindcss').Config} */
+
+// Var-backed NEUTRAL layer (DESIGN.md → Color → Neutral ramp). The white/slate
+// utilities are remapped PER UTILITY to CSS variables so the whole app
+// re-skins under data-theme="midnight" with zero call-site churn. The light
+// themes bind the vars to the exact Tailwind v3.4 slate values (pixel
+// identical); only the midnight block in src/index.css rebinds them. Shades
+// not var-backed for a given utility keep the literal value below.
+const nv = (v) => `rgb(var(${v}) / <alpha-value>)`;
+const SLATE = {
+  50: '#f8fafc',
+  100: '#f1f5f9',
+  200: '#e2e8f0',
+  300: '#cbd5e1',
+  400: '#94a3b8',
+  500: '#64748b',
+  600: '#475569',
+  700: '#334155',
+  800: '#1e293b',
+  900: '#0f172a',
+  950: '#020617',
+};
+
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      // Backgrounds: bg-white = card, bg-slate-50 = page, 100/200/300 =
+      // raised/strong/inset fills, 700/800/900 = the dark-chrome fills
+      // (tooltips, scrims, media panels). text-white stays literal — it is
+      // ink on colored fills, never a surface.
+      backgroundColor: {
+        white: nv('--nb-card'),
+        slate: {
+          ...SLATE,
+          50: nv('--nb-page'),
+          100: nv('--nb-raised'),
+          200: nv('--nb-strong'),
+          300: nv('--nb-inset'),
+          700: nv('--nb-dim'),
+          800: nv('--nb-dark'),
+          900: nv('--nb-deep'),
+        },
+      },
+      // Text ink: slate-300..900 invert on midnight (300 doubles as the
+      // platform-admin dark-sidebar nav tone — its midnight value is
+      // AA-checked on both card and deep surfaces). slate-50..200 + white
+      // stay literal: they are only ever ink on dark/colored fills.
+      textColor: {
+        slate: {
+          ...SLATE,
+          300: nv('--nt-300'),
+          400: nv('--nt-400'),
+          500: nv('--nt-500'),
+          600: nv('--nt-600'),
+          700: nv('--nt-700'),
+          800: nv('--nt-800'),
+          900: nv('--nt-900'),
+        },
+      },
+      // Edges. DEFAULT rebinding also fixes a latent drift: bare `border`
+      // rendered Tailwind's gray-200 #e5e7eb (the gray palette is banned) —
+      // it now follows the slate-200-equivalent edge token. divideColor
+      // derives from borderColor automatically.
+      borderColor: {
+        DEFAULT: nv('--ne-base'),
+        slate: {
+          ...SLATE,
+          100: nv('--ne-soft'),
+          200: nv('--ne-base'),
+          300: nv('--ne-strong'),
+        },
+      },
+      ringColor: {
+        slate: {
+          ...SLATE,
+          100: nv('--ne-soft'),
+          200: nv('--ne-base'),
+          300: nv('--ne-strong'),
+        },
+      },
+      ringOffsetColor: {
+        white: nv('--nb-card'),
+        slate: {
+          ...SLATE,
+          50: nv('--nb-page'),
+        },
+      },
+      gradientColorStops: {
+        white: nv('--nb-card'),
+        slate: {
+          ...SLATE,
+          50: nv('--nb-page'),
+          100: nv('--nb-raised'),
+          200: nv('--nb-strong'),
+        },
+      },
+      placeholderColor: {
+        slate: {
+          ...SLATE,
+          400: nv('--nt-400'),
+          500: nv('--nt-500'),
+        },
+      },
       colors: {
         primary: 'rgb(var(--color-primary) / <alpha-value>)',
         'primary-foreground': 'rgb(var(--color-primary-foreground) / <alpha-value>)',
@@ -37,6 +136,11 @@ export default {
         'cat-6': 'rgb(var(--color-cat-6) / <alpha-value>)',
         'cat-7': 'rgb(var(--color-cat-7) / <alpha-value>)',
         'cat-8': 'rgb(var(--color-cat-8) / <alpha-value>)',
+        // Fixed dark ink for saturated fills (amber/lime KPI tiles, colored
+        // pill tabs). Deliberately NOT themed: on a vivid gradient the ink
+        // must stay dark in every theme, including midnight where the
+        // slate-900 text utility inverts to near-white.
+        'ink-dark': 'rgb(var(--color-ink-dark) / <alpha-value>)',
       },
       fontFamily: {
         // App-wide typeface: Inter. `sans` is set so Tailwind Preflight applies

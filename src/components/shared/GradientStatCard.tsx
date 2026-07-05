@@ -35,7 +35,10 @@ const TONE: Record<GradientTone, { gradient: string; dark?: boolean }> = {
 
 // Foreground bundles, picked by tone darkness. Literal class strings keep them
 // JIT-safe. `dark` tiles (most) take white ink + white decor; `light` tiles
-// (amber/lime/yellow) take slate-900 ink + dark decor so contrast stays AA.
+// (amber/lime/yellow) take ink-dark + dark decor so contrast stays AA.
+// ink-dark (not slate-900) because the slate text utilities are theme-mapped:
+// under midnight text-slate-900 inverts to near-white, which would put white
+// ink on an amber tile. ink-dark is the constant on-color ink token.
 type FgSpec = {
   text: string; label: string; denom: string; sub: string; pill: string;
   track: string; fill: string; ring: string; glow: string; ringline: string;
@@ -49,10 +52,10 @@ const FG: Record<'dark' | 'light', FgSpec> = {
     dotA: 'bg-white/25', dotB: 'bg-white/20', dotC: 'bg-white/15',
   },
   light: {
-    text: 'text-slate-900', label: 'text-slate-900/80', denom: 'text-slate-900/60', sub: 'text-slate-900/70',
-    pill: 'bg-slate-900/10', track: 'bg-slate-900/10', fill: 'bg-slate-900/50', ring: 'ring-slate-900/5',
-    glow: 'bg-slate-900/10', ringline: 'border-slate-900/10', ghost: 'text-slate-900/10',
-    dotA: 'bg-slate-900/20', dotB: 'bg-slate-900/15', dotC: 'bg-slate-900/10',
+    text: 'text-ink-dark', label: 'text-ink-dark/80', denom: 'text-ink-dark/60', sub: 'text-ink-dark/70',
+    pill: 'bg-ink-dark/10', track: 'bg-ink-dark/10', fill: 'bg-ink-dark/50', ring: 'ring-ink-dark/5',
+    glow: 'bg-ink-dark/10', ringline: 'border-ink-dark/10', ghost: 'text-ink-dark/10',
+    dotA: 'bg-ink-dark/20', dotB: 'bg-ink-dark/15', dotC: 'bg-ink-dark/10',
   },
 };
 

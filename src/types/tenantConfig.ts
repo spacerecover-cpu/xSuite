@@ -5,8 +5,8 @@ export type TaxSystem = 'VAT' | 'GST' | 'SALES_TAX' | 'NONE';
 export const REQUIRED_SENTINEL: unique symbol = Symbol.for('country-config.required');
 export type RequiredSentinel = typeof REQUIRED_SENTINEL;
 
-export type Theme = 'royal' | 'burgundy' | 'scarlet';
-export const THEMES: readonly Theme[] = ['royal', 'burgundy', 'scarlet'] as const;
+export type Theme = 'royal' | 'burgundy' | 'scarlet' | 'midnight';
+export const THEMES: readonly Theme[] = ['royal', 'burgundy', 'scarlet', 'midnight'] as const;
 export const DEFAULT_THEME: Theme = 'royal';
 
 export interface CurrencyConfig {

@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { installDomTranslationGuard } from './lib/domTranslationGuard';
+import { THEMES } from './types/tenantConfig';
 import { logger } from './lib/logger';
 import { isChunkLoadError } from './lib/chunkError';
 import './index.css';
@@ -41,8 +42,10 @@ window.addEventListener('error', (event) => {
 // Anti-flash: apply the user's last-seen theme synchronously before React mounts,
 // so returning visitors don't see a Royal-default paint before their saved theme loads.
 // First-time visitors fall through to the :root default (Royal) in index.css.
+// The whitelist derives from THEMES so a newly added theme can never be
+// silently dropped here again (that regression = a wrong-theme flash).
 const themeHint = localStorage.getItem('xsuite_theme_hint');
-if (themeHint === 'royal' || themeHint === 'burgundy' || themeHint === 'scarlet') {
+if (themeHint && (THEMES as readonly string[]).includes(themeHint)) {
   document.documentElement.dataset.theme = themeHint;
 }
 
