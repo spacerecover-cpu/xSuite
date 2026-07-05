@@ -390,3 +390,9 @@ export const dataMigrationKeys = {
   validateResult: (fileHash: string) => [...dataMigrationKeys.all, 'validateResult', fileHash] as const,
   exportProgress: () => [...dataMigrationKeys.all, 'exportProgress'] as const,
 };
+
+export const countryPackKeys = {
+  all: ['country-packs'] as const,
+  list: () => [...countryPackKeys.all, 'list'] as const,
+  detail: (countryId: string) => [...countryPackKeys.all, 'detail', countryId] as const,
+};
