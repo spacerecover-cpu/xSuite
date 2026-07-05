@@ -1,14 +1,36 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const maybeSingle = vi.fn();
+// geo_countries uses `.select().eq().maybeSingle()`; master_einvoice_regimes
+// uses `.select().eq().is().lte().order()` returning ALL active regimes (latest first)
+// so the resolver can pick the latest IMPLEMENTED one. regimeState.rows is settable
+// per-test (hoisted, since vi.mock's factory is hoisted above top-level consts).
+const { regimeState } = vi.hoisted(() => ({
+  regimeState: { rows: [] as Array<{ adapter_key: string; mandatory_from: string }> },
+}));
 vi.mock('../supabaseClient', () => ({
-  supabase: { from: () => ({ select: () => ({ eq: () => ({ maybeSingle }) }) }) },
+  supabase: {
+    from: (table: string) =>
+      table === 'master_einvoice_regimes'
+        ? {
+            select: () => ({
+              eq: () => ({
+                is: () => ({
+                  lte: () => ({
+                    order: () => Promise.resolve({ data: regimeState.rows, error: null }),
+                  }),
+                }),
+              }),
+            }),
+          }
+        : { select: () => ({ eq: () => ({ maybeSingle }) }) },
+  },
 }));
 
 import { getResolvedCountryFacts } from './countryFactsService';
 
 describe('getResolvedCountryFacts (R3, §8b)', () => {
-  beforeEach(() => maybeSingle.mockReset());
+  beforeEach(() => { maybeSingle.mockReset(); regimeState.rows = []; });
 
   it('maps a geo_countries row to ResolvedCountryFacts (scalar tax_label path)', async () => {
     maybeSingle.mockResolvedValue({
@@ -25,6 +47,7 @@ describe('getResolvedCountryFacts (R3, §8b)', () => {
       code: 'OM', taxSystem: 'VAT', taxLabel: 'VAT', taxNumberLabel: 'VATIN', taxInvoiceRequired: true,
       languageCode: 'ar', decimalPlaces: 3, dateFormat: 'DD/MM/YYYY',
       decimalSeparator: '.', thousandsSeparator: ',', digitGrouping: '3',
+      einvoiceRegimeKey: 'no_einvoice',
       addressFormat: '%N %O %A %C %Z',
     });
   });
@@ -51,5 +74,25 @@ describe('getResolvedCountryFacts (R3, §8b)', () => {
   it('returns null when no geo_countries row is found', async () => {
     maybeSingle.mockResolvedValue({ data: null, error: null });
     expect(await getResolvedCountryFacts('missing')).toBeNull();
+  });
+
+  it('routes the QR to the latest IMPLEMENTED regime, not a declared-but-unimplemented later phase', async () => {
+    // SA carries zatca_ph1 (implemented) AND zatca_ph2 (clearance, later-mandated, NOT implemented).
+    // The resolver must skip the unimplemented latest and pick zatca_ph1 so the Phase-1 QR still emits.
+    maybeSingle.mockResolvedValue({
+      data: {
+        code: 'SA', tax_system: 'VAT', tax_label: 'VAT', tax_number_label: null,
+        tax_invoice_required: true, language_code: 'ar', decimal_places: 2,
+        date_format: 'DD/MM/YYYY', decimal_separator: '.', thousands_separator: ',',
+        digit_grouping: '3', address_format: null,
+      },
+      error: null,
+    });
+    regimeState.rows = [
+      { adapter_key: 'zatca_ph2', mandatory_from: '2023-01-01' },
+      { adapter_key: 'zatca_ph1', mandatory_from: '2021-12-04' },
+    ];
+    const facts = await getResolvedCountryFacts('sa-uuid');
+    expect(facts?.einvoiceRegimeKey).toBe('zatca_ph1');
   });
 });

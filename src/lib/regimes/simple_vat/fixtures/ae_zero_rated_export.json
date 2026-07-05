@@ -1,0 +1,21 @@
+{
+  "name": "ae_zero_rated_export_of_services",
+  "input_document": {
+    "documentType": "invoice",
+    "seller": { "legalEntityId": "fixture-le", "countryId": "fixture-ae", "subdivisionId": null, "taxIdentifier": "100000000000003", "registrations": [] },
+    "buyer": { "taxNumber": null, "countryId": null, "subdivisionId": null, "isBusiness": true, "addressSnapshot": null },
+    "taxPointDate": "2026-07-02",
+    "placeOfSupplySubdivisionId": null,
+    "lines": [{ "lineItemId": null, "description": "Remote recovery — export of services", "quantity": 1, "unitPrice": 2000, "lineDiscount": 0, "unitCode": "C62", "itemCode": null, "treatment": "zero_rated", "treatmentReasonCode": "EXPORT_SERVICES" }],
+    "documentDiscount": 0,
+    "taxInclusive": false,
+    "rateContext": { "documentCurrency": "AED", "documentDecimals": 2, "baseCurrency": "AED", "baseDecimals": 2, "rate": 1, "rateSource": "derived" },
+    "rates": [{ "id": "fixture-ae-vat-std", "country_id": "fixture-ae", "subdivision_id": null, "component_code": "VAT", "component_label": "VAT 5%", "tax_category": "standard", "rate": 5, "applies_to": null, "valid_from": "2018-01-01", "valid_to": null, "sort_order": 0 }],
+    "roundingPolicy": { "mode": "half_up", "level": "document" },
+    "scaleSystem": "western"
+  },
+  "expected": {
+    "totals": { "taxableBase": 2000, "taxTotal": 0, "grandTotal": 2000, "roundingAdjustment": null },
+    "rollups": []
+  }
+}

@@ -9,6 +9,7 @@ import { prefixNumbering } from './prefix_numbering';
 import { genericInvoice } from './generic_invoice';
 import { gccTaxInvoiceProfile } from './gcc_tax_invoice';
 import { noEinvoice } from './no_einvoice';
+import { zatcaPh1Transport } from './zatca_ph1';
 import { gccReturnComposer } from './gcc_return';
 
 let registered = false;
@@ -20,6 +21,7 @@ export function registerAllRegimePlugins(): void {
   registerRegimePlugin('documents', genericInvoice);
   registerRegimePlugin('documents', gccTaxInvoiceProfile);
   registerRegimePlugin('einvoice', noEinvoice);
+  registerRegimePlugin('einvoice', zatcaPh1Transport);
   registerRegimePlugin('return', gccReturnComposer);
   registered = true;
 }

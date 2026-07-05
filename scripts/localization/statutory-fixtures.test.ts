@@ -7,9 +7,18 @@ import { resolveTaxStrategy } from '../../src/lib/regimes/registry';
 import omStandard from '../../src/lib/regimes/simple_vat/fixtures/om-standard-invoice.json';
 import omZero from '../../src/lib/regimes/simple_vat/fixtures/om-zero-rated-export.json';
 import omDiscount from '../../src/lib/regimes/simple_vat/fixtures/om-doc-discount-mils.json';
+import aeStandard from '../../src/lib/regimes/simple_vat/fixtures/ae_standard_invoice.json';
+import aeZero from '../../src/lib/regimes/simple_vat/fixtures/ae_zero_rated_export.json';
+import saStandard from '../../src/lib/regimes/simple_vat/fixtures/sa_standard_invoice.json';
+import saMultiline from '../../src/lib/regimes/simple_vat/fixtures/sa_multiline_line_rounding.json';
 
 const REPO_FIXTURES: Record<string, PackFixture[]> = {
   OM: [omStandard, omZero, omDiscount] as unknown as PackFixture[],
+  // Added by the P3 governed pipeline (Tasks 29/30). AE published statutory_ready, so the
+  // live-DB half REQUIRES AE fixtures here; SA published formatting_ready (zatca_ph2 unimplemented)
+  // so it is not enumerated live, but its fixtures still gate through the kernel in the repo half.
+  AE: [aeStandard, aeZero] as unknown as PackFixture[],
+  SA: [saStandard, saMultiline] as unknown as PackFixture[],
 };
 
 describe('statutory-fixtures gate (repo half — always runs)', () => {

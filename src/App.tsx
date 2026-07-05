@@ -298,6 +298,8 @@ const router = createBrowserRouter(
         <Route path="isolation-tests" lazy={page(() => import('./pages/platform-admin/TenantIsolationTestPage'), 'TenantIsolationTestPage')} />
         <Route path="rate-limits" lazy={page(() => import('./pages/platform-admin/RateLimitDashboardPage'), 'RateLimitDashboardPage')} />
         <Route path="notifications/dlq" lazy={page(() => import('./pages/platform-admin/NotificationDLQ'), 'NotificationDLQ')} />
+        <Route path="countries" lazy={page(() => import('./pages/platform-admin/CountryPacksPage'), 'CountryPacksPage')} />
+        <Route path="countries/:countryId" lazy={page(() => import('./pages/platform-admin/CountryPackEditorPage'), 'CountryPackEditorPage')} />
       </Route>
 
       <Route

@@ -49,8 +49,7 @@ describe('default regime plugins (the ~80% data-only path)', () => {
     const t = resolveEInvoicingTransport('no_einvoice');
     expect(() => t.buildArtifact({
       documentType: 'invoice', documentId: 'x', documentNumber: 'INVO-1', issuedAt: '2026-07-02T00:00:00Z',
-      currency: 'OMR', totals: { taxableBase: 0, taxTotal: 0, grandTotal: 0 },
-      taxLines: [], sellerTaxIdentifier: null, buyerTaxNumber: null,
+      currency: 'OMR', sellerName: 'X', sellerTaxNumber: null, totalAmount: 0, taxAmount: 0, meta: {},
     })).toThrowError(/no_einvoice/);
   });
 });

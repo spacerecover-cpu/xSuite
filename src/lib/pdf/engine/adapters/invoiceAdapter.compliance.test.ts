@@ -4,9 +4,10 @@ import {
   BUILT_IN_TEMPLATE_CONFIGS,
   resolveTemplateConfigWithCountry,
 } from '../../templateConfig';
-import { countryTemplateOverride } from '../countryConfig';
+import { countryTemplateOverride, type ResolvedCountryFacts } from '../countryConfig';
 import { gccTaxInvoiceProfile } from '../../../regimes/gcc_tax_invoice';
 import type { DocumentComplianceProfile } from '../../../regimes/types';
+import { registerAllRegimePlugins } from '../../../regimes/register';
 import { buildInvoiceFixture } from '../invoiceParity.fixtures';
 
 // ---------------------------------------------------------------------------
@@ -35,6 +36,7 @@ const omFacts = {
   decimalSeparator: '.',
   thousandsSeparator: ',',
   digitGrouping: '3',
+  einvoiceRegimeKey: 'no_einvoice',
 };
 
 function omConfig() {
@@ -199,5 +201,33 @@ describe('invoiceAdapter compliance rendering', () => {
     const forcedCols = forced.sections.find((s) => s.key === 'lineItems')!.columns!;
     expect(forcedCols.find((c) => c.key === 'itemCode')!.visible).toBe(true);
     expect(forcedCols.find((c) => c.key === 'unit')!.visible).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regime-routed e-invoice QR (P3, Task 28). The ZATCA Phase-1 TLV is routed by
+// facts.einvoiceRegimeKey (resolved from master_einvoice_regimes), NEVER by a
+// seller country string — the legacy country-string QR hardcode is retired.
+// Emission is DATA-gated: only a 'zatca_ph1' regime key (with the tax bar on and
+// a seller VAT number present) produces a payload; 'no_einvoice' produces none.
+// ---------------------------------------------------------------------------
+describe('regime-routed e-invoice QR (P3)', () => {
+  registerAllRegimePlugins(); // resolveEInvoicingTransport('zatca_ph1') needs the plugin registered
+  const zatcaFacts: ResolvedCountryFacts = { ...omFacts, einvoiceRegimeKey: 'zatca_ph1' };
+  const noEinvoiceFacts: ResolvedCountryFacts = { ...omFacts, einvoiceRegimeKey: 'no_einvoice' };
+
+  it('emits the TLV payload only when facts.einvoiceRegimeKey is zatca_ph1', () => {
+    const fixture = buildInvoiceFixture({ seller_tax_number: '310123456700003' });
+    const withRegime = toEngineData(fixture, omConfig(), zatcaFacts);
+    const withoutRegime = toEngineData(fixture, omConfig(), noEinvoiceFacts);
+    expect(withRegime.zatcaPayload).toBeTruthy();
+    expect(withoutRegime.zatcaPayload).toBeNull();
+  });
+
+  it('the routing module is gone (retired hardcode is unimportable)', async () => {
+    // Path split so the retired module name appears nowhere as a live reference
+    // (the grep-zero gate); the import still fails because the file was deleted.
+    const retiredModule = '../einvoice' + 'Routing';
+    await expect(import(/* @vite-ignore */ retiredModule)).rejects.toThrow();
   });
 });

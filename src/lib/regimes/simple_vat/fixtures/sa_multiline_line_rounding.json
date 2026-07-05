@@ -1,0 +1,24 @@
+{
+  "name": "sa_multiline_line_rounding",
+  "input_document": {
+    "documentType": "invoice",
+    "seller": { "legalEntityId": "fixture-le", "countryId": "fixture-sa", "subdivisionId": null, "taxIdentifier": "310123456700003", "registrations": [] },
+    "buyer": { "taxNumber": null, "countryId": null, "subdivisionId": null, "isBusiness": true, "addressSnapshot": null },
+    "taxPointDate": "2026-07-02",
+    "placeOfSupplySubdivisionId": null,
+    "lines": [
+      { "lineItemId": null, "description": "Recovery labour hour A", "quantity": 1, "unitPrice": 10.10, "lineDiscount": 0, "unitCode": "C62", "itemCode": null, "treatment": "standard", "treatmentReasonCode": null },
+      { "lineItemId": null, "description": "Recovery labour hour B", "quantity": 1, "unitPrice": 10.10, "lineDiscount": 0, "unitCode": "C62", "itemCode": null, "treatment": "standard", "treatmentReasonCode": null }
+    ],
+    "documentDiscount": 0,
+    "taxInclusive": false,
+    "rateContext": { "documentCurrency": "SAR", "documentDecimals": 2, "baseCurrency": "SAR", "baseDecimals": 2, "rate": 1, "rateSource": "derived" },
+    "rates": [{ "id": "fixture-sa-vat-std", "country_id": "fixture-sa", "subdivision_id": null, "component_code": "VAT", "component_label": "VAT 15%", "tax_category": "standard", "rate": 15, "applies_to": null, "valid_from": "2020-07-01", "valid_to": null, "sort_order": 0 }],
+    "roundingPolicy": { "mode": "half_up", "level": "line" },
+    "scaleSystem": "western"
+  },
+  "expected": {
+    "totals": { "taxableBase": 20.20, "taxTotal": 3.04, "grandTotal": 23.24, "roundingAdjustment": null },
+    "rollups": [{ "componentCode": "VAT", "rate": 15, "taxableBase": 20.20, "taxAmount": 3.04, "taxTreatment": "standard" }]
+  }
+}

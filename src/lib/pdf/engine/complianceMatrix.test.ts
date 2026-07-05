@@ -48,6 +48,7 @@ const factsFor = (c: Cell) => ({
   code: c.code, taxSystem: c.taxSystem, taxLabel: c.taxLabel, taxNumberLabel: c.taxNumberLabel,
   taxInvoiceRequired: c.taxInvoiceRequired, languageCode: c.languageCode, decimalPlaces: c.dp,
   dateFormat: 'DD/MM/YYYY', decimalSeparator: '.', thousandsSeparator: ',', digitGrouping: '3',
+  einvoiceRegimeKey: 'no_einvoice',
   addressFormat: null as string | null,
 });
 const profileFor = (c: Cell) =>

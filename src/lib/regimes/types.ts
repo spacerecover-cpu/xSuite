@@ -229,13 +229,14 @@ export interface DocumentComplianceProfile {
 export interface IssuedDocumentSnapshot {
   documentType: TaxDocumentType;
   documentId: string;
-  documentNumber: string;
-  issuedAt: string;
+  documentNumber: string | null;
+  sellerName: string;
+  sellerTaxNumber: string | null;
+  issuedAt: string;              // ISO timestamp of the tax point
   currency: string;
-  totals: { taxableBase: number; taxTotal: number; grandTotal: number };
-  taxLines: ComputedTaxLine[];
-  sellerTaxIdentifier: string | null;
-  buyerTaxNumber: string | null;
+  totalAmount: number;           // document currency, gross
+  taxAmount: number;             // document currency
+  meta: Record<string, unknown>;
 }
 
 export interface EInvoicingTransport {

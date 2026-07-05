@@ -15,8 +15,8 @@ import type { DocumentTemplateConfig, ColumnConfig, TotalsLineKey } from '../../
 import { formatDate, safeString, formatEngineMoney, formatPartyAddressLines } from '../../utils';
 import { fmtDateWithConfig } from '../../configDate';
 import { amountInWordsAr, amountInWordsEn } from '../amountInWords';
-import { buildZatcaTlvBase64 } from '../zatcaQr';
-import { shouldEmitZatcaQr } from '../einvoiceRouting';
+import { resolveEInvoicingTransport } from '../../../regimes/registry';
+import type { ResolvedCountryFacts } from '../countryConfig';
 import type {
   BankBlock,
   EngineDocData,
@@ -36,19 +36,6 @@ const COLUMN_ALIGN: Record<string, 'left' | 'center' | 'right'> = {
   unitPrice: 'right',
   lineTotal: 'right',
 };
-
-/** Map the seller's free-text country (ISO code or display name) to the ISO-3166
- *  alpha-2 `SA` when it is Saudi Arabia, else the trimmed/upper raw value (or null).
- *  Used only to route the KSA-specific ZATCA QR (D11); not a general normalizer. */
-function normalizeSaudi(country: string | null | undefined): string | null {
-  const raw = (country ?? '').trim();
-  if (!raw) return null;
-  const upper = raw.toUpperCase();
-  if (upper === 'SA' || upper === 'KSA' || upper === 'SAUDI ARABIA' || upper === 'SAUDIARABIA') {
-    return 'SA';
-  }
-  return upper;
-}
 
 function resolveColumns(config: DocumentTemplateConfig): ColumnConfig[] {
   const lineItems = config.sections.find((s) => s.key === 'lineItems');
@@ -74,6 +61,7 @@ function totalsLines(config: DocumentTemplateConfig): Record<string, boolean> {
 export function toEngineData(
   invoice: InvoiceDocumentData,
   config: DocumentTemplateConfig,
+  facts?: ResolvedCountryFacts | null,
 ): EngineDocData {
   const { invoiceData, companySettings } = invoice;
 
@@ -398,13 +386,12 @@ export function toEngineData(
         }
       : null;
 
-  // ---- ZATCA / GCC e-invoice QR (country-routed) ---------------------------
-  // The ZATCA TLV is a Saudi-VAT statutory artifact: it is emitted ONLY when the
-  // resolving entity's country + tax system route to KSA (D11) — never on a bare
-  // UI tax-bar toggle, so a non-KSA tenant cannot emit a "compliant" KSA QR. The
-  // tax bar still gates whether the seller VAT identification is present at all.
+  // ---- E-invoice artifact (regime-routed, P3) ------------------------------
+  // Routed by the country pack's master_einvoice_regimes row resolved into
+  // facts.einvoiceRegimeKey — never by country-string matching (D11 → data). A
+  // non-zatca_ph1 country (incl. an unresolved/no-country render) emits nothing.
+  // The tax bar still gates whether seller VAT identification is present at all.
   // Rendered natively by the QR surfaces (pdfmake `qr`), so no QR dependency.
-  const sellerCountryCode = normalizeSaudi(companySettings.location?.country);
   // Seller registration number for the printed band + QR: the STAMPED
   // `seller_tax_number` (legal_entities-sourced snapshot) wins over the live
   // `company_settings` value, so the printed band matches the Task 14 preview.
@@ -412,11 +399,8 @@ export function toEngineData(
   const identity = sellerVatNumber
     ? { ...companySettings, basic_info: { ...companySettings.basic_info, vat_number: sellerVatNumber } }
     : companySettings;
-  // The tax bar is the entity's VAT/GST identification opt-in; within it the
-  // applicable system is VAT (the only ZATCA-eligible system in scope).
-  const taxSystem = config.taxBar?.enabled ? 'VAT' : null;
   let zatcaPayload: string | null = null;
-  if (config.taxBar?.enabled && shouldEmitZatcaQr({ taxSystem, countryCode: sellerCountryCode })) {
+  if (config.taxBar?.enabled && facts?.einvoiceRegimeKey === 'zatca_ph1') {
     const sellerName =
       companySettings.basic_info?.legal_name || companySettings.basic_info?.company_name || '';
     // Feed the SAME stamped number to the QR so the QR and the band agree; a
@@ -424,16 +408,22 @@ export function toEngineData(
     const vatNumber =
       (config.taxBar.source === 'manual' ? config.taxBar.value : sellerVatNumber) || '';
     if (sellerName && vatNumber) {
-      const timestamp = invoiceData.invoice_date
-        ? new Date(invoiceData.invoice_date).toISOString()
-        : new Date().toISOString();
-      zatcaPayload = buildZatcaTlvBase64({
+      const transport = resolveEInvoicingTransport('zatca_ph1');
+      const artifact = transport.buildArtifact({
+        documentType: 'invoice',
+        documentId: invoiceData.id ?? '',
+        documentNumber: invoiceData.invoice_number ?? null,
         sellerName,
-        vatNumber,
-        timestamp,
-        total: totalAmount.toFixed(2),
-        vatAmount: storedTax.toFixed(2),
+        sellerTaxNumber: vatNumber,
+        issuedAt: invoiceData.invoice_date
+          ? new Date(invoiceData.invoice_date).toISOString()
+          : new Date().toISOString(),
+        currency: '',            // TLV Phase-1 carries no currency field; totals are document-currency strings
+        totalAmount,
+        taxAmount: storedTax,
+        meta: {},
       });
+      zatcaPayload = typeof artifact.payload === 'string' ? artifact.payload : null;
     }
   }
 

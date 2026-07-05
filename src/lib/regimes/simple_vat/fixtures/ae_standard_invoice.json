@@ -1,0 +1,21 @@
+{
+  "name": "ae_standard_rate_invoice",
+  "input_document": {
+    "documentType": "invoice",
+    "seller": { "legalEntityId": "fixture-le", "countryId": "fixture-ae", "subdivisionId": null, "taxIdentifier": "100000000000003", "registrations": [] },
+    "buyer": { "taxNumber": null, "countryId": null, "subdivisionId": null, "isBusiness": true, "addressSnapshot": null },
+    "taxPointDate": "2026-07-02",
+    "placeOfSupplySubdivisionId": null,
+    "lines": [{ "lineItemId": null, "description": "HDD logical recovery", "quantity": 1, "unitPrice": 1000, "lineDiscount": 0, "unitCode": "C62", "itemCode": null, "treatment": "standard", "treatmentReasonCode": null }],
+    "documentDiscount": 0,
+    "taxInclusive": false,
+    "rateContext": { "documentCurrency": "AED", "documentDecimals": 2, "baseCurrency": "AED", "baseDecimals": 2, "rate": 1, "rateSource": "derived" },
+    "rates": [{ "id": "fixture-ae-vat-std", "country_id": "fixture-ae", "subdivision_id": null, "component_code": "VAT", "component_label": "VAT 5%", "tax_category": "standard", "rate": 5, "applies_to": null, "valid_from": "2018-01-01", "valid_to": null, "sort_order": 0 }],
+    "roundingPolicy": { "mode": "half_up", "level": "document" },
+    "scaleSystem": "western"
+  },
+  "expected": {
+    "totals": { "taxableBase": 1000, "taxTotal": 50, "grandTotal": 1050, "roundingAdjustment": null },
+    "rollups": [{ "componentCode": "VAT", "rate": 5, "taxableBase": 1000, "taxAmount": 50, "taxTreatment": "standard" }]
+  }
+}

@@ -1,7 +1,7 @@
 import React, { Suspense } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { ContentLoadingFallback } from '../shared/ContentLoadingFallback';
-import { LayoutDashboard, Users, Ticket, Megaphone, LogOut, Settings, ChevronRight, CreditCard, Tag, AlertOctagon } from 'lucide-react';
+import { LayoutDashboard, Users, Ticket, Megaphone, LogOut, Settings, ChevronRight, CreditCard, Tag, AlertOctagon, Globe2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { PlatformAdminProvider } from '../../contexts/PlatformAdminContext';
 
@@ -19,6 +19,7 @@ const navItems: NavItem[] = [
   { path: '/platform-admin/tickets', label: 'Support Tickets', icon: Ticket },
   { path: '/platform-admin/announcements', label: 'Announcements', icon: Megaphone },
   { path: '/platform-admin/notifications/dlq', label: 'Notification DLQ', icon: AlertOctagon },
+  { path: '/platform-admin/countries', label: 'Country Packs', icon: Globe2 },
   { path: '/platform-admin/settings', label: 'Settings', icon: Settings },
 ];
 

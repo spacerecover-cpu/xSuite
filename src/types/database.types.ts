@@ -9752,6 +9752,7 @@ export type Database = {
           authored_by: string | null
           changelog: string | null
           checksum: string | null
+          content_updated_at: string | null
           country_id: string
           created_at: string
           deleted_at: string | null
@@ -9768,6 +9769,7 @@ export type Database = {
           authored_by?: string | null
           changelog?: string | null
           checksum?: string | null
+          content_updated_at?: string | null
           country_id: string
           created_at?: string
           deleted_at?: string | null
@@ -9784,6 +9786,7 @@ export type Database = {
           authored_by?: string | null
           changelog?: string | null
           checksum?: string | null
+          content_updated_at?: string | null
           country_id?: string
           created_at?: string
           deleted_at?: string | null
@@ -18195,6 +18198,19 @@ export type Database = {
       _apply_country_config: { Args: { p_tenant_id: string }; Returns: number }
       _fin_base_currency: { Args: { p_tenant: string }; Returns: string }
       _fin_currency_decimals: { Args: { p_code: string }; Returns: number }
+      _pack_admin_id: { Args: never; Returns: string }
+      _pack_open_version: { Args: { p_country_id: string }; Returns: string }
+      _pack_require_platform_admin: { Args: never; Returns: undefined }
+      _pack_touch: {
+        Args: {
+          p_action: string
+          p_details: Json
+          p_pack_version_id: string
+          p_resource_id: string
+          p_resource_type: string
+        }
+        Returns: undefined
+      }
       admin_validate_user_creation: { Args: { p_email: string }; Returns: Json }
       anonymize_customer_data: {
         Args: { p_customer_id: string }
@@ -18380,6 +18396,10 @@ export type Database = {
       }
       convert_proforma_to_tax_invoice: {
         Args: { p_quote_id: string }
+        Returns: string
+      }
+      create_country_pack_draft: {
+        Args: { p_changelog: string; p_country_id: string }
         Returns: string
       }
       create_receipt_with_allocations: {
@@ -18782,6 +18802,10 @@ export type Database = {
         }
         Returns: string
       }
+      numbering_template_render_length: {
+        Args: { p_format_template: string; p_padding: number }
+        Returns: number
+      }
       portal_sign_off_document: {
         Args: {
           p_image_bucket?: string
@@ -18860,6 +18884,10 @@ export type Database = {
         Args: { p_case_id: string; p_device_id: string }
         Returns: undefined
       }
+      publish_country_pack: {
+        Args: { p_country_id: string; p_version: number }
+        Returns: Json
+      }
       reconcile_expense_ledger: {
         Args: { p_date_from?: string; p_date_to?: string }
         Returns: {
@@ -18918,6 +18946,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      record_pack_test_result: {
+        Args: { p_result: Json; p_test_id: string }
+        Returns: undefined
       }
       record_payment: {
         Args: { p_allocations: Json; p_payment: Json }
@@ -19075,6 +19107,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      refresh_pack_staleness: { Args: never; Returns: undefined }
       reject_quote: {
         Args: { p_quote_id: string; p_reason?: string }
         Returns: undefined
@@ -19203,11 +19236,7 @@ export type Database = {
         }
       }
       set_case_status: {
-        Args: {
-          p_case_id: string
-          p_notes?: string
-          p_to_status_id: string
-        }
+        Args: { p_case_id: string; p_notes?: string; p_to_status_id: string }
         Returns: Json
       }
       set_customer_portal_password: {
@@ -19236,6 +19265,14 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      submit_country_pack_for_review: {
+        Args: { p_pack_version_id: string }
+        Returns: undefined
+      }
+      sync_engine_capabilities: {
+        Args: { p_capabilities: Json }
+        Returns: number
+      }
       tenant_feature_enabled: {
         Args: { p_key: string; p_tenant_id: string }
         Returns: boolean
@@ -19309,6 +19346,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      update_country_pack_facts: {
+        Args: { p_config: Json; p_country_id: string; p_scalars: Json }
+        Returns: undefined
+      }
       update_number_sequence: {
         Args: {
           p_current_value?: number
@@ -19322,6 +19363,18 @@ export type Database = {
           p_scope: string
         }
         Returns: undefined
+      }
+      upsert_country_einvoice_regime: { Args: { p_row: Json }; Returns: string }
+      upsert_country_numbering_policy: {
+        Args: { p_row: Json }
+        Returns: string
+      }
+      upsert_country_pack_test: { Args: { p_row: Json }; Returns: string }
+      upsert_country_tax_rate: { Args: { p_row: Json }; Returns: string }
+      upsert_document_requirement: { Args: { p_row: Json }; Returns: string }
+      validate_requirement_condition: {
+        Args: { p_condition: Json }
+        Returns: boolean
       }
       void_credit_note: {
         Args: { p_credit_note_id: string; p_reason: string }
