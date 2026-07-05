@@ -16,6 +16,12 @@ describe('StatusPillSelect', () => {
   const renderSelect = (value: string | null = 'Recovery in Progress') =>
     render(<StatusPillSelect value={value} options={OPTIONS} onSelect={onSelect} />);
 
+  const mockAnchorRect = (rect: Partial<DOMRect>) =>
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+      top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0, x: 0, y: 0,
+      toJSON: () => ({}), ...rect,
+    } as DOMRect);
+
   it('renders the current status as a colored pill on the trigger', () => {
     renderSelect();
     const trigger = screen.getByRole('combobox', { name: /change case status/i });
@@ -98,5 +104,40 @@ describe('StatusPillSelect', () => {
       />
     );
     expect(screen.getByText('Mystery')).toHaveStyle({ color: '#6b7280' });
+  });
+
+  it('opens upward (anchored via bottom) when there is more room above than below', () => {
+    const originalHeight = window.innerHeight;
+    Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
+    // Trigger near the viewport bottom: ~110px below, ~660px above.
+    mockAnchorRect({ top: 660, bottom: 690, left: 100, right: 260, width: 160, height: 30 });
+
+    renderSelect();
+    fireEvent.click(screen.getByRole('combobox'));
+
+    const listbox = screen.getByRole('listbox');
+    expect(listbox.style.position).toBe('fixed');
+    expect(listbox.style.bottom).not.toBe('');
+    expect(listbox.style.top).toBe('');
+
+    vi.restoreAllMocks();
+    Object.defineProperty(window, 'innerHeight', { value: originalHeight, configurable: true });
+  });
+
+  it('opens downward (anchored via top) when there is ample room below', () => {
+    const originalHeight = window.innerHeight;
+    Object.defineProperty(window, 'innerHeight', { value: 1200, configurable: true });
+    // Trigger near the top: lots of room below.
+    mockAnchorRect({ top: 90, bottom: 120, left: 100, right: 260, width: 160, height: 30 });
+
+    renderSelect();
+    fireEvent.click(screen.getByRole('combobox'));
+
+    const listbox = screen.getByRole('listbox');
+    expect(listbox.style.top).not.toBe('');
+    expect(listbox.style.bottom).toBe('');
+
+    vi.restoreAllMocks();
+    Object.defineProperty(window, 'innerHeight', { value: originalHeight, configurable: true });
   });
 });
