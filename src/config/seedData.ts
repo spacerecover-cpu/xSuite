@@ -637,23 +637,28 @@ export const CASE_SERVICE_SEED_DATA = {
   // it MUST use the underscored vocabulary from src/lib/caseLifecycle.ts
   // (matches the live master_case_statuses rows and case_status_transitions
   // edges). Recovery outcome is data (cases.recovery_outcome), never a status.
+  // Colors: one distinct 600–900-grade hue per status, grouped by lifecycle
+  // type (intake=blues, diagnosis=cyan, qa=navy, quoting/waiting=warm,
+  // approved=lime, recovery=teal, ready/delivered=greens, closed=slate/maroon,
+  // cancelled=pink/red, no_solution=umber). Matches the live rows after the
+  // distinct_case_status_colors migration — keep both in sync.
   master_case_statuses: [
-    { name: 'Registered', type: 'intake', color: '#3b82f6', sort_order: 10, is_default: true, customer_visible: true },
-    { name: 'Device Received', type: 'intake', color: '#0ea5e9', sort_order: 20, is_default: false, customer_visible: true },
-    { name: 'In Diagnosis', type: 'diagnosis', color: '#06b6d4', sort_order: 30, is_default: false, customer_visible: true },
-    { name: 'Preparing Quote', type: 'quoting', color: '#f59e0b', sort_order: 40, is_default: false, customer_visible: true },
-    { name: 'Awaiting Customer Approval', type: 'awaiting_approval', color: '#f97316', sort_order: 50, is_default: false, customer_visible: true },
-    { name: 'Approved — In Queue', type: 'approved', color: '#14b8a6', sort_order: 60, is_default: false, customer_visible: true },
-    { name: 'Recovery in Progress', type: 'recovery', color: '#0d9488', sort_order: 70, is_default: false, customer_visible: true },
-    { name: 'On Hold — Awaiting Parts', type: 'recovery', color: '#d97706', sort_order: 75, is_default: false, customer_visible: false },
-    { name: 'Verification (QA)', type: 'qa', color: '#0891b2', sort_order: 80, is_default: false, customer_visible: false },
-    { name: 'Ready for Delivery', type: 'ready', color: '#10b981', sort_order: 90, is_default: false, customer_visible: true },
-    { name: 'Data Delivered', type: 'delivered', color: '#22c55e', sort_order: 100, is_default: false, customer_visible: true },
-    { name: 'Closed — Device Returned', type: 'closed', color: '#64748b', sort_order: 110, is_default: false, customer_visible: true },
-    { name: 'Closed — Media Disposed', type: 'closed', color: '#475569', sort_order: 115, is_default: false, customer_visible: false },
-    { name: 'Cancelled — Customer Declined', type: 'cancelled', color: '#6b7280', sort_order: 120, is_default: false, customer_visible: true },
-    { name: 'Cancelled — Unrecoverable', type: 'cancelled', color: '#ef4444', sort_order: 125, is_default: false, customer_visible: true },
-    { name: 'No Solution — Future Follow-up', type: 'no_solution', color: '#b45309', sort_order: 130, is_default: false, customer_visible: true },
+    { name: 'Registered', type: 'intake', color: '#2563EB', sort_order: 10, is_default: true, customer_visible: true },
+    { name: 'Device Received', type: 'intake', color: '#0369A1', sort_order: 20, is_default: false, customer_visible: true },
+    { name: 'In Diagnosis', type: 'diagnosis', color: '#0E7490', sort_order: 30, is_default: false, customer_visible: true },
+    { name: 'Preparing Quote', type: 'quoting', color: '#D97706', sort_order: 40, is_default: false, customer_visible: true },
+    { name: 'Awaiting Customer Approval', type: 'awaiting_approval', color: '#C2410C', sort_order: 50, is_default: false, customer_visible: true },
+    { name: 'Approved — In Queue', type: 'approved', color: '#4D7C0F', sort_order: 60, is_default: false, customer_visible: true },
+    { name: 'Recovery in Progress', type: 'recovery', color: '#0F766E', sort_order: 70, is_default: false, customer_visible: true },
+    { name: 'On Hold — Awaiting Parts', type: 'recovery', color: '#A16207', sort_order: 75, is_default: false, customer_visible: false },
+    { name: 'Verification (QA)', type: 'qa', color: '#1E40AF', sort_order: 80, is_default: false, customer_visible: false },
+    { name: 'Ready for Delivery', type: 'ready', color: '#15803D', sort_order: 90, is_default: false, customer_visible: true },
+    { name: 'Data Delivered', type: 'delivered', color: '#065F46', sort_order: 100, is_default: false, customer_visible: true },
+    { name: 'Closed — Device Returned', type: 'closed', color: '#334155', sort_order: 110, is_default: false, customer_visible: true },
+    { name: 'Closed — Media Disposed', type: 'closed', color: '#7F1D1D', sort_order: 115, is_default: false, customer_visible: false },
+    { name: 'Cancelled — Customer Declined', type: 'cancelled', color: '#BE185D', sort_order: 120, is_default: false, customer_visible: true },
+    { name: 'Cancelled — Unrecoverable', type: 'cancelled', color: '#B91C1C', sort_order: 125, is_default: false, customer_visible: true },
+    { name: 'No Solution — Future Follow-up', type: 'no_solution', color: '#78350F', sort_order: 130, is_default: false, customer_visible: true },
   ],
 
   // Structured reasons a case is parked as No Solution — Future Follow-up

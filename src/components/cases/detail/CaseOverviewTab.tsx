@@ -7,6 +7,7 @@ import { Card } from '../../ui/Card';
 import { SearchableSelect } from '../../ui/SearchableSelect';
 import { MultiSelectDropdown } from '../../ui/MultiSelectDropdown';
 import { EngineerSelector } from '../EngineerSelector';
+import { StatusPillSelect } from '../StatusPillSelect';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import type { Database } from '../../../types/database.types';
@@ -138,10 +139,8 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
   const [editedCaseData, setEditedCaseData] = useState<Partial<CaseRow>>({});
   const [editedDeviceData, setEditedDeviceData] = useState<Partial<CaseDeviceRow>>({});
   const [editedClientData, setEditedClientData] = useState<Record<string, unknown>>({});
-  const [isEditingStatus, setIsEditingStatus] = useState(false);
   const [isEditingPriority, setIsEditingPriority] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const statusRef = useRef<HTMLDivElement>(null);
   const priorityRef = useRef<HTMLDivElement>(null);
 
   const { data: caseStatuses = [] } = useQuery({
@@ -214,9 +213,6 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (statusRef.current && !statusRef.current.contains(event.target as Node)) {
-        setIsEditingStatus(false);
-      }
       if (priorityRef.current && !priorityRef.current.contains(event.target as Node)) {
         setIsEditingPriority(false);
       }
@@ -224,18 +220,6 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const getStatusColor = (statusName: string | null | undefined) => {
-    if (!statusName) return '#6b7280';
-    const status = caseStatuses.find(s => s.name === statusName);
-    return status?.color || '#6b7280';
-  };
-
-  const getStatusDisplayName = (statusName: string | null | undefined) => {
-    if (!statusName) return '';
-    const status = caseStatuses.find(s => s.name === statusName);
-    return status?.name || statusName;
-  };
 
   const getPriorityColor = (priorityName: string | null | undefined) => {
     if (!priorityName) return '#6b7280';
@@ -357,33 +341,14 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
                 <Activity className="w-3.5 h-3.5 text-slate-400" />
                 Status
               </label>
-              <div ref={statusRef} className="relative">
-                {!isEditingStatus ? (
-                  <div onClick={() => setIsEditingStatus(true)} className="cursor-pointer">
-                    <Badge variant="custom" color={getStatusColor(caseData.status)} size="sm">
-                      {getStatusDisplayName(caseData.status)}
-                    </Badge>
-                  </div>
-                ) : (
-                  <select
-                    value={caseData.status ?? ''}
-                    onChange={(e) => { onUpdateStatus(e.target.value); setIsEditingStatus(false); }}
-                    className="text-xs px-2 py-1 border border-primary/40 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary"
-                    aria-label="Change case status"
-                    autoFocus
-                  >
-                    {/* Free-form manual override: every active status, flat. Keep
-                        a legacy/inactive current value selectable so the field
-                        never renders blank. */}
-                    {caseData.status && !caseStatuses.some((s) => s.name === caseData.status) && (
-                      <option value={caseData.status}>{caseData.status}</option>
-                    )}
-                    {caseStatuses.map((s) => (
-                      <option key={s.id} value={s.name}>{s.name}</option>
-                    ))}
-                  </select>
-                )}
-              </div>
+              {/* Free-form manual override: every active status, flat, rendered
+                  as its colored pill (StatusPillSelect injects a legacy/inactive
+                  current value so the field never renders blank). */}
+              <StatusPillSelect
+                value={caseData.status ?? null}
+                options={caseStatuses}
+                onSelect={(statusName) => onUpdateStatus(statusName)}
+              />
             </div>
             <div className="flex items-center justify-between py-3 border-b border-slate-100">
               <label className="text-sm text-slate-600 flex items-center gap-2">
