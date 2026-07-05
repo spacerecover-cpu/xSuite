@@ -1,95 +1,56 @@
-# Session Handoff — 2026-07-04 — Localization Phase 3: WP-1/2/3 DONE (WP-4→7 remain)
+# Session Handoff — 2026-07-05 — Localization Phase 3: WP-4→WP-7 COMPLETE
 
 ## What this session did
-Executed **Localization Phase 3 — Returns, Numbering Value & Publish Governance** from
-`docs/superpowers/plans/2026-07-02-localization-phase3-returns-numbering-governance.md`
-(32 tasks, 7 work packages). This session took it from "WP-1 implemented but unreviewed"
-to **WP-1 verified + WP-2 complete + WP-3 complete**, and caught+fixed a live legal-numbering bug.
+Continued P3 after WP-1/2/3 landed on `main` (#369/#370/#371). **Executed WP-4, WP-5, WP-6, WP-7
+end-to-end** — the full plan `docs/superpowers/plans/2026-07-02-localization-phase3-returns-numbering-governance.md`
+is now COMPLETE. All local, **nothing pushed** (local-first standing rule).
 
-Method (keep using it): I personally own every LIVE migration (reconcile-against-live: capture
-`pg_get_functiondef` first, edit only intended lines, apply, then rolled-back DO-block probes);
-UI/test tasks fan out via `Workflow` (implement → adversarial review → conditional fix); a
-whole-branch adversarial review runs per WP. tsc re-verified UN-PIPED by me each task (subagents
-have falsely reported tsc 0 before). Migrations apply to the canonical DB `ssmbegiyjivrcwgcqutu`.
+## Fork resolved first
+`origin/claude/handoff-continuation-hbytbe` is the **pre-squash dev history of Localization Phase 1 (#361)**
+— already merged into `main` and a strict subset of it (13 behind, main is a superset). Redundant; ignored.
+Cut every WP branch fresh from `main` per the squash-merge rule.
 
-## Current status
-- **Branch: `feat/p3-fiscal-numbering` (WP-3 tip) @ `fd50755`.** It STACKS the whole phase:
-  `feat/p3-returns-schema` (WP-1) → `feat/p3-gcc-return` (WP-2) → `feat/p3-fiscal-numbering` (WP-3).
-  All three pushed to origin this session. Base = `ebb7781` (a local-only PRE-REQ tsc fix that fixed
-  3 errors #366 leaked; it rides along on the branch and merges via the branch PR — **do NOT push main**).
-- **tsc 0 (own un-piped run), all WP tests green, working tree clean** (only `.claude/settings.local.json`,
-  harness-owned, left untouched). Every Phase-3 migration is LIVE on `ssmbegiyjivrcwgcqutu`.
-- **⚠️ The authoritative task-by-task ledger `.superpowers/sdd/progress.md` is GITIGNORED** — it does
-  NOT travel with the push. If you're on a new machine, THIS file + `git log` + the plan are your map.
-
-## Commit stack (origin/main 459b36b → HEAD fd50755, 12 commits incl. PRE-REQ)
+## Branch stack (all cut from / stacked on `main` @ 092009e; nothing pushed)
 ```
-fd50755 test(numbering): P3 regression probe pack (recorded evidence)          # WP-3 T13
-2270b1c fix(db): min-width padding — no LPAD truncation of legal numbers        # WP-3 LPAD fix
-ac4ce1d feat(settings): SystemNumbers fiscal-template fields + live preview     # WP-3 T12
-1e80940 feat(db): master_numbering_policies + apply_country_numbering_policy    # WP-3 T10+T11
-5b498fb feat(vat): return drill-down + reconciliation badge                     # WP-2 T9
-5c4285d feat(vat): VATReturnModal files through composer + file_vat_return      # WP-2 T8
-5116feb fix(vat): drill-down + quarterly summary on tax_period dimension        # WP-2 T7
-a988572 feat(tax): taxReturnService                                             # WP-2 T6
-a2a8dc9 feat(regimes): gcc_return ReturnComposer                                # WP-2 T5
-ea63c44 feat(country): filing keys + trigger parity                             # WP-2 T4
-6c7661f feat(db): P3 WP-1 returns schema + file_vat_return                      # WP-1 T1-3
-ebb7781 fix(types): boundary-cast tax columns (PRE-REQ, local-only base)
+feat/p3-publish-governance  (WP-4)  → feat/p3-country-studio (WP-5)
+  → feat/p3-cldr-import (WP-6)       → feat/p3-ae-sa-zatca (WP-7)  ← HEAD @ 55a133d
 ```
+21 commits total. `git log --oneline main..feat/p3-ae-sa-zatca` is the full stack.
 
-## What shipped, by WP
-- **WP-1 (verified):** `tax_return_lines`, `vat_returns` regime cols, `file_vat_return` RPC
-  (re-derives boxes from `vat_records.vat_amount_base` by `tax_period`, rejects divergence/overlap).
-  Seam resolved: output box fully sourced by issue_tax_document/credit-note-contra/record_stock_sale
-  (all `record_type='sale'`); input box has no writer yet (fail-loud via divergence guard).
-- **WP-2 (complete):** registry filing keys (`tax.filing_frequency`/`period_anchor`/`return_composer`)
-  + trigger parity; `gcc_return` composer (3-box, month-aligned anchors, base==jurisdiction guard);
-  `taxReturnService` (config→composer→subledger→file); vatService drill-down + quarterly summary onto
-  `tax_period`; VATReturnModal rewrite (no UTC quarter math); VATReturnDetailModal + reconciliation badge.
-  **Live rolled-back proof: return files from subledger, `reconciled=t`.**
-- **WP-3 (complete):** `master_numbering_policies` global table + GCC seeds; `apply_country_numbering_policy`
-  (non-destructive NULL→value fill); SystemNumbers fiscal UI (plan was STALE — Phase-1 already built the
-  fields+preview; workflow added the missing test + fixed a lying legacy badge → 'Templated'); regression probe pack.
+## Status by WP (all migrations LIVE on `ssmbegiyjivrcwgcqutu`; tsc 0; 132 P3 tests green)
+- **WP-4 Publish governance (T14-18):** 11 authoring/publish RPCs + `publish_country_pack` 4-part gate +
+  pg_cron staleness monitor + capability-manifest sync + resync no-op probe. **Adversarial review (12
+  agents) → 8 confirmed findings, all remediated** (`phase3_wp4_review_fixes`): incl. CRITICAL broken
+  capability-kind bridge (mocked test hid it) + bare-`{SEQ}` country-wide-issuance-break class.
+- **WP-5 Country Authoring Studio (T19-25):** service + routes/nav + list/staleness + generic CRUD grid +
+  editor tabs + fixtures tab + dual-control publish panel. Built via parallel Workflow (5 agents returned
+  file contents; I integrated). **Adversarial review (15 agents) → 12 confirmed findings, all remediated**
+  (`5e558f4`): incl. HIGH silent data-loss on edit (grid sent only edited cols; RPC overwrites whole row).
+- **WP-6 CLDR import (T26):** pure mapping module + generator + fill-only operator seed (266 territories,
+  zero DELETE/DROP), offline suite green. Seed committed; **applying it to live is an operator step (NOT done)**.
+- **WP-7 AE/SA + zatca_ph1 (T27-32):** sync `sha256Hex` + `zatca_ph1` render_artifact transport; **retired
+  `einvoiceRouting.ts`** (regime-routed QR; grep 0); kernel-verified AE/SA fixtures; **AE PUBLISHED
+  `statutory_ready`** + **SA PUBLISHED `formatting_ready`** (honest — `zatca_ph2` clearance unimplemented)
+  via LIVE dual-control publish (impersonated the two `platform_admins`); statutory-fixtures CI covers AE/SA;
+  exit evidence `docs/superpowers/specs/2026-07-02-p3-exit-evidence.md`.
 
-## Two catches worth remembering
-1. **Plan-drift trap (WP-2 T4):** the plan's `validate_country_config_overrides` trigger migration assumed
-   `statutory_keys` held 1 key and would REPLACE with 4 — LIVE held **11** (P1/P2 grew it). A verbatim paste
-   would have DELETED 10 jurisdiction locks. Reconcile-against-live caught it → additive 11→14. **Every
-   plan migration in WP-4→7 must be reconciled against live before applying — the plan drifts.**
-2. **LIVE LPAD invoice-number truncation bug (fixed, owner-approved):** `LPAD(v,width)` TRUNCATES longer
-   values → `get_next_number` (the invoice-minting path) rendered 10193 as '1019' at padding 4 (Risk #8,
-   duplicate legal numbers). OM `invoices` counter=10192 was already in the truncation zone. Fixed via new
-   `format_sequence_number(bigint,int)` min-width helper (migration `phase3_fix_lpad_sequence_truncation`).
+## LIVE-execution findings (the runbook found what static review couldn't — RPCs had never been run)
+1. **FIXED** `phase3_wp7_submit_no_content_bump` — submit staled fixtures via `_pack_touch`.
+2. **FIXED** `phase3_wp7_pack_audit_admin_id_fk` — `platform_audit_logs.admin_id` FKs `platform_admins.id`
+   (NOT `auth.uid()` = `.user_id`); every authoring RPC 23503'd. New `_pack_admin_id()` resolves it.
+3. **carry-forward** `upsert_country_tax_rate` not idempotent vs seeded rates (add ON CONFLICT).
+4. **carry-forward** publish capability gate requires unimplemented future-phase caps (`zatca_ph2`) → SA capped.
+5. **carry-forward** `countryFactsService` picks the latest-mandated regime (`zatca_ph2`) over the implemented
+   `zatca_ph1` → SA invoice QR does not emit (prefer latest REGISTERED regime).
 
-## Carry-forwards (all MINOR / config-time / unreachable-today — none block; fix in a follow-up pass)
-- WP-2: dead vatService helpers `createVATRecordFromInvoice`/`FromPurchase` (no tax_period/base, 0 callers)
-  — recommend delete. Legacy `createVATReturn`/`createVATReturnFromPeriod` still exported (returns w/o
-  tax_return_lines show spurious "NOT reconciled"). `file_vat_return` trusts `p_tax_periods` for the SUM but
-  stores `period_start/end` separately (fine for contiguous gcc_return; harden for future composers).
-- WP-3: **F1** preview_number_format renders `{FY}` as fiscal `YYYY-YY` always, but get_next_number renders
-  bare `YYYY` for calendar_year/never → preview lies for those bases (fix: mirror the reset_basis branch in
-  preview). **F2** `update_number_sequence` COALESCE has no clear-sentinel → UI can't unset a template/reset_basis.
-  Same LPAD-truncation class in `assign_receipt_number`/`assign_tenant_code`/`data_migration_finalize` (unfixed).
-- OM data: `resolved_country_config` has null filing keys → getFilingConfig falls back to coded defaults
-  (correct GCC); a later OM pack republish should set them explicitly. OM `invoices` prefix='INVO' vs historical
-  imported "TAX INVOICE####" = data-import mismatch (orthogonal to the LPAD fix).
-- Oman reconciliation "real" (nonzero) proof needs SEEDED issued invoices — vat_records is 0 rows live.
+## HOW TO RESUME / next steps
+1. Nothing is pushed. To ship: the 4 stacked branches → 4 PRs (or squash the stack) from `feat/p3-ae-sa-zatca`.
+   All 21 commits carry the CLAUDE.md co-author trailer.
+2. Owner carry-forwards (all documented in the exit-evidence doc): publish an OM pack through the gate for
+   parity; resolve findings 3/4/5 so SA → statutory_ready + emits the Phase-1 QR; apply the CLDR operator seed.
+3. `.superpowers/sdd/progress.md` is gitignored — THIS file + `git log` + the plan are the map.
 
-## HOW TO RESUME (next session → WP-4)
-1. `git checkout feat/p3-fiscal-numbering` (or your pushed tip); `git pull` if continuing elsewhere.
-2. Re-read the plan WP-4 section (`### Task 14`…`Task 18`, ~lines 2022-2804) — **11 publish-governance RPCs**:
-   pack authoring RPCs + gate helpers (T14), `publish_country_pack` 4-part machine gate (T15), pg_cron
-   staleness monitor (T16), publish→resync no-op probe (T17), capability manifest sync (T18).
-3. Cut `feat/p3-publish-governance` **from `feat/p3-fiscal-numbering`** (keep stacking — cross-WP type deps).
-4. RECONCILE every migration against live first (the plan drifts — see catch #1). Own live DDL yourself;
-   fan out any TS/UI via Workflow; whole-branch review per WP.
-5. Then **WP-5** (Country Authoring Studio UI, 7 tasks T19-25), **WP-6** (CLDR import, T26),
-   **WP-7** (AE/SA pack publish + zatca_ph1 + retire einvoiceRouting, T27-32).
-   ⚠️ **WP-7 needs a SECOND platform-admin account** (different `auth.uid()`) for dual-control publish —
-   line it up before starting (via `user-management` edge fn / platform-admin flow).
-
-## Standing rules
-- Local-first was released this session (owner asked to push). If continuing: commit locally, push when asked.
-- Reconcile-against-live on EVERY migration. Re-verify tsc UN-PIPED. Do NOT git-add `.superpowers/` (gitignored)
-  or `.claude/settings.local.json`. Never push `main` — PRs squash-merge; don't reuse a merged branch name.
+## Standing rules honored
+Reconcile-against-live on every migration (own live DDL personally); UI/test fan-out via Workflow with
+adversarial review per WP; tsc re-verified UN-PIPED by me each task; local-first (no push until asked);
+never reuse a squash-merged branch (cut fresh from main).
