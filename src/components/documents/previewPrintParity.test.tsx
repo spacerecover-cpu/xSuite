@@ -54,6 +54,7 @@ const BASE_FACTS: Omit<ResolvedCountryFacts, 'taxInvoiceRequired'> = {
   decimalSeparator: '.',
   thousandsSeparator: ',',
   digitGrouping: '3',
+  einvoiceRegimeKey: 'no_einvoice',
 };
 
 const SINGLE_VAT_LINE: DocumentTaxLine[] = [

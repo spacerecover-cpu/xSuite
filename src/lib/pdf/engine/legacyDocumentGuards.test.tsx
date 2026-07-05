@@ -35,7 +35,7 @@ function omConfig() {
       {
         code: 'OM', taxSystem: 'VAT', taxLabel: 'VAT', taxNumberLabel: 'VATIN', taxInvoiceRequired: true,
         languageCode: 'ar', decimalPlaces: 3, dateFormat: 'DD/MM/YYYY', decimalSeparator: '.',
-        thousandsSeparator: ',', digitGrouping: '3', addressFormat: null,
+        thousandsSeparator: ',', digitGrouping: '3', einvoiceRegimeKey: 'no_einvoice', addressFormat: null,
       },
       { profile: gccTaxInvoiceProfile, sellerRegistered: true, docType: 'invoice' },
     ),

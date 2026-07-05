@@ -36,6 +36,7 @@ const omFacts = {
   decimalSeparator: '.',
   thousandsSeparator: ',',
   digitGrouping: '3',
+  einvoiceRegimeKey: 'no_einvoice',
 };
 
 function omConfig() {

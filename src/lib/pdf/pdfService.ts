@@ -56,7 +56,7 @@ import {
 import { getDeployedVersionByType, readConfig } from '../documentTemplateService';
 import { resolveBrandingImage, type BrandingImage } from './brandingImage';
 import type { SignatureImagesConfig } from './templateConfig';
-import { countryTemplateOverride, type ComplianceOverrideInputs } from './engine/countryConfig';
+import { countryTemplateOverride, type ComplianceOverrideInputs, type ResolvedCountryFacts } from './engine/countryConfig';
 import { resolveComplianceRenderInputs } from './engine/profileResolver';
 import type { TaxDocumentType } from '../regimes/types';
 
@@ -107,6 +107,22 @@ export async function resolveCountryLayer(
   }
 }
 
+/** Resolve the CURRENT tenant's country facts for regime-routed statutory
+ *  artifacts (e.g. the ZATCA Phase-1 e-invoice QR, keyed off
+ *  `facts.einvoiceRegimeKey`). Reuses the ~60s render cache warmed by
+ *  {@link resolveCountryLayer}, so this costs no extra DB round-trip. Fail-soft:
+ *  null on any resolution failure — a missing/unresolvable country simply yields
+ *  no regime artifact (never a fabricated one). */
+export async function resolveCountryFacts(): Promise<ResolvedCountryFacts | null> {
+  try {
+    const compliance = await resolveComplianceRenderInputs();
+    return compliance.facts;
+  } catch (err) {
+    console.error('[PDF Service] country facts resolution failed, no regime artifact:', err);
+    return null;
+  }
+}
+
 /**
  * Build the invoice pdfmake doc-definition via the NEW config-driven engine.
  *
@@ -137,6 +153,9 @@ async function buildInvoiceDocumentViaEngine(
   }
 
   const countryLayer = await resolveCountryLayer('invoice');
+  // Country facts feed the regime-routed e-invoice QR (facts.einvoiceRegimeKey);
+  // resolved after the layer so it rides the warm ~60s cache (no extra DB hit).
+  const countryFacts = await resolveCountryFacts();
 
   const resolvedConfig: DocumentTemplateConfig = resolveTemplateConfigWithCountry(
     BUILT_IN_TEMPLATE_CONFIGS.invoice,
@@ -150,7 +169,7 @@ async function buildInvoiceDocumentViaEngine(
   // the engine renders bilingual/RTL when the tenant is configured for it.
   const languageAwareConfig = applyTenantLanguage(resolvedConfig, data.companySettings, docTypeOverride?.language !== undefined || countryLayer?.language !== undefined);
 
-  const engineData = toEngineData(data, languageAwareConfig);
+  const engineData = toEngineData(data, languageAwareConfig, countryFacts);
   await initializePDFFonts(resolveSecondary(languageAwareConfig.language));
   return renderWithQr(languageAwareConfig, engineData, ctxFromLanguageConfig(languageAwareConfig.language), logoBase64, qrCodeBase64);
 }

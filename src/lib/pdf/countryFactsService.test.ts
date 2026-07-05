@@ -1,8 +1,28 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const maybeSingle = vi.fn();
+// geo_countries uses `.select().eq().maybeSingle()`; master_einvoice_regimes
+// uses `.select().eq().is().lte().order().limit().maybeSingle()`. The regime
+// terminal resolves to no row so einvoiceRegimeKey falls back to 'no_einvoice'.
 vi.mock('../supabaseClient', () => ({
-  supabase: { from: () => ({ select: () => ({ eq: () => ({ maybeSingle }) }) }) },
+  supabase: {
+    from: (table: string) =>
+      table === 'master_einvoice_regimes'
+        ? {
+            select: () => ({
+              eq: () => ({
+                is: () => ({
+                  lte: () => ({
+                    order: () => ({
+                      limit: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }),
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          }
+        : { select: () => ({ eq: () => ({ maybeSingle }) }) },
+  },
 }));
 
 import { getResolvedCountryFacts } from './countryFactsService';
@@ -25,6 +45,7 @@ describe('getResolvedCountryFacts (R3, §8b)', () => {
       code: 'OM', taxSystem: 'VAT', taxLabel: 'VAT', taxNumberLabel: 'VATIN', taxInvoiceRequired: true,
       languageCode: 'ar', decimalPlaces: 3, dateFormat: 'DD/MM/YYYY',
       decimalSeparator: '.', thousandsSeparator: ',', digitGrouping: '3',
+      einvoiceRegimeKey: 'no_einvoice',
       addressFormat: '%N %O %A %C %Z',
     });
   });

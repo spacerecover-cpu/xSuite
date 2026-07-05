@@ -6,16 +6,19 @@ const OMAN: ResolvedCountryFacts = {
   code: 'OM', taxSystem: 'VAT', taxLabel: 'VAT', taxNumberLabel: null, taxInvoiceRequired: true,
   languageCode: 'ar', decimalPlaces: 3, dateFormat: 'DD/MM/YYYY',
   decimalSeparator: null, thousandsSeparator: null, digitGrouping: null,
+  einvoiceRegimeKey: 'no_einvoice',
 };
 const UK: ResolvedCountryFacts = {
   code: 'GB', taxSystem: 'VAT', taxLabel: 'VAT', taxNumberLabel: null, taxInvoiceRequired: true,
   languageCode: 'en', decimalPlaces: 2, dateFormat: 'DD/MM/YYYY',
   decimalSeparator: null, thousandsSeparator: null, digitGrouping: null,
+  einvoiceRegimeKey: 'no_einvoice',
 };
 const US: ResolvedCountryFacts = {
   code: 'US', taxSystem: 'SALES_TAX', taxLabel: 'Sales Tax', taxNumberLabel: null, taxInvoiceRequired: false,
   languageCode: 'en', decimalPlaces: 2, dateFormat: 'MM/DD/YYYY',
   decimalSeparator: null, thousandsSeparator: null, digitGrouping: null,
+  einvoiceRegimeKey: 'no_einvoice',
 };
 
 describe('countryTemplateOverride (§8b)', () => {
@@ -60,6 +63,7 @@ const omFacts: ResolvedCountryFacts = {
   code: 'OM', taxSystem: 'VAT', taxLabel: 'VAT', taxNumberLabel: 'VATIN',
   taxInvoiceRequired: true, languageCode: 'ar', decimalPlaces: 3,
   dateFormat: 'DD/MM/YYYY', decimalSeparator: '.', thousandsSeparator: ',', digitGrouping: '3',
+  einvoiceRegimeKey: 'no_einvoice',
 };
 
 describe('countryTemplateOverride + DocumentComplianceProfile', () => {

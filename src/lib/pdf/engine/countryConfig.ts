@@ -35,6 +35,10 @@ export interface ResolvedCountryFacts {
   decimalSeparator: string | null;
   thousandsSeparator: string | null;
   digitGrouping: string | null;        // '3' western, '3;2' Indian (consumed Phase 4)
+  /** Adapter key of the active e-invoice regime row (master_einvoice_regimes,
+   *  mandatory_from <= today), or 'no_einvoice'. Routes statutory artifacts by
+   *  REGIME, never by country-string matching. */
+  einvoiceRegimeKey: string;
   /** Joined geo_countries.address_format lines (e.g. '%N %O %A %C %Z'), or null.
    *  Optional so existing fixtures/tests built without it keep compiling. */
   addressFormat?: string | null;
