@@ -10,9 +10,10 @@ import type { RateContext } from './currencyService';
 import type { Json } from '../types/database.types';
 import { registerAllRegimePlugins } from './regimes/register';
 import { resolveTaxStrategy } from './regimes/registry';
+import { derivePlaceOfSupply } from './regimes/in_gst/placeOfSupply';
 import type {
-  GeoCountryTaxRateRow, LegalEntityTaxRegistrationRow, RuleTrace,
-  TaxComputation, TaxContext, TaxDocumentType, TaxableLine,
+  GeoCountryTaxRateRow, LegalEntityTaxRegistrationRow, RoundingPolicy, RuleTrace,
+  ScaleSystem, TaxComputation, TaxContext, TaxDocumentType, TaxableLine,
 } from './regimes/types';
 
 export interface DocumentTotalsInput {
@@ -23,6 +24,11 @@ export interface DocumentTotalsInput {
   documentType: TaxDocumentType;
   documentDate: string;
   taxInclusive?: boolean;
+  /** Buyer identity for TaxContext threading (company overrides customer,
+   *  mirroring issue_tax_document's buyer-identity block). Optional: legacy
+   *  callers without a buyer keep the pre-S2 null-buyer context. */
+  customerId?: string | null;
+  companyId?: string | null;
 }
 
 export interface RequirementFailure {
@@ -102,12 +108,12 @@ export function totalsFromComputation(
 }
 
 async function fetchSellerContext(): Promise<{
-  legalEntityId: string; countryId: string; taxIdentifier: string | null;
-  registrations: LegalEntityTaxRegistrationRow[];
+  legalEntityId: string; tenantId: string; countryId: string; subdivisionId: string | null;
+  taxIdentifier: string | null; registrations: LegalEntityTaxRegistrationRow[];
 }> {
   const { data: le, error } = await supabase
     .from('legal_entities')
-    .select('id, country_id, tax_identifier')
+    .select('id, tenant_id, country_id, subdivision_id, tax_identifier')
     .eq('is_primary', true)
     .is('deleted_at', null)
     .maybeSingle();
@@ -120,7 +126,8 @@ async function fetchSellerContext(): Promise<{
     .is('deleted_at', null);
   if (regErr) throw regErr;
   return {
-    legalEntityId: le.id, countryId: le.country_id, taxIdentifier: le.tax_identifier,
+    legalEntityId: le.id, tenantId: le.tenant_id, countryId: le.country_id,
+    subdivisionId: le.subdivision_id ?? null, taxIdentifier: le.tax_identifier,
     registrations: (regs ?? []) as LegalEntityTaxRegistrationRow[],
   };
 }
@@ -138,11 +145,96 @@ async function fetchEffectiveRates(countryId: string, onDate: string): Promise<G
   return (data ?? []) as GeoCountryTaxRateRow[];
 }
 
+/** Pack-resolved rounding + scale (pattern: assembleStockSaleContext.ts:36-63).
+ *  The strategy KEY is deliberately NOT consumed here — threading regime.tax
+ *  before in_gst registers would throw CountryConfigError (WP-S3 owns it). */
+async function fetchPackContext(tenantId: string): Promise<{
+  roundingPolicy: RoundingPolicy; scaleSystem: ScaleSystem;
+}> {
+  const { data: tenant, error } = await supabase
+    .from('tenants')
+    .select('resolved_country_config')
+    .eq('id', tenantId)
+    .maybeSingle();
+  if (error) throw error;
+  const resolved = (tenant?.resolved_country_config ?? {}) as Record<string, unknown>;
+  return {
+    roundingPolicy: (resolved['tax.rounding_policy'] as RoundingPolicy | undefined)
+      ?? { mode: 'half_up', level: 'document' },
+    scaleSystem: (resolved['format.amount_words_scale'] as ScaleSystem | undefined) ?? 'western',
+  };
+}
+
+/** Buyer identity for the context: company overrides customer per-field,
+ *  structurally mirroring issue_tax_document's «buyer-identity» block. */
+async function fetchBuyerContext(customerId: string | null, companyId: string | null): Promise<{
+  taxNumber: string | null; countryId: string | null; subdivisionId: string | null; isBusiness: boolean;
+}> {
+  let taxNumber: string | null = null;
+  let countryId: string | null = null;
+  let subdivisionId: string | null = null;
+  if (customerId) {
+    const { data, error } = await supabase
+      .from('customers_enhanced')
+      .select('tax_number, country_id, subdivision_id')
+      .eq('id', customerId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (error) throw error;
+    taxNumber = data?.tax_number ?? null;
+    countryId = data?.country_id ?? null;
+    subdivisionId = data?.subdivision_id ?? null;
+  }
+  if (companyId) {
+    const { data, error } = await supabase
+      .from('companies')
+      .select('tax_number, country_id, subdivision_id')
+      .eq('id', companyId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (error) throw error;
+    taxNumber = data?.tax_number ?? taxNumber;
+    countryId = data?.country_id ?? countryId;
+    subdivisionId = data?.subdivision_id ?? subdivisionId;
+  }
+  return { taxNumber, countryId, subdivisionId, isBusiness: companyId !== null };
+}
+
+/** tax_authority_code → subdivision id for the seller country (empty for
+ *  countries without GST-style authority codes, e.g. OM governorates). */
+async function fetchSubdivisionAuthorityMap(countryId: string): Promise<Map<string, string>> {
+  const { data, error } = await supabase
+    .from('geo_subdivisions')
+    .select('id, tax_authority_code')
+    .eq('country_id', countryId)
+    .eq('is_active', true)
+    .is('deleted_at', null);
+  if (error) throw error;
+  const map = new Map<string, string>();
+  for (const row of data ?? []) {
+    if (row.tax_authority_code) map.set(row.tax_authority_code, row.id);
+  }
+  return map;
+}
+
 export async function computeDocumentTotals(
   input: DocumentTotalsInput, rc: RateContext,
-): Promise<{ computation: TaxComputation; subtotal: number; taxAmount: number; totalAmount: number }> {
+): Promise<{ computation: TaxComputation; placeOfSupplySubdivisionId: string | null; subtotal: number; taxAmount: number; totalAmount: number }> {
   registerAllRegimePlugins();
   const seller = await fetchSellerContext();
+  const pack = await fetchPackContext(seller.tenantId);
+  const hasBuyer = Boolean(input.customerId || input.companyId);
+  const buyer = hasBuyer
+    ? await fetchBuyerContext(input.customerId ?? null, input.companyId ?? null)
+    : { taxNumber: null, countryId: null, subdivisionId: null, isBusiness: false };
+  const authorityMap = hasBuyer
+    ? await fetchSubdivisionAuthorityMap(seller.countryId)
+    : new Map<string, string>();
+  const pos = derivePlaceOfSupply({
+    buyerTaxNumber: buyer.taxNumber,
+    buyerSubdivisionId: buyer.subdivisionId,
+    subdivisionIdByAuthorityCode: authorityMap,
+  });
   const effective = await fetchEffectiveRates(seller.countryId, input.documentDate);
   const rates = matchFormRate(effective, input.taxRate || 0);
   const lines = buildTaxableLines(input.items, rc.documentDecimals);
@@ -159,19 +251,19 @@ export async function computeDocumentTotals(
   const ctx: TaxContext = {
     documentType: input.documentType,
     seller: {
-      legalEntityId: seller.legalEntityId, countryId: seller.countryId, subdivisionId: null,
+      legalEntityId: seller.legalEntityId, countryId: seller.countryId, subdivisionId: seller.subdivisionId,
       taxIdentifier: seller.taxIdentifier, registrations: seller.registrations,
     },
-    buyer: { taxNumber: null, countryId: null, subdivisionId: null, isBusiness: false, addressSnapshot: null },
-    taxPointDate: input.documentDate, placeOfSupplySubdivisionId: null,
+    buyer: { ...buyer, addressSnapshot: null },
+    taxPointDate: input.documentDate, placeOfSupplySubdivisionId: pos.subdivisionId,
     lines: effectiveLines, documentDiscount, taxInclusive: input.taxInclusive ?? false,
     rateContext: rc, rates,
-    roundingPolicy: { mode: 'half_up', level: 'document' },  // Oman parity default; pack-data override wires in Phase 2
-    scaleSystem: 'western',
+    roundingPolicy: pack.roundingPolicy,
+    scaleSystem: pack.scaleSystem,
   };
-  const strategy = resolveTaxStrategy('simple_vat'); // Phase 2: thread useRegimeConfig().tax
+  const strategy = resolveTaxStrategy('simple_vat'); // WP-S3 threads pack-resolved regime.tax (in_gst registers there)
   const computation = await strategy.compute(ctx);
-  return { computation, ...totalsFromComputation(computation, documentDiscount, rc.documentDecimals) };
+  return { computation, placeOfSupplySubdivisionId: pos.subdivisionId, ...totalsFromComputation(computation, documentDiscount, rc.documentDecimals) };
 }
 
 export async function persistDocumentTaxLines(args: {
