@@ -12,7 +12,7 @@ import { registerAllRegimePlugins } from './regimes/register';
 import { resolveTaxStrategy } from './regimes/registry';
 import { derivePlaceOfSupply } from './regimes/in_gst/placeOfSupply';
 import type {
-  GeoCountryTaxRateRow, LegalEntityTaxRegistrationRow, RoundingPolicy, RuleTrace,
+  ComputedTaxLine, GeoCountryTaxRateRow, LegalEntityTaxRegistrationRow, RoundingPolicy, RuleTrace,
   ScaleSystem, TaxComputation, TaxContext, TaxDocumentType, TaxableLine,
 } from './regimes/types';
 
@@ -119,6 +119,20 @@ export function matchFormRate(
  *  so a live India invoice resolves `in_gst` (kernel split) instead of `simple_vat`. */
 export function resolveStrategyKey(resolved: Record<string, unknown>): string {
   return (resolved['regime.tax'] as string) || 'simple_vat';
+}
+
+/** Section 170 (CGST Act): whole-rupee cash rounding leaves a ± paise residual.
+ *  Persist it as an explicit document-level "Round off" line (out_of_scope) so
+ *  invoice grand total, the vat ledger and the GST return all reconcile — the
+ *  residual is never smeared into a tax head. Null/0 adjustment → no line. */
+export function roundOffAdjustmentLine(computation: TaxComputation): ComputedTaxLine | null {
+  const adj = computation.totals.roundingAdjustment;
+  if (adj === null || adj === 0) return null;
+  return {
+    lineItemId: null, componentCode: 'ROUND_OFF', componentLabel: 'Round off',
+    jurisdictionRef: null, rate: 0, taxableBase: 0, taxAmount: adj,
+    taxTreatment: 'out_of_scope', treatmentReasonCode: 'SEC_170_ROUNDING', sequence: 999,
+  };
 }
 
 /** Kernel totals → the legacy header shape (subtotal is PRE-document-discount). */
@@ -335,6 +349,19 @@ export async function persistDocumentTaxLines(args: {
     backfilled: false,
     sequence: l.sequence,
   }));
+  const roundOff = roundOffAdjustmentLine(computation);
+  if (roundOff) {
+    rows.push({
+      tenant_id: tenantId, document_type: documentType, document_id: documentId,
+      line_item_id: null, component_code: roundOff.componentCode, component_label: roundOff.componentLabel,
+      jurisdiction_ref: null, rate: roundOff.rate, taxable_base: roundOff.taxableBase, tax_amount: roundOff.taxAmount,
+      currency: rc.documentCurrency, exchange_rate: rc.rate,
+      tax_amount_base: convertToBase(roundOff.taxAmount, rc.rate, rc.baseDecimals),
+      tax_treatment: roundOff.taxTreatment, treatment_reason_code: roundOff.treatmentReasonCode,
+      regime_key: computation.trace.regimeKey, plugin_version: computation.trace.pluginVersion,
+      pack_version_id: computation.trace.packVersionId, rule_trace: null, backfilled: false, sequence: roundOff.sequence,
+    });
+  }
   const { error } = await supabase.from('document_tax_lines').insert(rows);
   if (error) throw error;
 }
