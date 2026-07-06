@@ -14,7 +14,13 @@ const { computeTotalsSpy, insertedPayloads, fromMock } = vi.hoisted(() => {
   }));
   const rowFor = (table: string): unknown =>
     table === 'invoices'
-      ? { id: 'inv-1', invoice_number: null, due_date: null }
+      ? {
+          id: 'inv-1', invoice_number: null, due_date: null,
+          status: 'draft', payment_status: 'unpaid', invoice_type: 'tax_invoice',
+          total_amount: 0, amount_paid: 0, balance_due: 0,
+          currency: 'INR', exchange_rate: 1, rate_source: 'derived',
+          customer_id: 'cust-existing', company_id: null,
+        }
       : [{ id: 'li-1', sort_order: 0 }];
   const fromMock = vi.fn((table: string) => {
     const chain: Record<string, unknown> = {};
@@ -57,7 +63,7 @@ vi.mock('./rateLimiter', () => ({
 vi.mock('./tenantConfigService', () => ({ getTenantConfig: vi.fn(async () => ({})) }));
 vi.mock('./tenantToday', () => ({ currentTenantToday: vi.fn(async () => '2026-07-05') }));
 
-import { createInvoice } from './invoiceService';
+import { createInvoice, updateInvoice } from './invoiceService';
 
 beforeEach(() => {
   computeTotalsSpy.mockClear();
@@ -75,5 +81,18 @@ describe('createInvoice — buyer threading + place-of-supply persistence (P4 S2
       expect.anything(),
     );
     expect(insertedPayloads['invoices'][0]).toMatchObject({ place_of_supply_subdivision_id: 'sub-ka' });
+  });
+});
+
+describe('updateInvoice — buyer resolution semantics (P4 S2 review #7)', () => {
+  it('a line-only edit (no customer_id in the patch) keeps the persisted buyer', async () => {
+    await updateInvoice('inv-1', { tax_rate: 18 }, [{ description: 'x', quantity: 1, unit_price: 8000 }] as never);
+    expect(computeTotalsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ customerId: 'cust-existing', companyId: null }), expect.anything());
+  });
+  it('an explicit customer_id:null clears the buyer (place of supply derives from null, not the stale row buyer)', async () => {
+    await updateInvoice('inv-1', { customer_id: null }, [{ description: 'x', quantity: 1, unit_price: 8000 }] as never);
+    expect(computeTotalsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ customerId: null, companyId: null }), expect.anything());
   });
 });

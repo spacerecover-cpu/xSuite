@@ -621,8 +621,8 @@ export const updateQuote = async (id: string, quote: Partial<Quote>, items?: Quo
         documentType: 'quote',
         documentDate: new Date().toISOString().slice(0, 10),
         taxInclusive: quote.tax_inclusive ?? false,
-        customerId: quote.customer_id ?? existing?.customer_id ?? null,
-        companyId: quote.company_id ?? existing?.company_id ?? null,
+        customerId: quote.customer_id !== undefined ? quote.customer_id : (existing?.customer_id ?? null),
+        companyId: quote.company_id !== undefined ? quote.company_id : (existing?.company_id ?? null),
       },
       rc,
     );
