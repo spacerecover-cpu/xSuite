@@ -241,10 +241,10 @@ export const COUNTRY_CONFIG_REGISTRY: ConfigKeyDef[] = [
   },
   {
     key: 'tax.rounding_policy', domain: 'tax', label: 'Tax rounding policy',
-    description: 'Pack DATA (graft 4): {mode: half_up|half_even, level: line|document, cash_increment?}. simple_vat default preserves Oman byte-parity.',
+    description: 'Pack DATA (graft 4): {mode: half_up|half_even, level: line|document|head, cash_increment?}. head = per-tax-head-per-document (India Sec 170). simple_vat default preserves Oman byte-parity.',
     schema: z.object({
       mode: z.enum(['half_up', 'half_even']),
-      level: z.enum(['line', 'document']),
+      level: z.enum(['line', 'document', 'head']),
       cash_increment: z.number().positive().optional(),
     }),
     codedDefault: { mode: 'half_up', level: 'document' }, maxOverrideLayer: 'country',

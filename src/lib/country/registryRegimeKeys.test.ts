@@ -21,6 +21,14 @@ describe('regime.* + reserved pack-schema keys (Phase 1 contract)', () => {
     expect(byKey.get('tax.rounding_policy')!.codedDefault).toEqual({ mode: 'half_up', level: 'document' });
     expect(byKey.get('tax.rounding_policy')!.maxOverrideLayer).toBe('country');
   });
+  it("tax.rounding_policy level accepts 'head' (India Section 170 per-head rounding — P4 S1a)", () => {
+    const schema = byKey.get('tax.rounding_policy')!.schema;
+    expect(schema.safeParse({ mode: 'half_up', level: 'head', cash_increment: 1 }).success).toBe(true);
+    expect(schema.safeParse({ mode: 'half_up', level: 'line' }).success).toBe(true);
+    expect(schema.safeParse({ mode: 'half_up', level: 'document' }).success).toBe(true);
+    expect(schema.safeParse({ mode: 'half_up', level: 'total' }).success).toBe(false);
+    expect(byKey.get('tax.rounding_policy')!.codedDefault).toEqual({ mode: 'half_up', level: 'document' });
+  });
   it('format.amount_words_scale defaults western, country-locked', () => {
     expect(byKey.get('format.amount_words_scale')!.codedDefault).toBe('western');
   });
