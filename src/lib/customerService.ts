@@ -2,6 +2,7 @@ import { supabase } from './supabaseClient';
 import { logAuditTrail } from './auditTrailService';
 import { logger } from './logger';
 import type { Database } from '../types/database.types';
+import { assertPartyTaxNumberValid } from './regimes/partyTaxValidation';
 
 type CustomerRow = Database['public']['Tables']['customers_enhanced']['Row'];
 type CustomerInsert = Database['public']['Tables']['customers_enhanced']['Insert'];
@@ -19,6 +20,7 @@ export interface CreateCustomerInput {
   address_line1?: string | null;
   address_line2?: string | null;
   subdivision_id?: string | null;
+  tax_number?: string | null;
   postal_code?: string | null;
   portal_enabled?: boolean;
   notes?: string | null;
@@ -34,6 +36,12 @@ export interface CreateCustomerInput {
  * the set_*_tenant_and_audit trigger (the cast satisfies the NOT-NULL Insert type).
  */
 export async function createCustomer(input: CreateCustomerInput): Promise<CustomerRow | null> {
+  await assertPartyTaxNumberValid({
+    countryId: input.country_id ?? null,
+    subdivisionId: input.subdivision_id ?? null,
+    taxNumber: input.tax_number ?? null,
+  });
+
   const { data: customerNumber, error: numberError } = await supabase.rpc('get_next_customer_number');
   if (numberError) throw numberError;
 

@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient';
 import { logger } from './logger';
 import type { Database } from '../types/database.types';
+import { assertPartyTaxNumberValid } from './regimes/partyTaxValidation';
 
 type CompanyRow = Database['public']['Tables']['companies']['Row'];
 type CompanyInsert = Database['public']['Tables']['companies']['Insert'];
@@ -57,6 +58,12 @@ export async function createCompany(
   const resolvedName = (input.company_name ?? input.name ?? '').trim();
   if (!resolvedName) throw new Error('Company name is required');
 
+  await assertPartyTaxNumberValid({
+    countryId: input.country_id ?? null,
+    subdivisionId: input.subdivision_id ?? null,
+    taxNumber: input.tax_number ?? null,
+  });
+
   const { data: companyNumber, error: numberError } = await supabase.rpc('get_next_company_number');
   if (numberError) throw numberError;
 
@@ -102,6 +109,16 @@ export async function createCompany(
  */
 export async function updateCompany(id: string, input: CompanyUpdate): Promise<CompanyRow> {
   if (!id) throw new Error('Company id is required');
+
+  if (typeof input.tax_number === 'string' && input.tax_number.trim() !== '') {
+    const { data: ctxRow } = await supabase
+      .from('companies').select('country_id, subdivision_id').eq('id', id).maybeSingle();
+    await assertPartyTaxNumberValid({
+      countryId: (input.country_id as string | null | undefined) ?? ctxRow?.country_id ?? null,
+      subdivisionId: (input.subdivision_id as string | null | undefined) ?? ctxRow?.subdivision_id ?? null,
+      taxNumber: input.tax_number,
+    });
+  }
 
   const patch = stripGeneratedColumns({ ...input }) as CompanyUpdate;
   for (const key of ['industry_id', 'country_id', 'city_id'] as const) {
