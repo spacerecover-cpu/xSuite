@@ -19,7 +19,7 @@ const { rpcMock } = vi.hoisted(() => ({
 vi.mock('./supabaseClient', () => ({ supabase: { rpc: rpcMock } }));
 
 import {
-  buildTaxableLines, matchFormRate, totalsFromComputation, dryRunIssueTaxDocument,
+  buildTaxableLines, matchFormRate, resolveStrategyKey, totalsFromComputation, dryRunIssueTaxDocument,
   classifyRequirementFailures, parseRequirementFailures,
 } from './taxDocumentService';
 
@@ -58,6 +58,27 @@ describe('taxDocumentService pure helpers', () => {
     expect(t.subtotal).toBe(200);        // pre-doc-discount, legacy shape
     expect(t.taxAmount).toBe(9.995);     // round(199.900 * 0.05, 3)
     expect(t.totalAmount).toBe(209.895);
+  });
+
+  // --- WP-S3 seam completion ---
+  const inCgst: GeoCountryTaxRateRow = { id: 'in-cgst-18', country_id: 'in', subdivision_id: null, component_code: 'CGST', component_label: 'CGST', tax_category: 'standard', rate: 9, applies_to: 'gst_slab_18', valid_from: '2017-07-01', valid_to: null, sort_order: 10 };
+  const inSgst: GeoCountryTaxRateRow = { id: 'in-sgst-18', country_id: 'in', subdivision_id: null, component_code: 'SGST', component_label: 'SGST', tax_category: 'standard', rate: 9, applies_to: 'gst_slab_18', valid_from: '2017-07-01', valid_to: null, sort_order: 20 };
+  const inIgst: GeoCountryTaxRateRow = { id: 'in-igst-18', country_id: 'in', subdivision_id: null, component_code: 'IGST', component_label: 'IGST', tax_category: 'standard', rate: 18, applies_to: 'gst_slab_18', valid_from: '2017-07-01', valid_to: null, sort_order: 30 };
+
+  it('matchFormRate is slab-aware: IN form rate 18 returns the full CGST/SGST/IGST head-set, never a synthetic form:18 row', () => {
+    const rows = matchFormRate([inCgst, inSgst, inIgst], 18);
+    expect(rows.map((r) => r.component_code)).toEqual(['CGST', 'SGST', 'IGST']);
+    expect(rows.some((r) => r.id.startsWith('form:'))).toBe(false);
+  });
+  it('matchFormRate leaves the legacy single-levy path byte-identical (Oman VAT 5 → the one VAT row)', () => {
+    expect(matchFormRate([omVat], 5)).toEqual([omVat]);
+    expect(matchFormRate([omVat], 7.5)[0]).toMatchObject({ id: 'form:7.5', rate: 7.5, component_code: 'VAT' });
+    expect(matchFormRate([omVat], 0)).toEqual([]);
+  });
+  it('resolveStrategyKey reads regime.tax, defaulting to simple_vat when unbound', () => {
+    expect(resolveStrategyKey({ 'regime.tax': 'in_gst' })).toBe('in_gst');
+    expect(resolveStrategyKey({})).toBe('simple_vat');
+    expect(resolveStrategyKey({ 'regime.tax': null })).toBe('simple_vat');
   });
 });
 
