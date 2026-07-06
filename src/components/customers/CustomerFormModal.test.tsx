@@ -13,6 +13,13 @@ const { createCompanySpy, createCustomerSpy } = vi.hoisted(() => ({
 
 vi.mock('../../lib/companyService', () => ({ createCompany: createCompanySpy }));
 vi.mock('../../lib/customerService', () => ({ createCustomer: createCustomerSpy }));
+
+const { validatePureSpy } = vi.hoisted(() => ({
+  validatePureSpy: vi.fn((): { ok: boolean; error: string | null } => ({ ok: true, error: null })),
+}));
+vi.mock('../../lib/regimes/partyTaxValidation', () => ({
+  validatePartyTaxNumberPure: validatePureSpy,
+}));
 vi.mock('../../lib/geoSubdivisionService', () => ({
   listSubdivisions: vi.fn(async () => []),
 }));
@@ -126,6 +133,41 @@ describe('CustomerFormModal — inline Add New Company', () => {
           subdivision_id: null,
           postal_code: '133',
         }),
+      ),
+    );
+  });
+});
+
+describe('CustomerFormModal — tax registration number (GSTIN) capture', () => {
+  beforeEach(() => {
+    validatePureSpy.mockReset();
+    validatePureSpy.mockReturnValue({ ok: true, error: null });
+    createCustomerSpy.mockReset();
+    createCustomerSpy.mockResolvedValue({ id: 'cust-1' });
+  });
+
+  it('blocks submit and shows the validator error for an invalid tax number', async () => {
+    const user = userEvent.setup();
+    validatePureSpy.mockReturnValue({
+      ok: false, error: 'GSTIN check character is invalid — please re-check the number.',
+    });
+    renderModal();
+    await user.type(screen.getByLabelText(/customer name/i), 'Jane Doe');
+    await user.type(screen.getByLabelText(/tax registration number/i), '29ABCDE1234F1Z5');
+    await user.click(screen.getByRole('button', { name: /create customer/i }));
+    expect(await screen.findByText(/check character is invalid/i)).toBeInTheDocument();
+    expect(createCustomerSpy).not.toHaveBeenCalled();
+  });
+
+  it('includes tax_number in the createCustomer payload when valid', async () => {
+    const user = userEvent.setup();
+    renderModal();
+    await user.type(screen.getByLabelText(/customer name/i), 'Jane Doe');
+    await user.type(screen.getByLabelText(/tax registration number/i), '29AAACX0000X1ZW');
+    await user.click(screen.getByRole('button', { name: /create customer/i }));
+    await waitFor(() =>
+      expect(createCustomerSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ tax_number: '29AAACX0000X1ZW' }),
       ),
     );
   });

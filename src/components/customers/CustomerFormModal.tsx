@@ -10,6 +10,7 @@ import { PhoneInput } from '../ui/PhoneInput';
 import { UsageLimitGuard } from '../shared/UsageLimitGuard';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { AddressFields, type AddressValue } from '../ui/AddressFields';
+import { validatePartyTaxNumberPure } from '../../lib/regimes/partyTaxValidation';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   User,
@@ -60,6 +61,7 @@ interface City {
 interface FormErrors {
   customer_name?: string;
   email?: string;
+  tax_number?: string;
 }
 
 const SectionHeader: React.FC<{
@@ -114,6 +116,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     address_line1: '',
     address_line2: '',
     subdivision_id: null as string | null,
+    tax_number: '',
     postal_code: '',
     portal_enabled: true,
     notes: '',
@@ -199,8 +202,16 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
       errs.email = 'Please enter a valid email address';
     }
+    if (data.tax_number.trim()) {
+      const countryCode =
+        (countries.find((c) => c.id === data.country_id) as { code?: string } | undefined)?.code ?? null;
+      const check = validatePartyTaxNumberPure({
+        countryCode, taxNumber: data.tax_number, subdivisionAuthorityCode: null,
+      });
+      if (!check.ok) errs.tax_number = check.error ?? 'Invalid tax registration number';
+    }
     return errs;
-  }, []);
+  }, [countries]);
 
   const handleFieldChange = (field: string, value: string | boolean) => {
     const updated = { ...formData, [field]: value };
@@ -231,6 +242,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         address_line1: customer.address_line1 || null,
         address_line2: customer.address_line2 || null,
         subdivision_id: customer.subdivision_id,
+        tax_number: customer.tax_number.trim() || null,
         postal_code: customer.postal_code || null,
         portal_enabled: customer.portal_enabled,
         notes: customer.notes || null,
@@ -274,6 +286,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       address_line1: '',
       address_line2: '',
       subdivision_id: null,
+      tax_number: '',
       postal_code: '',
       portal_enabled: true,
       notes: '',
@@ -290,7 +303,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     e.preventDefault();
     const validationErrors = validate(formData);
     setErrors(validationErrors);
-    setTouched({ customer_name: true, email: true });
+    setTouched({ customer_name: true, email: true, tax_number: true });
     if (Object.keys(validationErrors).length > 0) return;
     createMutation.mutate(formData);
   };
@@ -456,6 +469,22 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 onChange={(next) => setFormData((f) => ({ ...f, ...next }))}
                 countryId={formData.country_id || null}
               />
+
+              <div>
+                <label htmlFor="customer-tax-number" className="mb-1 block text-sm font-medium">
+                  {(countries.find((c) => c.id === formData.country_id) as { tax_number_label?: string | null } | undefined)
+                    ?.tax_number_label ?? 'Tax Registration Number'}
+                </label>
+                <input
+                  id="customer-tax-number"
+                  aria-label="Tax Registration Number"
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={formData.tax_number}
+                  onChange={(e) => handleFieldChange('tax_number', e.target.value)}
+                  onBlur={() => handleBlur('tax_number')}
+                />
+                {errors.tax_number && <p className="mt-1 text-sm text-danger">{errors.tax_number}</p>}
+              </div>
 
               <div>
                 <button
