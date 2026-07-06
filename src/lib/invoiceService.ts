@@ -691,8 +691,8 @@ export const updateInvoice = async (id: string, invoice: Partial<Invoice>, items
         documentType: 'invoice',
         documentDate: invoice.invoice_date || new Date().toISOString().slice(0, 10),
         taxInclusive: invoice.tax_inclusive ?? false,
-        customerId: invoice.customer_id ?? existing?.customer_id ?? null,
-        companyId: invoice.company_id ?? existing?.company_id ?? null,
+        customerId: invoice.customer_id !== undefined ? invoice.customer_id : (existing?.customer_id ?? null),
+        companyId: invoice.company_id !== undefined ? invoice.company_id : (existing?.company_id ?? null),
       },
       rc,
     );

@@ -477,7 +477,6 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 </label>
                 <input
                   id="customer-tax-number"
-                  aria-label="Tax Registration Number"
                   className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   value={formData.tax_number}
                   onChange={(e) => handleFieldChange('tax_number', e.target.value)}
