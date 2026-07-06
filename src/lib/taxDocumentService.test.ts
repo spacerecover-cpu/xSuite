@@ -19,7 +19,8 @@ const { rpcMock } = vi.hoisted(() => ({
 vi.mock('./supabaseClient', () => ({ supabase: { rpc: rpcMock } }));
 
 import {
-  buildTaxableLines, matchFormRate, resolveStrategyKey, totalsFromComputation, dryRunIssueTaxDocument,
+  buildTaxableLines, matchFormRate, resolveStrategyKey, scopeRatesToPlaceOfSupply,
+  totalsFromComputation, dryRunIssueTaxDocument,
   classifyRequirementFailures, parseRequirementFailures,
 } from './taxDocumentService';
 
@@ -64,6 +65,7 @@ describe('taxDocumentService pure helpers', () => {
   const inCgst: GeoCountryTaxRateRow = { id: 'in-cgst-18', country_id: 'in', subdivision_id: null, component_code: 'CGST', component_label: 'CGST', tax_category: 'standard', rate: 9, applies_to: 'gst_slab_18', valid_from: '2017-07-01', valid_to: null, sort_order: 10 };
   const inSgst: GeoCountryTaxRateRow = { id: 'in-sgst-18', country_id: 'in', subdivision_id: null, component_code: 'SGST', component_label: 'SGST', tax_category: 'standard', rate: 9, applies_to: 'gst_slab_18', valid_from: '2017-07-01', valid_to: null, sort_order: 20 };
   const inIgst: GeoCountryTaxRateRow = { id: 'in-igst-18', country_id: 'in', subdivision_id: null, component_code: 'IGST', component_label: 'IGST', tax_category: 'standard', rate: 18, applies_to: 'gst_slab_18', valid_from: '2017-07-01', valid_to: null, sort_order: 30 };
+  const inChUtgst: GeoCountryTaxRateRow = { id: 'in-utgst-ch', country_id: 'in', subdivision_id: 'sub-IN-CH', component_code: 'SGST', component_label: 'UTGST', tax_category: 'standard', rate: 9, applies_to: 'gst_slab_18', valid_from: '2017-07-01', valid_to: null, sort_order: 20 };
 
   it('matchFormRate is slab-aware: IN form rate 18 returns the full CGST/SGST/IGST head-set, never a synthetic form:18 row', () => {
     const rows = matchFormRate([inCgst, inSgst, inIgst], 18);
@@ -79,6 +81,23 @@ describe('taxDocumentService pure helpers', () => {
     expect(resolveStrategyKey({ 'regime.tax': 'in_gst' })).toBe('in_gst');
     expect(resolveStrategyKey({})).toBe('simple_vat');
     expect(resolveStrategyKey({ 'regime.tax': null })).toBe('simple_vat');
+  });
+  it('scopeRatesToPlaceOfSupply collapses the SGST fan-out to ONE head — country SGST for a state, the UT UTGST row for a UT', () => {
+    // Live gst_slab_18 bucket = country CGST/SGST/IGST + one UT SGST row per UT.
+    const bucket = [inCgst, inSgst, inIgst, inChUtgst];
+    // Place of supply = a State (no UT row matches) → keep the country SGST.
+    const state = scopeRatesToPlaceOfSupply(bucket, 'sub-IN-KA');
+    expect(state.map((r) => r.component_code).sort()).toEqual(['CGST', 'IGST', 'SGST']);
+    expect(state.filter((r) => r.component_code === 'SGST').map((r) => r.id)).toEqual(['in-sgst-18']);
+    // Place of supply = Chandigarh (UT) → the CH UTGST row wins over the country SGST.
+    const ut = scopeRatesToPlaceOfSupply(bucket, 'sub-IN-CH');
+    const utSgst = ut.filter((r) => r.component_code === 'SGST');
+    expect(utSgst.map((r) => r.id)).toEqual(['in-utgst-ch']);
+    expect(utSgst[0].component_label).toBe('UTGST');
+  });
+  it('scopeRatesToPlaceOfSupply is a no-op for single-levy packs (Oman VAT)', () => {
+    expect(scopeRatesToPlaceOfSupply([omVat], null)).toEqual([omVat]);
+    expect(scopeRatesToPlaceOfSupply([omVat], 'sub-anything')).toEqual([omVat]);
   });
 });
 

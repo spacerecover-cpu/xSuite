@@ -121,6 +121,28 @@ export function resolveStrategyKey(resolved: Record<string, unknown>): string {
   return (resolved['regime.tax'] as string) || 'simple_vat';
 }
 
+/** India's `gst_slab_18` bucket carries the country CGST/SGST/IGST plus one
+ *  UT-scoped SGST (labelled UTGST) row per Union Territory. The kernel's intra
+ *  split (`split_by_place_of_supply`) selects EVERY 'SGST'-coded row, so the
+ *  bucket must first collapse to one row per component — preferring the row
+ *  scoped to the place of supply (a UT's UTGST) over the country default — else
+ *  an intra-state invoice stacks all six SGST heads. A no-op for single-levy
+ *  packs (already one row per component). NOTE: correct for single/split modes
+ *  (every live country); a future jurisdiction_stack country needs its own path. */
+export function scopeRatesToPlaceOfSupply(
+  rows: GeoCountryTaxRateRow[], placeOfSupplySubdivisionId: string | null,
+): GeoCountryTaxRateRow[] {
+  const score = (r: GeoCountryTaxRateRow): number =>
+    r.subdivision_id !== null && r.subdivision_id === placeOfSupplySubdivisionId ? 2
+      : r.subdivision_id === null ? 1 : 0;
+  const best = new Map<string, GeoCountryTaxRateRow>();
+  for (const r of rows) {
+    const cur = best.get(r.component_code);
+    if (!cur || score(r) > score(cur)) best.set(r.component_code, r);
+  }
+  return [...best.values()];
+}
+
 /** Section 170 (CGST Act): whole-rupee cash rounding leaves a ± paise residual.
  *  Persist it as an explicit document-level "Round off" line (out_of_scope) so
  *  invoice grand total, the vat ledger and the GST return all reconcile — the
@@ -276,7 +298,9 @@ export async function computeDocumentTotals(
     subdivisionIdByAuthorityCode: authorityMap,
   });
   const effective = await fetchEffectiveRates(seller.countryId, input.documentDate);
-  const rates = matchFormRate(effective, input.taxRate || 0);
+  // Collapse the slab bucket's per-UT SGST fan-out to one head per component
+  // (scoped to the place of supply) BEFORE the kernel's split selects heads.
+  const rates = scopeRatesToPlaceOfSupply(matchFormRate(effective, input.taxRate || 0), pos.subdivisionId);
   const lines = buildTaxableLines(input.items, rc.documentDecimals);
   const preDiscountSubtotal = lines.reduce(
     (s, l) => roundMoney(s + roundMoney(roundMoney(l.quantity * l.unitPrice, rc.documentDecimals) - l.lineDiscount, rc.documentDecimals), rc.documentDecimals), 0);
