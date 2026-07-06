@@ -22,7 +22,10 @@ export type TaxDocumentType = 'quote' | 'invoice' | 'credit_note' | 'stock_sale'
 
 export interface RoundingPolicy {
   mode: 'half_up' | 'half_even';
-  level: 'line' | 'document';
+  /** 'head' = per tax head per document (India Section 170); the kernel treats
+   *  it as component-rollup rounding — identical arithmetic to 'document' in
+   *  single mode, distinct per CGST/SGST/IGST head under split (WP-S3). */
+  level: 'line' | 'document' | 'head';
   cash_increment?: number;
 }
 
