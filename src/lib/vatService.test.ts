@@ -5,8 +5,17 @@ vi.mock('./supabaseClient', () => ({ supabase: { from } }));
 
 import {
   createVATRecordFromPurchase, createVATRecordFromInvoice, calculateVATForPeriod,
-  getVATRecordsByReturn, getQuarterlyVATSummary,
+  getVATRecordsByReturn, getQuarterlyVATSummary, fetchHsnLineAggregates,
 } from './vatService';
+
+// A thenable query builder: every chain method returns the builder; awaiting it at
+// any point resolves the given result (terminal method varies per query).
+function chainFor(result: { data: unknown; error: unknown }) {
+  const chain: Record<string, unknown> = {};
+  for (const m of ['select', 'eq', 'in', 'is', 'not', 'or', 'order', 'limit']) chain[m] = vi.fn(() => chain);
+  (chain as { then: unknown }).then = (resolve: (v: unknown) => unknown) => resolve(result);
+  return chain as Record<string, ReturnType<typeof vi.fn>> & PromiseLike<{ data: unknown; error: unknown }>;
+}
 
 /** insert-path builder: .insert(rows).select().maybeSingle() → { data: rows[0] }. */
 function makeInsertQuery() {
@@ -119,5 +128,31 @@ describe('getQuarterlyVATSummary (P3 — composer-derived period anchor)', () =>
     // Fiscal year starts April → Q1 window is Apr–Jun, NOT calendar Jan–Mar.
     expect(orArgs[0]).toContain('tax_period.gte.2026-04');
     expect(orArgs[0]).toContain('tax_period.lte.2026-06');
+  });
+});
+
+describe('fetchHsnLineAggregates (GSTR-1 Table 12 source, AD-4)', () => {
+  it('resolves invoice ids from vat_records by tax_period, then aggregates line + tax-line data', async () => {
+    const vatChain = chainFor({ data: [{ source_document_id: 'inv1' }], error: null });
+    const lineChain = chainFor({ data: [{ id: 'l1', invoice_id: 'inv1', item_code: '998713', unit_code: 'NOS', quantity: 2 }], error: null });
+    const taxChain = chainFor({ data: [
+      { line_item_id: 'l1', component_code: 'CGST', taxable_base: 90000, tax_amount_base: 8100, exchange_rate: 1 },
+      { line_item_id: 'l1', component_code: 'SGST', taxable_base: 90000, tax_amount_base: 8100, exchange_rate: 1 },
+    ], error: null });
+    from.mockImplementation((t: string) =>
+      t === 'vat_records' ? vatChain : t === 'invoice_line_items' ? lineChain : taxChain);
+
+    const rows = await fetchHsnLineAggregates(['2026-07']);
+
+    // tax_period is THE period dimension — never created_at (vatService.ts:279 drift class)
+    expect(vatChain.in).toHaveBeenCalledWith('tax_period', ['2026-07']);
+    // taxable counted ONCE per line (CGST+SGST share the line's base)
+    expect(rows).toEqual([
+      { itemCode: '998713', unitCode: 'NOS', quantity: 2, taxableBase: 90000, componentTaxBase: { CGST: 8100, SGST: 8100 } },
+    ]);
+  });
+  it('returns [] when no invoices fall in the periods', async () => {
+    from.mockReturnValue(chainFor({ data: [], error: null }) as never);
+    expect(await fetchHsnLineAggregates(['2026-07'])).toEqual([]);
   });
 });

@@ -1,5 +1,7 @@
 import { supabase } from './supabaseClient';
 import { gccReturnComposer, taxPeriodsBetween } from './regimes/gcc_return';
+import { roundMoney } from './financialMath';
+import type { HsnLineAggregate } from './regimes/gstr/hsnSummary';
 
 export interface VATRecord {
   id?: string;
@@ -308,6 +310,68 @@ export const getQuarterlyVATSummary = async (year: number, periodAnchor: string 
   return summaries;
 };
 
+/**
+ * GSTR-1 Table 12 source (AD-4): line-level HSN/SAC aggregates for the invoices whose
+ * ledger rows fall in the given tax periods. tax_period is THE period dimension —
+ * never created_at.
+ */
+export const fetchHsnLineAggregates = async (taxPeriods: string[]): Promise<HsnLineAggregate[]> => {
+  const { data: ledger, error: ledgerError } = await supabase
+    .from('vat_records')
+    .select('source_document_id')
+    .eq('record_type', 'sale')
+    .eq('source_document_type', 'invoice')
+    .in('tax_period', taxPeriods)
+    .is('deleted_at', null);
+  if (ledgerError) throw ledgerError;
+  const invoiceIds = [...new Set((ledger ?? []).map((r) => r.source_document_id).filter(Boolean))] as string[];
+  if (invoiceIds.length === 0) return [];
+
+  const { data: lines, error: linesError } = await supabase
+    .from('invoice_line_items')
+    .select('id, invoice_id, item_code, unit_code, quantity')
+    .in('invoice_id', invoiceIds);
+  if (linesError) throw linesError;
+
+  const { data: taxLines, error: taxError } = await supabase
+    .from('document_tax_lines')
+    .select('line_item_id, component_code, taxable_base, tax_amount_base, exchange_rate')
+    .eq('document_type', 'invoice')
+    .in('document_id', invoiceIds)
+    .not('line_item_id', 'is', null)
+    .is('deleted_at', null);
+  if (taxError) throw taxError;
+
+  const byLine = new Map<string, { taxable: number; counted: boolean; components: Record<string, number> }>();
+  for (const t of taxLines ?? []) {
+    const key = t.line_item_id as string;
+    const agg = byLine.get(key) ?? { taxable: 0, counted: false, components: {} };
+    if (!agg.counted) {
+      // taxable_base is document-currency; convert once at the row's frozen rate.
+      // Counted ONCE per line — the CGST/SGST pair shares the line's base.
+      agg.taxable = roundMoney(Number(t.taxable_base ?? 0) * Number(t.exchange_rate ?? 1), 2);
+      agg.counted = true;
+    }
+    agg.components[t.component_code] = roundMoney(
+      (agg.components[t.component_code] ?? 0) + Number(t.tax_amount_base ?? 0), 2,
+    );
+    byLine.set(key, agg);
+  }
+
+  return (lines ?? [])
+    .filter((l) => l.item_code)
+    .map((l) => {
+      const tax = byLine.get(l.id) ?? { taxable: 0, counted: false, components: {} };
+      return {
+        itemCode: l.item_code as string,
+        unitCode: (l.unit_code as string | null) ?? null,
+        quantity: Number(l.quantity ?? 0),
+        taxableBase: tax.taxable,
+        componentTaxBase: tax.components,
+      };
+    });
+};
+
 export const vatService = {
   fetchVATRecords,
   fetchVATReturns,
@@ -324,4 +388,5 @@ export const vatService = {
   getVATStats,
   getVATRecordsByReturn,
   getQuarterlyVATSummary,
+  fetchHsnLineAggregates,
 };
