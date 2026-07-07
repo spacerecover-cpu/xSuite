@@ -18,10 +18,11 @@ export const CURRENCY_KEYS = [
 ] as const;
 
 // Date/Time + Regional override keys (all non-statutory, tenant-overridable).
-// NOTE: datetime.weekend_days is intentionally excluded — the resolver does not
-// surface it on DateTimeConfig and no UI consumes it yet, so editing it here would
-// be a write with no observable effect. Surfacing it is a resolver change owned by
-// the backend phase, not this UI.
+// NOTE: datetime.weekend_days IS now surfaced on DateTimeConfig and consumed (the
+// leave business-day calc, countBusinessDays). It stays out of this editor only
+// because it is a number[] (weekday indices) and the scalar controls here can't
+// edit an array — adding it needs a multi-day picker widget (a follow-up). Tenants
+// get the correct weekend from their country pack meanwhile.
 export const DATETIME_KEYS = [
   'datetime.date_format',
   'datetime.time_format',

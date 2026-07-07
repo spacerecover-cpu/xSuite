@@ -5,8 +5,9 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Wallet, Banknote } from 'lucide-react';
 import { bankingService } from '../../lib/bankingService';
-import { useDateTimeConfig } from '../../contexts/TenantConfigContext';
+import { useCurrencyConfig, useDateTimeConfig } from '../../contexts/TenantConfigContext';
 import { tenantToday } from '../../lib/tenantToday';
+import { resolveExpensePaymentCurrency, filterExpensePaymentAccounts } from './expensePaymentCurrency';
 
 export interface ExpensePaymentTarget {
   id: string;
@@ -38,11 +39,13 @@ export const ExpensePaymentModal: React.FC<ExpensePaymentModalProps> = ({
   isSubmitting = false,
 }) => {
   const { timezone } = useDateTimeConfig();
+  const currency = useCurrencyConfig();
+  const baseCurrency = typeof currency.code === 'string' ? currency.code : '';
   const [bankAccountId, setBankAccountId] = useState('');
   const [paidAt, setPaidAt] = useState(() => tenantToday(timezone));
   const [reference, setReference] = useState('');
 
-  const expenseCurrency = expense?.currency ?? 'USD';
+  const expenseCurrency = resolveExpensePaymentCurrency(expense?.currency, baseCurrency);
 
   const { data: accounts = [], isLoading } = useQuery({
     queryKey: ['bank_accounts', 'active'],
@@ -52,8 +55,8 @@ export const ExpensePaymentModal: React.FC<ExpensePaymentModalProps> = ({
 
   // Match-currency v1: only accounts in the expense's currency can pay it 1:1.
   const eligibleAccounts = useMemo(
-    () => accounts.filter((a) => (a.currency ?? 'USD') === expenseCurrency),
-    [accounts, expenseCurrency],
+    () => filterExpensePaymentAccounts(accounts, expenseCurrency, baseCurrency),
+    [accounts, expenseCurrency, baseCurrency],
   );
 
   // Reset the form whenever a new expense opens the modal.

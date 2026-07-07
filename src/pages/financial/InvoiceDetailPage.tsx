@@ -54,7 +54,7 @@ export const InvoiceDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const toast = useToast();
-  const { formatCurrency, currencyFormat } = useCurrency();
+  const { formatCurrencyIn, currencyFormat } = useCurrency();
   const {
     companySettings,
     isLoadingSettings,
@@ -107,6 +107,10 @@ export const InvoiceDetailPage: React.FC = () => {
     queryFn: () => getCreditNotesByInvoice(id!),
     enabled: !!id,
   });
+
+  // Render this invoice's money in the invoice's OWN currency — a foreign-currency
+  // invoice must not display the tenant's symbol/decimals.
+  const fmtDoc = (n: number) => formatCurrencyIn(n, invoice?.currency);
 
   const handleDownloadPDF = async () => {
     if (!invoice || !id) return;
@@ -858,7 +862,7 @@ export const InvoiceDetailPage: React.FC = () => {
                 <div className="pt-2 border-t">
                   <span className="text-slate-600">Total:</span>
                   <span className="ml-2 text-slate-900 font-bold">
-                    {formatCurrency(invoice.total_amount || 0)}
+                    {fmtDoc(invoice.total_amount || 0)}
                   </span>
                 </div>
                 {(invoice.amount_paid ?? 0) > 0 && (
@@ -866,13 +870,13 @@ export const InvoiceDetailPage: React.FC = () => {
                     <div>
                       <span className="text-success">Paid:</span>
                       <span className="ml-2 text-success font-bold">
-                        {formatCurrency(invoice.amount_paid ?? 0)}
+                        {fmtDoc(invoice.amount_paid ?? 0)}
                       </span>
                     </div>
                     <div>
                       <span className="text-warning">Balance Due:</span>
                       <span className="ml-2 text-warning font-bold">
-                        {formatCurrency(
+                        {fmtDoc(
                           invoice.balance_due ??
                             ((invoice.total_amount ?? 0) - (invoice.amount_paid ?? 0))
                         )}
@@ -885,10 +889,10 @@ export const InvoiceDetailPage: React.FC = () => {
 
             <DetailSidebarCard title="Payment History" icon={Receipt}>
               <div className="space-y-3">
-                <PaymentSummaryBar summary={getPaymentSummary(invoice)} formatMoney={formatCurrency} />
+                <PaymentSummaryBar summary={getPaymentSummary(invoice)} formatMoney={fmtDoc} />
                 <PaymentHistoryTable
                   entries={payments}
-                  formatMoney={formatCurrency}
+                  formatMoney={fmtDoc}
                   formatDate={(d) => (d ? new Date(d).toLocaleDateString() : '—')}
                 />
               </div>
@@ -913,7 +917,7 @@ export const InvoiceDetailPage: React.FC = () => {
                         <span
                           className={`font-semibold tabular-nums ${cn.status === 'void' ? 'text-slate-400 line-through' : 'text-slate-900'}`}
                         >
-                          −{formatCurrency(cn.total_amount || 0)}
+                          −{fmtDoc(cn.total_amount || 0)}
                         </span>
                         <button
                           type="button"

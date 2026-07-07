@@ -118,6 +118,7 @@ export function resolveTenantConfigFromLayers(
       timeFormat: get<'12h' | '24h'>('datetime.time_format'),
       timezone: get<string>('datetime.timezone'),
       weekStartsOn: get<0 | 1 | 2 | 3 | 4 | 5 | 6>('datetime.week_starts_on'),
+      weekendDays: get<number[]>('datetime.weekend_days'),
       fiscalYearStart: get<string>('datetime.fiscal_year_start'),
     },
     locale: {
@@ -185,6 +186,7 @@ export function mapRowToConfig(
       timeFormat: ((country?.time_format as string) || '12h') as '12h' | '24h',
       timezone: (data.timezone as string) || 'UTC',
       weekStartsOn: ((country?.week_starts_on as number) ?? 0) as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      weekendDays: (country?.weekend_days as number[]) ?? [6, 0],
       fiscalYearStart: (data.fiscal_year_start as string) || '01-01',
     },
     locale: {

@@ -1,8 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { CalendarDays, Plus, RefreshCw, Search, Check, X, Trash2, Users, Clock, CalendarCheck, CalendarX, CreditCard as Edit2, Calendar, FileText } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format, parseISO, addDays } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { leaveService } from '../../lib/leaveService';
+import { countBusinessDays } from '../../lib/businessDays';
+import { useDateTimeConfig } from '../../contexts/TenantConfigContext';
 import type { LeaveRequestWithDetails } from '../../lib/leaveService';
 import { leaveKeys } from '../../lib/queryKeys';
 import { Badge } from '../../components/ui/Badge';
@@ -32,21 +34,6 @@ function getStatusBadge(status: string | null) {
   }
 }
 
-function calcBusinessDays(start: string, end: string): number {
-  if (!start || !end) return 0;
-  const s = parseISO(start);
-  const e = parseISO(end);
-  if (e < s) return 0;
-  let count = 0;
-  let cur = s;
-  while (cur <= e) {
-    const day = cur.getDay();
-    if (day !== 0 && day !== 6) count++;
-    cur = addDays(cur, 1);
-  }
-  return count;
-}
-
 interface RequestLeaveModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -67,6 +54,7 @@ const RequestLeaveModal: React.FC<RequestLeaveModalProps> = ({
   onSuccess,
 }) => {
   const toast = useToast();
+  const { weekendDays } = useDateTimeConfig();
   const [form, setForm] = useState({
     employee_id: '',
     leave_type_id: '',
@@ -77,8 +65,8 @@ const RequestLeaveModal: React.FC<RequestLeaveModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
 
   const daysRequested = useMemo(
-    () => calcBusinessDays(form.start_date, form.end_date),
-    [form.start_date, form.end_date]
+    () => countBusinessDays(form.start_date, form.end_date, weekendDays),
+    [form.start_date, form.end_date, weekendDays]
   );
 
   const handleSubmit = async (e: React.FormEvent) => {

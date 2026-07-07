@@ -110,6 +110,7 @@ export const settingsKeys = {
   general: () => ['settings', 'general'] as const,
   listPageSize: () => ['settings', 'list-page-size'] as const,
   listSelection: () => ['settings', 'list-selection'] as const,
+  labelPrinting: () => ['settings', 'label-printing'] as const,
   statCardStyle: () => ['settings', 'stat-card-style'] as const,
   systemNumbers: () => ['settings', 'system-numbers'] as const,
   locales: () => ['settings', 'locales'] as const,

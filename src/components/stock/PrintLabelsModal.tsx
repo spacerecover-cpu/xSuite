@@ -1,11 +1,17 @@
 import React, { useId, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Printer, Download, X, Plus, Minus } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { useToast } from '../../hooks/useToast';
-// pdf/fonts + StockLabelDocument are dynamic-imported inside handlePrint
-// so this modal — mounted by StockListPage — doesn't drag pdfmake into
-// the stock page's initial load.
+import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
+import { formatCurrencyWithConfig } from '../../lib/format';
+import { settingsKeys } from '../../lib/queryKeys';
+import { getLabelPrintingPrefs } from '../../lib/labelPrefsService';
+import { LABEL_SIZE_PRESETS } from '../../lib/pdf/labels/labelSizes';
+// labelPrintService (and pdfmake behind it) is dynamic-imported inside
+// handlePrint so this modal — mounted by StockListPage — doesn't drag pdfmake
+// into the stock page's initial load.
 import type { StockItemWithCategory } from '../../lib/stockService';
 
 interface PrintLabelsModalProps {
@@ -15,7 +21,6 @@ interface PrintLabelsModalProps {
 
 interface LabelConfig {
   showPrice: boolean;
-  showBarcode: boolean;
   copies: number;
   locationName: string;
   companyName: string;
@@ -23,7 +28,6 @@ interface LabelConfig {
 
 const DEFAULT_CONFIG: LabelConfig = {
   showPrice: true,
-  showBarcode: true,
   copies: 1,
   locationName: '',
   companyName: '',
@@ -31,76 +35,47 @@ const DEFAULT_CONFIG: LabelConfig = {
 
 export const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({ items, onClose }) => {
   const toast = useToast();
+  const currency = useCurrencyConfig();
   const companyFieldRef = useRef<HTMLInputElement>(null);
   const companyFieldId = useId();
   const locationFieldId = useId();
+  const sizeFieldId = useId();
   const [config, setConfig] = useState<LabelConfig>(DEFAULT_CONFIG);
+  const [sizeId, setSizeId] = useState<string | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
+
+  const { data: labelPrefs } = useQuery({
+    queryKey: settingsKeys.labelPrinting(),
+    queryFn: getLabelPrintingPrefs,
+  });
+  const effectiveSizeId = sizeId ?? labelPrefs?.sizes.stock ?? LABEL_SIZE_PRESETS[0].id;
 
   const set = <K extends keyof LabelConfig>(key: K, value: LabelConfig[K]) =>
     setConfig((prev) => ({ ...prev, [key]: value }));
 
-  const handlePrint = async (download = false) => {
+  const handlePrint = async (output: 'print' | 'download') => {
     if (items.length === 0) return;
     setIsPrinting(true);
     try {
-      const [{ initializePDFFonts, createPdfWithFonts }, { buildStockLabelDocument }, { isPdfEngineEnabled }] =
-        await Promise.all([
-          import('../../lib/pdf/fonts'),
-          import('../../lib/pdf/documents/StockLabelDocument'),
-          import('../../lib/pdf/engine/featureFlag'),
-        ]);
-      await initializePDFFonts();
-
-      // Engine path is flag-guarded and OFF by default: with the flag unset, the
-      // legacy `buildStockLabelDocument(...)` path below is byte-identical to
-      // production. The engine renders ONE label body per document, so the
-      // multi-copy sheet is reproduced by looping `config.copies` times here.
-      const engineEnabled = isPdfEngineEnabled('stock_label');
-      const engineMods = engineEnabled
-        ? await Promise.all([
-            import('../../lib/pdf/engine/adapters/stockLabelAdapter'),
-            import('../../lib/pdf/engine/renderTemplate'),
-            import('../../lib/pdf/templateConfig'),
-            import('../../lib/pdf/translationContext'),
-          ])
-        : null;
-
-      for (const item of items) {
-        let docDef;
-        if (engineEnabled && engineMods) {
-          const [{ toEngineData }, { renderTemplate }, { BUILT_IN_TEMPLATE_CONFIGS }, { createTranslationContext }] =
-            engineMods;
-          const config_ = BUILT_IN_TEMPLATE_CONFIGS.stock_label;
-          const ctx = createTranslationContext('english_only', null);
-          const labelData = {
-            item,
-            locationName: config.locationName || undefined,
-            companyName: config.companyName || undefined,
-            showPrice: config.showPrice,
-            showBarcode: config.showBarcode,
-          };
-          const engineData = toEngineData(labelData, config_);
-          docDef = renderTemplate(config_, engineData, ctx, null, null);
-        } else {
-          docDef = buildStockLabelDocument({
-            item,
-            locationName: config.locationName || undefined,
-            companyName: config.companyName || undefined,
-            showPrice: config.showPrice,
-            showBarcode: config.showBarcode,
-            copies: config.copies,
-          });
-        }
-        const pdf = createPdfWithFonts(docDef);
-        const filename = `label-${item.sku ?? item.name.replace(/\s+/g, '-')}.pdf`;
-        if (download) {
-          pdf.download(filename);
-        } else {
-          pdf.open();
-        }
+      const { printStockLabelBatch } = await import('../../lib/pdf/labels/labelPrintService');
+      const entries = items.map((item) => ({
+        item,
+        priceText:
+          config.showPrice && item.selling_price != null
+            ? formatCurrencyWithConfig(item.selling_price, currency)
+            : null,
+      }));
+      const result = await printStockLabelBatch(entries, {
+        output,
+        sizeId: effectiveSizeId,
+        copies: config.copies,
+        locationName: config.locationName || undefined,
+        companyName: config.companyName || undefined,
+      });
+      if (!result.success) {
+        toast.error(result.error || 'Failed to generate label PDF');
       }
-    } catch (err) {
+    } catch {
       toast.error('Failed to generate label PDF');
     } finally {
       setIsPrinting(false);
@@ -128,6 +103,25 @@ export const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({ items, onClo
 
         <div className="space-y-4">
           <h4 className="text-sm font-semibold text-slate-700">Label Options</h4>
+
+          <div>
+            <label htmlFor={sizeFieldId} className="block text-xs font-medium text-slate-600 mb-1">Label Size</label>
+            <select
+              id={sizeFieldId}
+              value={effectiveSizeId}
+              onChange={(e) => setSizeId(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              {LABEL_SIZE_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.name} — {preset.printers}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-slate-500">
+              The page is sized exactly to the label — print at 100% scale on your label printer.
+            </p>
+          </div>
 
           <div>
             <label htmlFor={companyFieldId} className="block text-xs font-medium text-slate-600 mb-1">Company Name</label>
@@ -164,15 +158,6 @@ export const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({ items, onClo
               />
               Show Price
             </label>
-            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={config.showBarcode}
-                onChange={(e) => set('showBarcode', e.target.checked)}
-                className="w-4 h-4 rounded border-slate-300 text-primary"
-              />
-              Show Barcode/SKU
-            </label>
           </div>
 
           <div>
@@ -204,7 +189,7 @@ export const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({ items, onClo
             variant="secondary"
             size="sm"
             className="gap-1"
-            onClick={() => handlePrint(true)}
+            onClick={() => handlePrint('download')}
             disabled={isPrinting || items.length === 0}
           >
             <Download className="w-4 h-4" />
@@ -214,11 +199,11 @@ export const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({ items, onClo
             variant="primary"
             size="sm"
             className="gap-1"
-            onClick={() => handlePrint(false)}
+            onClick={() => handlePrint('print')}
             disabled={isPrinting || items.length === 0}
           >
             <Printer className="w-4 h-4" />
-            {isPrinting ? 'Generating...' : 'Open & Print'}
+            {isPrinting ? 'Generating…' : 'Print'}
           </Button>
         </div>
       </div>

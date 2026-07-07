@@ -58,6 +58,9 @@ export interface DateTimeConfig {
   timeFormat: '12h' | '24h';
   timezone: string;
   weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  /** Weekend weekday indices (0=Sun … 6=Sat). Gulf tenants use [5,6] (Fri/Sat);
+   *  default [6,0] (Sat/Sun). Distinct from weekStartsOn. */
+  weekendDays: number[];
   fiscalYearStart: string;
 }
 
@@ -125,6 +128,7 @@ export const DEFAULT_TENANT_CONFIG: TenantConfig = {
     timeFormat: '12h',
     timezone: 'UTC',
     weekStartsOn: 0,
+    weekendDays: [6, 0],
     fiscalYearStart: '01-01',
   },
   locale: {

@@ -35,6 +35,7 @@ import { useCurrency } from '../../hooks/useCurrency';
 import type { Json } from '../../types/database.types';
 import { toDateInputValue } from '../../lib/format';
 import { inventoryKeys } from '../../lib/queryKeys';
+import { shouldAutoPrintLabel } from '../../lib/labelPrefsService';
 import { logger } from '../../lib/logger';
 import type { DeviceFamily } from '../../lib/devices/deviceFamily';
 import type { CatalogOption } from '../../lib/devices/deviceCatalogQueries';
@@ -400,6 +401,7 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
       };
 
       let savedItemId: string;
+      let createdItem: Awaited<ReturnType<typeof createInventoryItem>> = null;
       if (isEdit && itemId) {
         await updateInventoryItem(itemId, basePayload);
         savedItemId = itemId;
@@ -415,6 +417,7 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
         });
         if (!created) throw new Error('Failed to create inventory item');
         savedItemId = created.id;
+        createdItem = created;
       }
 
       // Persist donor parts when is_donor is checked
@@ -434,6 +437,17 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
       }
 
       await queryClient.invalidateQueries({ queryKey: inventoryKeys.lists() });
+
+      // Direct Print Label: fire-and-forget so a printer problem never blocks intake.
+      if (createdItem) {
+        const item = createdItem;
+        void shouldAutoPrintLabel('inventory').then(async (enabled) => {
+          if (!enabled) return;
+          const { printInventoryLabels } = await import('../../lib/pdf/labels/labelPrintService');
+          await printInventoryLabels([item], { output: 'print' });
+        });
+      }
+
       onSuccess();
       onClose();
     } catch (err) {

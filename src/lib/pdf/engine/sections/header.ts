@@ -87,28 +87,55 @@ export const renderHeader: SectionRenderer = (
       }
     }
     const enFirst = config.language.primary !== 'ar' || !secondaryTitle;
-    const enLine: Content = {
-      text: englishTitle,
-      fontSize: 19,
-      bold: true,
-      color: config.colors ? colors.text : PDF_COLORS.text,
-      characterSpacing: 0.6,
-      alignment: 'center',
-    };
-    const secondaryLine: Content | null = secondaryTitle
-      ? {
-          text: secondaryTitle,
-          fontSize: 13,
-          bold: true,
-          color: PDF_COLORS.textLight,
-          alignment: 'center',
-          margin: [0, 3, 0, 0],
-        }
-      : null;
-    const lines = enFirst
-      ? [enLine, ...(secondaryLine ? [secondaryLine] : [])]
-      : [{ ...(secondaryLine as object), fontSize: 17, margin: [0, 0, 0, 0] } as Content, { ...(enLine as object), fontSize: 14, margin: [0, 3, 0, 0] } as Content];
-    titleBlock = { stack: lines, margin: [0, 2, 0, 10] };
+    const inkColor = config.colors ? colors.text : PDF_COLORS.text;
+    if (config.language.mode === 'bilingual_sidebyside' && secondaryTitle) {
+      // Side-by-side layout keeps the heading on ONE line — the same promise
+      // every "EN | AR" label makes. The leading (primary) run carries the
+      // display ink; the trailing run and separator step back in a muted tone.
+      // characterSpacing stays on the Latin run only (it breaks Arabic joining).
+      const enRun = {
+        text: englishTitle,
+        fontSize: enFirst ? 18 : 14,
+        bold: true,
+        color: enFirst ? inkColor : PDF_COLORS.textLight,
+        ...(enFirst ? { characterSpacing: 0.6 } : {}),
+      };
+      const secondaryRun = {
+        text: secondaryTitle,
+        fontSize: enFirst ? 14 : 17,
+        bold: true,
+        color: enFirst ? PDF_COLORS.textLight : inkColor,
+      };
+      const sep = { text: ' | ', fontSize: 14, bold: true, color: PDF_COLORS.textLight };
+      titleBlock = {
+        text: enFirst ? [enRun, sep, secondaryRun] : [secondaryRun, sep, enRun],
+        alignment: 'center',
+        margin: [0, 2, 0, 10],
+      };
+    } else {
+      const enLine: Content = {
+        text: englishTitle,
+        fontSize: 19,
+        bold: true,
+        color: inkColor,
+        characterSpacing: 0.6,
+        alignment: 'center',
+      };
+      const secondaryLine: Content | null = secondaryTitle
+        ? {
+            text: secondaryTitle,
+            fontSize: 13,
+            bold: true,
+            color: PDF_COLORS.textLight,
+            alignment: 'center',
+            margin: [0, 3, 0, 0],
+          }
+        : null;
+      const lines = enFirst
+        ? [enLine, ...(secondaryLine ? [secondaryLine] : [])]
+        : [{ ...(secondaryLine as object), fontSize: 17, margin: [0, 0, 0, 0] } as Content, { ...(enLine as object), fontSize: 14, margin: [0, 3, 0, 0] } as Content];
+      titleBlock = { stack: lines, margin: [0, 2, 0, 10] };
+    }
   }
 
   const showLogo = config.branding.logo && classifyLogo(logo).kind !== 'none';

@@ -11,7 +11,8 @@ import { useCustomerPickerRows } from '../../lib/pickerSearch';
 import { CaseSuccessModal } from './CaseSuccessModal';
 import { ServerBulkDrivesModal } from './ServerBulkDrivesModal';
 import { UsageLimitGuard } from '../shared/UsageLimitGuard';
-import { printReceipt, printLabel, printCustomerCopy } from '../../lib/printUtils';
+import { printReceipt, printCustomerCopy } from '../../lib/printUtils';
+import { shouldAutoPrintLabel } from '../../lib/labelPrefsService';
 import {
   Users,
   HardDrive,
@@ -495,6 +496,12 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
       queryClient.invalidateQueries({ queryKey: [CASE_COMMAND_STATS_KEY] });
       setCreatedCase({ id: newCase.id, case_no: newCase.case_no ?? newCase.case_number ?? '' });
       setShowSuccessModal(true);
+      // Direct Print Label: fire-and-forget so a printer problem never blocks intake.
+      void shouldAutoPrintLabel('case').then(async (enabled) => {
+        if (!enabled) return;
+        const { printCaseLabels } = await import('../../lib/pdf/labels/labelPrintService');
+        await printCaseLabels(newCase.id, { output: 'print' });
+      });
     },
     onError: (error) => {
       logger.error('Case creation error:', error);
@@ -1079,7 +1086,10 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
             printCustomerCopy(createdCase.id, createdCase.case_no);
           }}
           onPrintLabel={() => {
-            printLabel(createdCase.id, createdCase.case_no);
+            // Direct print: one label per device, straight to the print dialog.
+            void import('../../lib/pdf/labels/labelPrintService').then(({ printCaseLabels }) =>
+              printCaseLabels(createdCase.id, { output: 'print' }),
+            );
           }}
         />
       )}
