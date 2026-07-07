@@ -47,6 +47,7 @@ describe('getResolvedCountryFacts (R3, §8b)', () => {
       code: 'OM', taxSystem: 'VAT', taxLabel: 'VAT', taxNumberLabel: 'VATIN', taxInvoiceRequired: true,
       languageCode: 'ar', decimalPlaces: 3, dateFormat: 'DD/MM/YYYY',
       decimalSeparator: '.', thousandsSeparator: ',', digitGrouping: '3',
+      amountWordsScale: 'western',
       einvoiceRegimeKey: 'no_einvoice',
       addressFormat: '%N %O %A %C %Z',
     });
@@ -94,5 +95,34 @@ describe('getResolvedCountryFacts (R3, §8b)', () => {
     ];
     const facts = await getResolvedCountryFacts('sa-uuid');
     expect(facts?.einvoiceRegimeKey).toBe('zatca_ph1');
+  });
+
+  it("maps country_config format.amount_words_scale='indian' onto facts.amountWordsScale", async () => {
+    maybeSingle.mockResolvedValue({
+      data: {
+        code: 'IN', tax_system: 'GST', tax_label: 'GST', tax_number_label: 'GSTIN',
+        tax_invoice_required: true, language_code: 'en', decimal_places: 2,
+        date_format: 'DD/MM/YYYY', decimal_separator: '.', thousands_separator: ',',
+        digit_grouping: '3;2', address_format: null,
+        country_config: { 'format.amount_words_scale': 'indian' },
+      },
+      error: null,
+    });
+    const facts = await getResolvedCountryFacts('in-uuid');
+    expect(facts?.amountWordsScale).toBe('indian');
+  });
+
+  it("defaults amountWordsScale to 'western' when the country_config binding is absent", async () => {
+    maybeSingle.mockResolvedValue({
+      data: {
+        code: 'OM', tax_system: 'VAT', tax_label: 'VAT', tax_number_label: 'VATIN',
+        tax_invoice_required: true, language_code: 'ar', decimal_places: 3,
+        date_format: 'DD/MM/YYYY', decimal_separator: '.', thousands_separator: ',',
+        digit_grouping: '3', address_format: null,
+      },
+      error: null,
+    });
+    const facts = await getResolvedCountryFacts('om-uuid');
+    expect(facts?.amountWordsScale).toBe('western');
   });
 });

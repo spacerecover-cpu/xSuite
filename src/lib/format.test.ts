@@ -10,6 +10,7 @@ import {
   formatDateTime,
   formatCurrencyWithConfig,
   renderCurrencyToken,
+  groupIntegerDigits,
   toDateInputValue,
   formatTaxRatePercent,
 } from './format';
@@ -279,5 +280,47 @@ describe('formatTaxRatePercent', () => {
   it('treats null/undefined as 0', () => {
     expect(formatTaxRatePercent(null)).toBe('0.00%');
     expect(formatTaxRatePercent(undefined)).toBe('0.00%');
+  });
+});
+
+describe('groupIntegerDigits (WP-L1)', () => {
+  it("western '3' reproduces the legacy regex byte-for-byte", () => {
+    expect(groupIntegerDigits('1000000', '3', ',')).toBe('1,000,000');
+    expect(groupIntegerDigits('106200', '3', ',')).toBe('106,200');
+    expect(groupIntegerDigits('123', '3', ',')).toBe('123');
+  });
+  it("lakh/crore '3;2': last 3, then pairs", () => {
+    expect(groupIntegerDigits('1000000', '3;2', ',')).toBe('10,00,000');
+    expect(groupIntegerDigits('106200', '3;2', ',')).toBe('1,06,200');
+    expect(groupIntegerDigits('123', '3;2', ',')).toBe('123');
+    expect(groupIntegerDigits('1234', '3;2', ',')).toBe('1,234');
+    expect(groupIntegerDigits('123456789', '3;2', ',')).toBe('12,34,56,789');
+    expect(groupIntegerDigits('-106200', '3;2', ',')).toBe('-1,06,200');
+  });
+});
+
+describe('formatCurrencyWithConfig digitGrouping (WP-L1)', () => {
+  it('renders the walkthrough total ₹1,06,200.00', () => {
+    expect(
+      formatCurrencyWithConfig(106200, cfg({ code: 'INR', symbol: '₹', position: 'before', digitGrouping: '3;2' })),
+    ).toBe('₹1,06,200.00');
+  });
+  it('absent digitGrouping stays byte-identical to today', () => {
+    expect(formatCurrencyWithConfig(106200, cfg({ symbol: '$', position: 'before' }))).toBe('$106,200.00');
+  });
+  it("explicit '3' equals absent", () => {
+    expect(formatCurrencyWithConfig(106200, cfg({ symbol: '$', position: 'before', digitGrouping: '3' })))
+      .toBe('$106,200.00');
+  });
+});
+
+describe('U+20B9 passes through the in-app formatter unmangled (WP-L1)', () => {
+  it('formatCurrencyWithConfig emits the exact rupee code point', () => {
+    const out = formatCurrencyWithConfig(1, cfg({ code: 'INR', symbol: '₹', position: 'before', digitGrouping: '3;2' }));
+    expect(out.codePointAt(0)).toBe(0x20b9);
+    expect(out).toBe('₹1.00');
+  });
+  it('renderCurrencyToken symbol_code keeps ₹ intact beside the ISO code', () => {
+    expect(renderCurrencyToken(cfg({ code: 'INR', symbol: '₹', displayMode: 'symbol_code' }))).toBe('₹ INR');
   });
 });

@@ -14,6 +14,7 @@ import { SearchableSelect } from '../../components/ui/SearchableSelect';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
+import { useTaxConfig } from '../../contexts/TenantConfigContext';
 import { logger } from '../../lib/logger';
 import {
   Building2,
@@ -119,6 +120,7 @@ export const GeneralSettings: React.FC = () => {
   const queryClient = useQueryClient();
   const toast = useToast();
   const confirm = useConfirm();
+  const taxConfig = useTaxConfig();
   const [formData, setFormData] = useState<Partial<CompanySettings> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [, setUploadingFiles] = useState<Set<string>>(new Set());
@@ -734,7 +736,7 @@ export const GeneralSettings: React.FC = () => {
               placeholder="1234567890"
             />
             <FormField
-              label="VAT Number"
+              label={`${taxConfig.label || 'VAT'} Number`}
               value={formData.basic_info?.vat_number}
               onChange={(val: string) => updateField('basic_info', 'vat_number', val)}
               placeholder="OM1234567890"

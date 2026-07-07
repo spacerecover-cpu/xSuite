@@ -90,6 +90,7 @@ export function toCreditNoteEngineData(
       position: creditNoteData.currency_position === 'before' ? 'before' : 'after',
       decimalSeparator: config.locale?.decimalSeparator,
       thousandsSeparator: config.locale?.thousandsSeparator,
+      digitGrouping: config.locale?.groupingStyle === 'indian' ? '3;2' : '3',
     });
 
   // ---- Title (config-driven; the country layer sets TAX CREDIT NOTE vs CREDIT NOTE) --

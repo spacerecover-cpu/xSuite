@@ -74,6 +74,7 @@ export const VATAuditPage: React.FC = () => {
   const { formatCurrency } = useCurrency();
   const confirm = useConfirm();
   const taxConfig = useTaxConfig();
+  const taxLabel = taxConfig.label || 'VAT';
   const { timezone } = useDateTimeConfig();
   const [activeTab, setActiveTab] = useState<'vat' | 'audit'>('vat');
   const [searchTerm, setSearchTerm] = useState('');
@@ -134,8 +135,8 @@ export const VATAuditPage: React.FC = () => {
   const handleSubmitReturn = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (await confirm({
-      title: 'Submit VAT return?',
-      message: 'Submit this VAT return? This action cannot be undone.',
+      title: `Submit ${taxLabel} return?`,
+      message: `Submit this ${taxLabel} return? This action cannot be undone.`,
       tone: 'default',
     })) {
       await submitVATReturnMutation.mutateAsync(id);
@@ -145,8 +146,8 @@ export const VATAuditPage: React.FC = () => {
   const handleMarkPaid = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (await confirm({
-      title: 'Mark VAT return as paid?',
-      message: 'Mark this VAT return as paid?',
+      title: `Mark ${taxLabel} return as paid?`,
+      message: `Mark this ${taxLabel} return as paid?`,
       tone: 'default',
     })) {
       await markVATPaidMutation.mutateAsync(id);
@@ -195,13 +196,13 @@ export const VATAuditPage: React.FC = () => {
   return (
     <div className="px-6 py-5 max-w-[1800px] mx-auto">
       <PageHeaderSlot
-        title="VAT & Audit"
+        title={`${taxLabel} & Audit`}
         icon={FileCheck}
         actions={
           <>
             <Button variant="secondary" size="sm" className="flex items-center gap-2">
               <Download className="w-4 h-4 mr-2" />
-              Export VAT Report
+              {`Export ${taxLabel} Report`}
             </Button>
             <Button
               size="sm"
@@ -209,7 +210,7 @@ export const VATAuditPage: React.FC = () => {
               onClick={() => setShowVATReturnModal(true)}
             >
               <Plus className="w-4 h-4 mr-2" />
-              New VAT Return
+              {`New ${taxLabel} Return`}
             </Button>
           </>
         }
@@ -225,7 +226,7 @@ export const VATAuditPage: React.FC = () => {
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
-            VAT Management
+            {`${taxLabel} Management`}
           </button>
           <button
             onClick={() => setActiveTab('audit')}
@@ -247,19 +248,19 @@ export const VATAuditPage: React.FC = () => {
                 stats={[
                   {
                     tone: 'success',
-                    label: 'VAT Collected',
+                    label: `${taxLabel} Collected`,
                     value: formatCurrency(totalVATCollected),
                     icon: TrendingUp,
                   },
                   {
                     tone: 'danger',
-                    label: 'VAT Paid',
+                    label: `${taxLabel} Paid`,
                     value: formatCurrency(totalVATPaid),
                     icon: TrendingDown,
                   },
                   {
                     tone: 'info',
-                    label: 'Net VAT Position',
+                    label: `Net ${taxLabel} Position`,
                     value: formatCurrency(Math.abs(netVATPosition)),
                     sub: netVATPosition >= 0 ? 'Payable' : 'Reclaimable',
                     icon: Calculator,
@@ -276,16 +277,16 @@ export const VATAuditPage: React.FC = () => {
 
               <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden mb-6">
                 <div className="p-6 border-b border-slate-200">
-                  <h2 className="text-lg font-semibold text-slate-900">Recent VAT Returns</h2>
+                  <h2 className="text-lg font-semibold text-slate-900">{`Recent ${taxLabel} Returns`}</h2>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-slate-50 border-b border-slate-200">
                       <tr>
                         <th className="text-left py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Period</th>
-                        <th className="text-right py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Output VAT</th>
-                        <th className="text-right py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Input VAT</th>
-                        <th className="text-right py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Net VAT</th>
+                        <th className="text-right py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">{`Output ${taxLabel}`}</th>
+                        <th className="text-right py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">{`Input ${taxLabel}`}</th>
+                        <th className="text-right py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">{`Net ${taxLabel}`}</th>
                         <th className="text-left py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
                         <th className="text-right py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Actions</th>
                       </tr>
@@ -295,8 +296,8 @@ export const VATAuditPage: React.FC = () => {
                         <tr>
                           <td colSpan={6} className="py-12 text-center">
                             <FileCheck className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                            <p className="text-slate-500 text-lg">No VAT returns filed</p>
-                            <p className="text-slate-400 text-sm mt-1">Create your first VAT return to get started</p>
+                            <p className="text-slate-500 text-lg">{`No ${taxLabel} returns filed`}</p>
+                            <p className="text-slate-400 text-sm mt-1">{`Create your first ${taxLabel} return to get started`}</p>
                           </td>
                         </tr>
                       ) : (
@@ -371,7 +372,7 @@ export const VATAuditPage: React.FC = () => {
               <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
                 <div className="p-6 border-b border-slate-200">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-slate-900">VAT Records</h2>
+                    <h2 className="text-lg font-semibold text-slate-900">{`${taxLabel} Records`}</h2>
                     <div className="flex gap-2">
                       <select
                         value={recordTypeFilter}
@@ -402,8 +403,8 @@ export const VATAuditPage: React.FC = () => {
                         <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Date</th>
                         <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Type</th>
                         <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Record ID</th>
-                        <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">VAT Amount</th>
-                        <th className="text-center py-3 px-4 text-sm font-semibold text-slate-700">VAT Rate</th>
+                        <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">{`${taxLabel} Amount`}</th>
+                        <th className="text-center py-3 px-4 text-sm font-semibold text-slate-700">{`${taxLabel} Rate`}</th>
                         <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Tax Period</th>
                       </tr>
                     </thead>

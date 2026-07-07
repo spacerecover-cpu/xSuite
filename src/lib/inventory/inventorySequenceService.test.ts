@@ -39,3 +39,23 @@ describe('formatCurrentNumber', () => {
     expect(formatCurrentNumber('USB', 123, 6)).toBe('USB-000123');
   });
 });
+
+describe('template-aware previews (cosmetic fix — spec §4 WP-S5)', () => {
+  it('formatNextNumber renders the v2 template when the row carries one', () => {
+    expect(
+      formatNextNumber('INV', 41, 4, 'INV/{FY}/{SEQ:4}', '04-01', new Date(2026, 6, 5)),
+    ).toBe('INV/26-27/0042');
+  });
+
+  it('formatCurrentNumber renders the template and keeps the em-dash for 0', () => {
+    expect(
+      formatCurrentNumber('INV', 42, 4, 'INV/{FY}/{SEQ:4}', '04-01', new Date(2026, 6, 5)),
+    ).toBe('INV/26-27/0042');
+    expect(formatCurrentNumber('INV', 0, 4, 'INV/{FY}/{SEQ:4}', '04-01')).toBe('—');
+  });
+
+  it('null/omitted template keeps the exact legacy shape (all existing callers unchanged)', () => {
+    expect(formatNextNumber('HDD', 0, 4, null, null)).toBe('HDD-0001');
+    expect(formatCurrentNumber('HDD', 5, 4)).toBe('HDD-0005');
+  });
+});

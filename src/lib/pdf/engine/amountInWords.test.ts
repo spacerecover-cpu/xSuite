@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { amountInWordsEn, amountInWordsAr, numberToWordsEn } from './amountInWords';
+import { amountInWordsEn, amountInWordsAr, numberToWordsEn, numberToWordsEnIndian } from './amountInWords';
 
 describe('numberToWordsEn', () => {
   const cases: [number, string][] = [
@@ -47,5 +47,40 @@ describe('amountInWordsAr', () => {
 
   it('appends the currency', () => {
     expect(amountInWordsAr(5, 'ر.ع')).toContain('ر.ع');
+  });
+});
+
+describe('numberToWordsEnIndian (WP-L1)', () => {
+  const cases: [number, string][] = [
+    [0, 'Zero'],
+    [999, 'Nine Hundred Ninety Nine'],
+    [106200, 'One Lakh Six Thousand Two Hundred'],
+    [1234000, 'Twelve Lakh Thirty Four Thousand'],
+    [10000000, 'One Crore'],
+    [123456789, 'Twelve Crore Thirty Four Lakh Fifty Six Thousand Seven Hundred Eighty Nine'],
+  ];
+  it.each(cases)('spells %i as "%s"', (n, words) => {
+    expect(numberToWordsEnIndian(n)).toBe(words);
+  });
+  it('returns null for the honest-degrade guard cases (non-finite / negative)', () => {
+    expect(numberToWordsEnIndian(Number.NaN)).toBeNull();
+    expect(numberToWordsEnIndian(Number.POSITIVE_INFINITY)).toBeNull();
+    expect(numberToWordsEnIndian(-5)).toBeNull();
+  });
+});
+
+describe("amountInWordsEn scale='indian' (WP-L1)", () => {
+  it('spells the walkthrough total', () => {
+    expect(amountInWordsEn(106200, '₹', 2, 'indian')).toBe('₹ One Lakh Six Thousand Two Hundred only');
+  });
+  it('keeps cheque-style minor units', () => {
+    expect(amountInWordsEn(106200.5, '₹', 2, 'indian')).toBe('₹ One Lakh Six Thousand Two Hundred and 50/100 only');
+  });
+  it('default scale stays western (byte-identical)', () => {
+    expect(amountInWordsEn(1234000, 'OMR', 3)).toBe('OMR One Million Two Hundred Thirty Four Thousand only');
+  });
+  it('non-finite honest-degrades to no words (matches the western path, never renders "null")', () => {
+    expect(amountInWordsEn(Number.NaN, '₹', 2, 'indian')).not.toContain('null');
+    expect(amountInWordsEn(Number.NaN, '₹', 2, 'indian')).toBe(amountInWordsEn(Number.NaN, '₹', 2));
   });
 });

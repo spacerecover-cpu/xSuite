@@ -22,6 +22,7 @@ import {
   Briefcase,
   User,
   AlertTriangle,
+  ChevronDown,
 } from 'lucide-react';
 import { logger } from '../../lib/logger';
 
@@ -40,7 +41,8 @@ interface RecordPaymentModalProps {
       status: 'pending' | 'completed';
       notes?: string;
     },
-    allocations: Array<{ invoice_id: string; amount: number }>
+    allocations: Array<{ invoice_id: string; amount: number }>,
+    withholding?: { amount: number; certificateRef: string } | null
   ) => Promise<void>;
   preselectedCaseId?: string;
   preselectedInvoiceId?: string;
@@ -87,6 +89,9 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   // Surface the method/account "required" errors only after a submit attempt, so
   // the form doesn't shout at the user before they've had a chance to fill it in.
   const [showErrors, setShowErrors] = useState(false);
+  const [showWithholding, setShowWithholding] = useState(false);
+  const [withheldAmount, setWithheldAmount] = useState<number>(0);
+  const [certificateRef, setCertificateRef] = useState('');
 
   const { data: casesWithInvoices = [] } = useQuery({
     queryKey: ['cases_with_unpaid_invoices'],
@@ -221,14 +226,15 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
     updateTotalFromAllocations(updated);
   };
 
-  const updateTotalFromAllocations = (allocs: InvoiceAllocation[]) => {
-    const total = allocs.reduce((sum, a) => sum + a.allocation_amount, 0);
-    setTotalAmount(total);
-  };
-
   const roundToCurrency = (n: number) => {
     const factor = Math.pow(10, currencyFormat.decimalPlaces);
     return Math.round(n * factor) / factor;
+  };
+
+  const updateTotalFromAllocations = (allocs: InvoiceAllocation[]) => {
+    const total = allocs.reduce((sum, a) => sum + a.allocation_amount, 0);
+    // Withheld tax reduces the CASH received, not the receivable settled.
+    setTotalAmount(Math.max(0, roundToCurrency(total - withheldAmount)));
   };
 
   // Two-way sync: typing the payment amount distributes it across the listed
@@ -238,13 +244,22 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   const handleTotalAmountChange = (value: number) => {
     setTotalAmount(value);
     setAllocations((prev) => {
-      let remaining = roundToCurrency(value);
+      // The receivable settled = cash amount + withheld tax; distribute that total.
+      let remaining = roundToCurrency(value + withheldAmount);
       return prev.map((a) => {
         const take = roundToCurrency(Math.min(remaining, a.balance_due));
         remaining = roundToCurrency(remaining - take);
         return { ...a, allocation_amount: take };
       });
     });
+  };
+
+  // Withheld tax reduces the CASH received, not the receivable settled: keep
+  // the allocations pinned to the invoice dues and re-derive the cash amount.
+  const handleWithheldChange = (value: number) => {
+    const w = Math.max(0, value);
+    setWithheldAmount(w);
+    setTotalAmount(Math.max(0, roundToCurrency(totalAllocated - w)));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -257,7 +272,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       setShowErrors(true);
       return;
     }
-    if (Math.abs(totalAllocated - totalAmount) > 1e-6) return;
+    if (Math.abs(totalAllocated - (totalAmount + withheldAmount)) > 1e-6 || certMissing) return;
 
     setIsSubmitting(true);
     try {
@@ -275,7 +290,8 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         allocations.map(a => ({
           invoice_id: a.invoice_id,
           amount: a.allocation_amount,
-        }))
+        })),
+        withheldAmount > 0 ? { amount: withheldAmount, certificateRef: certificateRef.trim() } : null
       );
       handleClose();
     } catch (error) {
@@ -296,6 +312,9 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
     setNotes('');
     setAllocations([]);
     setShowErrors(false);
+    setShowWithholding(false);
+    setWithheldAmount(0);
+    setCertificateRef('');
     onClose();
   };
 
@@ -310,7 +329,9 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   const remainingBalance = Math.max(0, totalDue - totalAllocated);
   // record_payment rejects any difference (money conservation) — block the
   // submit client-side and explain, instead of surfacing a server 400.
-  const allocationMismatch = allocations.length > 0 && Math.abs(totalAllocated - totalAmount) > 1e-6;
+  const allocationMismatch =
+    allocations.length > 0 && Math.abs(totalAllocated - (totalAmount + withheldAmount)) > 1e-6;
+  const certMissing = withheldAmount > 0 && !certificateRef.trim();
   // Required for financial integrity — a payment must name its method and deposit account.
   const methodMissing = !paymentMethodId;
   const accountMissing = !bankAccountId;
@@ -596,9 +617,9 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                       {allocationMismatch ? (
                         <p className="flex items-center gap-1.5 text-sm font-medium text-warning" role="alert">
                           <AlertTriangle className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
-                          {totalAmount - totalAllocated > 0
-                            ? `${formatCurrency(totalAmount - totalAllocated)} of the payment is unallocated — it exceeds the listed invoices' due. Reduce the amount or add another invoice.`
-                            : `Allocated ${formatCurrency(totalAllocated)} exceeds the payment amount ${formatCurrency(totalAmount)} — lower the allocations or raise the amount.`}
+                          {totalAmount + withheldAmount - totalAllocated > 0
+                            ? `${formatCurrency(totalAmount + withheldAmount - totalAllocated)} of the payment is unallocated — it exceeds the listed invoices' due. Reduce the amount or add another invoice.`
+                            : `Allocated ${formatCurrency(totalAllocated)} exceeds the payment amount plus withheld tax ${formatCurrency(totalAmount + withheldAmount)} — lower the allocations or raise the amount.`}
                         </p>
                       ) : (
                         <p className="flex items-center gap-1.5 text-sm text-success">
@@ -625,6 +646,62 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           )}
         </div>
 
+        <div className="border border-slate-200 rounded-lg">
+          <button
+            type="button"
+            onClick={() => setShowWithholding((v) => !v)}
+            aria-expanded={showWithholding}
+            className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
+          >
+            <span>Withholding (TDS/WHT)</span>
+            <ChevronDown
+              aria-hidden="true"
+              className={`w-4 h-4 text-slate-400 transition-transform ${showWithholding ? 'rotate-180' : ''}`}
+            />
+          </button>
+          {showWithholding && (
+            <div className="px-3 pb-3 space-y-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="payment-withheld-amount" className="block text-sm font-medium text-slate-700 mb-1">
+                    Withheld Amount
+                  </label>
+                  <Input
+                    id="payment-withheld-amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={withheldAmount || ''}
+                    onChange={(e) => handleWithheldChange(parseFloat(e.target.value) || 0)}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="payment-withholding-cert" className="block text-sm font-medium text-slate-700 mb-1">
+                    Certificate Reference {withheldAmount > 0 && <span className="text-danger">*</span>}
+                  </label>
+                  <Input
+                    id="payment-withholding-cert"
+                    type="text"
+                    value={certificateRef}
+                    onChange={(e) => setCertificateRef(e.target.value)}
+                    placeholder="e.g. TDS 194J / Form 16A ref"
+                  />
+                  {certMissing && (
+                    <p className="mt-1 flex items-center gap-1 text-xs text-danger" role="alert">
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
+                      Required when an amount is withheld
+                    </p>
+                  )}
+                </div>
+              </div>
+              <p className="text-xs text-slate-500">
+                The invoice settles for the full allocated amount; the withheld portion is recorded
+                as a tax-credit receivable against the certificate.
+              </p>
+            </div>
+          )}
+        </div>
+
         <div>
           <label htmlFor="payment-notes" className="block text-sm font-medium text-slate-700 mb-1">
             Notes
@@ -640,24 +717,33 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         </div>
 
         <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
-          {(methodMissing || accountMissing) && (
+          {(methodMissing || accountMissing) ? (
             <span className="mr-auto flex items-center gap-1.5 text-xs font-medium text-danger">
               <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
               Select {methodMissing && accountMissing ? 'method & account' : methodMissing ? 'a payment method' : 'a deposit account'}
             </span>
-          )}
+          ) : certMissing ? (
+            // Surfaced here too so the disabled reason is visible even when the
+            // Withholding section (which holds the inline error) is collapsed.
+            <span className="mr-auto flex items-center gap-1.5 text-xs font-medium text-danger">
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
+              Add the withholding certificate reference
+            </span>
+          ) : null}
           <Button type="button" variant="secondary" onClick={handleClose}>
             Cancel
           </Button>
           <Button
             type="submit"
-            disabled={isSubmitting || totalAmount <= 0 || !selectedCaseId || allocations.length === 0 || allocationMismatch || methodMissing || accountMissing}
+            disabled={isSubmitting || totalAmount <= 0 || !selectedCaseId || allocations.length === 0 || allocationMismatch || methodMissing || accountMissing || certMissing}
             title={
               allocationMismatch
                 ? 'The allocation must equal the payment amount before recording'
                 : (methodMissing || accountMissing)
                   ? 'Select a payment method and deposit account before recording'
-                  : undefined
+                  : certMissing
+                    ? 'A withholding certificate reference is required when an amount is withheld'
+                    : undefined
             }
             className="flex items-center gap-2"
             variant="primary"

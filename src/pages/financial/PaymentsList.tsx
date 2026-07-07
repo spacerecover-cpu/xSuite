@@ -168,11 +168,13 @@ export const PaymentsList: React.FC = () => {
     mutationFn: async ({
       paymentData,
       allocations,
+      withholding,
     }: {
       paymentData: Omit<import('../../lib/paymentsService').Payment, 'id' | 'payment_number' | 'created_at' | 'updated_at'>;
       allocations: Array<{ invoice_id: string; amount: number }>;
+      withholding?: { amount: number; certificateRef: string } | null;
     }) => {
-      return createPayment(paymentData, allocations);
+      return createPayment(paymentData, allocations, withholding);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
@@ -587,8 +589,8 @@ export const PaymentsList: React.FC = () => {
       <RecordPaymentModal
         isOpen={showRecordPaymentModal}
         onClose={() => setShowRecordPaymentModal(false)}
-        onSave={async (paymentData, allocations) => {
-          await createPaymentMutation.mutateAsync({ paymentData, allocations });
+        onSave={async (paymentData, allocations, withholding) => {
+          await createPaymentMutation.mutateAsync({ paymentData, allocations, withholding: withholding ?? null });
         }}
       />
 

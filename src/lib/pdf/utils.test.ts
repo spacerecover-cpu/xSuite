@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCapacity, formatEngineMoney, formatPartyAddressLines } from './utils';
+import { formatCapacity, formatCurrency, formatEngineMoney, formatPartyAddressLines } from './utils';
 
 describe('formatEngineMoney', () => {
   // Regression: adapters used a bare `toFixed()` that dropped the thousands
@@ -84,5 +84,28 @@ describe('formatPartyAddressLines', () => {
   });
   it('returns [] when nothing is present', () => {
     expect(formatPartyAddressLines({}, false)).toEqual([]);
+  });
+});
+
+describe("formatEngineMoney digitGrouping '3;2' (WP-L1)", () => {
+  it('groups lakh/crore with the walkthrough total', () => {
+    expect(formatEngineMoney(106200, { symbol: '₹', decimalPlaces: 2, position: 'before', digitGrouping: '3;2' }))
+      .toBe('₹ 1,06,200.00');
+    expect(formatEngineMoney(12345678.9, { symbol: '₹', decimalPlaces: 2, position: 'before', digitGrouping: '3;2' }))
+      .toBe('₹ 1,23,45,678.90');
+    expect(formatEngineMoney(250, { symbol: '₹', decimalPlaces: 2, position: 'before', digitGrouping: '3;2' }))
+      .toBe('₹ 250.00');
+  });
+  it("absent / '3' stays byte-identical to today", () => {
+    expect(formatEngineMoney(106200, { symbol: 'AED', decimalPlaces: 2, position: 'after' })).toBe('106,200.00 AED');
+    expect(formatEngineMoney(106200, { symbol: 'AED', decimalPlaces: 2, position: 'after', digitGrouping: '3' }))
+      .toBe('106,200.00 AED');
+  });
+  it('formatCurrency (CurrencyConfig mirror) honors digitGrouping', () => {
+    expect(formatCurrency(106200, {
+      code: 'INR', symbol: '₹', name: 'Indian Rupee', decimalPlaces: 2,
+      decimalSeparator: '.', thousandsSeparator: ',', position: 'before',
+      displayMode: 'symbol', negativeFormat: 'minus', digitGrouping: '3;2',
+    })).toBe('₹1,06,200.00');
   });
 });

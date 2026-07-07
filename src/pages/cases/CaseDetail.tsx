@@ -999,10 +999,11 @@ export const CaseDetail: React.FC = () => {
               }}
               preselectedCaseId={id ?? undefined}
               preselectedInvoiceId={(modals.selectedInvoiceForPayment as { id?: string } | null)?.id ?? undefined}
-              onSave={async (paymentData, allocations) => {
+              onSave={async (paymentData, allocations, withholding) => {
                 await createPaymentMutation.mutateAsync({
                   paymentData: paymentData as Omit<PaymentShape, 'id' | 'payment_number' | 'created_at' | 'updated_at'>,
                   allocations,
+                  withholding: withholding ?? null,
                 });
                 invalidateCaseFinanceQueries();
               }}

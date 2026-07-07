@@ -1,5 +1,9 @@
 import { supabase } from './supabaseClient';
 import { gccReturnComposer, taxPeriodsBetween } from './regimes/gcc_return';
+import { roundMoney } from './financialMath';
+import { composeGstr1HsnSummary, type HsnLineAggregate } from './regimes/gstr/hsnSummary';
+import { composeGstr3bTable32, type InterStateB2CAggregate } from './regimes/gstr/table32';
+import type { ReturnBoxLine } from './regimes/types';
 
 export interface VATRecord {
   id?: string;
@@ -308,6 +312,161 @@ export const getQuarterlyVATSummary = async (year: number, periodAnchor: string 
   return summaries;
 };
 
+/**
+ * GSTR-1 Table 12 source (AD-4): line-level HSN/SAC aggregates for the invoices whose
+ * ledger rows fall in the given tax periods. tax_period is THE period dimension —
+ * never created_at.
+ */
+export const fetchHsnLineAggregates = async (taxPeriods: string[]): Promise<HsnLineAggregate[]> => {
+  const { data: ledger, error: ledgerError } = await supabase
+    .from('vat_records')
+    .select('source_document_id')
+    .eq('record_type', 'sale')
+    .eq('source_document_type', 'invoice')
+    .in('tax_period', taxPeriods)
+    .is('deleted_at', null);
+  if (ledgerError) throw ledgerError;
+  const invoiceIds = [...new Set((ledger ?? []).map((r) => r.source_document_id).filter(Boolean))] as string[];
+  if (invoiceIds.length === 0) return [];
+
+  const { data: lines, error: linesError } = await supabase
+    .from('invoice_line_items')
+    .select('id, invoice_id, item_code, unit_code, quantity')
+    .in('invoice_id', invoiceIds)
+    .is('deleted_at', null);        // updateInvoice soft-deletes + re-inserts lines on every
+                                    // edit — without this, stale rows double-count Table 12 qty
+  if (linesError) throw linesError;
+
+  const { data: taxLines, error: taxError } = await supabase
+    .from('document_tax_lines')
+    .select('line_item_id, component_code, taxable_base, tax_amount_base, exchange_rate')
+    .eq('document_type', 'invoice')
+    .in('document_id', invoiceIds)
+    .not('line_item_id', 'is', null)
+    .is('deleted_at', null);
+  if (taxError) throw taxError;
+
+  const byLine = new Map<string, { taxable: number; counted: boolean; components: Record<string, number> }>();
+  for (const t of taxLines ?? []) {
+    const key = t.line_item_id as string;
+    const agg = byLine.get(key) ?? { taxable: 0, counted: false, components: {} };
+    if (!agg.counted) {
+      // taxable_base is document-currency; convert once at the row's frozen rate.
+      // Counted ONCE per line — the CGST/SGST pair shares the line's base.
+      agg.taxable = roundMoney(Number(t.taxable_base ?? 0) * Number(t.exchange_rate ?? 1), 2);
+      agg.counted = true;
+    }
+    agg.components[t.component_code] = roundMoney(
+      (agg.components[t.component_code] ?? 0) + Number(t.tax_amount_base ?? 0), 2,
+    );
+    byLine.set(key, agg);
+  }
+
+  return (lines ?? [])
+    .filter((l) => l.item_code)
+    .map((l) => {
+      const tax = byLine.get(l.id) ?? { taxable: 0, counted: false, components: {} };
+      return {
+        itemCode: l.item_code as string,
+        unitCode: (l.unit_code as string | null) ?? null,
+        quantity: Number(l.quantity ?? 0),
+        taxableBase: tax.taxable,
+        componentTaxBase: tax.components,
+      };
+    });
+};
+
+/**
+ * GSTR-3B Table 3.2 source: inter-state (IGST) supplies to unregistered buyers
+ * (invoices.buyer_tax_number IS NULL), grouped by place-of-supply state.
+ *
+ * Filtered to component_code='IGST' + source_document_type='invoice', so this is GROSS
+ * of credit notes — matching the gross 3.1(a) box (the live head-less CN contra carries
+ * no component/source, so it is excluded here AND from 3.1(a); the two reconcile). Exact
+ * credit-note / advance netting of both is WP-L4's domain — do NOT assume CN contras net
+ * here (they don't).
+ *
+ * An inter-state B2C invoice with NO place-of-supply is bucketed under an explicit
+ * 'unknown' state rather than silently dropped, so Table 3.2 still reconciles with the
+ * IGST already counted in gross 3.1(a) and the missing PoS is visible (e.g. the
+ * convert_proforma PoS-drop, or a walk-in buyer with no address).
+ */
+const UNKNOWN_POS = { stateCode: '00', stateName: 'Unknown / unspecified place of supply' } as const;
+
+export const fetchInterStateB2CAggregates = async (taxPeriods: string[]): Promise<InterStateB2CAggregate[]> => {
+  const { data: ledger, error: ledgerError } = await supabase
+    .from('vat_records')
+    .select('source_document_id, taxable_amount_base, vat_amount_base')
+    .eq('record_type', 'sale')
+    .eq('component_code', 'IGST')
+    .eq('source_document_type', 'invoice')
+    .in('tax_period', taxPeriods)
+    .is('deleted_at', null);
+  if (ledgerError) throw ledgerError;
+  const perInvoice = new Map<string, { taxable: number; igst: number }>();
+  for (const r of ledger ?? []) {
+    if (!r.source_document_id) continue;
+    const agg = perInvoice.get(r.source_document_id) ?? { taxable: 0, igst: 0 };
+    agg.taxable += Number(r.taxable_amount_base ?? 0);
+    agg.igst += Number(r.vat_amount_base ?? 0);
+    perInvoice.set(r.source_document_id, agg);
+  }
+  if (perInvoice.size === 0) return [];
+
+  const { data: invoices, error: invError } = await supabase
+    .from('invoices')
+    .select('id, buyer_tax_number, place_of_supply_subdivision_id')
+    .in('id', [...perInvoice.keys()])
+    .is('buyer_tax_number', null)                            // B2C = unregistered buyer
+    .is('deleted_at', null);
+  if (invError) throw invError;
+  if ((invoices ?? []).length === 0) return [];
+
+  const subIds = [...new Set((invoices ?? []).map((i) => i.place_of_supply_subdivision_id).filter(Boolean))] as string[];
+  const subById = new Map<string, { id: string; name: string; code: string; tax_authority_code: string | null }>();
+  if (subIds.length > 0) {
+    const { data: subs, error: subError } = await supabase
+      .from('geo_subdivisions')
+      .select('id, name, code, tax_authority_code')
+      .in('id', subIds);
+    if (subError) throw subError;
+    for (const s of subs ?? []) subById.set(s.id, s);
+  }
+
+  const byState = new Map<string, InterStateB2CAggregate>();
+  for (const inv of invoices ?? []) {
+    const amounts = perInvoice.get(inv.id);
+    if (!amounts) continue;
+    const sub = inv.place_of_supply_subdivision_id ? subById.get(inv.place_of_supply_subdivision_id) : undefined;
+    const stateCode = sub ? (sub.tax_authority_code ?? sub.code) : UNKNOWN_POS.stateCode;
+    const stateName = sub ? sub.name : UNKNOWN_POS.stateName;
+    const agg = byState.get(stateCode) ?? { stateCode, stateName, taxableBase: 0, igstBase: 0 };
+    agg.taxableBase = roundMoney(agg.taxableBase + amounts.taxable, 2);
+    agg.igstBase = roundMoney(agg.igstBase + amounts.igst, 2);
+    byState.set(stateCode, agg);
+  }
+  return [...byState.values()];
+};
+
+/**
+ * Everything the GSTR return needs beyond the ledger-only composer: Table 3.2
+ * (part of the 3B) first, then the GSTR-1 Table 12 HSN annexure. Sequences
+ * continue from startSequence so persisted tax_return_lines never collide.
+ *
+ * Known scaling limit: the underlying fetches pass the period's invoice-id set into
+ * PostgREST `.in()` filters unchunked. A period with many hundreds of invoices could
+ * overrun the request URL length (→ 414, a LOUD hard-fail, never a wrong amount). Fine
+ * for the target lab volumes; batch the `.in()` lists if a high-volume tenant appears.
+ */
+export const composeGstrSupplementaryBoxes = async (
+  taxPeriods: string[],
+  startSequence: number,
+): Promise<ReturnBoxLine[]> => {
+  const t32 = composeGstr3bTable32(await fetchInterStateB2CAggregates(taxPeriods), startSequence);
+  const hsn = composeGstr1HsnSummary(await fetchHsnLineAggregates(taxPeriods), startSequence + t32.length);
+  return [...t32, ...hsn];
+};
+
 export const vatService = {
   fetchVATRecords,
   fetchVATReturns,
@@ -324,4 +483,7 @@ export const vatService = {
   getVATStats,
   getVATRecordsByReturn,
   getQuarterlyVATSummary,
+  fetchHsnLineAggregates,
+  fetchInterStateB2CAggregates,
+  composeGstrSupplementaryBoxes,
 };

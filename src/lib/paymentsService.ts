@@ -22,6 +22,8 @@ export interface Payment {
   reference?: string;
   status: 'pending' | 'completed' | 'failed' | 'refunded';
   notes?: string;
+  withheld_amount?: number;
+  withholding_certificate_ref?: string | null;
   created_by?: string;
   created_at?: string;
   updated_at?: string;
@@ -175,7 +177,8 @@ export const fetchPaymentById = async (id: string) => {
 
 export const createPayment = async (
   payment: Omit<Payment, 'id' | 'payment_number' | 'created_at' | 'updated_at'>,
-  allocations?: Array<{ invoice_id: string; amount: number }>
+  allocations?: Array<{ invoice_id: string; amount: number }>,
+  withholding?: { amount: number; certificateRef: string } | null
 ) => {
   if (!allocations || allocations.length === 0) {
     // Money conservation: every unit of cash received must be allocated to an invoice.
@@ -193,6 +196,13 @@ export const createPayment = async (
   }
   if (!payment.bank_account_id) {
     throw new Error('A deposit account is required to record a payment.');
+  }
+
+  // TDS/WHT: a withheld amount is a certificate-backed tax credit — never
+  // accept it without the certificate reference (record_payment enforces
+  // this server-side too; failing here gives an actionable form error).
+  if (withholding && withholding.amount > 0 && !withholding.certificateRef.trim()) {
+    throw new Error('A withholding certificate reference is required when an amount is withheld.');
   }
 
   // Resolve the payment-date rate client-side (honouring any manual override). The RPC
@@ -217,6 +227,8 @@ export const createPayment = async (
       reference: payment.reference ?? null,
       status: payment.status ?? 'completed',
       notes: payment.notes ?? null,
+      withheld_amount: withholding?.amount ?? 0,
+      certificate_ref: withholding?.certificateRef?.trim() || null,
     },
     p_allocations: allocations.map((a) => ({ invoice_id: a.invoice_id, amount: a.amount })),
   });

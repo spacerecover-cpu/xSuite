@@ -57,7 +57,14 @@ export const VATReturnDetailModal: React.FC<VATReturnDetailModalProps> = ({ vatR
         <div className="divide-y divide-border rounded-lg border border-border">
           {lines.map((l) => (
             <div key={l.id} className="flex items-center justify-between px-4 py-2">
-              <span className="text-sm">{l.box_label}</span>
+              <div>
+                <span className="text-sm">{l.box_label}</span>
+                {l.quantity != null && (
+                  <div className="text-xs text-slate-500 tabular-nums">
+                    {`Qty ${Number(l.quantity)}${l.unit_code ? ` ${l.unit_code}` : ''}`}
+                  </div>
+                )}
+              </div>
               <span className="text-sm font-semibold tabular-nums">{formatCurrency(Number(l.amount_base))}</span>
             </div>
           ))}
@@ -72,7 +79,7 @@ export const VATReturnDetailModal: React.FC<VATReturnDetailModalProps> = ({ vatR
                   <th className="px-3 py-2">Period</th>
                   <th className="px-3 py-2">Type</th>
                   <th className="px-3 py-2">Source</th>
-                  <th className="px-3 py-2 text-right">VAT (base)</th>
+                  <th className="px-3 py-2 text-right">Tax (base)</th>
                 </tr>
               </thead>
               <tbody>

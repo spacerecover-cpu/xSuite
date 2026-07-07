@@ -42,6 +42,10 @@ export interface ResolvedCountryFacts {
   /** Joined geo_countries.address_format lines (e.g. '%N %O %A %C %Z'), or null.
    *  Optional so existing fixtures/tests built without it keep compiling. */
   addressFormat?: string | null;
+  /** format.amount_words_scale binding from geo_countries.country_config (S1b
+   *  seeds 'indian' for IN). Optional so pre-existing fixtures keep compiling;
+   *  absent = 'western'. */
+  amountWordsScale?: 'western' | 'indian';
 }
 
 /** Profile inputs for financial documents; null docType = non-financial doc
@@ -125,6 +129,8 @@ export function countryTemplateOverride(
   if (facts.decimalPlaces != null) locale.decimalPlaces = facts.decimalPlaces;
   if (facts.decimalSeparator) locale.decimalSeparator = facts.decimalSeparator;
   if (facts.thousandsSeparator != null) locale.thousandsSeparator = facts.thousandsSeparator;
+  if (facts.digitGrouping === '3;2') locale.groupingStyle = 'indian';
+  if (facts.amountWordsScale === 'indian') locale.amountWordsScale = 'indian';
 
   // Address-line ordering (Task 22): geo_countries.address_format is a jsonb
   // postal-address template (e.g. '%N %O %A %C %Z'). postalFirst is set true
