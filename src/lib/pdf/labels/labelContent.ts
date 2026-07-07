@@ -47,8 +47,13 @@ export function caseLabelContents(data: ReceiptData, size: LabelSizePreset): Map
           .filter(present)
           .join(' · ')
       : '';
+    // A strip only fits two meta lines, so lead with the strongest DEVICE
+    // descriptor available (serial → brand/model/capacity → device type), then
+    // the customer. Keying only off the serial meant a device with no serial
+    // captured printed zero device-identifying data and wasted the second line.
+    const deviceLine = serial ?? (present(deviceSummary) ? deviceSummary : device?.device_type ?? null);
     const lines = strip
-      ? [serial, customer].filter(present)
+      ? [deviceLine, customer].filter(present)
       : [serial, present(deviceSummary) ? deviceSummary : null, device?.device_type ?? null, received].filter(present);
 
     return {

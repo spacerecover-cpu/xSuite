@@ -47,22 +47,62 @@ async function resolveSize(entity: LabelEntity, sizeId?: string): Promise<LabelS
   return getLabelSize(prefs.sizes[entity]);
 }
 
+/**
+ * The font a label should render its VALUES in. Labels print customer / item
+ * names, which may be non-Latin (Arabic/CJK/Thai), so — like the document
+ * generators — resolve the tenant's configured secondary language and load its
+ * family into the VFS; without this a Roboto-only label prints Arabic names as
+ * missing-glyph boxes. `isRTL` drives per-value word-order correction.
+ */
+async function resolveLabelFont(): Promise<{ fontFamily: string; isRTL: boolean }> {
+  const [{ fetchCompanySettings }, { initializePDFFonts, getFontFamily }, { isRTLLanguage }] =
+    await Promise.all([import('../dataFetcher'), import('../fonts'), import('../../documentTranslations')]);
+  let languageCode: LanguageCode | null = null;
+  try {
+    const cs = await fetchCompanySettings();
+    languageCode = (cs.localization?.document_language_settings?.secondary_language ?? null) as LanguageCode | null;
+  } catch {
+    /* no tenant settings reachable — fall back to the Latin default */
+  }
+  const loaded = await initializePDFFonts(languageCode);
+  if (!loaded && languageCode) {
+    languageCode = null;
+    await initializePDFFonts(null);
+  }
+  return { fontFamily: getFontFamily(languageCode), isRTL: isRTLLanguage(languageCode) };
+}
+
 async function resolveImages(
   mapped: MappedLabel[],
   size: LabelSizePreset,
+  isRTL = false,
 ): Promise<CompactLabelContent[]> {
-  const [{ generateQrPngDataUrl }, { generateCode128DataUrl }] = await Promise.all([
+  const [{ generateQrPngDataUrl }, { generateCode128DataUrl }, { reverseArabicText }] = await Promise.all([
     import('../qrImage'),
     import('../barcodeImage'),
+    import('../fonts'),
   ]);
   const barcodeCapable = supportsBarcode(size);
+  // pdfmake has no bidi pass, so a multi-word RTL value (Arabic customer / item
+  // names) renders with reversed word order. Correct it here; reverseArabicText
+  // no-ops on Latin/CJK, so it is safe to apply to every free-text value. The
+  // identifier and device index stay LTR codes and are left untouched.
+  const fix = (s: string): string => (isRTL ? reverseArabicText(s) : s);
   return Promise.all(
     mapped.map(async (m) => {
       const [qrDataUrl, barcodeDataUrl] = await Promise.all([
         generateQrPngDataUrl(m.qrPayload),
         barcodeCapable && m.barcodeValue ? generateCode128DataUrl(m.barcodeValue) : Promise.resolve(null),
       ]);
-      return { ...m.content, qrDataUrl, barcodeDataUrl };
+      const c = m.content;
+      return {
+        ...c,
+        title: c.title ? fix(c.title) : c.title,
+        lines: c.lines?.map(fix),
+        footer: c.footer ? fix(c.footer) : c.footer,
+        qrDataUrl,
+        barcodeDataUrl,
+      };
     }),
   );
 }
@@ -112,6 +152,7 @@ export async function printCaseLabels(
 
     // Same secondary-language font fallback as generateCaseLabel: labels render
     // values only (customer names may be Arabic), so we need the right family.
+    const { isRTLLanguage } = await import('../../documentTranslations');
     const languageSettings = data.companySettings.localization?.document_language_settings;
     let languageCode = (languageSettings?.secondary_language ?? null) as LanguageCode | null;
     const fontsLoaded = await initializePDFFonts(languageCode);
@@ -122,7 +163,7 @@ export async function printCaseLabels(
     const ctx = createTranslationContext('english_only', languageCode);
 
     const mapped = caseLabelContents(data, size);
-    const labels = withCopies(await resolveImages(mapped, size), opts.copies);
+    const labels = withCopies(await resolveImages(mapped, size, isRTLLanguage(languageCode)), opts.copies);
     const caseNo = data.caseData.case_number ?? data.caseData.case_no;
     await buildAndEmit(labels, size, ctx.fontFamily, opts.output ?? 'print', `Labels_${caseNo}.pdf`);
     return { success: true };
@@ -145,11 +186,8 @@ export async function printStockLabelBatch(
 ): Promise<LabelPrintResult> {
   try {
     if (entries.length === 0) return { success: false, error: 'No items to label' };
-    const [{ initializePDFFonts }, { stockLabelContent }] = await Promise.all([
-      import('../fonts'),
-      import('./labelContent'),
-    ]);
-    await initializePDFFonts();
+    const { stockLabelContent } = await import('./labelContent');
+    const { fontFamily, isRTL } = await resolveLabelFont();
     const size = await resolveSize('stock', opts.sizeId);
 
     const mapped = entries.map(({ item, priceText }) =>
@@ -159,12 +197,12 @@ export async function printStockLabelBatch(
         companyName: opts.companyName,
       }),
     );
-    const labels = withCopies(await resolveImages(mapped, size), opts.copies);
+    const labels = withCopies(await resolveImages(mapped, size, isRTL), opts.copies);
     const filename =
       entries.length === 1
         ? `stock-label-${entries[0].item.sku ?? entries[0].item.name.replace(/\s+/g, '-')}.pdf`
         : 'stock-labels.pdf';
-    await buildAndEmit(labels, size, 'Roboto', opts.output ?? 'print', filename);
+    await buildAndEmit(labels, size, fontFamily, opts.output ?? 'print', filename);
     return { success: true };
   } catch (error) {
     console.error('Error generating stock labels:', error);
@@ -178,19 +216,16 @@ export async function printInventoryLabels(
 ): Promise<LabelPrintResult> {
   try {
     if (items.length === 0) return { success: false, error: 'No items to label' };
-    const [{ initializePDFFonts }, { inventoryLabelContent }] = await Promise.all([
-      import('../fonts'),
-      import('./labelContent'),
-    ]);
-    await initializePDFFonts();
+    const { inventoryLabelContent } = await import('./labelContent');
+    const { fontFamily, isRTL } = await resolveLabelFont();
     const size = await resolveSize('inventory', opts.sizeId);
 
     const mapped = items.map(inventoryLabelContent);
-    const labels = withCopies(await resolveImages(mapped, size), opts.copies);
+    const labels = withCopies(await resolveImages(mapped, size, isRTL), opts.copies);
     const first = items[0];
     const filename =
       items.length === 1 ? `inv-label-${first.item_number ?? first.id}.pdf` : 'inventory-labels.pdf';
-    await buildAndEmit(labels, size, 'Roboto', opts.output ?? 'print', filename);
+    await buildAndEmit(labels, size, fontFamily, opts.output ?? 'print', filename);
     return { success: true };
   } catch (error) {
     console.error('Error generating inventory labels:', error);

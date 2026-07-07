@@ -58,9 +58,11 @@ export function fitFontSize(text: string, maxWidthPt: number, basePt: number, mi
 }
 
 /** Truncate with an ellipsis so a line never wraps (wraps overflow tiny pages).
- *  0.62em average glyph width — label meta is caps/digit-heavy (serials, SKUs). */
-function truncate(text: string, maxWidthPt: number, fontSize: number): string {
-  const maxChars = Math.floor(maxWidthPt / (fontSize * 0.62));
+ *  Default 0.62em average glyph width — label meta is caps/digit-heavy (serials,
+ *  SKUs). The identifier passes `em = 0.6` to match {@link fitFontSize}, so a
+ *  value the size-fitter already accepted is never spuriously truncated. */
+function truncate(text: string, maxWidthPt: number, fontSize: number, em = 0.62): string {
+  const maxChars = Math.floor(maxWidthPt / (fontSize * em));
   if (text.length <= maxChars) return text;
   return `${text.slice(0, Math.max(1, maxChars - 1))}…`;
 }
@@ -84,9 +86,18 @@ function idRow(
   const indexText = label.index ? ` ${label.index}` : '';
   const indexSize = Math.max(minPt, basePt * 0.5);
   const size = sizeOverride ?? idRowSize(label, maxWidthPt, basePt, minPt);
-  const spans: Content[] = [{ text: label.id, bold: true, fontSize: size, color: INK }];
+  // The identifier is the ONLY text that must never wrap: every builder budgets
+  // it as exactly one line (the QR-height reservation, the square QR sizing, the
+  // card `consumed` count). fitFontSize floors at minPt, so a value longer than
+  // the column at minPt — e.g. a stock item with no SKU whose id falls back to a
+  // 45-char free-text name — would otherwise wrap to 2-3 lines and spill onto a
+  // second physical label (pushing the QR off). Truncate to the width budget at
+  // the chosen size (index chip reserved first) and hard-set noWrap.
+  const indexWidth = indexText.length * indexSize * 0.6;
+  const idText = truncate(label.id, maxWidthPt - indexWidth, size, 0.6);
+  const spans: Content[] = [{ text: idText, bold: true, fontSize: size, color: INK }];
   if (indexText) spans.push({ text: indexText, fontSize: indexSize, color: INK });
-  return { text: spans, lineHeight: LINE_HEIGHT };
+  return { text: spans, noWrap: true, lineHeight: LINE_HEIGHT };
 }
 
 function metaLine(text: string, maxWidthPt: number, fontSize: number, bold = false): ContentText {
@@ -190,20 +201,38 @@ function buildStrip(label: CompactLabelContent, contentW: number, contentH: numb
 }
 
 function buildSquare(label: CompactLabelContent, contentW: number, contentH: number): Content {
-  const meta = label.title ?? label.lines?.[0];
+  // Show the discriminating meta, not just the title: on a case label `title`
+  // is the customer (always present) while `lines[0]` is the device serial — so
+  // keying only off `title` silently dropped the serial from every square case
+  // label. Render the title AND the first meta line (typically the serial),
+  // each only while the height budget allows, so the device data survives.
   const idSize = fitFontSize(label.id, contentW, 9, 5);
+  const metaSize = 5;
+  const metaCandidates = [label.title, label.lines?.[0]].filter(
+    (m): m is string => !!m && m.trim().length > 0,
+  );
   const stack: Content[] = [];
   if (label.qrDataUrl) {
     const qrSide = Math.min(
       contentW,
-      contentH - lineBoxPt(idSize) - (meta ? lineBoxPt(5) : 0) - 4,
+      contentH - lineBoxPt(idSize) - metaCandidates.length * lineBoxPt(metaSize) - 4,
     );
     if (qrSide >= MIN_QR_SIDE_PT) {
       stack.push({ ...qrNode(label.qrDataUrl, qrSide, true), margin: [0, 0, 0, 2] });
     }
   }
   stack.push({ ...idRow(label, contentW, 9, 5), alignment: 'center' });
-  if (meta) stack.push({ ...metaLine(meta, contentW, 5), alignment: 'center' });
+  // Budget the remaining height for meta lines so a second line never overflows.
+  const usedH = stack.reduce((h, n) => {
+    const img = n as { height?: number };
+    return h + (typeof img.height === 'number' ? img.height + 2 : lineBoxPt(idSize));
+  }, 0);
+  let remaining = contentH - usedH;
+  for (const meta of metaCandidates) {
+    if (remaining < lineBoxPt(metaSize)) break;
+    stack.push({ ...metaLine(meta, contentW, metaSize), alignment: 'center' });
+    remaining -= lineBoxPt(metaSize);
+  }
   return { stack };
 }
 

@@ -57,9 +57,20 @@ describe('caseLabelContents', () => {
     expect(labels[0].content.lines?.[1]).toBe('Ahmed Al Mansoori');
   });
 
-  it('on strip stock a device without serial still shows the customer', () => {
+  it('on strip stock a serial-less device leads with its brand/model, then the customer', () => {
+    // d-2 has no serial: the device descriptor (brand/model) must take the first
+    // meta line so the label still identifies the hardware — the customer follows.
     const labels = caseLabelContents(receiptData(), STRIP);
-    expect(labels[1].content.lines?.[0]).toBe('Ahmed Al Mansoori');
+    expect(labels[1].content.lines?.[0]).toBe('Samsung 870 EVO');
+    expect(labels[1].content.lines?.[1]).toBe('Ahmed Al Mansoori');
+  });
+
+  it('on strip stock a serial-less device with only a type falls back to the device type', () => {
+    const data = receiptData({
+      devices: [{ id: 'd-x', device_type: 'HDD' }],
+    } as Partial<ReceiptData>);
+    const labels = caseLabelContents(data, STRIP);
+    expect(labels[0].content.lines?.[0]).toBe('HDD');
   });
 
   it('on card stock carries serial, device summary and received date with customer as title', () => {

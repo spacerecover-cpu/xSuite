@@ -36,6 +36,7 @@ import type { Json } from '../../types/database.types';
 import { toDateInputValue } from '../../lib/format';
 import { inventoryKeys } from '../../lib/queryKeys';
 import { shouldAutoPrintLabel } from '../../lib/labelPrefsService';
+import type { InventoryItemWithDetails } from '../../lib/inventory/inventoryLabelTypes';
 import { logger } from '../../lib/logger';
 import type { DeviceFamily } from '../../lib/devices/deviceFamily';
 import type { CatalogOption } from '../../lib/devices/deviceCatalogQueries';
@@ -440,10 +441,17 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
 
       // Direct Print Label: fire-and-forget so a printer problem never blocks intake.
       if (createdItem) {
-        const item = createdItem;
+        const newItemId = createdItem.id;
+        const bareItem = createdItem;
         void shouldAutoPrintLabel('inventory').then(async (enabled) => {
           if (!enabled) return;
           const { printInventoryLabels } = await import('../../lib/pdf/labels/labelPrintService');
+          // createInventoryItem returns the bare insert row (no joined brand /
+          // device type / capacity / location), so re-fetch the enriched item
+          // — otherwise the auto-printed label silently drops the spec + location
+          // lines that a list-printed label shows. Fall back to the bare row.
+          const enriched = await getInventoryItemById(newItemId).catch(() => null);
+          const item = (enriched ?? bareItem) as unknown as InventoryItemWithDetails;
           await printInventoryLabels([item], { output: 'print' });
         });
       }

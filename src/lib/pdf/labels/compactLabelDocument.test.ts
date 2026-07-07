@@ -156,6 +156,35 @@ describe('buildCompactLabelDocument', () => {
     expect(idNode!.fontSize).toBeGreaterThanOrEqual(9);
   });
 
+  it('truncates an over-long identifier to one line so it never wraps or evicts the QR', () => {
+    // A stock item with no SKU falls back to its free-text name as the id; at
+    // 45 chars it used to wrap to 2-3 lines, overflowing the page and pushing
+    // the QR off. It must collapse to one ellipsised line with the QR intact.
+    const longId = 'Seagate Barracuda 2TB SATA 3.5in Internal HDD';
+    const doc = buildCompactLabelDocument(
+      [label({ id: longId, index: undefined, title: null, lines: ['Donor Drives'] })],
+      getLabelSize('nb_15x26'),
+    );
+    expect(collectImages(doc)).toContain(QR_PNG);
+    const idSpans: string[] = [];
+    walk(doc.content, (n) => {
+      if (typeof n.text === 'string' && n.text.startsWith('Seagate')) idSpans.push(n.text);
+    });
+    expect(idSpans.length).toBeGreaterThan(0);
+    expect(idSpans.every((t) => t.length < longId.length)).toBe(true);
+    expect(idSpans.some((t) => t.endsWith('…'))).toBe(true);
+  });
+
+  it('square layout keeps the device serial, not just the customer title', () => {
+    // title (customer) is always present, so keying only off it dropped the
+    // serial from square case labels — the serial must still print.
+    const doc = buildCompactLabelDocument(
+      [label({ title: 'Ahmed Al Mansoori', lines: ['SN WD-WX91A123', 'WD Blue 2TB'] })],
+      getLabelSize('sq_25'),
+    );
+    expect(collectTexts(doc).map((t) => t.text)).toContain('SN WD-WX91A123');
+  });
+
   it('square layout stacks QR above the identifier', () => {
     const doc = buildCompactLabelDocument([label()], getLabelSize('sq_25'));
     const page = (doc.content as Content[])[0] as { stack: Content[] };
