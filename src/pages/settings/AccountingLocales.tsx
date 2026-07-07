@@ -11,6 +11,7 @@ import {
   Info,
 } from 'lucide-react';
 import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
+import { EInvoiceReadinessCard } from '../../components/settings/EInvoiceReadinessCard';
 import { TenantCurrenciesSection } from './CurrencySettings';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
@@ -524,6 +525,8 @@ export const LocalizationCenter: React.FC = () => {
                 />
               </div>
             </SectionCard>
+
+            <EInvoiceReadinessCard />
           </>
         )}
       </div>
