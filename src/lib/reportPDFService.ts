@@ -15,6 +15,7 @@ import {
 import {
   resolveTemplateConfig,
   resolveSecondary,
+  reportTemplateKey,
   type DocumentTemplateConfig,
   type TemplateConfigOverride,
 } from './pdf/templateConfig';
@@ -43,11 +44,11 @@ class ReportPDFService {
   /**
    * Build the report pdfmake doc-definition via the NEW config-driven engine.
    *
-   * Resolves the tenant's deployed report template (if any) as the doc-type
-   * cascade layer over the built-in 'report' default, normalizes the report
-   * data through the adapter, and assembles via `renderTemplate`. With no
-   * tenant template seeded it falls back to the built-in config. Mirrors
-   * `buildInvoiceDocumentViaEngine` in `pdf/pdfService.ts`.
+   * Resolves the tenant's deployed template for this report's TYPE (the
+   * `report:<subtype>` storage key), falling back to the legacy shared `report`
+   * template, as the doc-type cascade layer over the built-in per-subtype
+   * default. With neither deployed it falls back to the built-in config.
+   * Mirrors `buildInvoiceDocumentViaEngine` in `pdf/pdfService.ts`.
    */
   async buildReportDocViaEngine(
     data: ReportData,
@@ -57,7 +58,9 @@ class ReportPDFService {
   ): Promise<TDocumentDefinitions> {
     let docTypeOverride: TemplateConfigOverride | undefined;
     try {
-      const deployed = await getDeployedVersionByType('report');
+      const deployed =
+        (await getDeployedVersionByType(reportTemplateKey(data.report.report_type))) ??
+        (await getDeployedVersionByType('report'));
       if (deployed) {
         docTypeOverride = readConfig(deployed.config);
       }
