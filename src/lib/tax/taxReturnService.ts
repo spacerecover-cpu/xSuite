@@ -3,9 +3,12 @@
 // vat_records.tax_period — never created_at (the vatService.ts:279 drift class).
 import { supabase } from '../supabaseClient';
 import { resolveReturnComposer } from '../regimes/registry';
+import { registerAllRegimePlugins } from '../regimes/register';
 import { taxPeriodsBetween } from '../regimes/gcc_return';
+import { composeGstrSupplementaryBoxes } from '../vatService';
+import { roundMoney } from '../financialMath';
 import { tenantToday } from '../tenantToday';
-import type { ComposedReturn } from '../regimes/types';
+import type { ComposedReturn, ReturnBoxLine } from '../regimes/types';
 import type { Database, Json } from '../../types/database.types';
 
 export type VatReturnRow = Database['public']['Tables']['vat_returns']['Row'];
@@ -75,7 +78,18 @@ export async function getFilingConfig(tenantId: string): Promise<FilingConfig> {
   };
 }
 
+// Data-keyed supplementary sources (NOT country branching — the key comes from the
+// tenant's resolved pack config). gstr appends GSTR-3B Table 3.2 + GSTR-1 Table 12,
+// which need invoice-level dimensions the amount-only ledger cannot provide (AD-4).
+const SUPPLEMENTARY_BOX_SOURCES: Record<
+  string,
+  (taxPeriods: string[], startSequence: number) => Promise<ReturnBoxLine[]>
+> = {
+  gstr: composeGstrSupplementaryBoxes,
+};
+
 export async function composeReturnForDate(tenantId: string, forDate?: string): Promise<ComposedReturnPreview> {
+  registerAllRegimePlugins();
   const cfg = await getFilingConfig(tenantId);
   const composer = resolveReturnComposer(cfg.composerKey);
   const bounds = composer.periodBounds(
@@ -90,22 +104,38 @@ export async function composeReturnForDate(tenantId: string, forDate?: string): 
     .in('tax_period', bounds.taxPeriods)
     .is('deleted_at', null);
   if (error) throw error;
+  const ledgerRows = rows ?? [];
 
   const composed = composer.compose({
     tenantId,
     legalEntityId: cfg.legalEntityId,
     taxPeriods: bounds.taxPeriods,
-    ledgerRows: (rows ?? []) as unknown as import('../regimes/types').VatRecordRow[],
+    ledgerRows: ledgerRows as unknown as import('../regimes/types').VatRecordRow[],
     jurisdictionCurrency: cfg.jurisdictionCurrency,
     baseCurrency: cfg.baseCurrency,
   });
 
+  const supplementary = SUPPLEMENTARY_BOX_SOURCES[cfg.composerKey];
+  if (supplementary) {
+    const startSequence = composed.boxes.reduce((m, b) => Math.max(m, b.sequence), 0) + 1;
+    composed.boxes.push(...(await supplementary(bounds.taxPeriods, startSequence)));
+  }
+
+  // Composer-agnostic header totals, mirroring file_vat_return's authoritative
+  // re-derivation EXACTLY (SUM(vat_amount_base) by record_type over the same
+  // tax_period rows) — the RPC RAISEs on >0.0001 divergence, and the previous
+  // boxAmount('BOX_1_OUTPUT') lookup is a gcc-only vocabulary (0 for gstr).
+  const outputVat = roundMoney(
+    ledgerRows.filter((r) => r.record_type === 'sale').reduce((s, r) => s + Number(r.vat_amount_base ?? 0), 0), 4);
+  const inputVat = roundMoney(
+    ledgerRows.filter((r) => r.record_type === 'purchase').reduce((s, r) => s + Number(r.vat_amount_base ?? 0), 0), 4);
+
   return {
     ...bounds,
     composed,
-    outputVat: boxAmount(composed, 'BOX_1_OUTPUT'),
-    inputVat: boxAmount(composed, 'BOX_2_INPUT'),
-    netVat: boxAmount(composed, 'BOX_3_NET'),
+    outputVat,
+    inputVat,
+    netVat: roundMoney(outputVat - inputVat, 4),
     regimeKey: cfg.composerKey,
     filingFrequency: cfg.filingFrequency,
     periodAnchor: cfg.periodAnchor,

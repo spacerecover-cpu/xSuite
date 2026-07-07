@@ -57,11 +57,20 @@ export function numberToWordsEn(value: number): string {
  * has no fractional part (D13). `decimals` defaults to 2 so existing callers are
  * unchanged; pass the currency's decimal_places for currency-correct minor units.
  */
-export function amountInWordsEn(amount: number, currency = '', decimals = 2): string {
+export function amountInWordsEn(
+  amount: number,
+  currency = '',
+  decimals = 2,
+  scale: 'western' | 'indian' = 'western',
+): string {
   const whole = Math.floor(Math.abs(amount));
   const factor = 10 ** decimals;
   const minor = Math.round((Math.abs(amount) - whole) * factor);
-  const words = numberToWordsEn(whole);
+  // `?? ''` aligns the indian path with the western one (numberToWordsEn returns ''
+  // for non-finite) and the S4 sibling formatAmountWordsForScale's null-guard, so a
+  // non-finite amount degrades to no words rather than the literal "null" on a doc.
+  // No-op for every valid finite amount (numberToWordsEnIndian returns a string then).
+  const words = scale === 'indian' ? (numberToWordsEnIndian(whole) ?? '') : numberToWordsEn(whole);
   const minorPart = decimals > 0 && minor > 0
     ? ` and ${String(minor).padStart(decimals, '0')}/${factor}` : '';
   return `${currency ? `${currency} ` : ''}${words}${minorPart} only`;
@@ -124,15 +133,29 @@ export function amountInWordsAr(amount: number, currency = '', decimals = 2): st
 }
 
 /**
- * HOOK (defined by WP-S4, implemented in place by WP-L1 Task L1.3 — same module,
- * same `string | null` signature, no second export): spell a whole number in Indian
- * English (lakh/crore grouping). Returns null until L1 supplies the body, so a
- * render path OMITS the words line rather than printing western grouping on an
- * Indian statutory document. L1 flips this to a non-null grammatically-complete
- * speller and updates amountInWordsHook.test.ts accordingly.
+ * Indian numbering scale: crore (10^7), lakh (10^5), thousand, hundreds. Same word
+ * tables and joining style as numberToWordsEn (threeDigitsEn). Implements the WP-S4
+ * Task S4.5 hook in place (same module, same `string | null` signature, no second
+ * export): returns the spelled string for valid finite non-negative input and null
+ * only for the guard cases S4's stub documented (non-finite / negative), so the
+ * render path OMITS the words line rather than mis-spelling an Indian statutory doc.
  */
-export function numberToWordsEnIndian(_value: number): string | null {
-  return null;
+export function numberToWordsEnIndian(value: number): string | null {
+  if (!Number.isFinite(value) || value < 0) return null;
+  let n = Math.floor(value);
+  if (n === 0) return 'Zero';
+  const parts: string[] = [];
+  const crore = Math.floor(n / 10000000);
+  if (crore > 0) parts.push(`${numberToWordsEnIndian(crore)} Crore`);
+  n %= 10000000;
+  const lakh = Math.floor(n / 100000);
+  if (lakh > 0) parts.push(`${threeDigitsEn(lakh)} Lakh`);
+  n %= 100000;
+  const thousand = Math.floor(n / 1000);
+  if (thousand > 0) parts.push(`${threeDigitsEn(thousand)} Thousand`);
+  n %= 1000;
+  if (n > 0) parts.push(threeDigitsEn(n));
+  return parts.join(' ').trim();
 }
 
 /** Scale-keyed amount-in-words dispatch. 'western' → the existing speller;

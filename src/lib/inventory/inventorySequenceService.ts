@@ -6,6 +6,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../supabaseClient';
 import type { Database } from '../../types/database.types';
+import { renderNumberTemplate } from '../numbering/templates';
 
 type NumberSequenceRow = Database['public']['Tables']['number_sequences']['Row'];
 
@@ -85,14 +86,25 @@ export async function fetchMaxSuffixForPrefix(prefix: string): Promise<number> {
   return maxNumericSuffix((data ?? []).map((r) => r.item_number ?? ''), prefix);
 }
 
-/** Format a next-number preview from a sequence row or catalog defaults. */
-export function formatNextNumber(prefix: string, currentValue: number, padding: number): string {
+/** Format a next-number preview from a sequence row or catalog defaults.
+ *  Template-aware: a row carrying a v2 format_template previews via the same
+ *  {FY}/{SEQ:n} rendering the DB uses (short-form FY) instead of the legacy
+ *  template-blind `${prefix}-${padded}` shape. */
+export function formatNextNumber(
+  prefix: string, currentValue: number, padding: number,
+  formatTemplate?: string | null, fiscalYearAnchor?: string | null, today?: Date,
+): string {
   const next = currentValue + 1;
+  if (formatTemplate) return renderNumberTemplate(formatTemplate, next, fiscalYearAnchor ?? null, today);
   return `${prefix}-${next.toString().padStart(padding, '0')}`;
 }
 
 /** Format the current (last-allocated) number, or '—' if none allocated yet. */
-export function formatCurrentNumber(prefix: string, currentValue: number, padding: number): string {
+export function formatCurrentNumber(
+  prefix: string, currentValue: number, padding: number,
+  formatTemplate?: string | null, fiscalYearAnchor?: string | null, today?: Date,
+): string {
   if (currentValue === 0) return '—';
+  if (formatTemplate) return renderNumberTemplate(formatTemplate, currentValue, fiscalYearAnchor ?? null, today);
   return `${prefix}-${currentValue.toString().padStart(padding, '0')}`;
 }

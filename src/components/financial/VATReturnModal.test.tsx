@@ -10,6 +10,7 @@ const preview = {
     { boxCode: 'BOX_1_OUTPUT', boxLabel: 'Output VAT on sales', amountBase: 62.5, sequence: 1 },
     { boxCode: 'BOX_2_INPUT', boxLabel: 'Recoverable input VAT on purchases', amountBase: 12.25, sequence: 2 },
     { boxCode: 'BOX_3_NET', boxLabel: 'Net VAT payable / (refundable)', amountBase: 50.25, sequence: 3 },
+    { boxCode: 'hsn.998713', boxLabel: 'HSN/SAC 998713', amountBase: 90000, quantity: 5, unitCode: 'NOS', sequence: 6 },
   ], meta: {} },
   outputVat: 62.5, inputVat: 12.25, netVat: 50.25,
   regimeKey: 'gcc_return', filingFrequency: 'quarterly', periodAnchor: '01-01',
@@ -53,5 +54,11 @@ describe('VATReturnModal (P3)', () => {
     await screen.findByText('Output VAT on sales');
     await userEvent.click(screen.getByRole('button', { name: /previous period/i }));
     await waitFor(() => expect(composeReturnForDate).toHaveBeenLastCalledWith('tenant-1', '2026-06-30'));
+  });
+
+  it('renders quantity + UQC on boxes that carry them (GSTR HSN summary rows)', async () => {
+    render(<VATReturnModal isOpen onClose={() => {}} onFiled={() => {}} />);
+    await screen.findByText('HSN/SAC 998713');
+    expect(screen.getByText('Qty 5 NOS')).toBeInTheDocument();
   });
 });

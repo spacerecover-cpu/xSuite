@@ -19,7 +19,7 @@ export async function getResolvedCountryFacts(
 
   const { data } = await supabase
     .from('geo_countries')
-    .select('code, tax_system, tax_label, tax_number_label, tax_invoice_required, language_code, decimal_places, date_format, decimal_separator, thousands_separator, digit_grouping, address_format')
+    .select('code, tax_system, tax_label, tax_number_label, tax_invoice_required, language_code, decimal_places, date_format, decimal_separator, thousands_separator, digit_grouping, address_format, country_config')
     .eq('id', countryId)
     .maybeSingle();
 
@@ -70,6 +70,10 @@ export async function getResolvedCountryFacts(
     decimalSeparator: data.decimal_separator ?? null,
     thousandsSeparator: data.thousands_separator ?? null,
     digitGrouping: data.digit_grouping ?? null,
+    amountWordsScale:
+      ((data.country_config ?? {}) as Record<string, unknown>)['format.amount_words_scale'] === 'indian'
+        ? 'indian'
+        : 'western',
     einvoiceRegimeKey,
     addressFormat,
   };

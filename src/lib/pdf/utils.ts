@@ -17,6 +17,22 @@ export function formatDateTime(date: string | Date | null | undefined): string {
   return formatDate(date, 'dd/MM/yyyy HH:mm');
 }
 
+/** Module-local mirror of lib/format's groupIntegerDigits — duplicated (not
+ *  imported) so this PDF leaf stays free of the lib/format import chain, exactly
+ *  like the formatCurrency mirror below it. '3' = legacy Western regex,
+ *  '3;2' = Indian lakh/crore. Empty separator = no grouping (engine contract). */
+function groupInt(intPart: string, grouping: '3' | '3;2', separator: string): string {
+  if (separator === '') return intPart;
+  if (grouping === '3;2') {
+    const sign = intPart.startsWith('-') ? '-' : '';
+    const digits = sign ? intPart.slice(1) : intPart;
+    if (digits.length <= 3) return intPart;
+    const rest = digits.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, separator);
+    return `${sign}${rest}${separator}${digits.slice(-3)}`;
+  }
+  return intPart.replace(/\B(?=(\d{3})+(?!\d))/g, separator);
+}
+
 export function formatCurrency(
   amount: number | null | undefined,
   // Pass the tenant's resolved CurrencyConfig: it carries symbol/code/position,
@@ -44,7 +60,7 @@ export function formatCurrency(
   const magnitude = useParens ? Math.abs(amount) : amount;
 
   const parts = magnitude.toFixed(config.decimalPlaces).split('.');
-  const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, config.thousandsSeparator);
+  const integerPart = groupInt(parts[0], config.digitGrouping ?? '3', config.thousandsSeparator);
   const decimalPart = parts[1];
   const formattedNumber =
     config.decimalPlaces > 0
@@ -74,12 +90,15 @@ export function formatEngineMoney(
     position: 'before' | 'after';
     decimalSeparator?: string;
     thousandsSeparator?: string;
+    /** '3' (default, Western) or '3;2' (Indian lakh/crore). Additive — untouched
+     *  call sites render byte-identically. */
+    digitGrouping?: '3' | '3;2';
   },
 ): string {
   const dec = opts.decimalSeparator ?? '.';
   const thou = opts.thousandsSeparator ?? ',';
   const [intPart, decPart] = amount.toFixed(opts.decimalPlaces).split('.');
-  const grouped = thou === '' ? intPart : intPart.replace(/\B(?=(\d{3})+(?!\d))/g, thou);
+  const grouped = groupInt(intPart, opts.digitGrouping ?? '3', thou);
   const formatted = decPart ? `${grouped}${dec}${decPart}` : grouped;
   return opts.position === 'before' ? `${opts.symbol} ${formatted}` : `${formatted} ${opts.symbol}`;
 }

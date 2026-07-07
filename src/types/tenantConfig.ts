@@ -23,6 +23,11 @@ export interface CurrencyConfig {
   /** Tenant preference: negative-amount rendering — leading minus (default) or
    *  accounting parentheses. Resolved from currency.negative_format. */
   negativeFormat: 'minus' | 'parentheses';
+  /** Integer digit grouping: '3' (Western thousands, default) or '3;2' (Indian
+   *  lakh/crore). Resolved from the number_format.digit_grouping snapshot key
+   *  (populated from geo_countries.digit_grouping). Optional — absent = '3',
+   *  keeping every existing CurrencyConfig literal byte-identical. */
+  digitGrouping?: '3' | '3;2';
 }
 
 export interface TaxConfig {
@@ -97,6 +102,7 @@ export const DEFAULT_TENANT_CONFIG: TenantConfig = {
     position: 'before',
     displayMode: 'symbol',
     negativeFormat: 'minus',
+    digitGrouping: '3',
   },
   tax: {
     system: 'SALES_TAX',

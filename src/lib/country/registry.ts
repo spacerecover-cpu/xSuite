@@ -204,6 +204,14 @@ export const COUNTRY_CONFIG_REGISTRY: ConfigKeyDef[] = [
     codedDefault: REQUIRED_SENTINEL,
     required: true,
   },
+  {
+    key: 'number_format.digit_grouping',
+    domain: 'number_format',
+    label: 'Digit grouping',
+    description: "Integer grouping style: '3' Western thousands, '3;2' Indian lakh/crore. Snapshot-populated from geo_countries.digit_grouping by _apply_country_config; display preference, not statutory.",
+    schema: z.enum(['3', '3;2']),
+    codedDefault: '3',
+  },
   // ── locale ──
   {
     key: 'locale.code',

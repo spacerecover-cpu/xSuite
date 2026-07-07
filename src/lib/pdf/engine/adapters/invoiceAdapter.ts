@@ -80,6 +80,7 @@ export function toEngineData(
       position: currencyPosition,
       decimalSeparator: config.locale?.decimalSeparator ?? invoiceData.accounting_locales?.decimal_separator,
       thousandsSeparator: config.locale?.thousandsSeparator ?? invoiceData.accounting_locales?.thousands_separator,
+      digitGrouping: config.locale?.groupingStyle === 'indian' ? '3;2' : '3',
     });
   // Country/tenant date format (falls back to the neutral 'dd MMM yyyy' default
   // when no locale is threaded, so un-wired call sites are byte-identical).
@@ -287,7 +288,7 @@ export function toEngineData(
   // spell in Arabic, bilingual shows both.
   if (lines.amountInWords === true) {
     const mode = config.language.mode;
-    const enWords = amountInWordsEn(totalAmount, currencySymbol, decimalPlaces);
+    const enWords = amountInWordsEn(totalAmount, currencySymbol, decimalPlaces, config.locale?.amountWordsScale ?? 'western');
     const arWords = amountInWordsAr(totalAmount, currencySymbol, decimalPlaces);
     const value = mode === 'ar' ? arWords : mode.startsWith('bilingual') ? `${enWords}  ·  ${arWords}` : enWords;
     totals.push({ ...tl('amountInWords', 'Amount in Words:', 'المبلغ بالحروف:'), value });
@@ -322,8 +323,8 @@ export function toEngineData(
                   config.language.mode === 'ar'
                     ? amountInWordsAr(storedTax, currencySymbol, decimalPlaces)
                     : config.language.mode.startsWith('bilingual')
-                      ? `${amountInWordsEn(storedTax, currencySymbol, decimalPlaces)}  ·  ${amountInWordsAr(storedTax, currencySymbol, decimalPlaces)}`
-                      : amountInWordsEn(storedTax, currencySymbol, decimalPlaces),
+                      ? `${amountInWordsEn(storedTax, currencySymbol, decimalPlaces, config.locale?.amountWordsScale ?? 'western')}  ·  ${amountInWordsAr(storedTax, currencySymbol, decimalPlaces)}`
+                      : amountInWordsEn(storedTax, currencySymbol, decimalPlaces, config.locale?.amountWordsScale ?? 'western'),
               }
             : {}),
         }

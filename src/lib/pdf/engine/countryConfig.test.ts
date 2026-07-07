@@ -115,3 +115,13 @@ describe('countryTemplateOverride address ordering', () => {
     expect(override.locale?.postalFirst).toBeUndefined();
   });
 });
+
+describe("digitGrouping → locale.groupingStyle (WP-L1)", () => {
+  it("sets groupingStyle 'indian' for '3;2'", () => {
+    expect(countryTemplateOverride({ ...omFacts, digitGrouping: '3;2' }).locale?.groupingStyle).toBe('indian');
+  });
+  it("leaves groupingStyle unset for '3' and null (byte parity)", () => {
+    expect(countryTemplateOverride({ ...omFacts, digitGrouping: '3' }).locale?.groupingStyle).toBeUndefined();
+    expect(countryTemplateOverride({ ...omFacts, digitGrouping: null }).locale?.groupingStyle).toBeUndefined();
+  });
+});

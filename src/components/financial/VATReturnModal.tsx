@@ -132,6 +132,11 @@ export const VATReturnModal: React.FC<VATReturnModalProps> = ({ isOpen, onClose,
                 <div>
                   <div className="text-sm font-medium">{box.boxLabel}</div>
                   <div className="text-xs text-slate-500">{box.boxCode}</div>
+                  {box.quantity != null && (
+                    <div className="text-xs text-slate-500 tabular-nums">
+                      {`Qty ${box.quantity}${box.unitCode ? ` ${box.unitCode}` : ''}`}
+                    </div>
+                  )}
                 </div>
                 <div className="text-sm font-semibold tabular-nums">{formatCurrency(box.amountBase)}</div>
               </div>

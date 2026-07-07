@@ -588,6 +588,9 @@ export interface TaxSummaryConfig {
 export interface LocaleConfig {
   dateFormat?: string;
   groupingStyle?: 'standard' | 'indian';
+  /** Amount-in-words scale for the English speller: absent/'western' = million/
+   *  billion (today's output), 'indian' = lakh/crore (WP-L1). */
+  amountWordsScale?: 'western' | 'indian';
   decimalPlaces?: number;
   /** Country decimal separator ('.' or ','); absent = engine default '.'. */
   decimalSeparator?: string;
