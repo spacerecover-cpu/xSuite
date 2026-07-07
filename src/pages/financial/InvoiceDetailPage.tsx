@@ -34,6 +34,7 @@ import {
 } from '../../lib/taxDocumentService';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { RequirementFailuresPanel } from '../../components/financial/RequirementFailuresPanel';
+import { EInvoiceReadinessBanner } from '../../components/financial/EInvoiceReadinessBanner';
 
 const statusConfig = {
   draft: { label: 'Draft', color: 'secondary', icon: FileText },
@@ -777,6 +778,7 @@ export const InvoiceDetailPage: React.FC = () => {
       }}
       alerts={
         <>
+          <EInvoiceReadinessBanner />
           {(translationsError || settingsError || resourceError) && (
             <div className="bg-danger-muted border border-danger/30 rounded-lg p-3">
               <div className="flex items-start gap-2">
