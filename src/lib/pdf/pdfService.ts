@@ -7,6 +7,8 @@ import { buildCaseLabelDocument } from './documents/CaseLabelDocument';
 import { buildPaymentReceiptDocument } from './documents/PaymentReceiptDocument';
 import { buildPayslipDocument } from './documents/PayslipDocument';
 import { buildChainOfCustodyDocument } from './documents/ChainOfCustodyDocument';
+import { buildDeliveryChallanDocument } from './documents/DeliveryChallanDocument';
+import { getIssuedChallan, assembleDeliveryChallanData, fetchChallanConsignee } from '../deliveryChallanService';
 import { loadImageAsBase64 } from './utils';
 import { logPDFGeneration } from './loggingService';
 import { withTimeout, createTranslationContext, ctxFromLanguageConfig } from './translationContext';
@@ -779,6 +781,65 @@ export async function generateCheckoutForm(caseId: string, download: boolean = t
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to generate checkout form',
+    };
+  }
+}
+
+export async function generateDeliveryChallan(
+  caseId: string,
+  batchId: string,
+  download: boolean = true,
+): Promise<PDFGenerationResult> {
+  try {
+    const data = await fetchReceiptData(caseId);
+
+    const issued = await getIssuedChallan(caseId, batchId);
+    if (!issued) {
+      return { success: false, error: 'No delivery challan has been issued for this checkout' };
+    }
+
+    const consignee = data.caseData.customer_id
+      ? await fetchChallanConsignee(data.caseData.customer_id)
+      : {
+          name: data.caseData.customer?.customer_name || data.caseData.contact_name || 'Customer',
+          address: null,
+          gstin: null,
+          phone: data.caseData.contact_phone ?? null,
+        };
+    const challanData = assembleDeliveryChallanData(data, issued, consignee);
+
+    const languageSettings = data.companySettings.localization?.document_language_settings;
+    let languageCode: LanguageCode | null = (languageSettings?.secondary_language as LanguageCode) || null;
+    const fontsLoaded = await initializePDFFonts(languageCode);
+    if (!fontsLoaded && languageCode) {
+      languageCode = null;
+    }
+    // The Rule 55 challan is an English statutory document; only the font family
+    // is taken from the translation context.
+    const ctx = createTranslationContext('english_only', languageCode);
+
+    const logoBase64 = data.companySettings.branding?.logo_url
+      ? await loadImageAsBase64(data.companySettings.branding.logo_url)
+      : null;
+
+    const docDefinition = buildDeliveryChallanDocument(
+      { challanData, companySettings: data.companySettings },
+      ctx,
+      logoBase64,
+    );
+
+    const filename = `Delivery_Challan_${issued.challanNo.replace(/\//g, '-')}.pdf`;
+    if (download) {
+      createPdfWithFonts(docDefinition).download(filename);
+    } else {
+      createPdfWithFonts(docDefinition).open();
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Error generating delivery challan:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to generate delivery challan',
     };
   }
 }

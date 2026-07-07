@@ -20,7 +20,8 @@ import { RequirementFailuresPanel } from '../../components/financial/Requirement
 import { useCurrency } from '../../hooks/useCurrency';
 import { CaseStageBanner } from '../../components/cases/detail/CaseStageBanner';
 import type { CasePhase } from '../../lib/caseStateMachineService';
-import { useTenantFeatures } from '../../contexts/TenantConfigContext';
+import { useTenantFeatures, useTenantConfig } from '../../contexts/TenantConfigContext';
+import { deliveryChallanEnabled } from '../../lib/regimes/in_gst/deliveryChallan';
 import { CASE_TAB_FEATURE } from '../../lib/features/registry';
 import { SendMessageModal } from '../../components/communications/SendMessageModal';
 import { DeviceCheckoutModal } from '../../components/cases/DeviceCheckoutModal';
@@ -88,6 +89,7 @@ export const CaseDetail: React.FC = () => {
   // History tab sub-view: the forensic custody ledger vs the workflow activity log.
   const [historyView, setHistoryView] = useState<'custody' | 'activity'>('custody');
   const { isEnabled } = useTenantFeatures();
+  const { config: tenantConfig } = useTenantConfig();
   const modals = useCaseModals();
 
   const { formatCurrency } = useCurrency();
@@ -518,6 +520,7 @@ export const CaseDetail: React.FC = () => {
                 queryClient.invalidateQueries({ queryKey: ['case_history', id] });
               }}
               onShowCheckoutPreview={handleOpenCheckoutPreview}
+              challanEnabled={deliveryChallanEnabled(tenantConfig.regime.documents)}
             />
           )}
 

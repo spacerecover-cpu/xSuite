@@ -157,6 +157,53 @@ describe('presentation gating (office receipt)', () => {
   });
 });
 
+describe('display title follows the bilingual layout mode', () => {
+  const EN_TITLE = 'DEVICE CHECK-IN RECEIPT';
+  const AR_TITLE_WORD = 'إيصال'; // a word of the built-in Arabic title
+
+  /** Two-line display treatment: a stack pairing the EN line with the AR line. */
+  const titleStacks = (def: TDocumentDefinitions) =>
+    findAll(
+      def,
+      (o) =>
+        Array.isArray(o.stack) &&
+        (o.stack as Record<string, unknown>[]).some((l) => l?.text === EN_TITLE) &&
+        (o.stack as Record<string, unknown>[]).some(
+          (l) => typeof l?.text === 'string' && (l.text as string).includes(AR_TITLE_WORD),
+        ),
+    );
+
+  /** One-line treatment: a single rich-text node carrying runs of BOTH languages. */
+  const titleLines = (def: TDocumentDefinitions) =>
+    findAll(
+      def,
+      (o) =>
+        Array.isArray(o.text) &&
+        JSON.stringify(o.text).includes(EN_TITLE) &&
+        JSON.stringify(o.text).includes(AR_TITLE_WORD),
+    );
+
+  it('side-by-side keeps both languages on ONE line', () => {
+    const def = receiptRender({
+      language: { mode: 'bilingual_sidebyside', primary: 'en', secondary: 'ar' },
+      presentation: { titleStyle: 'display' },
+    });
+    const lines = titleLines(def);
+    expect(lines).toHaveLength(1);
+    expect(JSON.stringify(lines[0].text)).toContain(' | ');
+    expect(titleStacks(def)).toHaveLength(0);
+  });
+
+  it('stacked keeps the two-line display treatment', () => {
+    const def = receiptRender({
+      language: { mode: 'bilingual_stacked', primary: 'en', secondary: 'ar' },
+      presentation: { titleStyle: 'display' },
+    });
+    expect(titleStacks(def)).toHaveLength(1);
+    expect(titleLines(def)).toHaveLength(0);
+  });
+});
+
 describe('docRefBannerActive', () => {
   it('requires both the presentation style and a visible docRef section', () => {
     const base = BUILT_IN_TEMPLATE_CONFIGS.office_receipt;
