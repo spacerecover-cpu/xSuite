@@ -22,7 +22,7 @@ import type {
 } from '../types';
 import { isBilingualMode, en, ar, resolveLabel, fieldLabelLanguage } from '../labels';
 import { resolveSectionFill, resolveHeaderText, resolvePresentation } from '../branding';
-import { openInfoBox, openInfoRow } from './openCard';
+import { openCardHeaderColumns, openCardLayout, openInfoBox, openInfoRow } from './openCard';
 import { engineLayoutDirection } from '../rtl';
 
 function infoRow(
@@ -300,30 +300,44 @@ export function renderPartiesMeta(
   }
   if (!details) return renderParties(engine, data);
 
-  // Premium open finish: TWO independent cards with a visible gutter (matching
-  // the reference layout), instead of the shared-border equal-height table. The
-  // RTL mirror still swaps the halves.
+  // Premium open finish: the two cards render as ONE 3-column table (card |
+  // gutter | card) with per-cell borders — the gutter column draws nothing, so
+  // the cards read as separate, while the shared table rows GUARANTEE both
+  // cards are exactly the same height (a row sizes every cell to the tallest).
+  // The RTL mirror still swaps the halves.
   if (open) {
-    const partyCard = openInfoBox(
-      en(party.title),
-      bilingual ? ar(party.title, language) : null,
-      partyRows(party, partyLabelLang, true),
-      partyIcon,
-    );
-    const detailsCard = openInfoBox(
-      en(details.title),
-      bilingual ? ar(details.title, language) : null,
-      details.rows,
-      getGeneralIconSvg('fileText'),
-    );
+    const noBorder = [false, false, false, false];
+    const gutterHeader = { text: '', border: noBorder };
+    const gutterContent = { text: '', border: noBorder };
+    const partyHeader = {
+      ...openCardHeaderColumns(en(party.title), bilingual ? ar(party.title, language) : null, partyIcon),
+      border: [true, true, true, true],
+      margin: [8, 7, 8, 5],
+    };
+    const detailsHeader = {
+      ...openCardHeaderColumns(en(details.title), bilingual ? ar(details.title, language) : null, getGeneralIconSvg('fileText')),
+      border: [true, true, true, true],
+      margin: [8, 7, 8, 5],
+    };
+    const partyContent = { stack: partyRows(party, partyLabelLang, true), border: [true, false, true, true], margin: [8, 6, 8, 7] };
+    const detailsContent = { stack: details.rows, border: [true, false, true, true], margin: [8, 6, 8, 7] };
+
     const rtlOpen = engineLayoutDirection(language) === 'rtl';
-    const halves = rtlOpen ? [detailsCard, partyCard] : [partyCard, detailsCard];
+    const headerRowOpen = rtlOpen
+      ? [detailsHeader, gutterHeader, partyHeader]
+      : [partyHeader, gutterHeader, detailsHeader];
+    const contentRowOpen = rtlOpen
+      ? [detailsContent, gutterContent, partyContent]
+      : [partyContent, gutterContent, detailsContent];
+
     return {
-      columns: [
-        { width: '*', stack: [halves[0]] },
-        { width: 12, text: '' },
-        { width: '*', stack: [halves[1]] },
-      ],
+      table: {
+        widths: ['*', 12, '*'],
+        body: [headerRowOpen, contentRowOpen] as unknown as TableCell[][],
+      },
+      // Same layout as the standalone open card, so padding + hairlines are
+      // identical whether a card renders alone or in the equal-height pair.
+      layout: openCardLayout(),
       margin: [0, 0, 0, 10],
     };
   }

@@ -255,6 +255,33 @@ const PREMIUM_BUSINESS: Recipe = {
   config: PREMIUM_BASE,
 };
 
+/** Premium payslip preset: the same finish on the payslip component tables. */
+const PREMIUM_PAYSLIP: TemplatePreset = {
+  id: 'payslip-premium-lab',
+  docType: 'payslip',
+  name: 'Premium Lab',
+  description:
+    'Flagship reference finish — display title, open employee card, light earnings/deductions tables, and a branded social footer.',
+  category: 'premium',
+  fontLabel: 'Roboto · premium',
+  thumbnailHint: 'premium',
+  config: PREMIUM_BASE,
+};
+
+/** Premium chain-of-custody preset: the finish without the case-number banner
+ *  (the forensic ledger keeps the Case ID row inside the case-info card). */
+const PREMIUM_CUSTODY: TemplatePreset = {
+  id: 'chain_of_custody-premium-lab',
+  docType: 'chain_of_custody',
+  name: 'Premium Lab',
+  description:
+    'Flagship reference finish — display title, open case card, and a light forensic entries table with zebra rows.',
+  category: 'premium',
+  fontLabel: 'Roboto · premium',
+  thumbnailHint: 'premium',
+  config: PREMIUM_BASE,
+};
+
 /** GCC tax-compliant invoice preset (ZATCA/FTA): TRN bar + page numbers. */
 const GCC_INVOICE: Recipe = {
   key: 'gcc-compliance',
@@ -324,7 +351,7 @@ const financialFor = (docType: TemplateDocumentType): TemplatePreset[] =>
 export const TEMPLATE_PRESETS: Record<TemplateDocumentType, TemplatePreset[]> = {
   invoice: [fromRecipe('invoice', PREMIUM_BUSINESS), ...financialFor('invoice'), fromRecipe('invoice', GCC_INVOICE)],
   quote: [fromRecipe('quote', PREMIUM_BUSINESS), ...financialFor('quote')],
-  credit_note: financialFor('credit_note'),
+  credit_note: [fromRecipe('credit_note', PREMIUM_BUSINESS), ...financialFor('credit_note')],
   payment_receipt: [
     fromRecipe('payment_receipt', PREMIUM_BUSINESS),
     fromRecipe('payment_receipt', FINANCIAL_RECIPES[0]),
@@ -336,9 +363,9 @@ export const TEMPLATE_PRESETS: Record<TemplateDocumentType, TemplatePreset[]> = 
   checkout_form: [premiumLabPreset('checkout_form', PREMIUM_CHECKOUT_ORDERS), ...genericPresets('checkout_form')],
   case_label: genericPresets('case_label'),
   stock_label: genericPresets('stock_label'),
-  chain_of_custody: genericPresets('chain_of_custody'),
+  chain_of_custody: [PREMIUM_CUSTODY, ...genericPresets('chain_of_custody')],
   report: [PREMIUM_REPORT, ...genericPresets('report')],
-  payslip: genericPresets('payslip'),
+  payslip: [PREMIUM_PAYSLIP, ...genericPresets('payslip')],
 };
 
 /** The categories present for a given document type, in display order. */

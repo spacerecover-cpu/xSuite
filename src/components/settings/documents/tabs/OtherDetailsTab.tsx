@@ -48,7 +48,7 @@ const GUIDANCE_HINTS: Record<string, string> = {
 
 const SECTION_LABELS: Record<string, string> = {
   header: 'Header & logo',
-  docRef: 'Job ID banner',
+  docRef: 'Case ID banner',
   parties: 'Customer / party details',
   meta: 'Document details',
   caseInfo: 'Case information',

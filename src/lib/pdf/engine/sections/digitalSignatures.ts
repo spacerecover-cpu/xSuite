@@ -29,6 +29,7 @@ import type {
   SectionRenderer,
 } from '../types';
 import { isBilingualMode, en, ar, resolveLabel } from '../labels';
+import { resolvePresentation } from '../branding';
 import { engineLayoutDirection, mirrorColumns } from '../rtl';
 
 function headerAlignment(col: ResolvedColumn): 'left' | 'center' | 'right' {
@@ -56,10 +57,14 @@ export const renderDigitalSignatures: SectionRenderer = (
     bilingual ? ar(block.title, language) : null,
   ) as Content;
 
+  // Premium light finish: white header + dark bold labels, consistent with the
+  // other data tables; the legacy navy 'tableHeader' style otherwise.
+  const light = resolvePresentation(engine.config).tableHeaderStyle === 'light';
   const headerRow: TableCell[] = columns.map((col) => ({
     text: resolveLabel(col.label, language),
     style: 'tableHeader',
-    alignment: headerAlignment(col),
+    alignment: light ? (col.align ?? 'left') : headerAlignment(col),
+    ...(light ? { fillColor: PDF_COLORS.white, color: PDF_COLORS.text, fontSize: 8.5 } : {}),
   }));
 
   const body: TableCell[][] = [headerRow];

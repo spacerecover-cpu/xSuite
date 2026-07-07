@@ -180,7 +180,7 @@ export function toEngineData(
     meta.push({ label: { en: 'Supply Date:', ar: 'تاريخ التوريد:' }, value: docDate(invoiceData.supply_date) });
   }
   if (invoiceData.cases?.case_no) {
-    meta.push({ label: { en: 'Job ID:', ar: 'رقم المهمة:' }, value: invoiceData.cases.case_no });
+    meta.push({ label: { en: 'Case ID:', ar: 'رقم الحالة:' }, value: invoiceData.cases.case_no });
   }
   // India Rule-46 statutory meta — appended only for the in_gst_invoice profile,
   // from fields already on the doc (place-of-supply state code = GSTIN prefix).

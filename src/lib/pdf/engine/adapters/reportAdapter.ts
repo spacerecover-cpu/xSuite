@@ -390,7 +390,7 @@ function buildReportHeader(data: ReportData, ctx: TranslationContext): ReportHea
     companyName,
     ...(contactBits.length ? { companyTagline: contactBits.join('  ·  ') } : {}),
     title: reportTypeTitle(report.report_type, ctx),
-    ...(caseNo ? { jobLine: `${ctx.t('jobId', 'Job')} ${safeString(caseNo)}` } : {}),
+    ...(caseNo ? { jobLine: `${ctx.t('caseId', 'Case ID')}: ${safeString(caseNo)}` } : {}),
   };
 }
 
@@ -560,7 +560,7 @@ export function toEngineData(
   // section — the premium classic-letterhead report presets add one).
   const refNo = caseData?.case_no || caseData?.case_number || report.case_id;
   const docRef = refNo
-    ? { label: { en: 'Job ID', ar: 'رقم الحالة' }, value: safeString(refNo) }
+    ? { label: { en: 'Case ID', ar: 'رقم الحالة' }, value: safeString(refNo) }
     : null;
 
   return {

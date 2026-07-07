@@ -26,7 +26,7 @@
 
 import type { Content, TableCell } from 'pdfmake/interfaces';
 import { PDF_COLORS, createBilingualSectionHeader } from '../../styles';
-import { resolveSectionFill } from '../branding';
+import { resolveSectionFill, resolvePresentation } from '../branding';
 import { readableTextOn } from '../palette';
 import type {
   EngineContext,
@@ -125,15 +125,20 @@ export const renderCustodyLog: SectionRenderer = (
   ) as Content;
 
   // Header row: per-section fill (default keeps the navy 'tableHeader' look) with
-  // auto-contrast text so a custom fill stays readable.
-  const headerFill = resolveSectionFill(engine.config, 'custodyLog', PDF_COLORS.primary);
-  const headerText = readableTextOn(headerFill);
+  // auto-contrast text so a custom fill stays readable. The premium light finish
+  // uses the white header + dark labels, consistent with the other data tables.
+  const light = resolvePresentation(engine.config).tableHeaderStyle === 'light';
+  const headerFill = light
+    ? PDF_COLORS.white
+    : resolveSectionFill(engine.config, 'custodyLog', PDF_COLORS.primary);
+  const headerText = light ? PDF_COLORS.text : readableTextOn(headerFill);
   const headerRow: TableCell[] = columns.map((col) => ({
     text: resolveLabel(col.label, language),
     style: 'tableHeader',
     fillColor: headerFill,
     color: headerText,
-    alignment: headerAlignment(col),
+    alignment: light ? (col.align ?? 'left') : headerAlignment(col),
+    ...(light ? { fontSize: 8.5 } : {}),
   }));
 
   const body: TableCell[][] = [headerRow];

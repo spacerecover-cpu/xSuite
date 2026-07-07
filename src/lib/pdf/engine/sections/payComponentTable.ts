@@ -14,7 +14,7 @@
 
 import type { Content, TableCell } from 'pdfmake/interfaces';
 import { PDF_COLORS, createBilingualSectionHeader } from '../../styles';
-import { resolveSectionFill } from '../branding';
+import { resolveSectionFill, resolvePresentation } from '../branding';
 import { readableTextOn } from '../palette';
 import { safeString } from '../../utils';
 import type { EngineContext, LabelText, PayComponentBlock } from '../types';
@@ -70,14 +70,20 @@ export function buildPayComponentTable(
     bilingual ? ar(block.title, language) : null,
   ) as Content;
 
-  const headerFill = resolveSectionFill(engine.config, sectionKey, PDF_COLORS.headerBg);
-  const headerText = readableTextOn(headerFill);
+  // Premium light finish: white header with dark bold labels (consistent with
+  // the line-item / device tables); legacy filled band otherwise.
+  const light = resolvePresentation(engine.config).tableHeaderStyle === 'light';
+  const headerFill = light
+    ? PDF_COLORS.white
+    : resolveSectionFill(engine.config, sectionKey, PDF_COLORS.headerBg);
+  const headerText = light ? PDF_COLORS.text : readableTextOn(headerFill);
   const headerRow: TableCell[] = ordered.map((c) => ({
     text: resolveLabel(c.label, language),
     style: 'tableHeader',
     fillColor: headerFill,
     color: headerText,
     alignment: c.align,
+    ...(light ? { fontSize: 8.5 } : {}),
   }));
 
   const body: TableCell[][] = [headerRow];
@@ -117,12 +123,20 @@ export function buildPayComponentTable(
       heading,
       {
         table: { headerRows: 1, widths, body },
-        layout: {
-          hLineWidth: () => 0.5,
-          vLineWidth: () => 0.5,
-          hLineColor: () => PDF_COLORS.border,
-          vLineColor: () => PDF_COLORS.border,
-        },
+        layout: light
+          ? {
+              hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
+                i === 0 || i === 1 || i === node.table.body.length ? 0.75 : 0.5,
+              vLineWidth: () => 0.5,
+              hLineColor: () => PDF_COLORS.border,
+              vLineColor: () => PDF_COLORS.border,
+            }
+          : {
+              hLineWidth: () => 0.5,
+              vLineWidth: () => 0.5,
+              hLineColor: () => PDF_COLORS.border,
+              vLineColor: () => PDF_COLORS.border,
+            },
         margin: [0, 0, 0, 12],
       },
     ],

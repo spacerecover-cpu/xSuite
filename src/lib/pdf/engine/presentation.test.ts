@@ -114,15 +114,18 @@ describe('presentation gating (office receipt)', () => {
     expect(JSON.stringify(def.content)).not.toContain('Registered by:');
   });
 
-  it('renders the Job ID banner when the docRef section + presentation opt in', () => {
+  it('renders the Case ID banner when the docRef section + presentation opt in', () => {
     const def = receiptRender({
       presentation: { docRef: 'banner' },
       sections: [{ key: 'docRef', visible: true, order: 1 }],
     });
     const rects = findAll(def, (o) => o.type === 'rect' && typeof o.r === 'number');
     expect(rects.length).toBeGreaterThan(0);
-    // The banner takes over the case number: the Case Details card drops its row.
-    expect(JSON.stringify(def.content)).not.toContain('Case ID:');
+    expect(JSON.stringify(def.content)).toContain('Case ID');
+    // The banner takes over the case number: the Case Details card drops its
+    // row, so the case number appears exactly once (in the banner).
+    const caseNo = JSON.stringify(def.content).match(/CASE-0007/g) ?? [];
+    expect(caseNo).toHaveLength(1);
   });
 
   it('renders no banner when the presentation style is none even with a visible section', () => {
@@ -173,8 +176,12 @@ describe('docRefBannerActive', () => {
 });
 
 describe('premium gallery presets', () => {
-  it('ships a premium preset for the intake, checkout, report, and invoice doc types', () => {
-    for (const docType of ['office_receipt', 'customer_copy', 'checkout_form', 'report', 'invoice'] as const) {
+  it('ships a premium preset for every non-label document type', () => {
+    for (const docType of [
+      'office_receipt', 'customer_copy', 'checkout_form', 'report',
+      'invoice', 'quote', 'credit_note', 'payment_receipt',
+      'payslip', 'chain_of_custody',
+    ] as const) {
       const premium = TEMPLATE_PRESETS[docType].filter((p) => p.category === 'premium');
       expect(premium.length, docType).toBeGreaterThan(0);
     }

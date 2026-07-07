@@ -1,5 +1,5 @@
 /**
- * Document-reference section — the "Job ID: CASE-0042" banner rendered under
+ * Document-reference section — the "Case ID: CASE-0042" banner rendered under
  * the document title (premium presentation). Two finishes:
  *
  * - `'banner'`: a full-width rounded hairline box with the centered reference —
@@ -41,11 +41,11 @@ export const renderDocRef: SectionRenderer = (
   const colors = resolveColors(engine.config);
   // The banner reads in ONE language (the reference look): the secondary when
   // it leads, else English — a joined bilingual label would crowd the box.
-  const labelText = ref.label ?? { en: 'Job ID', ar: 'رقم الحالة' };
+  const labelText = ref.label ?? { en: 'Case ID', ar: 'رقم الحالة' };
   const label =
     language.primary === 'ar'
-      ? (ar(labelText, language) ?? en(labelText, 'Job ID'))
-      : en(labelText, 'Job ID');
+      ? (ar(labelText, language) ?? en(labelText, 'Case ID'))
+      : en(labelText, 'Case ID');
 
   const refText: Content = {
     text: [

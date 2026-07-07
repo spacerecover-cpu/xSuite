@@ -192,7 +192,7 @@ export function toEngineData(
   // ---- Premium document-reference banner ------------------------------------
   const bannerActive = docRefBannerActive(config);
   const docRef: DocRefBlock | null = caseData.case_no
-    ? { label: { en: 'Job ID', ar: 'رقم الحالة' }, value: safeString(caseData.case_no) }
+    ? { label: { en: 'Case ID', ar: 'رقم الحالة' }, value: safeString(caseData.case_no) }
     : null;
 
   // ---- Case-info header ----------------------------------------------------

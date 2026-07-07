@@ -83,7 +83,7 @@ export function toEngineData(
     meta.push({ label: { en: 'Invoice No:', ar: 'رقم الفاتورة:' }, value: paymentData.invoice.invoice_number });
   }
   if (paymentData.cases?.case_no) {
-    meta.push({ label: { en: 'Job ID:', ar: 'رقم المهمة:' }, value: paymentData.cases.case_no });
+    meta.push({ label: { en: 'Case ID:', ar: 'رقم الحالة:' }, value: paymentData.cases.case_no });
   }
 
   // ---- Totals (the single received amount as the prominent grand total) -----

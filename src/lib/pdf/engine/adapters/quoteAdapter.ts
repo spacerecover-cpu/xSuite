@@ -182,7 +182,7 @@ export function toEngineData(
     meta.push({ label: { en: 'Supply Date:', ar: 'تاريخ التوريد:' }, value: docDate(quoteData.supply_date) });
   }
   if (quoteData.cases?.case_no) {
-    meta.push({ label: { en: 'Job ID:', ar: 'رقم المهمة:' }, value: quoteData.cases.case_no });
+    meta.push({ label: { en: 'Case ID:', ar: 'رقم الحالة:' }, value: quoteData.cases.case_no });
   }
 
   // ---- Line items ----------------------------------------------------------

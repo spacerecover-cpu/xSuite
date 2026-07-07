@@ -129,7 +129,7 @@ export function toCreditNoteEngineData(
     });
   }
   if (creditNoteData.case_no) {
-    meta.push({ label: { en: 'Job ID:', ar: 'رقم المهمة:' }, value: creditNoteData.case_no });
+    meta.push({ label: { en: 'Case ID:', ar: 'رقم الحالة:' }, value: creditNoteData.case_no });
   }
   // India Rule-46 statutory meta — appended only for the in_gst_invoice profile,
   // from fields already on the doc (place-of-supply state code = GSTIN prefix).

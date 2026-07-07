@@ -210,7 +210,7 @@ export const GeneralTab: React.FC<{ api: StudioApi }> = ({ api }) => {
           ]}
         />
         <SegmentedControl<DocRefStyle>
-          label="Job / document ID banner"
+          label="Case / document ID banner"
           columns={3}
           value={presentation?.docRef ?? 'none'}
           onChange={(v) => api.setPresentation({ docRef: v })}

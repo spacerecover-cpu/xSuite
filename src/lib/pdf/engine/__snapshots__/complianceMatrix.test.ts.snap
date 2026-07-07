@@ -175,8 +175,8 @@ exports[`Phase 2 compliance matrix > 'AE' invoice — title ceremony, band, comp
     },
     {
       "label": {
-        "ar": "رقم المهمة:",
-        "en": "Job ID:",
+        "ar": "رقم الحالة:",
+        "en": "Case ID:",
       },
       "value": "CASE-0007",
     },
@@ -542,8 +542,8 @@ exports[`Phase 2 compliance matrix > 'AE' quote resolves QUOTATION + component r
     },
     {
       "label": {
-        "ar": "رقم المهمة:",
-        "en": "Job ID:",
+        "ar": "رقم الحالة:",
+        "en": "Case ID:",
       },
       "value": "CASE-0007",
     },
@@ -837,8 +837,8 @@ exports[`Phase 2 compliance matrix > 'BH' invoice — title ceremony, band, comp
     },
     {
       "label": {
-        "ar": "رقم المهمة:",
-        "en": "Job ID:",
+        "ar": "رقم الحالة:",
+        "en": "Case ID:",
       },
       "value": "CASE-0007",
     },
@@ -1204,8 +1204,8 @@ exports[`Phase 2 compliance matrix > 'BH' quote resolves QUOTATION + component r
     },
     {
       "label": {
-        "ar": "رقم المهمة:",
-        "en": "Job ID:",
+        "ar": "رقم الحالة:",
+        "en": "Case ID:",
       },
       "value": "CASE-0007",
     },
@@ -1499,8 +1499,8 @@ exports[`Phase 2 compliance matrix > 'GB' invoice — title ceremony, band, comp
     },
     {
       "label": {
-        "ar": "رقم المهمة:",
-        "en": "Job ID:",
+        "ar": "رقم الحالة:",
+        "en": "Case ID:",
       },
       "value": "CASE-0007",
     },
@@ -1866,8 +1866,8 @@ exports[`Phase 2 compliance matrix > 'GB' quote resolves QUOTATION + component r
     },
     {
       "label": {
-        "ar": "رقم المهمة:",
-        "en": "Job ID:",
+        "ar": "رقم الحالة:",
+        "en": "Case ID:",
       },
       "value": "CASE-0007",
     },
@@ -2161,8 +2161,8 @@ exports[`Phase 2 compliance matrix > 'KW' invoice — title ceremony, band, comp
     },
     {
       "label": {
-        "ar": "رقم المهمة:",
-        "en": "Job ID:",
+        "ar": "رقم الحالة:",
+        "en": "Case ID:",
       },
       "value": "CASE-0007",
     },
@@ -2520,8 +2520,8 @@ exports[`Phase 2 compliance matrix > 'KW' quote resolves QUOTATION + component r
     },
     {
       "label": {
-        "ar": "رقم المهمة:",
-        "en": "Job ID:",
+        "ar": "رقم الحالة:",
+        "en": "Case ID:",
       },
       "value": "CASE-0007",
     },
@@ -2807,8 +2807,8 @@ exports[`Phase 2 compliance matrix > 'OM' invoice — title ceremony, band, comp
     },
     {
       "label": {
-        "ar": "رقم المهمة:",
-        "en": "Job ID:",
+        "ar": "رقم الحالة:",
+        "en": "Case ID:",
       },
       "value": "CASE-0007",
     },
@@ -3174,8 +3174,8 @@ exports[`Phase 2 compliance matrix > 'OM' quote resolves QUOTATION + component r
     },
     {
       "label": {
-        "ar": "رقم المهمة:",
-        "en": "Job ID:",
+        "ar": "رقم الحالة:",
+        "en": "Case ID:",
       },
       "value": "CASE-0007",
     },
@@ -3469,8 +3469,8 @@ exports[`Phase 2 compliance matrix > 'QA' invoice — title ceremony, band, comp
     },
     {
       "label": {
-        "ar": "رقم المهمة:",
-        "en": "Job ID:",
+        "ar": "رقم الحالة:",
+        "en": "Case ID:",
       },
       "value": "CASE-0007",
     },
@@ -3828,8 +3828,8 @@ exports[`Phase 2 compliance matrix > 'QA' quote resolves QUOTATION + component r
     },
     {
       "label": {
-        "ar": "رقم المهمة:",
-        "en": "Job ID:",
+        "ar": "رقم الحالة:",
+        "en": "Case ID:",
       },
       "value": "CASE-0007",
     },
@@ -4115,8 +4115,8 @@ exports[`Phase 2 compliance matrix > 'SA' invoice — title ceremony, band, comp
     },
     {
       "label": {
-        "ar": "رقم المهمة:",
-        "en": "Job ID:",
+        "ar": "رقم الحالة:",
+        "en": "Case ID:",
       },
       "value": "CASE-0007",
     },
@@ -4482,8 +4482,8 @@ exports[`Phase 2 compliance matrix > 'SA' quote resolves QUOTATION + component r
     },
     {
       "label": {
-        "ar": "رقم المهمة:",
-        "en": "Job ID:",
+        "ar": "رقم الحالة:",
+        "en": "Case ID:",
       },
       "value": "CASE-0007",
     },
@@ -4881,8 +4881,8 @@ Due Date:",
                   {
                     "color": "#64748b",
                     "fontSize": 9.6,
-                    "text": "رقم المهمة:
-Job ID:",
+                    "text": "رقم الحالة:
+Case ID:",
                     "width": 150,
                   },
                   {
@@ -6220,8 +6220,8 @@ Due Date:",
                   {
                     "color": "#64748b",
                     "fontSize": 9.6,
-                    "text": "رقم المهمة:
-Job ID:",
+                    "text": "رقم الحالة:
+Case ID:",
                     "width": 150,
                   },
                   {

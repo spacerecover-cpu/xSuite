@@ -175,7 +175,7 @@ describe('Option B report — universal shell', () => {
     const texts = allTexts(renderEngine(makeData())).join('|');
     expect(texts).toContain('EVALUATION REPORT');
     expect(texts).toContain('Acme Data Recovery LLC');
-    expect(texts).toContain('Job CASE-0042');
+    expect(texts).toContain('Case ID: CASE-0042');
   });
 
   it('renders the summary tiles incl. the recoverability CATEGORY (no percentage)', () => {
