@@ -6,6 +6,7 @@ vi.mock('./supabaseClient', () => ({ supabase: { from } }));
 import {
   createVATRecordFromPurchase, createVATRecordFromInvoice, calculateVATForPeriod,
   getVATRecordsByReturn, getQuarterlyVATSummary, fetchHsnLineAggregates,
+  fetchInterStateB2CAggregates, composeGstrSupplementaryBoxes,
 } from './vatService';
 
 // A thenable query builder: every chain method returns the builder; awaiting it at
@@ -154,5 +155,62 @@ describe('fetchHsnLineAggregates (GSTR-1 Table 12 source, AD-4)', () => {
   it('returns [] when no invoices fall in the periods', async () => {
     from.mockReturnValue(chainFor({ data: [], error: null }) as never);
     expect(await fetchHsnLineAggregates(['2026-07'])).toEqual([]);
+  });
+});
+
+describe('fetchInterStateB2CAggregates (GSTR-3B Table 3.2 source)', () => {
+  it('joins IGST sale rows → B2C invoices → subdivision state codes and nets signed amounts', async () => {
+    const vatChain = chainFor({ data: [
+      { source_document_id: 'inv1', taxable_amount_base: 90000, vat_amount_base: 16200 },
+      { source_document_id: 'inv1', taxable_amount_base: -1000, vat_amount_base: -180 },  // L4 advance offset nets in
+      { source_document_id: 'inv2', taxable_amount_base: 5000, vat_amount_base: 900 },    // B2B — filtered out below
+    ], error: null });
+    const invChain = chainFor({ data: [
+      { id: 'inv1', buyer_tax_number: null, place_of_supply_subdivision_id: 'sub-ka' },
+      // inv2 absent: its buyer_tax_number is set, so the .is('buyer_tax_number', null) filter drops it
+    ], error: null });
+    const subChain = chainFor({ data: [
+      { id: 'sub-ka', name: 'Karnataka', code: 'KA', tax_authority_code: '29' },
+    ], error: null });
+    from.mockImplementation((t: string) =>
+      t === 'vat_records' ? vatChain : t === 'invoices' ? invChain : subChain);
+
+    const rows = await fetchInterStateB2CAggregates(['2026-07']);
+
+    expect(vatChain.eq).toHaveBeenCalledWith('component_code', 'IGST');
+    expect(vatChain.in).toHaveBeenCalledWith('tax_period', ['2026-07']);
+    expect(invChain.is).toHaveBeenCalledWith('buyer_tax_number', null);
+    expect(rows).toEqual([
+      { stateCode: '29', stateName: 'Karnataka', taxableBase: 89000, igstBase: 16020 },
+    ]);
+  });
+});
+
+describe('composeGstrSupplementaryBoxes (Table 3.2 + Table 12, collision-free sequences)', () => {
+  it('emits 3.2 boxes first, then hsn boxes, sequenced from startSequence', async () => {
+    from.mockImplementation((t: string) => {
+      if (t === 'vat_records') return chainFor({ data: [
+        { source_document_id: 'inv1', taxable_amount_base: 90000, vat_amount_base: 16200 },
+      ], error: null });
+      if (t === 'invoices') return chainFor({ data: [
+        { id: 'inv1', buyer_tax_number: null, place_of_supply_subdivision_id: 'sub-ka' },
+      ], error: null });
+      if (t === 'geo_subdivisions') return chainFor({ data: [
+        { id: 'sub-ka', name: 'Karnataka', code: 'KA', tax_authority_code: '29' },
+      ], error: null });
+      if (t === 'invoice_line_items') return chainFor({ data: [
+        { id: 'l1', invoice_id: 'inv1', item_code: '998713', unit_code: 'NOS', quantity: 2 },
+      ], error: null });
+      // document_tax_lines
+      return chainFor({ data: [
+        { line_item_id: 'l1', component_code: 'IGST', taxable_base: 90000, tax_amount_base: 16200, exchange_rate: 1 },
+      ], error: null });
+    });
+
+    const boxes = await composeGstrSupplementaryBoxes(['2026-07'], 6);
+
+    expect(boxes.map((b) => b.boxCode)).toEqual(['3.2.29', 'hsn.998713']);
+    expect(boxes.map((b) => b.sequence)).toEqual([6, 7]);
+    expect(new Set(boxes.map((b) => b.sequence)).size).toBe(boxes.length);
   });
 });

@@ -1,7 +1,9 @@
 import { supabase } from './supabaseClient';
 import { gccReturnComposer, taxPeriodsBetween } from './regimes/gcc_return';
 import { roundMoney } from './financialMath';
-import type { HsnLineAggregate } from './regimes/gstr/hsnSummary';
+import { composeGstr1HsnSummary, type HsnLineAggregate } from './regimes/gstr/hsnSummary';
+import { composeGstr3bTable32, type InterStateB2CAggregate } from './regimes/gstr/table32';
+import type { ReturnBoxLine } from './regimes/types';
 
 export interface VATRecord {
   id?: string;
@@ -372,6 +374,78 @@ export const fetchHsnLineAggregates = async (taxPeriods: string[]): Promise<HsnL
     });
 };
 
+/**
+ * GSTR-3B Table 3.2 source: inter-state (IGST) supplies to unregistered buyers
+ * (invoices.buyer_tax_number IS NULL), grouped by place-of-supply state. Signed
+ * ledger sums mean credit-note contras and L4 advance offsets net automatically —
+ * and the query composes identically when no such rows exist.
+ */
+export const fetchInterStateB2CAggregates = async (taxPeriods: string[]): Promise<InterStateB2CAggregate[]> => {
+  const { data: ledger, error: ledgerError } = await supabase
+    .from('vat_records')
+    .select('source_document_id, taxable_amount_base, vat_amount_base')
+    .eq('record_type', 'sale')
+    .eq('component_code', 'IGST')
+    .eq('source_document_type', 'invoice')
+    .in('tax_period', taxPeriods)
+    .is('deleted_at', null);
+  if (ledgerError) throw ledgerError;
+  const perInvoice = new Map<string, { taxable: number; igst: number }>();
+  for (const r of ledger ?? []) {
+    if (!r.source_document_id) continue;
+    const agg = perInvoice.get(r.source_document_id) ?? { taxable: 0, igst: 0 };
+    agg.taxable += Number(r.taxable_amount_base ?? 0);
+    agg.igst += Number(r.vat_amount_base ?? 0);
+    perInvoice.set(r.source_document_id, agg);
+  }
+  if (perInvoice.size === 0) return [];
+
+  const { data: invoices, error: invError } = await supabase
+    .from('invoices')
+    .select('id, buyer_tax_number, place_of_supply_subdivision_id')
+    .in('id', [...perInvoice.keys()])
+    .is('buyer_tax_number', null)                            // B2C = unregistered buyer
+    .not('place_of_supply_subdivision_id', 'is', null)
+    .is('deleted_at', null);
+  if (invError) throw invError;
+  const subIds = [...new Set((invoices ?? []).map((i) => i.place_of_supply_subdivision_id).filter(Boolean))] as string[];
+  if (subIds.length === 0) return [];
+
+  const { data: subs, error: subError } = await supabase
+    .from('geo_subdivisions')
+    .select('id, name, code, tax_authority_code')
+    .in('id', subIds);
+  if (subError) throw subError;
+  const subById = new Map((subs ?? []).map((s) => [s.id, s]));
+
+  const byState = new Map<string, InterStateB2CAggregate>();
+  for (const inv of invoices ?? []) {
+    const amounts = perInvoice.get(inv.id);
+    const sub = subById.get(inv.place_of_supply_subdivision_id as string);
+    if (!amounts || !sub) continue;
+    const stateCode = sub.tax_authority_code ?? sub.code;
+    const agg = byState.get(stateCode) ?? { stateCode, stateName: sub.name, taxableBase: 0, igstBase: 0 };
+    agg.taxableBase = roundMoney(agg.taxableBase + amounts.taxable, 2);
+    agg.igstBase = roundMoney(agg.igstBase + amounts.igst, 2);
+    byState.set(stateCode, agg);
+  }
+  return [...byState.values()];
+};
+
+/**
+ * Everything the GSTR return needs beyond the ledger-only composer: Table 3.2
+ * (part of the 3B) first, then the GSTR-1 Table 12 HSN annexure. Sequences
+ * continue from startSequence so persisted tax_return_lines never collide.
+ */
+export const composeGstrSupplementaryBoxes = async (
+  taxPeriods: string[],
+  startSequence: number,
+): Promise<ReturnBoxLine[]> => {
+  const t32 = composeGstr3bTable32(await fetchInterStateB2CAggregates(taxPeriods), startSequence);
+  const hsn = composeGstr1HsnSummary(await fetchHsnLineAggregates(taxPeriods), startSequence + t32.length);
+  return [...t32, ...hsn];
+};
+
 export const vatService = {
   fetchVATRecords,
   fetchVATReturns,
@@ -389,4 +463,6 @@ export const vatService = {
   getVATRecordsByReturn,
   getQuarterlyVATSummary,
   fetchHsnLineAggregates,
+  fetchInterStateB2CAggregates,
+  composeGstrSupplementaryBoxes,
 };
