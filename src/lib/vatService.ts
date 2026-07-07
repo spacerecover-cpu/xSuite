@@ -332,7 +332,9 @@ export const fetchHsnLineAggregates = async (taxPeriods: string[]): Promise<HsnL
   const { data: lines, error: linesError } = await supabase
     .from('invoice_line_items')
     .select('id, invoice_id, item_code, unit_code, quantity')
-    .in('invoice_id', invoiceIds);
+    .in('invoice_id', invoiceIds)
+    .is('deleted_at', null);        // updateInvoice soft-deletes + re-inserts lines on every
+                                    // edit — without this, stale rows double-count Table 12 qty
   if (linesError) throw linesError;
 
   const { data: taxLines, error: taxError } = await supabase
@@ -376,10 +378,21 @@ export const fetchHsnLineAggregates = async (taxPeriods: string[]): Promise<HsnL
 
 /**
  * GSTR-3B Table 3.2 source: inter-state (IGST) supplies to unregistered buyers
- * (invoices.buyer_tax_number IS NULL), grouped by place-of-supply state. Signed
- * ledger sums mean credit-note contras and L4 advance offsets net automatically —
- * and the query composes identically when no such rows exist.
+ * (invoices.buyer_tax_number IS NULL), grouped by place-of-supply state.
+ *
+ * Filtered to component_code='IGST' + source_document_type='invoice', so this is GROSS
+ * of credit notes — matching the gross 3.1(a) box (the live head-less CN contra carries
+ * no component/source, so it is excluded here AND from 3.1(a); the two reconcile). Exact
+ * credit-note / advance netting of both is WP-L4's domain — do NOT assume CN contras net
+ * here (they don't).
+ *
+ * An inter-state B2C invoice with NO place-of-supply is bucketed under an explicit
+ * 'unknown' state rather than silently dropped, so Table 3.2 still reconciles with the
+ * IGST already counted in gross 3.1(a) and the missing PoS is visible (e.g. the
+ * convert_proforma PoS-drop, or a walk-in buyer with no address).
  */
+const UNKNOWN_POS = { stateCode: '00', stateName: 'Unknown / unspecified place of supply' } as const;
+
 export const fetchInterStateB2CAggregates = async (taxPeriods: string[]): Promise<InterStateB2CAggregate[]> => {
   const { data: ledger, error: ledgerError } = await supabase
     .from('vat_records')
@@ -405,26 +418,29 @@ export const fetchInterStateB2CAggregates = async (taxPeriods: string[]): Promis
     .select('id, buyer_tax_number, place_of_supply_subdivision_id')
     .in('id', [...perInvoice.keys()])
     .is('buyer_tax_number', null)                            // B2C = unregistered buyer
-    .not('place_of_supply_subdivision_id', 'is', null)
     .is('deleted_at', null);
   if (invError) throw invError;
-  const subIds = [...new Set((invoices ?? []).map((i) => i.place_of_supply_subdivision_id).filter(Boolean))] as string[];
-  if (subIds.length === 0) return [];
+  if ((invoices ?? []).length === 0) return [];
 
-  const { data: subs, error: subError } = await supabase
-    .from('geo_subdivisions')
-    .select('id, name, code, tax_authority_code')
-    .in('id', subIds);
-  if (subError) throw subError;
-  const subById = new Map((subs ?? []).map((s) => [s.id, s]));
+  const subIds = [...new Set((invoices ?? []).map((i) => i.place_of_supply_subdivision_id).filter(Boolean))] as string[];
+  const subById = new Map<string, { id: string; name: string; code: string; tax_authority_code: string | null }>();
+  if (subIds.length > 0) {
+    const { data: subs, error: subError } = await supabase
+      .from('geo_subdivisions')
+      .select('id, name, code, tax_authority_code')
+      .in('id', subIds);
+    if (subError) throw subError;
+    for (const s of subs ?? []) subById.set(s.id, s);
+  }
 
   const byState = new Map<string, InterStateB2CAggregate>();
   for (const inv of invoices ?? []) {
     const amounts = perInvoice.get(inv.id);
-    const sub = subById.get(inv.place_of_supply_subdivision_id as string);
-    if (!amounts || !sub) continue;
-    const stateCode = sub.tax_authority_code ?? sub.code;
-    const agg = byState.get(stateCode) ?? { stateCode, stateName: sub.name, taxableBase: 0, igstBase: 0 };
+    if (!amounts) continue;
+    const sub = inv.place_of_supply_subdivision_id ? subById.get(inv.place_of_supply_subdivision_id) : undefined;
+    const stateCode = sub ? (sub.tax_authority_code ?? sub.code) : UNKNOWN_POS.stateCode;
+    const stateName = sub ? sub.name : UNKNOWN_POS.stateName;
+    const agg = byState.get(stateCode) ?? { stateCode, stateName, taxableBase: 0, igstBase: 0 };
     agg.taxableBase = roundMoney(agg.taxableBase + amounts.taxable, 2);
     agg.igstBase = roundMoney(agg.igstBase + amounts.igst, 2);
     byState.set(stateCode, agg);
@@ -436,6 +452,11 @@ export const fetchInterStateB2CAggregates = async (taxPeriods: string[]): Promis
  * Everything the GSTR return needs beyond the ledger-only composer: Table 3.2
  * (part of the 3B) first, then the GSTR-1 Table 12 HSN annexure. Sequences
  * continue from startSequence so persisted tax_return_lines never collide.
+ *
+ * Known scaling limit: the underlying fetches pass the period's invoice-id set into
+ * PostgREST `.in()` filters unchunked. A period with many hundreds of invoices could
+ * overrun the request URL length (→ 414, a LOUD hard-fail, never a wrong amount). Fine
+ * for the target lab volumes; batch the `.in()` lists if a high-volume tenant appears.
  */
 export const composeGstrSupplementaryBoxes = async (
   taxPeriods: string[],

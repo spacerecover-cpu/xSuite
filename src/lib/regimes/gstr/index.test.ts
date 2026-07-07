@@ -75,7 +75,9 @@ describe('gstr composer — GSTR-3B', () => {
     expect(box(r, '3.1(a).taxable')).toBe(0);
   });
 
-  it('credit-note contra rows net into the same boxes', () => {
+  it('PER-HEAD credit-note contras net into the same boxes (WP-L4 target shape)', () => {
+    // When a CN posts one contra PER head (component_code carried), signed sums net
+    // the heads AND the taxable base to zero. This is WP-L4's target ledger shape.
     const rows = [
       row({ id: 'a', component_code: 'CGST', vat_amount_base: 8100, taxable_amount_base: 90000 }),
       row({ id: 'b', component_code: 'SGST', vat_amount_base: 8100, taxable_amount_base: 90000 }),
@@ -85,6 +87,25 @@ describe('gstr composer — GSTR-3B', () => {
     const r = gstrComposer.compose(input(rows));
     expect(box(r, '3.1(a).cgst')).toBe(0);
     expect(box(r, '3.1(a).taxable')).toBe(0);
+  });
+
+  it('HEAD-LESS credit-note contra (live post_credit_note_vat_record shape) keeps 3.1(a) internally consistent — gross, never tax-on-zero-base', () => {
+    // The live trigger writes ONE head-less contra (component_code NULL) that cannot be
+    // attributed to CGST/SGST/IGST. Excluding it from BOTH the heads and the taxable base
+    // keeps 3.1(a) consistent (gross) instead of declaring 18k tax on a 0 net base. The
+    // header output tax (SUM(vat_amount_base)) still nets to 0 separately. Exact per-head
+    // CN netting = WP-L4.
+    const rows = [
+      row({ id: 'a', component_code: 'CGST', vat_amount_base: 9000, taxable_amount_base: 100000 }),
+      row({ id: 'b', component_code: 'SGST', vat_amount_base: 9000, taxable_amount_base: 100000 }),
+      row({ id: 'c', record_id: 'cn1', source_document_id: null, source_document_type: null, component_code: null, vat_amount_base: -18000, taxable_amount_base: -100000 }),
+    ];
+    const r = gstrComposer.compose(input(rows));
+    expect(box(r, '3.1(a).taxable')).toBe(100000);   // gross — head-less contra excluded, NOT 0
+    expect(box(r, '3.1(a).cgst')).toBe(9000);
+    expect(box(r, '3.1(a).sgst')).toBe(9000);
+    expect(r.meta['headless_sale_tax_base']).toBe(-18000);
+    expect(r.meta['credit_notes_netting']).toBe('gross_pending_l4');
   });
 
   it('advance netting (L4 shape): voucher month + net invoice month conserve total tax; works with rows absent too', () => {

@@ -147,6 +147,9 @@ describe('fetchHsnLineAggregates (GSTR-1 Table 12 source, AD-4)', () => {
 
     // tax_period is THE period dimension — never created_at (vatService.ts:279 drift class)
     expect(vatChain.in).toHaveBeenCalledWith('tax_period', ['2026-07']);
+    // invoice_line_items MUST filter soft-deletes — updateInvoice soft-deletes+re-inserts
+    // all lines on edit, so stale rows would otherwise double-count Table 12 quantity.
+    expect(lineChain.is).toHaveBeenCalledWith('deleted_at', null);
     // taxable counted ONCE per line (CGST+SGST share the line's base)
     expect(rows).toEqual([
       { itemCode: '998713', unitCode: 'NOS', quantity: 2, taxableBase: 90000, componentTaxBase: { CGST: 8100, SGST: 8100 } },
@@ -184,6 +187,24 @@ describe('fetchInterStateB2CAggregates (GSTR-3B Table 3.2 source)', () => {
       { stateCode: '29', stateName: 'Karnataka', taxableBase: 89000, igstBase: 16020 },
     ]);
   });
+
+  it('buckets inter-state B2C with NO place-of-supply into an explicit unknown state — never silently dropped (reconciles with gross 3.1(a))', async () => {
+    const vatChain = chainFor({ data: [
+      { source_document_id: 'inv1', taxable_amount_base: 50000, vat_amount_base: 9000 },
+    ], error: null });
+    const invChain = chainFor({ data: [
+      { id: 'inv1', buyer_tax_number: null, place_of_supply_subdivision_id: null },
+    ], error: null });
+    const subChain = chainFor({ data: [], error: null });
+    from.mockImplementation((t: string) =>
+      t === 'vat_records' ? vatChain : t === 'invoices' ? invChain : subChain);
+
+    const rows = await fetchInterStateB2CAggregates(['2026-07']);
+
+    expect(rows).toEqual([
+      { stateCode: '00', stateName: 'Unknown / unspecified place of supply', taxableBase: 50000, igstBase: 9000 },
+    ]);
+  });
 });
 
 describe('composeGstrSupplementaryBoxes (Table 3.2 + Table 12, collision-free sequences)', () => {
@@ -209,7 +230,7 @@ describe('composeGstrSupplementaryBoxes (Table 3.2 + Table 12, collision-free se
 
     const boxes = await composeGstrSupplementaryBoxes(['2026-07'], 6);
 
-    expect(boxes.map((b) => b.boxCode)).toEqual(['3.2.29', 'hsn.998713']);
+    expect(boxes.map((b) => b.boxCode)).toEqual(['3.2.29', 'hsn.998713.NOS']);
     expect(boxes.map((b) => b.sequence)).toEqual([6, 7]);
     expect(new Set(boxes.map((b) => b.sequence)).size).toBe(boxes.length);
   });
