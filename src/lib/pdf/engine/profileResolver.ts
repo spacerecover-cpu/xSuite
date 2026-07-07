@@ -38,6 +38,24 @@ function resolveProfileOrFallback(key: string): DocumentComplianceProfile {
   }
 }
 
+/** Honest-degrade dev assertion (spec §4-S4, moved here from L2 so it never fires
+ *  before in_gst_invoice exists): a registered seller whose country DECLARED a
+ *  non-generic documents profile that silently fell back to generic_invoice means
+ *  the declared plugin is not registered — a misconfiguration, not a valid render.
+ *  Throws in dev/test; warns in prod (never crashes a customer's document). */
+export function assertProfileResolved(
+  declaredKey: string, resolved: DocumentComplianceProfile, sellerRegistered: boolean,
+): void {
+  const fellBack = declaredKey !== 'generic_invoice' && resolved.key === 'generic_invoice';
+  if (fellBack && sellerRegistered) {
+    const msg =
+      `Compliance profile "${declaredKey}" is declared for this registered tenant but ` +
+      `resolved to "generic_invoice" — its regime plugin is not registered.`;
+    if (import.meta.env.MODE !== 'production') throw new Error(msg);
+    console.error(`[profileResolver] ${msg}`);
+  }
+}
+
 /** Resolve the render-time compliance inputs for the CURRENT tenant (RLS-scoped):
  *  primary legal entity -> country facts; the `regime.documents` key from
  *  tenants.resolved_country_config -> a registered DocumentComplianceProfile; seller
@@ -99,6 +117,7 @@ export async function resolveComplianceRenderInputs(): Promise<ComplianceRenderI
     sellerRegistered: sellerTaxNumber != null,
     sellerTaxNumber,
   };
+  assertProfileResolved(profileKey, value.profile, value.sellerRegistered);
   cache = { at: Date.now(), value };
   return value;
 }
