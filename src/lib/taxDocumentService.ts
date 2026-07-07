@@ -364,7 +364,13 @@ export async function persistDocumentTaxLines(args: {
     .is('deleted_at', null);
   if (clearErr) throw clearErr;
 
-  const rows = [...computation.rollups, ...computation.lines].map((l) => ({
+  // Rollups own the line_item_id IS NULL space (document-level Σ evidence that
+  // _issue_advance_voucher and the return composers read). A per-line row MUST
+  // anchor to a real line item — for a line-item-less document (advance voucher:
+  // no lineItemIds), the kernel's idx: sentinels relabel to null, and persisting
+  // them would DOUBLE the rollup tax. Keep only line rows with a real anchor.
+  const lineRows = computation.lines.filter((l) => relabel(l.lineItemId) !== null);
+  const rows = [...computation.rollups, ...lineRows].map((l) => ({
     tenant_id: tenantId,
     document_type: documentType,
     document_id: documentId,
