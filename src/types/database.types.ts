@@ -197,6 +197,153 @@ export type Database = {
           },
         ]
       }
+      advance_vouchers: {
+        Row: {
+          buyer_address: Json | null
+          buyer_tax_number: string | null
+          case_id: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          customer_id: string | null
+          deleted_at: string | null
+          exchange_rate: number
+          id: string
+          notations: Json
+          original_voucher_id: string | null
+          pack_version_id: string | null
+          payment_id: string
+          place_of_supply_subdivision_id: string | null
+          regime_key: string | null
+          seller_tax_number: string | null
+          status: string
+          tax_amount: number
+          taxable_amount: number
+          tenant_id: string
+          total_amount: number
+          updated_at: string
+          voucher_date: string
+          voucher_number: string | null
+          voucher_type: string
+        }
+        Insert: {
+          buyer_address?: Json | null
+          buyer_tax_number?: string | null
+          case_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          customer_id?: string | null
+          deleted_at?: string | null
+          exchange_rate?: number
+          id?: string
+          notations?: Json
+          original_voucher_id?: string | null
+          pack_version_id?: string | null
+          payment_id: string
+          place_of_supply_subdivision_id?: string | null
+          regime_key?: string | null
+          seller_tax_number?: string | null
+          status?: string
+          tax_amount?: number
+          taxable_amount?: number
+          tenant_id: string
+          total_amount?: number
+          updated_at?: string
+          voucher_date?: string
+          voucher_number?: string | null
+          voucher_type: string
+        }
+        Update: {
+          buyer_address?: Json | null
+          buyer_tax_number?: string | null
+          case_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          customer_id?: string | null
+          deleted_at?: string | null
+          exchange_rate?: number
+          id?: string
+          notations?: Json
+          original_voucher_id?: string | null
+          pack_version_id?: string | null
+          payment_id?: string
+          place_of_supply_subdivision_id?: string | null
+          regime_key?: string | null
+          seller_tax_number?: string | null
+          status?: string
+          tax_amount?: number
+          taxable_amount?: number
+          tenant_id?: string
+          total_amount?: number
+          updated_at?: string
+          voucher_date?: string
+          voucher_number?: string | null
+          voucher_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "advance_vouchers_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advance_vouchers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advance_vouchers_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advance_vouchers_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_enhanced"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advance_vouchers_original_voucher_id_fkey"
+            columns: ["original_voucher_id"]
+            isOneToOne: false
+            referencedRelation: "advance_vouchers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advance_vouchers_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advance_vouchers_place_of_supply_subdivision_id_fkey"
+            columns: ["place_of_supply_subdivision_id"]
+            isOneToOne: false
+            referencedRelation: "geo_subdivisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advance_vouchers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       announcement_dismissals: {
         Row: {
           announcement_id: string
@@ -11927,6 +12074,7 @@ export type Database = {
           legal_entity_id: string | null
           notes: string | null
           payment_date: string | null
+          payment_kind: string
           payment_method_id: string | null
           payment_number: string | null
           rate_source: string
@@ -11954,6 +12102,7 @@ export type Database = {
           legal_entity_id?: string | null
           notes?: string | null
           payment_date?: string | null
+          payment_kind?: string
           payment_method_id?: string | null
           payment_number?: string | null
           rate_source?: string
@@ -11981,6 +12130,7 @@ export type Database = {
           legal_entity_id?: string | null
           notes?: string | null
           payment_date?: string | null
+          payment_kind?: string
           payment_method_id?: string | null
           payment_number?: string | null
           rate_source?: string
@@ -19061,6 +19211,7 @@ export type Database = {
           legal_entity_id: string | null
           notes: string | null
           payment_date: string | null
+          payment_kind: string
           payment_method_id: string | null
           payment_number: string | null
           rate_source: string
@@ -19544,6 +19695,7 @@ export type Database = {
           legal_entity_id: string | null
           notes: string | null
           payment_date: string | null
+          payment_kind: string
           payment_method_id: string | null
           payment_number: string | null
           rate_source: string
