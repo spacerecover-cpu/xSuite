@@ -84,6 +84,18 @@ export interface InvoiceSummaryData {
   conversionRate: number;
 }
 
+/** Revenue on the P&L must EXCLUDE output tax — collected VAT/GST is a liability
+ *  owed to the tax authority, never income. Nets the PAID portion of tax off a
+ *  (possibly partial) payment via the invoice's tax/total ratio, in base currency.
+ *  Tax-free rows (no tax, or no total basis) pass through as gross == net. */
+export function paidRevenueNetOfTax(inv: Record<string, unknown>): number {
+  const paid = baseAmount(inv, 'amount_paid');
+  const total = baseAmount(inv, 'total_amount');
+  const tax = baseAmount(inv, 'tax_amount');
+  if (total <= 0 || tax <= 0) return paid;
+  return paid * ((total - tax) / total);
+}
+
 export const generateProfitLossReport = async (
   dateFrom: string,
   dateTo: string
@@ -91,7 +103,8 @@ export const generateProfitLossReport = async (
   const [invoicesResult, expensesResult] = await Promise.all([
     supabase
       .from('invoices')
-      .select('amount_paid, amount_paid_base, status')
+      .select('amount_paid, amount_paid_base, total_amount, total_amount_base, tax_amount, tax_amount_base, status')
+      .is('deleted_at', null)
       .gte('invoice_date', dateFrom)
       .lte('invoice_date', dateTo),
     supabase
@@ -111,7 +124,7 @@ export const generateProfitLossReport = async (
   const invoices = invoicesResult.data || [];
   const expenses = expensesResult.data || [];
 
-  const totalRevenue = invoices.reduce((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
+  const totalRevenue = invoices.reduce((sum, inv) => sum + paidRevenueNetOfTax(inv), 0);
 
   const expensesByCategory: Record<string, number> = {};
   expenses.forEach((exp: any) => {
