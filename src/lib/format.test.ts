@@ -313,3 +313,14 @@ describe('formatCurrencyWithConfig digitGrouping (WP-L1)', () => {
       .toBe('$106,200.00');
   });
 });
+
+describe('U+20B9 passes through the in-app formatter unmangled (WP-L1)', () => {
+  it('formatCurrencyWithConfig emits the exact rupee code point', () => {
+    const out = formatCurrencyWithConfig(1, cfg({ code: 'INR', symbol: '₹', position: 'before', digitGrouping: '3;2' }));
+    expect(out.codePointAt(0)).toBe(0x20b9);
+    expect(out).toBe('₹1.00');
+  });
+  it('renderCurrencyToken symbol_code keeps ₹ intact beside the ISO code', () => {
+    expect(renderCurrencyToken(cfg({ code: 'INR', symbol: '₹', displayMode: 'symbol_code' }))).toBe('₹ INR');
+  });
+});
