@@ -11824,6 +11824,92 @@ export type Database = {
           },
         ]
       }
+      payment_withholdings: {
+        Row: {
+          amount: number
+          amount_base: number
+          certificate_ref: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          customer_id: string | null
+          deleted_at: string | null
+          exchange_rate: number
+          id: string
+          payment_id: string
+          reconciled_at: string | null
+          tax_point_date: string
+          tenant_id: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          amount: number
+          amount_base: number
+          certificate_ref: string
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          customer_id?: string | null
+          deleted_at?: string | null
+          exchange_rate?: number
+          id?: string
+          payment_id: string
+          reconciled_at?: string | null
+          tax_point_date: string
+          tenant_id: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          amount?: number
+          amount_base?: number
+          certificate_ref?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          customer_id?: string | null
+          deleted_at?: string | null
+          exchange_rate?: number
+          id?: string
+          payment_id?: string
+          reconciled_at?: string | null
+          tax_point_date?: string
+          tenant_id?: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_withholdings_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_withholdings_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_enhanced"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_withholdings_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_withholdings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number
@@ -11849,6 +11935,8 @@ export type Database = {
           tenant_id: string
           transaction_id: string | null
           updated_at: string
+          withheld_amount: number
+          withholding_certificate_ref: string | null
         }
         Insert: {
           amount: number
@@ -11874,6 +11962,8 @@ export type Database = {
           tenant_id: string
           transaction_id?: string | null
           updated_at?: string
+          withheld_amount?: number
+          withholding_certificate_ref?: string | null
         }
         Update: {
           amount?: number
@@ -11899,6 +11989,8 @@ export type Database = {
           tenant_id?: string
           transaction_id?: string | null
           updated_at?: string
+          withheld_amount?: number
+          withholding_certificate_ref?: string | null
         }
         Relationships: [
           {
@@ -18977,6 +19069,8 @@ export type Database = {
           tenant_id: string
           transaction_id: string | null
           updated_at: string
+          withheld_amount: number
+          withholding_certificate_ref: string | null
         }
         SetofOptions: {
           from: "*"
@@ -19458,6 +19552,8 @@ export type Database = {
           tenant_id: string
           transaction_id: string | null
           updated_at: string
+          withheld_amount: number
+          withholding_certificate_ref: string | null
         }
         SetofOptions: {
           from: "*"
