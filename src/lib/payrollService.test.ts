@@ -13,7 +13,7 @@ vi.mock('./currencyService', () => ({ resolveRateContext: vi.fn() }));
 vi.mock('./payrollBase', () => ({ buildPayrollBaseColumns: vi.fn(() => ({})) }));
 vi.mock('./logger', () => ({ logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
-import { payrollService } from './payrollService';
+import { payrollService, computeEmployeePay } from './payrollService';
 import { logger } from './logger';
 
 /** Thenable query builder: every chainable method returns the builder; awaiting
@@ -150,5 +150,103 @@ describe('bank-file generation is honestly disabled (Phase 0)', () => {
 
   it('generateWPSFileContent throws the same honest error', () => {
     expect(() => payrollService.generateWPSFileContent([])).toThrow(/not configured for this tenant/);
+  });
+});
+
+describe('computeEmployeePay (Phase 0 — dock unauthorized absence / LOP)', () => {
+  const payInput = (o: Record<string, unknown> = {}) => ({
+    basicSalary: 1000, workingDaysPerMonth: 22, workingHoursPerDay: 8,
+    overtimeMultiplier: 1.5, overtimeHours: 0, daysAbsent: 0,
+    socialSecurityRate: null as number | null, loanDeductions: 0,
+    ...o,
+  });
+
+  it('full attendance, no extras → net == basic salary', () => {
+    const r = computeEmployeePay(payInput());
+    expect(r.totalEarnings).toBe(1000);
+    expect(r.totalDeductions).toBe(0);
+    expect(r.netSalary).toBe(1000);
+  });
+
+  it('docks unauthorized absence at the daily rate (5 of 22 days absent)', () => {
+    const r = computeEmployeePay(payInput({ daysAbsent: 5 }));
+    expect(r.absenceDeduction).toBeCloseTo(227.27, 2); // 5 * 1000/22
+    expect(r.totalEarnings).toBe(1000);                // basic stays contracted
+    expect(r.netSalary).toBeCloseTo(772.73, 2);
+  });
+
+  it('never docks more than the basic salary (absence beyond the working-days denominator)', () => {
+    const r = computeEmployeePay(payInput({ daysAbsent: 30 }));
+    expect(r.absenceDeduction).toBe(1000);
+    expect(r.netSalary).toBe(0);
+  });
+
+  it('pays overtime at hourly rate × multiplier', () => {
+    const r = computeEmployeePay(payInput({ overtimeHours: 10 }));
+    expect(r.overtimeAmount).toBeCloseTo(85.23, 2); // 10 * (1000/22/8) * 1.5
+    expect(r.totalEarnings).toBeCloseTo(1085.23, 2);
+  });
+
+  it('applies a configured social-security rate on the basic', () => {
+    const r = computeEmployeePay(payInput({ socialSecurityRate: 0.07 }));
+    expect(r.socialSecurityDeduction).toBe(70);
+    expect(r.netSalary).toBe(930);
+  });
+
+  it('guards a zero working-days config (no divide-by-zero / NaN)', () => {
+    const r = computeEmployeePay(payInput({ workingDaysPerMonth: 0, daysAbsent: 5 }));
+    expect(r.absenceDeduction).toBe(0);
+    expect(r.netSalary).toBe(1000);
+  });
+});
+
+describe('processPayroll docks unauthorized absence (Phase 0 overpayment fix)', () => {
+  function arrangePay(
+    over: { daysAbsent?: number },
+    captured: { records?: Array<Record<string, unknown>> },
+  ) {
+    vi.spyOn(payrollService, 'getPayrollPeriod').mockResolvedValue(
+      { id: 'period-1', status: 'draft', start_date: '2026-06-01', end_date: '2026-06-30', period_name: 'Jun 2026' } as never,
+    );
+    vi.spyOn(payrollService, 'getPayrollSettings').mockResolvedValue(
+      { working_days_per_month: 22, working_hours_per_day: 8, overtime_rate_multiplier: { regular: 1.5, weekend: 1.5, holiday: 2 }, payment_day: 28, social_security_rate: undefined } as never,
+    );
+    vi.spyOn(payrollService, 'getEmployeeAttendance').mockResolvedValue(
+      { daysWorked: 17, daysAbsent: over.daysAbsent ?? 0, daysLeave: 0, regularHours: 136, overtimeHours: 0 } as never,
+    );
+    vi.spyOn(payrollService, 'getActiveLoans').mockResolvedValue([] as never);
+    vi.spyOn(payrollService, 'updatePayrollPeriod').mockResolvedValue(undefined as never);
+
+    from.mockImplementation((table: string) => {
+      if (table === 'employees') return makeQuery([{ id: 'emp-1', tenant_id: 't-1', basic_salary: 1000 }]);
+      if (table === 'payroll_records') {
+        return {
+          insert: (rows: Array<Record<string, unknown>>) => {
+            captured.records = rows;
+            return { select: () => Promise.resolve({ data: rows, error: null }) };
+          },
+        } as unknown as ReturnType<typeof makeQuery>;
+      }
+      return makeQuery(null);
+    });
+  }
+
+  it('prorates unauthorized absence into the payroll record', async () => {
+    const captured: { records?: Array<Record<string, unknown>> } = {};
+    arrangePay({ daysAbsent: 5 }, captured);
+
+    await payrollService.processPayroll('period-1');
+
+    expect(captured.records![0].total_deductions as number).toBeCloseTo(227.27, 2);
+    expect(captured.records![0].net_salary as number).toBeCloseTo(772.73, 2);
+  });
+
+  it('leaves a fully-present employee at full pay', async () => {
+    const captured: { records?: Array<Record<string, unknown>> } = {};
+    arrangePay({ daysAbsent: 0 }, captured);
+
+    await payrollService.processPayroll('period-1');
+
+    expect(captured.records![0].net_salary).toBe(1000);
   });
 });
