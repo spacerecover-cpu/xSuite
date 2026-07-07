@@ -11,6 +11,7 @@ import { CommandPalette } from '../shared/CommandPalette';
 import { useCommandPalette } from '../../hooks/useCommandPalette';
 import { SidebarPreferencesProvider } from '../../contexts/SidebarPreferencesContext';
 import { useLocale } from '../../contexts/LocaleContext';
+import { useTaxConfig } from '../../contexts/TenantConfigContext';
 import { HeaderSlotProvider, useHeaderSlot } from '../../contexts/HeaderSlotContext';
 
 const routeLabels: Record<string, string> = {
@@ -22,7 +23,7 @@ const routeLabels: Record<string, string> = {
   'finance': 'Revenue',
   'transactions': 'Transactions',
   'banking': 'Banking',
-  'vat-audit': 'VAT & Audit',
+  'vat-audit': '__TAX__ & Audit',
   'reports': 'Reports',
   'customers': 'Customers',
   'quotes': 'Quotes',
@@ -112,7 +113,10 @@ const HeaderActionsHost: React.FC = () => {
 
 export const AppLayout: React.FC = () => {
   const location = useLocation();
-  const { label, section } = getBreadcrumbs(location.pathname);
+  const taxConfig = useTaxConfig();
+  const crumbs = getBreadcrumbs(location.pathname);
+  const label = crumbs.label.replace('__TAX__', taxConfig.label || 'VAT');
+  const section = crumbs.section;
   const palette = useCommandPalette();
   const { locale } = useLocale();
   const isRTL = locale === 'ar';

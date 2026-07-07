@@ -11,6 +11,7 @@ import { gccTaxInvoiceProfile } from './gcc_tax_invoice';
 import { noEinvoice } from './no_einvoice';
 import { zatcaPh1Transport } from './zatca_ph1';
 import { gccReturnComposer } from './gcc_return';
+import { gstrComposer } from './gstr';
 import { inGstStrategy } from './in_gst';
 import { inGstInvoiceProfile } from './in_gst/documents';
 import { inFiscalNumberingPolicy } from './in_gst/numbering';
@@ -29,5 +30,6 @@ export function registerAllRegimePlugins(): void {
   registerRegimePlugin('einvoice', noEinvoice);
   registerRegimePlugin('einvoice', zatcaPh1Transport);
   registerRegimePlugin('return', gccReturnComposer);
+  registerRegimePlugin('return', gstrComposer);
   registered = true;
 }

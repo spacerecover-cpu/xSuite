@@ -7,6 +7,7 @@ vi.mock('../../lib/tax/taxReturnService', () => ({
     { id: 'l1', box_code: 'BOX_1_OUTPUT', box_label: 'Output VAT on sales', amount_base: 62.5, sequence: 1 },
     { id: 'l2', box_code: 'BOX_2_INPUT', box_label: 'Recoverable input VAT on purchases', amount_base: 12.25, sequence: 2 },
     { id: 'l3', box_code: 'BOX_3_NET', box_label: 'Net VAT payable / (refundable)', amount_base: 50.25, sequence: 3 },
+    { id: 'l4', box_code: 'hsn.998713', box_label: 'HSN/SAC 998713', amount_base: 90000, quantity: 5, unit_code: 'NOS', sequence: 6 },
   ]),
   getReturnLedgerRows: vi.fn().mockResolvedValue([
     { id: 'v1', record_type: 'sale', vat_amount_base: 62.5, tax_period: '2026-07', record_id: 'inv-1' },
@@ -28,5 +29,11 @@ describe('VATReturnDetailModal (P3)', () => {
     expect(await screen.findByText('Output VAT on sales')).toBeInTheDocument();
     expect(await screen.findByText(/reconciled/i)).toBeInTheDocument();
     expect(screen.getByText('2026-07')).toBeInTheDocument();
+  });
+
+  it('renders quantity + UQC on persisted HSN lines', async () => {
+    render(<VATReturnDetailModal vatReturn={vatReturn} onClose={() => {}} />);
+    await screen.findByText('HSN/SAC 998713');
+    expect(screen.getByText('Qty 5 NOS')).toBeInTheDocument();
   });
 });
