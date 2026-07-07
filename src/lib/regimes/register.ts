@@ -13,6 +13,7 @@ import { zatcaPh1Transport } from './zatca_ph1';
 import { gccReturnComposer } from './gcc_return';
 import { inGstStrategy } from './in_gst';
 import { inGstInvoiceProfile } from './in_gst/documents';
+import { inFiscalNumberingPolicy } from './in_gst/numbering';
 
 let registered = false;
 
@@ -21,6 +22,7 @@ export function registerAllRegimePlugins(): void {
   registerRegimePlugin('tax', simpleVat);
   registerRegimePlugin('tax', inGstStrategy);
   registerRegimePlugin('numbering', prefixNumbering);
+  registerRegimePlugin('numbering', inFiscalNumberingPolicy);
   registerRegimePlugin('documents', genericInvoice);
   registerRegimePlugin('documents', gccTaxInvoiceProfile);
   registerRegimePlugin('documents', inGstInvoiceProfile);

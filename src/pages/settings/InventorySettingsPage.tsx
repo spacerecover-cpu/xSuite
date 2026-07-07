@@ -292,7 +292,7 @@ export default function InventorySettingsPage() {
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs text-slate-500">Next number</span>
                     <Badge variant="success" size="sm" className="font-mono">
-                      {formatNextNumber(effectivePrefix, currentValue, effectivePadding)}
+                      {formatNextNumber(effectivePrefix, currentValue, effectivePadding, seq?.format_template ?? null, seq?.fiscal_year_anchor ?? null)}
                     </Badge>
                   </div>
 
@@ -300,7 +300,7 @@ export default function InventorySettingsPage() {
                     <span>Prefix <span className="block font-mono text-slate-700">{effectivePrefix}</span></span>
                     <span>Padding <span className="block font-mono text-slate-700">{effectivePadding}</span></span>
                     <span>Current <span className="block font-mono text-slate-700">
-                      {hasStarted ? formatCurrentNumber(effectivePrefix, currentValue, effectivePadding) : '—'}
+                      {hasStarted ? formatCurrentNumber(effectivePrefix, currentValue, effectivePadding, seq?.format_template ?? null, seq?.fiscal_year_anchor ?? null) : '—'}
                     </span></span>
                   </div>
                 </div>
@@ -396,7 +396,7 @@ export default function InventorySettingsPage() {
                 <span className="font-semibold text-slate-700">Last allocated:</span>{' '}
                 {(editModal.sequence.current_value ?? 0) === 0
                   ? 'none yet'
-                  : formatCurrentNumber(editModal.sequence.prefix ?? editModal.prefix, editModal.sequence.current_value ?? 0, editModal.sequence.padding ?? editModal.padding)}
+                  : formatCurrentNumber(editModal.sequence.prefix ?? editModal.prefix, editModal.sequence.current_value ?? 0, editModal.sequence.padding ?? editModal.padding, editModal.sequence.format_template ?? null, editModal.sequence.fiscal_year_anchor ?? null)}
                 {' '}— counters advance atomically as items are created; adjust Next Number above to re-anchor.
               </div>
             )}
