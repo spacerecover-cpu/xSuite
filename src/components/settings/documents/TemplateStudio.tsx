@@ -55,6 +55,8 @@ import { getCompanyLogo, getCompanyStamp, getCompanySignature } from '../../../l
 import { resolveBrandingImage, type BrandingImage } from '../../../lib/pdf/brandingImage';
 import { fetchCompanySettings } from '../../../lib/pdf/dataFetcher';
 import type { CompanySettingsData } from '../../../lib/pdf/types';
+import { reportConfigForSubtype } from '../../../lib/pdf/engine/adapters/reportAdapter';
+import { REPORT_TYPES } from '../../../lib/reportTypes';
 import { GeneralTab } from './tabs/GeneralTab';
 import { HeaderFooterTab } from './tabs/HeaderFooterTab';
 import { TransactionTab } from './tabs/TransactionTab';
@@ -164,14 +166,21 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   onOpenGallery,
 }) => {
   const toast = useToast();
-  const builtIn = BUILT_IN_TEMPLATE_CONFIGS[docType];
   const [override, setOverride] = useState<TemplateConfigOverride>(initialOverride);
   const [activeTab, setActiveTab] = useState<TabId>('general');
   // Preview data source: 'sample' synthetic data, or a real record id.
   const [dataSource, setDataSource] = useState<string>('sample');
   const [records, setRecords] = useState<{ id: string; label: string }[]>([]);
+  // Report templates serve all 8 report types; the picker previews each one the
+  // exact way generation resolves it (subtype base + this template's override).
+  const [reportSubtype, setReportSubtype] = useState<string>('evaluation');
   const recordPreviewSupported =
     docType === 'invoice' || docType === 'quote' || docType === 'payment_receipt';
+
+  const builtIn = useMemo(
+    () => (docType === 'report' ? reportConfigForSubtype(reportSubtype) : BUILT_IN_TEMPLATE_CONFIGS[docType]),
+    [docType, reportSubtype],
+  );
 
   const resolved = useMemo(
     () => resolveTemplateConfig(builtIn, undefined, override),
@@ -208,7 +217,17 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
           // Pass the tenant's real company settings so the sample preview shows the
           // tenant's own header/branding/language (predicting the generated PDF),
           // not the neutral bilingual sample company.
-          ({ url, warnings } = await previewTemplate(docType, resolved, undefined, tenantLogo, tenantStamp, tenantSignature, companySettings ?? undefined, languageExplicit));
+          ({ url, warnings } = await previewTemplate(
+            docType,
+            resolved,
+            undefined,
+            tenantLogo,
+            tenantStamp,
+            tenantSignature,
+            companySettings ?? undefined,
+            languageExplicit,
+            docType === 'report' ? { reportSubtype } : undefined,
+          ));
         } else {
           const { previewDocumentForRecord } = await import('../../../lib/pdf/previewRecord');
           ({ url, warnings } = await previewDocumentForRecord(docType, dataSource, resolved, languageExplicit));
@@ -233,7 +252,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [resolved, languageExplicit, dataSource, docType, tenantLogo, tenantStamp, tenantSignature, companySettings]);
+  }, [resolved, languageExplicit, dataSource, docType, reportSubtype, tenantLogo, tenantStamp, tenantSignature, companySettings]);
 
   useEffect(() => () => {
     if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
@@ -592,6 +611,20 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
                     <Download className="h-3.5 w-3.5" />
                     Download
                   </a>
+                )}
+                {docType === 'report' && (
+                  <select
+                    aria-label="Preview report type"
+                    value={reportSubtype}
+                    onChange={(e) => setReportSubtype(e.target.value)}
+                    className="max-w-[190px] rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {Object.values(REPORT_TYPES).map((o) => (
+                      <option key={o.key} value={o.key}>
+                        {o.name}
+                      </option>
+                    ))}
+                  </select>
                 )}
                 {recordPreviewSupported && records.length > 0 && (
                   <select

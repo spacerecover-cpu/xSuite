@@ -242,8 +242,8 @@ describe('Option B report — per-subtype coverage (all 8)', () => {
     expect(texts).toContain('Report ID: REP-0007');
   });
 
-  it('prevention + recovered_files OMIT the Device column', () => {
-    for (const type of ['prevention', 'recovered_files']) {
+  it('prevention (advisory — no media examined) OMITS the Device column', () => {
+    for (const type of ['prevention']) {
       const data = makeData({ report: { ...makeData().report, report_type: type } });
       const config = reportConfigForSubtype(type);
       const engineData = toEngineData(data, config, englishCtx);
@@ -252,7 +252,9 @@ describe('Option B report — per-subtype coverage (all 8)', () => {
   });
 
   it('device subtypes INCLUDE the Device column', () => {
-    for (const type of ['evaluation', 'service', 'server', 'malware', 'forensic', 'data_destruction']) {
+    // recovered_files joined the device set in the 2026-07 taxonomy: a delivery
+    // acceptance report must identify the specific device it covers.
+    for (const type of ['evaluation', 'service', 'server', 'malware', 'forensic', 'data_destruction', 'recovered_files']) {
       const data = makeData({ report: { ...makeData().report, report_type: type } });
       const config = reportConfigForSubtype(type);
       const engineData = toEngineData(data, config, englishCtx);

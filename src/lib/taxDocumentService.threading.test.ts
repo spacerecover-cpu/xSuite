@@ -48,7 +48,11 @@ beforeEach(() => {
   computeSpy.mockResolvedValue(cannedComputation);
   fromMock.mockClear();
   tables.legal_entities = { id: 'le-1', tenant_id: 't-1', country_id: 'in-1', subdivision_id: 'sub-ka', tax_identifier: '29AAACX0000X1ZW', is_primary: true };
-  tables.legal_entity_tax_registrations = [];
+  // An active registration row: the seller is a REGISTERED GST tenant (GSTIN
+  // above), so the D6 explicit-registration guard passes via registration_row.
+  tables.legal_entity_tax_registrations = [
+    { id: 'reg-1', legal_entity_id: 'le-1', country_id: 'in-1', subdivision_id: 'sub-ka', tax_number: '29AAACX0000X1ZW', scheme: 'standard', registered_from: '2017-07-01', registered_to: null, is_primary: true },
+  ];
   tables.tenants = {
     resolved_country_config: {
       'regime.tax': 'in_gst',

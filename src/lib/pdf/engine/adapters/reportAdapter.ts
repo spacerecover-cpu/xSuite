@@ -119,6 +119,41 @@ const CANONICAL_SECTIONS: Record<string, CanonicalSection> = {
   chain_of_custody_notes: { tkey: 'chainOfCustody', en: 'Chain of Custody', tone: 'neutral', kind: 'custody' },
   destruction_certificate: { tkey: 'certificateOfDestruction', en: 'Certificate of Destruction', tone: 'neutral', kind: 'destruction_certificate' },
   recovered_files_summary: { tkey: 'recoveredFilesSummary', en: 'Recovered Files Summary', tone: 'neutral' },
+  // ── Industry-taxonomy sections (2026-07 research: NIST 800-88/800-61,
+  // SWGDE/ISO 27037, CISA #StopRansomware, 3-2-1/ISO 31000, lab conventions) ──
+  // Evaluation
+  estimated_timeline: { tkey: 'estimatedTimeline', en: 'Estimated Recovery Time', tone: 'warning' },
+  risks_disclaimers: { tkey: 'risksDisclaimers', en: 'Risks & Required Consents', tone: 'danger' },
+  // Service
+  parts_used: { tkey: 'partsUsed', en: 'Parts & Materials Used', tone: 'neutral' },
+  verification_qa: { tkey: 'verificationQa', en: 'Verification & Quality Assurance', tone: 'success' },
+  delivery_details: { tkey: 'deliveryDetails', en: 'Delivery & Data Retention', tone: 'info' },
+  // Server / RAID
+  array_configuration: { tkey: 'arrayConfiguration', en: 'Array Configuration', tone: 'info' },
+  member_drives: { tkey: 'memberDrives', en: 'Member Drive Assessment', tone: 'warning' },
+  // Malware / ransomware
+  infection_vector: { tkey: 'infectionVector', en: 'Infection Vector & Root Cause', tone: 'warning' },
+  affected_systems: { tkey: 'affectedSystems', en: 'Affected Systems & Data Scope', tone: 'warning' },
+  // Forensic
+  examiner_qualifications: { tkey: 'examinerQualifications', en: 'Examiner Qualifications', tone: 'neutral' },
+  acquisition_details: { tkey: 'acquisitionDetails', en: 'Acquisition Methodology', tone: 'info' },
+  conclusions: { tkey: 'conclusionsOpinion', en: 'Conclusions & Expert Opinion', tone: 'info' },
+  limitations: { tkey: 'limitationsDisclaimers', en: 'Limitations & Disclaimers', tone: 'warning' },
+  // Data destruction (NIST SP 800-88 certificate structure)
+  sanitization_details: { tkey: 'sanitizationDetails', en: 'Sanitization Details', tone: 'info' },
+  verification_details: { tkey: 'verificationValidation', en: 'Verification & Validation', tone: 'success' },
+  media_disposition: { tkey: 'mediaDisposition', en: 'Media Destination & Disposition', tone: 'neutral' },
+  // Prevention / strategy
+  root_cause: { tkey: 'rootCause', en: 'Root Cause of Data Loss', tone: 'warning' },
+  risk_assessment: { tkey: 'riskAssessment', en: 'Risk Assessment', tone: 'danger' },
+  backup_strategy: { tkey: 'backupStrategy', en: 'Backup Strategy Recommendation', tone: 'info' },
+  monitoring_plan: { tkey: 'monitoringPlan', en: 'Monitoring & Early-Warning Plan', tone: 'info' },
+  action_plan: { tkey: 'actionPlan', en: 'Prioritized Action Plan', tone: 'success' },
+  emergency_response: { tkey: 'emergencyResponse', en: 'Warning Signs & Emergency Response', tone: 'danger' },
+  // Recovered files / delivery acceptance
+  recovery_statistics: { tkey: 'recoveryStatistics', en: 'Recovery Statistics', tone: 'info' },
+  file_categories: { tkey: 'fileCategories', en: 'File Category Breakdown', tone: 'neutral' },
+  critical_files: { tkey: 'criticalFiles', en: 'Critical Files Verification', tone: 'success' },
 };
 
 /**
@@ -137,8 +172,10 @@ const SECTION_KEY_ALIASES: Record<string, string> = {
   important_notes: 'recommendations',
   service_important_notes: 'recommendations',
   actions_taken: 'work_performed',
-  estimated_recovery_time: 'recovery_results',
-  recovery_time: 'recovery_results',
+  // Authored recovery-time content now renders under the warning-toned
+  // Estimated Recovery Time section (the reference evaluation layout).
+  estimated_recovery_time: 'estimated_timeline',
+  recovery_time: 'estimated_timeline',
   non_recovery_reasons: 'findings',
   chain_of_custody: 'chain_of_custody_notes',
   destruction: 'destruction_certificate',
@@ -146,6 +183,9 @@ const SECTION_KEY_ALIASES: Record<string, string> = {
   recovered_files: 'recovered_files_summary',
   device: 'device_information',
   device_information: 'device_information',
+  raid_configuration: 'array_configuration',
+  iocs: 'security_analysis',
+  malware_identification: 'security_analysis',
 };
 
 /** Normalize an authored section key to its canonical Option B key. */
@@ -161,30 +201,117 @@ function canonicalKey(sectionKey: string): string {
 // keys are canonical prose/custody/certificate sections.
 // ---------------------------------------------------------------------------
 
+// Ordered per the 2026-07 industry research (see CANONICAL_SECTIONS notes):
+// each subtype mirrors the professional report structure for that engagement —
+// evaluation = pre-approval diagnostic assessment (reference layout), service =
+// work-completion report, server = multi-drive RAID engagement report, malware =
+// customer-facing IR report (NIST 800-61 / CISA shape), forensic = SWGDE/ISO
+// 27037 examination report, data_destruction = NIST SP 800-88 certificate,
+// prevention = post-recovery advisory (root cause → risk → plan), and
+// recovered_files = stage-12 file listing & delivery acceptance report.
 const SUBTYPE_SECTIONS: Record<string, string[]> = {
-  evaluation: ['executive_summary', 'device_information', 'initial_assessment', 'findings', 'recommendations'],
-  service: ['executive_summary', 'device_information', 'work_performed', 'recovery_results', 'recommendations'],
-  server: ['executive_summary', 'device_information', 'initial_assessment', 'work_performed', 'recovery_results', 'recommendations'],
-  malware: ['executive_summary', 'device_information', 'security_analysis', 'findings', 'recommendations'],
-  forensic: ['executive_summary', 'device_information', 'chain_of_custody_notes', 'findings', 'recommendations'],
-  data_destruction: ['executive_summary', 'device_information', 'destruction_certificate'],
-  prevention: ['executive_summary', 'findings', 'recommendations'],
-  recovered_files: ['executive_summary', 'recovered_files_summary', 'recommendations'],
+  evaluation: [
+    'executive_summary', 'device_information', 'initial_assessment', 'findings',
+    'recommendations', 'estimated_timeline', 'risks_disclaimers',
+  ],
+  service: [
+    'executive_summary', 'device_information', 'findings', 'work_performed',
+    'parts_used', 'recovery_results', 'verification_qa', 'recommendations',
+  ],
+  server: [
+    'executive_summary', 'device_information', 'array_configuration', 'member_drives',
+    'work_performed', 'recovery_results', 'verification_qa', 'recommendations',
+  ],
+  malware: [
+    'executive_summary', 'device_information', 'infection_vector', 'security_analysis',
+    'affected_systems', 'work_performed', 'recovery_results', 'recommendations',
+  ],
+  forensic: [
+    'executive_summary', 'examiner_qualifications', 'device_information', 'acquisition_details',
+    'chain_of_custody_notes', 'findings', 'conclusions', 'limitations',
+  ],
+  data_destruction: [
+    'executive_summary', 'device_information', 'sanitization_details',
+    'verification_details', 'media_disposition', 'destruction_certificate',
+  ],
+  prevention: [
+    'executive_summary', 'root_cause', 'risk_assessment', 'backup_strategy',
+    'monitoring_plan', 'action_plan', 'emergency_response',
+  ],
+  recovered_files: [
+    'executive_summary', 'device_information', 'recovery_statistics', 'file_categories',
+    'critical_files', 'recovered_files_summary', 'limitations', 'delivery_details',
+  ],
 };
 
 /** The default subtype when an unknown report_type is supplied. */
 const DEFAULT_SUBTYPE = 'evaluation';
 
 /**
+ * Authoring guidance per canonical section — what industry practice expects the
+ * engineer to write. Shown as editor placeholder text (never printed); the PDF
+ * simply skips sections the engineer leaves empty.
+ */
+const SECTION_GUIDANCE: Record<string, string> = {
+  executive_summary: 'Plain-language outcome in 3–5 sentences: what was received, what failed, what was (or can be) recovered, and the overall verdict. Written for a non-technical reader.',
+  initial_assessment: 'Condition on receipt: physical inspection findings, prior-opening evidence, reported symptoms and events leading to the loss, customer-identified critical files.',
+  findings: 'The exact cause of failure with evidence: fault class (logical / electronic / firmware / mechanical / media), SMART indicators, inspection results, severity.',
+  recommendations: 'The recommended recovery strategy mapped to the fault, the escalation path (non-invasive first, destructive last), donor parts needed, and expected challenges.',
+  estimated_timeline: 'Turnaround per service tier (Standard / Priority / Emergency) in business days; note donor-part lead time. The clock starts at approval.',
+  risks_disclaimers: 'Consent items: further-damage risk on already-damaged media, warranty-void on opening, DESTRUCTIVE-ATTEMPT consent (irreversible, last resort), encryption limits.',
+  work_performed: 'Chronological, specific actions — never "repaired drive": cleanroom work, head-stack swap, PCB/ROM transfer, firmware repair, imaging passes and tools (with versions), logical reconstruction.',
+  parts_used: 'Every donor / replacement part consumed: part type, donor model + serial, compatibility basis, quantity, billed or not. The patient drive is not returned in working order.',
+  recovery_results: 'Outcome per device and overall: sectors imaged (binary read %), files recovered vs requested (count and %), volume recovered, corrupted-file handling, unrecoverable items with reasons.',
+  verification_qa: 'How results were validated: file-list generation, sample-open checks of priority files, image hashes (SHA-256), QA checklist sign-off by a second engineer.',
+  delivery_details: 'Target media (make/model/serial), encryption applied, original-device disposition, retention window for the lab working copy and the exact secure-deletion date.',
+  array_configuration: 'RAID level, member count, hot spares, stripe/chunk size, parity rotation, disk order, controller make/model/firmware, volumes and file systems — as reported vs as determined.',
+  member_drives: 'One entry per member drive: slot, model, serial, SMART/physical findings, array state (active / spare / failed / stale), % imaged, bad sectors, image hash.',
+  infection_vector: 'How the malware entered (phishing, exposed RDP, vulnerability, credentials) with the evidence basis and confidence level; state what was ruled out if undetermined.',
+  security_analysis: 'Malware family/variant and identification basis (ransom note, extension scheme, hash lookup); key indicators of compromise (hashes, IPs, domains — defanged).',
+  affected_systems: 'Per-device scope: host, role, OS, encryption status, backup status; data types and volume affected vs intact.',
+  examiner_qualifications: 'Examiner name, title, years of experience, certifications and relevant training; assisting staff and roles; lab accreditations.',
+  acquisition_details: 'Write blocker (make/model/firmware), imaging tool + version, image format, source parameters, read-error log, acquisition + verification hashes per image.',
+  conclusions: 'Every opinion with its basis, tied back to the findings; calibrated language ("consistent with", "in my professional opinion") — never advocacy.',
+  limitations: 'What could not be examined or recovered and why; assumptions relied on; tool limits; qualifications to the conclusions.',
+  sanitization_details: 'NIST SP 800-88 category (Clear / Purge / Destroy), method used (overwrite, crypto-erase, degauss, shred…), method details (passes / particle size), tool or equipment + version, date and location.',
+  verification_details: 'Verification method (full read-back / sampling), per-device result (passed / failed), post-sanitization classification, QA sampling notes.',
+  media_disposition: 'Final destination per NIST Appendix G: internal/external reuse, recycling facility, returned to customer; downstream vendor if media leaves the lab.',
+  root_cause: 'The diagnostic finding restated for the customer: failure class, evidence observed, contributing factors (age, heat, single-copy), and a one-line preventability statement.',
+  risk_assessment: 'One entry per remaining risk: description, likelihood 1–5, impact 1–5, score and band (Low/Moderate/High/Critical), and the action that mitigates it.',
+  backup_strategy: 'The 3-2-1 prescription sized to the customer (3 copies, 2 media, 1 offsite; add immutable copy + restore tests for ransomware exposure); current posture vs target.',
+  monitoring_plan: 'Metric | tool | frequency | alert threshold | action. Include the SMART watchlist (attributes 5, 187, 188, 197, 198): any raw value > 0 = watch; rising = replace now.',
+  action_plan: 'Numbered actions with priority (Critical/High/Medium/Low), timeframe (0–7d / 0–30d / 30–90d), owner, and the risk each one mitigates. Every action specific and actionable.',
+  emergency_response: 'Failure symptoms to watch for (clicking, disconnects, SMART alerts) and what to do: power down immediately, never run recovery software on a failing drive, contact the lab.',
+  recovery_statistics: 'Total files identified; recovered good / suspect / not recovered; recovery rate BY COUNT and BY VOLUME (they diverge on partial recoveries); GB recovered vs source used capacity.',
+  file_categories: 'Per category (Photos, Documents, Video, Email, Databases…): recovered / suspect / not-recovered counts and volume — how the customer sanity-checks "are my photos there".',
+  critical_files: 'One line per customer-declared must-have file/folder: path, status (recovered-verified / partial / not recovered), verification method (opened / functional test).',
+  recovered_files_summary: 'Where the full manifest lives (portal link / attached listing), how it is organized (original folder structure), and the per-file status vocabulary (Good / Suspect / Partial).',
+  chain_of_custody_notes: 'Context for the custody timeline below: seals, storage, transfers. The event table itself is rendered automatically from the custody ledger.',
+  destruction_certificate: 'The attestation paragraph: media itemized above were sanitized/destroyed on [date] at [location] per NIST SP 800-88, rendering the data unrecoverable. Operator + witness sign below.',
+};
+
+/** Editor guidance for a (possibly aliased) section key; undefined when none. */
+export function reportSectionGuidance(sectionKey: string): string | undefined {
+  return SECTION_GUIDANCE[canonicalKey(sectionKey)];
+}
+
+/**
  * The ordered canonical prose-section descriptors for a report subtype — the seed
  * list the Documents tab uses to create document_instance_sections. Mirrors the
  * sections the adapter renders, so a freshly-seeded draft matches the PDF layout.
  * `device_information` is excluded because it is the auto-rendered two-column device
- * card (handled by reportInfoColumns), not an editable prose section.
+ * card (handled by reportInfoColumns), not an editable prose section. `guidance`
+ * is editor placeholder copy (industry practice per section) — never printed.
  */
-export function reportSubtypeSections(subtype: string): Array<{ key: string; title: string }> {
+export function reportSubtypeSections(
+  subtype: string,
+): Array<{ key: string; title: string; guidance?: string }> {
   const keys = proseSectionKeysForSubtype(subtype);
-  return keys.map((key) => ({ key, title: CANONICAL_SECTIONS[key]?.en ?? key }));
+  return keys.map((key) => ({
+    key,
+    title: CANONICAL_SECTIONS[key]?.en ?? key,
+    ...(SECTION_GUIDANCE[key] ? { guidance: SECTION_GUIDANCE[key] } : {}),
+  }));
 }
 
 /** The ordered Option B prose-section keys for a subtype (device_information dropped). */

@@ -15,6 +15,7 @@ export async function fetchInstanceReportData(instanceId: string): Promise<Repor
   const companySettingsRaw = await getOrCreateCompanySettings();
   const companySettings = mapCompanySettingsToReportData(companySettingsRaw);
   const signatureBlocks = await resolveSignatureBlocks(instanceId);
+  const preparedByName = await fetchPreparedByName(instance.created_by ?? null);
 
   return mapInstanceToReportData(
     instance,
@@ -25,8 +26,19 @@ export async function fetchInstanceReportData(instanceId: string): Promise<Repor
       sort_order: s.sort_order,
       is_visible: s.is_visible,
     })),
-    { ...caseCtx, companySettings, signatureBlocks },
+    { ...caseCtx, companySettings, signatureBlocks, ...(preparedByName ? { preparedByName } : {}) },
   );
+}
+
+/** The report author's display name (Technician row / provable footer context). */
+async function fetchPreparedByName(createdBy: string | null): Promise<string | null> {
+  if (!createdBy) return null;
+  const { data } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('id', createdBy)
+    .maybeSingle<{ full_name: string | null }>();
+  return data?.full_name ?? null;
 }
 
 /** Map the service-layer CompanySettings to the PDF engine's ReportData['companySettings']. */
@@ -92,23 +104,26 @@ function mapCompanySettingsToReportData(cs: CompanySettings): ReportData['compan
   };
 }
 
-/** Minimal case/customer/device/recoverability lookup for the report context. */
+/** Case/customer/device/custody/recoverability lookup for the report context. */
 async function fetchCaseContext(caseId: string): Promise<Partial<ReportData>> {
   type CustomerEmbed = { customer_name: string | null; email: string | null; mobile_number: string | null } | null;
   type CompanyEmbed = { company_name: string | null } | null;
+  type NameEmbed = { name: string | null } | null;
   type CaseWithEmbeds = {
     case_no: string | null;
     case_number: string | null;
     created_at: string;
     priority: string | null;
     client_reference: string | null;
+    estimated_completion: string | null;
     customers_enhanced: CustomerEmbed;
     companies: CompanyEmbed;
+    catalog_service_types: NameEmbed;
   };
 
   const { data: c } = await supabase
     .from('cases')
-    .select('case_no, case_number, created_at, priority, client_reference, customers_enhanced!customer_id(customer_name, email, mobile_number), companies!company_id(company_name)')
+    .select('case_no, case_number, created_at, priority, client_reference, estimated_completion, customers_enhanced!customer_id(customer_name, email, mobile_number), companies!company_id(company_name), catalog_service_types!service_type_id(name)')
     .eq('id', caseId)
     .maybeSingle<CaseWithEmbeds>();
 
@@ -116,8 +131,11 @@ async function fetchCaseContext(caseId: string): Promise<Partial<ReportData>> {
   const company = c?.companies ?? null;
 
   type DeviceWithEmbeds = {
-    catalog_device_types: { name: string | null } | null;
-    catalog_device_brands: { name: string | null } | null;
+    catalog_device_types: NameEmbed;
+    catalog_device_brands: NameEmbed;
+    catalog_device_capacities: NameEmbed;
+    catalog_device_interfaces: NameEmbed;
+    catalog_device_conditions: NameEmbed;
     model: string | null;
     serial_number: string | null;
     recovery_result: string | null;
@@ -125,13 +143,29 @@ async function fetchCaseContext(caseId: string): Promise<Partial<ReportData>> {
 
   const { data: devices } = await supabase
     .from('case_devices')
-    .select('catalog_device_types!device_type_id(name), catalog_device_brands!brand_id(name), model, serial_number, recovery_result')
+    .select('catalog_device_types!device_type_id(name), catalog_device_brands!brand_id(name), catalog_device_capacities!capacity_id(name), catalog_device_interfaces!interface_id(name), catalog_device_conditions!condition_id(name), model, serial_number, recovery_result')
     .eq('case_id', caseId)
     .is('deleted_at', null)
     .order('created_at', { ascending: true })
     .overrideTypes<DeviceWithEmbeds[]>();
 
   const dev = devices?.[0];
+
+  // Custody ledger → report timeline (forensic subtype renders it; the others
+  // simply carry no custodyLog block). Append-only table, ordered by creation.
+  type CustodyRow = {
+    action: string;
+    description: string | null;
+    actor_name: string;
+    created_at: string;
+  };
+  const { data: custody } = await supabase
+    .from('chain_of_custody')
+    .select('action, description, actor_name, created_at')
+    .eq('case_id', caseId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true })
+    .overrideTypes<CustodyRow[]>();
 
   return {
     caseData: c
@@ -144,6 +178,8 @@ async function fetchCaseContext(caseId: string): Promise<Partial<ReportData>> {
           priority: c.priority ?? undefined,
           client_reference: c.client_reference ?? undefined,
           company_name: company?.company_name ?? undefined,
+          service_type: c.catalog_service_types?.name ?? undefined,
+          estimated_completion: c.estimated_completion ?? undefined,
         }
       : undefined,
     customerData: cust
@@ -160,8 +196,21 @@ async function fetchCaseContext(caseId: string): Promise<Partial<ReportData>> {
           brand: dev.catalog_device_brands?.name ?? undefined,
           model: dev.model ?? undefined,
           serial_number: dev.serial_number ?? undefined,
+          capacity: dev.catalog_device_capacities?.name ?? undefined,
+          interface: dev.catalog_device_interfaces?.name ?? undefined,
+          condition: dev.catalog_device_conditions?.name ?? undefined,
         }
       : undefined,
+    chainOfCustodyEvents:
+      custody && custody.length > 0
+        ? custody.map((e) => ({
+            event_type: e.action,
+            event_date: e.created_at,
+            event_timestamp: e.created_at,
+            event_description: e.description ?? undefined,
+            actor: { full_name: e.actor_name },
+          }))
+        : undefined,
     recoverability: dev?.recovery_result ?? null,
   };
 }

@@ -12,6 +12,7 @@ import {
   transitionDocument,
 } from '../../lib/documentInstanceService';
 import { captureStaffSignature, listInstanceSignatures } from '../../lib/documentSignatureService';
+import { reportSectionGuidance as sectionGuidance } from '../../lib/pdf/engine/adapters/reportAdapter';
 import type { CapturedSignature } from './SignatureCaptureModal';
 import { SignatureCaptureModal } from './SignatureCaptureModal';
 import { reportPDFService } from '../../lib/reportPDFService';
@@ -344,6 +345,7 @@ export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
                 <Textarea
                   label={s.title}
                   value={s.content}
+                  placeholder={sectionGuidance(s.section_key)}
                   onChange={(e) =>
                     setSections((prev) =>
                       prev.map((x, j) => (j === i ? { ...x, content: e.target.value } : x)),

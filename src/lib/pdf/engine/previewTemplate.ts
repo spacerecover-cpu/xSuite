@@ -103,6 +103,7 @@ export async function previewTemplate(
   signatureImage?: BrandingImage | null,
   companySettings?: CompanySettingsData,
   languageExplicit = false,
+  opts?: { reportSubtype?: string },
 ): Promise<PreviewResult> {
   // When the tenant's company settings are supplied, render the way the generator
   // does: the tenant's real company replaces the sample company, and the config
@@ -139,7 +140,7 @@ export async function previewTemplate(
       /* non-fatal: render proceeds with the base font */
     }
   }
-  const engineData = buildPreviewEngineData(docType, effectiveConfig, companySettings);
+  const engineData = buildPreviewEngineData(docType, effectiveConfig, companySettings, opts);
   // Draw the real logo when resolved, else a labeled placeholder box. The QR is
   // auto-generated from the document's verification payload as a PNG image —
   // pdfmake's native `qr` does not paint in the browser build, so an image is the
