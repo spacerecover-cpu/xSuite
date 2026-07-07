@@ -102,6 +102,20 @@ describe('RecordPaymentModal withholding (WP-L3 TDS, AD-7 universal collapsed se
     expect(screen.getByText(/required when an amount is withheld/i)).toBeInTheDocument();
   });
 
+  it('surfaces the certificate-required reason in the footer even when the section is collapsed (WP-L3 review fix)', async () => {
+    renderModal();
+    await fillRequiredFields();
+
+    const toggle = screen.getByRole('button', { name: /withholding/i });
+    await userEvent.click(toggle);
+    await userEvent.type(screen.getByLabelText(/withheld amount/i), '2');
+    await userEvent.click(toggle); // collapse — the inline error is now hidden
+
+    // The disabled reason must still be visible somewhere (footer), not a dead-end.
+    expect(screen.getByText(/certificate reference/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /record payment/i })).toBeDisabled();
+  });
+
   it('passes null withholding when the section is untouched (regression: existing flow)', async () => {
     const { onSave } = renderModal();
     await fillRequiredFields();

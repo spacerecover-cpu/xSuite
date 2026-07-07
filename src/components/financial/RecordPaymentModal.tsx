@@ -717,12 +717,19 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         </div>
 
         <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
-          {(methodMissing || accountMissing) && (
+          {(methodMissing || accountMissing) ? (
             <span className="mr-auto flex items-center gap-1.5 text-xs font-medium text-danger">
               <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
               Select {methodMissing && accountMissing ? 'method & account' : methodMissing ? 'a payment method' : 'a deposit account'}
             </span>
-          )}
+          ) : certMissing ? (
+            // Surfaced here too so the disabled reason is visible even when the
+            // Withholding section (which holds the inline error) is collapsed.
+            <span className="mr-auto flex items-center gap-1.5 text-xs font-medium text-danger">
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
+              Add the withholding certificate reference
+            </span>
+          ) : null}
           <Button type="button" variant="secondary" onClick={handleClose}>
             Cancel
           </Button>
@@ -734,7 +741,9 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 ? 'The allocation must equal the payment amount before recording'
                 : (methodMissing || accountMissing)
                   ? 'Select a payment method and deposit account before recording'
-                  : undefined
+                  : certMissing
+                    ? 'A withholding certificate reference is required when an amount is withheld'
+                    : undefined
             }
             className="flex items-center gap-2"
             variant="primary"
