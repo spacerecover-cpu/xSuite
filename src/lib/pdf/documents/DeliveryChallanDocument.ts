@@ -179,6 +179,8 @@ function buildChallanCopy(
     margin: [0, 0, 0, 14],
   };
 
+  // A column child: `width` is valid inside `columns` at runtime; the ContentStack
+  // type doesn't model it, so assert to Content.
   const signatureBox = (title: string): Content => ({
     width: '50%',
     stack: [
@@ -186,7 +188,7 @@ function buildChallanCopy(
       { canvas: [{ type: 'rect', x: 0, y: 0, w: 230, h: 42, lineWidth: 0.5, lineColor: PDF_COLORS.border }], margin: [0, 0, 0, 2] },
       { text: 'Signature & Date', fontSize: 7.5, color: PDF_COLORS.textLight, alignment: 'center' },
     ],
-  });
+  } as Content);
 
   const signatures: Content = {
     columns: [signatureBox('Received by (Consignee/Collector)'), { width: 20, text: '' }, signatureBox(`For ${legalName} — Authorised Signatory`)],

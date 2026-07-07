@@ -3,7 +3,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { DeviceCheckoutModal } from './DeviceCheckoutModal';
 import { supabase } from '../../lib/supabaseClient';
 import {
-  fetchDeviceRolePartition,
   getCheckoutBatchId,
   issueDeliveryChallan,
 } from '../../lib/deliveryChallanService';
