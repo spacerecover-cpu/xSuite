@@ -1,55 +1,30 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { printCaseLabels } from '../../lib/pdf/labels/labelPrintService';
-import { Printer, X, Loader2, AlertCircle, RefreshCw, Tag } from 'lucide-react';
+import { generateDeliveryChallan } from '../../lib/pdf/pdfService';
+import { Printer, X, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 
-export const PrintLabelPage = () => {
-  const { caseId } = useParams<{ caseId: string }>();
+export const PrintDeliveryChallanPage = () => {
+  const { caseId, batchId } = useParams<{ caseId: string; batchId: string }>();
   const navigate = useNavigate();
   const [isGenerating, setIsGenerating] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const run = async (id: string, batch: string) => {
+    setIsGenerating(true);
+    setError(null);
+    const result = await generateDeliveryChallan(id, batch, false);
+    if (!result.success) setError(result.error || 'Failed to generate PDF');
+    setIsGenerating(false);
+  };
+
   useEffect(() => {
-    if (!caseId) {
-      setError('Invalid case ID');
+    if (!caseId || !batchId) {
+      setError('Invalid delivery challan reference');
       setIsGenerating(false);
       return;
     }
-
-    const generatePDF = async () => {
-      setIsGenerating(true);
-      setError(null);
-
-      const result = await printCaseLabels(caseId, { output: 'print' });
-
-      if (!result.success) {
-        setError(result.error || 'Failed to generate PDF');
-      }
-
-      setIsGenerating(false);
-    };
-
-    generatePDF();
-  }, [caseId]);
-
-  const handleRetry = () => {
-    if (caseId) {
-      setIsGenerating(true);
-      setError(null);
-      printCaseLabels(caseId, { output: 'print' }).then((result) => {
-        if (!result.success) {
-          setError(result.error || 'Failed to generate PDF');
-        }
-        setIsGenerating(false);
-      });
-    }
-  };
-
-  const handleDownload = () => {
-    if (caseId) {
-      printCaseLabels(caseId, { output: 'download' });
-    }
-  };
+    void run(caseId, batchId);
+  }, [caseId, batchId]);
 
   const handleClose = () => {
     if (window.opener) {
@@ -59,32 +34,14 @@ export const PrintLabelPage = () => {
     }
   };
 
-  if (!caseId) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md text-center">
-          <AlertCircle className="w-16 h-16 text-danger mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-slate-900 mb-2">Invalid Case ID</h2>
-          <p className="text-slate-600 mb-6">No case ID was provided.</p>
-          <button
-            onClick={handleClose}
-            className="px-6 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center">
       <div className="bg-white rounded-xl shadow-lg p-8 max-w-md text-center">
         {isGenerating ? (
           <>
             <Loader2 className="w-16 h-16 text-primary mx-auto mb-4 animate-spin" />
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Generating Label</h2>
-            <p className="text-slate-600">Please wait while your case label is being generated...</p>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">Generating PDF</h2>
+            <p className="text-slate-600">Preparing the Rule 55 delivery challan (triplicate)...</p>
           </>
         ) : error ? (
           <>
@@ -93,7 +50,7 @@ export const PrintLabelPage = () => {
             <p className="text-slate-600 mb-6">{error}</p>
             <div className="flex gap-3 justify-center">
               <button
-                onClick={handleRetry}
+                onClick={() => caseId && batchId && void run(caseId, batchId)}
                 className="flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -110,12 +67,12 @@ export const PrintLabelPage = () => {
           </>
         ) : (
           <>
-            <Tag className="w-16 h-16 text-success mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Label Ready</h2>
-            <p className="text-slate-600 mb-6">Your case labels were sent to the print dialog — one label per device.</p>
+            <Printer className="w-16 h-16 text-success mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-slate-900 mb-2">PDF Ready</h2>
+            <p className="text-slate-600 mb-6">The delivery challan has been generated and opened.</p>
             <div className="flex gap-3 justify-center">
               <button
-                onClick={handleDownload}
+                onClick={() => caseId && batchId && generateDeliveryChallan(caseId, batchId, true)}
                 className="flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
               >
                 <Printer className="w-4 h-4" />
@@ -136,4 +93,4 @@ export const PrintLabelPage = () => {
   );
 };
 
-export default PrintLabelPage;
+export default PrintDeliveryChallanPage;

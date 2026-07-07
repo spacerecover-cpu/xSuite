@@ -1,5 +1,5 @@
 import { useCurrencyConfig } from '../contexts/TenantConfigContext';
-import { formatCurrencyWithConfig } from '../lib/format';
+import { formatCurrencyWithConfig, formatMoneyInDocumentCurrency } from '../lib/format';
 import type { CurrencyFormat } from '../lib/format';
 
 export const useCurrency = () => {
@@ -18,9 +18,15 @@ export const useCurrency = () => {
     return formatCurrencyWithConfig(amount, currencyConfig);
   };
 
+  /** Format money in a document's OWN currency (foreign-currency invoices/quotes
+   *  render in their currency; same/absent currency uses the tenant display prefs). */
+  const formatCurrencyIn = (amount: number, documentCurrency?: string | null): string =>
+    formatMoneyInDocumentCurrency(amount, documentCurrency, currencyConfig);
+
   return {
     currencyFormat,
     formatCurrency,
+    formatCurrencyIn,
     loading: false,
   };
 };

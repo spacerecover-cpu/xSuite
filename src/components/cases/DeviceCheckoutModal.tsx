@@ -1,10 +1,19 @@
-import React, { useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Package, User, Phone, CreditCard, Printer } from 'lucide-react';
+import { Package, User, Phone, CreditCard, Printer, FileText } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { logger } from '../../lib/logger';
+import {
+  fetchDeviceRolePartition,
+  getCheckoutBatchId,
+  issueDeliveryChallan,
+} from '../../lib/deliveryChallanService';
+import {
+  ewayBillGuidance,
+  LAB_SUPPLIED_GOODS_GUIDANCE,
+} from '../../lib/regimes/in_gst/deliveryChallan';
 
 interface Device {
   id: string;
@@ -41,6 +50,9 @@ interface DeviceCheckoutModalProps {
   customerMobileNumber?: string;
   onCheckoutComplete: () => void;
   onShowCheckoutPreview?: () => void;
+  /** True when the tenant's documents regime requires a Rule 55 delivery
+   *  challan at device checkout (deliveryChallanEnabled(regime.documents)). */
+  challanEnabled?: boolean;
 }
 
 export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
@@ -53,6 +65,7 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
   customerMobileNumber,
   onCheckoutComplete,
   onShowCheckoutPreview,
+  challanEnabled = false,
 }) => {
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [collectorName, setCollectorName] = useState(customerName);
@@ -62,12 +75,45 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
   const [relationship, setRelationship] = useState<CollectorRelationship>('self');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [declaredValues, setDeclaredValues] = useState<Record<string, string>>({});
+  const [labSuppliedIds, setLabSuppliedIds] = useState<string[]>([]);
+  const [checkoutDone, setCheckoutDone] = useState(false);
   const firstFieldRef = useRef<HTMLInputElement>(null);
   const collectorNameId = useId();
   const collectorMobileId = useId();
   const collectorIdId = useId();
   const recoveryOutcomeId = useId();
   const relationshipId = useId();
+
+  useEffect(() => {
+    if (!challanEnabled || !isOpen || selectedDevices.length === 0) {
+      setLabSuppliedIds([]);
+      return;
+    }
+    let cancelled = false;
+    fetchDeviceRolePartition(selectedDevices)
+      .then((p) => {
+        if (!cancelled) setLabSuppliedIds(p.labSupplied.map((d) => d.id));
+      })
+      .catch((e) => {
+        // Fail open to customer-owned: over-listing on a non-supply challan is
+        // harmless; silently dropping a customer device is not.
+        if (!cancelled) {
+          setLabSuppliedIds([]);
+          logger.error('Device role partition failed:', e);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [challanEnabled, isOpen, selectedDevices]);
+
+  const challanEligibleSelected = selectedDevices.filter((id) => !labSuppliedIds.includes(id));
+  const declaredTotal = challanEligibleSelected.reduce(
+    (sum, id) => sum + (parseFloat(declaredValues[id] ?? '') || 0),
+    0,
+  );
+  const ewayNote = challanEnabled ? ewayBillGuidance(declaredTotal) : null;
 
   const handleDeviceToggle = (deviceId: string) => {
     setSelectedDevices((prev) =>
@@ -90,19 +136,38 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
     }
   };
 
+  const runChallanIssuance = async (): Promise<string> => {
+    const challanLines = challanEligibleSelected.map((id) => ({
+      deviceId: id,
+      declaredValue: parseFloat(declaredValues[id]),
+    }));
+    const batchId = await getCheckoutBatchId(selectedDevices[0]);
+    if (!batchId) throw new Error('Checkout batch not found for the delivery challan');
+    await issueDeliveryChallan({ caseId, batchId, lines: challanLines });
+    return batchId;
+  };
+
   const handleSubmit = async () => {
-    if (selectedDevices.length === 0) {
-      setError('Please select at least one device');
-      return;
+    if (!checkoutDone) {
+      if (selectedDevices.length === 0) {
+        setError('Please select at least one device');
+        return;
+      }
+      if (!collectorName.trim() || !collectorMobile.trim()) {
+        setError('Collector name and mobile number are required');
+        return;
+      }
+      if (relationship !== 'self' && !collectorId.trim()) {
+        setError('A National ID / passport is required when someone collects on behalf of the customer.');
+        return;
+      }
     }
 
-    if (!collectorName.trim() || !collectorMobile.trim()) {
-      setError('Collector name and mobile number are required');
-      return;
-    }
-
-    if (relationship !== 'self' && !collectorId.trim()) {
-      setError('A National ID / passport is required when someone collects on behalf of the customer.');
+    if (
+      challanEnabled &&
+      challanEligibleSelected.some((id) => !(parseFloat(declaredValues[id] ?? '') > 0))
+    ) {
+      setError('Enter a declared value (INR) for every customer-owned device — the Rule 55 delivery challan requires it.');
       return;
     }
 
@@ -110,21 +175,38 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
     setError('');
 
     try {
-      const { error: dbError } = await supabase.rpc('log_case_checkout', {
-        p_case_id: caseId,
-        p_collector_name: collectorName.trim(),
-        p_collector_mobile: collectorMobile.trim(),
-        p_collector_id: collectorId.trim() || undefined,
-        p_recovery_outcome: recoveryOutcome,
-        p_device_ids: selectedDevices,
-        p_collector_relationship: relationship,
-      });
+      if (!checkoutDone) {
+        const { error: dbError } = await supabase.rpc('log_case_checkout', {
+          p_case_id: caseId,
+          p_collector_name: collectorName.trim(),
+          p_collector_mobile: collectorMobile.trim(),
+          p_collector_id: collectorId.trim() || undefined,
+          p_recovery_outcome: recoveryOutcome,
+          p_device_ids: selectedDevices,
+          p_collector_relationship: relationship,
+        });
+        if (dbError) throw dbError;
+        setCheckoutDone(true);
+        onCheckoutComplete();
+      }
 
-      if (dbError) throw dbError;
+      if (challanEnabled && challanEligibleSelected.length > 0) {
+        try {
+          const batchId = await runChallanIssuance();
+          window.open(`/print/delivery-challan/${caseId}/${batchId}`, '_blank');
+        } catch (challanErr) {
+          logger.error('Delivery challan issuance failed after checkout:', challanErr);
+          const msg =
+            challanErr instanceof Error ? challanErr.message : 'unknown error';
+          setError(
+            `Devices are checked out and custody is recorded, but the delivery challan could not be issued: ${msg}. ` +
+              'Retry below — closing this dialog will skip automatic challan issuance.',
+          );
+          return;
+        }
+      }
 
-      onCheckoutComplete();
       onClose();
-
       setTimeout(() => {
         if (onShowCheckoutPreview) {
           onShowCheckoutPreview();
@@ -154,6 +236,9 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
       setRecoveryOutcome('full');
       setRelationship('self');
       setError('');
+      setDeclaredValues({});
+      setLabSuppliedIds([]);
+      setCheckoutDone(false);
       onClose();
     }
   };
@@ -301,6 +386,51 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
           </select>
         </div>
 
+        {challanEnabled && selectedDevices.length > 0 && (
+          <div className="bg-warning-muted border border-warning/30 rounded-lg p-4 space-y-3">
+            <div className="flex items-center gap-2 text-warning-foreground font-semibold">
+              <FileText className="w-5 h-5" />
+              <span>Delivery Challan (Rule 55)</span>
+            </div>
+            <p className="text-xs text-slate-600">
+              Customer-owned devices leaving the lab move under a Rule 55 delivery challan
+              (printed in triplicate). Enter each device's declared goods value — this is a
+              transit value declaration, not a charge.
+            </p>
+            {devices
+              .filter((d) => selectedDevices.includes(d.id) && !labSuppliedIds.includes(d.id))
+              .map((device) => (
+                <div key={device.id} className="flex items-center gap-3">
+                  <span className="flex-1 text-sm text-slate-700">
+                    {device.device_type?.name || 'Device'}
+                    {device.serial_number ? ` · S/N ${device.serial_number}` : ''}
+                  </span>
+                  <label className="sr-only" htmlFor={`challan-value-${device.id}`}>
+                    Declared goods value for {device.serial_number || device.id}
+                  </label>
+                  <Input
+                    id={`challan-value-${device.id}`}
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    value={declaredValues[device.id] ?? ''}
+                    onChange={(e) =>
+                      setDeclaredValues((prev) => ({ ...prev, [device.id]: e.target.value }))
+                    }
+                    placeholder="Declared value (INR)"
+                    className="w-44"
+                  />
+                </div>
+              ))}
+            {labSuppliedIds.some((id) => selectedDevices.includes(id)) && (
+              <p className="text-xs text-warning-foreground font-medium">
+                {LAB_SUPPLIED_GOODS_GUIDANCE}
+              </p>
+            )}
+            {ewayNote && <p className="text-xs text-slate-600">{ewayNote}</p>}
+          </div>
+        )}
+
         <p className="text-xs text-slate-500">
           When the last device is checked out, the case automatically moves to
           Closed — Device Returned (after Data Delivered where applicable).
@@ -334,7 +464,7 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
             ) : (
               <span className="flex items-center gap-2">
                 <Printer className="w-4 h-4" />
-                Print Checkout Form
+                {checkoutDone ? 'Retry Delivery Challan' : 'Print Checkout Form'}
               </span>
             )}
           </Button>

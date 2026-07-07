@@ -194,9 +194,41 @@ export const getTransactionTypes = (): TransactionType[] => {
   ];
 };
 
-export const getFinancialYearDates = () => {
+/** Fiscal-year bounds for a tenant whose fiscal year starts on `fiscalYearStart`
+ *  ('MM-DD'). The FY containing `today` runs from that MM-DD to the day before it
+ *  a year later; '01-01' is the calendar year. Date-only and DST-safe (UTC
+ *  arithmetic), so it never drifts a day across timezones the way toISOString did. */
+export const fiscalYearBounds = (
+  fiscalYearStart: string,
+  today: Date,
+): { thisYear: { start: string; end: string }; lastYear: { start: string; end: string } } => {
+  const [mRaw, dRaw] = (fiscalYearStart || '01-01').split('-').map(Number);
+  const startMonth = mRaw >= 1 && mRaw <= 12 ? mRaw : 1;
+  const startDay = dRaw >= 1 && dRaw <= 31 ? dRaw : 1;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const mm = pad(startMonth);
+  const dd = pad(startDay);
+
+  const curMonth = today.getMonth() + 1;
+  const curDay = today.getDate();
+  const started = curMonth > startMonth || (curMonth === startMonth && curDay >= startDay);
+  const fyStartYear = started ? today.getFullYear() : today.getFullYear() - 1;
+
+  const startOf = (yr: number) => `${yr}-${mm}-${dd}`;
+  const endOf = (yr: number) => {
+    const end = new Date(Date.UTC(yr + 1, startMonth - 1, startDay) - 86400000);
+    return `${end.getUTCFullYear()}-${pad(end.getUTCMonth() + 1)}-${pad(end.getUTCDate())}`;
+  };
+  return {
+    thisYear: { start: startOf(fyStartYear), end: endOf(fyStartYear) },
+    lastYear: { start: startOf(fyStartYear - 1), end: endOf(fyStartYear - 1) },
+  };
+};
+
+export const getFinancialYearDates = (fiscalYearStart = '01-01') => {
   const now = new Date();
   const currentYear = now.getFullYear();
+  const fy = fiscalYearBounds(fiscalYearStart, now);
 
   return {
     thisMonth: {
@@ -211,13 +243,7 @@ export const getFinancialYearDates = () => {
       start: new Date(currentYear, Math.floor(now.getMonth() / 3) * 3, 1).toISOString().split('T')[0],
       end: new Date(currentYear, Math.floor(now.getMonth() / 3) * 3 + 3, 0).toISOString().split('T')[0],
     },
-    thisYear: {
-      start: new Date(currentYear, 0, 1).toISOString().split('T')[0],
-      end: new Date(currentYear, 11, 31).toISOString().split('T')[0],
-    },
-    lastYear: {
-      start: new Date(currentYear - 1, 0, 1).toISOString().split('T')[0],
-      end: new Date(currentYear - 1, 11, 31).toISOString().split('T')[0],
-    },
+    thisYear: fy.thisYear,
+    lastYear: fy.lastYear,
   };
 };

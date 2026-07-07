@@ -581,6 +581,33 @@ export interface CreditNoteDocumentData {
   companySettings: CompanySettingsData;
 }
 
+export interface DeliveryChallanLine {
+  description: string;
+  hsnCode: string;
+  quantity: number;
+  unitCode: string;
+  serialNumber: string | null;
+  declaredValue: number;
+}
+
+export interface DeliveryChallanData {
+  challanNo: string;
+  /** ISO timestamp of issuance. */
+  challanDate: string;
+  caseNo: string;
+  consignee: { name: string; address: string | null; gstin: string | null; phone: string | null };
+  transport: { collectorName: string | null; collectorMobile: string | null; relationship: string | null };
+  lines: DeliveryChallanLine[];
+  totalDeclaredValue: number;
+  ewayNote: string | null;
+  notation: string;
+}
+
+export interface DeliveryChallanDocumentData {
+  challanData: DeliveryChallanData;
+  companySettings: CompanySettingsData;
+}
+
 export type DocumentType =
   | 'office_receipt'
   | 'customer_copy'

@@ -9,6 +9,7 @@ import {
   formatDate,
   formatDateTime,
   formatCurrencyWithConfig,
+  formatMoneyInDocumentCurrency,
   renderCurrencyToken,
   groupIntegerDigits,
   toDateInputValue,
@@ -170,6 +171,32 @@ const cfg = (over: Partial<CurrencyConfig> = {}): CurrencyConfig => ({
 
 const omr = (over: Partial<CurrencyConfig> = {}): CurrencyConfig =>
   cfg({ code: 'OMR', symbol: 'ر.ع.', name: 'Omani Rial', decimalPlaces: 3, position: 'after', ...over });
+
+describe('formatMoneyInDocumentCurrency (a document renders in its OWN currency)', () => {
+  it('uses the tenant display config when the document currency matches the tenant', () => {
+    expect(formatMoneyInDocumentCurrency(1000, 'OMR', omr()))
+      .toBe(formatCurrencyWithConfig(1000, omr()));
+  });
+
+  it('falls back to the tenant config when the document currency is absent', () => {
+    expect(formatMoneyInDocumentCurrency(1000, null, omr()))
+      .toBe(formatCurrencyWithConfig(1000, omr()));
+    expect(formatMoneyInDocumentCurrency(1000, undefined, omr()))
+      .toBe(formatCurrencyWithConfig(1000, omr()));
+  });
+
+  it('renders a FOREIGN document currency in that currency, not the tenant symbol', () => {
+    // EUR invoice on an OMR tenant must show EUR (Intl), never the OMR token
+    const out = formatMoneyInDocumentCurrency(1000, 'EUR', omr());
+    expect(out).toBe(formatCurrency(1000, 'EUR'));
+    expect(out).not.toContain('ر.ع.');
+  });
+
+  it('uses the FOREIGN currency decimals, not the tenant decimals', () => {
+    // JPY has 0 decimals; the OMR tenant has 3 — the document wins
+    expect(formatMoneyInDocumentCurrency(1000, 'JPY', omr())).toBe(formatCurrency(1000, 'JPY'));
+  });
+});
 
 describe('renderCurrencyToken — which token a tenant sees', () => {
   it("'symbol' mode returns the display symbol (default, byte-identical)", () => {

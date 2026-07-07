@@ -6,6 +6,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Modal } from '../../components/ui/Modal';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useDateTimeConfig } from '../../contexts/TenantConfigContext';
 import { getFinancialYearDates } from '../../lib/financialService';
 import { baseAmount } from '../../lib/financialMath';
 import { sumBase, groupSumBase } from './reportsDashboardRollup';
@@ -66,7 +67,8 @@ export const ReportsDashboard: React.FC = () => {
   const [expenseByCategoryData, setExpenseByCategoryData] = useState<ExpenseByCategoryData | null>(null);
   const [invoiceVsExpenseData, setInvoiceVsExpenseData] = useState<InvoiceVsExpenseData | null>(null);
 
-  const dates = getFinancialYearDates();
+  const { fiscalYearStart } = useDateTimeConfig();
+  const dates = getFinancialYearDates(fiscalYearStart);
   const selectedDateRange = dates[dateRange as keyof typeof dates] || dates.thisMonth;
 
   const handleGenerateReport = async (reportId: string) => {

@@ -119,6 +119,7 @@ const router = createBrowserRouter(
           <Route path="/print/label/:caseId" lazy={page(() => import('./pages/print/PrintLabelPage'), 'PrintLabelPage')} />
           <Route path="/print/customer-copy/:caseId" lazy={page(() => import('./pages/print/PrintCustomerCopyPage'), 'PrintCustomerCopyPage')} />
           <Route path="/print/checkout/:caseId" lazy={page(() => import('./pages/print/PrintCheckoutPage'), 'PrintCheckoutPage')} />
+          <Route path="/print/delivery-challan/:caseId/:batchId" lazy={page(() => import('./pages/print/PrintDeliveryChallanPage'), 'PrintDeliveryChallanPage')} />
           <Route path="/print/payment-receipt/:paymentId" lazy={page(() => import('./pages/print/PrintPaymentReceiptPage'), 'PrintPaymentReceiptPage')} />
         </Route>
       </Route>

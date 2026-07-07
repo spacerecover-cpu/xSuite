@@ -107,6 +107,25 @@ export const formatCurrency = (amount: number, currency = 'USD', localeCode?: st
 };
 
 /**
+ * Format a document's money in the DOCUMENT's own currency. When the document
+ * currency matches the tenant (or is absent) the tenant's display config is used
+ * (symbol/position/grouping prefs); a FOREIGN document currency is formatted in
+ * that currency's ISO-4217 shape — so e.g. a EUR invoice on an OMR tenant shows €
+ * with 2 decimals, never the tenant token with 3.
+ */
+export const formatMoneyInDocumentCurrency = (
+  amount: number,
+  documentCurrency: string | null | undefined,
+  tenantConfig: CurrencyConfig,
+): string => {
+  const tenantCode = typeof tenantConfig.code === 'string' ? tenantConfig.code : '';
+  if (!documentCurrency || documentCurrency === tenantCode) {
+    return formatCurrencyWithConfig(amount, tenantConfig);
+  }
+  return formatCurrency(amount, documentCurrency);
+};
+
+/**
  * "≈ <base>" preview for a document total. Returns null when doc currency == base
  * (caller hides the line). Rounds via Intl to the base currency's ISO-4217 decimals.
  */
