@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { sanitizeFilterValue } from './postgrestSanitizer';
+import { startOfWeekIso } from './weekDates';
 import type { Database } from '../types/database.types';
 
 type Timesheet = Database['public']['Tables']['timesheets']['Row'];
@@ -184,15 +185,12 @@ export const timesheetService = {
     return data ?? [];
   },
 
-  async getTimesheetStats(): Promise<TimesheetStats> {
+  async getTimesheetStats(weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6): Promise<TimesheetStats> {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const startOfWeek = (() => {
-      const d = new Date(now);
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-      return new Date(d.setDate(diff)).toISOString().split('T')[0];
-    })();
+    // Honor the tenant's first-day-of-week instead of a hardcoded Monday, so the
+    // "this week" hours window is correct for Sunday-start (Gulf/US) tenants.
+    const startOfWeek = startOfWeekIso(now, weekStartsOn);
 
     const [totalRes, pendingRes, billableRes, weekRes] = await Promise.all([
       supabase.from('timesheets').select('id', { count: 'exact', head: true }),

@@ -375,8 +375,8 @@ export function TimesheetManagement() {
   });
 
   const { data: stats } = useQuery({
-    queryKey: timesheetKeys.stats(),
-    queryFn: () => timesheetService.getTimesheetStats(),
+    queryKey: [...timesheetKeys.stats(), wso],
+    queryFn: () => timesheetService.getTimesheetStats(wso),
   });
 
   const { data: employees = [] } = useQuery({
