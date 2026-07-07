@@ -131,6 +131,15 @@ export interface StudioApi {
 
 interface TemplateStudioProps {
   docType: TemplateDocumentType;
+  /**
+   * For report templates: the report type this template is scoped to. The
+   * built-in defaults and the live preview follow it, and the preview's
+   * report-type picker is hidden. Absent (legacy shared base), the Studio keeps
+   * a preview picker across all 8 types.
+   */
+  reportSubtype?: string;
+  /** Card label for the heading / download name (defaults to the doc-type label). */
+  titleLabel?: string;
   initialOverride: TemplateConfigOverride;
   isSaving: boolean;
   onBack: () => void;
@@ -159,6 +168,8 @@ const TABS: { id: TabId; label: string; icon: typeof Settings2 }[] = [
  */
 export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   docType,
+  reportSubtype,
+  titleLabel,
   initialOverride,
   isSaving,
   onBack,
@@ -171,15 +182,19 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   // Preview data source: 'sample' synthetic data, or a real record id.
   const [dataSource, setDataSource] = useState<string>('sample');
   const [records, setRecords] = useState<{ id: string; label: string }[]>([]);
-  // Report templates serve all 8 report types; the picker previews each one the
-  // exact way generation resolves it (subtype base + this template's override).
-  const [reportSubtype, setReportSubtype] = useState<string>('evaluation');
+  // A subtype-scoped template previews as its own report type. The legacy
+  // shared base serves all 8, so it keeps a preview picker that renders each
+  // one the exact way generation resolves it (subtype base + this override).
+  const [previewSubtype, setPreviewSubtype] = useState<string>(reportSubtype ?? 'evaluation');
+  const showSubtypePicker = docType === 'report' && !reportSubtype;
   const recordPreviewSupported =
     docType === 'invoice' || docType === 'quote' || docType === 'payment_receipt';
 
+  const heading = titleLabel ?? DOC_TYPE_LABELS[docType];
+
   const builtIn = useMemo(
-    () => (docType === 'report' ? reportConfigForSubtype(reportSubtype) : BUILT_IN_TEMPLATE_CONFIGS[docType]),
-    [docType, reportSubtype],
+    () => (docType === 'report' ? reportConfigForSubtype(previewSubtype) : BUILT_IN_TEMPLATE_CONFIGS[docType]),
+    [docType, previewSubtype],
   );
 
   const resolved = useMemo(
@@ -226,7 +241,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
             tenantSignature,
             companySettings ?? undefined,
             languageExplicit,
-            docType === 'report' ? { reportSubtype } : undefined,
+            docType === 'report' ? { reportSubtype: previewSubtype } : undefined,
           ));
         } else {
           const { previewDocumentForRecord } = await import('../../../lib/pdf/previewRecord');
@@ -252,7 +267,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [resolved, languageExplicit, dataSource, docType, reportSubtype, tenantLogo, tenantStamp, tenantSignature, companySettings]);
+  }, [resolved, languageExplicit, dataSource, docType, previewSubtype, tenantLogo, tenantStamp, tenantSignature, companySettings]);
 
   useEffect(() => () => {
     if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
@@ -537,7 +552,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
             <ArrowLeft className="h-5 w-5 text-slate-600" />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-slate-900">{DOC_TYPE_LABELS[docType]} template</h1>
+            <h1 className="text-xl font-bold text-slate-900">{heading} template</h1>
             <p className="text-sm text-slate-600">Design every detail. The preview updates live.</p>
           </div>
         </div>
@@ -601,7 +616,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
                 {previewUrl && (
                   <a
                     href={previewUrl}
-                    download={`${DOC_TYPE_LABELS[docType]}${
+                    download={`${heading}${
                       dataSource !== 'sample' ? `-${records.find((r) => r.id === dataSource)?.label ?? ''}` : ''
                     }.pdf`.replace(/[^\w.\-]+/g, '-')}
                     title="Download the rendered PDF"
@@ -612,11 +627,11 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
                     Download
                   </a>
                 )}
-                {docType === 'report' && (
+                {showSubtypePicker && (
                   <select
                     aria-label="Preview report type"
-                    value={reportSubtype}
-                    onChange={(e) => setReportSubtype(e.target.value)}
+                    value={previewSubtype}
+                    onChange={(e) => setPreviewSubtype(e.target.value)}
                     className="max-w-[190px] rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     {Object.values(REPORT_TYPES).map((o) => (
@@ -672,7 +687,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
                 // document large + clean instead of a small page inside dark chrome.
                 <iframe
                   src={`${previewUrl}#toolbar=0&navpanes=0&statusbar=0&view=FitH`}
-                  title={`${DOC_TYPE_LABELS[docType]} preview`}
+                  title={`${heading} preview`}
                   className="h-full w-full border-0"
                 />
               ) : (

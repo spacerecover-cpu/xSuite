@@ -26,13 +26,19 @@ import {
   ShieldCheck,
   ClipboardList,
 } from 'lucide-react';
-import type { TemplateDocumentType } from '../../lib/pdf/templateConfig';
+import type { TemplateDocumentType, TemplateStorageKey } from '../../lib/pdf/templateConfig';
+import { reportTemplateKey } from '../../lib/pdf/templateConfig';
+import { REPORT_TYPES } from '../../lib/reportTypes';
 
 /** The bands the document types are grouped into in the Studio landing rail. */
 export type DocCategory = 'financial' | 'intake' | 'reports' | 'internal';
 
 export interface DocumentTypeMeta {
+  /** Storage key of the tenant template row this card edits (`document_type`). */
+  key: TemplateStorageKey;
   type: TemplateDocumentType;
+  /** Set on the 8 report cards: the report type the template is scoped to. */
+  reportSubtype?: string;
   label: string;
   description: string;
   icon: LucideIcon;
@@ -64,11 +70,42 @@ export const DOC_TYPE_LABELS: Record<TemplateDocumentType, string> = {
 };
 
 /**
+ * The 8 report types, each surfaced as its own template card in the Reports
+ * category (subtype-scoped storage key). Names/descriptions/icons come from the
+ * canonical {@link REPORT_TYPES} catalog.
+ */
+const REPORT_TEMPLATE_CARDS: DocumentTypeMeta[] = Object.values(REPORT_TYPES).map((rt) => ({
+  key: reportTemplateKey(rt.key),
+  type: 'report' as const,
+  reportSubtype: rt.key,
+  label: rt.name,
+  description: rt.description,
+  icon: rt.icon,
+  category: 'reports' as const,
+}));
+
+/**
+ * The legacy shared report template (bare `report` storage key). Generation
+ * falls back to it for any report type without its own template, so while a
+ * tenant still has this row the Reports category shows this extra card to keep
+ * it editable / resettable. New tenants never create it.
+ */
+export const LEGACY_REPORT_CARD: DocumentTypeMeta = {
+  key: 'report',
+  type: 'report',
+  label: 'All reports — shared base',
+  description: 'Legacy shared template that styles any report type without its own customization.',
+  icon: ClipboardList,
+  category: 'reports',
+};
+
+/**
  * Every engine-rendered document type, surfaced in the landing grid. Each opens
  * the template Studio + gallery and previews from its own sample data.
  */
 export const DOCUMENT_TYPES: DocumentTypeMeta[] = [
   {
+    key: 'invoice',
     type: 'invoice',
     label: DOC_TYPE_LABELS.invoice,
     description: 'Tax invoice issued to customers for recovery work.',
@@ -76,6 +113,7 @@ export const DOCUMENT_TYPES: DocumentTypeMeta[] = [
     category: 'financial',
   },
   {
+    key: 'quote',
     type: 'quote',
     label: DOC_TYPE_LABELS.quote,
     description: 'Quotation sent for customer approval before work starts.',
@@ -83,6 +121,7 @@ export const DOCUMENT_TYPES: DocumentTypeMeta[] = [
     category: 'financial',
   },
   {
+    key: 'payment_receipt',
     type: 'payment_receipt',
     label: DOC_TYPE_LABELS.payment_receipt,
     description: 'Receipt confirming a payment received against an invoice.',
@@ -90,6 +129,7 @@ export const DOCUMENT_TYPES: DocumentTypeMeta[] = [
     category: 'financial',
   },
   {
+    key: 'credit_note',
     type: 'credit_note',
     label: DOC_TYPE_LABELS.credit_note,
     description: 'Credit note issued to reduce or refund a prior invoice.',
@@ -97,6 +137,7 @@ export const DOCUMENT_TYPES: DocumentTypeMeta[] = [
     category: 'financial',
   },
   {
+    key: 'office_receipt',
     type: 'office_receipt',
     label: DOC_TYPE_LABELS.office_receipt,
     description: "Office's intake receipt printed when a device arrives at the lab.",
@@ -104,6 +145,7 @@ export const DOCUMENT_TYPES: DocumentTypeMeta[] = [
     category: 'intake',
   },
   {
+    key: 'customer_copy',
     type: 'customer_copy',
     label: DOC_TYPE_LABELS.customer_copy,
     description: "Customer's copy of the device check-in receipt.",
@@ -111,6 +153,7 @@ export const DOCUMENT_TYPES: DocumentTypeMeta[] = [
     category: 'intake',
   },
   {
+    key: 'checkout_form',
     type: 'checkout_form',
     label: DOC_TYPE_LABELS.checkout_form,
     description: 'Receipt signed when a device is returned or collected.',
@@ -118,6 +161,7 @@ export const DOCUMENT_TYPES: DocumentTypeMeta[] = [
     category: 'intake',
   },
   {
+    key: 'case_label',
     type: 'case_label',
     label: DOC_TYPE_LABELS.case_label,
     description: 'Physical label affixed to an intake case for tracking.',
@@ -125,20 +169,16 @@ export const DOCUMENT_TYPES: DocumentTypeMeta[] = [
     category: 'intake',
   },
   {
+    key: 'chain_of_custody',
     type: 'chain_of_custody',
     label: DOC_TYPE_LABELS.chain_of_custody,
     description: 'Forensic chain-of-custody log for a case.',
     icon: ShieldCheck,
     category: 'intake',
   },
+  ...REPORT_TEMPLATE_CARDS,
   {
-    type: 'report',
-    label: DOC_TYPE_LABELS.report,
-    description: 'Diagnostic / forensic case report delivered to the customer.',
-    icon: ClipboardList,
-    category: 'reports',
-  },
-  {
+    key: 'stock_label',
     type: 'stock_label',
     label: DOC_TYPE_LABELS.stock_label,
     description: 'Barcode label for an inventory / stock item.',
@@ -146,6 +186,7 @@ export const DOCUMENT_TYPES: DocumentTypeMeta[] = [
     category: 'internal',
   },
   {
+    key: 'payslip',
     type: 'payslip',
     label: DOC_TYPE_LABELS.payslip,
     description: 'Employee payslip for a payroll period.',

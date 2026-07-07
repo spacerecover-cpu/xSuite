@@ -4,62 +4,66 @@ import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
 import { Checkbox } from '../../ui/Checkbox';
 import { Badge } from '../../ui/Badge';
-import type { TemplateDocumentType } from '../../../lib/pdf/templateConfig';
-import { DOCUMENT_TYPES, DOC_CATEGORIES, DOC_TYPE_LABELS } from '../../../pages/settings/documentTypeMeta';
+import type { TemplateStorageKey } from '../../../lib/pdf/templateConfig';
+import { DOC_CATEGORIES, type DocumentTypeMeta } from '../../../pages/settings/documentTypeMeta';
 
 interface CopyStyleModalProps {
   isOpen: boolean;
-  /** The template whose style is being copied FROM. */
-  sourceType: TemplateDocumentType | null;
-  /** Which doc types are currently customized (for the per-row status badge). */
-  customizedTypes: Set<TemplateDocumentType>;
+  /** The template card whose style is being copied FROM. */
+  sourceKey: TemplateStorageKey | null;
+  /** Every card the style can copy to (the parent decides, e.g. legacy visibility). */
+  cards: DocumentTypeMeta[];
+  /** Which cards are currently customized (for the per-row status badge). */
+  customizedKeys: Set<TemplateStorageKey>;
   busy?: boolean;
   onClose: () => void;
-  onCopy: (targets: TemplateDocumentType[]) => void;
+  onCopy: (targets: TemplateStorageKey[]) => void;
 }
 
 /**
- * "Copy template style" — apply one document type's visual style (colours, fonts,
- * header/footer, table + totals styling) to one or more OTHER types. Each target
- * keeps its own structure, labels and document title; only the look is copied.
+ * "Copy template style" — apply one template's visual style (colours, fonts,
+ * header/footer, table + totals styling) to one or more OTHER templates. Each
+ * target keeps its own structure, labels and document title; only the look is
+ * copied.
  */
 export const CopyStyleModal: React.FC<CopyStyleModalProps> = ({
   isOpen,
-  sourceType,
-  customizedTypes,
+  sourceKey,
+  cards,
+  customizedKeys,
   busy,
   onClose,
   onCopy,
 }) => {
-  const [selected, setSelected] = useState<Set<TemplateDocumentType>>(new Set());
+  const [selected, setSelected] = useState<Set<TemplateStorageKey>>(new Set());
 
   // Reset the selection whenever the modal opens or the source changes.
   useEffect(() => {
     setSelected(new Set());
-  }, [sourceType, isOpen]);
+  }, [sourceKey, isOpen]);
 
-  const targets = useMemo(() => DOCUMENT_TYPES.filter((d) => d.type !== sourceType), [sourceType]);
+  const targets = useMemo(() => cards.filter((d) => d.key !== sourceKey), [cards, sourceKey]);
   const allSelected = targets.length > 0 && selected.size === targets.length;
-  const sourceLabel = sourceType ? DOC_TYPE_LABELS[sourceType] : '';
+  const sourceLabel = sourceKey ? cards.find((d) => d.key === sourceKey)?.label ?? sourceKey : '';
 
-  const toggle = (t: TemplateDocumentType) =>
+  const toggle = (key: TemplateStorageKey) =>
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(t)) next.delete(t);
-      else next.add(t);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
 
   const toggleAll = () =>
-    setSelected(allSelected ? new Set() : new Set(targets.map((d) => d.type)));
+    setSelected(allSelected ? new Set() : new Set(targets.map((d) => d.key)));
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="lg" title="Copy template style" icon={Copy}>
       <div className="space-y-4">
         <p className="text-sm text-slate-600">
           Apply <span className="font-semibold text-slate-900">{sourceLabel}</span>&rsquo;s colours, fonts,
-          header &amp; footer, and table / totals styling to other document types. Each type keeps its own
-          structure, labels and document title &mdash; only the look is copied.
+          header &amp; footer, and table / totals styling to other document templates. Each template keeps its
+          own structure, labels and document title &mdash; only the look is copied.
         </p>
 
         <div className="flex items-center justify-between">
@@ -82,19 +86,19 @@ export const CopyStyleModal: React.FC<CopyStyleModalProps> = ({
                 <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">{cat.label}</p>
                 <div className="space-y-1.5">
                   {rows.map((d) => {
-                    const on = selected.has(d.type);
+                    const on = selected.has(d.key);
                     return (
                       <label
-                        key={d.type}
+                        key={d.key}
                         className={[
                           'flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors',
                           on ? 'border-primary bg-primary/5' : 'border-slate-200 hover:bg-slate-50',
                         ].join(' ')}
                       >
-                        <Checkbox checked={on} onChange={() => toggle(d.type)} />
+                        <Checkbox checked={on} onChange={() => toggle(d.key)} />
                         <d.icon className="h-4 w-4 flex-shrink-0 text-slate-400" />
                         <span className="flex-1 text-sm font-medium text-slate-800">{d.label}</span>
-                        {customizedTypes.has(d.type) ? (
+                        {customizedKeys.has(d.key) ? (
                           <Badge variant="success" size="sm">Customized</Badge>
                         ) : (
                           <Badge variant="default" size="sm">Default</Badge>
@@ -118,7 +122,7 @@ export const CopyStyleModal: React.FC<CopyStyleModalProps> = ({
             onClick={() => onCopy([...selected])}
           >
             <Copy className="mr-1.5 h-4 w-4" />
-            Copy to {selected.size} {selected.size === 1 ? 'type' : 'types'}
+            Copy to {selected.size} {selected.size === 1 ? 'template' : 'templates'}
           </Button>
         </div>
       </div>

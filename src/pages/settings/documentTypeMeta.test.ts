@@ -1,9 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { DOCUMENT_TYPES, DOC_TYPE_LABELS } from './documentTypeMeta';
-import { BUILT_IN_TEMPLATE_CONFIGS, type TemplateDocumentType } from '../../lib/pdf/templateConfig';
+import { DOCUMENT_TYPES, DOC_TYPE_LABELS, LEGACY_REPORT_CARD } from './documentTypeMeta';
+import {
+  BUILT_IN_TEMPLATE_CONFIGS,
+  parseTemplateStorageKey,
+  reportTemplateKey,
+  type TemplateDocumentType,
+} from '../../lib/pdf/templateConfig';
+import { REPORT_TYPES } from '../../lib/reportTypes';
 
 // Guards the "Office check-in receipt is missing" bug: the landing grid must
 // surface EVERY engine document type, so none can silently drop off again.
+// Since 2026-07, `report` is surfaced as 8 subtype-scoped cards (one per
+// REPORT_TYPES entry) plus a conditional legacy shared-base card.
 
 const allTypes = Object.keys(BUILT_IN_TEMPLATE_CONFIGS) as TemplateDocumentType[];
 
@@ -13,20 +21,44 @@ describe('documentTypeMeta', () => {
     for (const t of allTypes) {
       expect(listed.has(t), `${t} is missing from the documents grid`).toBe(true);
     }
-    expect(DOCUMENT_TYPES.length).toBe(allTypes.length);
   });
 
-  it('has no duplicate types in the grid', () => {
-    const types = DOCUMENT_TYPES.map((d) => d.type);
-    expect(new Set(types).size).toBe(types.length);
+  it('has no duplicate storage keys, and never the legacy key', () => {
+    const keys = DOCUMENT_TYPES.map((d) => d.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    // The legacy shared base is a separate, conditionally-rendered card.
+    expect(keys).not.toContain(LEGACY_REPORT_CARD.key);
   });
 
-  it('gives every type a non-empty label and description', () => {
+  it('surfaces every report type as its own subtype-scoped card', () => {
+    const reportCards = DOCUMENT_TYPES.filter((d) => d.type === 'report');
+    expect(reportCards.map((d) => d.reportSubtype)).toEqual(Object.keys(REPORT_TYPES));
+    for (const card of reportCards) {
+      expect(card.key).toBe(reportTemplateKey(card.reportSubtype!));
+      expect(card.category).toBe('reports');
+    }
+  });
+
+  it('storage keys round-trip through parseTemplateStorageKey', () => {
+    expect(parseTemplateStorageKey(reportTemplateKey('malware'))).toEqual({
+      docType: 'report',
+      reportSubtype: 'malware',
+    });
+    expect(parseTemplateStorageKey('invoice')).toEqual({ docType: 'invoice' });
+    for (const d of [...DOCUMENT_TYPES, LEGACY_REPORT_CARD]) {
+      const parsed = parseTemplateStorageKey(d.key);
+      expect(parsed.docType, `docType for ${d.key}`).toBe(d.type);
+      expect(parsed.reportSubtype, `subtype for ${d.key}`).toBe(d.reportSubtype);
+    }
+  });
+
+  it('gives every card a non-empty label and description', () => {
     for (const t of allTypes) {
       expect(DOC_TYPE_LABELS[t]?.length ?? 0, `label for ${t}`).toBeGreaterThan(0);
     }
-    for (const d of DOCUMENT_TYPES) {
-      expect(d.description.length, `description for ${d.type}`).toBeGreaterThan(0);
+    for (const d of [...DOCUMENT_TYPES, LEGACY_REPORT_CARD]) {
+      expect(d.label.length, `label for ${d.key}`).toBeGreaterThan(0);
+      expect(d.description.length, `description for ${d.key}`).toBeGreaterThan(0);
     }
   });
 });

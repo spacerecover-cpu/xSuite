@@ -735,6 +735,33 @@ export type TemplateDocumentType =
   | 'stock_label';
 
 /**
+ * Storage key for a tenant template row (`document_templates_pdf.document_type`,
+ * a free-text column): either a plain {@link TemplateDocumentType}, or a
+ * report-subtype-scoped `report:<subtype>` key so each of the 8 report types can
+ * carry its own template. The bare `report` key remains the legacy shared base
+ * that any subtype without its own template falls back to.
+ */
+export type TemplateStorageKey = string;
+
+const REPORT_KEY_PREFIX = 'report:';
+
+/** The subtype-scoped storage key for one report type's template. */
+export function reportTemplateKey(subtype: string): TemplateStorageKey {
+  return `${REPORT_KEY_PREFIX}${subtype}`;
+}
+
+/** Recover the engine doc type (and report subtype, if any) from a storage key. */
+export function parseTemplateStorageKey(key: TemplateStorageKey): {
+  docType: TemplateDocumentType;
+  reportSubtype?: string;
+} {
+  if (key.startsWith(REPORT_KEY_PREFIX)) {
+    return { docType: 'report', reportSubtype: key.slice(REPORT_KEY_PREFIX.length) };
+  }
+  return { docType: key as TemplateDocumentType };
+}
+
+/**
  * A partial, layer-specific override of a {@link DocumentTemplateConfig}.
  * Every level of the cascade (theme, doc-type, instance) supplies one of these;
  * the resolver deep-merges them onto the built-in base. Sections and labels are
