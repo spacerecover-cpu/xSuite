@@ -67,6 +67,9 @@ export async function issueIndiaCreditNote(
       })),
       discountType: null, discountAmount: 0, taxRate: input.tax_rate ?? 0,
       documentType: 'credit_note', documentDate: new Date().toISOString().slice(0, 10),
+      // Thread the buyer so place of supply resolves — else the kernel sees a null
+      // POS and reverses IGST on every CN, mis-filing intra-state (CGST/SGST) credits.
+      customerId: input.customer_id ?? null, companyId: input.company_id ?? null,
     },
     rc,
   );

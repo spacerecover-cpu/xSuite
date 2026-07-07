@@ -19,6 +19,10 @@ describe('whollyExemptGuard (Rule 49 Bill of Supply)', () => {
   it('passes when any line is taxable', () => {
     expect(whollyExemptGuard([line('exempt'), line('standard')])).toBeNull();
   });
+  it('does NOT block zero-rated (export/SEZ) supplies — they are taxable-at-0% and need a tax invoice', () => {
+    expect(whollyExemptGuard([line('zero_rated'), line('zero_rated')])).toBeNull();
+    expect(whollyExemptGuard([line('exempt'), line('zero_rated')])).toBeNull();
+  });
   it('passes on an empty set (no lines yet — nothing to guard)', () => {
     expect(whollyExemptGuard([])).toBeNull();
   });

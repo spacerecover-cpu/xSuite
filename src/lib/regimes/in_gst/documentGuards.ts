@@ -10,9 +10,10 @@ import type { DocumentTaxLine } from '../../pdf/types';
 
 export function whollyExemptGuard(rollups: DocumentTaxLine[]): RequirementFailure | null {
   if (rollups.length === 0) return null;
-  const allExempt = rollups.every(
-    (l) => l.tax_treatment === 'exempt' || l.tax_treatment === 'zero_rated',
-  );
+  // ONLY a wholly-EXEMPT supply needs a Bill of Supply (Rule 49). zero_rated
+  // (export/SEZ under LUT) is a TAXABLE-at-0% supply that MUST be issued on a tax
+  // invoice (Rule 46, with ITC) — never conflate it with exempt.
+  const allExempt = rollups.every((l) => l.tax_treatment === 'exempt');
   if (!allExempt) return null;
   return {
     field_key: 'wholly_exempt_bill_of_supply',
