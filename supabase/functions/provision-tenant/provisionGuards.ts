@@ -80,3 +80,30 @@ export function assertResidencySupported(
   if (availableRegions.some((r) => r !== 'global-1')) return;
   throw new ResidencyNotAvailableError(country.name ?? 'This country');
 }
+
+export interface PrimaryRegistrationInput {
+  tenantId: string;
+  legalEntityId: string;
+  countryId: string;
+  taxNumber: string | null | undefined;
+  subdivisionId: string | null | undefined;
+  today: string; // 'YYYY-MM-DD' (UTC)
+}
+
+/** Seller registration row from the jurisdiction payload. null = nothing captured
+ *  (the tenant declares registered/unregistered post-onboarding in Settings —
+ *  D6 explicit-status discipline; nothing is fabricated here). */
+export function buildPrimaryRegistrationRow(input: PrimaryRegistrationInput) {
+  const taxNumber = (input.taxNumber ?? '').trim();
+  if (!taxNumber) return null;
+  return {
+    tenant_id: input.tenantId,
+    legal_entity_id: input.legalEntityId,
+    country_id: input.countryId,
+    subdivision_id: input.subdivisionId ?? null,
+    tax_number: taxNumber,
+    scheme: 'standard' as const,
+    registered_from: input.today,
+    is_primary: true,
+  };
+}

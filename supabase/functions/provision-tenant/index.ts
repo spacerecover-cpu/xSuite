@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
-import { assertOnboardableCountry, assertResidencySupported, ProvisionGuardError, ResidencyNotAvailableError } from './provisionGuards.ts';
+import { assertOnboardableCountry, assertResidencySupported, buildPrimaryRegistrationRow, ProvisionGuardError, ResidencyNotAvailableError } from './provisionGuards.ts';
 
 const ALLOWED_ORIGINS = [
   'https://xsuite.space',
@@ -66,6 +66,7 @@ interface ProvisionTenantRequest {
   ui_language?: string;
   legal_entity_type?: string;
   tax_number?: string;
+  subdivision_id?: string;
   fiscal_year_start?: string;
   timezone?: string;
 }
@@ -140,7 +141,7 @@ Deno.serve(async (req: Request) => {
 
     const {
       name, slug, adminEmail, adminPassword, adminFullName, planId, countryId, base_currency_code,
-      ui_language, tax_number, fiscal_year_start, timezone: requestTimezone, legal_entity_type,
+      ui_language, tax_number, subdivision_id, fiscal_year_start, timezone: requestTimezone, legal_entity_type,
     } = requestData;
 
     // Self-service signups (no Authorization header) must have an OTP-verified
@@ -410,7 +411,7 @@ Deno.serve(async (req: Request) => {
     // we create it inline so the wizard's jurisdiction capture is honored.
     // currency_code is required + has NO 'USD' default (fail-loud, D2) — it
     // resolves from the guaranteed non-stub country.
-    const { error: legalEntityError } = await supabase
+    const { data: legalEntity, error: legalEntityError } = await supabase
       .from('legal_entities')
       .insert({
         tenant_id: tenant.id,
@@ -429,13 +430,36 @@ Deno.serve(async (req: Request) => {
               },
             }
           : {}),
-      });
+      })
+      .select('id')
+      .single();
 
     if (legalEntityError) {
       console.error('Primary legal entity creation failed:', legalEntityError);
       // Fail-loud: a tenant without its tax-identity entity must not survive.
       await supabase.from('tenants').update({ deleted_at: new Date().toISOString() }).eq('id', tenant.id);
       throw new Error(`Provisioning failed: legal_entities insert: ${legalEntityError.message}`);
+    }
+
+    // Primary tax registration (GSTIN / any registered seller). Same fail-loud
+    // soft-delete rollback discipline as the legal entity itself.
+    const registrationRow = buildPrimaryRegistrationRow({
+      tenantId: tenant.id,
+      legalEntityId: legalEntity!.id,
+      countryId,
+      taxNumber: tax_number,
+      subdivisionId: subdivision_id ?? null,
+      today: new Date().toISOString().slice(0, 10),
+    });
+    if (registrationRow) {
+      const { error: registrationError } = await supabase
+        .from('legal_entity_tax_registrations')
+        .insert(registrationRow);
+      if (registrationError) {
+        console.error('Primary tax registration creation failed:', registrationError);
+        await supabase.from('tenants').update({ deleted_at: new Date().toISOString() }).eq('id', tenant.id);
+        throw new Error(`Provisioning failed: legal_entity_tax_registrations insert: ${registrationError.message}`);
+      }
     }
 
     // Create onboarding progress

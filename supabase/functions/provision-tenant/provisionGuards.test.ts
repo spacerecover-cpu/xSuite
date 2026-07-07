@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   assertOnboardableCountry,
   assertResidencySupported,
+  buildPrimaryRegistrationRow,
   ProvisionGuardError,
   ResidencyNotAvailableError,
 } from './provisionGuards';
@@ -73,5 +74,27 @@ describe('assertResidencySupported (owner E6 honest 422)', () => {
     expect(() =>
       assertResidencySupported({ name: 'Ruritania', requires_local_residency: true }, ['global-1', 'eu-1']),
     ).not.toThrow();
+  });
+});
+
+describe('buildPrimaryRegistrationRow', () => {
+  const base = {
+    tenantId: 't1', legalEntityId: 'le1', countryId: 'c-in',
+    taxNumber: '29ABCDE1234F1Z5', subdivisionId: 's-ka', today: '2026-07-05',
+  };
+  it('builds a standard primary registration when a tax number exists', () => {
+    expect(buildPrimaryRegistrationRow(base)).toEqual({
+      tenant_id: 't1', legal_entity_id: 'le1', country_id: 'c-in',
+      subdivision_id: 's-ka', tax_number: '29ABCDE1234F1Z5',
+      scheme: 'standard', registered_from: '2026-07-05', is_primary: true,
+    });
+  });
+  it('returns null when no tax number was captured (unregistered business)', () => {
+    expect(buildPrimaryRegistrationRow({ ...base, taxNumber: '' })).toBe(null);
+    expect(buildPrimaryRegistrationRow({ ...base, taxNumber: null })).toBe(null);
+    expect(buildPrimaryRegistrationRow({ ...base, taxNumber: undefined })).toBe(null);
+  });
+  it('tolerates a missing subdivision (non-subdivision countries)', () => {
+    expect(buildPrimaryRegistrationRow({ ...base, subdivisionId: null })?.subdivision_id).toBe(null);
   });
 });
