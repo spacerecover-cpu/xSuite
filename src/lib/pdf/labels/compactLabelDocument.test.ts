@@ -122,6 +122,23 @@ describe('buildCompactLabelDocument', () => {
     expect(collectImages(doc)).toHaveLength(0);
   });
 
+  it('omits the QR on stock too small to print a scannable code (25×13)', () => {
+    const doc = buildCompactLabelDocument([label()], getLabelSize('dymo_30333'));
+    expect(collectImages(doc)).toHaveLength(0);
+  });
+
+  it('keeps the QR on wide strips (40×12) and narrow strips (26×15)', () => {
+    expect(collectImages(buildCompactLabelDocument([label()], getLabelSize('nb_12x40')))).toContain(QR_PNG);
+    expect(collectImages(buildCompactLabelDocument([label()], getLabelSize('nb_15x26')))).toContain(QR_PNG);
+  });
+
+  it('gives the identifier the full label width on narrow strips (26×15)', () => {
+    const doc = buildCompactLabelDocument([label()], getLabelSize('nb_15x26'));
+    const idNode = collectTexts(doc).find((t) => t.text === 'CASE-0042');
+    // Full 26mm width fits CASE-0042 + index at ~9.5pt; the old side-by-side layout starved it to 5.5pt.
+    expect(idNode!.fontSize).toBeGreaterThanOrEqual(9);
+  });
+
   it('square layout stacks QR above the identifier', () => {
     const doc = buildCompactLabelDocument([label()], getLabelSize('sq_25'));
     const page = (doc.content as Content[])[0] as { stack: Content[] };
