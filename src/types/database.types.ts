@@ -18440,6 +18440,10 @@ export type Database = {
       _apply_country_config: { Args: { p_tenant_id: string }; Returns: number }
       _fin_base_currency: { Args: { p_tenant: string }; Returns: string }
       _fin_currency_decimals: { Args: { p_code: string }; Returns: number }
+      _issue_advance_voucher: {
+        Args: { p_doc_id: string; p_doc_type: string; p_dry_run?: boolean }
+        Returns: Json
+      }
       _pack_admin_id: { Args: never; Returns: string }
       _pack_open_version: { Args: { p_country_id: string }; Returns: string }
       _pack_require_platform_admin: { Args: never; Returns: undefined }
@@ -18457,6 +18461,10 @@ export type Database = {
       anonymize_customer_data: {
         Args: { p_customer_id: string }
         Returns: undefined
+      }
+      apply_advance_to_invoice: {
+        Args: { p_amount: number; p_invoice_id: string; p_payment_id: string }
+        Returns: Json
       }
       apply_country_numbering_policy: {
         Args: { p_tenant_id: string }
