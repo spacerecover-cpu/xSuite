@@ -32,6 +32,52 @@ export interface ProcessPayrollOptions {
   includePendingAdjustments?: boolean;
 }
 
+export interface EmployeePayInput {
+  basicSalary: number;
+  workingDaysPerMonth: number;
+  workingHoursPerDay: number;
+  overtimeMultiplier: number;
+  overtimeHours: number;
+  daysAbsent: number;
+  socialSecurityRate: number | null;
+  loanDeductions: number;
+}
+
+export interface EmployeePayResult {
+  overtimeAmount: number;
+  absenceDeduction: number;
+  socialSecurityDeduction: number;
+  totalEarnings: number;
+  totalDeductions: number;
+  netSalary: number;
+}
+
+/** Compute one employee's pay for a period. Unauthorized ABSENCE ('absent' days)
+ *  is Loss of Pay, docked at the daily rate but never more than the basic salary;
+ *  approved leave ('leave' days) is presumed PAID and is NOT docked here
+ *  (distinguishing unpaid-leave types is a Phase-1 item). Rates are guarded against
+ *  a zero config. Pending payroll_adjustments are intentionally NOT applied here —
+ *  see the note in processPayroll. */
+export function computeEmployeePay(input: EmployeePayInput): EmployeePayResult {
+  const dailyRate = input.workingDaysPerMonth > 0 ? input.basicSalary / input.workingDaysPerMonth : 0;
+  const hourlyRate = input.workingHoursPerDay > 0 ? dailyRate / input.workingHoursPerDay : 0;
+
+  const overtimeAmount = Number(input.overtimeHours || 0) * hourlyRate * input.overtimeMultiplier;
+  // LOP can never dock more than the basic salary (guards a period whose absent
+  // days exceed the configured working-days denominator).
+  const absenceDeduction = Math.min(
+    input.basicSalary,
+    Math.max(0, Number(input.daysAbsent || 0)) * dailyRate,
+  );
+
+  const socialSecurityDeduction = input.socialSecurityRate == null ? 0 : input.basicSalary * input.socialSecurityRate;
+  const totalEarnings = input.basicSalary + overtimeAmount;
+  const totalDeductions = absenceDeduction + socialSecurityDeduction + input.loanDeductions;
+  const netSalary = totalEarnings - totalDeductions;
+
+  return { overtimeAmount, absenceDeduction, socialSecurityDeduction, totalEarnings, totalDeductions, netSalary };
+}
+
 interface PayrollSettingsValues {
   working_days_per_month: number;
   working_hours_per_day: number;
@@ -341,9 +387,13 @@ export const payrollService = {
     const workingDaysPerMonth = settings.working_days_per_month || 22;
     const workingHoursPerDay = settings.working_hours_per_day || 8;
 
-    if (options.includePendingAdjustments) {
-      await this.getPendingAdjustments();
-    }
+    // NOTE: options.includePendingAdjustments is accepted for API stability, but
+    // applying payroll_adjustments to net pay is a scoped follow-up. Doing it
+    // safely requires the row's `is_deduction` flag (not a type guess), a decision
+    // on pending-vs-approved status, and stamping/period-linking applied rows so
+    // they are never double-applied across runs. Until then adjustments are NOT
+    // auto-applied — previously they were fetched here and silently discarded
+    // (same net-pay effect, minus the wasted query).
 
     const records: PayrollRecordInsert[] = [];
     const tenantId = employees && employees.length > 0 ? employees[0].tenant_id : null;
@@ -382,9 +432,6 @@ export const payrollService = {
       const basicSalary = Number(employee.basic_salary || 0);
       if (!basicSalary) continue;
 
-      const dailyRate = basicSalary / workingDaysPerMonth;
-      const hourlyRate = dailyRate / workingHoursPerDay;
-
       const attendance = await this.getEmployeeAttendance(
         employee.id,
         period.start_date,
@@ -397,13 +444,18 @@ export const payrollService = {
         0
       );
 
-      // Pay overtime: hourly rate × overtime hours × the tenant's overtime
-      // multiplier. Previously the fetched overtime hours were discarded.
-      const overtimeAmount = Number(attendance.overtimeHours || 0) * hourlyRate * overtimeMultiplier;
-      const totalEarnings = basicSalary + overtimeAmount;
-      const socialSecurityDeduction = socialSecurityRate == null ? 0 : basicSalary * socialSecurityRate;
-      const totalDeductions = socialSecurityDeduction + loanDeductions;
-      const netSalary = totalEarnings - totalDeductions;
+      // Unauthorized absence is docked (Loss of Pay) and overtime paid —
+      // previously the fetched absence days were ignored, overstating net pay.
+      const { overtimeAmount, totalEarnings, totalDeductions, netSalary } = computeEmployeePay({
+        basicSalary,
+        workingDaysPerMonth,
+        workingHoursPerDay,
+        overtimeMultiplier,
+        overtimeHours: Number(attendance.overtimeHours || 0),
+        daysAbsent: attendance.daysAbsent,
+        socialSecurityRate,
+        loanDeductions,
+      });
 
       records.push({
         tenant_id: employee.tenant_id,
