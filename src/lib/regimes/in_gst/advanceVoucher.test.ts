@@ -16,4 +16,15 @@ describe('buildAdvanceVoucherTotalsInput (Rule 50 inclusive back-out)', () => {
     const input = buildAdvanceVoucherTotalsInput(1180, '2026-04-10', '998713');
     expect(input.items[0].description).toContain('998713');
   });
+
+  it('threads the buyer so place-of-supply (CGST/SGST vs IGST) follows the customer state', () => {
+    const withBuyer = buildAdvanceVoucherTotalsInput(5000, '2026-04-10', undefined, { customerId: 'cust-1' });
+    expect(withBuyer.customerId).toBe('cust-1');
+    expect(withBuyer.companyId).toBeNull();
+    // company overrides customer, mirroring the invoice buyer-identity block
+    const withCompany = buildAdvanceVoucherTotalsInput(5000, '2026-04-10', undefined, { companyId: 'co-1' });
+    expect(withCompany.companyId).toBe('co-1');
+    // a genuinely buyer-less advance keeps null buyer → the Rule 50 IGST proviso
+    expect(buildAdvanceVoucherTotalsInput(5000, '2026-04-10').customerId).toBeNull();
+  });
 });

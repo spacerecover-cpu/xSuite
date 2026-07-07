@@ -8,6 +8,7 @@ import type { DocumentTotalsInput } from '../../taxDocumentService';
  *  is the tenant default; callers may pass 998713 or another selectable SAC. */
 export function buildAdvanceVoucherTotalsInput(
   advanceAmount: number, documentDate: string, sacCode: string = '998319',
+  buyer?: { customerId?: string | null; companyId?: string | null },
 ): DocumentTotalsInput {
   return {
     items: [{
@@ -19,5 +20,11 @@ export function buildAdvanceVoucherTotalsInput(
     documentType: 'receipt_voucher',
     documentDate,
     taxInclusive: true,
+    // Thread the buyer so the kernel derives place-of-supply from the customer's
+    // state (intra → CGST+SGST, inter → IGST). The Rule 50 IGST proviso then
+    // applies ONLY to a genuinely buyer-less advance (POS indeterminable) — not
+    // to every advance. Without this every voucher silently books IGST.
+    customerId: buyer?.customerId ?? null,
+    companyId: buyer?.companyId ?? null,
   };
 }

@@ -49,7 +49,9 @@ export async function issueReceiptVoucher(draft: ReceiptVoucherDraft) {
   if (insErr) throw insErr;
 
   // Rule 50: back out GST from the inclusive advance (18/118, equal heads + round-off).
-  const input = buildAdvanceVoucherTotalsInput(draft.advance_amount, draft.payment_date, draft.sac_code);
+  // Thread the buyer so the CGST/SGST-vs-IGST split follows the customer's state.
+  const input = buildAdvanceVoucherTotalsInput(draft.advance_amount, draft.payment_date, draft.sac_code,
+    { customerId: draft.customer_id ?? null, companyId: draft.company_id ?? null });
   const { computation } = await computeDocumentTotals(input, rc);
   await persistDocumentTaxLines({
     tenantId: draft.tenant_id, documentType: 'receipt_voucher', documentId: voucher.id, computation, rc,
@@ -82,7 +84,8 @@ export async function issueRefundVoucher(receiptVoucherId: string, reason: strin
   }).select().single();
   if (rErr) throw rErr;
 
-  const input = buildAdvanceVoucherTotalsInput(orig.total_amount, refund.voucher_date, undefined);
+  const input = buildAdvanceVoucherTotalsInput(orig.total_amount, refund.voucher_date, undefined,
+    { customerId: orig.customer_id ?? null, companyId: orig.company_id ?? null });
   const { computation } = await computeDocumentTotals(input, rc);
   await persistDocumentTaxLines({
     tenantId: orig.tenant_id, documentType: 'refund_voucher', documentId: refund.id, computation, rc,
