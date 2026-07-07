@@ -656,6 +656,9 @@ export interface DocumentTemplateConfig {
   totals?: TotalsConfig;
   /** Standalone VAT/GST breakdown table (opt-in). */
   taxSummary?: TaxSummaryConfig;
+  /** Resolved DocumentComplianceProfile key (set by countryTemplateOverride).
+   *  Drives regime-owned statutory meta injection in the financial adapters. */
+  statutoryProfileKey?: string;
 }
 
 /**
@@ -691,6 +694,8 @@ export interface TemplateConfigOverride {
   language?: Partial<LanguageConfig>;
   sections?: SectionConfigOverride[];
   labels?: Record<string, LabelText>;
+  /** Resolved DocumentComplianceProfile key — drives statutory meta injection. */
+  statutoryProfileKey?: string;
   // ── Premium controls — the interfaces are all-optional, so they double as
   //    their own override shape. Scalars replace; the nested objects
   //    (`typography.sizes`, `header.dividerNudge`, `organization.show`/`manual`)

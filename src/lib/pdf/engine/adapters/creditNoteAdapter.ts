@@ -25,6 +25,7 @@ import type { CreditNoteDocumentData } from '../../types';
 import { formatEngineMoney, safeString } from '../../utils';
 import { fmtDateWithConfig } from '../../configDate';
 import type { EngineDocData, LabelText, PartyBlock, ResolvedColumn } from '../types';
+import { resolveStatutoryDocumentMeta } from '../../../regimes/in_gst/statutoryMeta';
 
 /** Default column alignments by column key (parity with invoice/quote).
  *  `itemCode` / `unit` are the optional statutory columns (hidden until a
@@ -121,6 +122,21 @@ export function toCreditNoteEngineData(
   }
   if (creditNoteData.case_no) {
     meta.push({ label: { en: 'Job ID:', ar: 'رقم المهمة:' }, value: creditNoteData.case_no });
+  }
+  // India Rule-46 statutory meta — appended only for the in_gst_invoice profile,
+  // from fields already on the doc (place-of-supply state code = GSTIN prefix).
+  {
+    const addr = creditNoteData.buyer_address as Record<string, string | null | undefined> | null | undefined;
+    const gstin = creditNoteData.buyer_tax_number ?? '';
+    for (const row of resolveStatutoryDocumentMeta(config.statutoryProfileKey ?? '', {
+      placeOfSupplyStateName: addr?.state ?? null,
+      placeOfSupplyStateCode: /^\d{2}/.test(gstin) ? gstin.slice(0, 2) : null,
+      reverseCharge: creditNoteData.reverse_charge ?? false,
+      billingAddress: addr?.address ?? null,
+      deliveryAddress: addr?.delivery_address ?? null,
+    })) {
+      meta.push({ label: { en: row.label.en, ar: '' }, value: row.value });
+    }
   }
 
   // ---- Line items ----------------------------------------------------------

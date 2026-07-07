@@ -90,6 +90,10 @@ export function countryTemplateOverride(
   const bandLabel = facts.taxNumberLabel ?? facts.taxLabel;
   if (bandLabel) override.taxBar.label = { en: bandLabel };
 
+  // Expose the resolved profile key so the financial adapters can inject the
+  // profile's statutory meta rows (regime-owned; no country branching here).
+  if (compliance) override.statutoryProfileKey = compliance.profile.key;
+
   // Forced statutory line-item columns (item code / unit). Map the profile's
   // snake_case forcedColumns to the real camelCase column keys and flip them
   // visible via a `lineItems` sections override — the shared helper so the
