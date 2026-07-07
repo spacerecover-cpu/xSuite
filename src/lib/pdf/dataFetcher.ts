@@ -733,7 +733,7 @@ export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditN
   const [settings, invoiceRes, customerRes, companyRes, caseRes, itemsRes, taxLines] = await Promise.all([
     fetchCompanySettings(),
     cnRow.invoice_id
-      ? supabase.from('invoices').select('invoice_number').eq('id', cnRow.invoice_id).maybeSingle()
+      ? supabase.from('invoices').select('invoice_number, invoice_date').eq('id', cnRow.invoice_id).maybeSingle()
       : Promise.resolve({ data: null }),
     cnRow.customer_id
       ? supabase.from('customers_enhanced').select('customer_name').eq('id', cnRow.customer_id).maybeSingle()
@@ -753,7 +753,7 @@ export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditN
     fetchDocumentTaxLines('credit_note', creditNoteId),
   ]);
 
-  const invoice = invoiceRes.data as { invoice_number?: string | null } | null;
+  const invoice = invoiceRes.data as { invoice_number?: string | null; invoice_date?: string | null } | null;
   const customer = customerRes.data as { customer_name?: string | null } | null;
   const company = companyRes.data as { company_name?: string | null; name?: string | null } | null;
   const caseRow = caseRes.data as { case_no?: string | null } | null;
@@ -774,6 +774,7 @@ export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditN
       total_amount: cnRow.total_amount ?? null,
       applied_amount: cnRow.applied_amount ?? null,
       invoice_number: invoice?.invoice_number ?? null,
+      invoice_date: invoice?.invoice_date ?? null,
       customer_name: customer?.customer_name ?? null,
       company_name: company?.company_name ?? company?.name ?? null,
       case_no: caseRow?.case_no ?? null,

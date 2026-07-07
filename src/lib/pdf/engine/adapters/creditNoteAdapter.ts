@@ -118,7 +118,14 @@ export function toCreditNoteEngineData(
   const status = humanize(creditNoteData.status);
   if (status) meta.push({ label: { en: 'Status:', ar: 'الحالة:' }, value: status });
   if (creditNoteData.invoice_number) {
-    meta.push({ label: { en: 'Against Invoice:', ar: 'مقابل الفاتورة:' }, value: creditNoteData.invoice_number });
+    // India r.53: reference the original tax invoice by number AND date. Non-India
+    // credit notes keep the legacy "Against Invoice" label (byte-stable goldens).
+    const isIndia = config.statutoryProfileKey === 'in_gst_invoice';
+    const dt = isIndia && creditNoteData.invoice_date ? ` dt ${creditNoteData.invoice_date}` : '';
+    meta.push({
+      label: { en: isIndia ? 'Revision of Tax Invoice:' : 'Against Invoice:', ar: 'مقابل الفاتورة:' },
+      value: `${creditNoteData.invoice_number}${dt}`,
+    });
   }
   if (creditNoteData.case_no) {
     meta.push({ label: { en: 'Job ID:', ar: 'رقم المهمة:' }, value: creditNoteData.case_no });
@@ -162,10 +169,15 @@ export function toCreditNoteEngineData(
   if (on('subtotal')) {
     totals.push({ ...tl('subtotal', 'Subtotal:', 'المجموع الفرعي:'), value: money(creditNoteData.subtotal ?? 0) });
   }
-  // M-I fallback: a single stored header tax_amount. Component tax lines
-  // (document_tax_lines) are threaded onto CreditNoteData in a later phase —
-  // never recompute from tax_rate × subtotal here.
-  if (on('tax') && (creditNoteData.tax_amount ?? 0) !== 0) {
+  // Per-head rows from the stored document_tax_lines rollups (India CGST/SGST/IGST
+  // reversal — already NEGATIVE) when present; else the M-I fallback single stored
+  // header tax_amount. Never recompute from tax_rate × subtotal here.
+  const cnRollups = (creditNoteData.tax_lines ?? []).filter((l) => l.line_item_id === null);
+  if (on('tax') && cnRollups.length > 0) {
+    for (const r of cnRollups) {
+      totals.push({ key: 'tax', label: { en: r.component_label, ar: '' }, value: money(r.tax_amount) });
+    }
+  } else if (on('tax') && (creditNoteData.tax_amount ?? 0) !== 0) {
     const rate = creditNoteData.tax_rate != null ? ` ${creditNoteData.tax_rate}%` : '';
     totals.push({
       key: 'tax',

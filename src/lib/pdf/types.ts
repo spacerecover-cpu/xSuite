@@ -553,6 +553,8 @@ export interface CreditNoteData {
   total_amount: number | null;
   applied_amount: number | null;
   invoice_number: string | null;
+  /** Original tax invoice date — India r.53 revision block ("… dt {date}"). */
+  invoice_date?: string | null;
   customer_name: string | null;
   company_name: string | null;
   case_no: string | null;
