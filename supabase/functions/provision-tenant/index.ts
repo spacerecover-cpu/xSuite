@@ -419,7 +419,7 @@ Deno.serve(async (req: Request) => {
         name,
         currency_code: base_currency_code || countryData!.currency_code,
         tax_system: countryData?.tax_system || 'NONE',
-        tax_identifier: tax_number || null,
+        tax_identifier: (tax_number || '').trim().toUpperCase() || null,
         is_primary: true,
         ...(fiscal_year_start || requestTimezone || legal_entity_type
           ? {
@@ -443,14 +443,53 @@ Deno.serve(async (req: Request) => {
 
     // Primary tax registration (GSTIN / any registered seller). Same fail-loud
     // soft-delete rollback discipline as the legal entity itself.
-    const registrationRow = buildPrimaryRegistrationRow({
-      tenantId: tenant.id,
-      legalEntityId: legalEntity!.id,
-      countryId,
-      taxNumber: tax_number,
-      subdivisionId: subdivision_id ?? null,
-      today: new Date().toISOString().slice(0, 10),
-    });
+    //
+    // This is the UNAUTHENTICATED self-service path (service-role, RLS bypassed),
+    // so the server validates the registration itself rather than trusting the
+    // client: a regime-agnostic subdivision→country integrity check plus, for GST
+    // regimes, a full GSTIN checksum/state validation (buildPrimaryRegistrationRow
+    // throws ProvisionGuardError on any of these).
+    let subdivisionBelongsToCountry = true;
+    let subdivisionTaxAuthorityCode: string | null = null;
+    if (subdivision_id) {
+      const { data: subRow } = await supabase
+        .from('geo_subdivisions')
+        .select('id, tax_authority_code')
+        .eq('id', subdivision_id)
+        .eq('country_id', countryId)
+        .maybeSingle();
+      subdivisionBelongsToCountry = !!subRow;
+      subdivisionTaxAuthorityCode = (subRow?.tax_authority_code as string | null) ?? null;
+    }
+    // DATA key, not a country literal: India (and any GST country) reports
+    // tax_system === 'GST' on its geo_countries row.
+    const isGstRegime = (countryData?.tax_system ?? '').toUpperCase() === 'GST';
+
+    let registrationRow;
+    try {
+      registrationRow = buildPrimaryRegistrationRow({
+        tenantId: tenant.id,
+        legalEntityId: legalEntity!.id,
+        countryId,
+        taxNumber: tax_number,
+        subdivisionId: subdivision_id ?? null,
+        isGstRegime,
+        subdivisionTaxAuthorityCode,
+        subdivisionBelongsToCountry,
+        today: new Date().toISOString().slice(0, 10),
+      });
+    } catch (regErr) {
+      // Fail-loud + rollback: never persist a tenant carrying an invalid/garbage
+      // statutory registration. Surface the validation message as its 422.
+      await supabase.from('tenants').update({ deleted_at: new Date().toISOString() }).eq('id', tenant.id);
+      if (regErr instanceof ProvisionGuardError) {
+        return new Response(
+          JSON.stringify({ error: regErr.message }),
+          { status: regErr.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      throw regErr;
+    }
     if (registrationRow) {
       const { error: registrationError } = await supabase
         .from('legal_entity_tax_registrations')
