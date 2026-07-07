@@ -20,8 +20,10 @@ const makeData = (
       actor_name: 'Lab Reception',
       actor_role: 'technician',
       occurred_at: '2026-06-01T09:00:00.000Z',
+      digital_signature: 'sig-0001',
     },
   ],
+  options: { includeSignatures: true },
   companySettings: {} as ChainOfCustodyDocumentData['companySettings'],
   dateTimeConfig,
 });
@@ -40,5 +42,13 @@ describe('chainOfCustodyAdapter — forensic event timestamps', () => {
     const out = toEngineData(makeData({ timezone: 'Asia/Muscat', timeFormat: '24h' }), CONFIG);
     const dateRangeRow = out.custodySummary!.rows.find((r) => r.value.includes(' - ') || r.value.includes('GMT'));
     expect(dateRangeRow?.value).toContain('GMT+4');
+  });
+
+  it('renders the digital-signature Date column zone-labelled (who signed WHEN)', () => {
+    const out = toEngineData(makeData({ timezone: 'Asia/Muscat', timeFormat: '24h' }), CONFIG);
+    const sigDate = out.digitalSignatures!.rows[0].date;
+    expect(sigDate).toContain('13:00');
+    expect(sigDate).toContain('GMT+4');
+    expect(sigDate).not.toMatch(/^\d{2}\/\d{2}\/\d{4}/); // not the old browser-tz dd/MM
   });
 });

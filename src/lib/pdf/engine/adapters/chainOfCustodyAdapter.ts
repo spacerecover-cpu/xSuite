@@ -233,7 +233,10 @@ function hashVerificationBlock(entries: ChainOfCustodyEntryData[]): HashVerifica
  * no entry is signed (the caller gates on `options.includeSignatures`; this
  * guards the data so an empty table is never emitted).
  */
-function digitalSignaturesBlock(entries: ChainOfCustodyEntryData[]): DigitalSignaturesBlock | null {
+function digitalSignaturesBlock(
+  entries: ChainOfCustodyEntryData[],
+  dtConfig: ChainOfCustodyDocumentData['dateTimeConfig'],
+): DigitalSignaturesBlock | null {
   const signed = entries.filter((e) => e.digital_signature);
   if (signed.length === 0) return null;
 
@@ -253,7 +256,8 @@ function digitalSignaturesBlock(entries: ChainOfCustodyEntryData[]): DigitalSign
       signer: safeString(entry.actor_name),
       role: entry.actor_role ? safeString(entry.actor_role) : '-',
       signature: `✓ ${safeString(entry.digital_signature)}`,
-      date: formatDate(entry.occurred_at, 'dd/MM/yyyy HH:mm'),
+      // Forensic: WHO signed WHEN — tenant timezone + zone label, never browser tz.
+      date: formatDateTimeWithConfig(entry.occurred_at, dtConfig ?? null, { withTz: true }),
     })),
   };
 }
@@ -308,7 +312,7 @@ export function toEngineData(
     ? hashVerificationBlock(entries)
     : null;
   const digitalSignatures: DigitalSignaturesBlock | null = options?.includeSignatures
-    ? digitalSignaturesBlock(entries)
+    ? digitalSignaturesBlock(entries, data.dateTimeConfig)
     : null;
 
   // ---- Signature lines -----------------------------------------------------
