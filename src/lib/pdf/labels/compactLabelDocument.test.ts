@@ -66,9 +66,9 @@ describe('buildCompactLabelDocument', () => {
     );
     const pages = doc.content as Content[];
     expect(pages).toHaveLength(3);
-    expect((pages[0] as Record<string, unknown>).pageBreak).toBeUndefined();
-    expect((pages[1] as Record<string, unknown>).pageBreak).toBe('before');
-    expect((pages[2] as Record<string, unknown>).pageBreak).toBe('before');
+    expect((pages[0] as unknown as Record<string, unknown>).pageBreak).toBeUndefined();
+    expect((pages[1] as unknown as Record<string, unknown>).pageBreak).toBe('before');
+    expect((pages[2] as unknown as Record<string, unknown>).pageBreak).toBe('before');
   });
 
   it('strip layout renders the QR image and the bold identifier', () => {

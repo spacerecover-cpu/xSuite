@@ -17,7 +17,7 @@
  *                         strip across the bottom.
  */
 
-import type { Content, TDocumentDefinitions } from 'pdfmake/interfaces';
+import type { Content, ContentImage, ContentText, TDocumentDefinitions } from 'pdfmake/interfaces';
 import type { LabelSizePreset } from './labelSizes';
 import { labelMarginPt, mmToPt, sizeClass, supportsBarcode } from './labelSizes';
 
@@ -59,7 +59,7 @@ function truncate(text: string, maxWidthPt: number, fontSize: number): string {
   return `${text.slice(0, Math.max(1, maxChars - 1))}…`;
 }
 
-function idRow(label: CompactLabelContent, maxWidthPt: number, basePt: number, minPt: number): Content {
+function idRow(label: CompactLabelContent, maxWidthPt: number, basePt: number, minPt: number): ContentText {
   const indexText = label.index ? ` ${label.index}` : '';
   const indexSize = Math.max(minPt, basePt * 0.5);
   const indexWidth = indexText.length * indexSize * 0.6;
@@ -69,7 +69,7 @@ function idRow(label: CompactLabelContent, maxWidthPt: number, basePt: number, m
   return { text: spans, lineHeight: LINE_HEIGHT };
 }
 
-function metaLine(text: string, maxWidthPt: number, fontSize: number, bold = false): Content {
+function metaLine(text: string, maxWidthPt: number, fontSize: number, bold = false): ContentText {
   return {
     text: truncate(text, maxWidthPt, fontSize),
     fontSize,
@@ -79,7 +79,7 @@ function metaLine(text: string, maxWidthPt: number, fontSize: number, bold = fal
   };
 }
 
-function qrNode(dataUrl: string, sidePt: number, centered = false): Content {
+function qrNode(dataUrl: string, sidePt: number, centered = false): ContentImage {
   return { image: dataUrl, width: sidePt, height: sidePt, ...(centered ? { alignment: 'center' as const } : {}) };
 }
 
