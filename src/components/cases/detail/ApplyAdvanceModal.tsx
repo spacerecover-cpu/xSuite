@@ -35,8 +35,11 @@ const AMOUNT_ID = 'apply-advance-amount';
 
 // Render the max as a plain number the amount <input type="number"> accepts
 // (no grouping/symbol), rounded to the currency's decimal places.
-const toAmountFieldValue = (n: number, decimals: number) =>
-  n > 0 ? n.toFixed(decimals).replace(/\.?0+$/, '') : '';
+// Round to the currency's precision then drop only INSIGNIFICANT fractional
+// zeros via a numeric round-trip. The old /\.?0+$/ regex stripped integer
+// trailing zeros for a 0-decimal currency (5000 → "5") — silent under-apply.
+export const toAmountFieldValue = (n: number, decimals: number) =>
+  n > 0 ? String(Number(n.toFixed(decimals))) : '';
 
 export const ApplyAdvanceModal: React.FC<ApplyAdvanceModalProps> = ({
   open,

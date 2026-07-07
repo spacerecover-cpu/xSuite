@@ -1,7 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { CurrencyConfig } from '../../../types/tenantConfig';
-import { ApplyAdvanceModal } from './ApplyAdvanceModal';
+import { ApplyAdvanceModal, toAmountFieldValue } from './ApplyAdvanceModal';
+
+describe('toAmountFieldValue (re-review RC2 — zero-decimal currencies)', () => {
+  it('never strips integer trailing zeros (JPY/KRW/VND, decimals=0)', () => {
+    expect(toAmountFieldValue(5000, 0)).toBe('5000'); // old regex gave "5"
+    expect(toAmountFieldValue(1230, 0)).toBe('1230'); // old regex gave "123"
+  });
+  it('drops only insignificant fractional zeros for 2/3-decimal currencies', () => {
+    expect(toAmountFieldValue(1200, 2)).toBe('1200');
+    expect(toAmountFieldValue(1234.5, 2)).toBe('1234.5');
+    expect(toAmountFieldValue(1000, 3)).toBe('1000');
+  });
+  it('returns empty for non-positive', () => {
+    expect(toAmountFieldValue(0, 2)).toBe('');
+    expect(toAmountFieldValue(-5, 2)).toBe('');
+  });
+});
 
 const currencyConfig: CurrencyConfig = {
   code: 'INR', symbol: '₹', name: 'Indian Rupee', decimalPlaces: 2,

@@ -47,15 +47,34 @@ export async function getHeldAdvancesForCase(caseId: string): Promise<HeldAdvanc
     byPayment.set(a.payment_id, list);
   }
 
+  // Re-review RC1: an issued Refund Voucher returns advance money WITHOUT an
+  // allocation, so it must also reduce the held balance — else refunded money
+  // still shows as applyable (double-use + double GST reversal). The DB
+  // apply_advance_to_invoice guard is the authoritative backstop; this keeps the
+  // picker honest so the Apply button never appears for refunded money.
+  const { data: refunds, error: rvErr } = await supabase
+    .from('advance_vouchers')
+    .select('payment_id, total_amount')
+    .in('payment_id', ids)
+    .eq('voucher_type', 'refund')
+    .eq('status', 'issued')
+    .is('deleted_at', null);
+  if (rvErr) throw rvErr;
+  const refundedByPayment = new Map<string, number>();
+  for (const rv of refunds ?? []) {
+    refundedByPayment.set(rv.payment_id, (refundedByPayment.get(rv.payment_id) ?? 0) + Number(rv.total_amount ?? 0));
+  }
+
   return rows
     .map((r) => {
       const amount = Number(r.amount) || 0;
+      const unapplied = computeUnappliedBalance(amount, byPayment.get(r.id) ?? []);
       return {
         id: r.id,
         payment_number: r.payment_number ?? null,
         amount,
         currency: r.currency ?? null,
-        unappliedBalance: computeUnappliedBalance(amount, byPayment.get(r.id) ?? []),
+        unappliedBalance: unapplied - (refundedByPayment.get(r.id) ?? 0),
       };
     })
     .filter((r) => r.unappliedBalance > 0);
