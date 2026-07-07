@@ -558,7 +558,10 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
               case_id: payment.case_id ?? caseId,
               customer_id: payment.customer_id ?? null,
               advance_amount: paymentData.amount,
-              currency: payment.currency ?? currencyConfig.code,
+              // currencyConfig.code may be the unresolved REQUIRED_SENTINEL symbol
+              // (D2) — coerce to a string like the useCurrency hook does. payment.currency
+              // is set by record_payment (base fallback), so this branch is defensive.
+              currency: payment.currency ?? (typeof currencyConfig.code === 'string' ? currencyConfig.code : ''),
               payment_date: payment.payment_date ?? paymentData.payment_date,
             });
             voucherNote = result.document_number ? ` · Receipt Voucher ${result.document_number} issued` : '';
