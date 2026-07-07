@@ -40,12 +40,18 @@ interface RecordPaymentModalProps {
       reference?: string;
       status: 'pending' | 'completed';
       notes?: string;
+      /** WP-L4: 'advance' records an unallocated advance (CGST Rule 50) with an
+       *  empty allocation array; 'standard' (default) allocates against invoices. */
+      kind?: 'standard' | 'advance';
     },
     allocations: Array<{ invoice_id: string; amount: number }>,
     withholding?: { amount: number; certificateRef: string } | null
   ) => Promise<void>;
   preselectedCaseId?: string;
   preselectedInvoiceId?: string;
+  /** WP-L4: open the modal pre-set to a payment kind (default 'standard'). The
+   *  case-side "Record Advance" entry passes 'advance'. */
+  initialKind?: 'standard' | 'advance';
 }
 
 interface InvoiceAllocation {
@@ -74,10 +80,12 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   onSave,
   preselectedCaseId,
   preselectedInvoiceId,
+  initialKind = 'standard',
 }) => {
   const { formatCurrency, currencyFormat } = useCurrency();
   const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [kind, setKind] = useState<'standard' | 'advance'>(initialKind);
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const [selectedCaseId, setSelectedCaseId] = useState<string>(preselectedCaseId || '');
@@ -120,7 +128,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   const { data: unpaidInvoices = [], refetch: refetchInvoices } = useQuery({
     queryKey: ['unpaid_invoices_by_case', selectedCaseId],
     queryFn: () => getUnpaidInvoicesByCase(selectedCaseId),
-    enabled: !!selectedCaseId,
+    enabled: kind === 'standard' && !!selectedCaseId,
   });
 
   const selectedCase = casesWithInvoices.find(
@@ -264,7 +272,42 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (totalAmount <= 0 || !selectedCaseId || isSubmitting) return;
+    if (isSubmitting) return;
+
+    // WP-L4 advance leg: an advance is held UNALLOCATED (no invoice yet — the lab
+    // takes money at intake), so there is no allocation grid to reconcile. Emit
+    // kind='advance' with an empty allocation array; the case-side handler routes
+    // it to advanceVoucherService.createAdvancePayment.
+    if (kind === 'advance') {
+      if (totalAmount <= 0 || !selectedCaseId) return;
+      setIsSubmitting(true);
+      try {
+        await onSave(
+          {
+            payment_date: paymentDate,
+            amount: totalAmount,
+            case_id: selectedCaseId || null,
+            customer_id: selectedCase?.customer?.id || null,
+            payment_method_id: paymentMethodId || null,
+            bank_account_id: bankAccountId || null,
+            reference: referenceNumber || undefined,
+            status: 'completed',
+            notes: notes || undefined,
+            kind: 'advance',
+          },
+          [],
+        );
+        handleClose();
+      } catch (error) {
+        logger.error('Error recording advance:', error);
+        toast.error(error instanceof Error ? error.message : 'Failed to record advance');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    if (totalAmount <= 0 || !selectedCaseId) return;
     // Financial integrity: every payment must record HOW it was paid and WHERE it
     // lands so it can be reconciled. Block (with inline errors) rather than recording
     // a payment with no method/account — createPayment enforces this server-side too.
@@ -303,6 +346,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   };
 
   const handleClose = () => {
+    setKind(initialKind);
     setPaymentDate(new Date().toISOString().split('T')[0]);
     setTotalAmount(0);
     setSelectedCaseId(preselectedCaseId || '');
@@ -378,6 +422,50 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           </p>
         )}
 
+        <div>
+          <span className="block text-sm font-medium text-slate-700 mb-1">Payment Type</span>
+          <div role="radiogroup" aria-label="Payment type" className="grid grid-cols-2 gap-2">
+            <label
+              className={`flex items-center gap-2 px-3 py-2 border rounded-lg cursor-pointer text-sm transition-colors ${
+                kind === 'standard'
+                  ? 'border-primary bg-primary/5 text-slate-900 font-medium'
+                  : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <input
+                type="radio"
+                name="payment-kind"
+                className="accent-primary"
+                checked={kind === 'standard'}
+                onChange={() => setKind('standard')}
+              />
+              Standard payment
+            </label>
+            <label
+              className={`flex items-center gap-2 px-3 py-2 border rounded-lg cursor-pointer text-sm transition-colors ${
+                kind === 'advance'
+                  ? 'border-primary bg-primary/5 text-slate-900 font-medium'
+                  : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <input
+                type="radio"
+                name="payment-kind"
+                className="accent-primary"
+                checked={kind === 'advance'}
+                onChange={() => setKind('advance')}
+              />
+              Advance (unallocated)
+            </label>
+          </div>
+          {kind === 'advance' && (
+            <p className="mt-1 flex items-start gap-1.5 text-xs text-slate-500">
+              <FileText className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-slate-400" aria-hidden="true" />
+              Held as an unallocated advance — a Receipt Voucher (CGST Rule 50) is issued for it. No invoice allocation.
+            </p>
+          )}
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -396,17 +484,22 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Payment Amount <span className="text-danger">*</span>
+            <label htmlFor="payment-amount" className="block text-sm font-medium text-slate-700 mb-1">
+              {kind === 'advance' ? 'Advance Amount' : 'Payment Amount'} <span className="text-danger">*</span>
             </label>
             <div className="relative">
               <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
               <Input
+                id="payment-amount"
                 type="number"
                 step="0.01"
                 min="0"
                 value={totalAmount}
-                onChange={(e) => handleTotalAmountChange(parseFloat(e.target.value) || 0)}
+                onChange={(e) =>
+                  kind === 'advance'
+                    ? setTotalAmount(parseFloat(e.target.value) || 0)
+                    : handleTotalAmountChange(parseFloat(e.target.value) || 0)
+                }
                 className="pl-10 pr-14 text-lg font-semibold tabular-nums"
                 required
               />
@@ -500,6 +593,8 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           />
         </div>
 
+        {kind === 'standard' && (
+          <>
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="block text-sm font-medium text-slate-700">
@@ -701,6 +796,8 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             </div>
           )}
         </div>
+          </>
+        )}
 
         <div>
           <label htmlFor="payment-notes" className="block text-sm font-medium text-slate-700 mb-1">
@@ -717,7 +814,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         </div>
 
         <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
-          {(methodMissing || accountMissing) ? (
+          {kind === 'standard' && (methodMissing || accountMissing) ? (
             <span className="mr-auto flex items-center gap-1.5 text-xs font-medium text-danger">
               <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
               Select {methodMissing && accountMissing ? 'method & account' : methodMissing ? 'a payment method' : 'a deposit account'}
@@ -735,21 +832,26 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           </Button>
           <Button
             type="submit"
-            disabled={isSubmitting || totalAmount <= 0 || !selectedCaseId || allocations.length === 0 || allocationMismatch || methodMissing || accountMissing || certMissing}
+            disabled={
+              isSubmitting || totalAmount <= 0 || !selectedCaseId ||
+              (kind === 'standard' && (allocations.length === 0 || allocationMismatch || methodMissing || accountMissing || certMissing))
+            }
             title={
-              allocationMismatch
-                ? 'The allocation must equal the payment amount before recording'
-                : (methodMissing || accountMissing)
-                  ? 'Select a payment method and deposit account before recording'
-                  : certMissing
-                    ? 'A withholding certificate reference is required when an amount is withheld'
-                    : undefined
+              kind === 'advance'
+                ? undefined
+                : allocationMismatch
+                  ? 'The allocation must equal the payment amount before recording'
+                  : (methodMissing || accountMissing)
+                    ? 'Select a payment method and deposit account before recording'
+                    : certMissing
+                      ? 'A withholding certificate reference is required when an amount is withheld'
+                      : undefined
             }
             className="flex items-center gap-2"
             variant="primary"
           >
             <CheckCircle className="w-4 h-4" />
-            {isSubmitting ? 'Recording...' : 'Record Payment'}
+            {isSubmitting ? 'Recording...' : kind === 'advance' ? 'Record Advance' : 'Record Payment'}
           </Button>
         </div>
       </form>

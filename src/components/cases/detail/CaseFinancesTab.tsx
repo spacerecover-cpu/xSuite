@@ -1,14 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FileText, DollarSign, Eye, CreditCard, RefreshCw, Lock, ExternalLink, TrendingUp, TrendingDown, Minus, Receipt, Wallet, Send } from 'lucide-react';
 import { CreditCard as Edit } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '../../ui/Button';
 import { Badge } from '../../ui/Badge';
 import { Card } from '../../ui/Card';
+import { RecordPaymentModal } from '../../financial/RecordPaymentModal';
 import { getCaseExpenses, getCasePayments, type CaseExpense, type CasePayment, type CaseFinancialSummary } from '@/lib/caseFinanceService';
+import { createAdvancePayment, issueReceiptVoucher } from '@/lib/advanceVoucherService';
+import { resolveAdvanceReceiptArtifact } from '@/lib/pdf/advanceReceiptArtifact';
 import { formatDate, formatCurrencyWithConfig } from '@/lib/format';
-import { useCurrencyConfig } from '@/contexts/TenantConfigContext';
+import { useCurrencyConfig, useRegimeConfig } from '@/contexts/TenantConfigContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/useToast';
 import { toQuoteEditInitialData } from '@/lib/quotesService';
 import { toInvoiceEditInitialData } from '@/lib/invoiceService';
 import { useNavigate } from 'react-router-dom';
@@ -104,8 +108,14 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
 }) => {
   const navigate = useNavigate();
   const currencyConfig = useCurrencyConfig();
+  const regime = useRegimeConfig();
+  const toast = useToast();
   const { profile } = useAuth();
   const isOwnerAdmin = ['owner', 'admin'].includes(profile?.role ?? '');
+  // WP-L4: case-level unallocated advance capture. Held (not allocated to an
+  // invoice) and, for IN-GST tenants, immediately issued as a Rule 50 Receipt
+  // Voucher — one advance yields exactly one customer artifact.
+  const [showAdvanceModal, setShowAdvanceModal] = useState(false);
 
   const { data: expenses = [] } = useQuery<CaseExpense[]>({
     queryKey: ['case_expenses', caseId],
@@ -113,7 +123,7 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
     enabled: !!caseId,
   });
 
-  const { data: payments = [] } = useQuery<CasePayment[]>({
+  const { data: payments = [], refetch: refetchPayments } = useQuery<CasePayment[]>({
     queryKey: ['case_payments', caseId],
     queryFn: () => getCasePayments(caseId),
     enabled: !!caseId,
@@ -148,6 +158,15 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
               <Button onClick={() => { onSetEditingInvoice(null); onSetShowInvoiceModal(true); }} size="sm">
                 <FileText className="w-4 h-4 mr-2" />
                 New Invoice
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setShowAdvanceModal(true)}
+                size="sm"
+                title="Record an unallocated advance — a GST Receipt Voucher (Rule 50) is issued for it"
+              >
+                <Wallet className="w-4 h-4 mr-2" />
+                Record Advance
               </Button>
             </div>
           </div>
@@ -508,6 +527,46 @@ export const CaseFinancesTab: React.FC<CaseFinancesTabProps> = ({
           </div>
         </Card>
       )}
+
+      <RecordPaymentModal
+        isOpen={showAdvanceModal}
+        onClose={() => setShowAdvanceModal(false)}
+        preselectedCaseId={caseId}
+        initialKind="advance"
+        onSave={async (paymentData) => {
+          if (paymentData.kind !== 'advance') {
+            throw new Error('This action records unallocated advances. To settle an invoice, use Record Payment on the invoice row.');
+          }
+          const payment = await createAdvancePayment({
+            amount: paymentData.amount,
+            payment_date: paymentData.payment_date,
+            customer_id: paymentData.customer_id ?? null,
+            case_id: paymentData.case_id ?? caseId,
+            payment_method_id: paymentData.payment_method_id ?? null,
+            bank_account_id: paymentData.bank_account_id ?? null,
+            reference: paymentData.reference ?? null,
+            notes: paymentData.notes ?? null,
+          });
+          // Regime-keyed receipt artifact: IN GST supersedes the legacy payment
+          // receipt with the statutory Rule 50 Receipt Voucher; other regimes
+          // keep the advance as a plain held payment (legacy receipt path).
+          let voucherNote = '';
+          if (resolveAdvanceReceiptArtifact(regime.documents) === 'receipt_voucher') {
+            const result = await issueReceiptVoucher({
+              payment_id: payment.id,
+              tenant_id: payment.tenant_id,
+              case_id: payment.case_id ?? caseId,
+              customer_id: payment.customer_id ?? null,
+              advance_amount: paymentData.amount,
+              currency: payment.currency ?? currencyConfig.code,
+              payment_date: payment.payment_date ?? paymentData.payment_date,
+            });
+            voucherNote = result.document_number ? ` · Receipt Voucher ${result.document_number} issued` : '';
+          }
+          toast.success(`Advance ${payment.payment_number ?? ''} recorded${voucherNote}`.trim());
+          await refetchPayments();
+        }}
+      />
     </div>
   );
 };
