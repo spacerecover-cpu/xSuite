@@ -3,6 +3,63 @@ import { logAuditTrail } from './auditTrailService';
 import { resolveRateContext } from './currencyService';
 import { computeDocumentTotals, persistDocumentTaxLines, issueTaxDocument } from './taxDocumentService';
 import { buildAdvanceVoucherTotalsInput } from './regimes/in_gst/advanceVoucher';
+import { computeUnappliedBalance } from './advanceApply';
+
+export interface HeldAdvance {
+  id: string;
+  payment_number: string | null;
+  amount: number;
+  currency: string | null;
+  unappliedBalance: number;
+}
+
+/**
+ * Case-scoped HELD advances: payment_kind='advance' payments on the case with a
+ * remaining (unapplied) balance. The record-payment write path stamps case_id on
+ * the payment, so we can read payments directly here (unlike getCasePayments,
+ * which resolves settled payments through allocations→invoices). Unapplied
+ * balance = amount − Σ(payment_allocations); only advances with balance > 0 are
+ * returned so a fully-netted advance drops out of the picker.
+ */
+export async function getHeldAdvancesForCase(caseId: string): Promise<HeldAdvance[]> {
+  const { data: advances, error } = await supabase
+    .from('payments')
+    .select('id, payment_number, amount, currency, payment_kind')
+    .eq('case_id', caseId)
+    .eq('payment_kind', 'advance')
+    .is('deleted_at', null);
+  if (error) throw error;
+  const rows = advances ?? [];
+  if (rows.length === 0) return [];
+
+  const ids = rows.map((r) => r.id);
+  const { data: allocs, error: aErr } = await supabase
+    .from('payment_allocations')
+    .select('payment_id, amount')
+    .in('payment_id', ids)
+    .is('deleted_at', null);
+  if (aErr) throw aErr;
+
+  const byPayment = new Map<string, { amount: number | string | null }[]>();
+  for (const a of allocs ?? []) {
+    const list = byPayment.get(a.payment_id) ?? [];
+    list.push({ amount: a.amount });
+    byPayment.set(a.payment_id, list);
+  }
+
+  return rows
+    .map((r) => {
+      const amount = Number(r.amount) || 0;
+      return {
+        id: r.id,
+        payment_number: r.payment_number ?? null,
+        amount,
+        currency: r.currency ?? null,
+        unappliedBalance: computeUnappliedBalance(amount, byPayment.get(r.id) ?? []),
+      };
+    })
+    .filter((r) => r.unappliedBalance > 0);
+}
 
 export interface AdvancePaymentInput {
   amount: number; payment_date: string; currency?: string | null; exchange_rate?: number;
@@ -109,4 +166,4 @@ export async function issueRefundVoucher(receiptVoucherId: string, reason: strin
   return { voucher_id: refund.id, ...result };
 }
 
-export const advanceVoucherService = { createAdvancePayment, issueReceiptVoucher, applyAdvanceToInvoice, issueRefundVoucher };
+export const advanceVoucherService = { createAdvancePayment, issueReceiptVoucher, applyAdvanceToInvoice, issueRefundVoucher, getHeldAdvancesForCase };
