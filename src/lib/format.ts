@@ -44,6 +44,24 @@ export const renderCurrencyToken = (config: CurrencyConfig): string => {
   }
 };
 
+/** Group an integer digit string per the tenant's grouping style. '3' reproduces
+ *  the legacy Western regex byte-for-byte; '3;2' is Indian lakh/crore (last 3
+ *  digits, then 2-digit groups). Sign-aware. Pure. */
+export const groupIntegerDigits = (
+  intPart: string,
+  grouping: '3' | '3;2',
+  separator: string,
+): string => {
+  if (grouping === '3;2') {
+    const sign = intPart.startsWith('-') ? '-' : '';
+    const digits = sign ? intPart.slice(1) : intPart;
+    if (digits.length <= 3) return intPart;
+    const rest = digits.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, separator);
+    return `${sign}${rest}${separator}${digits.slice(-3)}`;
+  }
+  return intPart.replace(/\B(?=(\d{3})+(?!\d))/g, separator);
+};
+
 export const formatCurrencyWithConfig = (
   amount: number,
   config: CurrencyConfig,
@@ -60,7 +78,7 @@ export const formatCurrencyWithConfig = (
   const magnitude = useParens ? Math.abs(amount) : amount;
 
   const parts = magnitude.toFixed(config.decimalPlaces).split('.');
-  const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, config.thousandsSeparator);
+  const integerPart = groupIntegerDigits(parts[0], config.digitGrouping ?? '3', config.thousandsSeparator);
   const decimalPart = parts[1];
   const formattedNumber = config.decimalPlaces > 0
     ? `${integerPart}${config.decimalSeparator}${decimalPart}`

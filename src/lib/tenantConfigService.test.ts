@@ -66,6 +66,31 @@ describe('resolveTenantConfigFromLayers — engine path (fail-loud, no US litera
     expect(cfg.locale.localeCode).toBe('ar-OM');
   });
 
+  it("resolves digitGrouping '3;2' from the number_format.digit_grouping snapshot key (IN)", () => {
+    const layers = buildConfigLayers({
+      resolved_country_config: {
+        'currency.code': 'INR', 'tax.label': 'GST', 'tax.default_rate': 18,
+        'locale.code': 'en-IN', 'datetime.date_format': 'dd/MM/yyyy', 'datetime.timezone': 'Asia/Kolkata',
+        'number_format.digit_grouping': '3;2',
+      },
+      country_config_overrides: {},
+    });
+    const cfg = resolveTenantConfigFromLayers(baseRow, layers);
+    expect(cfg.currency.digitGrouping).toBe('3;2');
+  });
+
+  it("defaults digitGrouping to '3' when the snapshot lacks the key (legacy tenants)", () => {
+    const layers = buildConfigLayers({
+      resolved_country_config: {
+        'currency.code': 'OMR', 'tax.label': 'VAT', 'tax.default_rate': 5,
+        'locale.code': 'ar-OM', 'datetime.date_format': 'dd/MM/yyyy', 'datetime.timezone': 'Asia/Muscat',
+      },
+      country_config_overrides: {},
+    });
+    const cfg = resolveTenantConfigFromLayers(baseRow, layers);
+    expect(cfg.currency.digitGrouping).toBe('3');
+  });
+
   it('THROWS CountryConfigError (not USD/$) when the required currency.code is unresolved', () => {
     const layers = buildConfigLayers({ resolved_country_config: {}, country_config_overrides: {} });
     expect(() => resolveTenantConfigFromLayers(baseRow, layers)).toThrow(CountryConfigError);

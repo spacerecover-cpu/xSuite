@@ -102,6 +102,7 @@ export function resolveTenantConfigFromLayers(
       // the tenant overrode via country_config_overrides). Non-statutory.
       displayMode: get<'symbol' | 'iso_code' | 'symbol_code'>('currency.display_mode'),
       negativeFormat: get<'minus' | 'parentheses'>('currency.negative_format'),
+      digitGrouping: get<'3' | '3;2'>('number_format.digit_grouping'),
     },
     tax: {
       system: ((snap['tax.system'] as string) || 'NONE') as TaxSystem,
@@ -168,6 +169,7 @@ export function mapRowToConfig(
       // to byte-identical pre-Phase-2 rendering. The engine path resolves overrides.
       displayMode: 'symbol',
       negativeFormat: 'minus',
+      digitGrouping: '3',
     },
     tax: {
       system: (data.tax_system || 'NONE') as TaxSystem,
