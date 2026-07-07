@@ -251,6 +251,7 @@ const router = createBrowserRouter(
             <Route index lazy={page(() => import('./pages/settings/SettingsDashboard'), 'SettingsDashboard')} />
             <Route path="general-settings" lazy={page(() => import('./pages/settings/GeneralSettings'), 'GeneralSettings')} />
             <Route path="appearance" lazy={page(() => import('./pages/settings/AppearanceSettings'), 'AppearanceSettings')} />
+            <Route path="tax-registration" lazy={page(() => import('./pages/settings/TaxRegistrationSettings'), 'TaxRegistrationSettings')} />
             <Route path="preferences" lazy={page(() => import('./pages/settings/PreferencesSettings'), 'PreferencesSettings')} />
             <Route path="table-columns" lazy={page(() => import('./pages/settings/TableColumnsSettings'), 'TableColumnsSettings')} />
             <Route path="case-lifecycle" lazy={page(() => import('./pages/settings/CaseLifecycleSettings'), 'CaseLifecycleSettings')} />

@@ -116,6 +116,8 @@ export const settingsKeys = {
   portal: () => ['settings', 'portal'] as const,
   categoryCount: (categoryId: string) => ['settings', 'category-count', categoryId] as const,
   masterData: (table: string) => ['settings', 'master-data', table] as const,
+  taxRegistration: () => ['settings', 'tax-registration'] as const,
+  branchStateCheck: () => ['settings', 'branch-state-check'] as const,
   seedStatus: (categoryId: string) => ['settings', 'seed-status', categoryId] as const,
 };
 

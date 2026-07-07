@@ -1,12 +1,13 @@
 import { motion } from 'framer-motion';
 import { Building2, Receipt } from 'lucide-react';
 import type { OnboardingFormData } from '../constants';
-import type { OnboardableCountry } from '../../../../lib/geoCountryService';
-import { validateTaxNumber } from '../onboardingValidation';
+import type { CountrySubdivision, OnboardableCountry } from '../../../../lib/geoCountryService';
+import { evaluateJurisdiction } from '../onboardingValidation';
 
 interface JurisdictionStepProps {
   formData: OnboardingFormData;
   country: OnboardableCountry;
+  subdivisions: CountrySubdivision[];
   updateField: <K extends keyof OnboardingFormData>(key: K, value: OnboardingFormData[K]) => void;
 }
 
@@ -27,12 +28,12 @@ const inputClasses = (hasError: boolean) =>
  * against the country's tax_number_format), and confirms the fiscal-year start.
  * Persists into formData → provision-tenant → primary legal_entity.
  */
-export const JurisdictionStep = ({ formData, country, updateField }: JurisdictionStepProps) => {
+export const JurisdictionStep = ({ formData, country, subdivisions, updateField }: JurisdictionStepProps) => {
   const taxLabel = country.tax_number_label || `${country.tax_label || 'Tax'} Registration Number`;
-  const taxCheck =
-    formData.taxNumber.trim().length > 0
-      ? validateTaxNumber(country.tax_number_format, formData.taxNumber)
-      : { ok: true };
+
+  // Subdivisions are loaded by the parent (LocationStep) and passed in, so the
+  // same evaluation drives both this inline error AND the Continue gate.
+  const { taxError } = evaluateJurisdiction(formData, country, subdivisions);
 
   return (
     <motion.div
@@ -69,19 +70,45 @@ export const JurisdictionStep = ({ formData, country, updateField }: Jurisdictio
           </div>
         </div>
 
+        {subdivisions.length > 0 && (
+          <div>
+            <label htmlFor="jurisdiction-subdivision" className="block text-sm font-medium text-slate-300 mb-2">
+              State / Union Territory <span className="text-primary">*</span>
+            </label>
+            <select
+              id="jurisdiction-subdivision"
+              aria-label="State / Union Territory"
+              value={formData.subdivisionId}
+              onChange={(e) => updateField('subdivisionId', e.target.value)}
+              className={inputClasses(false)}
+            >
+              <option value="" className="bg-slate-900">Select a state…</option>
+              {subdivisions.map((s) => (
+                <option key={s.id} value={s.id} className="bg-slate-900">
+                  {s.name}{s.tax_authority_code ? ` (${s.tax_authority_code})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">
+          <label htmlFor="jurisdiction-tax-number" className="block text-sm font-medium text-slate-300 mb-2">
             {taxLabel} <span className="text-primary">*</span>
           </label>
           <input
+            id="jurisdiction-tax-number"
+            aria-label={taxLabel}
             type="text"
             value={formData.taxNumber}
             onChange={(e) => updateField('taxNumber', e.target.value)}
             placeholder={country.tax_number_label || 'e.g. 300000000000003'}
-            className={inputClasses(!taxCheck.ok)}
+            className={inputClasses(!!taxError)}
+            aria-invalid={!taxError ? undefined : true}
+            aria-describedby={taxError ? 'jurisdiction-tax-error' : undefined}
           />
-          {!taxCheck.ok && (
-            <p className="text-danger text-xs mt-1">{taxCheck.message}</p>
+          {taxError && (
+            <p id="jurisdiction-tax-error" role="alert" className="text-danger text-xs mt-1">{taxError}</p>
           )}
         </div>
 

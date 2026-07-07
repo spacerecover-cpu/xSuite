@@ -18,6 +18,7 @@ import {
   FileStack,
   ListChecks,
   Workflow,
+  Receipt,
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 
@@ -75,6 +76,16 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     tables: [],
     actionLabel: 'Choose Theme',
     description: 'Pick the look and feel of xSuite for everyone in your workspace.',
+  },
+  {
+    id: 'tax-registration',
+    title: 'Tax Registration',
+    icon: Receipt,
+    backgroundColor: '#0f766e',
+    borderColor: '#0f766e',
+    tables: [],
+    actionLabel: 'Manage Registration',
+    description: 'Your tax registration number and registered/unregistered status — controls how every document is taxed.',
   },
   {
     id: 'preferences',
@@ -307,7 +318,7 @@ export interface SettingsGroup {
 export const SETTINGS_GROUPS: SettingsGroup[] = [
   { id: 'workspace', label: 'Workspace', categoryIds: ['appearance', 'preferences', 'table-columns', 'features', 'general-settings', 'notifications'] },
   { id: 'operations', label: 'Operations', categoryIds: ['device-media', 'inventory-settings', 'case-service', 'case-lifecycle', 'procurement'] },
-  { id: 'finance', label: 'Client & Finance', categoryIds: ['client-financial', 'localization'] },
+  { id: 'finance', label: 'Client & Finance', categoryIds: ['client-financial', 'localization', 'tax-registration'] },
   { id: 'documents', label: 'Documents & Reports', categoryIds: ['templates', 'documents'] },
   { id: 'system', label: 'System & Data', categoryIds: ['system-numbers', 'import-export', 'client-portal'] },
   { id: 'compliance', label: 'Security & Compliance', categoryIds: ['security', 'gdpr'] },

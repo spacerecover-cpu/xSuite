@@ -19,6 +19,8 @@ interface CreateTenantParams {
   /** Jurisdiction payload → primary legal_entity (only when the country has a tax system). */
   legalEntityType?: string;
   taxNumber?: string;
+  /** Seller state/UT (GSTIN state) — threads to legal_entity_tax_registrations.subdivision_id. */
+  subdivisionId?: string;
   fiscalYearStart?: string;
   timezone?: string;
 }
@@ -95,6 +97,7 @@ export const tenantService = {
         ...(params.uiLanguage ? { ui_language: params.uiLanguage } : {}),
         ...(params.legalEntityType ? { legal_entity_type: params.legalEntityType } : {}),
         ...(params.taxNumber ? { tax_number: params.taxNumber } : {}),
+        ...(params.subdivisionId ? { subdivision_id: params.subdivisionId } : {}),
         ...(params.fiscalYearStart ? { fiscal_year_start: params.fiscalYearStart } : {}),
         ...(params.timezone ? { timezone: params.timezone } : {}),
       }),

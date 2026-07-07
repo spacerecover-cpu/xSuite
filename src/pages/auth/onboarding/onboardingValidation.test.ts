@@ -7,6 +7,7 @@ import {
   canAdvanceFromAccount,
   otpCodeIsValidShape,
   resolveUiLanguagePayload,
+  evaluateJurisdiction,
 } from './onboardingValidation';
 
 describe('filterOnboardableCountries', () => {
@@ -100,6 +101,77 @@ describe('resolveUiLanguagePayload', () => {
   it('forwards the override only when the user deviated from the country default', () => {
     expect(resolveUiLanguagePayload('ar', 'en')).toBe('en'); // country ar, user chose en
     expect(resolveUiLanguagePayload('en', 'ar')).toBe('ar');
+  });
+});
+
+describe('evaluateJurisdiction (the operative onboarding Continue gate)', () => {
+  // GST-coded subdivisions (DATA key = a non-null tax_authority_code, never a
+  // country literal). Karnataka=29, Maharashtra=27.
+  const gstSubs = [
+    { id: 's-ka', tax_authority_code: '29' },
+    { id: 's-mh', tax_authority_code: '27' },
+  ];
+  const gstCountry = { tax_number_format: '^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$' };
+  const base = { legalEntityType: 'llc', taxNumber: '', subdivisionId: '' };
+
+  it('(a) GST country + bad-checksum GSTIN → incomplete with a tax error', () => {
+    // ...Z5 is checksum-invalid (correct check char for 29ABCDE1234F1Z is W).
+    const r = evaluateJurisdiction(
+      { ...base, taxNumber: '29ABCDE1234F1Z5', subdivisionId: 's-ka' },
+      gstCountry,
+      gstSubs,
+    );
+    expect(r.complete).toBe(false);
+    expect(r.taxError).toBeTruthy();
+  });
+
+  it('(b) GST + valid GSTIN but no state selected → incomplete (State required)', () => {
+    const r = evaluateJurisdiction(
+      { ...base, taxNumber: '29ABCDE1234F1ZW', subdivisionId: '' },
+      gstCountry,
+      gstSubs,
+    );
+    expect(r.taxError).toBeNull();
+    expect(r.complete).toBe(false);
+  });
+
+  it('(c) GST + valid GSTIN + matching state → complete', () => {
+    const r = evaluateJurisdiction(
+      { ...base, taxNumber: '29ABCDE1234F1ZW', subdivisionId: 's-ka' },
+      gstCountry,
+      gstSubs,
+    );
+    expect(r.taxError).toBeNull();
+    expect(r.complete).toBe(true);
+  });
+
+  it('(d) GST + valid GSTIN + WRONG state → incomplete with a mismatch message', () => {
+    const r = evaluateJurisdiction(
+      { ...base, taxNumber: '29ABCDE1234F1ZW', subdivisionId: 's-mh' },
+      gstCountry,
+      gstSubs,
+    );
+    expect(r.complete).toBe(false);
+    expect(r.taxError).toMatch(/does not match the selected state/i);
+  });
+
+  it('(e) non-GST country: soft format path, no GSTIN checksum applied', () => {
+    const vatCountry = { tax_number_format: '^[0-9]{15}$' };
+    const ok = evaluateJurisdiction(
+      { legalEntityType: 'llc', taxNumber: '300000000000003', subdivisionId: '' },
+      vatCountry,
+      [],
+    );
+    expect(ok.taxError).toBeNull();
+    expect(ok.complete).toBe(true);
+
+    const bad = evaluateJurisdiction(
+      { legalEntityType: 'llc', taxNumber: 'not-a-number', subdivisionId: '' },
+      vatCountry,
+      [],
+    );
+    expect(bad.taxError).toBeTruthy();
+    expect(bad.complete).toBe(false);
   });
 });
 

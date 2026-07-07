@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
-import { assertOnboardableCountry, assertResidencySupported, ProvisionGuardError, ResidencyNotAvailableError } from './provisionGuards.ts';
+import { assertOnboardableCountry, assertResidencySupported, buildPrimaryRegistrationRow, ProvisionGuardError, ResidencyNotAvailableError } from './provisionGuards.ts';
 
 const ALLOWED_ORIGINS = [
   'https://xsuite.space',
@@ -66,6 +66,7 @@ interface ProvisionTenantRequest {
   ui_language?: string;
   legal_entity_type?: string;
   tax_number?: string;
+  subdivision_id?: string;
   fiscal_year_start?: string;
   timezone?: string;
 }
@@ -140,7 +141,7 @@ Deno.serve(async (req: Request) => {
 
     const {
       name, slug, adminEmail, adminPassword, adminFullName, planId, countryId, base_currency_code,
-      ui_language, tax_number, fiscal_year_start, timezone: requestTimezone, legal_entity_type,
+      ui_language, tax_number, subdivision_id, fiscal_year_start, timezone: requestTimezone, legal_entity_type,
     } = requestData;
 
     // Self-service signups (no Authorization header) must have an OTP-verified
@@ -410,7 +411,7 @@ Deno.serve(async (req: Request) => {
     // we create it inline so the wizard's jurisdiction capture is honored.
     // currency_code is required + has NO 'USD' default (fail-loud, D2) — it
     // resolves from the guaranteed non-stub country.
-    const { error: legalEntityError } = await supabase
+    const { data: legalEntity, error: legalEntityError } = await supabase
       .from('legal_entities')
       .insert({
         tenant_id: tenant.id,
@@ -418,7 +419,7 @@ Deno.serve(async (req: Request) => {
         name,
         currency_code: base_currency_code || countryData!.currency_code,
         tax_system: countryData?.tax_system || 'NONE',
-        tax_identifier: tax_number || null,
+        tax_identifier: (tax_number || '').trim().toUpperCase() || null,
         is_primary: true,
         ...(fiscal_year_start || requestTimezone || legal_entity_type
           ? {
@@ -429,13 +430,75 @@ Deno.serve(async (req: Request) => {
               },
             }
           : {}),
-      });
+      })
+      .select('id')
+      .single();
 
     if (legalEntityError) {
       console.error('Primary legal entity creation failed:', legalEntityError);
       // Fail-loud: a tenant without its tax-identity entity must not survive.
       await supabase.from('tenants').update({ deleted_at: new Date().toISOString() }).eq('id', tenant.id);
       throw new Error(`Provisioning failed: legal_entities insert: ${legalEntityError.message}`);
+    }
+
+    // Primary tax registration (GSTIN / any registered seller). Same fail-loud
+    // soft-delete rollback discipline as the legal entity itself.
+    //
+    // This is the UNAUTHENTICATED self-service path (service-role, RLS bypassed),
+    // so the server validates the registration itself rather than trusting the
+    // client: a regime-agnostic subdivision→country integrity check plus, for GST
+    // regimes, a full GSTIN checksum/state validation (buildPrimaryRegistrationRow
+    // throws ProvisionGuardError on any of these).
+    let subdivisionBelongsToCountry = true;
+    let subdivisionTaxAuthorityCode: string | null = null;
+    if (subdivision_id) {
+      const { data: subRow } = await supabase
+        .from('geo_subdivisions')
+        .select('id, tax_authority_code')
+        .eq('id', subdivision_id)
+        .eq('country_id', countryId)
+        .maybeSingle();
+      subdivisionBelongsToCountry = !!subRow;
+      subdivisionTaxAuthorityCode = (subRow?.tax_authority_code as string | null) ?? null;
+    }
+    // DATA key, not a country literal: India (and any GST country) reports
+    // tax_system === 'GST' on its geo_countries row.
+    const isGstRegime = (countryData?.tax_system ?? '').toUpperCase() === 'GST';
+
+    let registrationRow: ReturnType<typeof buildPrimaryRegistrationRow>;
+    try {
+      registrationRow = buildPrimaryRegistrationRow({
+        tenantId: tenant.id,
+        legalEntityId: legalEntity!.id,
+        countryId,
+        taxNumber: tax_number,
+        subdivisionId: subdivision_id ?? null,
+        isGstRegime,
+        subdivisionTaxAuthorityCode,
+        subdivisionBelongsToCountry,
+        today: new Date().toISOString().slice(0, 10),
+      });
+    } catch (regErr) {
+      // Fail-loud + rollback: never persist a tenant carrying an invalid/garbage
+      // statutory registration. Surface the validation message as its 422.
+      await supabase.from('tenants').update({ deleted_at: new Date().toISOString() }).eq('id', tenant.id);
+      if (regErr instanceof ProvisionGuardError) {
+        return new Response(
+          JSON.stringify({ error: regErr.message }),
+          { status: regErr.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      throw regErr;
+    }
+    if (registrationRow) {
+      const { error: registrationError } = await supabase
+        .from('legal_entity_tax_registrations')
+        .insert(registrationRow);
+      if (registrationError) {
+        console.error('Primary tax registration creation failed:', registrationError);
+        await supabase.from('tenants').update({ deleted_at: new Date().toISOString() }).eq('id', tenant.id);
+        throw new Error(`Provisioning failed: legal_entity_tax_registrations insert: ${registrationError.message}`);
+      }
     }
 
     // Create onboarding progress

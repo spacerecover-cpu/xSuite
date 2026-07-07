@@ -11,6 +11,7 @@ import type { Json } from '../types/database.types';
 import { registerAllRegimePlugins } from './regimes/register';
 import { resolveTaxStrategy } from './regimes/registry';
 import { derivePlaceOfSupply } from './regimes/in_gst/placeOfSupply';
+import { assertGstRegistrationExplicit } from './taxRegistrationService';
 import type {
   ComputedTaxLine, GeoCountryTaxRateRow, LegalEntityTaxRegistrationRow, RoundingPolicy, RuleTrace,
   ScaleSystem, TaxComputation, TaxContext, TaxDocumentType, TaxableLine,
@@ -338,6 +339,7 @@ export async function computeDocumentTotals(
     scaleSystem: pack.scaleSystem,
   };
   const strategy = resolveTaxStrategy(pack.strategyKey); // pack.regime.tax → in_gst (kernel split) or simple_vat
+  await assertGstRegistrationExplicit(pack.strategyKey, seller.registrations, input.documentDate);
   const computation = await strategy.compute(ctx);
   return { computation, placeOfSupplySubdivisionId: pos.subdivisionId, ...totalsFromComputation(computation, documentDiscount, rc.documentDecimals) };
 }

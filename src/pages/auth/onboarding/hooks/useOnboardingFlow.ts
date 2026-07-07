@@ -200,6 +200,7 @@ export function useOnboardingFlow() {
         // Only present when the country actually has a tax system.
         legalEntityType: formData.legalEntityType || undefined,
         taxNumber: formData.taxNumber || undefined,
+        subdivisionId: formData.subdivisionId || undefined,
         fiscalYearStart: formData.fiscalYearStart || undefined,
         timezone: formData.timezone || undefined,
       });

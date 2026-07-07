@@ -5,6 +5,8 @@
 // 3-letter currency is NOT onboardable (it would otherwise force a '$'/'USD'
 // fallback downstream). Language defaults resolve to the app's supported union
 // (en | ar) — never a US locale literal.
+import { validateGSTIN } from '../../../lib/regimes/in_gst/gstin';
+import { gstinMatchesSubdivision } from '../../../lib/regimes/in_gst/registrationStatus';
 
 /** The shape these helpers actually read off a geo_countries row (loose on purpose). */
 export interface OnboardableCountryLike {
@@ -111,4 +113,72 @@ export function resolveUiLanguagePayload(
   if (!chosen) return undefined;
   const countryDefault = resolveUiLanguageDefault(countryLanguageCode);
   return chosen === countryDefault ? undefined : chosen;
+}
+
+/** The jurisdiction fields the Continue gate reads (structural, so both the
+ *  wizard step and LocationStep pass their real objects without coupling). */
+export interface JurisdictionFormLike {
+  legalEntityType: string;
+  taxNumber: string;
+  subdivisionId: string;
+}
+export interface JurisdictionCountryLike {
+  tax_number_format: string | null | undefined;
+}
+export interface JurisdictionSubdivisionLike {
+  id: string;
+  tax_authority_code: string | null;
+}
+export interface JurisdictionEvaluation {
+  complete: boolean;
+  taxError: string | null;
+}
+
+/**
+ * The SINGLE source of truth for whether the onboarding jurisdiction block is
+ * satisfied — consumed both by JurisdictionStep (inline error) and by
+ * LocationStep's Continue-button gate, so the strong GSTIN validation is no
+ * longer decorative.
+ *
+ * GST-coded countries (a subdivision carrying a `tax_authority_code` — a DATA
+ * key, never a country literal) get the S3 checksum validator + the L2 state
+ * cross-check; every other regime keeps the soft country-format regex.
+ * `complete` additionally requires a selected State whenever subdivisions exist.
+ */
+export function evaluateJurisdiction(
+  formData: JurisdictionFormLike,
+  country: JurisdictionCountryLike | null | undefined,
+  subdivisions: JurisdictionSubdivisionLike[],
+): JurisdictionEvaluation {
+  const trimmedTax = (formData.taxNumber ?? '').trim();
+  const hasGstSubdivisions = subdivisions.some((s) => s.tax_authority_code);
+  const selectedSubdivision = subdivisions.find((s) => s.id === formData.subdivisionId) ?? null;
+
+  let taxError: string | null = null;
+  if (trimmedTax.length > 0) {
+    if (hasGstSubdivisions) {
+      const gstin = validateGSTIN(trimmedTax);
+      if (!gstin.ok) {
+        taxError = gstin.error ?? 'Invalid GSTIN';
+      } else if (
+        selectedSubdivision &&
+        !gstinMatchesSubdivision(trimmedTax, selectedSubdivision.tax_authority_code)
+      ) {
+        taxError = `This GSTIN does not match the selected state (expected state code ${selectedSubdivision.tax_authority_code}).`;
+      }
+    } else {
+      const soft = validateTaxNumber(country?.tax_number_format ?? null, formData.taxNumber);
+      if (!soft.ok) {
+        taxError = soft.message ?? 'Does not match the expected format for this country';
+      }
+    }
+  }
+
+  const complete =
+    formData.legalEntityType.trim() !== '' &&
+    trimmedTax !== '' &&
+    taxError === null &&
+    (subdivisions.length === 0 || formData.subdivisionId.trim() !== '');
+
+  return { complete, taxError };
 }

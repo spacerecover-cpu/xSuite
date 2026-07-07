@@ -25,6 +25,14 @@ export type OnboardableCountry = Pick<
 const ONBOARDABLE_COLUMNS =
   'id, code, name, currency_code, currency_symbol, is_active, language_code, tax_system, tax_label, tax_number_label, tax_number_format, fiscal_year_start, timezone';
 
+export interface CountrySubdivision {
+  id: string;
+  code: string;
+  name: string;
+  subdivision_type: string | null;
+  tax_authority_code: string | null;
+}
+
 export const geoCountryService = {
   /**
    * The single source of truth for the onboarding country dropdown. Returns
@@ -42,5 +50,21 @@ export const geoCountryService = {
 
     if (error) throw new Error(error.message);
     return filterOnboardableCountries((data ?? []) as OnboardableCountry[]);
+  },
+
+  /**
+   * Tax subdivisions for a country (India states/UTs with GST codes; US states
+   * in Phase 5). Empty array = no subdivision dimension; callers hide the picker.
+   */
+  async listCountrySubdivisions(countryId: string): Promise<CountrySubdivision[]> {
+    const { data, error } = await supabase
+      .from('geo_subdivisions')
+      .select('id, code, name, subdivision_type, tax_authority_code')
+      .eq('country_id', countryId)
+      .eq('is_active', true)
+      .is('deleted_at', null)
+      .order('sort_order');
+    if (error) throw new Error(error.message);
+    return (data ?? []) as CountrySubdivision[];
   },
 };

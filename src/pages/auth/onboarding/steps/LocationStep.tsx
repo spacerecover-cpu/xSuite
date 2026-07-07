@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Languages } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import { supabase } from '../../../../lib/supabaseClient';
-import type { OnboardableCountry } from '../../../../lib/geoCountryService';
-import { resolveUiLanguageDefault, shouldShowJurisdictionStep, validateTaxNumber } from '../onboardingValidation';
+import { geoCountryService, type OnboardableCountry, type CountrySubdivision } from '../../../../lib/geoCountryService';
+import { resolveUiLanguageDefault, shouldShowJurisdictionStep, evaluateJurisdiction } from '../onboardingValidation';
 import { JurisdictionStep } from './JurisdictionStep';
 import type { OnboardingFormData } from '../constants';
 
@@ -48,6 +48,24 @@ export const LocationStep = ({
       );
   }, []);
 
+  const showJurisdiction = !!selectedCountry && shouldShowJurisdictionStep(selectedCountry.tax_system);
+
+  // Subdivisions are loaded HERE (lifted out of JurisdictionStep) so the Continue
+  // gate can require a State and run the GSTIN↔State cross-check. Only fetched
+  // when the jurisdiction block is actually shown.
+  const [subdivisions, setSubdivisions] = useState<CountrySubdivision[]>([]);
+  useEffect(() => {
+    if (!selectedCountry || !showJurisdiction) {
+      setSubdivisions([]);
+      return;
+    }
+    let cancelled = false;
+    geoCountryService.listCountrySubdivisions(selectedCountry.id)
+      .then((rows) => { if (!cancelled) setSubdivisions(rows); })
+      .catch(() => { if (!cancelled) setSubdivisions([]); });
+    return () => { cancelled = true; };
+  }, [selectedCountry?.id, showJurisdiction]);
+
   const handleCountryChange = (id: string) => {
     const c = countries.find((x) => x.id === id);
     updateField('countryId', id);
@@ -62,13 +80,11 @@ export const LocationStep = ({
 
   const activeLanguage = formData.uiLanguage || resolveUiLanguageDefault(selectedCountry?.language_code);
 
-  // When the jurisdiction block is shown, require entity type + a tax number that
-  // passes the country's format (soft if no reference format). Otherwise always complete.
-  const showJurisdiction = !!selectedCountry && shouldShowJurisdictionStep(selectedCountry.tax_system);
-  const jurisdictionComplete =
-    !showJurisdiction ||
-    (formData.legalEntityType.trim().length > 0 &&
-      validateTaxNumber(selectedCountry?.tax_number_format ?? null, formData.taxNumber).ok);
+  // Continue gate: the strong GSTIN checksum, the required State, and the
+  // GSTIN↔State cross-check now all live in evaluateJurisdiction — so they gate
+  // navigation instead of merely rendering an ignorable red hint.
+  const juris = evaluateJurisdiction(formData, selectedCountry, subdivisions);
+  const jurisdictionComplete = !showJurisdiction || juris.complete;
 
   return (
     <div className="space-y-5">
@@ -179,6 +195,7 @@ export const LocationStep = ({
           <JurisdictionStep
             formData={formData}
             country={selectedCountry}
+            subdivisions={subdivisions}
             updateField={updateField}
           />
         )}

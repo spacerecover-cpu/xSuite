@@ -97,6 +97,7 @@ export const step3Schema = z.object({
 export const jurisdictionSchema = z.object({
   legalEntityType: z.string().min(1, 'Select a legal entity type'),
   taxNumber: z.string().min(1, 'Tax registration number is required'),
+  subdivisionId: z.string(),
   fiscalYearStart: z.string().min(1, 'Confirm the fiscal year start'),
   timezone: z.string().min(1, 'Confirm the timezone'),
 });
@@ -124,6 +125,7 @@ export interface OnboardingFormData {
   uiLanguage: string;
   legalEntityType: string;
   taxNumber: string;
+  subdivisionId: string;
   fiscalYearStart: string;
   timezone: string;
   services: string[];
@@ -144,6 +146,7 @@ export const DEFAULT_FORM_DATA: OnboardingFormData = {
   uiLanguage: '',
   legalEntityType: '',
   taxNumber: '',
+  subdivisionId: '',
   fiscalYearStart: '',
   timezone: '',
   services: [],

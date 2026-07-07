@@ -79,3 +79,23 @@ describe('geoCountryService.listOnboardableCountries', () => {
     await expect(geoCountryService.listOnboardableCountries()).rejects.toThrow('boom');
   });
 });
+
+describe('listCountrySubdivisions', () => {
+  it('returns active, non-deleted subdivisions ordered by sort_order', async () => {
+    const order = vi.fn().mockResolvedValue({
+      data: [{ id: 's1', code: 'IN-KA', name: 'Karnataka', subdivision_type: 'state', tax_authority_code: '29' }],
+      error: null,
+    });
+    const is = vi.fn().mockReturnValue({ order });
+    const eq2 = vi.fn().mockReturnValue({ is });
+    const eq1 = vi.fn().mockReturnValue({ eq: eq2 });
+    const select = vi.fn().mockReturnValue({ eq: eq1 });
+    from.mockReturnValueOnce({ select });
+    const rows = await geoCountryService.listCountrySubdivisions('c-in');
+    expect(from).toHaveBeenCalledWith('geo_subdivisions');
+    expect(eq1).toHaveBeenCalledWith('country_id', 'c-in');
+    expect(eq2).toHaveBeenCalledWith('is_active', true);
+    expect(is).toHaveBeenCalledWith('deleted_at', null);
+    expect(rows[0].tax_authority_code).toBe('29');
+  });
+});
