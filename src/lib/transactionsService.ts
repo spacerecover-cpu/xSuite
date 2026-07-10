@@ -181,55 +181,30 @@ export const getTransactionStats = async (filters?: {
   dateFrom?: string;
   dateTo?: string;
 }) => {
-  let query = supabase
-    .from('financial_transactions')
-    .select('amount, amount_base, transaction_type, transaction_date')
-    .is('deleted_at', null);
-
-  if (filters?.dateFrom) {
-    query = query.gte('transaction_date', filters.dateFrom);
-  }
-
-  if (filters?.dateTo) {
-    query = query.lte('transaction_date', filters.dateTo);
-  }
-
-  const { data: transactions, error } = await query;
+  // One SQL aggregation (get_transaction_stats_base) instead of scanning the entire
+  // append-only financial_transactions ledger and reducing in JS (audit F3). Money
+  // is base-currency (coalesce(amount_base, amount)); fx_gain/fx_loss fold into net.
+  const { data, error } = await supabase.rpc('get_transaction_stats_base', {
+    p_date_from: filters?.dateFrom ?? undefined,
+    p_date_to: filters?.dateTo ?? undefined,
+  });
   if (error) throw error;
 
-  const allTransactions = transactions || [];
-
-  // Aggregate in base currency (transactions may be in mixed currencies once a
-  // tenant invoices in more than one). baseAmount falls back to raw for any
-  // pre-base transition row.
-  const income = allTransactions
-    .filter(t => t.transaction_type === 'income')
-    .reduce((sum, t) => sum + baseAmount(t, 'amount'), 0);
-
-  const expenseTotal = allTransactions
-    .filter(t => t.transaction_type === 'expense')
-    .reduce((sum, t) => sum + baseAmount(t, 'amount'), 0);
-
-  // Realized FX rows are posted as positive magnitudes typed fx_gain / fx_loss
-  // (see paymentsService.allocatePaymentToInvoices); fold them into the net so the
-  // bottom line reflects realized currency movement, not just operating flows.
-  const fxGain = allTransactions
-    .filter(t => t.transaction_type === 'fx_gain')
-    .reduce((sum, t) => sum + baseAmount(t, 'amount'), 0);
-
-  const fxLoss = allTransactions
-    .filter(t => t.transaction_type === 'fx_loss')
-    .reduce((sum, t) => sum + baseAmount(t, 'amount'), 0);
+  const s = (data ?? {}) as Record<string, number>;
+  const totalIncome = Number(s.totalIncomeBase ?? 0);
+  const totalExpenses = Number(s.totalExpensesBase ?? 0);
+  const fxGain = Number(s.fxGainBase ?? 0);
+  const fxLoss = Number(s.fxLossBase ?? 0);
 
   return {
-    total: allTransactions.length,
-    income: allTransactions.filter(t => t.transaction_type === 'income').length,
-    expense: allTransactions.filter(t => t.transaction_type === 'expense').length,
+    total: Number(s.total ?? 0),
+    income: Number(s.income ?? 0),
+    expense: Number(s.expense ?? 0),
     pending: 0,
     reconciled: 0,
-    totalIncome: income,
-    totalExpenses: expenseTotal,
-    netCashFlow: income - expenseTotal + fxGain - fxLoss,
+    totalIncome,
+    totalExpenses,
+    netCashFlow: totalIncome - totalExpenses + fxGain - fxLoss,
   };
 };
 

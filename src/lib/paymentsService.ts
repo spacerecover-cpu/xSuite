@@ -5,7 +5,6 @@ import { sanitizeFilterValue } from './postgrestSanitizer';
 import { buildPaymentSearchOr } from './searchResolvers';
 import { logger } from './logger';
 import { resolveRateContext } from './currencyService';
-import { baseAmount } from './financialMath';
 
 export interface Payment {
   id?: string;
@@ -375,38 +374,33 @@ export const getPaymentStats = async (filters?: {
   dateFrom?: string;
   dateTo?: string;
 }) => {
-  let query = supabase
-    .from('payments')
-    .select('amount, amount_base, status, payment_date');
-
-  if (filters?.dateFrom) {
-    query = query.gte('payment_date', filters.dateFrom);
-  }
-
-  if (filters?.dateTo) {
-    query = query.lte('payment_date', filters.dateTo);
-  }
-
-  const { data: payments, error } = await query;
-  if (error) throw error;
-
+  // One SQL aggregation (get_payment_stats_base) instead of fetching every payment
+  // row and reducing in JS. The RPC filters deleted_at IS NULL (the old query did
+  // not — audit F8) and computes `today` from payment_date's date (the old
+  // string-vs-timestamptz compare was ~always 0). today/month-start are passed in
+  // (browser tz, parity). Money is base-currency (coalesce(amount_base, amount)).
   const today = new Date().toISOString().split('T')[0];
   const thisMonth = new Date();
   thisMonth.setDate(1);
   const thisMonthStart = thisMonth.toISOString().split('T')[0];
 
-  const rows = payments ?? [];
+  const { data, error } = await supabase.rpc('get_payment_stats_base', {
+    p_date_from: filters?.dateFrom ?? undefined,
+    p_date_to: filters?.dateTo ?? undefined,
+    p_today: today,
+    p_month_start: thisMonthStart,
+  });
+  if (error) throw error;
 
+  const s = (data ?? {}) as Record<string, number>;
   return {
-    total: rows.length,
-    completed: rows.filter(p => p.status === 'completed').length,
-    pending: rows.filter(p => p.status === 'pending').length,
-    today: rows.filter(p => p.payment_date === today).length,
-    totalAmount: rows.reduce((sum, p) => sum + baseAmount(p, 'amount'), 0),
-    completedAmount: rows.filter(p => p.status === 'completed').reduce((sum, p) => sum + baseAmount(p, 'amount'), 0),
-    thisMonthAmount: rows
-      .filter(p => p.payment_date !== null && p.payment_date >= thisMonthStart)
-      .reduce((sum, p) => sum + baseAmount(p, 'amount'), 0),
+    total: Number(s.total ?? 0),
+    completed: Number(s.completed ?? 0),
+    pending: Number(s.pending ?? 0),
+    today: Number(s.today ?? 0),
+    totalAmount: Number(s.totalAmountBase ?? 0),
+    completedAmount: Number(s.completedAmountBase ?? 0),
+    thisMonthAmount: Number(s.thisMonthAmountBase ?? 0),
   };
 };
 

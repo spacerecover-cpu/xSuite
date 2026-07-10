@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { cn } from '../../lib/utils';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
-import { buildCaseSearchOr } from '../../lib/caseSearch';
+import { buildCaseSearchOr, applyCaseListFilters } from '../../lib/caseSearch';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { Button } from '../../components/ui/Button';
 import { Plus, Search, Filter, Briefcase, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Archive, Download } from 'lucide-react';
 import { EmptyState } from '../../components/shared/EmptyState';
@@ -138,6 +139,9 @@ export const CasesList: React.FC = () => {
     }
   }, [searchParams, setSearchParams]);
   const [searchTerm, setSearchTerm] = useState('');
+  // The input stays instant; only the debounced term reaches the query keys and
+  // the network — so typing a serial fires one search per pause, not ~6 per key.
+  const debouncedSearch = useDebouncedValue(searchTerm, 300);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
@@ -168,7 +172,7 @@ export const CasesList: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterStatus, filterPriority, casesPerPage, bucketFilter, sort]);
+  }, [debouncedSearch, filterStatus, filterPriority, casesPerPage, bucketFilter, sort]);
 
   // Hiding checkboxes (tenant preference) drops any in-flight selection so
   // bulk actions can't act on rows the user can no longer see or unselect.
@@ -220,48 +224,45 @@ export const CasesList: React.FC = () => {
 
   // Search spans case_no / client_reference / subject plus customer (name, email, mobile,
   // number) and device serials — the latter two pre-resolved to ids (see caseSearch.ts).
-  const resolveSearchOr = async (): Promise<string | null> =>
-    searchTerm ? buildCaseSearchOr(sanitizeFilterValue(searchTerm)) : null;
+  // Resolved through the query cache so the two ILIKE pre-resolution scans run ONCE per
+  // debounced term and are shared by the count + rows queries (and cached across paging
+  // and sorting), instead of both queryFns re-resolving on every fetch.
+  const resolveSearchOr = (): Promise<string | null> => {
+    const term = debouncedSearch.trim();
+    if (!term) return Promise.resolve(null);
+    return queryClient.fetchQuery({
+      queryKey: ['case-search-or', term],
+      queryFn: ({ signal }) => buildCaseSearchOr(sanitizeFilterValue(term), signal),
+      staleTime: 30_000,
+    });
+  };
 
-  const buildFiltersQuery = (searchOr: string | null) => {
-    let query = supabase
-      .from('cases')
-      .select('id, case_no, priority, status, customer_id', { count: 'exact', head: false })
-      .is('deleted_at', null);
-
-    if (searchOr) {
-      query = query.or(searchOr);
-    }
-
-    if (filterStatus !== 'all') {
-      query = query.eq('status', filterStatus);
-    }
-
-    if (filterPriority !== 'all') {
-      query = query.eq('priority', filterPriority);
-    }
-
-    if (bucketStatusNames) {
-      // Empty bucket → match nothing rather than everything.
-      query = query.in('status', bucketStatusNames.length > 0 ? bucketStatusNames : ['__none__']);
-    }
-
-    return query;
+  const caseListFilters = {
+    filterStatus,
+    filterPriority,
+    bucketStatusNames,
   };
 
   const { data: totalCountData } = useQuery({
-    queryKey: ['cases_count', searchTerm, filterStatus, filterPriority, bucketFilter, bucketStatusNames?.join('|') ?? ''],
-    queryFn: async () => {
-      const query = buildFiltersQuery(await resolveSearchOr());
-      const { count, error } = await query;
+    queryKey: ['cases_count', debouncedSearch, filterStatus, filterPriority, bucketFilter, bucketStatusNames?.join('|') ?? ''],
+    queryFn: async ({ signal }) => {
+      // head:true → PostgREST returns only the Content-Range count, no row payload.
+      let query = supabase
+        .from('cases')
+        .select('id', { count: 'exact', head: true })
+        .is('deleted_at', null);
+      query = applyCaseListFilters(query, { searchOr: await resolveSearchOr(), ...caseListFilters });
+      const { count, error } = await query.abortSignal(signal);
       if (error) throw error;
       return count || 0;
     },
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
   });
 
   const { data: cases = [], isLoading, isError, error, refetch, isFetching } = useQuery({
-    queryKey: ['cases', currentPage, casesPerPage, searchTerm, filterStatus, filterPriority, bucketFilter, bucketStatusNames?.join('|') ?? '', sort],
-    queryFn: async () => {
+    queryKey: ['cases', currentPage, casesPerPage, debouncedSearch, filterStatus, filterPriority, bucketFilter, bucketStatusNames?.join('|') ?? '', sort],
+    queryFn: async ({ signal }) => {
       const from = (currentPage - 1) * casesPerPage;
       const to = from + casesPerPage - 1;
 
@@ -287,24 +288,16 @@ export const CasesList: React.FC = () => {
         `)
         .is('deleted_at', null);
 
-      const searchOr = await resolveSearchOr();
-      if (searchOr) {
-        query = query.or(searchOr);
-      }
-
-      if (filterStatus !== 'all') {
-        query = query.eq('status', filterStatus);
-      }
-
-      if (filterPriority !== 'all') {
-        query = query.eq('priority', filterPriority);
-      }
+      // Same filters as the count query (bucket included) via the shared builder —
+      // this is what keeps a bucket-card click from showing unfiltered rows.
+      query = applyCaseListFilters(query, { searchOr: await resolveSearchOr(), ...caseListFilters });
 
       const { data, error } = await query
         .order(sort.key, { ascending: sort.dir === 'asc' })
         .order('is_primary', { referencedTable: 'case_devices', ascending: false })
         .order('created_at', { referencedTable: 'case_devices', ascending: true })
-        .range(from, to);
+        .range(from, to)
+        .abortSignal(signal);
 
       if (error) throw error;
 
@@ -322,7 +315,8 @@ export const CasesList: React.FC = () => {
         const { data: profilesData } = await supabase
           .from('profiles')
           .select('id, full_name')
-          .in('id', profileIds);
+          .in('id', profileIds)
+          .abortSignal(signal);
         for (const p of profilesData || []) profilesById.set(p.id, p);
       }
 
@@ -346,6 +340,10 @@ export const CasesList: React.FC = () => {
 
       return casesWithRelations as Case[];
     },
+    // Keep the current page visible while the next one loads (no skeleton flash on
+    // paging/sort), and don't re-run these RLS-taxed scans on every window refocus.
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
   });
 
   const { data: casePriorities = [] } = useQuery({

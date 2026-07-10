@@ -814,43 +814,27 @@ export const updateQuoteStatus = async (
 
 export const getQuoteStats = async () => {
   try {
-    // Money totals aggregate the BASE-currency column (falling back to
-    // total_amount * exchange_rate until a row carries total_amount_base), so the
-    // figures are correct across currencies. We aggregate in JS rather than via
-    // get_quote_stats_base because that RPC does not expose sentValue. Soft-deleted
-    // quotes are now excluded (the previous query counted them).
-    const { data: quotes, error } = await supabase
-      .from('quotes')
-      .select('status, total_amount, total_amount_base, exchange_rate')
-      .is('deleted_at', null);
-
+    // One SQL aggregation (get_quote_stats_base, SECURITY INVOKER → tenant-scoped,
+    // cheap post-P0) instead of fetching every quote row and reducing in JS. Money
+    // totals are base-currency (coalesce(total_amount_base, total_amount*exchange_rate)).
+    const { data, error } = await supabase.rpc('get_quote_stats_base');
     if (error) {
       logger.error('Error fetching quote stats:', error);
       throw new Error(`Failed to fetch quote statistics: ${error.message}`);
     }
-
-    const quotesList = quotes || [];
-    const baseValue = (q: { total_amount: number | null; total_amount_base: number | null; exchange_rate: number | null }) =>
-      Number(q.total_amount_base ?? (q.total_amount ?? 0) * (q.exchange_rate ?? 1));
-
-    const stats = {
-      total: quotesList.length,
-      draft: quotesList.filter((q) => q.status === 'draft').length,
-      sent: quotesList.filter((q) => q.status === 'sent').length,
-      accepted: quotesList.filter((q) => q.status === 'accepted').length,
-      rejected: quotesList.filter((q) => q.status === 'rejected').length,
-      expired: quotesList.filter((q) => q.status === 'expired').length,
-      converted: quotesList.filter((q) => q.status === 'converted').length,
-      totalValue: quotesList.reduce((sum, q) => sum + baseValue(q), 0),
-      sentValue: quotesList
-        .filter((q) => q.status === 'sent')
-        .reduce((sum, q) => sum + baseValue(q), 0),
-      acceptedValue: quotesList
-        .filter((q) => q.status === 'accepted')
-        .reduce((sum, q) => sum + baseValue(q), 0),
+    const s = (data ?? {}) as Record<string, number>;
+    return {
+      total: Number(s.total ?? 0),
+      draft: Number(s.draft ?? 0),
+      sent: Number(s.sent ?? 0),
+      accepted: Number(s.accepted ?? 0),
+      rejected: Number(s.rejected ?? 0),
+      expired: Number(s.expired ?? 0),
+      converted: Number(s.converted ?? 0),
+      totalValue: Number(s.totalValueBase ?? 0),
+      sentValue: Number(s.sentValueBase ?? 0),
+      acceptedValue: Number(s.acceptedValueBase ?? 0),
     };
-
-    return stats;
   } catch (error: unknown) {
     logger.error('Get quote stats failed:', error);
     return {

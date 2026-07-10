@@ -18823,6 +18823,15 @@ export type Database = {
       get_next_supplier_number: { Args: never; Returns: string }
       get_next_ticket_number: { Args: never; Returns: string }
       get_next_transfer_number: { Args: never; Returns: string }
+      get_payment_stats_base: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_month_start?: string
+          p_today?: string
+        }
+        Returns: Json
+      }
       get_primary_device_for_case: {
         Args: { p_case_id: string }
         Returns: {
@@ -18882,10 +18891,23 @@ export type Database = {
         }
       }
       get_quote_stats_base: { Args: never; Returns: Json }
+      get_sidebar_badge_counts: {
+        Args: { p_cases_since: string }
+        Returns: {
+          cases_today: number
+          invoices_attention: number
+          low_stock: number
+          pending_quotes: number
+        }[]
+      }
       get_system_setting: { Args: { p_key: string }; Returns: string }
       get_tenant_storage_bytes: {
         Args: { p_tenant_id: string }
         Returns: number
+      }
+      get_transaction_stats_base: {
+        Args: { p_date_from?: string; p_date_to?: string }
+        Returns: Json
       }
       get_user_case_access_level: { Args: never; Returns: string }
       get_user_profiles_with_email: {
@@ -19137,6 +19159,10 @@ export type Database = {
       publish_country_pack: {
         Args: { p_country_id: string; p_version: number }
         Returns: Json
+      }
+      receive_stock_from_po: {
+        Args: { p_items: Json; p_purchase_order_id: string }
+        Returns: number
       }
       reconcile_expense_ledger: {
         Args: { p_date_from?: string; p_date_to?: string }

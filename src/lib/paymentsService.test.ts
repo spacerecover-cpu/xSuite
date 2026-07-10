@@ -15,44 +15,48 @@ vi.mock('./chainOfCustodyService', () => ({ logInvoicePayment: vi.fn() }));
 
 import { getPaymentStats, createPayment } from './paymentsService';
 
-/** Thenable query builder: select/gte/lte are chainable; awaiting it yields {data}. */
-function makeQuery(rows: Array<Record<string, unknown>>) {
-  const builder: Record<string, unknown> = {
-    select: vi.fn(() => builder),
-    gte: vi.fn(() => builder),
-    lte: vi.fn(() => builder),
-    then: (resolve: (v: { data: unknown; error: null }) => void) =>
-      resolve({ data: rows, error: null }),
-  };
-  return builder;
-}
-
-beforeEach(() => from.mockReset());
+beforeEach(() => {
+  from.mockReset();
+  rpc.mockReset();
+});
 
 describe('getPaymentStats (D7 — cross-document totals must be base currency)', () => {
-  it('sums amount_base across mixed-currency payments, never the raw native amount', async () => {
-    // 100 @ rate→38 base, plus 50 @ base 50 ⇒ base total 88. Raw native sum would be 150.
-    const query = makeQuery([
-      { amount: 100, amount_base: 38, status: 'completed', payment_date: '2020-01-01' },
-      { amount: 50, amount_base: 50, status: 'completed', payment_date: '2020-01-01' },
-    ]);
-    from.mockReturnValue(query);
+  // The base-currency summation moved into the get_payment_stats_base SQL RPC
+  // (coalesce(amount_base, amount)); the raw-vs-base and deleted_at behavior is
+  // verified against live data by the P2c parity probe. At the service seam the
+  // contract is: read the *Base fields the RPC returns (never a raw native sum),
+  // pass the browser today/month-start, and default cleanly when there is no row.
+  it('surfaces the RPC base-currency totals, and passes today/month-start', async () => {
+    rpc.mockResolvedValue({
+      data: {
+        total: 2, completed: 2, pending: 0, today: 1,
+        totalAmountBase: 88, completedAmountBase: 88, thisMonthAmountBase: 88,
+      },
+      error: null,
+    });
 
     const stats = await getPaymentStats();
 
-    expect(stats.totalAmount).toBe(88);
+    expect(rpc).toHaveBeenCalledWith(
+      'get_payment_stats_base',
+      expect.objectContaining({ p_today: expect.any(String), p_month_start: expect.any(String) }),
+    );
+    expect(stats.total).toBe(2);
+    expect(stats.completed).toBe(2);
+    expect(stats.today).toBe(1);
+    expect(stats.totalAmount).toBe(88); // the *Base field, not a raw native sum
     expect(stats.completedAmount).toBe(88);
-    // the fix is real only if the base shadow is actually selected
-    expect(query.select).toHaveBeenCalledWith(expect.stringContaining('amount_base'));
+    expect(stats.thisMonthAmount).toBe(88);
   });
 
-  it('falls back to the raw amount for pre-base transition rows (no amount_base)', async () => {
-    const query = makeQuery([{ amount: 70, status: 'completed', payment_date: '2020-01-01' }]);
-    from.mockReturnValue(query);
+  it('defaults every field to 0 when the RPC returns no row', async () => {
+    rpc.mockResolvedValue({ data: null, error: null });
 
     const stats = await getPaymentStats();
 
-    expect(stats.totalAmount).toBe(70);
+    expect(stats.total).toBe(0);
+    expect(stats.totalAmount).toBe(0);
+    expect(stats.thisMonthAmount).toBe(0);
   });
 });
 
