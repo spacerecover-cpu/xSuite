@@ -223,7 +223,7 @@ function buildSquare(label: CompactLabelContent, contentW: number, contentH: num
   }
   stack.push({ ...idRow(label, contentW, 9, 5), alignment: 'center' });
   // Budget the remaining height for meta lines so a second line never overflows.
-  const usedH = stack.reduce((h, n) => {
+  const usedH = stack.reduce<number>((h, n) => {
     const img = n as { height?: number };
     return h + (typeof img.height === 'number' ? img.height + 2 : lineBoxPt(idSize));
   }, 0);
