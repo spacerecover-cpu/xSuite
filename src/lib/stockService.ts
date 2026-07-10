@@ -423,9 +423,11 @@ export async function recordStockReceipt(
   // Preserve NULL when no cost is known so downstream COGS/valuation reports stay honest.
   const unitCost = options?.cost ?? item.cost_price ?? null;
 
+  // Write the writable balance column — current_quantity is GENERATED over
+  // quantity_on_hand, so a direct write 400s ("can only be updated to DEFAULT").
   const { error: updateError } = await supabase
     .from('stock_items')
-    .update({ current_quantity: newQty, updated_at: new Date().toISOString() })
+    .update({ quantity_on_hand: newQty, updated_at: new Date().toISOString() })
     .eq('id', itemId);
   if (updateError) throw updateError;
 
@@ -628,9 +630,10 @@ export async function cancelStockSale(id: string): Promise<void> {
 
       const currentQty = stockItem.current_quantity ?? 0;
       const newQty = currentQty + item.quantity;
+      // Write quantity_on_hand — current_quantity is a GENERATED mirror (direct write 400s).
       await supabase
         .from('stock_items')
-        .update({ current_quantity: newQty, updated_at: new Date().toISOString() })
+        .update({ quantity_on_hand: newQty, updated_at: new Date().toISOString() })
         .eq('id', item.item_id);
 
       await supabase.from('stock_transactions').insert({
@@ -1061,23 +1064,23 @@ export interface ReceiveStockFromPOData {
 }
 
 export async function receiveStockFromPO(data: ReceiveStockFromPOData): Promise<void> {
-  for (const item of data.items) {
-    if (item.quantity <= 0) continue;
-    await recordStockReceipt(item.stockItemId, item.quantity, {
-      poId: data.purchaseOrderId,
-      cost: item.unitCost,
-      serialNumbers: item.serialNumbers,
-    });
-
-    // NOTE: purchase_order_items has stock_item_id + received_quantity but no received_at column.
-    await supabase
-      .from('purchase_order_items')
-      .update({
-        stock_item_id: item.stockItemId,
-        received_quantity: item.quantity,
-      })
-      .eq('id', item.poItemId);
-  }
+  // Atomic, race-safe path: the whole receipt (per-item quantity_on_hand increment,
+  // stock_transactions 'received' ledger rows, serial-number rows, and the PO-line
+  // received_quantity/link update) runs in ONE transaction inside receive_stock_from_po,
+  // which FOR UPDATE locks each stock row. Replaces the former per-item client loop
+  // that wrote the GENERATED current_quantity column (400 on the first item) and left
+  // quantities, the ledger, and PO state diverged on a mid-loop failure. (audit F10)
+  const { error } = await supabase.rpc('receive_stock_from_po', {
+    p_purchase_order_id: data.purchaseOrderId,
+    p_items: data.items.map((item) => ({
+      stock_item_id: item.stockItemId,
+      po_item_id: item.poItemId,
+      quantity: item.quantity,
+      unit_cost: item.unitCost,
+      serial_numbers: item.serialNumbers ?? [],
+    })),
+  });
+  if (error) throw error;
 }
 
 export async function getPortalCustomerPurchases(customerId: string): Promise<{
@@ -1332,9 +1335,10 @@ export async function bulkAdjustQuantities(
 
     const currentQty = item.current_quantity ?? 0;
     const variance = adj.newQuantity - currentQty;
+    // Write quantity_on_hand — current_quantity is a GENERATED mirror (direct write 400s).
     await supabase
       .from('stock_items')
-      .update({ current_quantity: adj.newQuantity, updated_at: new Date().toISOString() })
+      .update({ quantity_on_hand: adj.newQuantity, updated_at: new Date().toISOString() })
       .eq('id', adj.id);
 
     if (variance !== 0) {

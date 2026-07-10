@@ -19147,6 +19147,10 @@ export type Database = {
         Args: { p_country_id: string; p_version: number }
         Returns: Json
       }
+      receive_stock_from_po: {
+        Args: { p_items: Json; p_purchase_order_id: string }
+        Returns: number
+      }
       reconcile_expense_ledger: {
         Args: { p_date_from?: string; p_date_to?: string }
         Returns: {
