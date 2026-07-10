@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { IMPORT_ORDER, type ParsedWorkbook, type RawRow } from './workbookContract';
-import { normalizeDateCell, normalizeInvoiceStatus, coerceWorkbook } from './coerceWorkbook';
+import { normalizeDateCell, normalizeInvoiceStatus, normalizeQuoteStatus, coerceWorkbook } from './coerceWorkbook';
 
 function empty(): ParsedWorkbook {
   return Object.fromEntries(IMPORT_ORDER.map((e) => [e, [] as RawRow[]])) as ParsedWorkbook;
@@ -75,8 +75,8 @@ describe('normalizeInvoiceStatus', () => {
     expect(normalizeInvoiceStatus(input)).toBe(expected);
   });
 
-  it('leaves canonical lowercase values intact', () => {
-    for (const s of ['draft', 'sent', 'paid', 'partial', 'overdue', 'cancelled', 'void', 'converted']) {
+  it('leaves canonical lowercase values intact (overdue excepted — coerced to sent since WP-C)', () => {
+    for (const s of ['draft', 'sent', 'paid', 'partial', 'cancelled', 'void', 'converted']) {
       expect(normalizeInvoiceStatus(s)).toBe(s);
     }
   });
@@ -120,5 +120,51 @@ describe('coerceWorkbook', () => {
     wb.customers = [{ legacy_id: 'CU1', customer_name: 'Acme', email: 'a@b.co', is_active: 'Yes' }];
     const out = coerceWorkbook(wb);
     expect(out.customers[0]).toMatchObject({ customer_name: 'Acme', email: 'a@b.co', is_active: 'Yes' });
+  });
+});
+
+describe('normalizeQuoteStatus (WP-C: quotes.status is CHECK-constrained now)', () => {
+  it.each([
+    // master_quote_statuses display names from legacy exports
+    ['Sent to Client', 'sent'],
+    ['Pending Review', 'draft'],
+    ['Follow-up Required', 'sent'],
+    ['Under Negotiation', 'sent'],
+    ['Declined', 'rejected'],
+    ['Cancelled', 'rejected'],
+    ['Converted to Job', 'converted'],
+    ['Approved', 'accepted'],
+    // Title-case codes (the 2026-07-10 legacy shape) just lowercase
+    ['Sent', 'sent'],
+    ['Draft', 'draft'],
+    ['Accepted', 'accepted'],
+    ['Expired', 'expired'],
+  ])('maps %s -> %s', (input, expected) => {
+    expect(normalizeQuoteStatus(input)).toBe(expected);
+  });
+
+  it('lowercases unknown values so they fail validation as themselves', () => {
+    expect(normalizeQuoteStatus('Weird Custom Status')).toBe('weird custom status');
+  });
+
+  it('passes blanks through', () => {
+    expect(normalizeQuoteStatus(null)).toBeNull();
+    expect(normalizeQuoteStatus('')).toBe('');
+  });
+});
+
+describe('coerceWorkbook quote-status pass', () => {
+  it('normalizes quotes.status in place', () => {
+    const wb = Object.fromEntries(IMPORT_ORDER.map((e) => [e, []])) as unknown as ParsedWorkbook;
+    (wb.quotes as RawRow[]) = [{ status: 'Sent to Client' }, { status: 'Declined' }];
+    coerceWorkbook(wb);
+    expect((wb.quotes as RawRow[]).map((r) => r.status)).toEqual(['sent', 'rejected']);
+  });
+
+  it("coerces invoice 'overdue' to 'sent' (overdue is a due-date fact, not a stored status)", () => {
+    const wb = Object.fromEntries(IMPORT_ORDER.map((e) => [e, []])) as unknown as ParsedWorkbook;
+    (wb.invoices as RawRow[]) = [{ status: 'Overdue' }];
+    coerceWorkbook(wb);
+    expect((wb.invoices as RawRow[])[0].status).toBe('sent');
   });
 });

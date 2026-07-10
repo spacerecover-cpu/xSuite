@@ -1031,10 +1031,7 @@ export const recordPayment = async (
   const newAmountPaidBase = convertToBase(newAmountPaid, invoiceRate, baseDecimals);
   const newBalanceDueBase = convertToBase(newBalanceDue, invoiceRate, baseDecimals);
 
-  const newStatus = deriveInvoiceStatus(newAmountPaid, newBalanceDue, {
-    partialLabel: 'partial',
-    unpaidLabel: 'sent',
-  });
+  const newStatus = deriveInvoiceStatus(newAmountPaid, newBalanceDue);
 
   // payment_method here is the master_payment_methods UUID (caller already passes the FK).
   // The legacy `reference_number` arg maps to the `reference` column.

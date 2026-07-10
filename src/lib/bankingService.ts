@@ -684,17 +684,18 @@ export const bankingService = {
       const newAmountPaid = (invoice.amount_paid ?? 0) + amount;
       const newAmountDue = (invoice.balance_due ?? 0) - amount;
 
-      await supabase
+      // 'partially-paid' violated invoices_status_check, and the unchecked
+      // update swallowed the rejection — allocations landed while the invoice
+      // totals/status silently never moved. Canonical vocabulary + fail loud.
+      const { error: invoiceUpdateError } = await supabase
         .from('invoices')
         .update({
           amount_paid: newAmountPaid,
           balance_due: newAmountDue,
-          status: deriveInvoiceStatus(newAmountPaid, newAmountDue, {
-            partialLabel: 'partially-paid',
-            unpaidLabel: 'partially-paid',
-          }),
+          status: deriveInvoiceStatus(newAmountPaid, newAmountDue),
         })
         .eq('id', invoiceId);
+      if (invoiceUpdateError) throw invoiceUpdateError;
     }
   },
 
@@ -1051,19 +1052,17 @@ export const bankingService = {
           const newAmountPaid = (invoice.amount_paid ?? 0) + allocation.allocated_amount;
           const newAmountDue = (invoice.balance_due ?? 0) - allocation.allocated_amount;
 
-          const newStatus = deriveInvoiceStatus(newAmountPaid, newAmountDue, {
-            partialLabel: 'partially-paid',
-            unpaidLabel: invoice.status ?? 'sent',
-          });
-
-          await supabase
+          // Same fix as allocateReceiptToInvoice: canonical vocabulary
+          // (the CHECK rejected 'partially-paid') + fail loud on the update.
+          const { error: invoiceUpdateError } = await supabase
             .from('invoices')
             .update({
               amount_paid: newAmountPaid,
               balance_due: newAmountDue,
-              status: newStatus,
+              status: deriveInvoiceStatus(newAmountPaid, newAmountDue),
             })
             .eq('id', allocation.invoice_id);
+          if (invoiceUpdateError) throw invoiceUpdateError;
         }
       }
     }

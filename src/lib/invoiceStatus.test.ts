@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { deriveInvoiceStatus } from './invoiceStatus';
 
-// Pins the single payment-status rule extracted from the five inlined call sites.
-// The two divergent dimensions across those sites — the "partially paid" label
-// ('partial' in financial/payments, 'partially-paid' in banking) and the
-// fully-unpaid fall-through ('sent' vs the invoice's current status) — are
-// parameters, so each site reproduces its exact prior output.
+// Pins the single payment-status rule shared by all call sites. The vocabulary
+// is canonical (owner decision 2026-07-10, FU-1): lowercase codes matching
+// invoices_status_check — 'paid' / 'partial' / 'sent'. The banking-only
+// 'partially-paid' label was never storable (the CHECK rejects it); the label
+// parameters that preserved it are gone (WP-C).
 
 describe('deriveInvoiceStatus', () => {
   it('returns paid when the amount due is cleared (regardless of amount paid)', () => {
@@ -13,35 +13,19 @@ describe('deriveInvoiceStatus', () => {
     expect(deriveInvoiceStatus(120, -0.01)).toBe('paid');
   });
 
-  it('returns the partial label when some (but not all) is paid', () => {
+  it('returns partial when some (but not all) is paid', () => {
     expect(deriveInvoiceStatus(50, 50)).toBe('partial');
+    expect(deriveInvoiceStatus(30, 70)).toBe('partial');
   });
 
-  it('returns the unpaid label when nothing is paid', () => {
+  it('returns sent when nothing is paid', () => {
     expect(deriveInvoiceStatus(0, 100)).toBe('sent');
   });
 
-  it('honors a custom partial label (banking uses "partially-paid")', () => {
-    expect(deriveInvoiceStatus(50, 50, { partialLabel: 'partially-paid' })).toBe('partially-paid');
-  });
-
-  it('honors a custom unpaid label', () => {
-    expect(deriveInvoiceStatus(0, 100, { unpaidLabel: 'draft' })).toBe('draft');
-  });
-
-  // bankingService.recordPayment-style: invoiceService.recordPayment
-  it('reproduces recordPayment (partial / sent)', () => {
-    expect(deriveInvoiceStatus(0, 100, { partialLabel: 'partial', unpaidLabel: 'sent' })).toBe('sent');
-    expect(deriveInvoiceStatus(30, 70, { partialLabel: 'partial', unpaidLabel: 'sent' })).toBe('partial');
-    expect(deriveInvoiceStatus(100, 0, { partialLabel: 'partial', unpaidLabel: 'sent' })).toBe('paid');
-  });
-
-  // bankingService.allocateReceiptToInvoice: the inline ternary was
-  // `due <= 0 ? 'paid' : 'partially-paid'` — both non-paid branches collapse to
-  // the same label, so partial and unpaid labels are identical.
-  it('reproduces the banking allocate ternary (paid / partially-paid)', () => {
-    expect(deriveInvoiceStatus(0, 50, { partialLabel: 'partially-paid', unpaidLabel: 'partially-paid' })).toBe('partially-paid');
-    expect(deriveInvoiceStatus(50, 50, { partialLabel: 'partially-paid', unpaidLabel: 'partially-paid' })).toBe('partially-paid');
-    expect(deriveInvoiceStatus(50, 0, { partialLabel: 'partially-paid', unpaidLabel: 'partially-paid' })).toBe('paid');
+  it('never emits a value outside invoices_status_check vocabulary', () => {
+    const allowed = new Set(['draft', 'sent', 'paid', 'partial', 'overdue', 'cancelled', 'void', 'converted']);
+    for (const [paid, due] of [[0, 100], [50, 50], [100, 0], [0, 0], [-5, 10]] as Array<[number, number]>) {
+      expect(allowed.has(deriveInvoiceStatus(paid, due))).toBe(true);
+    }
   });
 });

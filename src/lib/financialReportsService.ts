@@ -175,6 +175,7 @@ export const generateAgedReceivablesReport = async (): Promise<AgedReceivablesDa
       customer:customers_enhanced(id, customer_name)
     `)
     .gt('balance_due', 0)
+    .is('deleted_at', null)
     .in('status', ['sent', 'partial', 'overdue']);
 
   if (error) throw error;

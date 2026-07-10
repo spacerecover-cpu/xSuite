@@ -123,6 +123,10 @@ const INVOICE_STATUS_SYNONYMS: Record<string, string> = {
   'not paid': 'sent',
   'awaiting payment': 'sent',
   issued: 'sent',
+  // Owner decision 2026-07-10 (FU-1/WP-C): overdue is a due-date fact derived at
+  // read time, never a stored status — an imported 'overdue' invoice is an
+  // issued, unpaid one. (The CHECK still tolerates legacy 'overdue' rows.)
+  overdue: 'sent',
 };
 
 /** Normalise an invoice status to the canonical lowercase enum (or blank → unchanged). */
@@ -132,6 +136,31 @@ export function normalizeInvoiceStatus(value: unknown): string | null {
   if (s === '') return s;
   const lower = s.toLowerCase();
   return INVOICE_STATUS_SYNONYMS[lower] ?? lower;
+}
+
+// quotes.status is CHECK-constrained to the 6 service-layer codes (WP-C), and
+// legacy exports carry master_quote_statuses display names. Map every display
+// name onto its nearest code; identity spellings (Draft/Sent/Accepted/…)
+// only need lowercasing. Anything not listed is lowercased so a genuinely
+// invalid value still fails validation as itself (not as a case mismatch).
+const QUOTE_STATUS_SYNONYMS: Record<string, string> = {
+  'sent to client': 'sent',
+  'pending review': 'draft',
+  'follow-up required': 'sent',
+  'under negotiation': 'sent',
+  declined: 'rejected',
+  cancelled: 'rejected',
+  'converted to job': 'converted',
+  approved: 'accepted',
+};
+
+/** Normalise a quote status to the canonical lowercase codes (or blank → unchanged). */
+export function normalizeQuoteStatus(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const s = String(value).trim();
+  if (s === '') return s;
+  const lower = s.toLowerCase();
+  return QUOTE_STATUS_SYNONYMS[lower] ?? lower;
 }
 
 /**
@@ -147,12 +176,14 @@ export function coerceWorkbook(wb: ParsedWorkbook): ParsedWorkbook {
 
     const dateKeys = ENTITY_COLUMNS[entity].filter((c) => c.type === 'date').map((c) => c.key);
     const isInvoices = entity === 'invoices';
+    const isQuotes = entity === 'quotes';
 
     for (const row of rows as RawRow[]) {
       for (const key of dateKeys) {
         if (key in row) row[key] = normalizeDateCell(row[key]);
       }
       if (isInvoices && 'status' in row) row.status = normalizeInvoiceStatus(row.status);
+      if (isQuotes && 'status' in row) row.status = normalizeQuoteStatus(row.status);
     }
   }
   return wb;

@@ -120,12 +120,18 @@ const UNIQUE_NUMBER: Partial<Record<EntityType, string>> = {
 
 // Status enum guards. Only fields constrained DB-side (hard CHECK) are validated as ERRORS
 // here so the failure surfaces client-side rather than as an opaque per-row RPC failure.
-// Free-text / tenant-configurable statuses (quotes, cases, stock sale status, …) are
+// Free-text / tenant-configurable statuses (cases, stock sale status, …) are
 // intentionally NOT guarded — flagging them would false-positive on valid legacy data.
+// quotes.status became a hard CHECK in WP-C (quotes_status_check, 6 codes) and legacy
+// display names are mapped by normalizeQuoteStatus BEFORE validation, so it is guarded.
 const STATUS_ENUMS: Partial<Record<EntityType, Array<{ field: string; allowed: ReadonlySet<string> }>>> = {
   invoices: [{
     field: 'status',
     allowed: new Set(['draft', 'sent', 'paid', 'partial', 'overdue', 'cancelled', 'void', 'converted']),
+  }],
+  quotes: [{
+    field: 'status',
+    allowed: new Set(['draft', 'sent', 'accepted', 'rejected', 'expired', 'converted']),
   }],
   expenses: [{
     field: 'status',

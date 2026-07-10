@@ -121,3 +121,50 @@ describe('createTransfer — cross-currency guard (Phase 0)', () => {
     expect(result).toMatchObject({ id: 't1' });
   });
 });
+
+describe('allocateReceiptToInvoice — canonical status vocabulary + fail-loud (WP-C)', () => {
+  function makeAllocationHarness(invoice: Record<string, unknown>, updateError: { message: string } | null) {
+    const updateEq = vi.fn(() => ({
+      then: (resolve: (v: { error: { message: string } | null }) => void) =>
+        resolve({ error: updateError }),
+    }));
+    const update = vi.fn(() => ({ eq: updateEq }));
+    const insert = vi.fn(() => ({
+      then: (resolve: (v: { error: null }) => void) => resolve({ error: null }),
+    }));
+    const maybeSingle = vi.fn(() => Promise.resolve({ data: invoice, error: null }));
+    const selectEq = vi.fn(() => ({ maybeSingle }));
+    const select = vi.fn(() => ({ eq: selectEq }));
+    from.mockImplementation((table: string) => {
+      if (table === 'receipt_allocations') return { insert };
+      return { select, update };
+    });
+    return { update };
+  }
+
+  beforeEach(() => {
+    getUser.mockResolvedValue({ data: { user: { id: 'user-1' } } });
+    resolveTenantId.mockResolvedValue('tenant-1');
+  });
+
+  it("writes the canonical 'partial' status (never the CHECK-rejected 'partially-paid')", async () => {
+    const { update } = makeAllocationHarness({ amount_paid: 0, balance_due: 100, status: 'sent' }, null);
+
+    await bankingService.allocateReceiptToInvoice('rcpt-1', 'inv-1', 40);
+
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ amount_paid: 40, balance_due: 60, status: 'partial' }),
+    );
+  });
+
+  it('throws when the invoice update fails instead of silently swallowing it', async () => {
+    makeAllocationHarness(
+      { amount_paid: 0, balance_due: 100, status: 'sent' },
+      { message: 'violates check constraint' },
+    );
+
+    await expect(
+      bankingService.allocateReceiptToInvoice('rcpt-1', 'inv-1', 40),
+    ).rejects.toBeTruthy();
+  });
+});

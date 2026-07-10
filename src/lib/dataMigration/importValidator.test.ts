@@ -96,13 +96,30 @@ describe('validateWorkbook', () => {
     }
   });
 
-  it('does NOT flag quote/case statuses (free text, tenant-configurable DB-side)', () => {
+  it('does NOT flag case statuses (free text, tenant-configurable DB-side)', () => {
     const wb = empty();
     wb.customers = [{ legacy_id: 'CU1', customer_name: 'A' }];
     wb.cases = [{ legacy_id: 'K1', case_number: 'C-1', customer_legacy_id: 'CU1', status: 'diagnosis in progress' }];
-    wb.quotes = [{ legacy_id: 'Q1', quote_number: 'Q-1', case_legacy_id: 'K1', status: 'under negotiation' }];
     const r = validateWorkbook(wb, 'records');
     expect(r.issues.some((i) => i.field === 'status')).toBe(false);
+  });
+
+  // quotes.status is CHECK-constrained since WP-C. In the real pipeline
+  // coerceWorkbook maps legacy display names ('Under Negotiation' -> 'sent')
+  // BEFORE validation, so only genuinely out-of-vocabulary values reach here —
+  // and those must ERROR client-side rather than fail per-row in the RPC.
+  it('flags out-of-vocabulary quote statuses and accepts canonical codes', () => {
+    const wb = empty();
+    wb.customers = [{ legacy_id: 'CU1', customer_name: 'A' }];
+    wb.cases = [{ legacy_id: 'K1', case_number: 'C-1', customer_legacy_id: 'CU1' }];
+    wb.quotes = [
+      { legacy_id: 'Q1', quote_number: 'Q-1', case_legacy_id: 'K1', status: 'sent' },
+      { legacy_id: 'Q2', quote_number: 'Q-2', case_legacy_id: 'K1', status: 'totally bogus' },
+    ];
+    const r = validateWorkbook(wb, 'records');
+    const statusIssues = r.issues.filter((i) => i.entity === 'quotes' && i.field === 'status');
+    expect(statusIssues).toHaveLength(1);
+    expect(statusIssues[0].rowIndex).toBe(1);
   });
 
   // Real-world files (and our own boolean columns) go to the RPC as `(v_row->>'x')::boolean`,
