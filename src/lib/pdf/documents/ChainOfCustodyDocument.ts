@@ -2,6 +2,7 @@ import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interface
 import type { ChainOfCustodyDocumentData, TranslationContext } from '../types';
 import { PDF_COLORS, getStylesWithFont, createBilingualSectionHeader } from '../styles';
 import { formatDate, safeString } from '../utils';
+import { formatDateTimeWithConfig } from '../../format';
 
 const categoryColors: Record<string, string> = {
   creation: '#D1FAE5',
@@ -135,8 +136,8 @@ function buildSummarySection(
     const sortedByDate = [...entries].sort(
       (a, b) => new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime()
     );
-    const first = formatDate(sortedByDate[0].occurred_at, 'dd/MM/yyyy HH:mm');
-    const last = formatDate(sortedByDate[sortedByDate.length - 1].occurred_at, 'dd/MM/yyyy HH:mm');
+    const first = formatDateTimeWithConfig(sortedByDate[0].occurred_at, data.dateTimeConfig ?? null, { withTz: true });
+    const last = formatDateTimeWithConfig(sortedByDate[sortedByDate.length - 1].occurred_at, data.dateTimeConfig ?? null, { withTz: true });
     dateRange = `${first} - ${last}`;
   }
 
@@ -230,7 +231,7 @@ function buildEntriesTable(
       { text: formatActionType(entry.action_type), fontSize: 7, bold: true, color: PDF_COLORS.text, fillColor: bgColor, margin: [2, 3, 2, 3] as [number, number, number, number] },
       { text: safeString(entry.action_description), fontSize: 7, color: PDF_COLORS.text, fillColor: bgColor, margin: [2, 3, 2, 3] as [number, number, number, number] },
       { text: actorText, fontSize: 7, color: PDF_COLORS.text, fillColor: bgColor, margin: [2, 3, 2, 3] as [number, number, number, number] },
-      { text: formatDate(entry.occurred_at, 'dd/MM/yyyy HH:mm'), fontSize: 7, color: PDF_COLORS.textLight, fillColor: bgColor, margin: [2, 3, 2, 3] as [number, number, number, number], alignment: 'center' as const },
+      { text: formatDateTimeWithConfig(entry.occurred_at, data.dateTimeConfig ?? null, { withTz: true }), fontSize: 7, color: PDF_COLORS.textLight, fillColor: bgColor, margin: [2, 3, 2, 3] as [number, number, number, number], alignment: 'center' as const },
       {
         table: {
           widths: ['*'],
@@ -383,7 +384,7 @@ function buildSignatureSection(
         },
         width: 'auto' as const,
       },
-      { text: `${safeString(entry.actor_name)} — ${formatDate(entry.occurred_at, 'dd/MM/yyyy HH:mm')}`, fontSize: 7, color: PDF_COLORS.textLight, margin: [6, 4, 0, 0] as [number, number, number, number] },
+      { text: `${safeString(entry.actor_name)} — ${formatDateTimeWithConfig(entry.occurred_at, data.dateTimeConfig ?? null, { withTz: true })}`, fontSize: 7, color: PDF_COLORS.textLight, margin: [6, 4, 0, 0] as [number, number, number, number] },
     ],
     margin: [0, 0, 0, 3] as [number, number, number, number],
   }));

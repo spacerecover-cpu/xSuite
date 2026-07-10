@@ -26,6 +26,7 @@
 import type { ChainOfCustodyDocumentData, ChainOfCustodyEntryData } from '../../types';
 import type { DocumentTemplateConfig, ColumnConfig } from '../../templateConfig';
 import { formatDate, safeString } from '../../utils';
+import { formatDateTimeWithConfig } from '../../../format';
 import type {
   CaseInfoBlock,
   CustodyLogBlock,
@@ -120,7 +121,10 @@ function resolveCustodyColumns(config: DocumentTemplateConfig): ResolvedColumn[]
 }
 
 /** Stringify one ledger entry into the custody-table row shape (keys ↔ columns). */
-function entryRow(entry: ChainOfCustodyEntryData): Record<string, string> {
+function entryRow(
+  entry: ChainOfCustodyEntryData,
+  dtConfig: ChainOfCustodyDocumentData['dateTimeConfig'],
+): Record<string, string> {
   // Actor + role on one line (parity: "Name\n(role)"), so the cell carries both.
   const actorText = entry.actor_role
     ? `${safeString(entry.actor_name)}\n(${entry.actor_role})`
@@ -131,7 +135,9 @@ function entryRow(entry: ChainOfCustodyEntryData): Record<string, string> {
     action: humanize(entry.action_type),
     description: safeString(entry.action_description),
     actor: actorText,
-    occurredAt: formatDate(entry.occurred_at, 'dd/MM/yyyy HH:mm'),
+    // Forensic event time: tenant timezone + explicit zone label, unambiguous
+    // month-name — never the printer's browser timezone.
+    occurredAt: formatDateTimeWithConfig(entry.occurred_at, dtConfig ?? null, { withTz: true }),
     // RAW category passes straight through; renderCustodyLog maps it to the
     // humanized label + badge colour (or a '-' dash cell when empty).
     actionCategory: entry.action_category ?? '',
@@ -162,7 +168,10 @@ function caseInfoBlock(caseNumber: string): CaseInfoBlock {
  * first→last occurred-at date range (formatted `dd/MM/yyyy HH:mm`, '-' when no
  * entries). The renderer stays dumb; all the derivation lives here.
  */
-function custodySummaryBlock(entries: ChainOfCustodyEntryData[]): CustodySummaryBlock {
+function custodySummaryBlock(
+  entries: ChainOfCustodyEntryData[],
+  dtConfig: ChainOfCustodyDocumentData['dateTimeConfig'],
+): CustodySummaryBlock {
   const categories = new Set(entries.map((e) => e.action_category));
   const actors = new Set(entries.map((e) => e.actor_name));
 
@@ -171,8 +180,8 @@ function custodySummaryBlock(entries: ChainOfCustodyEntryData[]): CustodySummary
     const sortedByDate = [...entries].sort(
       (a, b) => new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime(),
     );
-    const first = formatDate(sortedByDate[0].occurred_at, 'dd/MM/yyyy HH:mm');
-    const last = formatDate(sortedByDate[sortedByDate.length - 1].occurred_at, 'dd/MM/yyyy HH:mm');
+    const first = formatDateTimeWithConfig(sortedByDate[0].occurred_at, dtConfig ?? null, { withTz: true });
+    const last = formatDateTimeWithConfig(sortedByDate[sortedByDate.length - 1].occurred_at, dtConfig ?? null, { withTz: true });
     dateRange = `${first} - ${last}`;
   }
 
@@ -224,7 +233,10 @@ function hashVerificationBlock(entries: ChainOfCustodyEntryData[]): HashVerifica
  * no entry is signed (the caller gates on `options.includeSignatures`; this
  * guards the data so an empty table is never emitted).
  */
-function digitalSignaturesBlock(entries: ChainOfCustodyEntryData[]): DigitalSignaturesBlock | null {
+function digitalSignaturesBlock(
+  entries: ChainOfCustodyEntryData[],
+  dtConfig: ChainOfCustodyDocumentData['dateTimeConfig'],
+): DigitalSignaturesBlock | null {
   const signed = entries.filter((e) => e.digital_signature);
   if (signed.length === 0) return null;
 
@@ -244,7 +256,8 @@ function digitalSignaturesBlock(entries: ChainOfCustodyEntryData[]): DigitalSign
       signer: safeString(entry.actor_name),
       role: entry.actor_role ? safeString(entry.actor_role) : '-',
       signature: `✓ ${safeString(entry.digital_signature)}`,
-      date: formatDate(entry.occurred_at, 'dd/MM/yyyy HH:mm'),
+      // Forensic: WHO signed WHEN — tenant timezone + zone label, never browser tz.
+      date: formatDateTimeWithConfig(entry.occurred_at, dtConfig ?? null, { withTz: true }),
     })),
   };
 }
@@ -279,7 +292,7 @@ export function toEngineData(
   const custodyLog: CustodyLogBlock = {
     title: { en: 'Chain of Custody Entries', ar: 'سجل سلسلة الحيازة' },
     columns,
-    rows: entries.map(entryRow),
+    rows: entries.map((e) => entryRow(e, data.dateTimeConfig)),
     legalNotice: LEGAL_NOTICE,
     includeHashes: !!options?.includeHashes,
     includeSignatures: !!options?.includeSignatures,
@@ -288,7 +301,7 @@ export function toEngineData(
   // ---- Forensic summary box (always emitted) -------------------------------
   // Restores the legacy Summary box: total entries, action categories, unique
   // actors, date range.
-  const custodySummary: CustodySummaryBlock = custodySummaryBlock(entries);
+  const custodySummary: CustodySummaryBlock = custodySummaryBlock(entries, data.dateTimeConfig);
 
   // ---- Hash verification + digital signatures (option-gated) ---------------
   // Matching the legacy gating: the Hash Verification table is emitted ONLY when
@@ -299,7 +312,7 @@ export function toEngineData(
     ? hashVerificationBlock(entries)
     : null;
   const digitalSignatures: DigitalSignaturesBlock | null = options?.includeSignatures
-    ? digitalSignaturesBlock(entries)
+    ? digitalSignaturesBlock(entries, data.dateTimeConfig)
     : null;
 
   // ---- Signature lines -----------------------------------------------------

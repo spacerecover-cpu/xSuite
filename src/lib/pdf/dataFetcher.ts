@@ -1,4 +1,4 @@
-import { supabase } from '../supabaseClient';
+import { supabase, resolveTenantId } from '../supabaseClient';
 import { fetchInvoicePaymentLedger } from '../paymentLedger';
 import { getOrCreateCompanySettings } from '../companySettingsService';
 import type {
@@ -1146,11 +1146,23 @@ export async function fetchChainOfCustodyData(
     fetchCompanySettings(),
   ]);
 
+  // Forensic event times want the tenant timezone + zone label, but a
+  // config-resolution failure must NEVER block generating the custody document —
+  // degrade to browser-local (unlabelled) rather than throw.
+  let dateTimeConfig: ChainOfCustodyDocumentData['dateTimeConfig'];
+  try {
+    const cfg = await getTenantConfig(await resolveTenantId());
+    dateTimeConfig = { timezone: cfg.dateTime.timezone, timeFormat: cfg.dateTime.timeFormat };
+  } catch {
+    dateTimeConfig = undefined;
+  }
+
   return {
     caseNumber,
     entries: entriesResult,
     options,
     companySettings: settingsResult,
+    dateTimeConfig,
   };
 }
 

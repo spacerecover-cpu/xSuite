@@ -200,7 +200,7 @@ exports[`PDF builder characterization (golden snapshots) > buildChainOfCustodyDo
                         {
                           "color": "#334155",
                           "fontSize": 9,
-                          "text": "Date Range: 01/06/2026 13:00 - 02/06/2026 15:30",
+                          "text": "Date Range: Jun 01, 2026, 13:00 GMT+4 - Jun 02, 2026, 15:30 GMT+4",
                         },
                       ],
                       "width": "*",
@@ -339,7 +339,7 @@ exports[`PDF builder characterization (golden snapshots) > buildChainOfCustodyDo
                     2,
                     3,
                   ],
-                  "text": "01/06/2026 13:00",
+                  "text": "Jun 01, 2026, 13:00 GMT+4",
                 },
                 {
                   "fillColor": "#ffffff",
@@ -446,7 +446,7 @@ exports[`PDF builder characterization (golden snapshots) > buildChainOfCustodyDo
                     2,
                     3,
                   ],
-                  "text": "02/06/2026 15:30",
+                  "text": "Jun 02, 2026, 15:30 GMT+4",
                 },
                 {
                   "fillColor": "#f8fafc",
@@ -657,7 +657,7 @@ exports[`PDF builder characterization (golden snapshots) > buildChainOfCustodyDo
                 0,
                 0,
               ],
-              "text": "Lab Reception — 01/06/2026 13:00",
+              "text": "Lab Reception — Jun 01, 2026, 13:00 GMT+4",
             },
           ],
           "margin": [

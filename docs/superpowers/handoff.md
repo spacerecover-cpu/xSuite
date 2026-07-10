@@ -1,3 +1,75 @@
+> **TWO CONCURRENT WORKSTREAMS.** Most recent first: (A) the **Performance program** (2026-07-10, PR #410) below, then (B) the **India Pack Phase 4** handoff (2026-07-07, PR stack #385–#388) preserved beneath the `═══` separator. Read the one you're resuming.
+
+---
+
+# Session Handoff (A) — 2026-07-10 — Performance program: P0–P2 shipped as PR #410 · next = follow-ups FU-1…FU-5
+
+## What I was doing
+Ran an end-to-end performance audit of xSuite (10-dimension multi-agent workflow, 93 verified findings) and implemented the fixes in phases **P0 → P2c**. All five root causes are addressed and shipped as **PR #410**. This section carries the remaining follow-up work into a fresh session.
+
+## Current status
+- **Branch:** `main` is clean at `origin/main` (`66ffac6`). Perf work is on **`perf/e2e-audit-p0-p2`** → **PR #410** (OPEN, MERGEABLE, base `main`; Cloudflare green, Supabase Preview pending).
+- **Last completed:** P2c shipped; PR #410 opened; local `main` reset to origin.
+- **Next step:** owner reviews/merges #410 (never merge unasked). Then the follow-ups below.
+- **⚠️ DB note:** All 6 migrations in #410 are **already applied to the live canonical DB** (`ssmbegiyjivrcwgcqutu`) via the Supabase MCP during dev. The PR only *records* them (manifest + `docs/migrations-pending/` archive) + ships regenerated types. Nothing new runs on merge; `schema-drift` should be green.
+
+## The audit = source of truth for all remaining work
+`docs/superpowers/specs/2026-07-09-e2e-performance-audit.md` — full 93-finding catalog + a dated **UPDATE block per phase** (P0/P1/P2a/P2b/P2c) recording what shipped and what's deferred. Read its top section first.
+
+## Shipped in PR #410 (do not redo)
+| Phase | Commit | What |
+|---|---|---|
+| P0 | `9ba2894` | 665 bare RLS helper calls → `(SELECT …)` InitPlans + 6 BU OR-chains reordered + `is_portal_user()` STABLE. Live: cases count **642→4.1ms (~156×)**, status-counts **2487→8.3ms (~300×)**. CI guard `scripts/check-rls-initplan.sql` + CLAUDE.md template updated. |
+| P1 | `ad6df52` | Cases list: `useDebouncedValue` + shared cached search-or (`fetchQuery`) + AbortSignal; count `head:true`; `refetchOnWindowFocus:false`+`keepPreviousData`; **fixed the bucket-card filter bug** (count filtered, rows weren't). New `applyCaseListFilters` shared builder + 13 TDD tests. |
+| P2a | `3c448d7` | `get_sidebar_badge_counts()` RPC replaces 4 polled badge queries; fixes IDX-06 (`deleted_at`). |
+| P2b | `82a5d59` | `receive_stock_from_po(uuid, jsonb)` atomic RPC — PO receiving was broken (wrote GENERATED `current_quantity`). Also crash-fixed the 3 sibling generated-column writes (`current_quantity`→`quantity_on_hand`). |
+| P2c | `79bb9f4` | `get_quote_stats_base` (+sentValueBase) + new `get_payment_stats_base` + `get_transaction_stats_base` — 3 fetch-all-reduce-in-JS stats → SQL aggregation. |
+
+## Remaining phases / follow-ups (NOT started)
+
+### FU-1 — Status-literal fixes (HIGHEST VALUE; user-visible-wrong today) 🔴
+Three surfaces filter on status literals that don't match stored DB values → read **wrong/0 right now**. Deliberately **preserved verbatim** in P2a/P2c (a perf refactor must not silently change displayed numbers); deferred to one reviewed change:
+1. **Invoice "attention" badge** (`get_sidebar_badge_counts`): filters `('sent','partially-paid','overdue')` but `invoices.status` stores `sent`/`partial`/`paid`/`draft`/`cancelled` (no `partially-paid`, no `overdue`) → counts only `sent`.
+2. **Quote "pending" badge** (`get_sidebar_badge_counts`): `status='sent'` lowercase but `quotes.status` stores Title-case `Sent`/`Draft`/`Accepted` → **0 for every tenant**.
+3. **`getQuoteStats` / `get_quote_stats_base`**: same lowercase-vs-Title-case → draft/sent/accepted read 0.
+Owner decision first: which vocabulary is canonical (lowercase codes vs stored Title-case)? Then fix the literals in the RPCs + live-probe. Changes displayed numbers → its own reviewed PR.
+
+### FU-2 — Systemic undebounced-search sweep (PERF-06) 🟡
+Same pattern P1 fixed on Cases still on 6 pages (raw `searchTerm`→queryKey, no debounce; some run a twice-scan `buildXSearchOr` per keystroke). Mirror P1: `useDebouncedValue(searchTerm,300)` + route search-or through `queryClient.fetchQuery`. Reusable primitive exists: `src/hooks/useDebouncedValue.ts`.
+- **Tier 1:** `pages/financial/PaymentsList.tsx`, `financial/ExpensesList.tsx`, `financial/TransactionsList.tsx`, `notifications/NotificationsHistory.tsx`.
+- **Tier 2:** `financial/VATAuditPage.tsx` (searchTerm is a **dead** key segment — just drop it), `resources/CloneDrivesList.tsx` (gated lookup box).
+
+### FU-3 — Pre-existing `tsc` errors (CI RISK, not ours) 🟠
+`src/lib/pdf/labels/compactLabelDocument.ts:228,230` — `TS2365`/`TS2363` (`Content` + `number`). On `main` (`66ffac6`), untouched by #410. If a `typecheck` gate runs it's red from these regardless of #410. ~2-line fix in a tiny separate PR unblocks it. Reproduce: `npm run typecheck`.
+
+### FU-4 — Stock-write hygiene (LOW; stock feature unused in prod, 0 rows)
+RPC-ify the 3 still-non-atomic stock siblings (`recordStockReceipt`/`cancelStockSale`/`bulkAdjustQuantities` — crash-fixed but still non-atomic; mirror `receive_stock_from_po`); prune dead `ReceiveStockFromPOData.receivedBy`; `seedData.ts sampleBackupDevices.current_quantity` is dead config that would 400 if wired to a stock_items insert.
+
+### FU-5 — Grant consistency (LOW; RLS already gates)
+`get_quote_stats_base`/`get_invoice_stats_base`/`get_expense_stats_base` keep a pre-existing PUBLIC/anon EXECUTE grant (the 2 new P2c fns revoke it). All SECURITY INVOKER so RLS scopes rows. Optional `REVOKE … FROM PUBLIC, anon` for consistency.
+
+### Deferred audit items not yet scoped (completeness critic; lower priority)
+pdfmake/typst layout on main thread; `useCasesRealtime` broad `['cases']` invalidation fan-out (do AFTER P0 — done); AuthContext TOKEN_REFRESHED re-render cascade; global `retry:2` stacking; render-blocking Google Fonts; xlsx main-thread workbook assembly. See the audit doc's "Areas NOT covered."
+
+## Playbook that worked (reuse it)
+Per DB phase: **generate/author SQL mirroring an existing precedent RPC** → **live RED/parity/EXPLAIN probe in a rolled-back txn** under `SET LOCAL ROLE authenticated` + real JWT (owner sub `b4b86e5d-de36-4059-9237-0018157c9f1d`, tenant `4803501b-87a1-4a0e-abbe-8d7d45eeb4fc`) → **`apply_migration`** → **`npm run db:types`** → **rewrite callers** → **tsc + eslint + full vitest** → **adversarial `Workflow` review** (2–4 lenses, each re-verifying on the live DB) → **manifest row + archive SQL in `docs/migrations-pending/` + audit-doc UPDATE block** → **commit**. Owner merges.
+
+## Key conventions (don't re-derive)
+- **Perf refactors are behavior-neutral.** Preserve status literals/semantics; surface latent bugs as follow-ups (→ FU-1). Only sanctioned in-refactor fixes were audit-named mechanical ones (deleted_at/IDX-06, timestamptz `today`).
+- **Read RPCs:** SECURITY INVOKER, house style `LANGUAGE sql STABLE SET search_path TO ''` + schema-qualified `public.<table>` + `jsonb_build_object` + `coalesce(sum(...),0)`. **Write RPCs:** mirror `record_stock_usage_for_case` (SECURITY DEFINER + explicit `get_current_tenant_id()` guard + `FOR UPDATE`). Always `REVOKE … FROM PUBLIC, anon; GRANT EXECUTE … TO authenticated`.
+- **`stock_items`:** `current_quantity`/`minimum_quantity`/`quantity_available` are **GENERATED** — never write them; write `quantity_on_hand`.
+- **Migrations are NOT mirrored as files** in `supabase/migrations/`; the **manifest is source of truth**, reviewed SQL archived in `docs/migrations-pending/`.
+- **`Workflow` scripts are plain JS** — NO backticks inside the backtick-delimited prompt template (parse fails; hit twice). Use single quotes for inline code.
+- Suite baseline: **3 pre-existing `ExpensePaymentModal` failures** + **1 load-flaky typst test** (passes in isolation) — proven pre-existing, not regressions.
+
+## Open questions / blockers (perf)
+- **Owner decision for FU-1** (canonical status vocabulary) — blocks the literal fix.
+- **PR #410 merge** — awaiting owner. Recommended post-merge order: FU-3 (unblock CI) → FU-1 (user-visible) → FU-2 → FU-4/FU-5.
+
+═══════════════════════════════════════════════════════════════════════════════
+# (B) PRESERVED — India Pack Phase 4 handoff (separate active workstream)
+═══════════════════════════════════════════════════════════════════════════════
+
 # Session Handoff — 2026-07-07 (autonomous /loop) — Phase 4 India Pack: S1a–S3 MERGED · S4 #385 / S5 #386 / S6 #387 / L1 #388 open (stacked) · next = L4
 
 ## OPEN PR STACK (owner merges bottom-up; each merge deletes its branch → auto-closes the child → reopen+retarget base→main+rebase)

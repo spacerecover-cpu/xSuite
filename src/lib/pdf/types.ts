@@ -534,6 +534,10 @@ export interface ChainOfCustodyDocumentData {
     watermark?: string;
   };
   companySettings: CompanySettingsData;
+  /** Tenant timezone + clock for rendering event times on this FORENSIC document
+   *  in an unambiguous, zone-labelled way (not the printer's browser timezone).
+   *  Absent → falls back to browser-local, month-name, no zone label. */
+  dateTimeConfig?: { timezone: string | null; timeFormat: '12h' | '24h' };
 }
 
 export interface CreditNoteLineItem {

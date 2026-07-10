@@ -216,6 +216,9 @@ const chainOfCustodyFixture: ChainOfCustodyDocumentData = {
     includeSignatures: true,
   },
   companySettings,
+  // Forensic event times render in the tenant timezone with a zone label. Muscat
+  // is UTC+4, so 09:00Z → 13:00 GMT+4 (deterministic under the pinned test TZ).
+  dateTimeConfig: { timezone: 'Asia/Muscat', timeFormat: '24h' },
 };
 
 describe('PDF builder characterization (golden snapshots)', () => {
