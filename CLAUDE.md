@@ -140,10 +140,21 @@ xSuite is an AI-powered, multi-tenant SaaS platform for the **data recovery indu
   ```sql
   CREATE POLICY "{table}_tenant_isolation" ON {table}
     AS RESTRICTIVE FOR ALL TO authenticated
-    USING (tenant_id = get_current_tenant_id() OR is_platform_admin());
+    USING (tenant_id = (SELECT get_current_tenant_id()) OR (SELECT is_platform_admin()));
   ```
 - The `RESTRICTIVE` keyword ensures this policy is always ANDed with any permissive policies
 - Platform admins (tenant_id IS NULL in profiles) can access all tenants
+- **InitPlan discipline (MANDATORY):** every call to a SECURITY DEFINER helper
+  (`get_current_tenant_id`, `is_platform_admin`, `is_staff_user`, `has_role`, `is_admin`,
+  `get_current_business_unit_id`, `business_unit_scoping_enabled`, `is_tenant_admin`,
+  `get_current_portal_customer_id`, `auth.uid`) inside a policy `USING`/`WITH CHECK`
+  **MUST** be wrapped in a scalar sub-select — `(SELECT is_platform_admin())`, never a bare
+  `is_platform_admin()`. A bare call is re-evaluated **per row** (it never InitPlans), which
+  on the `cases` policies measured **642 ms → 4 ms (~156×)** once wrapped
+  (migration `perf_p0_rls_helper_initplan_wrap_*`, 2026-07-10;
+  audit `docs/superpowers/specs/2026-07-09-e2e-performance-audit.md` PERF-01/02). CI guard:
+  `scripts/check-rls-initplan.sql`. Order OR-chains cheapest-first (free column checks before
+  helper InitPlans), as the `*_business_unit_isolation` policies do.
 
 ### Role Hierarchy
 ```
