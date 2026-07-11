@@ -18,6 +18,7 @@ import { useCurrency } from '../../hooks/useCurrency';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useToast } from '../../hooks/useToast';
 import { useListPageSize } from '../../hooks/useListPageSize';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { createPayment, getPaymentStats, voidPayment, fetchPaymentById } from '../../lib/paymentsService';
 import { baseAmount } from '../../lib/financialMath';
 import { EmptyState } from '../../components/shared/EmptyState';
@@ -45,6 +46,9 @@ export const PaymentsList: React.FC = () => {
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
+  // The input stays instant; only the debounced term reaches the query key and
+  // the network — so typing fires one search per pause, not one per keystroke.
+  const debouncedSearch = useDebouncedValue(searchTerm, 300);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
@@ -71,7 +75,7 @@ export const PaymentsList: React.FC = () => {
   // Reset to the first page whenever the active filters/search change.
   useEffect(() => {
     setPage(0);
-  }, [searchTerm, statusFilter, dateFilter, paymentMethodFilter, pageSize]);
+  }, [debouncedSearch, statusFilter, dateFilter, paymentMethodFilter, pageSize]);
 
   const { data: paymentMethods = [] } = useQuery({
     queryKey: ['payment_methods_active'],
@@ -87,7 +91,7 @@ export const PaymentsList: React.FC = () => {
   });
 
   const { data: paymentsPage, isLoading } = useQuery({
-    queryKey: ['payments', searchTerm, statusFilter, dateFilter, paymentMethodFilter, page, pageSize],
+    queryKey: ['payments', debouncedSearch, statusFilter, dateFilter, paymentMethodFilter, page, pageSize],
     queryFn: async () => {
       let query = supabase
         .from('payments')
@@ -113,8 +117,8 @@ export const PaymentsList: React.FC = () => {
         .order('payment_date', { ascending: false })
         .range(page * pageSize, (page + 1) * pageSize - 1);
 
-      if (searchTerm) {
-        const s = sanitizeFilterValue(searchTerm);
+      if (debouncedSearch) {
+        const s = sanitizeFilterValue(debouncedSearch);
         query = query.or(await buildPaymentSearchOr(s));
       }
 

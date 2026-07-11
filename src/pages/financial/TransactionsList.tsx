@@ -5,6 +5,7 @@ import { Badge } from '../../components/ui/Badge';
 import { formatDate } from '../../lib/format';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useConfirm } from '../../hooks/useConfirm';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useListPageSize } from '../../hooks/useListPageSize';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { baseAmount } from '../../lib/financialMath';
@@ -55,6 +56,9 @@ export const TransactionsList: React.FC = () => {
   const { formatCurrency } = useCurrency();
   const confirm = useConfirm();
   const [searchTerm, setSearchTerm] = useState('');
+  // The input stays instant; only the debounced term reaches the query key and
+  // the network — so typing fires one search per pause, not one per keystroke.
+  const debouncedSearch = useDebouncedValue(searchTerm, 300);
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
@@ -90,14 +94,14 @@ export const TransactionsList: React.FC = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [searchTerm, typeFilter, dateRange, pageSize]);
+  }, [debouncedSearch, typeFilter, dateRange, pageSize]);
 
   const { data: transactionsPage, isLoading } = useQuery({
-    queryKey: ['financial_transactions', searchTerm, typeFilter, dateRange, page, pageSize],
+    queryKey: ['financial_transactions', debouncedSearch, typeFilter, dateRange, page, pageSize],
     queryFn: async () => {
       const { rows, total } = await fetchTransactionsPage({
         type: typeFilter !== 'all' ? typeFilter : undefined,
-        search: searchTerm || undefined,
+        search: debouncedSearch || undefined,
         dateFrom: getDateFromFilter(),
         page,
         pageSize,
