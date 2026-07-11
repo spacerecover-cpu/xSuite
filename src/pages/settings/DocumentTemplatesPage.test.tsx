@@ -48,6 +48,9 @@ vi.mock('../../components/settings/documents/TemplateGalleryModal', () => ({
 vi.mock('../../components/settings/documents/CopyStyleModal', () => ({
   CopyStyleModal: () => null,
 }));
+vi.mock('../../components/settings/documents/LabelStudio', () => ({
+  LabelStudio: ({ label }: { label: string }) => <div data-testid="label-studio">{label}</div>,
+}));
 
 import { DocumentTemplatesPage } from './DocumentTemplatesPage';
 
@@ -103,5 +106,30 @@ describe('DocumentTemplatesPage — Reports category', () => {
     const card = screen.getByRole('heading', { name: 'Malware Report' }).closest('div.flex.flex-col')!;
     fireEvent.click(within(card as HTMLElement).getByRole('button', { name: /Edit/ }));
     expect(await screen.findByTestId('studio')).toBeInTheDocument();
+  });
+});
+
+describe('DocumentTemplatesPage — Labels category', () => {
+  it('shows case, stock AND inventory thermal label cards', async () => {
+    renderPage();
+    await screen.findByText('Tax invoice issued to customers for recovery work.');
+    fireEvent.click(screen.getByRole('button', { name: /Labels/ }));
+
+    expect(screen.getByRole('heading', { name: 'Case label' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Stock label' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Inventory label' })).toBeInTheDocument();
+    const rail = screen.getByRole('button', { name: /Labels/ });
+    expect(within(rail).getByText('3')).toBeInTheDocument();
+  });
+
+  it('opens the LabelStudio when a label card is designed', async () => {
+    renderPage();
+    await screen.findByText('Tax invoice issued to customers for recovery work.');
+    fireEvent.click(screen.getByRole('button', { name: /Labels/ }));
+
+    const card = screen.getByRole('heading', { name: 'Inventory label' }).closest('div.flex.flex-col')!;
+    fireEvent.click(within(card as HTMLElement).getByRole('button', { name: /Design/ }));
+    const studio = await screen.findByTestId('label-studio');
+    expect(studio).toHaveTextContent('Inventory label');
   });
 });

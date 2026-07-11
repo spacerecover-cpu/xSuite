@@ -190,9 +190,14 @@ export const CaseDetail: React.FC = () => {
     modals.setShowPDFPreviewModal(true);
   };
 
-  const handlePrintLabel = () => {
-    modals.setPreviewDocumentType('case_label');
-    modals.setShowPDFPreviewModal(true);
+  const handlePrintLabel = async () => {
+    if (!id) return;
+    // Thermal Direct Print — the SAME compact label the size picker (Settings →
+    // Documents → Labels) designs and case auto-print emits, so the manual
+    // button and auto-print stay consistent (was the legacy A4 case_label PDF).
+    const { printCaseLabels } = await import('../../lib/pdf/labels/labelPrintService');
+    const result = await printCaseLabels(id, { output: 'print' });
+    if (!result.success) toast.error(result.error ?? 'Failed to print the label');
   };
 
   const handleSendEmailFromPreview = (_blobUrl: string, blob: Blob, filename: string) => {

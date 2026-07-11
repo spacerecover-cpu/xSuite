@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DOCUMENT_TYPES, DOC_TYPE_LABELS, LEGACY_REPORT_CARD } from './documentTypeMeta';
+import { DOCUMENT_TYPES, DOC_TYPE_LABELS, LEGACY_REPORT_CARD, LABEL_CARDS } from './documentTypeMeta';
 import {
   BUILT_IN_TEMPLATE_CONFIGS,
   parseTemplateStorageKey,
@@ -11,15 +11,30 @@ import { REPORT_TYPES } from '../../lib/reportTypes';
 // Guards the "Office check-in receipt is missing" bug: the landing grid must
 // surface EVERY engine document type, so none can silently drop off again.
 // Since 2026-07, `report` is surfaced as 8 subtype-scoped cards (one per
-// REPORT_TYPES entry) plus a conditional legacy shared-base card.
+// REPORT_TYPES entry) plus a conditional legacy shared-base card, and the label
+// types (case_label / stock_label) are surfaced as thermal LABEL_CARDS in the
+// dedicated Labels category — they open the LabelStudio, not the config engine.
 
 const allTypes = Object.keys(BUILT_IN_TEMPLATE_CONFIGS) as TemplateDocumentType[];
+const LABEL_DOC_TYPES: TemplateDocumentType[] = ['case_label', 'stock_label'];
 
 describe('documentTypeMeta', () => {
-  it('DOCUMENT_TYPES lists every engine document type', () => {
+  it('DOCUMENT_TYPES lists every engine document type except the thermal labels', () => {
     const listed = new Set(DOCUMENT_TYPES.map((d) => d.type));
     for (const t of allTypes) {
+      if (LABEL_DOC_TYPES.includes(t)) continue; // now LabelStudio cards
       expect(listed.has(t), `${t} is missing from the documents grid`).toBe(true);
+    }
+    // The old config-engine label documents are no longer edited in the grid.
+    expect(listed.has('case_label')).toBe(false);
+    expect(listed.has('stock_label')).toBe(false);
+  });
+
+  it('surfaces case, stock AND inventory as thermal label cards', () => {
+    expect(LABEL_CARDS.map((c) => c.entity)).toEqual(['case', 'stock', 'inventory']);
+    for (const c of LABEL_CARDS) {
+      expect(c.label.length, `label for ${c.entity}`).toBeGreaterThan(0);
+      expect(c.description.length, `description for ${c.entity}`).toBeGreaterThan(0);
     }
   });
 

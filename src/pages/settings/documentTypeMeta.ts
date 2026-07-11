@@ -25,13 +25,16 @@ import {
   Wallet,
   ShieldCheck,
   ClipboardList,
+  QrCode,
+  Package,
 } from 'lucide-react';
 import type { TemplateDocumentType, TemplateStorageKey } from '../../lib/pdf/templateConfig';
 import { reportTemplateKey } from '../../lib/pdf/templateConfig';
 import { REPORT_TYPES } from '../../lib/reportTypes';
+import type { LabelEntity } from '../../lib/labelPrefsService';
 
 /** The bands the document types are grouped into in the Studio landing rail. */
-export type DocCategory = 'financial' | 'intake' | 'reports' | 'internal';
+export type DocCategory = 'financial' | 'intake' | 'reports' | 'labels' | 'internal';
 
 export interface DocumentTypeMeta {
   /** Storage key of the tenant template row this card edits (`document_type`). */
@@ -48,8 +51,9 @@ export interface DocumentTypeMeta {
 /** Category rail metadata (order = display order). */
 export const DOC_CATEGORIES: { id: DocCategory; label: string; description: string; icon: LucideIcon }[] = [
   { id: 'financial', label: 'Financial', description: 'Customer-facing money documents', icon: Receipt },
-  { id: 'intake', label: 'Intake & Custody', description: 'Device receipts, labels & custody', icon: ShieldCheck },
+  { id: 'intake', label: 'Intake & Custody', description: 'Device receipts & custody', icon: ShieldCheck },
   { id: 'reports', label: 'Reports', description: 'Diagnostic & forensic reports', icon: ClipboardList },
+  { id: 'labels', label: 'Labels', description: 'Thermal device & stock labels', icon: QrCode },
   { id: 'internal', label: 'Internal', description: 'Inventory & HR documents', icon: Barcode },
 ];
 
@@ -161,14 +165,6 @@ export const DOCUMENT_TYPES: DocumentTypeMeta[] = [
     category: 'intake',
   },
   {
-    key: 'case_label',
-    type: 'case_label',
-    label: DOC_TYPE_LABELS.case_label,
-    description: 'Physical label affixed to an intake case for tracking.',
-    icon: Tag,
-    category: 'intake',
-  },
-  {
     key: 'chain_of_custody',
     type: 'chain_of_custody',
     label: DOC_TYPE_LABELS.chain_of_custody,
@@ -178,19 +174,47 @@ export const DOCUMENT_TYPES: DocumentTypeMeta[] = [
   },
   ...REPORT_TEMPLATE_CARDS,
   {
-    key: 'stock_label',
-    type: 'stock_label',
-    label: DOC_TYPE_LABELS.stock_label,
-    description: 'Barcode label for an inventory / stock item.',
-    icon: Barcode,
-    category: 'internal',
-  },
-  {
     key: 'payslip',
     type: 'payslip',
     label: DOC_TYPE_LABELS.payslip,
     description: 'Employee payslip for a payroll period.',
     icon: Wallet,
     category: 'internal',
+  },
+];
+
+/**
+ * Metadata for a thermal-label card (Labels category). Unlike document
+ * templates, labels are NOT config-engine documents — each card opens the
+ * dedicated {@link LabelStudio} and is keyed by its {@link LabelEntity}, editing
+ * `company_settings.metadata.label_printing`, and printed by the compact
+ * thermal engine.
+ */
+export interface LabelCardMeta {
+  entity: LabelEntity;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+}
+
+/** The three thermal-label cards shown under the Labels category. */
+export const LABEL_CARDS: LabelCardMeta[] = [
+  {
+    entity: 'case',
+    label: 'Case label',
+    description: 'Thermal label for a case — one per tracked device, with QR.',
+    icon: Tag,
+  },
+  {
+    entity: 'stock',
+    label: 'Stock label',
+    description: 'Thermal label for a stock item — SKU, price and barcode.',
+    icon: Barcode,
+  },
+  {
+    entity: 'inventory',
+    label: 'Inventory label',
+    description: 'Thermal label for an inventory / donor item — spec, location, QR.',
+    icon: Package,
   },
 ];

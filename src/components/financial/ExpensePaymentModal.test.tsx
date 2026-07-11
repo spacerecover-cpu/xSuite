@@ -11,7 +11,10 @@ const getAccounts = vi.fn();
 vi.mock('../../lib/bankingService', () => ({
   bankingService: { getAccounts: (...a: unknown[]) => getAccounts(...a) },
 }));
-vi.mock('../../contexts/TenantConfigContext', () => ({ useDateTimeConfig: () => ({ timezone: 'Asia/Dubai' }) }));
+vi.mock('../../contexts/TenantConfigContext', () => ({
+  useDateTimeConfig: () => ({ timezone: 'Asia/Dubai' }),
+  useCurrencyConfig: () => ({ code: 'AED' }),
+}));
 // tenantToday.ts imports supabaseClient at module scope for its async helpers (unused
 // here — only the pure `tenantToday()` fn is called); stub it so import doesn't throw
 // on missing env vars in the test environment.

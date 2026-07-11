@@ -16,7 +16,7 @@
  * inventoryLabelPrint / PrintLabelsModal before this module).
  */
 
-import type { LabelEntity } from '../../labelPrefsService';
+import type { LabelEntity, LabelEntityConfig } from '../../labelPrefsService';
 import type { LanguageCode } from '../../documentTranslations';
 import type { InventoryItemWithDetails } from '../../inventory/inventoryLabelTypes';
 import type { StockLabelItem, StockLabelOptions, MappedLabel } from './labelContent';
@@ -29,10 +29,13 @@ export type LabelOutput = 'print' | 'open' | 'download';
 export interface LabelPrintOptions {
   /** How to emit the PDF. Default 'print' (direct to the browser print dialog). */
   output?: LabelOutput;
-  /** Label-stock preset id; defaults to the tenant's per-entity preference. */
+  /** Label-stock preset id; overrides the tenant's per-entity preference. */
   sizeId?: string;
-  /** Copies of each label (extra pages). Default 1. */
+  /** Copies of each label (extra pages); overrides the tenant preference. */
   copies?: number;
+  /** Full design override — the LabelStudio previews an unsaved config through
+   *  the exact print path so preview == print. */
+  config?: LabelEntityConfig;
 }
 
 export interface LabelPrintResult {
@@ -40,11 +43,21 @@ export interface LabelPrintResult {
   error?: string;
 }
 
-async function resolveSize(entity: LabelEntity, sizeId?: string): Promise<LabelSizePreset> {
-  if (sizeId) return getLabelSize(sizeId);
-  const { getLabelPrintingPrefs } = await import('../../labelPrefsService');
-  const prefs = await getLabelPrintingPrefs();
-  return getLabelSize(prefs.sizes[entity]);
+/** The resolved design for one print, with `sizeId`/`copies` overrides applied. */
+export interface ResolvedLabelConfig extends LabelEntityConfig {
+  size: LabelSizePreset;
+}
+
+/** Resolve the effective design: an explicit `config` (LabelStudio) or the tenant
+ *  preference, with per-call `sizeId` / `copies` overrides layered on top. */
+export async function resolveLabelConfig(entity: LabelEntity, opts: LabelPrintOptions): Promise<ResolvedLabelConfig> {
+  let base = opts.config;
+  if (!base) {
+    const { getLabelEntityConfig } = await import('../../labelPrefsService');
+    base = await getLabelEntityConfig(entity);
+  }
+  const sizeId = opts.sizeId ?? base.sizeId;
+  return { ...base, sizeId, copies: opts.copies ?? base.copies, size: getLabelSize(sizeId) };
 }
 
 /**
@@ -72,17 +85,18 @@ async function resolveLabelFont(): Promise<{ fontFamily: string; isRTL: boolean 
   return { fontFamily: getFontFamily(languageCode), isRTL: isRTLLanguage(languageCode) };
 }
 
-async function resolveImages(
+export async function resolveLabelImages(
   mapped: MappedLabel[],
   size: LabelSizePreset,
-  isRTL = false,
+  opts: { isRTL?: boolean; showQr?: boolean; showBarcode?: boolean } = {},
 ): Promise<CompactLabelContent[]> {
+  const { isRTL = false, showQr = true, showBarcode = true } = opts;
   const [{ generateQrPngDataUrl }, { generateCode128DataUrl }, { reverseArabicText }] = await Promise.all([
     import('../qrImage'),
     import('../barcodeImage'),
     import('../fonts'),
   ]);
-  const barcodeCapable = supportsBarcode(size);
+  const barcodeCapable = showBarcode && supportsBarcode(size);
   // pdfmake has no bidi pass, so a multi-word RTL value (Arabic customer / item
   // names) renders with reversed word order. Correct it here; reverseArabicText
   // no-ops on Latin/CJK, so it is safe to apply to every free-text value. The
@@ -91,7 +105,7 @@ async function resolveImages(
   return Promise.all(
     mapped.map(async (m) => {
       const [qrDataUrl, barcodeDataUrl] = await Promise.all([
-        generateQrPngDataUrl(m.qrPayload),
+        showQr ? generateQrPngDataUrl(m.qrPayload) : Promise.resolve(null),
         barcodeCapable && m.barcodeValue ? generateCode128DataUrl(m.barcodeValue) : Promise.resolve(null),
       ]);
       const c = m.content;
@@ -130,6 +144,27 @@ async function buildAndEmit(
   else pdf.print();
 }
 
+/** Render labels to a blob object-URL for the LabelStudio live preview iframe.
+ *  Same builder as printing, so the preview is byte-identical to the print. */
+export async function buildLabelBlobUrl(
+  labels: CompactLabelContent[],
+  size: LabelSizePreset,
+  fontFamily: string,
+): Promise<string> {
+  const [{ createPdfWithFonts }, { buildCompactLabelDocument }] = await Promise.all([
+    import('../fonts'),
+    import('./compactLabelDocument'),
+  ]);
+  const pdf = createPdfWithFonts(buildCompactLabelDocument(labels, size, fontFamily));
+  return new Promise<string>((resolve, reject) => {
+    pdf.getBlob(
+      (blob: Blob) => resolve(URL.createObjectURL(blob)),
+      undefined,
+      (err: unknown) => reject(err instanceof Error ? err : new Error('Label preview render failed')),
+    );
+  });
+}
+
 /**
  * Case labels: one per tracked device (chain-of-custody: devices are labelled
  * individually), single case label when no devices are captured.
@@ -148,7 +183,7 @@ export async function printCaseLabels(
       ]);
 
     const data = await fetchReceiptData(caseId);
-    const size = await resolveSize('case', opts.sizeId);
+    const cfg = await resolveLabelConfig('case', opts);
 
     // Same secondary-language font fallback as generateCaseLabel: labels render
     // values only (customer names may be Arabic), so we need the right family.
@@ -162,10 +197,15 @@ export async function printCaseLabels(
     }
     const ctx = createTranslationContext('english_only', languageCode);
 
-    const mapped = caseLabelContents(data, size);
-    const labels = withCopies(await resolveImages(mapped, size, isRTLLanguage(languageCode)), opts.copies);
+    const mapped = caseLabelContents(data, cfg.size, cfg.fields);
+    const images = await resolveLabelImages(mapped, cfg.size, {
+      isRTL: isRTLLanguage(languageCode),
+      showQr: cfg.showQr,
+      showBarcode: cfg.showBarcode,
+    });
+    const labels = withCopies(images, cfg.copies);
     const caseNo = data.caseData.case_number ?? data.caseData.case_no;
-    await buildAndEmit(labels, size, ctx.fontFamily, opts.output ?? 'print', `Labels_${caseNo}.pdf`);
+    await buildAndEmit(labels, cfg.size, ctx.fontFamily, opts.output ?? 'print', `Labels_${caseNo}.pdf`);
     return { success: true };
   } catch (error) {
     console.error('Error generating case labels:', error);
@@ -188,21 +228,22 @@ export async function printStockLabelBatch(
     if (entries.length === 0) return { success: false, error: 'No items to label' };
     const { stockLabelContent } = await import('./labelContent');
     const { fontFamily, isRTL } = await resolveLabelFont();
-    const size = await resolveSize('stock', opts.sizeId);
+    const cfg = await resolveLabelConfig('stock', opts);
 
     const mapped = entries.map(({ item, priceText }) =>
-      stockLabelContent(item, {
-        priceText,
-        locationName: opts.locationName,
-        companyName: opts.companyName,
-      }),
+      stockLabelContent(
+        item,
+        { priceText, locationName: opts.locationName, companyName: opts.companyName },
+        cfg.fields,
+      ),
     );
-    const labels = withCopies(await resolveImages(mapped, size, isRTL), opts.copies);
+    const images = await resolveLabelImages(mapped, cfg.size, { isRTL, showQr: cfg.showQr, showBarcode: cfg.showBarcode });
+    const labels = withCopies(images, cfg.copies);
     const filename =
       entries.length === 1
         ? `stock-label-${entries[0].item.sku ?? entries[0].item.name.replace(/\s+/g, '-')}.pdf`
         : 'stock-labels.pdf';
-    await buildAndEmit(labels, size, fontFamily, opts.output ?? 'print', filename);
+    await buildAndEmit(labels, cfg.size, fontFamily, opts.output ?? 'print', filename);
     return { success: true };
   } catch (error) {
     console.error('Error generating stock labels:', error);
@@ -218,14 +259,15 @@ export async function printInventoryLabels(
     if (items.length === 0) return { success: false, error: 'No items to label' };
     const { inventoryLabelContent } = await import('./labelContent');
     const { fontFamily, isRTL } = await resolveLabelFont();
-    const size = await resolveSize('inventory', opts.sizeId);
+    const cfg = await resolveLabelConfig('inventory', opts);
 
-    const mapped = items.map(inventoryLabelContent);
-    const labels = withCopies(await resolveImages(mapped, size, isRTL), opts.copies);
+    const mapped = items.map((item) => inventoryLabelContent(item, cfg.fields));
+    const images = await resolveLabelImages(mapped, cfg.size, { isRTL, showQr: cfg.showQr, showBarcode: cfg.showBarcode });
+    const labels = withCopies(images, cfg.copies);
     const first = items[0];
     const filename =
       items.length === 1 ? `inv-label-${first.item_number ?? first.id}.pdf` : 'inventory-labels.pdf';
-    await buildAndEmit(labels, size, fontFamily, opts.output ?? 'print', filename);
+    await buildAndEmit(labels, cfg.size, fontFamily, opts.output ?? 'print', filename);
     return { success: true };
   } catch (error) {
     console.error('Error generating inventory labels:', error);

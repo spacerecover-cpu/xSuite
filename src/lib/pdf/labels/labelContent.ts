@@ -26,35 +26,43 @@ export interface MappedLabel {
 const present = (value: string | null | undefined): value is string => !!value && value.trim().length > 0;
 
 /**
+ * Per-entity content-field visibility (keys from LABEL_FIELDS in
+ * labelPrefsService). A field shows unless it is explicitly `false`; an absent
+ * map (or absent key) means "show" — so callers that pass no config, and the
+ * existing tests, keep the full-content behavior. The identifier and device
+ * index are always rendered and are not gated here.
+ */
+export type LabelFields = Record<string, boolean> | undefined;
+const on = (fields: LabelFields, key: string): boolean => (fields ? fields[key] !== false : true);
+
+/**
  * One label per tracked device (a 12-drive RAID gets 12 individually
  * identifiable labels), or a single case label when no devices are captured.
  */
-export function caseLabelContents(data: ReceiptData, size: LabelSizePreset): MappedLabel[] {
+export function caseLabelContents(data: ReceiptData, size: LabelSizePreset, fields?: LabelFields): MappedLabel[] {
   const { caseData, devices, companySettings } = data;
   const id = caseData.case_number ?? caseData.case_no;
-  const customer = caseData.customer?.customer_name ?? caseData.contact_name ?? null;
-  const footer = companySettings.basic_info?.company_name ?? null;
-  const received = formatDate(caseData.created_at, 'dd/MM/yyyy');
+  const customerRaw = caseData.customer?.customer_name ?? caseData.contact_name ?? null;
+  const customer = on(fields, 'customer') && present(customerRaw) ? customerRaw : null;
+  const footer = on(fields, 'footer') ? companySettings.basic_info?.company_name ?? null : null;
+  const received = on(fields, 'date') ? formatDate(caseData.created_at, 'dd/MM/yyyy') : null;
   const strip = sizeClass(size) === 'strip';
 
   const buildOne = (device: (typeof devices)[number] | null, index: string | null): MappedLabel => {
-    const serial = present(device?.serial_number) ? `SN ${device!.serial_number}` : null;
-    const deviceSummary = device
-      ? [
-          [device.brand, device.model].filter(present).join(' '),
-          device.capacity,
-        ]
-          .filter(present)
-          .join(' · ')
+    const serial = on(fields, 'serial') && present(device?.serial_number) ? `SN ${device!.serial_number}` : null;
+    const deviceSummaryRaw = device
+      ? [[device.brand, device.model].filter(present).join(' '), device.capacity].filter(present).join(' · ')
       : '';
+    const deviceSummary = on(fields, 'device') && present(deviceSummaryRaw) ? deviceSummaryRaw : null;
+    const deviceType = on(fields, 'device') ? device?.device_type ?? null : null;
     // A strip only fits two meta lines, so lead with the strongest DEVICE
     // descriptor available (serial → brand/model/capacity → device type), then
     // the customer. Keying only off the serial meant a device with no serial
     // captured printed zero device-identifying data and wasted the second line.
-    const deviceLine = serial ?? (present(deviceSummary) ? deviceSummary : device?.device_type ?? null);
+    const deviceLine = serial ?? deviceSummary ?? deviceType;
     const lines = strip
       ? [deviceLine, customer].filter(present)
-      : [serial, present(deviceSummary) ? deviceSummary : null, device?.device_type ?? null, received].filter(present);
+      : [serial, deviceSummary, deviceType, received].filter(present);
 
     return {
       content: { id, title: customer, lines, footer, index },
@@ -83,26 +91,35 @@ export interface StockLabelOptions {
   companyName?: string | null;
 }
 
-export function stockLabelContent(item: StockLabelItem, opts: StockLabelOptions): MappedLabel {
+export function stockLabelContent(item: StockLabelItem, opts: StockLabelOptions, fields?: LabelFields): MappedLabel {
   const id = item.sku ?? item.name;
   const lines = [
-    item.stock_categories?.name ?? null,
-    item.brand ?? null,
-    opts.priceText ?? null,
-    opts.locationName ?? null,
+    on(fields, 'category') ? item.stock_categories?.name ?? null : null,
+    on(fields, 'brand') ? item.brand ?? null : null,
+    on(fields, 'price') ? opts.priceText ?? null : null,
+    on(fields, 'location') ? opts.locationName ?? null : null,
   ].filter(present);
 
   return {
-    content: { id, title: item.name, lines, footer: opts.companyName ?? null, index: null },
+    content: {
+      id,
+      title: item.name,
+      lines,
+      footer: on(fields, 'footer') ? opts.companyName ?? null : null,
+      index: null,
+    },
     qrPayload: item.sku ?? item.barcode ?? item.name,
     barcodeValue: item.barcode ?? item.sku ?? null,
   };
 }
 
-export function inventoryLabelContent(item: InventoryItemWithDetails): MappedLabel {
+export function inventoryLabelContent(item: InventoryItemWithDetails, fields?: LabelFields): MappedLabel {
   const id = item.item_number ?? item.name ?? 'ITEM';
-  const spec = [item.brand?.name, item.device_type?.name, item.capacity?.name].filter(present).join(' · ');
-  const lines = [present(spec) ? spec : null, item.storage_location?.name ?? null].filter(present);
+  const specRaw = [item.brand?.name, item.device_type?.name, item.capacity?.name].filter(present).join(' · ');
+  const lines = [
+    on(fields, 'spec') && present(specRaw) ? specRaw : null,
+    on(fields, 'location') ? item.storage_location?.name ?? null : null,
+  ].filter(present);
 
   return {
     content: { id, title: item.name ?? item.model ?? null, lines, footer: null, index: null },

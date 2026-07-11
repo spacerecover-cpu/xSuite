@@ -161,4 +161,42 @@ describe('inventoryLabelContent', () => {
     expect(mapped.qrPayload).toBe('INV-00014');
     expect(mapped.content.lines).toEqual([]);
   });
+
+  it('honors field toggles: hides spec, keeps location', () => {
+    const mapped = inventoryLabelContent(item, { spec: false, location: true });
+    expect(mapped.content.lines).not.toContain('WD · HDD · 1 TB');
+    expect(mapped.content.lines).toContain('Bin D-12');
+  });
+});
+
+describe('label field toggles', () => {
+  const STRIP = getLabelSize('nb_15x26');
+  const CARD = getLabelSize('nb_50x30');
+
+  it('case: disabling customer + date drops those lines on the card', () => {
+    const data = receiptData();
+    const withAll = caseLabelContents(data, CARD)[0].content.lines ?? [];
+    const trimmed = caseLabelContents(data, CARD, { customer: false, date: false })[0].content;
+    expect(withAll.some((l) => l.includes('07/07/2026'))).toBe(true);
+    expect(trimmed.title).toBeNull();
+    expect((trimmed.lines ?? []).some((l) => l.includes('07/07/2026'))).toBe(false);
+    // the serial + device summary still print
+    expect(trimmed.lines).toContain('SN WX91A123');
+  });
+
+  it('case: disabling the serial falls back to the device summary on a strip', () => {
+    const labels = caseLabelContents(receiptData(), STRIP, { serial: false });
+    expect(labels[0].content.lines?.[0]).toBe('WD Blue · 2 TB');
+  });
+
+  it('stock: disabling price and category removes them', () => {
+    const item = { name: 'SATA Cable', sku: 'STK-1', brand: 'Generic', stock_categories: { name: 'Cables' } };
+    const full = stockLabelContent(item as never, { priceText: 'AED 15.00' });
+    expect(full.content.lines).toContain('Cables');
+    expect(full.content.lines).toContain('AED 15.00');
+    const trimmed = stockLabelContent(item as never, { priceText: 'AED 15.00' }, { category: false, price: false });
+    expect(trimmed.content.lines).not.toContain('Cables');
+    expect(trimmed.content.lines).not.toContain('AED 15.00');
+    expect(trimmed.content.lines).toContain('Generic');
+  });
 });
