@@ -68,6 +68,8 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
       title="Print options"
       icon={Printer}
       size="sm"
+      closeOnBackdrop={!busy}
+      closeOnEscape={!busy}
       footer={
         <div className="flex items-center justify-end gap-3">
           <Button variant="secondary" size="sm" onClick={onClose} disabled={busy}>

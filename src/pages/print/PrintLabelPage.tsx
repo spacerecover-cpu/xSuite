@@ -114,7 +114,7 @@ export const PrintLabelPage = () => {
               </button>
               <button
                 onClick={() => setShowOptions(true)}
-                className="flex items-center gap-2 px-6 py-2 border border-slate-200 bg-white text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-2 px-6 py-2 border border-slate-200 bg-white text-sm font-medium text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
               >
                 <SlidersHorizontal className="w-4 h-4" />
                 Print options

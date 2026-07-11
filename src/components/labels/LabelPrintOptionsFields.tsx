@@ -41,7 +41,7 @@ export const LabelPrintOptionsFields: React.FC<LabelPrintOptionsFieldsProps> = (
   return (
     <div className="space-y-4">
       <div>
-        <label htmlFor={`${idPrefix}-size`} className="mb-1 block text-sm font-semibold text-slate-800">
+        <label htmlFor={`${idPrefix}-size`} className="mb-1 block text-sm font-medium text-slate-700">
           Label stock
         </label>
         <select
@@ -63,7 +63,7 @@ export const LabelPrintOptionsFields: React.FC<LabelPrintOptionsFieldsProps> = (
       </div>
 
       <div className="flex items-center gap-3">
-        <label htmlFor={`${idPrefix}-copies`} className="flex-1 text-sm font-semibold text-slate-800">
+        <label htmlFor={`${idPrefix}-copies`} className="flex-1 text-sm font-medium text-slate-700">
           Copies
         </label>
         <input

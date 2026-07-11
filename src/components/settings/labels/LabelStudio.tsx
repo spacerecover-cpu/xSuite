@@ -149,7 +149,7 @@ export const LabelStudio: React.FC<LabelStudioProps> = ({ entity, label, onBack 
       {/* Top bar */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="rounded-lg p-2 transition-colors hover:bg-slate-100" aria-label="Back to documents">
+          <button onClick={onBack} className="rounded-lg p-2 transition-colors hover:bg-slate-100" aria-label="Back to Label Studio">
             <ArrowLeft className="h-5 w-5 text-slate-600" />
           </button>
           <div>

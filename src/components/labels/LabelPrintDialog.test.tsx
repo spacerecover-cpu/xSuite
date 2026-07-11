@@ -36,14 +36,15 @@ function renderDialog(props: Partial<React.ComponentProps<typeof LabelPrintDialo
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const onPrint = vi.fn();
   const onClose = vi.fn();
-  render(
+  const tree = (p: Partial<React.ComponentProps<typeof LabelPrintDialog>>) => (
     <QueryClientProvider client={qc}>
       <MemoryRouter>
-        <LabelPrintDialog entity="case" isOpen onClose={onClose} onPrint={onPrint} {...props} />
+        <LabelPrintDialog entity="case" isOpen onClose={onClose} onPrint={onPrint} {...props} {...p} />
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
-  return { onPrint, onClose };
+  const { rerender } = render(tree({}));
+  return { onPrint, onClose, rerender: (p: Partial<React.ComponentProps<typeof LabelPrintDialog>>) => rerender(tree(p)) };
 }
 
 beforeEach(() => {
@@ -88,6 +89,19 @@ describe('LabelPrintDialog', () => {
 
     fireEvent.change(screen.getByLabelText(/label stock/i), { target: { value: 'zebra_2x1' } });
     expect(screen.getByLabelText(/barcode/i)).toBeEnabled();
+  });
+
+  it('re-seeds from the saved design on reopen — an abandoned edit never leaks into the next print', async () => {
+    const { rerender } = renderDialog();
+
+    const sizeSelect = await screen.findByLabelText(/label stock/i);
+    fireEvent.change(sizeSelect, { target: { value: 'zebra_2x1' } });
+    expect(sizeSelect).toHaveValue('zebra_2x1');
+
+    rerender({ isOpen: false });
+    rerender({ isOpen: true });
+
+    expect(await screen.findByLabelText(/label stock/i)).toHaveValue('nb_15x26');
   });
 
   it('cancel closes without printing, and the one-off hint links to the Label Studio', async () => {
