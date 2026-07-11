@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { getNextCaseNumber } from '../../lib/caseService';
-import { MessageCircle, Printer, FileText, Tag, CheckCircle2, Copy, User, HardDrive, FileStack, AlertCircle, Package, Activity, Settings, History, Users, DollarSign, Trash2, Grid2x2 as Grid, Eye, Mail, RotateCcw, CircleHelp } from 'lucide-react';
+import { MessageCircle, Printer, FileText, Tag, CheckCircle2, Copy, User, HardDrive, FileStack, AlertCircle, Package, Activity, Settings, History, Users, DollarSign, Trash2, Grid2x2 as Grid, Eye, Mail, RotateCcw, CircleHelp, SlidersHorizontal } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -28,6 +28,8 @@ import { DeviceCheckoutModal } from '../../components/cases/DeviceCheckoutModal'
 import { DuplicateCaseConfirmationModal } from '../../components/cases/DuplicateCaseConfirmationModal';
 import { OutcomeBadge } from '../../components/cases/OutcomeBadge';
 import { MarkNoSolutionModal } from '../../components/cases/MarkNoSolutionModal';
+import { LabelPrintDialog } from '../../components/labels/LabelPrintDialog';
+import type { LabelEntityConfig } from '../../lib/labelPrefsService';
 import { StartReRecoveryModal } from '../../components/cases/StartReRecoveryModal';
 import { DeleteCaseConfirmationModal } from '../../components/cases/DeleteCaseConfirmationModal';
 import { DeviceFormModal } from '../../components/cases/DeviceFormModal';
@@ -166,6 +168,8 @@ export const CaseDetail: React.FC = () => {
   // a tenant template with case context, logs to case_communications).
   const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
   const [showNoSolutionModal, setShowNoSolutionModal] = useState(false);
+  const [showLabelOptions, setShowLabelOptions] = useState(false);
+  const [labelPrinting, setLabelPrinting] = useState(false);
   const [showReRecoveryModal, setShowReRecoveryModal] = useState(false);
   const [issueRequirementFailures, setIssueRequirementFailures] = useState<RequirementFailure[]>([]);
   const [showIssueBlockModal, setShowIssueBlockModal] = useState(false);
@@ -190,14 +194,20 @@ export const CaseDetail: React.FC = () => {
     modals.setShowPDFPreviewModal(true);
   };
 
-  const handlePrintLabel = async () => {
+  const handlePrintLabel = async (config?: LabelEntityConfig) => {
     if (!id) return;
-    // Thermal Direct Print — the SAME compact label the size picker (Settings →
-    // Documents → Labels) designs and case auto-print emits, so the manual
-    // button and auto-print stay consistent (was the legacy A4 case_label PDF).
-    const { printCaseLabels } = await import('../../lib/pdf/labels/labelPrintService');
-    const result = await printCaseLabels(id, { output: 'print' });
-    if (!result.success) toast.error(result.error ?? 'Failed to print the label');
+    // Thermal Direct Print — the SAME compact label the Label Studio designs
+    // and case auto-print emits, so the manual button and auto-print stay
+    // consistent. An optional `config` is a one-off print-time override.
+    setLabelPrinting(true);
+    try {
+      const { printCaseLabels } = await import('../../lib/pdf/labels/labelPrintService');
+      const result = await printCaseLabels(id, { output: 'print', config });
+      if (!result.success) toast.error(result.error ?? 'Failed to print the label');
+      else setShowLabelOptions(false);
+    } finally {
+      setLabelPrinting(false);
+    }
   };
 
   const handleSendEmailFromPreview = (_blobUrl: string, blob: Blob, filename: string) => {
@@ -424,13 +434,22 @@ export const CaseDetail: React.FC = () => {
               <span className="hidden md:inline">Customer Copy</span>
             </Button>
             <Button
-              onClick={handlePrintLabel}
+              onClick={() => handlePrintLabel()}
               className="bg-cat-7 text-white hover:bg-cat-7/90"
               size="sm"
               title="Print Label"
             >
               <Tag className="w-4 h-4 md:mr-2" />
               <span className="hidden md:inline">Print Label</span>
+            </Button>
+            <Button
+              onClick={() => setShowLabelOptions(true)}
+              className="bg-cat-7 text-white hover:bg-cat-7/90"
+              size="sm"
+              title="Print label with options (one-off size / copies)"
+              aria-label="Print label with options"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
             </Button>
             <Button
               onClick={() => modals.setShowCheckoutModal(true)}
@@ -559,6 +578,15 @@ export const CaseDetail: React.FC = () => {
               }}
             />
           )}
+
+          {/* One-off label print overrides (size / copies / QR) */}
+          <LabelPrintDialog
+            entity="case"
+            isOpen={showLabelOptions}
+            busy={labelPrinting}
+            onClose={() => setShowLabelOptions(false)}
+            onPrint={(config) => void handlePrintLabel(config)}
+          />
 
           {/* Start Re-Recovery (linked new case) */}
           {showReRecoveryModal && profile?.tenant_id && (

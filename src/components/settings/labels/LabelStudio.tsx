@@ -17,7 +17,7 @@ import {
   type LabelEntityConfig,
   type LabelPrintingPrefs,
 } from '../../../lib/labelPrefsService';
-import { LABEL_SIZE_PRESETS, getLabelSize, sizeClass, supportsBarcode } from '../../../lib/pdf/labels/labelSizes';
+import { LABEL_SIZE_GROUPS, LABEL_SIZE_PRESETS, getLabelSize, sizeClass, supportsBarcode } from '../../../lib/pdf/labels/labelSizes';
 
 interface LabelStudioProps {
   entity: LabelEntity;
@@ -37,12 +37,6 @@ function mergeEntityConfig(prefs: LabelPrintingPrefs, entity: LabelEntity, cfg: 
     fields: { ...prefs.fields, [entity]: cfg.fields },
   };
 }
-
-const SIZE_GROUPS: { cls: ReturnType<typeof sizeClass>; label: string }[] = [
-  { cls: 'strip', label: 'Strip — narrow rolls' },
-  { cls: 'square', label: 'Square' },
-  { cls: 'card', label: 'Card — wider stock' },
-];
 
 /**
  * Dedicated thermal-label editor. Unlike the 6-tab document TemplateStudio, a
@@ -155,7 +149,7 @@ export const LabelStudio: React.FC<LabelStudioProps> = ({ entity, label, onBack 
       {/* Top bar */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="rounded-lg p-2 transition-colors hover:bg-slate-100" aria-label="Back to documents">
+          <button onClick={onBack} className="rounded-lg p-2 transition-colors hover:bg-slate-100" aria-label="Back to Label Studio">
             <ArrowLeft className="h-5 w-5 text-slate-600" />
           </button>
           <div>
@@ -192,7 +186,7 @@ export const LabelStudio: React.FC<LabelStudioProps> = ({ entity, label, onBack 
               onChange={(e) => patch({ sizeId: e.target.value })}
               className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary"
             >
-              {SIZE_GROUPS.map((g) => (
+              {LABEL_SIZE_GROUPS.map((g) => (
                 <optgroup key={g.cls} label={g.label}>
                   {LABEL_SIZE_PRESETS.filter((p) => sizeClass(p) === g.cls).map((p) => (
                     <option key={p.id} value={p.id}>

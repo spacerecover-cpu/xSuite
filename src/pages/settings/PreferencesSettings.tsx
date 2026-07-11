@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Loader2 } from 'lucide-react';
 import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
@@ -79,7 +79,12 @@ const LabelPrintingCard: React.FC = () => {
 
   return (
     <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 mb-6">
-      <h2 className="text-base font-semibold text-slate-900">Device label printing</h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-base font-semibold text-slate-900">Device label printing</h2>
+        <Link to="/settings/labels" className="text-xs font-medium text-primary hover:underline">
+          Open Label Studio →
+        </Link>
+      </div>
       <p className="mt-1 text-sm text-slate-500">
         Adhesive labels for drives, devices and parts. Pick the label stock loaded in your thermal
         printer — the PDF page is sized exactly to the label, so print at 100% scale. Auto-print

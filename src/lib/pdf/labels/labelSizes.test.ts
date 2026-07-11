@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_LABEL_SIZE_ID,
+  LABEL_SIZE_GROUPS,
   LABEL_SIZE_PRESETS,
   getLabelSize,
   labelMarginPt,
@@ -87,5 +88,25 @@ describe('labelMarginPt', () => {
   it('uses tighter margins on narrow stock', () => {
     expect(labelMarginPt(getLabelSize('nb_15x26'))).toBeCloseTo(mmToPt(1.5), 2);
     expect(labelMarginPt(getLabelSize('dymo_30252'))).toBeCloseTo(mmToPt(2), 2);
+  });
+});
+
+describe('LABEL_SIZE_GROUPS', () => {
+  it('covers every size class, so no preset can silently vanish from grouped pickers', () => {
+    const grouped = new Set(LABEL_SIZE_GROUPS.map((g) => g.cls));
+    for (const p of LABEL_SIZE_PRESETS) {
+      expect(grouped.has(sizeClass(p)), `preset ${p.id} (${sizeClass(p)}) has no picker group`).toBe(true);
+    }
+  });
+
+  it('has no duplicate or empty groups', () => {
+    const classes = LABEL_SIZE_GROUPS.map((g) => g.cls);
+    expect(new Set(classes).size).toBe(classes.length);
+    for (const g of LABEL_SIZE_GROUPS) {
+      expect(
+        LABEL_SIZE_PRESETS.some((p) => sizeClass(p) === g.cls),
+        `group ${g.cls} lists no presets`,
+      ).toBe(true);
+    }
   });
 });

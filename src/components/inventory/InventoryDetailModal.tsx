@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Edit, Package, MapPin, History, TrendingUp, Info, Briefcase, CheckCircle2, XCircle, ChevronDown, ChevronUp, Zap, Printer } from 'lucide-react';
+import { Edit, Package, MapPin, History, TrendingUp, Info, Briefcase, CheckCircle2, XCircle, ChevronDown, ChevronUp, Zap, Printer, SlidersHorizontal } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -21,6 +21,8 @@ import {
   type CaseOption,
 } from '../../lib/inventoryCaseAssignmentService';
 import { MarkDefectiveModal } from './MarkDefectiveModal';
+import { LabelPrintDialog } from '../labels/LabelPrintDialog';
+import type { LabelEntityConfig } from '../../lib/labelPrefsService';
 import { CompleteAssignmentModal } from './CompleteAssignmentModal';
 import { AssignToCaseModal } from './AssignToCaseModal';
 import { format } from 'date-fns';
@@ -80,6 +82,7 @@ export default function InventoryDetailModal({
   const [availability, setAvailability] = useState<{ available: boolean; reason?: string } | null>(null);
   const [showAssignmentNotes, setShowAssignmentNotes] = useState(false);
   const [isPrintingLabel, setIsPrintingLabel] = useState(false);
+  const [showLabelOptions, setShowLabelOptions] = useState(false);
 
   const handlePrintLabel = async (download = false) => {
     if (!item) return;
@@ -91,6 +94,26 @@ export default function InventoryDetailModal({
       } else {
         await printInventoryLabel(item as Parameters<typeof printInventoryLabel>[0]);
       }
+    } catch (err) {
+      logger.error('Error printing inventory label:', err);
+      toast.error('Failed to generate label PDF');
+    } finally {
+      setIsPrintingLabel(false);
+    }
+  };
+
+  /** One-off print with the dialog's edited design — the saved design is untouched. */
+  const handlePrintLabelWithConfig = async (config: LabelEntityConfig) => {
+    if (!item) return;
+    setIsPrintingLabel(true);
+    try {
+      const { printInventoryLabels } = await import('../../lib/pdf/labels/labelPrintService');
+      const result = await printInventoryLabels(
+        [item as Parameters<typeof printInventoryLabels>[0][number]],
+        { output: 'print', config },
+      );
+      if (!result.success) toast.error(result.error || 'Failed to generate label PDF');
+      else setShowLabelOptions(false);
     } catch (err) {
       logger.error('Error printing inventory label:', err);
       toast.error('Failed to generate label PDF');
@@ -255,6 +278,16 @@ export default function InventoryDetailModal({
             >
               <Printer className="w-4 h-4 mr-1.5" />
               {isPrintingLabel ? 'Generating…' : 'Print Label'}
+            </Button>
+            <Button
+              onClick={() => setShowLabelOptions(true)}
+              variant="secondary"
+              size="sm"
+              disabled={isPrintingLabel || !item}
+              title="Print label with options (one-off size / copies)"
+              aria-label="Print label with options"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
             </Button>
             {onEdit && (
               <Button onClick={() => onEdit(itemId)} variant="ghost" size="sm">
@@ -666,6 +699,15 @@ export default function InventoryDetailModal({
           onSuccess={loadData}
         />
       )}
+
+      {/* One-off label print overrides (size / copies / QR) */}
+      <LabelPrintDialog
+        entity="inventory"
+        isOpen={showLabelOptions}
+        busy={isPrintingLabel}
+        onClose={() => setShowLabelOptions(false)}
+        onPrint={(config) => void handlePrintLabelWithConfig(config)}
+      />
 
       {showAssignToCaseModal && (
         <AssignToCaseModal

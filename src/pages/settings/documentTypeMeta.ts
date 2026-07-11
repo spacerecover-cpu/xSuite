@@ -20,21 +20,17 @@ import {
   ClipboardCheck,
   PackageOpen,
   Copy,
-  Tag,
   Barcode,
   Wallet,
   ShieldCheck,
   ClipboardList,
-  QrCode,
-  Package,
 } from 'lucide-react';
 import type { TemplateDocumentType, TemplateStorageKey } from '../../lib/pdf/templateConfig';
 import { reportTemplateKey } from '../../lib/pdf/templateConfig';
 import { REPORT_TYPES } from '../../lib/reportTypes';
-import type { LabelEntity } from '../../lib/labelPrefsService';
 
 /** The bands the document types are grouped into in the Studio landing rail. */
-export type DocCategory = 'financial' | 'intake' | 'reports' | 'labels' | 'internal';
+export type DocCategory = 'financial' | 'intake' | 'reports' | 'internal';
 
 export interface DocumentTypeMeta {
   /** Storage key of the tenant template row this card edits (`document_type`). */
@@ -53,7 +49,6 @@ export const DOC_CATEGORIES: { id: DocCategory; label: string; description: stri
   { id: 'financial', label: 'Financial', description: 'Customer-facing money documents', icon: Receipt },
   { id: 'intake', label: 'Intake & Custody', description: 'Device receipts & custody', icon: ShieldCheck },
   { id: 'reports', label: 'Reports', description: 'Diagnostic & forensic reports', icon: ClipboardList },
-  { id: 'labels', label: 'Labels', description: 'Thermal device & stock labels', icon: QrCode },
   { id: 'internal', label: 'Internal', description: 'Inventory & HR documents', icon: Barcode },
 ];
 
@@ -180,41 +175,5 @@ export const DOCUMENT_TYPES: DocumentTypeMeta[] = [
     description: 'Employee payslip for a payroll period.',
     icon: Wallet,
     category: 'internal',
-  },
-];
-
-/**
- * Metadata for a thermal-label card (Labels category). Unlike document
- * templates, labels are NOT config-engine documents — each card opens the
- * dedicated {@link LabelStudio} and is keyed by its {@link LabelEntity}, editing
- * `company_settings.metadata.label_printing`, and printed by the compact
- * thermal engine.
- */
-export interface LabelCardMeta {
-  entity: LabelEntity;
-  label: string;
-  description: string;
-  icon: LucideIcon;
-}
-
-/** The three thermal-label cards shown under the Labels category. */
-export const LABEL_CARDS: LabelCardMeta[] = [
-  {
-    entity: 'case',
-    label: 'Case label',
-    description: 'Thermal label for a case — one per tracked device, with QR.',
-    icon: Tag,
-  },
-  {
-    entity: 'stock',
-    label: 'Stock label',
-    description: 'Thermal label for a stock item — SKU, price and barcode.',
-    icon: Barcode,
-  },
-  {
-    entity: 'inventory',
-    label: 'Inventory label',
-    description: 'Thermal label for an inventory / donor item — spec, location, QR.',
-    icon: Package,
   },
 ];

@@ -19,6 +19,7 @@ import {
   ListChecks,
   Workflow,
   Receipt,
+  Tags,
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 
@@ -245,6 +246,16 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     description: 'Customize how invoices, quotes, and receipts look when printed or emailed.',
   },
   {
+    id: 'labels',
+    title: 'Label Studio',
+    icon: Tags,
+    backgroundColor: '#b45309',
+    borderColor: '#b45309',
+    tables: [],
+    actionLabel: 'Design Labels',
+    description: 'Design the thermal labels printed for cases, stock and inventory items.',
+  },
+  {
     id: 'client-portal',
     title: 'Client Portal',
     icon: Shield,
@@ -319,7 +330,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   { id: 'workspace', label: 'Workspace', categoryIds: ['appearance', 'preferences', 'table-columns', 'features', 'general-settings', 'notifications'] },
   { id: 'operations', label: 'Operations', categoryIds: ['device-media', 'inventory-settings', 'case-service', 'case-lifecycle', 'procurement'] },
   { id: 'finance', label: 'Client & Finance', categoryIds: ['client-financial', 'localization', 'tax-registration'] },
-  { id: 'documents', label: 'Documents & Reports', categoryIds: ['templates', 'documents'] },
+  { id: 'documents', label: 'Documents & Reports', categoryIds: ['templates', 'documents', 'labels'] },
   { id: 'system', label: 'System & Data', categoryIds: ['system-numbers', 'import-export', 'client-portal'] },
   { id: 'compliance', label: 'Security & Compliance', categoryIds: ['security', 'gdpr'] },
 ];

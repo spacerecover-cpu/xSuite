@@ -73,3 +73,10 @@ export function supportsBarcode(p: LabelSizePreset): boolean {
 export function labelMarginPt(p: LabelSizePreset): number {
   return mmToPt(p.widthMm <= 30 ? 1.5 : 2);
 }
+
+/** UI grouping for size pickers (Label Studio + the print-time options dialog). */
+export const LABEL_SIZE_GROUPS: readonly { cls: LabelSizeClass; label: string }[] = [
+  { cls: 'strip', label: 'Strip — narrow rolls' },
+  { cls: 'square', label: 'Square' },
+  { cls: 'card', label: 'Card — wider stock' },
+];
