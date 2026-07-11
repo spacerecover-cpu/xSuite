@@ -118,6 +118,7 @@ export const PortalQuotes: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['portal_quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['portal_pending_quotes'] });
       setIsApproveModalOpen(false);
       setIsDetailModalOpen(false);
       setResponse('');
@@ -136,6 +137,7 @@ export const PortalQuotes: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['portal_quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['portal_pending_quotes'] });
       setIsRejectModalOpen(false);
       setIsDetailModalOpen(false);
       setResponse('');

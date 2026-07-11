@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -23,6 +23,7 @@ import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { useListPageSize } from '../../hooks/useListPageSize';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import type { Database } from '../../types/database.types';
 
 type NotificationRow = Database['public']['Tables']['notification_log']['Row'];
@@ -54,14 +55,23 @@ export function NotificationsHistory() {
   const [readFilter, setReadFilter] = useState<ReadFilter>('all');
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
   const [search, setSearch] = useState('');
+  // The input stays instant; only the debounced term reaches the query key and
+  // the network — so typing fires one search per pause, not one per keystroke.
+  const debouncedSearch = useDebouncedValue(search, 300);
+
+  // Reset pagination when the debounced term lands (not per keystroke) so the
+  // query key changes exactly once per typing pause.
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch]);
 
   const userId = user?.id;
 
   // Reset to page 1 whenever filters change — otherwise pagination
   // overshoots the new (smaller) result set and shows an empty page.
   const queryKey = useMemo(
-    () => ['notifications-history', userId, page, pageSize, readFilter, channelFilter, search],
-    [userId, page, pageSize, readFilter, channelFilter, search],
+    () => ['notifications-history', userId, page, pageSize, readFilter, channelFilter, debouncedSearch],
+    [userId, page, pageSize, readFilter, channelFilter, debouncedSearch],
   );
 
   const { data, isLoading } = useQuery({
@@ -77,10 +87,10 @@ export function NotificationsHistory() {
       if (readFilter === 'unread') q = q.eq('is_read', false);
       if (readFilter === 'read') q = q.eq('is_read', true);
       if (channelFilter !== 'all') q = q.eq('channel', channelFilter);
-      if (search.trim()) {
+      if (debouncedSearch.trim()) {
         // ilike across title + body — server-side so pagination stays
         // honest. Empty search short-circuits this branch.
-        const term = `%${sanitizeFilterValue(search.trim())}%`;
+        const term = `%${sanitizeFilterValue(debouncedSearch.trim())}%`;
         q = q.or(`title.ilike.${term},body.ilike.${term}`);
       }
 
@@ -187,10 +197,7 @@ export function NotificationsHistory() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(0);
-                }}
+                onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search title or body…"
                 className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
               />

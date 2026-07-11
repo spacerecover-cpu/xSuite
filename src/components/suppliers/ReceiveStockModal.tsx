@@ -9,7 +9,6 @@ import { SerialNumberInput } from '../stock/SerialNumberInput';
 import { getStockItems, receiveStockFromPO } from '../../lib/stockService';
 import { stockKeys } from '../../lib/queryKeys';
 import { useToast } from '../../hooks/useToast';
-import { useAuth } from '../../contexts/AuthContext';
 
 interface POLineItem {
   id: string;
@@ -46,7 +45,6 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
 }) => {
   const toast = useToast();
   const queryClient = useQueryClient();
-  const { profile } = useAuth();
 
   const [rows, setRows] = useState<ReceiveRow[]>(() =>
     purchaseOrderItems.map((item) => ({
@@ -93,7 +91,6 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
           unitCost: Number(r.unitCost) || 0,
           serialNumbers: r.serialNumbers.length > 0 ? r.serialNumbers : undefined,
         })),
-        receivedBy: profile?.id ?? '',
       });
     },
     onSuccess: () => {

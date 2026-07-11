@@ -10,11 +10,15 @@ import { ListPageTemplate } from '../../components/templates/ListPageTemplate';
 import { KpiRow } from '../../components/templates/KpiRow';
 import { ResourceCloneDriveModal } from '../../components/resources/ResourceCloneDriveModal';
 import { useListPageSize } from '../../hooks/useListPageSize';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { HardDrive, Search, Filter, Plus, AlertCircle, CreditCard as Edit2, MapPin, Calendar, ArrowUpDown, FileText, X } from 'lucide-react';
 
 export const CloneDrivesList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [caseIdSearch, setCaseIdSearch] = useState('');
+  // The input stays instant; only the debounced term reaches the lookup query
+  // key/network — so typing a case ID fires one lookup per pause, not per key.
+  const debouncedCaseIdSearch = useDebouncedValue(caseIdSearch, 300);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [driveTypeFilter, setDriveTypeFilter] = useState<string>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -97,14 +101,14 @@ export const CloneDrivesList: React.FC = () => {
   });
 
   const { data: caseAssignments = [] } = useQuery({
-    queryKey: ['clone_drive_assignments', caseIdSearch],
+    queryKey: ['clone_drive_assignments', debouncedCaseIdSearch],
     queryFn: async () => {
-      if (!caseIdSearch.trim()) return [];
+      if (!debouncedCaseIdSearch.trim()) return [];
 
       const { data: caseData, error: caseError } = await supabase
         .from('cases')
         .select('id, case_no')
-        .ilike('case_no', `%${caseIdSearch}%`);
+        .ilike('case_no', `%${debouncedCaseIdSearch}%`);
 
       if (caseError) throw caseError;
       if (!caseData || caseData.length === 0) return [];
@@ -123,7 +127,7 @@ export const CloneDrivesList: React.FC = () => {
       if (assignError) throw assignError;
       return assignments || [];
     },
-    enabled: !!caseIdSearch.trim(),
+    enabled: !!debouncedCaseIdSearch.trim(),
   });
 
   const filteredDrives = resourceCloneDrives.filter((drive) => {

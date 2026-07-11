@@ -415,47 +415,20 @@ export async function recordStockReceipt(
     notes?: string;
   }
 ): Promise<void> {
-  const item = await getStockItem(itemId);
-  if (!item) throw new Error('Stock item not found');
-
-  const current = item.current_quantity ?? 0;
-  const newQty = current + quantity;
-  // Preserve NULL when no cost is known so downstream COGS/valuation reports stay honest.
-  const unitCost = options?.cost ?? item.cost_price ?? null;
-
-  // Write the writable balance column — current_quantity is GENERATED over
-  // quantity_on_hand, so a direct write 400s ("can only be updated to DEFAULT").
-  const { error: updateError } = await supabase
-    .from('stock_items')
-    .update({ quantity_on_hand: newQty, updated_at: new Date().toISOString() })
-    .eq('id', itemId);
-  if (updateError) throw updateError;
-
-  const tenantId = requireTenantId();
-  await supabase.from('stock_transactions').insert({
-    tenant_id: tenantId,
-    item_id: itemId,
-    transaction_type: 'received',
-    quantity,
-    reference_type: options?.poId ? 'purchase_order' : null,
-    reference_id: options?.poId ?? null,
-    unit_cost: unitCost,
-    total_cost: unitCost !== null ? unitCost * quantity : null,
-    notes: options?.notes ?? null,
+  // Single atomic transaction (RPC): locks the stock row, increments the writable
+  // quantity_on_hand server-side (current_quantity is a generated mirror; the old
+  // read→add→write sequence raced concurrent receipts), writes the 'received'
+  // stock_transaction with performed_by, and registers serials. Cost falls back
+  // to the item's cost_price, preserving NULL when neither is known.
+  const { error } = await supabase.rpc('record_stock_receipt', {
+    p_item_id: itemId,
+    p_quantity: quantity,
+    p_po_id: options?.poId,
+    p_unit_cost: options?.cost,
+    p_serial_numbers: options?.serialNumbers,
+    p_notes: options?.notes,
   });
-
-  if (options?.serialNumbers && options.serialNumbers.length > 0) {
-    // NOTE: stock_serial_numbers schema v1.0.0 does not carry purchase_order_id, purchase_date,
-    // purchase_cost. Those facts are derivable from the linked PO. TODO(B8): if needed, add
-    // those columns via migration or join through purchase_order_items.
-    const serials = options.serialNumbers.map((sn) => ({
-      tenant_id: tenantId,
-      item_id: itemId,
-      serial_number: sn,
-      status: 'in_stock' as const,
-    }));
-    await supabase.from('stock_serial_numbers').insert(serials);
-  }
+  if (error) throw error;
 }
 
 export async function recordStockUsage(
@@ -611,51 +584,16 @@ export async function updateStockSale(id: string, data: Partial<StockSaleInsert>
 }
 
 export async function cancelStockSale(id: string): Promise<void> {
-  const sale = await getStockSale(id);
-  if (!sale) throw new Error('Sale not found');
-
-  if (sale.stock_sale_items) {
-    // stock_sale_items.item_id in live schema (not stock_item_id)
-    const cancelItemIds = sale.stock_sale_items.map((item) => item.item_id);
-    const { data: cancelStockItemsData } = await supabase
-      .from('stock_items')
-      .select('*')
-      .in('id', cancelItemIds)
-      .is('deleted_at', null);
-    const cancelStockItemsMap = new Map((cancelStockItemsData ?? []).map((si) => [si.id, si]));
-
-    for (const item of sale.stock_sale_items) {
-      const stockItem = cancelStockItemsMap.get(item.item_id);
-      if (!stockItem) continue;
-
-      const currentQty = stockItem.current_quantity ?? 0;
-      const newQty = currentQty + item.quantity;
-      // Write quantity_on_hand — current_quantity is a GENERATED mirror (direct write 400s).
-      await supabase
-        .from('stock_items')
-        .update({ quantity_on_hand: newQty, updated_at: new Date().toISOString() })
-        .eq('id', item.item_id);
-
-      await supabase.from('stock_transactions').insert({
-        tenant_id: requireTenantId(),
-        item_id: item.item_id,
-        transaction_type: 'returned',
-        quantity: item.quantity,
-        reference_type: 'sale',
-        reference_id: id,
-        notes: `Returned from cancelled sale ${sale.sale_number}`,
-      });
-
-      // Serial number relinking on cancel:
-      // stock_sale_items v1.0.0 does not carry serial_number, so we cannot revert serial state
-      // without a sale-line→serial bridge. TODO(B8): if needed, link via a separate bridge table.
-    }
-  }
-
-  await supabase
-    .from('stock_sales')
-    .update({ status: 'refunded', deleted_at: new Date().toISOString() })
-    .eq('id', id);
+  // Single atomic transaction (RPC): locks the sale (deleted_at IS NULL gate makes
+  // a second cancel fail loud instead of double-restocking), restocks each live
+  // sale line into the writable quantity_on_hand with a 'returned' transaction,
+  // then marks the sale refunded + soft-deleted. Lines whose stock item is gone
+  // are skipped, matching the previous behavior.
+  // Serial number relinking on cancel:
+  // stock_sale_items v1.0.0 does not carry serial_number, so we cannot revert serial state
+  // without a sale-line→serial bridge. TODO(B8): if needed, link via a separate bridge table.
+  const { error } = await supabase.rpc('cancel_stock_sale', { p_sale_id: id });
+  if (error) throw error;
 }
 
 // NOTE: addSaleToInvoice was removed in C2 cleanup (2026-05-25). The v1.0.0 schema does not
@@ -1060,7 +998,6 @@ export interface ReceiveStockFromPOData {
     unitCost: number;
     serialNumbers?: string[];
   }>;
-  receivedBy: string;
 }
 
 export async function receiveStockFromPO(data: ReceiveStockFromPOData): Promise<void> {
@@ -1327,32 +1264,20 @@ export async function bulkUpdatePrices(
 export async function bulkAdjustQuantities(
   adjustments: Array<{ id: string; newQuantity: number; reason: string }>
 ): Promise<number> {
-  let count = 0;
-  const tenantId = requireTenantId();
-  for (const adj of adjustments) {
-    const item = await getStockItem(adj.id);
-    if (!item) continue;
-
-    const currentQty = item.current_quantity ?? 0;
-    const variance = adj.newQuantity - currentQty;
-    // Write quantity_on_hand — current_quantity is a GENERATED mirror (direct write 400s).
-    await supabase
-      .from('stock_items')
-      .update({ quantity_on_hand: adj.newQuantity, updated_at: new Date().toISOString() })
-      .eq('id', adj.id);
-
-    if (variance !== 0) {
-      await supabase.from('stock_transactions').insert({
-        tenant_id: tenantId,
-        item_id: adj.id,
-        transaction_type: 'adjusted',
-        quantity: variance,
-        notes: adj.reason,
-      });
-    }
-    count++;
-  }
-  return count;
+  // Single atomic transaction (RPC): per item, locks the row, computes the
+  // variance server-side against the writable quantity_on_hand (the old
+  // read→diff→write sequence raced concurrent movements), writes the new
+  // balance and an 'adjusted' transaction with performed_by when the variance
+  // is non-zero. Missing items are skipped; returns the adjusted count.
+  const { data, error } = await supabase.rpc('bulk_adjust_stock_quantities', {
+    p_adjustments: adjustments.map((adj) => ({
+      id: adj.id,
+      new_quantity: adj.newQuantity,
+      reason: adj.reason,
+    })),
+  });
+  if (error) throw error;
+  return data ?? 0;
 }
 
 export function exportStockItemsCSV(items: StockItemWithCategory[]): string {

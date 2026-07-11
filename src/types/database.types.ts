@@ -18609,7 +18609,12 @@ export type Database = {
         Returns: Json
       }
       belongs_to_tenant: { Args: { check_tenant_id: string }; Returns: boolean }
+      bulk_adjust_stock_quantities: {
+        Args: { p_adjustments: Json }
+        Returns: number
+      }
       business_unit_scoping_enabled: { Args: never; Returns: boolean }
+      cancel_stock_sale: { Args: { p_sale_id: string }; Returns: number }
       change_portal_password: {
         Args: {
           p_current_password: string
@@ -19265,57 +19270,15 @@ export type Database = {
         }
       }
       record_stock_receipt: {
-        Args: { p_item_id: string; p_options?: Json; p_quantity: number }
-        Returns: {
-          barcode: string | null
-          brand: string | null
-          capacity: string | null
-          category_id: string | null
-          cost_price: number | null
-          created_at: string
-          created_by: string | null
-          current_quantity: number | null
-          deleted_at: string | null
-          description: string | null
-          dimensions: string | null
-          id: string
-          image_url: string | null
-          is_active: boolean | null
-          is_featured: boolean
-          is_saleable: boolean | null
-          item_type: string | null
-          location: string | null
-          location_id: string | null
-          minimum_quantity: number | null
-          model: string | null
-          name: string
-          notes: string | null
-          photos: string[] | null
-          quantity_available: number | null
-          quantity_on_hand: number | null
-          quantity_reserved: number | null
-          reorder_level: number | null
-          reorder_quantity: number | null
-          selling_price: number | null
-          sku: string | null
-          specifications: Json | null
-          supplier_id: string | null
-          tax_inclusive: boolean
-          tax_rate: number | null
-          tenant_id: string
-          unit: string | null
-          unit_of_measure: string | null
-          updated_at: string
-          updated_by: string | null
-          warranty_months: number | null
-          weight: number | null
+        Args: {
+          p_item_id: string
+          p_notes?: string
+          p_po_id?: string
+          p_quantity: number
+          p_serial_numbers?: Json
+          p_unit_cost?: number
         }
-        SetofOptions: {
-          from: "*"
-          to: "stock_items"
-          isOneToOne: true
-          isSetofReturn: false
-        }
+        Returns: undefined
       }
       record_stock_sale: {
         Args: { p_items: Json; p_sale: Json; p_tax_lines?: Json }

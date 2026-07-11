@@ -155,7 +155,7 @@ export const VATAuditPage: React.FC = () => {
   };
 
   const { data: auditLogs = [], isLoading: auditLoading } = useQuery({
-    queryKey: ['financial_audit_logs', searchTerm],
+    queryKey: ['financial_audit_logs'],
     queryFn: async () => {
       let query = supabase
         .from('financial_audit_logs')
