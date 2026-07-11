@@ -12,7 +12,15 @@ vi.mock('./supabaseClient', () => ({
 }));
 vi.mock('./postgrestSanitizer', () => ({ sanitizeFilterValue: (v: string) => v }));
 
-import { getStockStats, getSalesReport, getTodaysSales, createStockSale } from './stockService';
+import {
+  getStockStats,
+  getSalesReport,
+  getTodaysSales,
+  createStockSale,
+  recordStockReceipt,
+  cancelStockSale,
+  bulkAdjustQuantities,
+} from './stockService';
 
 /**
  * Thenable query builder: every chained filter returns the builder; awaiting it
@@ -133,5 +141,64 @@ describe('createStockSale (Task 26: kernel tax parity — p_tax_lines threading)
     });
 
     expect(rpc).toHaveBeenCalledWith('record_stock_sale', expect.objectContaining({ p_tax_lines: null }));
+  });
+});
+
+describe('FU-4: non-atomic stock writes route through atomic RPCs', () => {
+  beforeEach(() => rpc.mockReset());
+
+  it('recordStockReceipt calls record_stock_receipt with the full arg set', async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: null });
+    await recordStockReceipt('item-1', 5, {
+      poId: 'po-1',
+      cost: 12.5,
+      serialNumbers: ['SN1', 'SN2'],
+      notes: 'delivery',
+    });
+    expect(rpc).toHaveBeenCalledWith('record_stock_receipt', {
+      p_item_id: 'item-1',
+      p_quantity: 5,
+      p_po_id: 'po-1',
+      p_unit_cost: 12.5,
+      p_serial_numbers: ['SN1', 'SN2'],
+      p_notes: 'delivery',
+    });
+  });
+
+  it('recordStockReceipt omits optional args (server DEFAULTs apply) and surfaces rpc errors', async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'boom' } });
+    await expect(recordStockReceipt('item-1', 3)).rejects.toBeTruthy();
+    expect(rpc).toHaveBeenCalledWith('record_stock_receipt', {
+      p_item_id: 'item-1',
+      p_quantity: 3,
+      p_po_id: undefined,
+      p_unit_cost: undefined,
+      p_serial_numbers: undefined,
+      p_notes: undefined,
+    });
+  });
+
+  it('cancelStockSale calls cancel_stock_sale and surfaces errors', async () => {
+    rpc.mockResolvedValueOnce({ data: 2, error: null });
+    await cancelStockSale('sale-9');
+    expect(rpc).toHaveBeenCalledWith('cancel_stock_sale', { p_sale_id: 'sale-9' });
+
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'not found' } });
+    await expect(cancelStockSale('sale-9')).rejects.toBeTruthy();
+  });
+
+  it('bulkAdjustQuantities maps adjustments to p_adjustments and returns the RPC count', async () => {
+    rpc.mockResolvedValueOnce({ data: 2, error: null });
+    const count = await bulkAdjustQuantities([
+      { id: 'a', newQuantity: 10, reason: 'recount' },
+      { id: 'b', newQuantity: 0, reason: 'damaged' },
+    ]);
+    expect(count).toBe(2);
+    expect(rpc).toHaveBeenCalledWith('bulk_adjust_stock_quantities', {
+      p_adjustments: [
+        { id: 'a', new_quantity: 10, reason: 'recount' },
+        { id: 'b', new_quantity: 0, reason: 'damaged' },
+      ],
+    });
   });
 });

@@ -40,6 +40,7 @@ import { downloadCSV } from '../../lib/csvExport';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useListPageSize } from '../../hooks/useListPageSize';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useListSelectionEnabled } from '../../hooks/useListSelectionEnabled';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { logger } from '../../lib/logger';
@@ -98,6 +99,9 @@ export const ExpensesList: React.FC = () => {
   const [isArchiving, setIsArchiving] = useState(false);
   const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  // The input stays instant; only the debounced term reaches the query key and
+  // the network — so typing fires one search per pause, not one per keystroke.
+  const debouncedSearch = useDebouncedValue(searchTerm, 300);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [page, setPage] = useState(0);
   const pageSize = useListPageSize();
@@ -124,7 +128,7 @@ export const ExpensesList: React.FC = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [searchTerm, statusFilter, pageSize]);
+  }, [debouncedSearch, statusFilter, pageSize]);
 
   // Hiding checkboxes (tenant preference) drops any in-flight selection so
   // bulk actions can't act on rows the user can no longer see or unselect.
@@ -138,7 +142,7 @@ export const ExpensesList: React.FC = () => {
   const canManage = canManageExpenses(profile?.role);
 
   const { data: expensesPage, isLoading, error, refetch } = useQuery({
-    queryKey: ['expenses', searchTerm, statusFilter, page, pageSize],
+    queryKey: ['expenses', debouncedSearch, statusFilter, page, pageSize],
     queryFn: async () => {
       try {
         let query = supabase
@@ -147,8 +151,8 @@ export const ExpensesList: React.FC = () => {
           .is('deleted_at', null)
           .order('expense_date', { ascending: false });
 
-        if (searchTerm) {
-          const s = sanitizeFilterValue(searchTerm);
+        if (debouncedSearch) {
+          const s = sanitizeFilterValue(debouncedSearch);
           query = query.or(await buildExpenseSearchOr(s));
         }
 
