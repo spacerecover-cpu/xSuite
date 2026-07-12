@@ -13,7 +13,7 @@ export function buildPayslipDocument(
   const companyName = companySettings.basic_info?.company_name || 'Company Name';
 
   const currencySymbol = payslipData.accounting_locales?.currency_symbol || 'USD';
-  const decimalPlaces = payslipData.accounting_locales?.decimal_places || 2;
+  const decimalPlaces = payslipData.accounting_locales?.decimal_places ?? 2;
   const currencyPosition = payslipData.accounting_locales?.currency_position || 'after';
 
   const formatCurrency = (amount: number): string =>

@@ -221,7 +221,11 @@ export async function getTenantDetails(tenantId: string): Promise<TenantWithHeal
       .limit(1)
       .maybeSingle(),
     supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId),
-    supabase.from('cases').select('id', { count: 'exact', head: true }).is('deleted_at', null),
+    supabase
+      .from('cases')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .is('deleted_at', null),
   ]);
 
   return {
@@ -243,15 +247,18 @@ export async function calculateHealthScore(tenantId: string): Promise<{
     supabase
       .from('user_activity_sessions')
       .select('user_id')
+      .eq('tenant_id', tenantId)
       .gte('session_start', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
     supabase
       .from('cases')
       .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
       .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
       .is('deleted_at', null),
     supabase
       .from('payments')
       .select('amount, amount_base')
+      .eq('tenant_id', tenantId)
       .gte('payment_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
     supabase
       .from('support_tickets')
@@ -310,11 +317,13 @@ export async function recordHealthMetrics(tenantId: string): Promise<void> {
     supabase
       .from('cases')
       .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
       .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
       .is('deleted_at', null),
     supabase
       .from('payments')
       .select('amount, amount_base')
+      .eq('tenant_id', tenantId)
       .gte('payment_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
     supabase
       .from('support_tickets')

@@ -32,6 +32,9 @@ function makeQuery(rows: unknown) {
 beforeEach(() => {
   from.mockReset();
   rpc.mockReset();
+  // Each test sets up its own spies in its arrange step; restore between tests so
+  // a spyOn(payrollService, ...) from one test never leaks into the next.
+  vi.restoreAllMocks();
 });
 
 describe('payrollService.getDashboardStats (D7 — cross-record totals must be base currency)', () => {
@@ -252,6 +255,58 @@ describe('processPayroll docks unauthorized absence (Phase 0 overpayment fix)', 
     await payrollService.processPayroll('period-1');
 
     expect(captured.records![0].net_salary).toBe(1000);
+  });
+});
+
+describe('getActiveLoans excludes future-dated loans (bug #55)', () => {
+  it('filters on start_date <= asOfDate when a period boundary is given', async () => {
+    const loansQuery = makeQuery([{ id: 'loan-1', installment_amount: 100 }]);
+    from.mockImplementation((table: string) =>
+      table === 'employee_loans' ? loansQuery : makeQuery(null),
+    );
+
+    await payrollService.getActiveLoans('emp-1', '2026-07-31');
+
+    expect(loansQuery.eq).toHaveBeenCalledWith('status', 'active');
+    // the fix: a loan whose repayment window opens after the period is not due yet
+    expect(loansQuery.lte).toHaveBeenCalledWith('start_date', '2026-07-31');
+  });
+
+  it('omits the start_date filter when called without a date', async () => {
+    const loansQuery = makeQuery([]);
+    from.mockImplementation(() => loansQuery);
+
+    await payrollService.getActiveLoans('emp-1');
+
+    expect(loansQuery.lte).not.toHaveBeenCalled();
+  });
+});
+
+describe('processPayroll only deducts loans whose repayment has started (bug #55)', () => {
+  it('scopes active-loan lookup to loans due by the period end_date', async () => {
+    vi.spyOn(payrollService, 'getPayrollPeriod').mockResolvedValue(
+      { id: 'period-1', status: 'draft', start_date: '2026-07-01', end_date: '2026-07-31', period_name: 'Jul 2026' } as never,
+    );
+    vi.spyOn(payrollService, 'getPayrollSettings').mockResolvedValue(
+      { working_days_per_month: 22, working_hours_per_day: 8, overtime_rate_multiplier: { regular: 1.5, weekend: 1.5, holiday: 2 }, payment_day: 28, social_security_rate: undefined } as never,
+    );
+    vi.spyOn(payrollService, 'getEmployeeAttendance').mockResolvedValue(
+      { daysWorked: 22, daysAbsent: 0, daysLeave: 0, regularHours: 176, overtimeHours: 0 } as never,
+    );
+    const activeLoansSpy = vi.spyOn(payrollService, 'getActiveLoans').mockResolvedValue([] as never);
+
+    from.mockImplementation((table: string) => {
+      if (table === 'employees') return makeQuery([{ id: 'emp-1', tenant_id: 't-1', basic_salary: 1000 }]);
+      if (table === 'payroll_periods') return makeQuery({ id: 'period-1', status: 'processing' });
+      if (table === 'payroll_records') {
+        return { insert: (rows: unknown) => ({ select: () => Promise.resolve({ data: rows, error: null }) }) } as never;
+      }
+      return makeQuery(null);
+    });
+
+    await payrollService.processPayroll('period-1');
+
+    expect(activeLoansSpy).toHaveBeenCalledWith('emp-1', '2026-07-31');
   });
 });
 

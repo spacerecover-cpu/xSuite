@@ -42,6 +42,7 @@ interface VATRecord {
   record_type: string;
   record_id: string;
   vat_amount: number;
+  vat_amount_base?: number | null;
   vat_rate: number;
   tax_period?: string | null;
   created_at: string;
@@ -180,8 +181,11 @@ export const VATAuditPage: React.FC = () => {
 
   const salesRecords = vatRecords.filter(r => r.record_type === 'sale');
   const purchaseRecords = vatRecords.filter(r => r.record_type === 'purchase');
-  const totalVATCollected = salesRecords.reduce((sum, r) => sum + (r.vat_amount || 0), 0);
-  const totalVATPaid = purchaseRecords.reduce((sum, r) => sum + (r.vat_amount || 0), 0);
+  // Sum base-currency tax (vat_amount_base) so foreign-currency rows aren't added
+  // under the tenant symbol; vat_amount is the document-currency figure. Falls back
+  // to vat_amount for legacy null-base rows — matches calculateVATForPeriod (vatService.ts).
+  const totalVATCollected = salesRecords.reduce((sum, r) => sum + (r.vat_amount_base ?? r.vat_amount ?? 0), 0);
+  const totalVATPaid = purchaseRecords.reduce((sum, r) => sum + (r.vat_amount_base ?? r.vat_amount ?? 0), 0);
   const netVATPosition = totalVATCollected - totalVATPaid;
 
   const getActionColor = (action: string) => {

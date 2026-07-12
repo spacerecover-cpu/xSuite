@@ -556,7 +556,7 @@ export const LeaveManagement: React.FC = () => {
   const { profile } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'hr';
+  const isAdmin = ['owner', 'admin', 'hr'].includes(profile?.role ?? '');
 
   const [activeTab, setActiveTab] = useState<TabId>('requests');
   const [search, setSearch] = useState('');

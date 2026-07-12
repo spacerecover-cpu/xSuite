@@ -438,7 +438,7 @@ export const payrollService = {
         period.end_date
       );
 
-      const activeLoans = await this.getActiveLoans(employee.id);
+      const activeLoans = await this.getActiveLoans(employee.id, period.end_date);
       const loanDeductions = activeLoans.reduce(
         (sum, loan) => sum + Number(loan.installment_amount),
         0
@@ -723,14 +723,23 @@ export const payrollService = {
     return data;
   },
 
-  async getActiveLoans(employeeId: string) {
-    const { data, error } = await supabase
+  async getActiveLoans(employeeId: string, asOfDate?: string) {
+    let query = supabase
       .from('employee_loans')
       .select('*')
       .eq('employee_id', employeeId)
       .eq('status', 'active')
       .is('deleted_at', null);
 
+    // start_date is the due date of installment #1 (LoanDetailModal builds the
+    // repayment schedule as start_date + i months), so a loan whose repayment
+    // window opens AFTER the period must not be deducted yet. Only pull loans
+    // whose first installment is due on or before asOfDate (the period end).
+    if (asOfDate) {
+      query = query.lte('start_date', asOfDate);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
     return data as EmployeeLoan[];
   },

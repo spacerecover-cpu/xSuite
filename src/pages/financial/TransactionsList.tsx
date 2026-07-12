@@ -15,7 +15,6 @@ import { TransactionFormModal } from '../../components/financial/TransactionForm
 import {
   createTransaction,
   fetchTransactionsPage,
-  reconcileTransaction,
   voidTransaction,
   getTransactionStats,
   Transaction,
@@ -28,7 +27,6 @@ import {
   Calendar,
   FileText,
   Filter,
-  CheckCircle,
   XCircle,
 } from 'lucide-react';
 
@@ -142,14 +140,6 @@ export const TransactionsList: React.FC = () => {
     },
   });
 
-  const reconcileMutation = useMutation({
-    mutationFn: (id: string) => reconcileTransaction(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['financial_transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['transaction_stats'] });
-    },
-  });
-
   const voidMutation = useMutation({
     mutationFn: (id: string) => voidTransaction(id),
     onSuccess: () => {
@@ -158,17 +148,6 @@ export const TransactionsList: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['bank_accounts'] });
     },
   });
-
-  const handleReconcile = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (await confirm({
-      title: 'Reconcile transaction?',
-      message: 'Mark this transaction as reconciled?',
-      tone: 'default',
-    })) {
-      await reconcileMutation.mutateAsync(id);
-    }
-  };
 
   const handleVoid = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -215,7 +194,6 @@ export const TransactionsList: React.FC = () => {
             { label: 'Total Income', value: formatCurrency(stats?.totalIncome ?? 0), tone: 'success' },
             { label: 'Total Expenses', value: formatCurrency(stats?.totalExpenses ?? 0), tone: 'danger' },
             { label: 'Net Cash Flow', value: formatCurrency(netCashFlow), tone: 'primary' },
-            { label: 'Reconciled', value: stats?.reconciled || 0, tone: 'info' },
           ]}
         />
       }
@@ -427,15 +405,6 @@ export const TransactionsList: React.FC = () => {
                       className="flex items-center justify-end gap-1"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {transaction.status === 'completed' && (
-                        <button
-                          onClick={(e) => handleReconcile(transaction.id, e)}
-                          className="p-1.5 text-success hover:bg-success-muted rounded transition-colors"
-                          title="Mark as Reconciled"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                        </button>
-                      )}
                       {(transaction.status === 'completed' || transaction.status === 'pending') && (
                         <button
                           onClick={(e) => handleVoid(transaction.id, e)}

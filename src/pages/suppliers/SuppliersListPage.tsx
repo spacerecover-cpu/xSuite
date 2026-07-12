@@ -134,7 +134,10 @@ export default function SuppliersListPage() {
       const [totalRes, activeRes, poRes] = await Promise.all([
         base(),
         base().eq('is_active', true),
-        supabase.from('purchase_orders').select('total_amount, total_amount_base'),
+        supabase
+          .from('purchase_orders')
+          .select('total_amount, total_amount_base')
+          .is('deleted_at', null),
       ]);
       const totalSpend = (poRes.data ?? []).reduce((sum, po) => sum + baseAmount(po, 'total_amount'), 0);
       return { total: totalRes.count ?? 0, active: activeRes.count ?? 0, totalSpend };
@@ -399,7 +402,7 @@ export default function SuppliersListPage() {
           stats={[
             { label: 'Total Suppliers', value: stats?.total ?? 0, tone: 'info' },
             { label: 'Active', value: stats?.active ?? 0, tone: 'success' },
-            { label: 'Total Spend (YTD)', value: formatCurrency(stats?.totalSpend ?? 0), tone: 'warning' },
+            { label: 'Total Spend', value: formatCurrency(stats?.totalSpend ?? 0), tone: 'warning' },
           ]}
         />
       }

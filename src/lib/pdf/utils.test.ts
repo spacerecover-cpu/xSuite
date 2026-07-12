@@ -1,5 +1,31 @@
 import { describe, it, expect } from 'vitest';
-import { formatCapacity, formatCurrency, formatEngineMoney, formatPartyAddressLines } from './utils';
+import { formatCapacity, formatCurrency, formatDate, formatEngineMoney, formatPartyAddressLines } from './utils';
+
+describe('formatDate', () => {
+  // Regression: `new Date('2026-07-01')` parses a date-only ISO string (the shape
+  // returned for DATE columns like invoice_date/quote_date) as UTC midnight, and
+  // date-fns then renders it in the runtime's LOCAL calendar. For any behind-UTC
+  // browser (US Eastern/Central/Pacific) that printed the previous calendar day —
+  // a wrong statutory date on the invoice/quote/credit-note/voucher PDF. parseISO
+  // reads date-only values at local midnight, so the same day renders everywhere.
+  it('renders a date-only string as the same calendar day regardless of timezone', () => {
+    expect(formatDate('2026-07-01')).toBe('01/07/2026');
+    expect(formatDate('2026-01-01')).toBe('01/01/2026');
+    expect(formatDate('2026-12-31')).toBe('31/12/2026');
+  });
+
+  it('honors the format string', () => {
+    expect(formatDate('2026-07-01', 'MM/dd/yyyy')).toBe('07/01/2026');
+    expect(formatDate('2026-07-01', 'dd MMM yyyy')).toBe('01 Jul 2026');
+  });
+
+  it('passes Date objects through unchanged and handles empty/invalid input', () => {
+    expect(formatDate(new Date(2026, 6, 1))).toBe('01/07/2026');
+    expect(formatDate(null)).toBe('-');
+    expect(formatDate(undefined)).toBe('-');
+    expect(formatDate('not-a-date')).toBe('-');
+  });
+});
 
 describe('formatEngineMoney', () => {
   // Regression: adapters used a bare `toFixed()` that dropped the thousands

@@ -823,13 +823,19 @@ export async function getSalesReport(startDate: string, endDate: string) {
   return { sales, totalRevenue, totalCost, totalProfit: totalRevenue - totalCost };
 }
 
-export async function getTopSellingItems(_startDate: string, _endDate: string, limit = 10) {
-  // NOTE: stock_sale_items v1.0.0 has no deleted_at or line_total columns; use total instead.
-  // Date filtering would have to happen via the parent stock_sales.sale_date join — not supported
-  // by the current implementation. TODO(B8): filter by sale_date once needed.
+export async function getTopSellingItems(startDate: string, endDate: string, limit = 10) {
+  // Aggregate only live line items whose parent sale is live and in range — mirrors
+  // getSalesReport's filters. cancel_stock_sale soft-deletes the parent stock_sales row
+  // (status='refunded', deleted_at=now()) but leaves child stock_sale_items live, so the
+  // stock_sales!inner + deleted_at/sale_date filters are what exclude cancelled/refunded and
+  // out-of-range sales from the top-sellers roll-up.
   const { data, error } = await supabase
     .from('stock_sale_items')
-    .select('item_id, quantity, total, stock_items(id, name, brand, sku)');
+    .select('item_id, quantity, total, stock_items(id, name, brand, sku), stock_sales!inner(deleted_at, sale_date)')
+    .is('deleted_at', null)
+    .is('stock_sales.deleted_at', null)
+    .gte('stock_sales.sale_date', startDate)
+    .lte('stock_sales.sale_date', endDate);
   if (error) throw error;
 
   const map = new Map<string, { name: string; brand: string | null; sku: string | null; totalQty: number; totalRevenue: number }>();

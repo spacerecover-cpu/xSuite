@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { logger } from '../logger';
 import type { CurrencyConfig } from '../../types/tenantConfig';
 import type { CompanySettingsData, TranslationContext } from './types';
@@ -6,7 +6,14 @@ import type { CompanySettingsData, TranslationContext } from './types';
 export function formatDate(date: string | Date | null | undefined, formatStr: string = 'dd/MM/yyyy'): string {
   if (!date) return '-';
   try {
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    // Parse strings with parseISO (not `new Date`): a date-only ISO string like
+    // '2026-07-01' (the shape returned for DATE columns such as invoice_date /
+    // quote_date) is interpreted by `new Date` as UTC midnight, which date-fns
+    // then renders in the runtime's LOCAL calendar — printing the previous day
+    // for behind-UTC tenants (US Eastern/Central/Pacific). parseISO reads
+    // date-only values at local midnight so the same calendar day renders in
+    // every timezone, matching lib/format.ts.
+    const dateObj = typeof date === 'string' ? parseISO(date) : date;
     return format(dateObj, formatStr);
   } catch {
     return '-';

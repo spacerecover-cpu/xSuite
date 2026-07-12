@@ -273,20 +273,24 @@ Deno.serve(async (req: Request) => {
 
         const { data: subscription } = await supabase
           .from("tenant_subscriptions")
-          .select("plan_id")
+          .select("id, plan_id")
           .eq("paypal_subscription_id", paypalSubscriptionId)
-          .single();
+          .maybeSingle();
 
         if (subscription) {
-          const { data: nextNumber } = await supabase
-            .rpc("get_next_number", { sequence_name: "invoices" });
+          const { data: nextNumber, error: numberError } = await supabase
+            .rpc("get_next_number", { p_scope: "invoices" });
+
+          if (numberError) {
+            console.error("Failed to mint billing invoice number:", numberError);
+          }
 
           const nowIso = new Date().toISOString();
           const { error: invoiceError } = await supabase
             .from("billing_invoices")
             .insert({
               tenant_id: tenantId,
-              subscription_id: subscription.plan_id,
+              subscription_id: subscription.id,
               invoice_number: nextNumber || `INV-${Date.now()}`,
               invoice_date: nowIso,
               subtotal: amount,

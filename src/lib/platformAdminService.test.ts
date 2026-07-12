@@ -7,7 +7,11 @@ const { from, insert } = vi.hoisted(() => ({ from: vi.fn(), insert: vi.fn() }));
 vi.mock('./supabaseClient', () => ({ supabase: { from } }));
 vi.mock('./logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
-import { calculateHealthScore, recordHealthMetrics } from './platformAdminService';
+import {
+  calculateHealthScore,
+  recordHealthMetrics,
+  getTenantDetails,
+} from './platformAdminService';
 
 /**
  * Thenable, count-aware query builder. select/eq/gte/in/is are chainable; awaiting
@@ -83,5 +87,94 @@ describe('recordHealthMetrics (D — revenue_last_30d persisted must be base cur
     expect(insert).toHaveBeenCalledTimes(1);
     const persisted = insert.mock.calls[0][0] as { revenue_last_30d: number };
     expect(persisted.revenue_last_30d).toBe(88);
+  });
+});
+
+/**
+ * Regression for bugs 60/61/62 — tenant-scoping leaks. Platform admins bypass the
+ * RESTRICTIVE tenant-isolation RLS (tenant_id = get_current_tenant_id() OR
+ * is_platform_admin()), so every per-tenant aggregate query MUST carry an explicit
+ * .eq('tenant_id', tenantId). Before the fix the cases / payments /
+ * user_activity_sessions queries omitted it and returned platform-wide totals,
+ * inflating caseCount, health score, and persisted health metrics for every tenant.
+ */
+function makeScopedQuery(result: {
+  data?: Array<Record<string, unknown>>;
+  count?: number;
+  single?: Record<string, unknown> | null;
+}) {
+  const builder: Record<string, unknown> = {
+    select: vi.fn(() => builder),
+    eq: vi.fn(() => builder),
+    gte: vi.fn(() => builder),
+    in: vi.fn(() => builder),
+    is: vi.fn(() => builder),
+    order: vi.fn(() => builder),
+    limit: vi.fn(() => builder),
+    maybeSingle: vi.fn(() =>
+      Promise.resolve({ data: result.single ?? null, count: result.count ?? null, error: null }),
+    ),
+    then: (resolve: (v: { data: unknown; count: number | null; error: null }) => void) =>
+      resolve({ data: result.data ?? null, count: result.count ?? null, error: null }),
+  };
+  return builder;
+}
+
+/** Route every from(table) to a builder and capture each builder keyed by table name. */
+function wireCapturing() {
+  const byTable: Record<string, Array<Record<string, unknown>>> = {};
+  from.mockImplementation((table: string) => {
+    let query: Record<string, unknown>;
+    switch (table) {
+      case 'tenants':
+        query = makeScopedQuery({ single: { id: 'tenant-1', name: 'A' } });
+        break;
+      case 'profiles':
+        query = makeScopedQuery({ data: [], count: 0 });
+        break;
+      case 'payments':
+      case 'user_activity_sessions':
+        query = makeScopedQuery({ data: [] });
+        break;
+      case 'tenant_health_metrics':
+        query = Object.assign(makeScopedQuery({ single: null }), { insert });
+        break;
+      default:
+        // cases, support_tickets, tenant_subscriptions — head/count or maybeSingle
+        query = makeScopedQuery({ count: 0, single: null });
+    }
+    (byTable[table] ||= []).push(query);
+    return query;
+  });
+  return byTable;
+}
+
+function expectAllScoped(builders: Array<Record<string, unknown>> | undefined, tenantId: string) {
+  expect(builders && builders.length).toBeTruthy();
+  for (const q of builders ?? []) {
+    expect(q.eq).toHaveBeenCalledWith('tenant_id', tenantId);
+  }
+}
+
+describe('tenant scoping (bugs 60/61/62 — platform admin bypasses RLS)', () => {
+  it('getTenantDetails scopes the cases count to the tenant', async () => {
+    const byTable = wireCapturing();
+    await getTenantDetails('tenant-1');
+    expectAllScoped(byTable['cases'], 'tenant-1');
+  });
+
+  it('calculateHealthScore scopes cases, payments and activity sessions to the tenant', async () => {
+    const byTable = wireCapturing();
+    await calculateHealthScore('tenant-1');
+    expectAllScoped(byTable['cases'], 'tenant-1');
+    expectAllScoped(byTable['payments'], 'tenant-1');
+    expectAllScoped(byTable['user_activity_sessions'], 'tenant-1');
+  });
+
+  it('recordHealthMetrics scopes every cases and payments query to the tenant', async () => {
+    const byTable = wireCapturing();
+    await recordHealthMetrics('tenant-1');
+    expectAllScoped(byTable['cases'], 'tenant-1');
+    expectAllScoped(byTable['payments'], 'tenant-1');
   });
 });

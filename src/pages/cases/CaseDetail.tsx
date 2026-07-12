@@ -957,6 +957,7 @@ export const CaseDetail: React.FC = () => {
                       bank_account_id: payload.bank_account_id,
                       terms_and_conditions: payload.terms_and_conditions,
                       quote_id: payload.quote_id,
+                      currency: payload.currency,
                     }, lineItems);
                     toast.success('Invoice updated successfully');
                   } else {
@@ -977,6 +978,7 @@ export const CaseDetail: React.FC = () => {
                       bank_account_id: payload.bank_account_id,
                       terms_and_conditions: payload.terms_and_conditions,
                       quote_id: payload.quote_id,
+                      currency: payload.currency,
                     }, lineItems);
                     toast.success('Invoice created successfully');
                   }

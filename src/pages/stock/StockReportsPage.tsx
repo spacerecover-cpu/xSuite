@@ -438,14 +438,16 @@ export const StockReportsPage: React.FC = () => {
                       <td className="px-3 py-2.5">
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${
-                            sale.payment_status === 'paid'
+                            sale.status === 'paid'
                               ? 'bg-success-muted text-success'
-                              : sale.payment_status === 'pending'
+                              : sale.status === 'pending'
                               ? 'bg-warning-muted text-warning'
+                              : sale.status === 'partial'
+                              ? 'bg-info-muted text-info'
                               : 'bg-slate-100 text-slate-600'
                           }`}
                         >
-                          {String(sale.payment_status ?? '—')}
+                          {String(sale.status ?? '—')}
                         </span>
                       </td>
                     </tr>

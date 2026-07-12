@@ -227,19 +227,25 @@ function toIdFullName(src: unknown): { id: string; full_name: string } | undefin
 
 // Line-item mappers — typed field extraction replaces the old
 // `as unknown as XItemData[]` casts so a column rename is a compile error.
-// `quote_items` has no line-total column, so the quote row total is computed
-// here. `invoice_line_items` does carry a stored `total` (tax-INCLUSIVE, post
-// line- and document-discount) plus a per-line `discount` PERCENT; the printed
-// tax-invoice Subtotal is the stored, discount-net header value, so the line
-// `line_total` must be the discount-adjusted, tax-EXCLUSIVE net to reconcile —
-// see toInvoiceItems (not gross quantity*unit_price, and not the tax-inclusive
-// stored `total`).
+// `quote_items` carries a stored, NOT-NULL `total` — the discount-net,
+// tax-EXCLUSIVE line amount that `quotes.subtotal` is summed from — so
+// `line_total` is that stored value (mirroring quotesService.getQuoteById:
+// `line_total: it.total`). Carrying it means imported quotes with a per-line
+// `discount` PERCENT print the same net the quote was priced/stored at and the
+// summed lines reconcile with the printed Subtotal; a render-time gross
+// quantity*unit_price would drop the discount and not reconcile.
+// `invoice_line_items` also carries a stored `total`, but that one is
+// tax-INCLUSIVE (post line- and document-discount), so toInvoiceItems instead
+// computes the discount-adjusted, tax-EXCLUSIVE net from `quantity`,
+// `unit_price` and the per-line `discount` PERCENT to reconcile with the
+// stored, discount-net Subtotal (not gross, and not the tax-inclusive `total`).
 export function toQuoteItems(rows: Partial<QuoteItemsRow>[] | null | undefined): QuoteItemData[] {
   return (rows ?? []).map(row => ({
     id: row.id ?? undefined,
     description: row.description ?? '',
     quantity: row.quantity ?? 0,
     unit_price: row.unit_price ?? 0,
+    line_total: row.total ?? undefined,
     unit_label: row.unit_label ?? null,
     item_code: row.item_code ?? null,
   }));
