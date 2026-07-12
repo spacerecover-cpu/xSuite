@@ -10,7 +10,6 @@ type BankAccountUpdate = Database['public']['Tables']['bank_accounts']['Update']
 type PaymentReceiptInsert = Database['public']['Tables']['payment_receipts']['Insert'];
 type PaymentDisbursementInsert = Database['public']['Tables']['payment_disbursements']['Insert'];
 type PaymentDisbursementUpdate = Database['public']['Tables']['payment_disbursements']['Update'];
-type AccountTransferInsert = Database['public']['Tables']['account_transfers']['Insert'];
 type AccountTransferUpdate = Database['public']['Tables']['account_transfers']['Update'];
 type ReceiptAllocationInsert = Database['public']['Tables']['receipt_allocations']['Insert'];
 
@@ -537,8 +536,6 @@ export const bankingService = {
   },
 
   async createTransfer(transferData: Partial<AccountTransfer>): Promise<AccountTransfer> {
-    const { data: { user } } = await supabase.auth.getUser();
-
     if (typeof transferData.amount !== 'number') {
       throw new Error('Transfer amount is required');
     }
@@ -577,54 +574,30 @@ export const bankingService = {
       throw new Error('Insufficient balance in the source account');
     }
 
-    const tenantId = await resolveTenantId();
-    const insertRow: AccountTransferInsert = {
-      amount: transferData.amount,
-      from_account_id: transferData.from_account_id,
-      to_account_id: transferData.to_account_id,
-      transfer_date: transferData.transfer_date ?? new Date().toISOString(),
-      reference: transferData.reference ?? null,
-      notes: transferData.notes ?? null,
-      status: transferData.status ?? 'completed',
-      created_by: user?.id ?? null,
-      tenant_id: tenantId,
-    };
-
-    const { data, error } = await supabase
-      .from('account_transfers')
-      .insert(insertRow)
-      .select()
-      .maybeSingle();
+    // The early guards above are kept only for friendlier client-side messages.
+    // execute_account_transfer is now authoritative: it locks both accounts,
+    // re-validates currency + sufficient balance, inserts the transfer, and (when
+    // status='completed') moves both balances atomically in ONE DB transaction —
+    // replacing the previous non-atomic read-modify-write + compensation dance
+    // that could understate cash on a partial failure (BUG-40).
+    // The generated Args type transfer_date/reference/notes as required non-null,
+    // but the SECURITY DEFINER function coalesces those nulls server-side, so we
+    // pass the optional metadata through as null when absent (assert past the
+    // stricter-than-reality generated signature).
+    const { data, error } = await supabase.rpc('execute_account_transfer', {
+      p_from: transferData.from_account_id,
+      p_to: transferData.to_account_id,
+      p_amount: transferData.amount,
+      p_transfer_date: transferData.transfer_date ?? null,
+      p_reference: transferData.reference ?? null,
+      p_notes: transferData.notes ?? null,
+      p_status: transferData.status ?? 'completed',
+    } as Database['public']['Functions']['execute_account_transfer']['Args']);
 
     if (error) throw error;
     if (!data) throw new Error('Failed to create account transfer');
 
-    if (data.status === 'completed') {
-      // Two independent balance moves without a DB transaction (postgrest gives
-      // the client no multi-statement atomicity). If the credit leg fails after
-      // the debit has committed, compensate: reverse the debit and void the
-      // transfer row so tenant cash is not left understated with a 'completed'
-      // transfer on record. Full atomicity + lost-update safety (an atomic
-      // `current_balance = current_balance +/- amount` under row locks) needs the
-      // server-side RPC tracked in the migration follow-up — see cross-file note.
-      await this.updateAccountBalance(transferData.from_account_id, transferData.amount, 'debit');
-      try {
-        await this.updateAccountBalance(transferData.to_account_id, transferData.amount, 'credit');
-      } catch (creditError) {
-        try {
-          await this.updateAccountBalance(transferData.from_account_id, transferData.amount, 'credit');
-          await supabase
-            .from('account_transfers')
-            .update({ deleted_at: new Date().toISOString() })
-            .eq('id', data.id);
-        } catch {
-          // best-effort compensation; surface the original credit failure below
-        }
-        throw creditError;
-      }
-    }
-
-    return data as AccountTransfer;
+    return data as unknown as AccountTransfer;
   },
 
   async approveTransfer(id: string, notes?: string): Promise<AccountTransfer> {
@@ -648,43 +621,17 @@ export const bankingService = {
   },
 
   async completeTransfer(id: string): Promise<AccountTransfer> {
-    const { data: transfer } = await supabase
-      .from('account_transfers')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (!transfer) throw new Error('Transfer not found');
-
-    const { data, error } = await supabase
-      .from('account_transfers')
-      .update({ status: 'completed' })
-      .eq('id', id)
-      .select()
-      .maybeSingle();
+    // complete_account_transfer locks both accounts, validates, moves balances
+    // atomically and sets status='completed' in ONE DB transaction (idempotent) —
+    // replacing the non-atomic status-update + read-modify-write + compensation.
+    const { data, error } = await supabase.rpc('complete_account_transfer', {
+      p_transfer_id: id,
+    });
 
     if (error) throw error;
     if (!data) throw new Error('Failed to complete transfer');
 
-    // Same non-atomic caveat as createTransfer: reverse the debit and revert the
-    // status if the credit leg fails, so a partial failure cannot understate cash.
-    await this.updateAccountBalance(transfer.from_account_id, transfer.amount, 'debit');
-    try {
-      await this.updateAccountBalance(transfer.to_account_id, transfer.amount, 'credit');
-    } catch (creditError) {
-      try {
-        await this.updateAccountBalance(transfer.from_account_id, transfer.amount, 'credit');
-        await supabase
-          .from('account_transfers')
-          .update({ status: transfer.status })
-          .eq('id', id);
-      } catch {
-        // best-effort compensation; surface the original credit failure below
-      }
-      throw creditError;
-    }
-
-    return data as AccountTransfer;
+    return data as unknown as AccountTransfer;
   },
 
   async allocateReceiptToInvoice(
@@ -739,23 +686,15 @@ export const bankingService = {
     amount: number,
     type: 'credit' | 'debit'
   ): Promise<void> {
-    const { data: account } = await supabase
-      .from('bank_accounts')
-      .select('current_balance')
-      .eq('id', accountId)
-      .maybeSingle();
-
-    if (!account) throw new Error('Account not found');
-
-    const currentBalance = account.current_balance ?? 0;
-    const newBalance = type === 'credit'
-      ? currentBalance + amount
-      : currentBalance - amount;
-
-    const { error } = await supabase
-      .from('bank_accounts')
-      .update({ current_balance: newBalance })
-      .eq('id', accountId);
+    // adjust_account_balance applies an atomic single-account increment under a
+    // row lock (`current_balance = current_balance +/- amount`), so concurrent
+    // callers can't lose updates the way the old read-modify-write did. This also
+    // fixes createDisbursement's balance move without touching its call site.
+    const { error } = await supabase.rpc('adjust_account_balance', {
+      p_account_id: accountId,
+      p_amount: amount,
+      p_direction: type,
+    });
 
     if (error) throw error;
   },

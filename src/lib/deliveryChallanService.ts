@@ -7,9 +7,7 @@
 // it back instead of consuming a fresh number.
 
 import { supabase } from './supabaseClient';
-import { logger } from './logger';
 import {
-  DELIVERY_CHALLAN_SCOPE,
   isCustomerOwnedRole,
   ewayBillGuidance,
   CHALLAN_NOTATION,
@@ -137,51 +135,40 @@ export async function issueDeliveryChallan(params: {
   batchId: string;
   lines: ChallanLineInput[];
 }): Promise<IssuedDeliveryChallan> {
-  const existing = await getIssuedChallan(params.caseId, params.batchId);
-  if (existing) return existing;
-
   if (params.lines.length === 0) {
     throw new Error('A delivery challan needs at least one customer-owned device line');
   }
 
-  const { data: challanNo, error: numberError } = await supabase.rpc('get_next_number', {
-    p_scope: DELIVERY_CHALLAN_SCOPE,
+  // Atomic, idempotent server-side issuance (bug #87): the RPC takes an advisory
+  // lock on (case, batch), returns any already-issued challan idempotently, and
+  // otherwise mints the number + appends the case_job_history row in ONE
+  // transaction — a failed append rolls back the sequence advance, so no gap and
+  // no two-challans-for-one-handover race for the client to reconcile.
+  const { data, error } = await supabase.rpc('issue_delivery_challan', {
+    p_case_id: params.caseId,
+    p_batch_id: params.batchId,
+    p_lines: params.lines.map((l) => ({ device_id: l.deviceId, declared_value: l.declaredValue })),
   });
-  if (numberError || !challanNo) {
-    throw numberError ?? new Error('Failed to allocate a delivery challan number');
-  }
+  if (error || !data) throw error ?? new Error('Failed to issue delivery challan');
 
-  const totalDeclaredValue = params.lines.reduce((sum, l) => sum + l.declaredValue, 0);
-  const issuedAt = new Date().toISOString();
-  const details: ChallanHistoryDetails = {
-    kind: 'delivery_challan',
-    batch_id: params.batchId,
-    challan_no: challanNo,
-    lines: params.lines.map((l) => ({ device_id: l.deviceId, declared_value: l.declaredValue })),
-    total_declared_value: totalDeclaredValue,
-    issued_at: issuedAt,
+  const issued = data as {
+    kind: string;
+    batch_id: string;
+    challan_no: string;
+    lines: Array<{ device_id: string; declared_value: number }>;
+    total_declared_value: number;
+    issued_at: string;
+    already_issued: boolean;
   };
 
-  const { error: historyError } = await supabase.rpc('log_case_history', {
-    p_case_id: params.caseId,
-    p_action: DELIVERY_CHALLAN_ACTION,
-    p_details: JSON.stringify(details),
-  });
-  if (historyError) {
-    logger.error('Delivery challan number allocated but issuance record failed:', historyError);
-    throw historyError;
-  }
-
-  // Mint-then-append is NOT atomic (no DB lock / unique constraint on
-  // case_id+batch_id — see cross-file note), so a truly-concurrent checkout of
-  // the same batch can append its own row carrying a different number. Re-read
-  // the ledger and return the CANONICAL (earliest) challan: every caller and
-  // every later reprint via getIssuedChallan then converge on ONE statutory
-  // number, so the customer is never handed two challans for one handover.
-  const canonical = await getIssuedChallan(params.caseId, params.batchId);
-  if (canonical) return canonical;
-
-  return { caseId: params.caseId, batchId: params.batchId, challanNo, issuedAt, lines: params.lines, totalDeclaredValue };
+  return {
+    caseId: params.caseId,
+    batchId: params.batchId,
+    challanNo: issued.challan_no,
+    issuedAt: issued.issued_at,
+    lines: issued.lines.map((l) => ({ deviceId: l.device_id, declaredValue: l.declared_value })),
+    totalDeclaredValue: Number(issued.total_declared_value),
+  };
 }
 
 /** Consignee block for the challan header, from the canonical customer table. */

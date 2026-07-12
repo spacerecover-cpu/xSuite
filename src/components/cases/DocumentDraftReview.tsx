@@ -284,8 +284,9 @@ export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
    * role label so they are never silently mis-attributed to the approver.
    */
   function resolveSlotSignerName(slot: PendingSlot, sig: CapturedSignature): string {
-    const typed = sig.method === 'typed' ? sig.typedValue?.trim() : undefined;
-    if (typed) return typed;
+    // Type method carries the name in typedValue; other methods carry it in signerName.
+    const entered = sig.method === 'typed' ? sig.typedValue?.trim() : sig.signerName?.trim();
+    if (entered) return entered;
     if (slot.slot === 'approver') return profile?.full_name?.trim() || 'Staff';
     return slot.signerRole;
   }
@@ -300,6 +301,9 @@ export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
         slot: currentSlot.slot,
         method: sig.method,
         signerName: resolveSlotSignerName(currentSlot, sig),
+        // Only the approver is the authenticated system user; operator/witness are
+        // external signatories with no account, so their row's identity stays null.
+        signerUserId: currentSlot.slot === 'approver' ? (user?.id ?? null) : null,
         signerRole: currentSlot.signerRole,
         typedValue: sig.typedValue,
         imageBlob: sig.imageBlob,

@@ -63,4 +63,41 @@ describe('captureStaffSignature', () => {
     expect(uploadSignature).not.toHaveBeenCalled();
     expect(inserted).toMatchObject({ method: 'typed', typed_value: 'Tech A', signature_image_path: null });
   });
+
+  it('leaves signer_user_id null for a non-approver slot with no signerUserId (external signatory)', async () => {
+    let inserted: Record<string, unknown> | null = null;
+    from.mockImplementation((table: string) => {
+      if (table === 'profiles') return chain({ data: { tenant_id: 't1' }, error: null });
+      const c = chain({ data: { id: 'sig-3' }, error: null });
+      c.insert = vi.fn((p: Record<string, unknown>) => { inserted = p; return c; });
+      return c;
+    });
+    await captureStaffSignature({ instanceId: 'di-1', slot: 'witness', method: 'typed', signerName: 'Walter Witness', typedValue: 'Walter Witness' });
+    // Witness is an external signatory, not the logged-in user — identity stays null.
+    expect(inserted).toMatchObject({ slot: 'witness', signer_user_id: null });
+  });
+
+  it('falls back to the authenticated user id for the approver slot when signerUserId is omitted', async () => {
+    let inserted: Record<string, unknown> | null = null;
+    from.mockImplementation((table: string) => {
+      if (table === 'profiles') return chain({ data: { tenant_id: 't1' }, error: null });
+      const c = chain({ data: { id: 'sig-4' }, error: null });
+      c.insert = vi.fn((p: Record<string, unknown>) => { inserted = p; return c; });
+      return c;
+    });
+    await captureStaffSignature({ instanceId: 'di-1', slot: 'approver', method: 'typed', signerName: 'Amy Approver', typedValue: 'Amy Approver' });
+    expect(inserted).toMatchObject({ slot: 'approver', signer_user_id: 'u1' });
+  });
+
+  it('uses an explicitly passed signerUserId over the authenticated user', async () => {
+    let inserted: Record<string, unknown> | null = null;
+    from.mockImplementation((table: string) => {
+      if (table === 'profiles') return chain({ data: { tenant_id: 't1' }, error: null });
+      const c = chain({ data: { id: 'sig-5' }, error: null });
+      c.insert = vi.fn((p: Record<string, unknown>) => { inserted = p; return c; });
+      return c;
+    });
+    await captureStaffSignature({ instanceId: 'di-1', slot: 'engineer', method: 'typed', signerName: 'Olivia Operator', typedValue: 'Olivia Operator', signerUserId: 'staff-99' });
+    expect(inserted).toMatchObject({ slot: 'engineer', signer_user_id: 'staff-99' });
+  });
 });

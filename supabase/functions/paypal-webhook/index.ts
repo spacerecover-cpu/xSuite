@@ -278,8 +278,13 @@ Deno.serve(async (req: Request) => {
           .maybeSingle();
 
         if (subscription) {
+          // Bug #75: this runs under the service-role client, so auth.uid() is
+          // null and the plain get_next_number (which derives the tenant from
+          // auth.uid()) cannot resolve a sequence. Use the tenant-explicit RPC
+          // instead. NOTE: this edge function still requires a separate deploy
+          // for this change to take effect.
           const { data: nextNumber, error: numberError } = await supabase
-            .rpc("get_next_number", { p_scope: "invoices" });
+            .rpc("get_next_number_for_tenant", { p_tenant: tenantId, p_scope: "invoices" });
 
           if (numberError) {
             console.error("Failed to mint billing invoice number:", numberError);

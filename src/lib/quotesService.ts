@@ -733,7 +733,11 @@ export const restoreQuote = async (id: string) => {
 };
 
 export const permanentDeleteQuote = async (id: string) => {
-  const { error } = await supabase.from('quotes').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+  // Bug #63: permanent purge. Stamps quotes.purged_at via a SECURITY DEFINER RPC
+  // (admin-gated, tenant-scoped) so the quote leaves the recycle bin for good
+  // while the forensic row is preserved. Re-soft-deleting only reset the 30-day
+  // countdown and left the quote visible in the bin.
+  const { error } = await supabase.rpc('delete_quote_permanently', { p_quote_id: id });
   if (error) throw error;
 };
 
@@ -761,6 +765,7 @@ export const fetchDeletedQuotes = async () => {
       )
     `)
     .not('deleted_at', 'is', null)
+    .is('purged_at', null)
     .order('deleted_at', { ascending: false });
 
   if (error) throw error;
