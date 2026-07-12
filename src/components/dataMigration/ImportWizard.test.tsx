@@ -106,6 +106,48 @@ describe('ImportWizard', () => {
     expect(screen.getByText('1')).toBeInTheDocument();
   });
 
+  it('summary lists only the imported domain sheets, not cross-domain entities', async () => {
+    const parsedWb = { companies: [{ legacy_id: 'c1', name: 'Acme' }], customers: [], cases: [] };
+    mocks.parseWorkbook.mockReturnValue(parsedWb);
+    mocks.validateWorkbook.mockReturnValue({
+      ok: true,
+      counts: { companies: 1, customers: 0, cases: 0 },
+      issues: [],
+    });
+    // runImport returns the FULL cross-domain counts object (emptyCounts iterates IMPORT_ORDER),
+    // including entities that are not part of the records domain.
+    mocks.runImport.mockResolvedValue({
+      runId: 'run-123',
+      counts: {
+        companies: { inserted: 1, skipped: 0, error: 0 },
+        customers: { inserted: 0, skipped: 0, error: 0 },
+        cases: { inserted: 0, skipped: 0, error: 0 },
+        employees: { inserted: 0, skipped: 0, error: 0 },
+        stock_items: { inserted: 0, skipped: 0, error: 0 },
+      },
+    });
+
+    wrap(<ImportWizard domain="records" onClose={onClose} />);
+
+    const file = new File(['dummy'], 'lab-export.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(input, 'files', { value: [file] });
+    fireEvent.change(input);
+
+    fireEvent.click(await screen.findByRole('button', { name: /^import$/i }));
+
+    expect(await screen.findByText(/import complete/i)).toBeInTheDocument();
+    // Domain sheets are shown…
+    expect(screen.getByText('Companies')).toBeInTheDocument();
+    expect(screen.getByText('Customers')).toBeInTheDocument();
+    expect(screen.getByText('Cases')).toBeInTheDocument();
+    // …cross-domain entities are NOT.
+    expect(screen.queryByText('employees')).toBeNull();
+    expect(screen.queryByText('stock_items')).toBeNull();
+  });
+
   it('shows validation errors when validateWorkbook reports issues', async () => {
     const parsedWb = { companies: [], customers: [], cases: [] };
     mocks.parseWorkbook.mockReturnValue(parsedWb);

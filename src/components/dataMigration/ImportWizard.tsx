@@ -19,7 +19,7 @@ import { fetchReferenceLists } from '../../lib/dataMigration/referenceLists';
 import { validateWorkbook, validateSchemaVersion } from '../../lib/dataMigration/importValidator';
 import { runImport } from '../../lib/dataMigration/importClient';
 import { DOMAIN_ENTITIES, DOMAIN_LABELS, SHEET_NAMES } from '../../lib/dataMigration/workbookContract';
-import type { ParsedWorkbook, EntityType, WorkbookDomain } from '../../lib/dataMigration/workbookContract';
+import type { ParsedWorkbook, WorkbookDomain } from '../../lib/dataMigration/workbookContract';
 import type { ValidationReport, ValidationIssue } from '../../lib/dataMigration/importValidator';
 import type { ImportProgress, ImportSummary } from '../../lib/dataMigration/importClient';
 
@@ -396,8 +396,9 @@ export const ImportWizard: React.FC<Props> = ({ domain, onClose }) => {
             </div>
 
             <div className="rounded-lg border border-slate-200 divide-y divide-slate-100">
-              {(Object.entries(summary.counts) as [EntityType, { inserted: number; skipped: number; error: number }][]).map(
-                ([entity, c]) => (
+              {domainEntities.map((entity) => {
+                const c = summary.counts[entity] ?? { inserted: 0, skipped: 0, error: 0 };
+                return (
                   <div key={entity} className="px-4 py-2.5 flex items-center justify-between text-sm">
                     <span className="text-slate-700">{SHEET_NAMES[entity] ?? entity}</span>
                     <div className="flex items-center gap-3 text-xs">
@@ -406,8 +407,8 @@ export const ImportWizard: React.FC<Props> = ({ domain, onClose }) => {
                       {c.error > 0 && <span className="text-danger font-medium">{c.error} error</span>}
                     </div>
                   </div>
-                ),
-              )}
+                );
+              })}
             </div>
 
             {summary.errorReport && (

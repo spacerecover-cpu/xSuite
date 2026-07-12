@@ -50,11 +50,15 @@ export const SidebarPreferencesProvider: React.FC<{ children: React.ReactNode }>
   const [position, setPositionState] = useState<SidebarPosition>(readPositionHint);
   const [isCollapsed, setIsCollapsedState] = useState<boolean>(readCollapsedHint);
   const [expandedSection, setExpandedSectionState] = useState<string | null>(null);
-  // True once the user changes any preference this session. The DB row loads
-  // asynchronously after mount; without this flag a slow SELECT landing after
-  // a user toggle snapped sections open/closed under the cursor (and stomped
-  // the newer, already-persisted intent with pre-change data).
-  const userInteractedRef = useRef(false);
+  // Per-field record of which preferences the user changed this session. The DB
+  // row loads asynchronously after mount; without this a slow SELECT landing
+  // after a user toggle snapped that field back under the cursor (and stomped
+  // the newer, already-persisted intent with pre-change data). Tracking is
+  // per-field so an in-flight SELECT still hydrates the fields the user has NOT
+  // touched — a single boolean here dropped every other saved preference the
+  // moment the user changed any one of them. Reset per userId so a later user's
+  // row is not suppressed by an earlier user's interaction.
+  const touchedRef = useRef({ position: false, collapsed: false, section: false });
 
   // Persist a partial patch for the current user. tenant_id is stamped by the
   // set_user_sidebar_preferences_tenant_and_audit trigger; a PostgREST upsert
@@ -72,6 +76,7 @@ export const SidebarPreferencesProvider: React.FC<{ children: React.ReactNode }>
   );
 
   useEffect(() => {
+    touchedRef.current = { position: false, collapsed: false, section: false };
     if (!userId) {
       setLoading(false);
       return;
@@ -84,23 +89,27 @@ export const SidebarPreferencesProvider: React.FC<{ children: React.ReactNode }>
         .eq('user_id', userId)
         .maybeSingle();
       if (cancelled) return;
-      if (userInteractedRef.current) {
-        setLoading(false);
-        return;
-      }
       if (!error && data) {
-        const pos: SidebarPosition = data.sidebar_position === 'right' ? 'right' : 'left';
-        setPositionState(pos);
-        localStorage.setItem(POSITION_HINT_KEY, pos);
+        // Apply each saved field only if the user has not changed that field
+        // since mount; untouched fields still hydrate from the DB row.
+        if (!touchedRef.current.position) {
+          const pos: SidebarPosition = data.sidebar_position === 'right' ? 'right' : 'left';
+          setPositionState(pos);
+          localStorage.setItem(POSITION_HINT_KEY, pos);
+        }
 
-        const collapsed = Boolean(data.is_collapsed);
-        setIsCollapsedState(collapsed);
-        localStorage.setItem(COLLAPSED_HINT_KEY, String(collapsed));
+        if (!touchedRef.current.collapsed) {
+          const collapsed = Boolean(data.is_collapsed);
+          setIsCollapsedState(collapsed);
+          localStorage.setItem(COLLAPSED_HINT_KEY, String(collapsed));
+        }
 
-        const collapsedSections = data.collapsed_sections ?? [];
-        if (collapsedSections.length > 0) {
-          const expanded = PERSISTED_SECTIONS.find((s) => !collapsedSections.includes(s));
-          setExpandedSectionState(expanded ?? null);
+        if (!touchedRef.current.section) {
+          const collapsedSections = data.collapsed_sections ?? [];
+          if (collapsedSections.length > 0) {
+            const expanded = PERSISTED_SECTIONS.find((s) => !collapsedSections.includes(s));
+            setExpandedSectionState(expanded ?? null);
+          }
         }
       }
       setLoading(false);
@@ -112,7 +121,7 @@ export const SidebarPreferencesProvider: React.FC<{ children: React.ReactNode }>
 
   const setPosition = useCallback(
     (next: SidebarPosition) => {
-      userInteractedRef.current = true;
+      touchedRef.current.position = true;
       setPositionState(next);
       localStorage.setItem(POSITION_HINT_KEY, next);
       void persist({ sidebar_position: next });
@@ -121,7 +130,7 @@ export const SidebarPreferencesProvider: React.FC<{ children: React.ReactNode }>
   );
 
   const toggleCollapsed = useCallback(() => {
-    userInteractedRef.current = true;
+    touchedRef.current.collapsed = true;
     setIsCollapsedState((prev) => {
       const next = !prev;
       localStorage.setItem(COLLAPSED_HINT_KEY, String(next));
@@ -132,7 +141,7 @@ export const SidebarPreferencesProvider: React.FC<{ children: React.ReactNode }>
 
   const setExpandedSection = useCallback(
     (section: string | null) => {
-      userInteractedRef.current = true;
+      touchedRef.current.section = true;
       setExpandedSectionState(section);
       void persist({ collapsed_sections: PERSISTED_SECTIONS.filter((s) => s !== section) });
     },

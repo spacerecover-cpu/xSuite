@@ -8,7 +8,7 @@ import { issueCreditNote, applyCreditNote, voidCreditNote } from '../../lib/cred
 import { RequirementFailuresPanel } from './RequirementFailuresPanel';
 import { parseRequirementFailures, type RequirementFailure } from '../../lib/taxDocumentService';
 import { logger } from '../../lib/logger';
-import { allocateLargestRemainder } from '../../lib/financialMath';
+import { allocateLargestRemainder, roundMoney } from '../../lib/financialMath';
 import { FileMinus, AlertTriangle, CheckCircle } from 'lucide-react';
 
 interface CreditNoteModalProps {
@@ -41,14 +41,34 @@ const REASON_OPTIONS: { value: string; label: string }[] = [
 
 const num = (v: number | null | undefined) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
-/** Reverse the invoice's VAT in proportion to the credited share, using the
- *  sanctioned splitter so the credited + remaining VAT sum exactly to the
- *  invoice VAT (no ad-hoc proration — xsuite/no-adhoc-money-allocation). */
-export function proratedVat(creditAmount: number, invoiceTax: number, invoiceTotal: number, decimals: number): number {
+/** Reverse the invoice's VAT in proportion to the credited share, on a CUMULATIVE
+ *  (running-total) basis so a SEQUENCE of partial credit notes reverses VAT that
+ *  sums EXACTLY to the invoice VAT once the invoice is fully credited. Each note
+ *  reverses the difference between the VAT owed on the new cumulative credited total
+ *  and the VAT already owed on the prior credited total (`alreadyCredited`), so the
+ *  per-note shares telescope to the invoice VAT — no residual minor unit is stranded
+ *  as it would be if each note re-prorated against the full invoice independently.
+ *  Uses the sanctioned splitter (no ad-hoc proration — xsuite/no-adhoc-money-allocation).
+ *  `alreadyCredited` defaults to 0 (the first / only credit note on the invoice). */
+export function proratedVat(
+  creditAmount: number,
+  invoiceTax: number,
+  invoiceTotal: number,
+  decimals: number,
+  alreadyCredited = 0,
+): number {
   if (invoiceTotal <= 0 || invoiceTax === 0) return 0;
-  const remaining = invoiceTotal - creditAmount;
-  const [creditedShare] = allocateLargestRemainder(invoiceTax, [creditAmount, Math.max(0, remaining)], decimals);
-  return creditedShare;
+  const vatOwedFor = (credited: number): number => {
+    const clamped = Math.min(Math.max(0, credited), invoiceTotal);
+    const [share] = allocateLargestRemainder(
+      invoiceTax,
+      [clamped, Math.max(0, invoiceTotal - clamped)],
+      decimals,
+    );
+    return share;
+  };
+  const prior = Math.max(0, alreadyCredited);
+  return roundMoney(vatOwedFor(prior + creditAmount) - vatOwedFor(prior), decimals);
 }
 
 export const CreditNoteModal: React.FC<CreditNoteModalProps> = ({ isOpen, onClose, invoice, onSaved }) => {
@@ -71,8 +91,16 @@ export const CreditNoteModal: React.FC<CreditNoteModalProps> = ({ isOpen, onClos
       ? Math.max(0, num(invoice.balance_due))
       : Math.max(0, total - num(invoice.amount_paid) - num(invoice.credited_amount)),
   );
-  // Reverse the invoice's VAT in proportion to the credited share of the total.
-  const taxAmount = proratedVat(amount, num(invoice.tax_amount), total, currencyFormat.decimalPlaces);
+  // Reverse the invoice's VAT in proportion to the credited share of the total, on a
+  // cumulative basis (accounting for VAT already reversed by prior credit notes) so a
+  // sequence of partial credits reverses VAT summing exactly to the invoice VAT.
+  const taxAmount = proratedVat(
+    amount,
+    num(invoice.tax_amount),
+    total,
+    currencyFormat.decimalPlaces,
+    num(invoice.credited_amount),
+  );
   const balanceAfter = roundMoney(balance - amount);
   const exceedsBalance = amount > balance + 1e-9;
   const settlesInFull = !exceedsBalance && amount > 0 && balanceAfter <= 0;

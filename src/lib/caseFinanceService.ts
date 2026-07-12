@@ -153,9 +153,10 @@ export async function getCasePayments(caseId: string): Promise<CasePayment[]> {
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
-  if (error) {
-    return [];
-  }
+  // A query failure must not masquerade as "no payments" — returning [] here would render
+  // the case Finances tab as if the customer never paid. Propagate the error, matching
+  // getCaseExpenses above.
+  if (error) throw error;
 
   type AllocationRow = {
     id: string;

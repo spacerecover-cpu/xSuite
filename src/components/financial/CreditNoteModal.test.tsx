@@ -41,6 +41,18 @@ describe('CreditNoteModal proratedVat', () => {
     // zero total → 0 (no divide-by-zero)
     expect(proratedVat(100, 0, 0, 3)).toBe(0);
   });
+
+  it('reverses VAT that sums exactly to the invoice VAT across a sequence of partial credits', () => {
+    // Invoice total 100.00, tax 10.00 (2dp). Three partial credits fully credit it.
+    // Prorating each independently against the full invoice strands 0.01 of VAT
+    // (3.33 + 3.33 + 3.33 = 9.99); the cumulative (running-total) basis telescopes to
+    // exactly 10.00. The 5th arg is the amount already credited before this note.
+    const cn1 = proratedVat(33.33, 10, 100, 2, 0);
+    const cn2 = proratedVat(33.33, 10, 100, 2, 33.33);
+    const cn3 = proratedVat(33.34, 10, 100, 2, 66.66);
+    expect([cn1, cn2, cn3]).toEqual([3.33, 3.34, 3.33]);
+    expect(cn1 + cn2 + cn3).toBeCloseTo(10, 6);
+  });
 });
 
 describe('CreditNoteModal issuance/allocation atomicity', () => {

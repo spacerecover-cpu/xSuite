@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import type { Database } from '../types/database.types';
-import { currentTenantToday } from './tenantToday';
+import { currentTenantToday, addDaysIso, addMonthsIso } from './tenantToday';
 
 type LeaveType = Database['public']['Tables']['master_leave_types']['Row'];
 type LeaveTypeInsert = Database['public']['Tables']['master_leave_types']['Insert'];
@@ -341,10 +341,13 @@ export const leaveService = {
   },
 
   async getLeaveStats(): Promise<LeaveStats> {
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-    const today = now.toISOString().split('T')[0];
+    // Boundaries derive from the tenant-local "today" (matching reviewed_date, which
+    // approve/reject stamp via currentTenantToday()). The prior new Date(...).toISOString()
+    // pattern used browser-local midnight cast to UTC, shifting the whole window back a day
+    // for any UTC+ tenant (e.g. Muscat, UTC+4) on month/day boundaries.
+    const today = await currentTenantToday();
+    const monthStart = `${today.slice(0, 7)}-01`;
+    const monthEnd = addDaysIso(addMonthsIso(monthStart, 1), -1);
 
     const [allRequests, pendingResult, approvedThisMonth, rejectedThisMonth, onLeaveToday] = await Promise.all([
       supabase.from('leave_requests').select('id', { count: 'exact', head: true }).is('deleted_at', null),

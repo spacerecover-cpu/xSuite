@@ -4,6 +4,9 @@
 -- column (400 on first item) and was non-atomic. SECURITY DEFINER + explicit
 -- tenant guard + FOR UPDATE, mirroring record_stock_usage_for_case /
 -- post_stock_adjustment. Writes the writable quantity_on_hand.
+-- purchase_order_items.received_quantity ACCUMULATES (COALESCE(...,0) + v_qty),
+-- mirroring the on_hand increment, so multi-shipment partial receipts stay in
+-- sync instead of the PO line reflecting only the last shipment.
 CREATE OR REPLACE FUNCTION public.receive_stock_from_po(p_purchase_order_id uuid, p_items jsonb)
 RETURNS integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
 AS $function$
@@ -46,7 +49,7 @@ BEGIN
       END LOOP;
     END IF;
     IF v_po_item_id IS NOT NULL THEN
-      UPDATE purchase_order_items SET stock_item_id = v_item_id, received_quantity = v_qty WHERE id = v_po_item_id AND tenant_id = v_tenant;
+      UPDATE purchase_order_items SET stock_item_id = v_item_id, received_quantity = COALESCE(received_quantity, 0) + v_qty WHERE id = v_po_item_id AND tenant_id = v_tenant;
     END IF;
     v_received := v_received + 1;
   END LOOP;

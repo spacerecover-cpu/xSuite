@@ -514,19 +514,19 @@ export async function getCurrentUsage(tenantId: string): Promise<UsageMetrics> {
   return {
     users: {
       current: usersResult.count || 0,
-      limit: featureMap.get('max_users')?.limit_value || null,
+      limit: featureMap.get('max_users')?.limit_value ?? null,
     },
     cases: {
       current: casesResult.count || 0,
-      limit: featureMap.get('max_cases_per_month')?.limit_value || null,
+      limit: featureMap.get('max_cases_per_month')?.limit_value ?? null,
     },
     storage_gb: {
       current: parseFloat(storageGb.toFixed(2)),
-      limit: featureMap.get('storage_gb')?.limit_value || null,
+      limit: featureMap.get('storage_gb')?.limit_value ?? null,
     },
     branches: {
       current: branchesResult.count || 0,
-      limit: featureMap.get('multi_branch')?.limit_value || null,
+      limit: featureMap.get('multi_branch')?.limit_value ?? null,
     },
   };
 }
@@ -600,7 +600,7 @@ export async function getFeatureLimit(
     .is('deleted_at', null)
     .maybeSingle();
 
-  return data?.limit_value || null;
+  return data?.limit_value ?? null;
 }
 
 export async function validateCoupon(
@@ -639,12 +639,16 @@ export async function getBillingStats(): Promise<BillingStats> {
     `)
     .is('deleted_at', null);
 
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
   const { data: invoices } = await supabase
     .from('billing_invoices')
     .select('total, status, paid_at')
     .eq('status', 'paid')
     .is('deleted_at', null)
-    .gte('paid_at', new Date(new Date().setDate(1)).toISOString());
+    .gte('paid_at', startOfMonth.toISOString());
 
   let mrr = 0;
   let activeCount = 0;

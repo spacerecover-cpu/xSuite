@@ -210,8 +210,12 @@ export async function getCasesForAssignment(): Promise<CaseOption[]> {
     `
     )
     .in('status', activeStatusNames)
-    .order('created_at', { ascending: false })
-    .limit(100);
+    .is('deleted_at', null)
+    // No row cap: the picker (AssignToCaseModal) loads this list into state and
+    // filters it client-side, so any cap silently hides older still-active cases
+    // from busy labs — breaking the donor→case linkage for those jobs. The result
+    // is already bounded by active-workflow statuses, deleted_at, and tenant RLS.
+    .order('created_at', { ascending: false });
 
   if (error) {
     logger.error('Error fetching cases for assignment:', error);

@@ -246,7 +246,7 @@ export async function checkUsageLimit(limitKey: UsageLimitKey): Promise<UsageLim
       current = count || 0;
 
       const branchLimit = planCache?.features.get('multi_branch');
-      limit = branchLimit?.limit || null;
+      limit = branchLimit?.limit ?? null;
       break;
     }
 
