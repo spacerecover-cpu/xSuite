@@ -460,14 +460,24 @@ const AllocateBalanceModal: React.FC<AllocateBalanceModalProps> = ({
     }
     setSubmitting(true);
     try {
+      // Re-allocating an existing balance must preserve already-consumed days
+      // (used_days is incremented by approvals). Resetting it to 0 would wipe the
+      // ledger and permanently desync it against approved requests. Look up the
+      // existing balance and carry its used_days forward, recomputing remaining.
+      const existing = await leaveService.getEmployeeLeaveBalance(
+        form.employee_id,
+        form.leave_type_id,
+        form.year,
+      );
+      const usedDays = existing?.used_days ?? 0;
       await leaveService.upsertLeaveBalance({
         tenant_id: tenantId,
         employee_id: form.employee_id,
         leave_type_id: form.leave_type_id,
         year: form.year,
         total_days: form.total_days,
-        used_days: 0,
-        remaining_days: form.total_days,
+        used_days: usedDays,
+        remaining_days: form.total_days - usedDays,
       });
       toast.success('Leave balance allocated');
       setForm({ employee_id: '', leave_type_id: '', year: CURRENT_YEAR, total_days: 0 });

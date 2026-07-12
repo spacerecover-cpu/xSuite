@@ -106,6 +106,37 @@ describe('PhoneInput', () => {
     expect(onChangeSpy).toHaveBeenLastCalledWith('+44 7');
   });
 
+  describe('country-search Space handling (regression)', () => {
+    it('lets a literal space type into the filter so multi-word country names are searchable', async () => {
+      const user = userEvent.setup();
+      render(<Harness />);
+      await user.click(screen.getByRole('combobox'));
+      const search = screen.getByPlaceholderText('Search country or code...');
+      await user.type(search, 'United A');
+      // The space between "United" and "A" must reach the filter. If Space were
+      // swallowed by the shared listbox handler the term would be "UnitedA",
+      // which matches nothing; only "United Arab Emirates" contains "united a".
+      expect(search).toHaveValue('United A');
+      const options = screen.getAllByRole('option');
+      expect(options).toHaveLength(1);
+      expect(options[0]).toHaveTextContent('United Arab Emirates');
+    });
+
+    it('pressing Space with a highlighted option types a space instead of committing the dial code', async () => {
+      const user = userEvent.setup();
+      const onChangeSpy = vi.fn();
+      render(<Harness onChangeSpy={onChangeSpy} />);
+      await user.click(screen.getByRole('combobox'));
+      const search = screen.getByPlaceholderText('Search country or code...');
+      search.focus();
+      await user.keyboard('{ArrowDown}'); // highlight the first option (activeIndex 0)
+      await user.keyboard(' '); // Space must NOT select the highlighted dial code
+      expect(onChangeSpy).not.toHaveBeenCalled();
+      expect(screen.getByRole('listbox')).toBeInTheDocument();
+      expect(search).toHaveValue(' ');
+    });
+  });
+
   describe('RTL logical utilities (Phase 4a proof slice)', () => {
     it('required asterisk uses logical ms-1, not physical ml-1', () => {
       render(

@@ -18,6 +18,7 @@ import {
   generateCashFlowReport,
   generateInvoiceSummaryReport,
   generateRevenueByCustomerReport,
+  generateAgedReceivablesReport,
 } from './financialReportsService';
 
 /** Thenable query builder: chainable filters; awaiting it yields {data}. */
@@ -29,6 +30,7 @@ function makeQuery(rows: Array<Record<string, unknown>>) {
     is: vi.fn(() => builder),
     in: vi.fn(() => builder),
     eq: vi.fn(() => builder),
+    gt: vi.fn(() => builder),
     not: vi.fn(() => builder),
     then: (resolve: (v: { data: unknown; error: null }) => void) =>
       resolve({ data: rows, error: null }),
@@ -170,6 +172,45 @@ describe('generateInvoiceSummaryReport (Bug 48 — soft-deleted invoices/quotes 
     expect(invoices.is).toHaveBeenCalledWith('deleted_at', null);
     expect(quotes.is).toHaveBeenCalledWith('deleted_at', null);
     expect(report.totals.invoiced).toBe(2000);
+  });
+
+  it('excludes proforma & converted rows from money totals but keeps them in the byType breakdown (Bug 10 — no AR double-count)', async () => {
+    const invoices = makeQuery([
+      // A standalone sent proforma owes nothing yet (balance_due = total, payments blocked).
+      { status: 'sent', invoice_type: 'proforma', total_amount: 630, amount_paid: 0, balance_due: 630 },
+      // A converted proforma keeps its balance_due — but is the SAME bill as the tax invoice.
+      { status: 'converted', invoice_type: 'proforma', total_amount: 630, amount_paid: 0, balance_due: 630 },
+      // ...the tax invoice it became is the real accounts-receivable.
+      { status: 'sent', invoice_type: 'tax_invoice', total_amount: 630, amount_paid: 0, balance_due: 630 },
+    ]);
+    const quotes = makeQuery([]);
+    from.mockImplementation((table: string) => (table === 'invoices' ? invoices : quotes));
+
+    const report = await generateInvoiceSummaryReport('2026-01-01', '2026-12-31');
+
+    // Only the single tax invoice is real AR — not 1,890 (3 × 630).
+    expect(report.totals.invoiced).toBe(630);
+    expect(report.totals.outstanding).toBe(630);
+    // The byType breakdown still surfaces both proforma rows (informational).
+    expect(report.byType.find(t => t.type === 'Proforma')?.count).toBe(2);
+    expect(report.byType.find(t => t.type === 'Tax Invoice')?.count).toBe(1);
+  });
+});
+
+describe('generateAgedReceivablesReport (Bug 9 — proforma invoices are not accounts-receivable)', () => {
+  it('ages only real tax invoices — the query filters invoice_type', async () => {
+    const invoices = makeQuery([
+      { id: 'i1', invoice_date: '2026-06-01', due_date: '2026-06-15', balance_due: 630,
+        customer: { id: 'c1', customer_name: 'Acme' } },
+    ]);
+    from.mockImplementation(() => invoices);
+
+    const report = await generateAgedReceivablesReport();
+
+    // Without this filter a sent proforma reliably matches (status 'sent',
+    // balance_due > 0) and is bucketed as money owed.
+    expect(invoices.eq).toHaveBeenCalledWith('invoice_type', 'tax_invoice');
+    expect(report.totals.total).toBe(630);
   });
 });
 

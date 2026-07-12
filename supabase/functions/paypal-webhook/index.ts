@@ -224,15 +224,30 @@ Deno.serve(async (req: Request) => {
       }
 
       case "BILLING.SUBSCRIPTION.SUSPENDED": {
-        await supabase
+        // Map SUSPENDED to 'past_due'. 'paused' is NOT permitted by
+        // tenant_subscriptions_status_check / tenants_subscription_status_check
+        // (both allow only trialing/active/past_due/cancelled/unpaid), so writing
+        // 'paused' was silently rejected by Postgres and the row kept its prior
+        // 'active' status — leaving a suspended, non-paying tenant fully entitled.
+        // 'past_due' is constraint-valid and, like the PAYMENT.FAILED handler,
+        // falls outside ACTIVE_SUBSCRIPTION_STATUSES so entitlement is revoked.
+        const { error: subError } = await supabase
           .from("tenant_subscriptions")
-          .update({ status: 'paused' })
+          .update({ status: 'past_due' })
           .eq("tenant_id", tenantId);
 
-        await supabase
+        if (subError) {
+          console.error("Failed to suspend tenant_subscriptions status:", subError);
+        }
+
+        const { error: tenantError } = await supabase
           .from("tenants")
-          .update({ subscription_status: 'paused' })
+          .update({ subscription_status: 'past_due' })
           .eq("id", tenantId);
+
+        if (tenantError) {
+          console.error("Failed to suspend tenants subscription_status:", tenantError);
+        }
 
         break;
       }

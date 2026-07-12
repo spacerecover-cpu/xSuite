@@ -11,6 +11,7 @@ import {
   calculateHealthScore,
   recordHealthMetrics,
   getTenantDetails,
+  getDashboardStats,
 } from './platformAdminService';
 
 /**
@@ -155,6 +156,55 @@ function expectAllScoped(builders: Array<Record<string, unknown>> | undefined, t
     expect(q.eq).toHaveBeenCalledWith('tenant_id', tenantId);
   }
 }
+
+/**
+ * Regression for bug 13 — MRR/ARR billing_interval value mismatch. tenant_subscriptions.
+ * billing_interval is CHECK-constrained to 'month'|'year' (never 'monthly'/'annual'), so the
+ * old literals matched zero rows and mrr/arr collapsed to $0. The mrr query must filter on
+ * 'month' and the annual query on 'year' to sum any revenue at all.
+ */
+function makeIntervalAwareSubscriptionQuery() {
+  let billingInterval: string | undefined;
+  const builder: Record<string, unknown> = {
+    select: vi.fn(() => builder),
+    eq: vi.fn((col: string, val: string) => {
+      if (col === 'billing_interval') billingInterval = val;
+      return builder;
+    }),
+    gte: vi.fn(() => builder),
+    in: vi.fn(() => builder),
+    is: vi.fn(() => builder),
+    then: (resolve: (v: { data: unknown; count: number | null; error: null }) => void) => {
+      let data: Array<Record<string, unknown>>;
+      if (billingInterval === 'month') {
+        data = [{ subscription_plans: { price_monthly: 100 } }];
+      } else if (billingInterval === 'year') {
+        data = [{ subscription_plans: { price_yearly: 1200 } }];
+      } else if (billingInterval !== undefined) {
+        data = []; // non-canonical literal (e.g. 'monthly'/'annual') matches nothing, like the DB
+      } else {
+        data = [{ status: 'active' }, { status: 'active' }, { status: 'trialing' }];
+      }
+      resolve({ data, count: null, error: null });
+    },
+  };
+  return builder;
+}
+
+describe('getDashboardStats (bug 13 — billing_interval must be month/year, not monthly/annual)', () => {
+  it('sums monthly + annualized revenue instead of collapsing MRR/ARR to $0', async () => {
+    from.mockImplementation((table: string) => {
+      if (table === 'tenant_subscriptions') return makeIntervalAwareSubscriptionQuery();
+      return makeQuery({ data: [], count: 0 });
+    });
+
+    const stats = await getDashboardStats();
+
+    // price_monthly 100 + price_yearly 1200/12 (100) = mrr 200; arr = 200 * 12 = 2400.
+    expect(stats.mrr).toBe(200);
+    expect(stats.arr).toBe(2400);
+  });
+});
 
 describe('tenant scoping (bugs 60/61/62 — platform admin bypasses RLS)', () => {
   it('getTenantDetails scopes the cases count to the tenant', async () => {

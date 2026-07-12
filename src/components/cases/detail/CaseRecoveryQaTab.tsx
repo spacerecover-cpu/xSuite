@@ -83,6 +83,12 @@ export const CaseRecoveryQaTab: React.FC<{ caseId: string }> = ({ caseId }) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['case_recovery_attempts', caseId] });
+      // recordRecoveryAttempt aggregates every attempt and writes
+      // cases.recovery_outcome directly, so the page-level ['case', id] query
+      // (created in useCaseQueries) must be refreshed too — otherwise its stale
+      // recovery_outcome seeds the Device Checkout dropdown (clobbering the DB on
+      // passive checkout) and drives the wrong Rule 51 refund gate.
+      queryClient.invalidateQueries({ queryKey: ['case', caseId] });
       setMethod('');
       setToolUsed('');
       setResult('success');
@@ -106,6 +112,9 @@ export const CaseRecoveryQaTab: React.FC<{ caseId: string }> = ({ caseId }) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['case_qa_checklists', caseId] });
+      // Keep the page-level case query in sync with QA-driven state (release
+      // readiness / status gating derives from QA evidence).
+      queryClient.invalidateQueries({ queryKey: ['case', caseId] });
       toast.success('QA result recorded');
     },
     onError: (e: Error) => toast.error(`Failed to record QA: ${e.message}`),

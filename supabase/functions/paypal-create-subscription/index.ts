@@ -253,7 +253,11 @@ Deno.serve(async (req: Request) => {
       .upsert({
         tenant_id: tenantId,
         plan_id: planId,
-        status: 'pending',
+        // Must be one of tenant_subscriptions_status_check
+        // ('trialing','active','past_due','cancelled','unpaid'). The subscription
+        // is created but not yet approved/billed; the ACTIVATED webhook promotes
+        // it to 'active'. 'pending' is NOT a valid status and fails the CHECK.
+        status: 'trialing',
         billing_interval: billingInterval,
         paypal_subscription_id: subscriptionData.id,
         created_at: new Date().toISOString(),
@@ -262,7 +266,34 @@ Deno.serve(async (req: Request) => {
       });
 
     if (upsertError) {
+      // The local row is the system of record the ACTIVATED /
+      // PAYMENT.SALE.COMPLETED webhooks and paypal-cancel-subscription rely on
+      // (keyed by tenant_id / paypal_subscription_id). If we can't persist it,
+      // handing back an approvalUrl would let the subscriber approve and get
+      // billed for a subscription we can't track. Best-effort cancel the
+      // just-created PayPal subscription, then fail the request instead of
+      // returning 200 with an approval URL.
       console.error("Failed to save subscription:", upsertError);
+
+      try {
+        await fetch(
+          `${paypalApiUrl}/v1/billing/subscriptions/${subscriptionData.id}/cancel`,
+          {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              reason: "Local subscription record could not be created",
+            }),
+          }
+        );
+      } catch (cancelError) {
+        console.error("Failed to cancel orphaned PayPal subscription:", cancelError);
+      }
+
+      throw new Error("Failed to persist subscription record");
     }
 
     const approvalUrl = subscriptionData.links?.find(

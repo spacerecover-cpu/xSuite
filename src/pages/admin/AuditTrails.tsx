@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { AuditCustodyFeed } from '../../components/cases/AuditCustodyFeed';
+import { fetchCustodyFeed } from '../../lib/chainOfCustodyService';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -12,6 +13,11 @@ import { format } from 'date-fns';
 import { useListPageSize } from '../../hooks/useListPageSize';
 
 type BadgeTone = 'success' | 'info' | 'danger' | 'secondary';
+
+// Mirrors AuditCustodyFeed's internal PAGE_SIZE so the parent-side custody query
+// shares React Query's cache entry (identical queryKey → single fetch) and the
+// Pager's page math matches the page size the feed actually renders with.
+const CUSTODY_PAGE_SIZE = 50;
 
 // Static tone map so Tailwind JIT can see every chip class literally. Dynamic
 // `bg-${color}-100` strings were stripped at build time, leaving invisible chips.
@@ -52,7 +58,7 @@ export const AuditTrails: React.FC = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [actionFilter, debouncedSearch, pageSize]);
+  }, [actionFilter, debouncedSearch, pageSize, scope]);
 
   const { data, isLoading: loading } = useQuery({
     queryKey: ['audit_trails', actionFilter, debouncedSearch, page, pageSize],
@@ -103,6 +109,24 @@ export const AuditTrails: React.FC = () => {
 
   const trails = data?.rows ?? [];
   const total = data?.total ?? 0;
+
+  // Parent-side custody query. Same queryKey/params as AuditCustodyFeed so React
+  // Query serves both from one cache entry (no extra fetch); this lifts the
+  // accurate {rows,total,loading} to the page so the Pager, loading and empty
+  // states track the custody feed instead of the disabled system-audit query.
+  const { data: custodyData, isLoading: custodyLoading } = useQuery({
+    queryKey: ['custody_feed', debouncedSearch, page],
+    enabled: scope === 'custody',
+    queryFn: () =>
+      fetchCustodyFeed({ page, pageSize: CUSTODY_PAGE_SIZE, search: debouncedSearch || undefined }),
+    placeholderData: keepPreviousData,
+  });
+
+  const isCustody = scope === 'custody';
+  const activeLoading = isCustody ? custodyLoading : loading;
+  const activeTotal = isCustody ? custodyData?.total ?? 0 : total;
+  const activeRowCount = isCustody ? custodyData?.rows.length ?? 0 : trails.length;
+  const activePageSize = isCustody ? CUSTODY_PAGE_SIZE : pageSize;
 
   const getActionIcon = (action: string) => {
     switch (action) {
@@ -206,10 +230,10 @@ export const AuditTrails: React.FC = () => {
     <ListPageTemplate
       title="Audit Trails"
       toolbar={toolbar}
-      table={scope === 'custody' ? <AuditCustodyFeed page={page} onPageChange={setPage} search={debouncedSearch} /> : table}
-      pager={{ page, pageSize, total, onPageChange: setPage, itemNoun: 'entries' }}
-      loading={loading}
-      isEmpty={!loading && trails.length === 0}
+      table={isCustody ? <AuditCustodyFeed page={page} onPageChange={setPage} search={debouncedSearch} /> : table}
+      pager={{ page, pageSize: activePageSize, total: activeTotal, onPageChange: setPage, itemNoun: 'entries' }}
+      loading={activeLoading}
+      isEmpty={!activeLoading && activeRowCount === 0}
       empty={
         <div className="text-center py-12">
           <p className="text-slate-500">No audit trails found</p>

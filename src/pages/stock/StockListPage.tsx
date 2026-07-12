@@ -152,7 +152,7 @@ export const StockListPage: React.FC = () => {
   };
 
   const handleViewDetail = (item: StockItemWithCategory) => {
-    navigate(`/resources/stock/${item.id}`);
+    navigate(`/stock/${item.id}`);
   };
 
   const handleReceive = (item: StockItemWithCategory) => {
@@ -216,7 +216,7 @@ export const StockListPage: React.FC = () => {
   const handleBarcodeItemFound = (item: StockItemWithCategory) => {
     setScanModalOpen(false);
     toast.success(`Found: ${item.name}`);
-    navigate(`/resources/stock/${item.id}`);
+    navigate(`/stock/${item.id}`);
   };
 
   const openBulkAdjust = () => {
@@ -269,13 +269,13 @@ export const StockListPage: React.FC = () => {
             <CheckSquare className="w-4 h-4" />
             {selectionMode ? 'Exit Select' : 'Bulk Select'}
           </Button>
-          <Link to="/resources/stock/adjustments">
+          <Link to="/stock/adjustments">
             <Button variant="secondary" size="sm" className="gap-2">
               <ClipboardList className="w-4 h-4" />
               Adjustments
             </Button>
           </Link>
-          <Link to="/resources/stock/categories">
+          <Link to="/stock/categories">
             <Button variant="secondary" size="sm" className="gap-2">
               <Settings className="w-4 h-4" />
               Categories
@@ -317,7 +317,7 @@ export const StockListPage: React.FC = () => {
               icon={TrendingDown}
               onClick={() => {
                 setActiveTab('low_stock');
-                navigate('/resources/stock?filter=low-stock');
+                navigate('/stock?filter=low-stock');
               }}
             />
             <StatCard

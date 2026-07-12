@@ -201,6 +201,22 @@ describe('workbookContract — structural invariants', () => {
     expect(ref?.ref).toBe('cases');
   });
 
+  // Regression: the 'Performed At' cell is delivered to data_migration_import_batch under
+  // its ColumnDef.key. The RPC's statusHistory branch reads the original timestamp from
+  // `performed_at` (COALESCE((v_row->>'performed_at')::timestamptz, now())) and the export
+  // RPC emits `performed_at`. When this column was keyed `created_at`, the RPC's lookup was
+  // always NULL, so every imported case_job_history event collapsed to the import instant —
+  // rewriting the chronology of an append-only/forensic table.
+  it("statusHistory keys its 'Performed At' column as performed_at (matches the import/export RPC)", () => {
+    const cols = ENTITY_COLUMNS['statusHistory'];
+    const dateCols = cols.filter(c => c.type === 'date');
+    expect(dateCols).toHaveLength(1);
+    expect(dateCols[0].header).toBe('Performed At');
+    expect(dateCols[0].key).toBe('performed_at');
+    // The stale `created_at` key must not linger — the RPC never reads it on this entity.
+    expect(cols.some(c => c.key === 'created_at')).toBe(false);
+  });
+
   it('devices has catalog string columns: device_type, brand, capacity, interface, condition', () => {
     const devCols = ENTITY_COLUMNS['devices'];
     for (const key of ['device_type', 'brand', 'capacity', 'interface', 'condition']) {

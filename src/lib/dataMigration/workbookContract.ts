@@ -663,6 +663,11 @@ export const ENTITY_COLUMNS: Record<EntityType, ColumnDef[]> = {
   // ── statusHistory (→ case_job_history table) ──────────────────────────────
   // case_job_history is append-only (mutation guard in DB). The engine only
   // INSERTs here — never UPDATE/DELETE — preserving forensic integrity.
+  // The timestamp key is `performed_at` (NOT `created_at` like every other
+  // entity): the import RPC reads case_job_history.created_at from the row's
+  // `performed_at` key and the export RPC emits `performed_at`. Keying it
+  // `created_at` would strand the original timestamp and collapse every
+  // imported event to the import instant.
   statusHistory: [
     { key: 'legacy_id',      header: 'Record Ref',      type: 'string',  required: true },
     { key: 'case_legacy_id', header: 'Case Record Ref', type: 'string',  required: true, ref: 'cases' },
@@ -670,7 +675,7 @@ export const ENTITY_COLUMNS: Record<EntityType, ColumnDef[]> = {
     { key: 'old_value',      header: 'Old Value',      type: 'string' },
     { key: 'new_value',      header: 'New Value',      type: 'string' },
     { key: 'details',        header: 'Details',        type: 'string' },
-    { key: 'created_at',     header: 'Performed At',   type: 'date' },
+    { key: 'performed_at',   header: 'Performed At',   type: 'date' },
   ],
 
   // ── inventoryLocations (→ inventory_locations table) ──────────────────────

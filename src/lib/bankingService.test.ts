@@ -294,3 +294,69 @@ describe('allocateReceiptToInvoice — canonical status vocabulary + fail-loud (
     ).rejects.toBeTruthy();
   });
 });
+
+describe('createReceiptWithAllocations — atomic RPC credits the deposit account & posts income (BUG-7)', () => {
+  beforeEach(() => {
+    rpc.mockReset();
+  });
+
+  it('routes through create_receipt_with_allocations, carrying the selected deposit account as bank_account_id', async () => {
+    rpc.mockResolvedValue({
+      data: { id: 'r-1', receipt_number: 'RCPT-1', amount: 1000, status: 'completed' },
+      error: null,
+    });
+
+    const result = await bankingService.createReceiptWithAllocations(
+      {
+        amount: 1000,
+        receipt_date: '2026-07-12',
+        customer_id: 'cust-1',
+        account_id: 'acc-main-checking',
+        payment_method_id: 'pm-1',
+        reference_number: 'CHK-42',
+        notes: 'n',
+        status: 'completed',
+      },
+      [{ invoice_id: 'inv-100', allocated_amount: 1000 }],
+    );
+
+    // The whole point of the fix: invoice recompute, the bank-account balance
+    // credit, and the single append-only income posting must be ONE server
+    // transaction — never a client-side invoice update with the cash/ledger
+    // side skipped. The old body dropped account_id entirely, so the chosen
+    // deposit account was never credited.
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith('create_receipt_with_allocations', {
+      p_receipt: expect.objectContaining({
+        amount: 1000,
+        bank_account_id: 'acc-main-checking',
+        customer_id: 'cust-1',
+        payment_method: 'pm-1',
+        reference: 'CHK-42',
+        status: 'completed',
+      }),
+      p_allocations: [{ invoice_id: 'inv-100', amount: 1000 }],
+    });
+    // must no longer hand-roll the receipt/allocation/invoice writes client-side
+    expect(from).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ id: 'r-1' });
+  });
+
+  it('throws (nothing presented as recorded) when the atomic RPC rejects', async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'money conservation violated' } });
+
+    await expect(
+      bankingService.createReceiptWithAllocations(
+        { amount: 500, account_id: 'acc-1' },
+        [{ invoice_id: 'inv-1', allocated_amount: 500 }],
+      ),
+    ).rejects.toBeTruthy();
+  });
+
+  it('rejects an unallocated receipt instead of recording cash the ledger cannot attribute', async () => {
+    await expect(
+      bankingService.createReceiptWithAllocations({ amount: 500, account_id: 'acc-1' }, []),
+    ).rejects.toThrow(/at least one invoice/);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});

@@ -391,6 +391,17 @@ describe('line-item mappers (replace the old as-unknown-as array casts)', () => 
     expect(result[0].line_total).toBe(900);
   });
 
+  it('toInvoiceItems rounds line_total at the currency decimalPlaces (3 for OMR) so lines reconcile with the stored Subtotal', () => {
+    // OMR (3 dp). qty=1, unit_price=10.125 → net 10.125. With the default 2-dp rounding
+    // this collapsed to 10.13 and the printed lines (10.130 + 10.130 = 20.260) no longer
+    // summed to the stored Subtotal 20.250. Threading decimalPlaces=3 preserves 10.125.
+    const result = toInvoiceItems(
+      [{ id: 'li1', description: 'Imaging', quantity: 1, unit_price: 10.125, tax_rate: 0 }],
+      3,
+    );
+    expect(result[0].line_total).toBe(10.125);
+  });
+
   it('both mappers return [] for null/undefined input', () => {
     expect(toQuoteItems(null)).toEqual([]);
     expect(toInvoiceItems(undefined)).toEqual([]);

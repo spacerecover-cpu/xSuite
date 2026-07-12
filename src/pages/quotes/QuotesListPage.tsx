@@ -756,7 +756,9 @@ export const QuotesListPage: React.FC = () => {
                 bank_account_id: typeof quoteData.bank_account_id === 'string' ? quoteData.bank_account_id : null,
                 terms: termsValue ?? undefined,
                 notes: notesValue ?? undefined,
-                currency: typeof currencyConfig.code === 'string' ? currencyConfig.code : undefined,
+                currency: typeof quoteData.currency === 'string' && quoteData.currency
+                  ? quoteData.currency
+                  : (typeof currencyConfig.code === 'string' ? currencyConfig.code : undefined),
               };
 
               const quoteItems: QuoteItemShape[] = items.map((item, index) => ({

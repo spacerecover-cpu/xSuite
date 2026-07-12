@@ -46,32 +46,33 @@ vi.mock('../../contexts/TenantConfigContext', () => ({
 // code under test) with a fixed "create" payload, same shape QuoteFormModal
 // produces (see QuoteFormModal.tsx handleSubmit).
 vi.mock('../../components/cases/QuoteFormModal', () => ({
-  QuoteFormModal: ({ onSave }: { onSave: (data: Record<string, unknown>, items: unknown[]) => Promise<void> }) => (
-    <button
-      onClick={() =>
-        onSave(
-          {
-            case_id: 'case-1',
-            customer_id: 'customer-1',
-            company_id: null,
-            status: 'draft',
-            title: 'SSD Data Recovery',
-            client_reference: null,
-            valid_until: null,
-            tax_rate: 5,
-            discount_amount: 0,
-            discount_type: 'fixed',
-            bank_account_id: null,
-            terms_and_conditions: null,
-            notes: null,
-          },
-          [{ description: 'Logical recovery', quantity: 1, unit_price: 200 }],
-        )
-      }
-    >
-      Trigger Quote Save
-    </button>
-  ),
+  QuoteFormModal: ({ onSave }: { onSave: (data: Record<string, unknown>, items: unknown[]) => Promise<void> }) => {
+    const basePayload = {
+      case_id: 'case-1',
+      customer_id: 'customer-1',
+      company_id: null,
+      status: 'draft',
+      title: 'SSD Data Recovery',
+      client_reference: null,
+      valid_until: null,
+      tax_rate: 5,
+      discount_amount: 0,
+      discount_type: 'fixed',
+      bank_account_id: null,
+      terms_and_conditions: null,
+      notes: null,
+    };
+    const items = [{ description: 'Logical recovery', quantity: 1, unit_price: 200 }];
+    return (
+      <>
+        <button onClick={() => onSave(basePayload, items)}>Trigger Quote Save</button>
+        {/* Multi-currency tenant: the functional-currency <select> picked EUR. */}
+        <button onClick={() => onSave({ ...basePayload, currency: 'EUR' }, items)}>
+          Trigger Quote Save EUR
+        </button>
+      </>
+    );
+  },
 }));
 
 // quotesService: mock only the list-fetch/stats seams the page needs to render
@@ -244,6 +245,30 @@ describe('QuotesListPage — New Quote create path stamps rate/base (T17 monitor
     expect(insertedRow.subtotal_base).not.toBeNull();
     expect(insertedRow.tax_amount_base).not.toBeNull();
     expect(insertedRow.total_amount_base).not.toBeNull();
+  });
+});
+
+// Regression guard for finding #22: the create branch hardcoded the new quote's
+// `currency` to currencyConfig.code (the tenant BASE currency) instead of the
+// user-selected quoteData.currency from the modal's functional-currency <select>.
+// On a multi-currency tenant, picking EUR then saving persisted the quote as USD
+// at rate 1 — the stored/PDF total no longer matched what the user selected/saw.
+// The fix threads quoteData.currency through, falling back to base only when the
+// modal sent no explicit selection.
+describe('QuotesListPage — New Quote honours the modal-selected functional currency', () => {
+  it('passes the user-picked currency (EUR) to createQuote, not the tenant base (USD)', async () => {
+    vi.mocked(createQuote).mockClear();
+
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Create Quote' }));
+    await user.click(await screen.findByRole('button', { name: 'Trigger Quote Save EUR' }));
+
+    await waitFor(() => expect(vi.mocked(createQuote)).toHaveBeenCalledTimes(1));
+    const [quoteArg] = vi.mocked(createQuote).mock.calls[0];
+    // Must be the selected currency — NOT overridden with currencyConfig.code.
+    expect(quoteArg.currency).toBe('EUR');
   });
 });
 

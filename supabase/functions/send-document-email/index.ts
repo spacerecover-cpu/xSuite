@@ -173,9 +173,39 @@ Deno.serve(async (req: Request) => {
 
     const { data: userProfile } = await supabaseClient
       .from("profiles")
-      .select("tenant_id")
+      .select("tenant_id, role")
       .eq("id", user.id)
       .maybeSingle();
+
+    // Tenant-isolation gate: log_case_communication runs under the service-role
+    // client (auth.uid() is NULL), so the RPC's own "guard user-context callers to
+    // their own tenant" check does not fire — it would happily write into whichever
+    // tenant owns the case. Enforce ownership here before we act on body.caseId.
+    // Platform admins (role owner/admin with NULL tenant_id) are exempt.
+    if (body.caseId) {
+      const isPlatformAdmin =
+        userProfile?.tenant_id == null &&
+        (userProfile?.role === "owner" || userProfile?.role === "admin");
+
+      if (!isPlatformAdmin) {
+        const { data: caseRow } = await supabaseClient
+          .from("cases")
+          .select("tenant_id")
+          .eq("id", body.caseId)
+          .is("deleted_at", null)
+          .maybeSingle();
+
+        if (!caseRow || caseRow.tenant_id !== userProfile?.tenant_id) {
+          return new Response(
+            JSON.stringify({ error: "Forbidden: case does not belong to your tenant" }),
+            {
+              status: 403,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+      }
+    }
 
     const { data: companySettings } = await supabaseClient
       .from("company_settings")

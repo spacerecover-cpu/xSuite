@@ -311,7 +311,15 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
                       setSearchTerm(e.target.value);
                       setActiveIndex(-1);
                     }}
-                    onKeyDown={onKeyDown}
+                    onKeyDown={(e) => {
+                      // Let a literal space type into the filter; the shared
+                      // listbox handler preventDefaults Space (select), which
+                      // would otherwise swallow spaces in multi-word country
+                      // names (e.g. "Saudi Arabia") or commit the highlighted
+                      // dial code.
+                      if (e.key === ' ') return;
+                      onKeyDown(e);
+                    }}
                   />
                 </div>
               </div>

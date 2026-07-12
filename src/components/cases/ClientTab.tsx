@@ -205,15 +205,20 @@ export const ClientTab: React.FC<ClientTabProps> = ({ caseId, caseData }) => {
 
       if (error) throw error;
 
-      // Log the change in history
-      await supabase.rpc('log_case_history', {
+      // Log the change in history. (The RPC takes p_details text — the previous
+      // p_details_json arg didn't exist, so this call failed silently.)
+      const { error: historyError } = await supabase.rpc('log_case_history', {
         p_case_id: caseId,
         p_action: 'CLIENT_CHANGED',
-        p_details_json: {
+        p_details: JSON.stringify({
           old_customer_id: caseData?.customer_id,
           new_customer_id: newCustomerId,
-        },
+        }),
+        p_old_value: caseData?.customer_id ?? undefined,
+        p_new_value: newCustomerId ?? undefined,
       });
+
+      if (historyError) throw historyError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['case', caseId] });

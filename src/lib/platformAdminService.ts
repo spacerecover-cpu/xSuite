@@ -67,13 +67,13 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     .from('tenant_subscriptions')
     .select('subscription_plans(price_monthly)')
     .eq('status', 'active')
-    .eq('billing_interval', 'monthly');
+    .eq('billing_interval', 'month');
 
   const annualCalc = await supabase
     .from('tenant_subscriptions')
     .select('subscription_plans(price_yearly)')
     .eq('status', 'active')
-    .eq('billing_interval', 'annual');
+    .eq('billing_interval', 'year');
 
   const mrr = (mrrCalc.data || []).reduce(
     (sum, sub) => sum + (sub.subscription_plans?.price_monthly ?? 0),

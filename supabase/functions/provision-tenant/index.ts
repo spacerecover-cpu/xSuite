@@ -71,6 +71,55 @@ interface ProvisionTenantRequest {
   timezone?: string;
 }
 
+// Look up an existing auth user by email across ALL pages. auth.admin.listUsers()
+// with no PageParams returns only page 1 at GoTrue's default perPage of 50, so any
+// account past the first 50 was invisible — silently breaking existing-user
+// detection, the "already owns a tenant" 409, and the update-in-place branch, and
+// pushing returning owners onto the createUser path where the duplicate email
+// throws a 500. We page until the email is found or the list is exhausted, using
+// GoTrue's own nextPage signal (from the Link header) so a server-capped perPage
+// cannot cause an early exit that misses users.
+async function findAuthUserByEmail(
+  supabase: ReturnType<typeof createClient>,
+  email: string
+): Promise<{ id: string; email?: string } | undefined> {
+  const target = email.toLowerCase();
+  const perPage = 1000;
+  for (let page = 1; ; page++) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+    if (error) throw error;
+    const users = (data?.users ?? []) as Array<{ id: string; email?: string }>;
+    const match = users.find((u) => u.email?.toLowerCase() === target);
+    if (match) return match;
+    const nextPage = (data as { nextPage?: number | null } | null)?.nextPage;
+    // Stop only when GoTrue reports no further page AND this page was not full;
+    // either signal alone keeps us paging so nothing beyond page 1 is missed.
+    if (!nextPage && users.length < perPage) return undefined;
+  }
+}
+
+// Complete rollback for failures that happen AFTER the profile has been bound to
+// the tenant. Soft-deleting only the tenant leaves an orphaned profile.tenant_id
+// pointing at a dead tenant plus (for fresh signups) an orphaned confirmed auth
+// user, which permanently blocks re-provisioning: on retry the existing-user gate
+// finds a profile.tenant_id and returns 409 forever, and createUser keeps failing
+// on the duplicate email. So we also detach the profile (tenant_id NULL, inactive)
+// and delete any auth user we created in THIS request. Soft-delete only for the
+// tenant (CLAUDE.md additive/soft rule); the auth-user delete targets an account
+// this request just created, never a pre-existing one we merely updated.
+async function rollbackProvision(
+  supabase: ReturnType<typeof createClient>,
+  tenantId: string,
+  userId: string,
+  createdNewUser: boolean
+): Promise<void> {
+  await supabase.from('tenants').update({ deleted_at: new Date().toISOString() }).eq('id', tenantId);
+  await supabase.from('profiles').update({ tenant_id: null, is_active: false }).eq('id', userId);
+  if (createdNewUser) {
+    await supabase.auth.admin.deleteUser(userId);
+  }
+}
+
 Deno.serve(async (req: Request) => {
   const corsHeaders = makeCorsHeaders(req);
 
@@ -257,11 +306,9 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Check if user already exists
-    const { data: existingUsers } = await supabase.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(
-      (u: { email?: string }) => u.email?.toLowerCase() === adminEmail.toLowerCase()
-    );
+    // Check if user already exists — paged lookup across all auth users, not just
+    // GoTrue's first-page-of-50 default (see findAuthUserByEmail).
+    const existingUser = await findAuthUserByEmail(supabase, adminEmail);
 
     // If user exists, check they don't already own a tenant
     if (existingUser) {
@@ -458,7 +505,9 @@ Deno.serve(async (req: Request) => {
     if (legalEntityError) {
       console.error('Primary legal entity creation failed:', legalEntityError);
       // Fail-loud: a tenant without its tax-identity entity must not survive.
-      await supabase.from('tenants').update({ deleted_at: new Date().toISOString() }).eq('id', tenant.id);
+      // Detach the profile + drop the freshly-created auth user so the owner isn't
+      // permanently locked out (see rollbackProvision).
+      await rollbackProvision(supabase, tenant.id, userId, !existingUser);
       throw new Error(`Provisioning failed: legal_entities insert: ${legalEntityError.message}`);
     }
 
@@ -501,8 +550,10 @@ Deno.serve(async (req: Request) => {
       });
     } catch (regErr) {
       // Fail-loud + rollback: never persist a tenant carrying an invalid/garbage
-      // statutory registration. Surface the validation message as its 422.
-      await supabase.from('tenants').update({ deleted_at: new Date().toISOString() }).eq('id', tenant.id);
+      // statutory registration. Surface the validation message as its 422. Also
+      // detach the profile + drop the freshly-created auth user (see
+      // rollbackProvision) so a rejected registration doesn't lock the owner out.
+      await rollbackProvision(supabase, tenant.id, userId, !existingUser);
       if (regErr instanceof ProvisionGuardError) {
         return new Response(
           JSON.stringify({ error: regErr.message }),
@@ -517,7 +568,7 @@ Deno.serve(async (req: Request) => {
         .insert(registrationRow);
       if (registrationError) {
         console.error('Primary tax registration creation failed:', registrationError);
-        await supabase.from('tenants').update({ deleted_at: new Date().toISOString() }).eq('id', tenant.id);
+        await rollbackProvision(supabase, tenant.id, userId, !existingUser);
         throw new Error(`Provisioning failed: legal_entity_tax_registrations insert: ${registrationError.message}`);
       }
     }
@@ -535,7 +586,7 @@ Deno.serve(async (req: Request) => {
     if (onboardingError) {
       console.error('Onboarding progress creation failed:', onboardingError);
       // FAIL-LOUD: a half-provisioned tenant must not silently lose its wizard.
-      await supabase.from('tenants').update({ deleted_at: new Date().toISOString() }).eq('id', tenant.id);
+      await rollbackProvision(supabase, tenant.id, userId, !existingUser);
       throw new Error(`Provisioning failed: onboarding_progress insert: ${onboardingError.message}`);
     }
 

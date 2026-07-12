@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { baseAmount, RECEIVABLE_INVOICE_EXCLUDED_STATUSES } from './financialMath';
+import { baseAmount, isReceivableInvoice, RECEIVABLE_INVOICE_EXCLUDED_STATUSES } from './financialMath';
 import { getBaseCurrency } from './currencyService';
 
 /** D8 — sum bank balances in base currency. A balance is a live position, so the
@@ -174,6 +174,10 @@ export const generateAgedReceivablesReport = async (): Promise<AgedReceivablesDa
       balance_due_base,
       customer:customers_enhanced(id, customer_name)
     `)
+    // Only real tax invoices are accounts-receivable — a proforma is a pre-bill that
+    // owes nothing yet (isReceivableInvoice / EXP-014). Without this a sent proforma
+    // (balance_due = total_amount, payments blocked) would be aged and counted as owed.
+    .eq('invoice_type', 'tax_invoice')
     .gt('balance_due', 0)
     .is('deleted_at', null)
     .in('status', ['sent', 'partial', 'overdue']);
@@ -341,10 +345,15 @@ export const generateInvoiceSummaryReport = async (
     byType[type].amount += baseAmount(inv, 'total_amount');
   });
 
-  const totalInvoiced = invoices.reduce((sum, inv) => sum + baseAmount(inv, 'total_amount'), 0);
-  const totalPaid = invoices.reduce((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
-  const totalOutstanding = invoices.reduce((sum, inv) => sum + baseAmount(inv, 'balance_due'), 0);
-  const totalOverdue = invoices
+  // Money totals count only real accounts-receivable tax invoices: a proforma owes
+  // nothing yet, and a converted proforma and the tax invoice it became are the SAME
+  // bill — summing both double-counts (isReceivableInvoice / EXP-014). The byStatus /
+  // byType breakdowns above intentionally stay over ALL invoice types.
+  const receivables = invoices.filter(isReceivableInvoice);
+  const totalInvoiced = receivables.reduce((sum, inv) => sum + baseAmount(inv, 'total_amount'), 0);
+  const totalPaid = receivables.reduce((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
+  const totalOutstanding = receivables.reduce((sum, inv) => sum + baseAmount(inv, 'balance_due'), 0);
+  const totalOverdue = receivables
     .filter(inv => inv.status === 'overdue')
     .reduce((sum, inv) => sum + baseAmount(inv, 'balance_due'), 0);
 
