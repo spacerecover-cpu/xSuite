@@ -8,7 +8,7 @@
  *   - {@link PayslipInfoBlock} — the employee/period header (name, number, pay
  *     period, payment date, and the working-days/hours rows), generalized from
  *     the legacy "Employee Information" + "Attendance Summary" boxes.
- *   - {@link PayComponentBlock} earnings  — items with `component_type === 'earning'`.
+ *   - {@link PayComponentBlock} earnings  — items with `component_type !== 'deduction'` (earning/allowance/bonus).
  *   - {@link PayComponentBlock} deductions — items with `component_type === 'deduction'`.
  *   - {@link NetPayBlock} — the emphasized Net Salary line.
  *
@@ -55,9 +55,13 @@ export function toEngineData(
   const documentTitle: LabelText = { en: 'PAYSLIP', ar: 'قسيمة الراتب' };
 
   // ---- Earning / deduction split (parity with the builder's filters) -------
+  // Component types are {earning, allowance, bonus, deduction}; allowance and bonus
+  // are earnings everywhere else in the app. Classify anything that is not a deduction
+  // as an earning so Total Earnings stays consistent with the Net Salary box — mirrors
+  // the corrected legacy builder in PayslipDocument.ts.
   const items = payslipData.items || [];
-  const earningItems = items.filter((i) => i.component_type === 'earning');
   const deductionItems = items.filter((i) => i.component_type === 'deduction');
+  const earningItems = items.filter((i) => i.component_type !== 'deduction');
 
   // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency (within-document: component items of one payroll record, no amount_base shadow on payslip line items)
   const totalEarnings = earningItems.reduce((sum, i) => sum + Number(i.amount), 0);

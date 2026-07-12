@@ -97,7 +97,13 @@ export type DueFollowUp = FollowUpRow & {
   cases: { case_number: string | null; title: string | null } | null;
 };
 
-/** Pending follow-ups due within the next `withinHours` (default: end of today + overdue). */
+/**
+ * Pending follow-ups due within the next `withinHours` (default: end of today + overdue).
+ * Returns the FULL matching set so callers can derive authoritative KPI totals
+ * (backlog count, overdue count) from `.length`; slice the result for any preview
+ * list. Do NOT re-introduce a row cap here — a truncated array under-reports the
+ * real backlog when consumed as a headline metric (see bug-audit-2026-07-12 #50).
+ */
 export async function listDueFollowUps(withinHours = 24): Promise<DueFollowUp[]> {
   const horizon = new Date(Date.now() + withinHours * 3_600_000).toISOString();
   const { data, error } = await supabase
@@ -106,8 +112,7 @@ export async function listDueFollowUps(withinHours = 24): Promise<DueFollowUp[]>
     .is('deleted_at', null)
     .eq('status', 'pending')
     .lte('follow_up_date', horizon)
-    .order('follow_up_date', { ascending: true })
-    .limit(20);
+    .order('follow_up_date', { ascending: true });
 
   if (error) {
     logger.error('Error listing due follow-ups:', error);

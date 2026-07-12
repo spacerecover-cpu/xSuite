@@ -72,7 +72,10 @@ export const useCasesRealtime = (options?: UseCasesRealtimeOptions) => {
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          // '*' (not 'UPDATE') so device INSERTs at intake also live-refresh the
+          // open case — a newly-intaked device must invalidate ['case', case_id]
+          // and ['case_devices', case_id] the same way an edit does.
+          event: '*',
           schema: 'public',
           table: 'case_devices',
           filter: `tenant_id=eq.${tenantId}`,
@@ -81,6 +84,11 @@ export const useCasesRealtime = (options?: UseCasesRealtimeOptions) => {
           if (payload.new && 'case_id' in payload.new) {
             debouncedInvalidate(['case', payload.new.case_id], 300);
             debouncedInvalidate(['case_devices', payload.new.case_id], 300);
+          }
+
+          if (payload.old && 'case_id' in payload.old) {
+            debouncedInvalidate(['case', payload.old.case_id], 300);
+            debouncedInvalidate(['case_devices', payload.old.case_id], 300);
           }
         }
       )

@@ -1,4 +1,4 @@
-import { useCallback, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useState, type KeyboardEvent } from 'react';
 
 interface UseListboxKeyboardOptions {
   open: boolean;
@@ -30,9 +30,10 @@ interface UseListboxKeyboardResult {
  * stays jsdom-testable.
  *
  * Keys: ArrowDown/Up move + clamp (ArrowDown when closed → `onOpen`); Home/End
- * jump; Enter/Space → `onSelect(activeIndex)` with `preventDefault` (single also
- * `onClose`, multi stays open); Escape → `onClose` + reset to -1; Tab → `onClose`
- * (no `preventDefault`, no trap).
+ * jump; Enter/Space when closed → `onOpen` (never selects), when open →
+ * `onSelect(activeIndex)` with `preventDefault` (single also `onClose`, multi
+ * stays open); Escape → `onClose` + reset to -1; Tab → `onClose` (no
+ * `preventDefault`, no trap). Closing always clears the active highlight.
  */
 export function useListboxKeyboard(
   opts: UseListboxKeyboardOptions
@@ -44,6 +45,14 @@ export function useListboxKeyboard(
     (i: number) => Math.max(0, Math.min(i, itemCount - 1)),
     [itemCount]
   );
+
+  // When the listbox is closed, nothing is active. Clearing here stops a stale
+  // highlight from a prior (possibly filtered) session leaking into the next
+  // one — e.g. a refocused closed trigger silently re-selecting an index that
+  // no longer maps to the same option after the filter reset.
+  useEffect(() => {
+    if (!open) setActiveIndex(-1);
+  }, [open]);
 
   const onKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -75,6 +84,10 @@ export function useListboxKeyboard(
         case 'Enter':
         case ' ': {
           e.preventDefault();
+          if (!open) {
+            onOpen();
+            return;
+          }
           if (activeIndex >= 0) {
             onSelect(activeIndex);
             if (!multiple) onClose();

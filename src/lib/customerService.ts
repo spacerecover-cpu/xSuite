@@ -3,6 +3,7 @@ import { logAuditTrail } from './auditTrailService';
 import { logger } from './logger';
 import type { Database } from '../types/database.types';
 import { assertPartyTaxNumberValid } from './regimes/partyTaxValidation';
+import { TERMINAL_TYPES } from './caseLifecycle';
 
 type CustomerRow = Database['public']['Tables']['customers_enhanced']['Row'];
 type CustomerInsert = Database['public']['Tables']['customers_enhanced']['Insert'];
@@ -60,6 +61,9 @@ export async function createCustomer(input: CreateCustomerInput): Promise<Custom
       .from('customer_company_relationships')
       .insert({ customer_id: newCustomer.id, company_id, is_primary: true } as RelationshipInsert);
     if (relError) throw relError;
+    // Populate the display-only denormalized name on creation, matching the
+    // other relationship mutators — templateContextService reads it directly.
+    await syncDenormalizedCompanyName(newCustomer.id);
   }
 
   return newCustomer;
@@ -293,7 +297,7 @@ async function getTerminalStatusNames(): Promise<string[]> {
   const { data, error } = await supabase
     .from('master_case_statuses')
     .select('name')
-    .in('type', ['completed', 'delivered', 'cancelled']);
+    .in('type', [...TERMINAL_TYPES]);
   if (error) throw error;
   return (data ?? []).map((s) => s.name);
 }

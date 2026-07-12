@@ -68,7 +68,10 @@ export const CaseBackupDevicesTab: React.FC<CaseBackupDevicesTabProps> = ({
 
   const handleSaleSuccess = (saleId: string) => {
     setShowSaleModal(false);
-    queryClient.invalidateQueries({ queryKey: stockKeys.salesByCase(caseId) });
+    // Broad-invalidate the whole stock namespace: record_stock_sale decrements
+    // quantity_on_hand and flips serials to 'sold', so serialNumbers/items/stats
+    // (and salesByCase) all go stale — not just this case's sales list.
+    queryClient.invalidateQueries({ queryKey: stockKeys.all });
     navigate(`/resources/stock/sales/${saleId}`);
   };
 
@@ -105,7 +108,10 @@ export const CaseBackupDevicesTab: React.FC<CaseBackupDevicesTabProps> = ({
         caseId={caseId}
         customerId={customerId}
         onSaleCreated={() => {
-          queryClient.invalidateQueries({ queryKey: stockKeys.salesByCase(caseId) });
+          // A sale flips serials to 'sold' and decrements stock, so the serial
+          // picker, items list and stats caches must also be invalidated — not
+          // only this case's sales list. Broad-invalidate the stock namespace.
+          queryClient.invalidateQueries({ queryKey: stockKeys.all });
         }}
       />
 

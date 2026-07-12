@@ -203,7 +203,13 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
   }, [customerSearch, searchCustomers]);
 
   const handleSelectItem = (item: StockItemWithCategory) => {
-    const maxQty = item.current_quantity ?? 0;
+    // Cap against availability (on-hand minus reserved), not raw on-hand — reserved
+    // units are committed to open cases and must not be sold. Mirrors getAvailableQuantity.
+    const maxQty = Math.max(0, (item.current_quantity ?? 0) - (item.quantity_reserved ?? 0));
+    if (maxQty < 1) {
+      toast.error(`${item.name} has no available stock (all units are reserved)`);
+      return;
+    }
     setCart((prev) => {
       const existing = prev.find((l) => l.item.id === item.id);
       if (existing) {
@@ -272,7 +278,8 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
           if (l.item.id !== itemId) return l;
           const newQty = l.quantity + delta;
           if (newQty < 1) return null;
-          if (newQty > (l.item.current_quantity ?? 0)) return l;
+          const available = Math.max(0, (l.item.current_quantity ?? 0) - (l.item.quantity_reserved ?? 0));
+          if (newQty > available) return l;
           return { ...l, quantity: newQty };
         })
         .filter((l): l is CartLine => l !== null)
@@ -368,7 +375,15 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
         payment_method: paymentMethod,
         notes: notes || null,
         discount_type: discountType === 'none' ? null : discountType,
-        discount_value: discountType !== 'none' ? parseFloat(discountValue) || null : null,
+        // Cap a fixed discount at the subtotal so the persisted total matches the
+        // previewed total (which uses Math.min(val, subtotal)) and can never go negative.
+        // Percentage discounts carry the raw rate (the RPC applies it against subtotal).
+        discount_value:
+          discountType === 'fixed'
+            ? Math.min(parseFloat(discountValue) || 0, subtotal) || null
+            : discountType === 'percentage'
+              ? parseFloat(discountValue) || null
+              : null,
         tax_inclusive: false,
         taxComputation,
         currency: saleCurrency ?? currencyFormat.currencyCode,

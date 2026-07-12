@@ -112,13 +112,22 @@ Deno.serve(async (req: Request) => {
 
       const { data: callerProfile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, tenant_id')
         .eq('id', user.id)
         .maybeSingle();
 
-      if (!callerProfile || !['owner', 'admin'].includes(callerProfile.role)) {
+      // A platform admin is role IN ('owner','admin') AND tenant_id IS NULL
+      // (matches is_platform_admin() / CLAUDE.md). A tenant-scoped owner/admin
+      // (tenant_id set) must NOT reach this bypass path — otherwise any tenant
+      // creator (stored with role='owner') could skip OTP + signup rate-limits
+      // and overwrite arbitrary un-onboarded accounts via updateUserById below.
+      if (
+        !callerProfile ||
+        callerProfile.tenant_id !== null ||
+        !['owner', 'admin'].includes(callerProfile.role)
+      ) {
         return new Response(
-          JSON.stringify({ error: 'Forbidden: Admin access required' }),
+          JSON.stringify({ error: 'Forbidden: Platform admin access required' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -147,8 +156,12 @@ Deno.serve(async (req: Request) => {
     // Self-service signups (no Authorization header) must have an OTP-verified
     // email before we create anything. Admin-provisioned (authed) flows bypass,
     // as before. We re-verify against signup_otps so a client that skipped the
-    // wizard OTP gate can't provision, then atomically consume the row so a
-    // verified code is SINGLE-USE (consumed_at, migration 20260615200307).
+    // wizard OTP gate can't provision. This is a READ-ONLY gate — the single-use
+    // consumption (consumed_at, migration 20260615200307) is DEFERRED until after
+    // the recoverable input validations below (required fields, country guards,
+    // duplicate slug), so a benign failure on a well-formed submission doesn't
+    // burn the verified code and block a legitimate retry.
+    let verifiedOtpId: string | null = null;
     if (!authHeader) {
       const { data: otpRow } = await supabase
         .from('signup_otps')
@@ -168,22 +181,7 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      // Single-use: claim the row atomically — the `consumed_at IS NULL` guard on
-      // the UPDATE means two concurrent provisions can't both pass this gate.
-      const { data: claimed } = await supabase
-        .from('signup_otps')
-        .update({ consumed_at: new Date().toISOString() })
-        .eq('id', otpRow.id)
-        .is('consumed_at', null)
-        .select('id')
-        .maybeSingle();
-
-      if (!claimed) {
-        return new Response(
-          JSON.stringify({ error: 'This verification code has already been used. Please request a new code.' }),
-          { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      verifiedOtpId = otpRow.id as string;
     }
 
     if (!name || !slug || !adminEmail || !adminPassword || !adminFullName || !planId || !countryId) {
@@ -234,6 +232,29 @@ Deno.serve(async (req: Request) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
+    }
+
+    // Single-use OTP consumption — deferred to HERE, past every recoverable input
+    // validation above (required fields, country onboardable/residency guards,
+    // duplicate slug) so a benign failure on a well-formed submission doesn't spend
+    // the verified code. Claimed atomically before we create anything: the
+    // `consumed_at IS NULL` guard on the UPDATE means two concurrent provisions
+    // can't both pass this gate (only one goes on to create a tenant).
+    if (!authHeader && verifiedOtpId) {
+      const { data: claimed } = await supabase
+        .from('signup_otps')
+        .update({ consumed_at: new Date().toISOString() })
+        .eq('id', verifiedOtpId)
+        .is('consumed_at', null)
+        .select('id')
+        .maybeSingle();
+
+      if (!claimed) {
+        return new Response(
+          JSON.stringify({ error: 'This verification code has already been used. Please request a new code.' }),
+          { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Check if user already exists

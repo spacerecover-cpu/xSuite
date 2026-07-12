@@ -219,9 +219,9 @@ export default function PurchaseOrderDetailPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {order.line_items?.map((item: { description?: string; item_name?: string; quantity: number; unit_price?: number; total?: number; stock_item_id?: string | null }, index: number) => (
-                      <tr key={index}>
-                        <td className="px-4 py-3 text-sm text-slate-900">{item.description}</td>
+                    {poLineItems.map((item: { id: string; description?: string; item_name?: string; quantity: number; unit_price?: number; total?: number; stock_item_id?: string | null }, index: number) => (
+                      <tr key={item.id ?? index}>
+                        <td className="px-4 py-3 text-sm text-slate-900">{item.description ?? item.item_name}</td>
                         <td className="px-4 py-3 text-sm text-slate-600 text-right">{item.quantity}</td>
                         <td className="px-4 py-3 text-sm text-slate-600 text-right">
                           {formatCurrency(item.unit_price ?? 0)}
@@ -422,23 +422,13 @@ export default function PurchaseOrderDetailPage() {
           isOpen={showReceiveModal}
           onClose={() => setShowReceiveModal(false)}
           purchaseOrderId={id}
-          purchaseOrderItems={
-            poLineItems.length > 0
-              ? poLineItems.map((item) => ({
-                  id: item.id,
-                  description: item.description ?? item.item_name ?? 'Item',
-                  quantity: item.quantity,
-                  unit_price: item.unit_price ?? null,
-                  stock_item_id: item.stock_item_id ?? null,
-                }))
-              : (order.line_items ?? []).map((item: { description?: string; item_name?: string; quantity: number; unit_price?: number }, idx: number) => ({
-                  id: `line-${idx}`,
-                  description: item.description ?? item.item_name ?? 'Item',
-                  quantity: item.quantity,
-                  unit_price: item.unit_price ?? null,
-                  stock_item_id: null,
-                }))
-          }
+          purchaseOrderItems={poLineItems.map((item) => ({
+            id: item.id,
+            description: item.description ?? item.item_name ?? 'Item',
+            quantity: item.quantity,
+            unit_price: item.unit_price ?? null,
+            stock_item_id: item.stock_item_id ?? null,
+          }))}
           onSuccess={() => {
             loadOrder(id);
             setShowReceiveModal(false);

@@ -4,6 +4,7 @@ import { Clock, Plus, Search, Filter, CheckCircle, XCircle, Trash2, CreditCard a
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, parseISO } from 'date-fns';
 import { useToast } from '../../hooks/useToast';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabaseClient';
 import { timesheetService, TimesheetWithEmployee, TimesheetFilters } from '../../lib/timesheetService';
 import { timesheetKeys } from '../../lib/queryKeys';
 import { Modal } from '../../components/ui/Modal';
@@ -70,16 +71,19 @@ interface TimesheetEntryModalProps {
   employees: { id: string; first_name: string; last_name: string; employee_number: string | null }[];
   onClose: () => void;
   onSave: () => void;
-  currentUserId: string;
+  currentEmployeeId: string;
   isAdmin: boolean;
 }
 
-function TimesheetEntryModal({ entry, employees, onClose, onSave, currentUserId, isAdmin }: TimesheetEntryModalProps) {
+function TimesheetEntryModal({ entry, employees, onClose, onSave, currentEmployeeId, isAdmin }: TimesheetEntryModalProps) {
   const toast = useToast();
   const queryClient = useQueryClient();
 
+  // Self-service (non-admin) entries default to the current user's own employee
+  // record. `currentEmployeeId` is resolved from employees.user_id — never the
+  // auth UID, which is not a valid employees.id and violates the employee_id FK.
   const [form, setForm] = useState({
-    employee_id: entry?.employee_id ?? (isAdmin ? '' : currentUserId),
+    employee_id: entry?.employee_id ?? (isAdmin ? '' : currentEmployeeId),
     work_date: entry?.work_date ?? format(new Date(), 'yyyy-MM-dd'),
     project_name: entry?.project_name ?? '',
     task_description: entry?.task_description ?? '',
@@ -339,7 +343,7 @@ export function TimesheetManagement() {
   const { user, profile } = useAuth();
   const { weekStartsOn } = useDateTimeConfig();
   const wso = resolveWeekStartsOn(weekStartsOn);
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'hr';
+  const isAdmin = profile?.role === 'owner' || profile?.role === 'admin' || profile?.role === 'hr';
 
   const [activeTab, setActiveTab] = useState<TabId>('entries');
   const [_filters, _setFilters] = useState<TimesheetFilters>({});
@@ -382,6 +386,24 @@ export function TimesheetManagement() {
   const { data: employees = [] } = useQuery({
     queryKey: timesheetKeys.employees(),
     queryFn: () => timesheetService.getEmployees(),
+  });
+
+  // Resolve the current user's own employees.id (employees.user_id = auth uid)
+  // so self-service entries default to a real employee row. Using the auth UID
+  // directly as employee_id violates timesheets_employee_id_fkey.
+  const { data: currentEmployeeId = '' } = useQuery({
+    queryKey: [...timesheetKeys.all, 'current-employee', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return '';
+      const { data } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('user_id', user.id)
+        .is('deleted_at', null)
+        .maybeSingle();
+      return data?.id ?? '';
+    },
+    enabled: !!user?.id && !isAdmin,
   });
 
   const { data: monthlySummary = [], isLoading: summaryLoading } = useQuery({
@@ -944,7 +966,7 @@ export function TimesheetManagement() {
           employees={employees}
           onClose={() => setEditingEntry(undefined)}
           onSave={() => setEditingEntry(undefined)}
-          currentUserId={user?.id ?? ''}
+          currentEmployeeId={currentEmployeeId}
           isAdmin={isAdmin}
         />
       )}

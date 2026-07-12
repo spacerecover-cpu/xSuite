@@ -1,3 +1,4 @@
+import * as XLSX from 'xlsx';
 import { supabase } from '../supabaseClient';
 import { buildWorkbook } from './workbookBuilder';
 import { validateWorkbook } from './importValidator';
@@ -7,6 +8,7 @@ import {
   type WorkbookDomain,
   IMPORT_ORDER,
   DOMAIN_ENTITIES,
+  SHEET_NAMES,
   WORKBOOK_SCHEMA_VERSION,
 } from './workbookContract';
 
@@ -48,6 +50,47 @@ function emptyWorkbook(): ParsedWorkbook {
   const wb = {} as ParsedWorkbook;
   for (const e of IMPORT_ORDER) wb[e] = [];
   return wb;
+}
+
+/** Non-contract key stamped onto a failed row to carry its per-row failure reason. It is NOT an
+ *  ENTITY_COLUMNS key, so buildWorkbook never emits it — buildErrorReport surfaces it explicitly. */
+const ERROR_FIELD = '_error';
+
+/** Sheet listing every failed row's reason. Not a contract entity sheet, so the parser ignores it. */
+export const ERROR_SHEET_NAME = 'Import Errors';
+
+/**
+ * Downloadable error report: the standard workbook of the failed rows (so it stays re-importable
+ * after the operator fixes them) PLUS a leading "Import Errors" sheet keyed by legacy_id that
+ * spells out WHY each row failed. Without this sheet the reason (stamped as ERROR_FIELD) is lost —
+ * buildWorkbook only writes ENTITY_COLUMNS cells and silently drops the non-contract key.
+ */
+function buildErrorReport(failedRows: ParsedWorkbook, domain: WorkbookDomain): ArrayBuffer {
+  const base = buildWorkbook(failedRows, {
+    domain,
+    sourceTenant: '',
+    exportedAt: new Date().toISOString(),
+    schemaVersion: WORKBOOK_SCHEMA_VERSION,
+    counts: Object.fromEntries(IMPORT_ORDER.map((e) => [e, failedRows[e].length])) as Record<EntityType, number>,
+  });
+
+  const wb = XLSX.read(base, { type: 'array' });
+  const aoa: unknown[][] = [['Sheet', 'Record Ref', 'Import Error']];
+  for (const entity of DOMAIN_ENTITIES[domain]) {
+    for (const row of failedRows[entity] ?? []) {
+      const legacyId = row.legacy_id;
+      const reason = (row as Record<string, unknown>)[ERROR_FIELD];
+      aoa.push([
+        SHEET_NAMES[entity],
+        legacyId == null ? '' : String(legacyId),
+        reason == null ? '' : String(reason),
+      ]);
+    }
+  }
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), ERROR_SHEET_NAME);
+  // Surface the reasons sheet first so the operator lands on it when opening the file.
+  wb.SheetNames = [ERROR_SHEET_NAME, ...wb.SheetNames.filter((n) => n !== ERROR_SHEET_NAME)];
+  return XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
 }
 
 /**
@@ -106,7 +149,7 @@ export async function runImport(
         const res = byLegacy.get(String(row.legacy_id));
         if (!res || res.status === 'error') {
           counts[entity].error += 1;
-          failedRows[entity].push({ ...row, _error: res?.error ?? 'no result returned' });
+          failedRows[entity].push({ ...row, [ERROR_FIELD]: res?.error ?? 'no result returned' });
         } else if (res.status === 'skipped_duplicate') {
           counts[entity].skipped += 1;
         } else {
@@ -124,15 +167,7 @@ export async function runImport(
   if (finErr) throw finErr;
 
   const hasFailures = entities.some((e) => failedRows[e].length > 0);
-  const errorReport = hasFailures
-    ? buildWorkbook(failedRows, {
-        domain,
-        sourceTenant: '',
-        exportedAt: new Date().toISOString(),
-        schemaVersion: WORKBOOK_SCHEMA_VERSION,
-        counts: Object.fromEntries(IMPORT_ORDER.map((e) => [e, failedRows[e].length])) as Record<EntityType, number>,
-      })
-    : undefined;
+  const errorReport = hasFailures ? buildErrorReport(failedRows, domain) : undefined;
 
   onProgress({ entity: lastEntity, processed: 0, total: 0, phase: 'done' });
   return { runId: runId as string, counts, errorReport };

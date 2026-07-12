@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { amountInWordsEn, amountInWordsAr, numberToWordsEn, numberToWordsEnIndian } from './amountInWords';
+import {
+  amountInWordsEn,
+  amountInWordsAr,
+  numberToWordsEn,
+  numberToWordsEnIndian,
+  formatAmountWordsForScale,
+} from './amountInWords';
 
 describe('numberToWordsEn', () => {
   const cases: [number, string][] = [
@@ -36,6 +42,11 @@ describe('amountInWordsEn', () => {
   it('defaults to 2 decimals when omitted (back-compat)', () => {
     expect(amountInWordsEn(1050.5, 'OMR')).toBe('OMR One Thousand Fifty and 50/100 only');
   });
+  it('carries a rounded-up minor unit into the whole (no 100/100 overflow)', () => {
+    expect(amountInWordsEn(9.999, 'OMR', 2)).toBe('OMR Ten only');
+    expect(amountInWordsEn(9.9999, 'OMR', 3)).toBe('OMR Ten only');
+    expect(amountInWordsEn(999.999, 'OMR', 2)).toBe('OMR One Thousand only');
+  });
 });
 
 describe('amountInWordsAr', () => {
@@ -47,6 +58,19 @@ describe('amountInWordsAr', () => {
 
   it('appends the currency', () => {
     expect(amountInWordsAr(5, 'ر.ع')).toContain('ر.ع');
+  });
+
+  it('carries a rounded-up minor unit into the whole', () => {
+    expect(amountInWordsAr(9.999, '', 2)).toBe('عشرة فقط');
+  });
+});
+
+describe('formatAmountWordsForScale carry', () => {
+  it('carries a rounded-up minor unit into the whole (indian scale)', () => {
+    expect(formatAmountWordsForScale(9.999, '₹', 2, 'indian')).toBe('₹ Ten only');
+  });
+  it('carries on the western path', () => {
+    expect(formatAmountWordsForScale(9.999, 'OMR', 2, 'western')).toBe('OMR Ten only');
   });
 });
 
@@ -78,6 +102,9 @@ describe("amountInWordsEn scale='indian' (WP-L1)", () => {
   });
   it('default scale stays western (byte-identical)', () => {
     expect(amountInWordsEn(1234000, 'OMR', 3)).toBe('OMR One Million Two Hundred Thirty Four Thousand only');
+  });
+  it('carries a rounded-up minor unit into the whole (indian scale)', () => {
+    expect(amountInWordsEn(9.999, '₹', 2, 'indian')).toBe('₹ Ten only');
   });
   it('non-finite honest-degrades to no words (matches the western path, never renders "null")', () => {
     expect(amountInWordsEn(Number.NaN, '₹', 2, 'indian')).not.toContain('null');

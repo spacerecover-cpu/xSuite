@@ -83,6 +83,11 @@ vi.mock('../../lib/quotesService', async (importOriginal) => {
     fetchQuotesPage: vi.fn(async () => ({ rows: [], total: 0 })),
     getQuoteStats: vi.fn(async () => ({ total: 0, totalValue: 0, acceptedValue: 0, sentValue: 0 })),
     createQuote: vi.fn(actual.createQuote),
+    // Edit-path regression guard: spy on the recomputing service. The list-page
+    // inline edit must delegate to updateQuote (which re-derives totals from the
+    // edited items) rather than hand-rolling a quotes.update that leaves the
+    // header total_amount frozen out of sync with the new line items.
+    updateQuote: vi.fn(async () => ({ id: 'quote-edit-1' })),
   };
 });
 
@@ -134,6 +139,27 @@ vi.mock('../../lib/supabaseClient', () => {
                 }),
               };
             }),
+            // Edit button reads the full quote row before opening the modal.
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: {
+                    id: 'quote-edit-1',
+                    case_id: 'case-1',
+                    customer_id: 'customer-1',
+                    company_id: null,
+                    status: 'draft',
+                    tax_rate: 5,
+                    discount_amount: 0,
+                    discount_type: 'fixed',
+                    terms: null,
+                    notes: null,
+                    valid_until: null,
+                  },
+                  error: null,
+                })),
+              })),
+            })),
           };
         }
         if (table === 'quote_items') {
@@ -142,6 +168,17 @@ vi.mock('../../lib/supabaseClient', () => {
               select: vi.fn(async () => ({
                 data: rows.map((r, i) => ({ id: `item-${i}`, sort_order: (r.sort_order as number | undefined) ?? i })),
                 error: null,
+              })),
+            })),
+            // Edit button loads the existing line items alongside the quote row.
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(() => ({
+                  order: vi.fn(async () => ({
+                    data: [{ id: 'item-0', description: 'Logical recovery', quantity: 1, unit_price: 100, sort_order: 0 }],
+                    error: null,
+                  })),
+                })),
               })),
             })),
           };
@@ -172,7 +209,7 @@ vi.mock('../../lib/supabaseClient', () => {
 });
 
 import { QuotesListPage } from './QuotesListPage';
-import { createQuote } from '../../lib/quotesService';
+import { createQuote, updateQuote, fetchQuotesPage } from '../../lib/quotesService';
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -207,5 +244,60 @@ describe('QuotesListPage — New Quote create path stamps rate/base (T17 monitor
     expect(insertedRow.subtotal_base).not.toBeNull();
     expect(insertedRow.tax_amount_base).not.toBeNull();
     expect(insertedRow.total_amount_base).not.toBeNull();
+  });
+});
+
+// Regression guard for finding #24: the inline Edit action on a /quotes row used
+// to hand-roll `supabase.from('quotes').update({...})` that set only status/
+// valid_until/tax_rate/discount_amount/terms/notes — never subtotal/tax_amount/
+// total_amount — then re-inserted the line items. The stored items changed while
+// the header totals stayed frozen (no DB trigger recomputes them). The fix routes
+// the edit through quotesService.updateQuote, which recomputes subtotal/tax_amount/
+// total_amount + the *_base snapshot via computeDocumentTotals — exactly what
+// QuoteDetailPage's edit already does.
+describe('QuotesListPage — inline Edit recomputes header totals via updateQuote', () => {
+  it('routes the list-row edit through quotesService.updateQuote with the edited items and discount_type', async () => {
+    vi.mocked(fetchQuotesPage).mockResolvedValue({
+      rows: [
+        {
+          id: 'quote-edit-1',
+          quote_number: 'QUOT-EDIT',
+          case_id: 'case-1',
+          customer_id: 'customer-1',
+          company_id: null,
+          status: 'draft',
+          total_amount: 100,
+          created_at: '2026-07-01T00:00:00Z',
+          valid_until: null,
+          customers: { customer_name: 'Acme' },
+        } as never,
+      ],
+      total: 1,
+    });
+    // Call history persists across tests (no clearMocks config); reset so the
+    // "no insert on edit" assertion reflects only this test's actions.
+    insertedQuotePayload.mockClear();
+
+    const user = userEvent.setup();
+    renderPage();
+
+    // Open the inline editor for the draft row, then trigger the modal's save.
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+    await user.click(await screen.findByRole('button', { name: 'Trigger Quote Save' }));
+
+    await waitFor(() => expect(vi.mocked(updateQuote)).toHaveBeenCalledTimes(1));
+
+    // The edit MUST delegate to the recomputing service, keyed to the edited
+    // quote, carrying discount_type (dropped by the old hand-rolled update) and
+    // the line items updateQuote re-derives the header totals from.
+    const [idArg, quoteArg, itemsArg] = vi.mocked(updateQuote).mock.calls[0];
+    expect(idArg).toBe('quote-edit-1');
+    expect(quoteArg.discount_type).toBe('fixed');
+    expect(quoteArg.tax_rate).toBe(5);
+    expect(itemsArg).toHaveLength(1);
+    expect(itemsArg?.[0]).toMatchObject({ description: 'Logical recovery', unit_price: 200 });
+
+    // The stale path is gone: no direct quotes.insert on an edit.
+    expect(insertedQuotePayload).not.toHaveBeenCalled();
   });
 });

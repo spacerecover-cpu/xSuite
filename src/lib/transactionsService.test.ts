@@ -7,7 +7,11 @@ const { from } = vi.hoisted(() => ({ from: vi.fn() }));
 vi.mock('./supabaseClient', () => ({ supabase: { from } }));
 vi.mock('./logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
-import { getCashFlowSummary } from './transactionsService';
+import {
+  getCashFlowSummary,
+  reconcileTransaction,
+  bulkReconcileTransactions,
+} from './transactionsService';
 
 /** Thenable query builder: fetchTransactions chains select/is/order/eq/gte/lte/range. */
 function makeQuery(rows: Array<Record<string, unknown>>) {
@@ -61,5 +65,20 @@ describe('getCashFlowSummary (cross-document monthly totals must be base currenc
 
     expect(summary[0].income).toBe(70);
     expect(summary[0].expense).toBe(20);
+  });
+});
+
+describe('reconcileTransaction (must not present a read-only call as a successful write)', () => {
+  it('rejects instead of silently returning a fetched row', async () => {
+    // financial_transactions is append-only with no is_reconciled/reconciled_at
+    // column, so reconciliation persists nothing. The old no-op returned a row
+    // (false success); it must now fail loudly and never issue a read.
+    await expect(reconcileTransaction('txn-1')).rejects.toThrow(/reconcil/i);
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it('bulkReconcileTransactions likewise rejects rather than resolving with rows', async () => {
+    await expect(bulkReconcileTransactions(['a', 'b'])).rejects.toThrow(/reconcil/i);
+    expect(from).not.toHaveBeenCalled();
   });
 });

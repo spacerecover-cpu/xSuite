@@ -6,9 +6,13 @@
 // The email content (subject/message) was rendered and FROZEN at scheduling
 // time — the author previewed exactly what goes out — so this function only
 // resolves the recipient, sends via SMTP, flips status, and logs the
-// communication. Retry: the scanner increments attempt_count before each
-// dispatch and gives up at 3; a failure here leaves status='pending' with
-// last_error so the next tick retries.
+// communication. Idempotency: the row is CLAIMED (status pending -> sent) with
+// an atomic conditional UPDATE *before* the irreversible SMTP send, so a lost
+// status write or a concurrent tick can never re-send the same frozen email —
+// a re-invocation finds status != 'pending' and no-ops. Retry: the scanner
+// increments attempt_count before each dispatch and gives up at 3; a send
+// failure releases the claim back to status='pending' with last_error so the
+// next tick retries (or marks 'failed' once the attempt cap is reached).
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -121,6 +125,29 @@ Deno.serve(async (req: Request) => {
       },
     });
 
+    // Claim the row BEFORE the irreversible send: atomically flip pending ->
+    // sent, conditioned on status='pending'. Exactly one invocation wins this
+    // conditional UPDATE, so a lost status write or a concurrent tick can never
+    // re-send the same frozen email. If it matches no row, another invocation
+    // already owns this follow-up and we no-op. A send failure releases the
+    // claim below (back to 'pending' for retry, or 'failed' at the cap).
+    const { data: claimed, error: claimError } = await supabase
+      .from("case_follow_ups")
+      .update({ status: "sent", sent_at: new Date().toISOString(), last_error: null })
+      .eq("id", followUpId)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+
+    if (claimError) return await fail(`claim failed: ${claimError.message}`);
+    if (!claimed) {
+      // Lost the claim race — already sent/claimed by another invocation.
+      return new Response(JSON.stringify({ success: true, skipped: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     try {
       await smtpClient.send({
         from: gmailUser,
@@ -133,13 +160,24 @@ Deno.serve(async (req: Request) => {
       try { await smtpClient.close(); } catch { /* already closed */ }
       const message = smtpError instanceof Error ? smtpError.message : "SMTP error";
       const terminal = (followUp.attempt_count ?? 0) >= 3;
-      return await fail(`smtp: ${message}`, terminal);
+      // Release the claim so the send is retried on the next tick. Revert to
+      // 'pending' (clearing sent_at) unless the attempt cap is reached, in
+      // which case fail terminally.
+      await supabase
+        .from("case_follow_ups")
+        .update({
+          status: terminal ? "failed" : "pending",
+          sent_at: null,
+          last_error: `smtp: ${message}`.slice(0, 500),
+        })
+        .eq("id", followUpId);
+      return new Response(JSON.stringify({ success: false, error: `smtp: ${message}` }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     }
-
-    await supabase
-      .from("case_follow_ups")
-      .update({ status: "sent", sent_at: new Date().toISOString(), last_error: null })
-      .eq("id", followUpId);
+    // Status already committed to 'sent' at claim time — no post-send flip
+    // needed (that write is exactly the one whose failure caused re-sends).
 
     try {
       await supabase.rpc("log_case_communication", {

@@ -13,7 +13,7 @@ vi.mock('./currencyService', () => ({
 vi.mock('./auditTrailService', () => ({ logAuditTrail: vi.fn() }));
 vi.mock('./chainOfCustodyService', () => ({ logInvoicePayment: vi.fn() }));
 
-import { getPaymentStats, createPayment } from './paymentsService';
+import { getPaymentStats, createPayment, fetchPaymentById } from './paymentsService';
 
 beforeEach(() => {
   from.mockReset();
@@ -68,6 +68,25 @@ const basePayment = (amount: number) => ({
   status: 'completed' as const,
   payment_method_id: 'pm1',
   bank_account_id: 'ba1',
+});
+
+describe('fetchPaymentById (BUG-54 — must not return soft-deleted allocations)', () => {
+  // void_payment soft-deletes a payment's allocations (deleted_at = now()) but
+  // leaves the payment row live (status='refunded'). The embed must filter those
+  // out so the View modal does not present reversed money as still allocated.
+  it('applies the allocations.deleted_at IS NULL referenced-table filter', async () => {
+    const maybeSingle = vi.fn(async () => ({ data: { id: 'p1', allocations: [] }, error: null }));
+    const is = vi.fn(() => ({ maybeSingle }));
+    const eq = vi.fn(() => ({ is }));
+    const select = vi.fn(() => ({ eq }));
+    from.mockReset().mockReturnValue({ select });
+
+    await fetchPaymentById('p1');
+
+    expect(from).toHaveBeenCalledWith('payments');
+    expect(eq).toHaveBeenCalledWith('id', 'p1');
+    expect(is).toHaveBeenCalledWith('allocations.deleted_at', null);
+  });
 });
 
 describe('createPayment withholding (WP-L3 TDS)', () => {

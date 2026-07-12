@@ -867,6 +867,7 @@ export const duplicateQuote = async (sourceId: string) => {
     valid_until: sourceQuote.valid_until,
     tax_rate: sourceQuote.tax_rate,
     discount_amount: sourceQuote.discount_amount,
+    discount_type: sourceQuote.discount_type,
     terms: sourceQuote.terms ?? sourceQuote.terms_and_conditions ?? null,
     notes: sourceQuote.notes,
     currency: sourceQuote.currency,

@@ -23,11 +23,12 @@ function makeAccountsQuery(rows: Array<Record<string, unknown>>) {
   return builder;
 }
 
-/** bank_transactions head-count builder: select/eq are chainable; awaiting yields {count}. */
+/** bank_transactions head-count builder: select/eq/is are chainable; awaiting yields {count}. */
 function makeCountQuery(count: number) {
   const builder: Record<string, unknown> = {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
+    is: vi.fn(() => builder),
     then: (resolve: (v: { count: number; error: null }) => void) =>
       resolve({ count, error: null }),
   };
@@ -67,6 +68,24 @@ describe('getAccountBalanceSummary (cross-document balances must be base currenc
     const summary = await bankingService.getAccountBalanceSummary();
 
     expect(summary.totalCashBalance).toBe(70);
+  });
+
+  it('excludes soft-deleted rows from the pending-reconciliation count', async () => {
+    // Soft-deleted unreconciled rows keep is_reconciled=false; without a
+    // deleted_at filter they inflate pendingReconciliations and it never hits 0.
+    const accountsQuery = makeAccountsQuery([
+      { account_type: 'bank', current_balance: 0, current_balance_base: 0, currency: 'OMR' },
+    ]);
+    const countQuery = makeCountQuery(4);
+    from.mockImplementation((table: string) =>
+      table === 'bank_accounts' ? accountsQuery : countQuery,
+    );
+
+    const summary = await bankingService.getAccountBalanceSummary();
+
+    expect(summary.pendingReconciliations).toBe(4);
+    // the count must be scoped to live (non-soft-deleted) transactions
+    expect(countQuery.is).toHaveBeenCalledWith('deleted_at', null);
   });
 });
 
@@ -119,6 +138,61 @@ describe('createTransfer — cross-currency guard (Phase 0)', () => {
     expect(insert).toHaveBeenCalledTimes(1);
     expect(captured.row).toMatchObject({ amount: 500, from_account_id: 'a', to_account_id: 'b' });
     expect(result).toMatchObject({ id: 't1' });
+  });
+});
+
+describe('createTransfer — non-atomic balance compensation on partial failure (BUG-40)', () => {
+  beforeEach(() => {
+    getUser.mockResolvedValue({ data: { user: { id: 'u-1' } } });
+    resolveTenantId.mockResolvedValue('t-1');
+  });
+
+  it('reverses the debit and voids the transfer when the credit leg fails', async () => {
+    const accountRead = (row: Record<string, unknown>) => {
+      const b: Record<string, unknown> = {
+        select: vi.fn(() => b),
+        eq: vi.fn(() => b),
+        maybeSingle: vi.fn().mockResolvedValue({ data: row, error: null }),
+      };
+      return b;
+    };
+    // updateAccountBalance is spied (never touches supabase here), so the only
+    // supabase.from calls are the two account reads and the transfer insert/void.
+    const bankReads = [
+      accountRead({ current_balance: 1000, currency: 'OMR' }), // source
+      accountRead({ currency: 'OMR' }),                        // destination
+    ];
+    const voidEq = vi.fn().mockResolvedValue({ error: null });
+    const voidUpdate = vi.fn(() => ({ eq: voidEq }));
+    const insert = vi.fn(() => ({
+      select: () => ({ maybeSingle: () => Promise.resolve({
+        data: { id: 't1', status: 'completed', from_account_id: 'a', to_account_id: 'b', amount: 500 },
+        error: null,
+      }) }),
+    }));
+    from.mockImplementation((table: string) =>
+      table === 'account_transfers' ? { insert, update: voidUpdate } : bankReads.shift(),
+    );
+
+    const balanceSpy = vi
+      .spyOn(bankingService, 'updateAccountBalance')
+      .mockImplementation(async (accountId: string, _amount: number, type: 'credit' | 'debit') => {
+        if (accountId === 'b' && type === 'credit') throw new Error('credit leg failed');
+      });
+
+    await expect(
+      bankingService.createTransfer({ amount: 500, from_account_id: 'a', to_account_id: 'b' }),
+    ).rejects.toThrow('credit leg failed');
+
+    // debit source -> attempt credit destination -> compensating credit back to source
+    expect(balanceSpy).toHaveBeenNthCalledWith(1, 'a', 500, 'debit');
+    expect(balanceSpy).toHaveBeenNthCalledWith(2, 'b', 500, 'credit');
+    expect(balanceSpy).toHaveBeenNthCalledWith(3, 'a', 500, 'credit');
+    // the persisted 'completed' transfer row is soft-voided so cash is not understated
+    expect(voidUpdate).toHaveBeenCalledWith(expect.objectContaining({ deleted_at: expect.any(String) }));
+    expect(voidEq).toHaveBeenCalledWith('id', 't1');
+
+    balanceSpy.mockRestore();
   });
 });
 

@@ -116,6 +116,30 @@ describe('issueDeliveryChallan — idempotent per checkout batch', () => {
     expect(supabase.rpc).not.toHaveBeenCalled();
   });
 
+  it('reconciles to the canonical (earliest) row when a concurrent same-batch checkout already appended one', async () => {
+    // Pre-mint existence check finds nothing, so this caller proceeds to mint
+    // 0008. Between the check and the post-write re-read, a truly-concurrent
+    // checkout of the SAME batch landed an earlier row (0007). Reconciliation
+    // must return 0007 — the number this caller minted must NOT reach the
+    // customer, or the same handover would carry two statutory challans.
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(chain({ data: [], error: null })) // pre-mint check: none yet
+      .mockReturnValueOnce(chain({ data: [HISTORY_ROW], error: null })); // post-write reconcile: 0007
+    vi.mocked(supabase.rpc).mockImplementation(((fn: string) => {
+      if (fn === 'get_next_number') return Promise.resolve({ data: 'DC/25-26/0008', error: null });
+      return Promise.resolve({ data: undefined, error: null }); // log_case_history
+    }) as never);
+
+    const issued = await issueDeliveryChallan({
+      caseId: 'case-1',
+      batchId: 'batch-1',
+      lines: [{ deviceId: 'dev-1', declaredValue: 12000 }],
+    });
+
+    expect(issued.challanNo).toBe('DC/25-26/0007');
+    expect(issued.challanNo).not.toBe('DC/25-26/0008');
+  });
+
   it('refuses an empty line set', async () => {
     vi.mocked(supabase.from).mockReturnValue(chain({ data: [], error: null }));
     await expect(

@@ -223,6 +223,7 @@ export const InvoiceDetailPage: React.FC = () => {
 
   const handlePaymentRecorded = () => {
     queryClient.invalidateQueries({ queryKey: ['invoice', id] });
+    queryClient.invalidateQueries({ queryKey: ['invoice_payments', id] });
     queryClient.invalidateQueries({ queryKey: ['invoices'] });
     setShowPaymentModal(false);
   };

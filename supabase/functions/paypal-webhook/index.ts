@@ -113,51 +113,38 @@ Deno.serve(async (req: Request) => {
     const bodyText = await req.text();
     const event: PayPalWebhookEvent = JSON.parse(bodyText);
 
-    if (paypalMode === "live") {
-      if (!paypalWebhookId || !paypalClientId || !paypalClientSecret) {
-        console.error("PayPal credentials missing in live mode — rejecting webhook");
-        return new Response(
-          JSON.stringify({ error: "Webhook verification not configured" }),
-          { status: 500, headers: corsHeaders }
-        );
-      }
-
-      const accessToken = await getPayPalAccessToken(
-        paypalClientId,
-        paypalClientSecret,
-        paypalApiUrl
+    // Verify the webhook signature in ALL modes. PayPal exposes
+    // verify-webhook-signature on both the sandbox and live API hosts, so there
+    // is no mode in which unsigned events may be trusted — an unverified event
+    // can drive tenant subscription state off an attacker-supplied custom_id.
+    if (!paypalWebhookId || !paypalClientId || !paypalClientSecret) {
+      console.error("PayPal webhook verification not configured — rejecting webhook");
+      return new Response(
+        JSON.stringify({ error: "Webhook verification not configured" }),
+        { status: 500, headers: corsHeaders }
       );
-
-      const isValid = await verifyWebhookSignature(
-        paypalWebhookId,
-        req.headers,
-        bodyText,
-        paypalApiUrl,
-        accessToken
-      );
-
-      if (!isValid) {
-        console.error("Invalid webhook signature");
-        return new Response(
-          JSON.stringify({ error: "Invalid signature" }),
-          { status: 401, headers: corsHeaders }
-        );
-      }
-    } else {
-      console.log("Sandbox mode: skipping webhook signature verification");
     }
 
-    const { error: insertError } = await supabase
-      .from("billing_events")
-      .insert({
-        event_type: event.event_type,
-        event_data: event,
-        paypal_event_id: event.id,
-        created_at: new Date().toISOString(),
-      });
+    const accessToken = await getPayPalAccessToken(
+      paypalClientId,
+      paypalClientSecret,
+      paypalApiUrl
+    );
 
-    if (insertError && !insertError.message.includes('duplicate')) {
-      console.error("Failed to insert billing event:", insertError);
+    const isValid = await verifyWebhookSignature(
+      paypalWebhookId,
+      req.headers,
+      bodyText,
+      paypalApiUrl,
+      accessToken
+    );
+
+    if (!isValid) {
+      console.error("Invalid webhook signature");
+      return new Response(
+        JSON.stringify({ error: "Invalid signature" }),
+        { status: 401, headers: corsHeaders }
+      );
     }
 
     const tenantId = event.resource?.custom_id;
@@ -169,6 +156,32 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({ received: true }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Record the event in the ledger. payload and tenant_id are NOT NULL, so
+    // this must run after tenantId is derived. The unique paypal_event_id acts
+    // as the idempotency guard: a duplicate delivery means we already recorded
+    // (and processed) this event, so short-circuit before re-applying state.
+    const { error: insertError } = await supabase
+      .from("billing_events")
+      .insert({
+        event_type: event.event_type,
+        payload: event,
+        paypal_event_id: event.id,
+        tenant_id: tenantId,
+      });
+
+    if (insertError) {
+      const isDuplicate =
+        insertError.code === '23505' || insertError.message.includes('duplicate');
+      if (isDuplicate) {
+        console.log(`Duplicate webhook event ${event.id} — already recorded, skipping`);
+        return new Response(
+          JSON.stringify({ received: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      console.error("Failed to insert billing event:", insertError);
     }
 
     switch (event.event_type) {
@@ -260,26 +273,39 @@ Deno.serve(async (req: Request) => {
 
         const { data: subscription } = await supabase
           .from("tenant_subscriptions")
-          .select("plan_id")
+          .select("id, plan_id")
           .eq("paypal_subscription_id", paypalSubscriptionId)
-          .single();
+          .maybeSingle();
 
         if (subscription) {
-          const { data: nextNumber } = await supabase
-            .rpc("get_next_number", { sequence_name: "invoices" });
+          const { data: nextNumber, error: numberError } = await supabase
+            .rpc("get_next_number", { p_scope: "invoices" });
 
-          await supabase
+          if (numberError) {
+            console.error("Failed to mint billing invoice number:", numberError);
+          }
+
+          const nowIso = new Date().toISOString();
+          const { error: invoiceError } = await supabase
             .from("billing_invoices")
             .insert({
               tenant_id: tenantId,
-              subscription_id: subscription.plan_id,
+              subscription_id: subscription.id,
               invoice_number: nextNumber || `INV-${Date.now()}`,
-              invoice_date: new Date().toISOString(),
-              amount_cents: Math.round(amount * 100),
+              invoice_date: nowIso,
+              subtotal: amount,
+              total: amount,
+              amount_paid: amount,
+              amount_due: 0,
+              paid_at: nowIso,
               currency,
               status: 'paid',
               paypal_transaction_id: event.resource?.id,
             });
+
+          if (invoiceError) {
+            console.error("Failed to insert billing invoice:", invoiceError);
+          }
 
           await supabase
             .from("tenant_subscriptions")

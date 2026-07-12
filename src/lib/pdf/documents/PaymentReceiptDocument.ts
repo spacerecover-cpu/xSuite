@@ -164,7 +164,7 @@ export function buildPaymentReceiptDocument(
   } as Content;
 
   const currencySymbol = paymentData.accounting_locales?.currency_symbol || 'USD';
-  const decimalPlaces = paymentData.accounting_locales?.decimal_places || 2;
+  const decimalPlaces = paymentData.accounting_locales?.decimal_places ?? 2;
   const currencyPosition = paymentData.accounting_locales?.currency_position || 'after';
 
   const formatCurrencyValue = (amount: number): string =>

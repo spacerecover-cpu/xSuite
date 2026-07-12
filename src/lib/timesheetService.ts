@@ -1,3 +1,4 @@
+import { endOfWeek as endOfWeekFns, format } from 'date-fns';
 import { supabase } from './supabaseClient';
 import { sanitizeFilterValue } from './postgrestSanitizer';
 import { startOfWeekIso } from './weekDates';
@@ -188,9 +189,16 @@ export const timesheetService = {
   async getTimesheetStats(weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6): Promise<TimesheetStats> {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    // Upper bound (last day of the current month) so future-dated entries — e.g.
+    // a work_date in next month — don't inflate the current-month KPI. Mirrors
+    // getMonthlySummary's [gte, lte] window.
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
     // Honor the tenant's first-day-of-week instead of a hardcoded Monday, so the
     // "this week" hours window is correct for Sunday-start (Gulf/US) tenants.
     const startOfWeek = startOfWeekIso(now, weekStartsOn);
+    // Upper bound (last day of the same week) so future-dated entries don't
+    // inflate the current-week KPI. Local-date based to match startOfWeekIso.
+    const endOfWeek = format(endOfWeekFns(now, { weekStartsOn }), 'yyyy-MM-dd');
 
     const [totalRes, pendingRes, billableRes, weekRes] = await Promise.all([
       supabase.from('timesheets').select('id', { count: 'exact', head: true }),
@@ -202,8 +210,13 @@ export const timesheetService = {
         .from('timesheets')
         .select('hours')
         .eq('is_billable', true)
-        .gte('work_date', startOfMonth),
-      supabase.from('timesheets').select('hours').gte('work_date', startOfWeek),
+        .gte('work_date', startOfMonth)
+        .lte('work_date', endOfMonth),
+      supabase
+        .from('timesheets')
+        .select('hours')
+        .gte('work_date', startOfWeek)
+        .lte('work_date', endOfWeek),
     ]);
 
     const billableHours = (billableRes.data ?? []).reduce((sum, r) => sum + (r.hours ?? 0), 0);

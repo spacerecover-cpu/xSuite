@@ -1,4 +1,4 @@
-import { StrictMode } from 'react';
+import { StrictMode, useState } from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import i18n from '../lib/i18n';
@@ -9,11 +9,12 @@ import type { TenantConfig } from '../types/tenantConfig';
 // reads config.locale.languageCode + refreshConfig via useTenantConfig().
 const refreshConfig = vi.fn(async () => {});
 let mockConfig: TenantConfig = DEFAULT_TENANT_CONFIG;
+let mockIsLoading = false;
 
 vi.mock('./TenantConfigContext', () => ({
   useTenantConfig: () => ({
     config: mockConfig,
-    isLoading: false,
+    isLoading: mockIsLoading,
     refreshConfig,
   }),
 }));
@@ -22,7 +23,7 @@ vi.mock('./TenantConfigContext', () => ({
 // test stays hermetic and importing it does not pull in the real Supabase client.
 // vi.hoisted initialises the spy before the hoisted vi.mock factory runs.
 const { updateTenantUiLanguage } = vi.hoisted(() => ({
-  updateTenantUiLanguage: vi.fn(async () => {}),
+  updateTenantUiLanguage: vi.fn(async (_tenantId: string, _lang: string) => {}),
 }));
 vi.mock('../lib/tenantConfigService', () => ({ updateTenantUiLanguage }));
 
@@ -49,10 +50,39 @@ function SetLocaleButton() {
   );
 }
 
+// Surfaces whether setLocale rejected, so a swallowed persistence error is observable.
+function SetLocaleProbe() {
+  const { setLocale } = useLocale();
+  const [outcome, setOutcome] = useState('');
+  return (
+    <button
+      data-testid="outcome"
+      data-outcome={outcome}
+      onClick={async () => {
+        try {
+          await setLocale('ar');
+          setOutcome('resolved');
+        } catch {
+          setOutcome('rejected');
+        }
+      }}
+    >
+      flip-to-ar
+    </button>
+  );
+}
+
 beforeEach(() => {
   refreshConfig.mockClear();
   updateTenantUiLanguage.mockClear();
+  // A successful persist writes the tenant's ui_language; refreshConfig then makes
+  // it authoritative. Model that here so clearing the optimistic value resolves to
+  // the newly-persisted language rather than the pre-change mock config.
+  updateTenantUiLanguage.mockImplementation(async (_tenantId: string, lang: string) => {
+    mockConfig = configWithLang(lang);
+  });
   mockConfig = DEFAULT_TENANT_CONFIG;
+  mockIsLoading = false;
   localStorage.clear();
   document.documentElement.dir = '';
   document.documentElement.lang = '';
@@ -152,6 +182,56 @@ describe('LocaleContext', () => {
     expect(refreshConfig).toHaveBeenCalled();
   });
 
+  it('rethrows and reverts the optimistic flip when persistence fails', async () => {
+    mockConfig = configWithLang('en');
+    updateTenantUiLanguage.mockRejectedValueOnce(new Error('RLS denied'));
+
+    await act(async () => {
+      render(
+        <LocaleProvider>
+          <SetLocaleProbe />
+        </LocaleProvider>
+      );
+    });
+
+    expect(document.documentElement.dir).toBe('ltr');
+
+    await act(async () => {
+      screen.getByTestId('outcome').click();
+    });
+
+    // The caller must see the rejection (so it can show an error toast), not a
+    // silently-swallowed success.
+    expect(screen.getByTestId('outcome')).toHaveAttribute('data-outcome', 'rejected');
+    // Optimistic state is reverted to the persisted tenant language.
+    expect(document.documentElement.dir).toBe('ltr');
+    expect(document.documentElement.lang).toBe('en');
+    expect(i18n.language).toBe('en');
+    expect(localStorage.getItem('xsuite_locale_hint')).toBe('en');
+    // refreshConfig is never reached because the write threw first.
+    expect(refreshConfig).not.toHaveBeenCalled();
+  });
+
+  it('clears optimistic state after a successful persist so refreshed config is authoritative', async () => {
+    mockConfig = configWithLang('en');
+
+    await act(async () => {
+      render(
+        <LocaleProvider>
+          <SetLocaleProbe />
+        </LocaleProvider>
+      );
+    });
+
+    await act(async () => {
+      screen.getByTestId('outcome').click();
+    });
+
+    expect(screen.getByTestId('outcome')).toHaveAttribute('data-outcome', 'resolved');
+    expect(updateTenantUiLanguage).toHaveBeenCalledWith('tenant-1', 'ar');
+    expect(refreshConfig).toHaveBeenCalled();
+  });
+
   it('useLocale exposes the effective locale', async () => {
     mockConfig = configWithLang('ar');
     function Probe() {
@@ -166,6 +246,52 @@ describe('LocaleContext', () => {
       );
     });
     expect(screen.getByTestId('locale')).toHaveTextContent('ar');
+  });
+
+  it('preserves the pre-seeded RTL hint during tenant-config load instead of flashing LTR', async () => {
+    // main.tsx synchronously pre-seeds this for a returning Arabic tenant before
+    // React mounts, so the first paint is RTL.
+    localStorage.setItem('xsuite_locale_hint', 'ar');
+    document.documentElement.dir = 'rtl';
+    document.documentElement.lang = 'ar';
+    await i18n.changeLanguage('ar');
+    // Pre-profile auth window: tenantId is still undefined so loadConfig short-circuits
+    // with isLoading=false while config stays DEFAULT_TENANT_CONFIG (unresolved 'en').
+    // This is the dominant part of a hard reload and the exact window the flash occurs in;
+    // the guard must key off isResolvedConfig(config), not isLoading.
+    mockIsLoading = false;
+    mockConfig = DEFAULT_TENANT_CONFIG;
+
+    let rerender!: ReturnType<typeof render>['rerender'];
+    await act(async () => {
+      const r = render(
+        <LocaleProvider>
+          <span>child</span>
+        </LocaleProvider>
+      );
+      rerender = r.rerender;
+    });
+
+    // The loading window must NOT clobber the pre-seeded RTL direction with the
+    // DEFAULT 'en'/LTR — that would be the visible LTR reflow flash on every reload.
+    expect(document.documentElement.dir).toBe('rtl');
+    expect(document.documentElement.lang).toBe('ar');
+    expect(i18n.language).toBe('ar');
+
+    // Once the real Arabic tenant config resolves, it stays RTL (fix doesn't pin to the hint).
+    mockIsLoading = false;
+    mockConfig = configWithLang('ar');
+    await act(async () => {
+      rerender(
+        <LocaleProvider>
+          <span>child</span>
+        </LocaleProvider>
+      );
+    });
+
+    expect(document.documentElement.dir).toBe('rtl');
+    expect(document.documentElement.lang).toBe('ar');
+    expect(i18n.language).toBe('ar');
   });
 
   it('is idempotent under StrictMode double-invoke', async () => {

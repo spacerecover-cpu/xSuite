@@ -275,6 +275,21 @@ export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
     }
   }
 
+  /**
+   * Resolve the identity to attribute THIS slot's signature to. A data-destruction
+   * certificate must attest three independent signatories, so we must never blanket-stamp
+   * every slot with the logged-in approver. The capture modal's "Type" method collects the
+   * signer's own name (sig.typedValue) — use it when present. Only the authenticated
+   * approver falls back to their account name; the operator and witness fall back to their
+   * role label so they are never silently mis-attributed to the approver.
+   */
+  function resolveSlotSignerName(slot: PendingSlot, sig: CapturedSignature): string {
+    const typed = sig.method === 'typed' ? sig.typedValue?.trim() : undefined;
+    if (typed) return typed;
+    if (slot.slot === 'approver') return profile?.full_name?.trim() || 'Staff';
+    return slot.signerRole;
+  }
+
   /** Called when SignatureCaptureModal fires onCapture for the current slot. */
   async function handleCapture(sig: CapturedSignature) {
     if (!id || !currentSlot) return;
@@ -284,7 +299,7 @@ export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
         instanceId: id,
         slot: currentSlot.slot,
         method: sig.method,
-        signerName: profile?.full_name ?? 'Staff',
+        signerName: resolveSlotSignerName(currentSlot, sig),
         signerRole: currentSlot.signerRole,
         typedValue: sig.typedValue,
         imageBlob: sig.imageBlob,

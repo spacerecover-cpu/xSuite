@@ -370,10 +370,25 @@ describe('line-item mappers (replace the old as-unknown-as array casts)', () => 
     expect(result[0].item_code).toBe('998713');
   });
 
-  it('toInvoiceItems computes line_total from quantity*unit_price (no DB column) and maps tax_rate', () => {
+  it('toQuoteItems carries the stored discount-net line total so lines reconcile with the printed Subtotal', () => {
+    // Imported quote line: qty=2, unit_price=500, discount=20% → stored quote_items.total=800,
+    // the net that quotes.subtotal is summed from. The PDF must print 800, NOT the gross 1000
+    // that the adapter's quantity*unit_price fallback would show when line_total is absent.
+    const result = toQuoteItems([{ id: 'qi1', description: 'Imaging', quantity: 2, unit_price: 500, discount: 20, total: 800 }]);
+    expect(result[0].line_total).toBe(800);
+  });
+
+  it('toInvoiceItems computes line_total as tax-exclusive net (no line discount) and maps tax_rate', () => {
     const result = toInvoiceItems([{ id: 'li1', description: 'Recovery', quantity: 3, unit_price: 50, tax_rate: 5 }]);
     expect(result[0].line_total).toBe(150);
     expect(result[0].tax_rate).toBe(5);
+  });
+
+  it('toInvoiceItems applies the per-line discount PERCENT so line totals reconcile with the stored Subtotal', () => {
+    // qty=1, unit_price=1000, discount=10% → net 900 (matches stored invoice_line_items.total base / invoices.subtotal),
+    // NOT the gross 1000 that quantity*unit_price would print.
+    const result = toInvoiceItems([{ id: 'li1', description: 'Recovery', quantity: 1, unit_price: 1000, tax_rate: 0, discount: 10 }]);
+    expect(result[0].line_total).toBe(900);
   });
 
   it('both mappers return [] for null/undefined input', () => {

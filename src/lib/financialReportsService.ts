@@ -257,6 +257,7 @@ export const generateCashFlowReport = async (
     supabase
       .from('payments')
       .select('amount, amount_base, status')
+      .is('deleted_at', null)
       .gte('payment_date', dateFrom)
       .lte('payment_date', dateTo)
       .eq('status', 'completed'),
@@ -307,11 +308,13 @@ export const generateInvoiceSummaryReport = async (
     supabase
       .from('invoices')
       .select('status, invoice_type, total_amount, total_amount_base, amount_paid, amount_paid_base, balance_due, balance_due_base')
+      .is('deleted_at', null)
       .gte('invoice_date', dateFrom)
       .lte('invoice_date', dateTo),
     supabase
       .from('quotes')
       .select('status')
+      .is('deleted_at', null)
       .gte('quote_date', dateFrom)
       .lte('quote_date', dateTo),
   ]);
@@ -378,6 +381,7 @@ export const generateRevenueByCustomerReport = async (
       amount_paid_base,
       customer:customers_enhanced(id, customer_name, email)
     `)
+    .is('deleted_at', null)
     .gte('invoice_date', dateFrom)
     .lte('invoice_date', dateTo);
 
@@ -651,7 +655,7 @@ export const generateInvoiceVsExpenseReport = async (
   const [invoicesRes, expensesRes] = await Promise.all([
     supabase
       .from('invoices')
-      .select('id, total_amount, total_amount_base, amount_paid, invoice_date, paid_at, status')
+      .select('id, amount_paid, amount_paid_base, invoice_date, paid_at, status')
       .is('deleted_at', null)
       .gte('invoice_date', dateFrom)
       .lte('invoice_date', dateTo),
@@ -675,7 +679,7 @@ export const generateInvoiceVsExpenseReport = async (
     if (!inv.invoice_date) continue;
     const key = inv.invoice_date.slice(0, 7);
     if (!byMonth[key]) byMonth[key] = { revenue: 0, expense: 0 };
-    byMonth[key].revenue += baseAmount(inv, 'total_amount');
+    byMonth[key].revenue += baseAmount(inv, 'amount_paid');
   }
   for (const exp of expensesRes.data ?? []) {
     if (!exp.expense_date) continue;

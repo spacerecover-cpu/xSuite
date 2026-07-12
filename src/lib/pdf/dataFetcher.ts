@@ -26,6 +26,7 @@ import type { Database } from '../../types/database.types';
 import type { CurrencyConfig } from '../../types/tenantConfig';
 import { getTenantConfig } from '../tenantConfigService';
 import { renderCurrencyToken } from '../format';
+import { roundMoney } from '../financialMath';
 
 type QuotesRow = Database['public']['Tables']['quotes']['Row'];
 type InvoicesRow = Database['public']['Tables']['invoices']['Row'];
@@ -226,15 +227,25 @@ function toIdFullName(src: unknown): { id: string; full_name: string } | undefin
 
 // Line-item mappers — typed field extraction replaces the old
 // `as unknown as XItemData[]` casts so a column rename is a compile error.
-// Neither table has a `line_total` column: the quote builder computes the row
-// total itself, and the invoice builder falls back to quantity*unit_price, so
-// we compute it here to satisfy the required field without changing output.
+// `quote_items` carries a stored, NOT-NULL `total` — the discount-net,
+// tax-EXCLUSIVE line amount that `quotes.subtotal` is summed from — so
+// `line_total` is that stored value (mirroring quotesService.getQuoteById:
+// `line_total: it.total`). Carrying it means imported quotes with a per-line
+// `discount` PERCENT print the same net the quote was priced/stored at and the
+// summed lines reconcile with the printed Subtotal; a render-time gross
+// quantity*unit_price would drop the discount and not reconcile.
+// `invoice_line_items` also carries a stored `total`, but that one is
+// tax-INCLUSIVE (post line- and document-discount), so toInvoiceItems instead
+// computes the discount-adjusted, tax-EXCLUSIVE net from `quantity`,
+// `unit_price` and the per-line `discount` PERCENT to reconcile with the
+// stored, discount-net Subtotal (not gross, and not the tax-inclusive `total`).
 export function toQuoteItems(rows: Partial<QuoteItemsRow>[] | null | undefined): QuoteItemData[] {
   return (rows ?? []).map(row => ({
     id: row.id ?? undefined,
     description: row.description ?? '',
     quantity: row.quantity ?? 0,
     unit_price: row.unit_price ?? 0,
+    line_total: row.total ?? undefined,
     unit_label: row.unit_label ?? null,
     item_code: row.item_code ?? null,
   }));
@@ -244,13 +255,18 @@ export function toInvoiceItems(rows: Partial<InvoiceLineItemsRow>[] | null | und
   return (rows ?? []).map(row => {
     const quantity = row.quantity ?? 0;
     const unit_price = row.unit_price ?? 0;
+    // `discount` is a per-line PERCENT (invoiceService stores `item.discount_percent`).
+    // Render the discount-adjusted, tax-exclusive net so the summed lines reconcile
+    // with the stored, discount-net Subtotal — not the gross quantity*unit_price,
+    // and not the stored `total` (which is tax-INCLUSIVE).
+    const discountPct = row.discount ?? 0;
     return {
       id: row.id ?? undefined,
       description: row.description ?? '',
       quantity,
       unit_price,
       tax_rate: row.tax_rate ?? 0,
-      line_total: quantity * unit_price,
+      line_total: roundMoney(quantity * unit_price * (1 - discountPct / 100)),
       unit_label: row.unit_label ?? null,
       item_code: row.item_code ?? null,
     };
@@ -1171,7 +1187,11 @@ async function fetchChainOfCustodyEntries(caseId: string): Promise<ChainOfCustod
     .from('chain_of_custody')
     .select('id, action, action_category, actor_name, actor_role, created_at, description, evidence_hash, metadata')
     .eq('case_id', caseId)
-    .order('created_at', { ascending: true });
+    // Mirror of the UI ledger's (created_at DESC, id DESC) ordering: ascending here
+    // so the PDF entry_number (index+1) matches the UI's for tied-timestamp rows
+    // (e.g. a multi-device intake). Direction must stay ASC — id DESC would re-break it.
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true });
 
   if (error) {
     console.error('Error fetching chain of custody entries:', error);

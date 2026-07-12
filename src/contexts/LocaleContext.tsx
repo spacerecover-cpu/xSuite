@@ -3,6 +3,7 @@ import i18n from '../lib/i18n';
 import { isRTLLanguage, normalizeLang, hydrateLanguages } from '../lib/locale';
 import { fetchActiveLanguages } from '../lib/languageService';
 import { useTenantConfig } from './TenantConfigContext';
+import { isResolvedConfig } from '../types/tenantConfig';
 import { updateTenantUiLanguage } from '../lib/tenantConfigService';
 import { logger } from '../lib/logger';
 
@@ -36,6 +37,14 @@ function persistLocaleHint(lang: Locale): void {
   }
 }
 
+function readLocaleHint(): string | null {
+  try {
+    return localStorage.getItem(LOCALE_HINT_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
   const { config, refreshConfig } = useTenantConfig();
   const tenantLang = normalizeLang(config.locale.languageCode);
@@ -43,7 +52,23 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
 
   const [optimisticLang, setOptimisticLang] = useState<Locale | null>(null);
 
-  const effectiveLang = optimisticLang ?? tenantLang;
+  // Snapshot the anti-flash hint main.tsx pre-seeded (read once — it holds the
+  // pre-mount value; we overwrite it ourselves via persistLocaleHint below).
+  const hintLang = useMemo<Locale | null>(() => {
+    const raw = readLocaleHint();
+    return raw ? normalizeLang(raw) : null;
+  }, []);
+
+  // Until the real tenant config resolves, `config` is DEFAULT_TENANT_CONFIG
+  // (languageCode 'en'). Adopting that would force dir='ltr' + English i18n and
+  // clobber the RTL direction main.tsx pre-seeded from the persisted hint — a full
+  // LTR→RTL→LTR reflow flash for returning Arabic tenants on every reload. Guard on
+  // isResolvedConfig(), not isLoading: during the pre-profile auth window tenantId
+  // is undefined so loadConfig short-circuits with isLoading=false while config is
+  // still DEFAULT — that whole window would otherwise flash LTR. Prefer the persisted
+  // hint until the config actually resolves. An in-flight optimistic change (setLocale)
+  // still wins so its flip is never suppressed.
+  const effectiveLang = optimisticLang ?? (isResolvedConfig(config) ? tenantLang : (hintLang ?? tenantLang));
 
   useEffect(() => {
     applyLocaleToDOM(effectiveLang);
@@ -66,8 +91,11 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     try {
       await updateTenantUiLanguage(tenantId, next);
       await refreshConfig();
+      setOptimisticLang(null);
     } catch (err) {
-      logger.error('Failed to persist UI language:', err);
+      logger.error('Failed to persist UI language; reverting:', err);
+      setOptimisticLang(null);
+      throw err;
     }
   }, [tenantId, refreshConfig]);
 

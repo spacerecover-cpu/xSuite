@@ -228,20 +228,38 @@ export const fiscalYearBounds = (
 export const getFinancialYearDates = (fiscalYearStart = '01-01') => {
   const now = new Date();
   const currentYear = now.getFullYear();
+  const month = now.getMonth();
   const fy = fiscalYearBounds(fiscalYearStart, now);
+
+  // Build month/quarter boundaries as date-only strings via UTC arithmetic, mirroring
+  // fiscalYearBounds. Constructing new Date(y, m, d) at the BROWSER's local midnight and
+  // then calling toISOString() shifts every boundary a day back for UTC+ tenants (Muscat,
+  // Riyadh, Dubai, Kolkata — the primary GCC market); Date.UTC + getUTC* never drifts.
+  const pad = (n: number) => String(n).padStart(2, '0');
+  // First day of month `m` (0-based; may under/overflow into adjacent years).
+  const firstOfMonth = (y: number, m: number) => {
+    const d = new Date(Date.UTC(y, m, 1));
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-01`;
+  };
+  // Last day of month `m` (0-based; day 0 of the next month is the last day of this one).
+  const lastOfMonth = (y: number, m: number) => {
+    const d = new Date(Date.UTC(y, m + 1, 0));
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+  };
+  const quarterStartMonth = Math.floor(month / 3) * 3;
 
   return {
     thisMonth: {
-      start: new Date(currentYear, now.getMonth(), 1).toISOString().split('T')[0],
-      end: new Date(currentYear, now.getMonth() + 1, 0).toISOString().split('T')[0],
+      start: firstOfMonth(currentYear, month),
+      end: lastOfMonth(currentYear, month),
     },
     lastMonth: {
-      start: new Date(currentYear, now.getMonth() - 1, 1).toISOString().split('T')[0],
-      end: new Date(currentYear, now.getMonth(), 0).toISOString().split('T')[0],
+      start: firstOfMonth(currentYear, month - 1),
+      end: lastOfMonth(currentYear, month - 1),
     },
     thisQuarter: {
-      start: new Date(currentYear, Math.floor(now.getMonth() / 3) * 3, 1).toISOString().split('T')[0],
-      end: new Date(currentYear, Math.floor(now.getMonth() / 3) * 3 + 3, 0).toISOString().split('T')[0],
+      start: firstOfMonth(currentYear, quarterStartMonth),
+      end: lastOfMonth(currentYear, quarterStartMonth + 2),
     },
     thisYear: fy.thisYear,
     lastYear: fy.lastYear,

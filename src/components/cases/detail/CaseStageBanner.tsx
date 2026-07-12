@@ -60,7 +60,15 @@ export function CaseStageBanner({
   });
 
   const nextAction = useMemo(
-    () => suggestNextAction(currentPhase, callerRole, allowed),
+    () => {
+      const suggestion = suggestNextAction(currentPhase, callerRole, allowed);
+      // Entering no_solution is DB-gated on cases.no_solution_reason_id being
+      // recorded first (transition_case_status ignores p_reason). Only
+      // MarkNoSolutionModal captures + sets that reason, so the banner must
+      // never offer no_solution as a plain forward move — it would 23514 every
+      // time. Route users to the dedicated "No Solution" action instead.
+      return suggestion && suggestion.to_phase === 'no_solution' ? null : suggestion;
+    },
     [currentPhase, callerRole, allowed],
   );
 
@@ -72,7 +80,11 @@ export function CaseStageBanner({
   const otherForwardEdges = useMemo(
     () =>
       allowed.filter(
-        (a) => a.to_phase !== 'cancelled' && !a.is_reopen && a !== nextAction,
+        (a) =>
+          a.to_phase !== 'cancelled' &&
+          a.to_phase !== 'no_solution' &&
+          !a.is_reopen &&
+          a !== nextAction,
       ),
     [allowed, nextAction],
   );

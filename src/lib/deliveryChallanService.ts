@@ -172,6 +172,15 @@ export async function issueDeliveryChallan(params: {
     throw historyError;
   }
 
+  // Mint-then-append is NOT atomic (no DB lock / unique constraint on
+  // case_id+batch_id — see cross-file note), so a truly-concurrent checkout of
+  // the same batch can append its own row carrying a different number. Re-read
+  // the ledger and return the CANONICAL (earliest) challan: every caller and
+  // every later reprint via getIssuedChallan then converge on ONE statutory
+  // number, so the customer is never handed two challans for one handover.
+  const canonical = await getIssuedChallan(params.caseId, params.batchId);
+  if (canonical) return canonical;
+
   return { caseId: params.caseId, batchId: params.batchId, challanNo, issuedAt, lines: params.lines, totalDeclaredValue };
 }
 

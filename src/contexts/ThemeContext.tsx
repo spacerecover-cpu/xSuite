@@ -31,15 +31,35 @@ function persistThemeHint(theme: Theme): void {
   }
 }
 
+function readThemeHint(): Theme | null {
+  try {
+    const hint = localStorage.getItem(THEME_HINT_KEY);
+    if (hint && (THEMES as readonly string[]).includes(hint)) {
+      return hint as Theme;
+    }
+  } catch {
+    // Ignore privacy-mode / disabled-storage errors — fall back to the config theme.
+  }
+  return null;
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const { config, refreshConfig } = useTenantConfig();
+  const { config, isLoading, refreshConfig } = useTenantConfig();
   const tenantTheme = config.theme;
   const tenantId = config.tenantId;
 
   const [optimisticTheme, setOptimisticTheme] = useState<Theme | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  // Snapshot of the pre-mounted anti-flash theme (main.tsx stamps this onto
+  // document.documentElement from the persisted hint before React mounts).
+  const [hintTheme] = useState<Theme | null>(() => readThemeHint());
 
-  const effectiveTheme = optimisticTheme ?? tenantTheme;
+  // While the tenant config is still loading, TenantConfigProvider serves
+  // DEFAULT_TENANT_CONFIG (theme: 'royal'). Applying that to the DOM would clobber
+  // the hint main.tsx already stamped and flash returning non-royal tenants to
+  // Royal on every full reload. Keep the pre-mounted hint until the real config
+  // resolves, then switch to the tenant's actual theme.
+  const effectiveTheme = optimisticTheme ?? (isLoading ? (hintTheme ?? tenantTheme) : tenantTheme);
 
   useEffect(() => {
     applyThemeToDOM(effectiveTheme);

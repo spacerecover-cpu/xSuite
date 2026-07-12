@@ -80,4 +80,23 @@ describe('DeviceCheckoutModal', () => {
     );
     expect(screen.queryByText(/Checkout failed/i)).not.toBeInTheDocument();
   });
+
+  it('seeds the outcome from the case and does not overwrite a recorded partial recovery on a passive checkout', async () => {
+    // The case was correctly marked 'partial' during recovery/QA. Staff open the
+    // modal and check out without touching the dropdown — the recorded outcome
+    // must be sent back, not the hardcoded default 'full'.
+    renderModal({ currentRecoveryOutcome: 'partial' });
+
+    // The dropdown reflects the recorded value.
+    expect((screen.getByRole('combobox', { name: /Recovery Outcome/i }) as HTMLSelectElement).value).toBe('partial');
+
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: /Print Checkout Form/i }));
+
+    await waitFor(() => expect(supabase.rpc).toHaveBeenCalled());
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      'log_case_checkout',
+      expect.objectContaining({ p_recovery_outcome: 'partial' }),
+    );
+  });
 });

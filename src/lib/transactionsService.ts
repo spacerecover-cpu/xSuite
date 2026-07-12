@@ -145,13 +145,27 @@ export const createTransaction = async (
   return data;
 };
 
-export const reconcileTransaction = async (id: string) => {
-  return fetchTransactionById(id);
+// Reconciliation is NOT backed on this ledger. financial_transactions is
+// append-only (REVOKE UPDATE/DELETE + prevent_audit_mutation) and has NO
+// is_reconciled/reconciled_at column — those live on the separate
+// bank_transactions table, which is keyed by bank_account_id, not by a
+// financial_transactions.id. The previous implementation did a pure read
+// (fetchTransactionById) and returned the row, so the mutation resolved and
+// the UI reported success while persisting nothing. Fail loudly instead of
+// presenting a read-only call as a completed write. A real reconcile needs a
+// SECURITY DEFINER RPC that stamps the correct table atomically; wire these to
+// that RPC once it exists (and until then the UI action must be removed).
+const RECONCILE_UNSUPPORTED =
+  'Reconciliation is not available for ledger transactions: the append-only ' +
+  'financial_transactions table has no reconciliation state to persist. ' +
+  'Reconcile bank statement lines from Banking instead.';
+
+export const reconcileTransaction = async (_id: string): Promise<never> => {
+  throw new Error(RECONCILE_UNSUPPORTED);
 };
 
-export const bulkReconcileTransactions = async (ids: string[]) => {
-  const results = await Promise.all(ids.map(id => fetchTransactionById(id)));
-  return results;
+export const bulkReconcileTransactions = async (_ids: string[]): Promise<never> => {
+  throw new Error(RECONCILE_UNSUPPORTED);
 };
 
 // Void = post a reversing (contra) entry. The original ledger row is

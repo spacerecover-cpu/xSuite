@@ -63,9 +63,14 @@ export function amountInWordsEn(
   decimals = 2,
   scale: 'western' | 'indian' = 'western',
 ): string {
-  const whole = Math.floor(Math.abs(amount));
+  let whole = Math.floor(Math.abs(amount));
   const factor = 10 ** decimals;
-  const minor = Math.round((Math.abs(amount) - whole) * factor);
+  let minor = Math.round((Math.abs(amount) - whole) * factor);
+  // Carry when the fractional part rounds up to a full unit (minor === factor):
+  // otherwise the whole never increments and minorPart spells the full factor as a
+  // fraction (e.g. 9.999 → "Nine and 100/100" instead of "Ten"), and padStart would
+  // overflow to decimals+1 digits.
+  if (minor === factor) { whole += 1; minor = 0; }
   // `?? ''` aligns the indian path with the western one (numberToWordsEn returns ''
   // for non-finite) and the S4 sibling formatAmountWordsForScale's null-guard, so a
   // non-finite amount degrades to no words rather than the literal "null" on a doc.
@@ -124,9 +129,11 @@ function numberToWordsAr(value: number): string {
  * over the currency's 10^decimals factor when non-zero, so OMR/baisa and JPY are both
  * correct (D13). */
 export function amountInWordsAr(amount: number, currency = '', decimals = 2): string {
-  const whole = Math.floor(Math.abs(amount));
+  let whole = Math.floor(Math.abs(amount));
   const factor = 10 ** decimals;
-  const minor = Math.round((Math.abs(amount) - whole) * factor);
+  let minor = Math.round((Math.abs(amount) - whole) * factor);
+  // Carry a rounded-up minor unit into the whole (see amountInWordsEn).
+  if (minor === factor) { whole += 1; minor = 0; }
   const words = numberToWordsAr(whole);
   const minorPart = decimals > 0 && minor > 0 ? ` و${numberToWordsAr(minor)}` : '';
   return `${words}${minorPart}${currency ? ` ${currency}` : ''} فقط`;
@@ -164,11 +171,13 @@ export function formatAmountWordsForScale(
   amount: number, currency: string, decimals: number, scale: ScaleSystem,
 ): string | null {
   if (scale === 'indian') {
-    const whole = Math.floor(Math.abs(amount));
+    let whole = Math.floor(Math.abs(amount));
+    const factor = 10 ** decimals;
+    let minor = Math.round((Math.abs(amount) - whole) * factor);
+    // Carry a rounded-up minor unit into the whole before spelling (see amountInWordsEn).
+    if (minor === factor) { whole += 1; minor = 0; }
     const words = numberToWordsEnIndian(whole);
     if (words === null) return null;
-    const factor = 10 ** decimals;
-    const minor = Math.round((Math.abs(amount) - whole) * factor);
     const minorPart = decimals > 0 && minor > 0 ? ` and ${String(minor).padStart(decimals, '0')}/${factor}` : '';
     return `${currency ? `${currency} ` : ''}${words}${minorPart} only`;
   }

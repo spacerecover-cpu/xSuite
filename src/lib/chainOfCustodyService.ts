@@ -337,11 +337,17 @@ export async function getChainOfCustody(
 ): Promise<ChainOfCustodyEntry[]> {
   // chain_of_custody schema has no entry_number or occurred_at column.
   // Order by created_at instead; filter date ranges via created_at.
+  // created_at DEFAULTs to now() = transaction-start time, so a multi-device
+  // intake writes several rows with an identical created_at. `id` is a stable
+  // tiebreaker: this DESC order is the exact reverse of the PDF path's
+  // `created_at ASC, id ASC` (src/lib/pdf/dataFetcher.ts), which is what keeps
+  // the derived entry_number identical on-screen and in the exported PDF.
   let query = supabase
     .from('chain_of_custody')
     .select('*')
     .eq('case_id', caseId)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false });
 
   if (options?.category) {
     query = query.eq('action_category', options.category);
@@ -780,7 +786,9 @@ export async function searchChainOfCustody(params: {
     query = query.eq('actor_id', params.actorId);
   }
 
-  query = query.order('created_at', { ascending: false });
+  // Same deterministic (created_at DESC, id DESC) order as getChainOfCustody so
+  // the synthesized entry_number stays stable and matches the PDF export.
+  query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
 
   const { data, error } = await query;
 
@@ -1216,7 +1224,10 @@ export async function fetchCustodyFeed(opts: {
       'id, case_id, device_id, action, action_category, description, actor_name, custody_status, created_at, cases:case_id(case_no)',
       { count: 'exact' },
     )
-    .order('created_at', { ascending: false });
+    // `id` tiebreaker keeps pagination deterministic when rows from one
+    // multi-device intake share an identical created_at.
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false });
 
   if (search) {
     const s = sanitizeFilterValue(search);

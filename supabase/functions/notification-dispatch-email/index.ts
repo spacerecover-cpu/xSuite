@@ -19,11 +19,28 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const GMAIL_USER = Deno.env.get("GMAIL_USER") ?? "";
 const GMAIL_APP_PASSWORD = Deno.env.get("GMAIL_APP_PASSWORD") ?? "";
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+// CORS is restricted to the origin allowlist (same pattern as send-document-email
+// / process-scheduled-followups siblings). This is a service-to-service function
+// invoked by pg_net with the service-role bearer, so it must never reflect '*'.
+const ALLOWED_ORIGINS = [
+  "https://xsuite.space",
+  "https://space-recovery.pages.dev",
+  ...(Deno.env.get("ALLOWED_ORIGINS") || Deno.env.get("ALLOWED_ORIGIN") || "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean),
+];
+
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("Origin") || "";
+  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+    "Vary": "Origin",
+  };
+}
 
 // Minimal {{variable}} substitution. Matches the SQL render helper used by
 // the in-app dispatch trigger so behavior is consistent across channels.
@@ -154,19 +171,34 @@ async function logNotification(
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
+  const CORS = corsHeaders(req);
+
+  if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
 
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...CORS, "Content-Type": "application/json" },
+    });
+  }
+
+  // Caller authorization: only the DB dispatch trigger (via pg_net) may invoke
+  // this, carrying the service-role bearer. This is the sole tenant-authz gate —
+  // it prevents any authenticated cross-tenant user from forcing another
+  // tenant's notification emails to be dispatched. Matches the
+  // process-scheduled-followups sibling.
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!SERVICE_ROLE_KEY || authHeader !== `Bearer ${SERVICE_ROLE_KEY}`) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
 
   if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
     return new Response(
       JSON.stringify({ error: "Email service not configured (GMAIL_USER/GMAIL_APP_PASSWORD)" }),
-      { status: 503, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
+      { status: 503, headers: { ...CORS, "Content-Type": "application/json" } },
     );
   }
 
@@ -176,7 +208,7 @@ Deno.serve(async (req: Request) => {
   } catch {
     return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
       status: 400,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
 
@@ -184,7 +216,7 @@ Deno.serve(async (req: Request) => {
   if (!eventId) {
     return new Response(JSON.stringify({ error: "event_id required" }), {
       status: 400,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
 
@@ -201,10 +233,36 @@ Deno.serve(async (req: Request) => {
   if (eventErr || !eventRow) {
     return new Response(
       JSON.stringify({ error: "Event not found", event_id: eventId }),
-      { status: 404, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
+      { status: 404, headers: { ...CORS, "Content-Type": "application/json" } },
     );
   }
   const event = eventRow as unknown as NotificationEvent;
+
+  // 1b. Idempotency guard: atomically claim the event by stamping processed_at
+  // only if it is still NULL. A retry/replay of the same event_id finds
+  // processed_at already set, matches zero rows here, and no-ops — so an event
+  // dispatches AT MOST ONCE (no duplicate emails, no duplicate notification_log
+  // rows) even under pg_net retries or a double invocation.
+  const { data: claimed, error: claimErr } = await supabase
+    .from("notification_events")
+    .update({ processed_at: new Date().toISOString() })
+    .eq("id", eventId)
+    .is("processed_at", null)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
+  if (claimErr) {
+    return new Response(JSON.stringify({ error: claimErr.message }), {
+      status: 500,
+      headers: { ...CORS, "Content-Type": "application/json" },
+    });
+  }
+  if (!claimed) {
+    return new Response(
+      JSON.stringify({ ok: true, deliveries: 0, reason: "already_processed", event_id: eventId }),
+      { headers: { ...CORS, "Content-Type": "application/json" } },
+    );
+  }
 
   // 2. Find every active email subscription for this event_type in the tenant.
   const { data: subs, error: subsErr } = await supabase
@@ -219,14 +277,14 @@ Deno.serve(async (req: Request) => {
   if (subsErr) {
     return new Response(JSON.stringify({ error: subsErr.message }), {
       status: 500,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
   const subscriptions = (subs ?? []) as unknown as EmailSubscription[];
 
   if (subscriptions.length === 0) {
     return new Response(JSON.stringify({ ok: true, deliveries: 0 }), {
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
 
@@ -234,7 +292,7 @@ Deno.serve(async (req: Request) => {
   const template = await findTemplate(supabase, event.tenant_id, event.event_type, "en");
   if (!template) {
     return new Response(JSON.stringify({ ok: true, deliveries: 0, reason: "no_template" }), {
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
 
@@ -336,6 +394,6 @@ Deno.serve(async (req: Request) => {
       sent,
       failed,
     }),
-    { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
+    { headers: { ...CORS, "Content-Type": "application/json" } },
   );
 });

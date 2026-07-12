@@ -1,9 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const range = vi.fn();
-const order = vi.fn(() => ({ range }));
-const orFn = vi.fn(() => ({ order }));
-const select = vi.fn(() => ({ order, or: orFn }));
+// Chainable builder: select/order/or all return the builder so the service's
+// `.order('created_at').order('id')[.or()].range()` chain resolves; range() ends it.
+const builder: Record<string, unknown> = {
+  order: vi.fn(() => builder),
+  or: vi.fn(() => builder),
+  range,
+};
+const select = vi.fn(() => builder);
 vi.mock('./supabaseClient', () => ({
   supabase: { from: vi.fn(() => ({ select })) },
 }));

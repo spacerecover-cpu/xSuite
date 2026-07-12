@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
 import { logger } from '../lib/logger';
@@ -43,6 +43,32 @@ export function useNotifications(): UseNotificationsResult {
         throw error;
       }
       return (data ?? []) as NotificationRow[];
+    },
+    enabled: Boolean(userId),
+    staleTime: 30_000,
+  });
+
+  // Unread count is fetched independently of the 50-row display window so the
+  // badge reflects the true total (e.g. can exceed MAX_VISIBLE / 99+) and never
+  // reads 0 while unread rows exist beyond the newest 50. Uses a head+count
+  // query (no rows transferred). Its query key is a child of the display key so
+  // every existing invalidation (realtime + mutations) refreshes it too.
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: [...NOTIFICATIONS_KEY, userId, 'unread-count'],
+    queryFn: async (): Promise<number> => {
+      if (!userId) return 0;
+      const { count, error } = await supabase
+        .from('notification_log')
+        .select('*', { count: 'exact', head: true })
+        .eq('recipient_user_id', userId)
+        .eq('channel', 'in_app')
+        .is('dismissed_at', null)
+        .eq('is_read', false);
+      if (error) {
+        logger.error('Failed to fetch unread notification count', error);
+        throw error;
+      }
+      return count ?? 0;
     },
     enabled: Boolean(userId),
     staleTime: 30_000,
@@ -112,11 +138,6 @@ export function useNotifications(): UseNotificationsResult {
       queryClient.invalidateQueries({ queryKey: [...NOTIFICATIONS_KEY, userId] });
     },
   });
-
-  const unreadCount = useMemo(
-    () => notifications.filter((n) => !n.is_read).length,
-    [notifications],
-  );
 
   return {
     notifications,

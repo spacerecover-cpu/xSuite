@@ -2,7 +2,7 @@ import { supabase, resolveTenantId } from './supabaseClient';
 import type { Database, Json } from '../types/database.types';
 import { resolveRateContext } from './currencyService';
 import { buildPayrollBaseColumns } from './payrollBase';
-import { baseAmount } from './financialMath';
+import { baseAmount, roundMoney } from './financialMath';
 import { currentTenantToday } from './tenantToday';
 import { logger } from './logger';
 
@@ -76,6 +76,20 @@ export function computeEmployeePay(input: EmployeePayInput): EmployeePayResult {
   const netSalary = totalEarnings - totalDeductions;
 
   return { overtimeAmount, absenceDeduction, socialSecurityDeduction, totalEarnings, totalDeductions, netSalary };
+}
+
+/** The amount to collect for one loan this period: the fixed installment, but
+ *  never more than the outstanding balance. installment_amount is stored rounded
+ *  to 2dp, so N installments can sum to slightly more than total_amount — the
+ *  final scheduled installment must not over-collect past the balance nor drive
+ *  remaining_amount negative (bug #89). Used for BOTH the net-pay deduction and
+ *  the recorded repayment so the payroll record and the loan ledger stay in
+ *  lock-step. */
+function scheduledLoanDeduction(
+  loan: Pick<EmployeeLoan, 'installment_amount' | 'remaining_amount' | 'total_amount'>,
+): number {
+  const outstanding = Math.max(0, Number(loan.remaining_amount ?? loan.total_amount));
+  return Math.min(Number(loan.installment_amount ?? 0), outstanding);
 }
 
 interface PayrollSettingsValues {
@@ -438,9 +452,9 @@ export const payrollService = {
         period.end_date
       );
 
-      const activeLoans = await this.getActiveLoans(employee.id);
+      const activeLoans = await this.getActiveLoans(employee.id, period.end_date);
       const loanDeductions = activeLoans.reduce(
-        (sum, loan) => sum + Number(loan.installment_amount),
+        (sum, loan) => sum + scheduledLoanDeduction(loan),
         0
       );
 
@@ -479,7 +493,7 @@ export const payrollService = {
       for (const loan of activeLoans) {
         pendingLoanRepayments.push({
           loan_id: loan.id,
-          amount: Number(loan.installment_amount),
+          amount: scheduledLoanDeduction(loan),
           payment_date: period.end_date,
           payment_method: 'payroll_deduction',
           notes: `Automatic deduction for ${period.period_name}`,
@@ -490,19 +504,6 @@ export const payrollService = {
     void tenantId;
 
     if (records.length > 0) {
-      const { data: createdRecords, error: recordError } = await supabase
-        .from('payroll_records')
-        .insert(records)
-        .select();
-
-      if (recordError) throw recordError;
-
-      // Post loan repayments now that payroll_records are committed, so a
-      // records-insert failure above can never deduct loans without backing.
-      for (const repayment of pendingLoanRepayments) {
-        await this.recordLoanRepayment(repayment);
-      }
-
       // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency: records[] is built in this one processPayroll run under a single resolved rate context (rc); summing the document amounts is correct here
       const totalGross = records.reduce((sum, r) => sum + Number(r.total_earnings ?? 0), 0);
       // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency: records[] is built in this one processPayroll run under a single resolved rate context (rc); summing the document amounts is correct here
@@ -513,13 +514,58 @@ export const payrollService = {
       // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency: records[] is built in this one processPayroll run under a single resolved rate context (rc); summing the document amounts is correct here
       const totalNet = records.reduce((sum, r) => sum + Number(r.net_salary ?? 0), 0);
 
-      await this.updatePayrollPeriod(periodId, {
-        status: 'processing',
-        total_gross: totalGross,
-        total_deductions: totalDeductions,
-        total_net: totalNet,
-        employee_count: records.length,
-      });
+      // Idempotency + concurrency guard: CLAIM the period by flipping it out of
+      // 'draft' BEFORE inserting any payroll_records or posting loan repayments,
+      // conditional on it STILL being 'draft'. A single UPDATE ... WHERE
+      // status = 'draft' is atomic in Postgres, so of two concurrent runs — or a
+      // retry after a mid-run failure — exactly one matches the row and proceeds;
+      // every other caller matches zero rows and aborts here, before it can write
+      // a duplicate set of records or double-deduct a loan. Doing this write FIRST
+      // also relocates the previously-last, failure-prone period update to the
+      // front: if it fails (e.g. the transient network drop in the original bug)
+      // nothing else has been written yet, so a retry has nothing to duplicate.
+      //
+      // This is the app-level guard. A DB-side SECURITY DEFINER RPC (records +
+      // loans + status in ONE transaction) plus a partial unique constraint on
+      // payroll_records(period_id, employee_id) WHERE deleted_at IS NULL are the
+      // belt-and-suspenders backstop — see cross-file notes.
+      const { data: claimed, error: claimError } = await supabase
+        .from('payroll_periods')
+        .update({
+          status: 'processing',
+          total_gross: totalGross,
+          total_deductions: totalDeductions,
+          total_net: totalNet,
+          employee_count: records.length,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', periodId)
+        .eq('status', 'draft')
+        .is('deleted_at', null)
+        .select()
+        .maybeSingle();
+
+      if (claimError) throw claimError;
+      if (!claimed) {
+        // The period was already claimed by a concurrent run, or it left 'draft'
+        // between the initial read and this write. Do NOT insert a second set of
+        // records or re-run loan deductions.
+        throw new Error('Payroll period is already being processed');
+      }
+
+      const { data: createdRecords, error: recordError } = await supabase
+        .from('payroll_records')
+        .insert(records)
+        .select();
+
+      if (recordError) throw recordError;
+
+      // Post loan repayments now that the period is claimed and payroll_records
+      // are committed, so neither a records-insert failure nor a retry can
+      // deduct loans without a backing record.
+      for (const repayment of pendingLoanRepayments) {
+        await this.recordLoanRepayment(repayment);
+      }
 
       return {
         success: true,
@@ -691,14 +737,23 @@ export const payrollService = {
     return data;
   },
 
-  async getActiveLoans(employeeId: string) {
-    const { data, error } = await supabase
+  async getActiveLoans(employeeId: string, asOfDate?: string) {
+    let query = supabase
       .from('employee_loans')
       .select('*')
       .eq('employee_id', employeeId)
       .eq('status', 'active')
       .is('deleted_at', null);
 
+    // start_date is the due date of installment #1 (LoanDetailModal builds the
+    // repayment schedule as start_date + i months), so a loan whose repayment
+    // window opens AFTER the period must not be deducted yet. Only pull loans
+    // whose first installment is due on or before asOfDate (the period end).
+    if (asOfDate) {
+      query = query.lte('start_date', asOfDate);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
     return data as EmployeeLoan[];
   },
@@ -761,10 +816,17 @@ export const payrollService = {
     const loan = await this.getEmployeeLoan(repayment.loan_id);
     if (!loan) throw new Error('Loan not found');
 
+    // Never collect (or record) more than the outstanding balance. The stored
+    // installment_amount is rounded to 2dp, so N installments can sum past the
+    // loan total; an uncapped final deduction over-collects and drives
+    // remaining_amount negative, polluting outstanding-balance aggregations (bug #89).
+    const outstanding = Math.max(0, Number(loan.remaining_amount ?? loan.total_amount));
+    const appliedAmount = Math.min(repayment.amount, outstanding);
+
     const repaymentInsert: Database['public']['Tables']['loan_repayments']['Insert'] = {
       tenant_id: loan.tenant_id,
       loan_id: repayment.loan_id,
-      amount: repayment.amount,
+      amount: appliedAmount,
       repayment_date: repayment.payment_date,
       payment_method: repayment.payment_method || 'payroll_deduction',
       notes: repayment.notes,
@@ -778,9 +840,12 @@ export const payrollService = {
 
     if (error) throw error;
 
-    const newRemainingAmount = Number(loan.remaining_amount ?? loan.total_amount) - repayment.amount;
+    const newRemainingAmount = roundMoney(Math.max(0, outstanding - appliedAmount));
     const newPaidInstallments = (loan.paid_installments || 0) + 1;
-    const isCompleted = newPaidInstallments >= loan.installments;
+    // Complete on either the scheduled installment count OR a cleared balance, so
+    // a loan is never left 'active' owing nothing (rounding rounded down) nor
+    // 'completed' while still owing.
+    const isCompleted = newPaidInstallments >= loan.installments || newRemainingAmount <= 0;
 
     const { error: updateError } = await supabase
       .from('employee_loans')

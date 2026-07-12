@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as XLSX from 'xlsx';
 import type { ParsedWorkbook, RawRow } from './workbookContract';
 import { IMPORT_ORDER } from './workbookContract';
 
 const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('../supabaseClient', () => ({ supabase: { rpc } }));
-// builder is exercised only for the error report; stub to a tiny buffer.
-vi.mock('./workbookBuilder', () => ({ buildWorkbook: vi.fn(() => new ArrayBuffer(8)) }));
+// The real workbookBuilder is used so the error report is a genuine, inspectable xlsx.
 
-import { runImport } from './importClient';
+import { ERROR_SHEET_NAME, runImport } from './importClient';
 
 function empty(): ParsedWorkbook {
   return Object.fromEntries(IMPORT_ORDER.map((e) => [e, [] as RawRow[]])) as ParsedWorkbook;
@@ -75,6 +75,23 @@ describe('runImport orchestration', () => {
     expect(summary.runId).toBe('run-1');
     expect(summary.counts.customers).toEqual({ inserted: 0, skipped: 0, error: 1 });
     expect(summary.errorReport).toBeInstanceOf(ArrayBuffer);
+  });
+
+  it('carries the per-row failure REASON into the downloadable error report (not just a count)', async () => {
+    mockRpc(false); // every row fails with error: 'bad'
+    const wb = empty();
+    wb.customers = [{ legacy_id: 'CU1', customer_name: 'Jo' }];
+    const summary = await runImport(wb, { filename: 'x.xlsx', hash: 'h' }, () => {}, 'records');
+
+    expect(summary.errorReport).toBeInstanceOf(ArrayBuffer);
+    const book = XLSX.read(summary.errorReport!, { type: 'array' });
+    // A dedicated reasons sheet exists and leads the workbook.
+    expect(book.SheetNames).toContain(ERROR_SHEET_NAME);
+    expect(book.SheetNames[0]).toBe(ERROR_SHEET_NAME);
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(book.Sheets[ERROR_SHEET_NAME]);
+    const cu1 = rows.find((r) => r['Record Ref'] === 'CU1');
+    expect(cu1, 'failed legacy_id CU1 should appear in the errors sheet').toBeTruthy();
+    expect(cu1!['Import Error']).toBe('bad'); // the reason, not a numeric count, survives
   });
 
   it('counts skipped_duplicate rows on resume', async () => {

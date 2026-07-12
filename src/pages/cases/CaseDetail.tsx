@@ -539,8 +539,11 @@ export const CaseDetail: React.FC = () => {
               devices={devices as unknown as React.ComponentProps<typeof DeviceCheckoutModal>['devices']}
               customerName={caseData.customer?.customer_name || ''}
               customerMobileNumber={caseData.customer?.mobile_number || caseData.customer?.phone || ''}
+              currentRecoveryOutcome={caseData.recovery_outcome}
               onCheckoutComplete={() => {
                 queryClient.invalidateQueries({ queryKey: ['case', id] });
+                queryClient.invalidateQueries({ queryKey: ['case_devices', id] });
+                queryClient.invalidateQueries({ queryKey: ['chain_of_custody', id] });
                 queryClient.invalidateQueries({ queryKey: ['case_history', id] });
               }}
               onShowCheckoutPreview={handleOpenCheckoutPreview}
@@ -954,6 +957,7 @@ export const CaseDetail: React.FC = () => {
                       bank_account_id: payload.bank_account_id,
                       terms_and_conditions: payload.terms_and_conditions,
                       quote_id: payload.quote_id,
+                      currency: payload.currency,
                     }, lineItems);
                     toast.success('Invoice updated successfully');
                   } else {
@@ -974,6 +978,7 @@ export const CaseDetail: React.FC = () => {
                       bank_account_id: payload.bank_account_id,
                       terms_and_conditions: payload.terms_and_conditions,
                       quote_id: payload.quote_id,
+                      currency: payload.currency,
                     }, lineItems);
                     toast.success('Invoice created successfully');
                   }
@@ -1431,6 +1436,7 @@ export const CaseDetail: React.FC = () => {
                   caseId={id!}
                   caseNumber={caseData.case_no ?? ''}
                   caseStatus={caseData.status ?? null}
+                  casePhase={currentPhase}
                   caseDevices={(devices ?? []).map((d) => ({
                     id: d.id,
                     model: d.model ?? null,

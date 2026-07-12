@@ -600,8 +600,28 @@ export const bankingService = {
     if (!data) throw new Error('Failed to create account transfer');
 
     if (data.status === 'completed') {
+      // Two independent balance moves without a DB transaction (postgrest gives
+      // the client no multi-statement atomicity). If the credit leg fails after
+      // the debit has committed, compensate: reverse the debit and void the
+      // transfer row so tenant cash is not left understated with a 'completed'
+      // transfer on record. Full atomicity + lost-update safety (an atomic
+      // `current_balance = current_balance +/- amount` under row locks) needs the
+      // server-side RPC tracked in the migration follow-up — see cross-file note.
       await this.updateAccountBalance(transferData.from_account_id, transferData.amount, 'debit');
-      await this.updateAccountBalance(transferData.to_account_id, transferData.amount, 'credit');
+      try {
+        await this.updateAccountBalance(transferData.to_account_id, transferData.amount, 'credit');
+      } catch (creditError) {
+        try {
+          await this.updateAccountBalance(transferData.from_account_id, transferData.amount, 'credit');
+          await supabase
+            .from('account_transfers')
+            .update({ deleted_at: new Date().toISOString() })
+            .eq('id', data.id);
+        } catch {
+          // best-effort compensation; surface the original credit failure below
+        }
+        throw creditError;
+      }
     }
 
     return data as AccountTransfer;
@@ -646,8 +666,23 @@ export const bankingService = {
     if (error) throw error;
     if (!data) throw new Error('Failed to complete transfer');
 
+    // Same non-atomic caveat as createTransfer: reverse the debit and revert the
+    // status if the credit leg fails, so a partial failure cannot understate cash.
     await this.updateAccountBalance(transfer.from_account_id, transfer.amount, 'debit');
-    await this.updateAccountBalance(transfer.to_account_id, transfer.amount, 'credit');
+    try {
+      await this.updateAccountBalance(transfer.to_account_id, transfer.amount, 'credit');
+    } catch (creditError) {
+      try {
+        await this.updateAccountBalance(transfer.from_account_id, transfer.amount, 'credit');
+        await supabase
+          .from('account_transfers')
+          .update({ status: transfer.status })
+          .eq('id', id);
+      } catch {
+        // best-effort compensation; surface the original credit failure below
+      }
+      throw creditError;
+    }
 
     return data as AccountTransfer;
   },
@@ -740,7 +775,8 @@ export const bankingService = {
     const { count: unreconciledCount } = await supabase
       .from('bank_transactions')
       .select('id', { count: 'exact', head: true })
-      .eq('is_reconciled', false);
+      .eq('is_reconciled', false)
+      .is('deleted_at', null);
 
     const bankBalance = sumBankBalanceBase(
       (accounts ?? []).filter((a) => a.account_type === 'bank' || a.account_type === 'checking' || a.account_type === 'savings'),

@@ -16,6 +16,7 @@ import {
   getStockStats,
   getSalesReport,
   getTodaysSales,
+  getTopSellingItems,
   createStockSale,
   recordStockReceipt,
   cancelStockSale,
@@ -89,6 +90,31 @@ describe('getTodaysSales (cross-document revenue total must be base currency)', 
     const summary = await getTodaysSales();
 
     expect(summary.revenue).toBe(88);
+  });
+});
+
+describe('getTopSellingItems (Bug 65: exclude cancelled/refunded sales and honour the date range)', () => {
+  it('joins stock_sales!inner and filters parent deleted_at + sale_date range, plus line-item deleted_at', async () => {
+    const query = makeQuery([
+      { item_id: 'i1', quantity: 3, total: 300, stock_items: { id: 'i1', name: 'WD 2TB', brand: 'WD', sku: 'WD2' } },
+    ]);
+    from.mockReturnValue(query);
+
+    const result = await getTopSellingItems('2020-01-01', '2020-12-31', 10);
+
+    // the parent sale must be inner-joined so a soft-deleted stock_sales row drops its live line items
+    expect(query.select).toHaveBeenCalledWith(expect.stringContaining('stock_sales!inner'));
+    // line item's own soft-delete filter
+    expect(query.is).toHaveBeenCalledWith('deleted_at', null);
+    // parent sale not cancelled/refunded (cancel_stock_sale soft-deletes the parent only)
+    expect(query.is).toHaveBeenCalledWith('stock_sales.deleted_at', null);
+    // date range applied through the parent sale_date (was previously ignored)
+    expect(query.gte).toHaveBeenCalledWith('stock_sales.sale_date', '2020-01-01');
+    expect(query.lte).toHaveBeenCalledWith('stock_sales.sale_date', '2020-12-31');
+
+    expect(result).toEqual([
+      { id: 'i1', name: 'WD 2TB', brand: 'WD', sku: 'WD2', totalQty: 3, totalRevenue: 300 },
+    ]);
   });
 });
 

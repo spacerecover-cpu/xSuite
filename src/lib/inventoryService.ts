@@ -406,23 +406,65 @@ export async function adjustInventoryQuantity(
   reason: string,
   notes?: string
 ) {
-  const { data: item, error: fetchError } = await supabase
-    .from('inventory_items')
-    .select('quantity, tenant_id')
-    .eq('id', itemId)
-    .maybeSingle();
+  const MAX_ATTEMPTS = 5;
+  let updatedItem: InventoryItem | null = null;
 
-  if (fetchError) throw fetchError;
-  if (!item) throw new Error(`Inventory item ${itemId} not found`);
+  // Compare-and-set retry loop: each attempt re-reads the current quantity and
+  // only applies the delta if the row still holds the value we read. This stops
+  // concurrent adjustments from silently overwriting each other (lost update)
+  // without needing a DB-side atomic increment.
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const { data: item, error: fetchError } = await supabase
+      .from('inventory_items')
+      .select('quantity')
+      .eq('id', itemId)
+      .maybeSingle();
 
-  const quantityBefore = item.quantity ?? 0;
-  const quantityAfter = quantityBefore + quantityChange;
+    if (fetchError) throw fetchError;
+    if (!item) throw new Error(`Inventory item ${itemId} not found`);
 
+    const quantityBefore = item.quantity ?? 0;
+    const quantityAfter = quantityBefore + quantityChange;
+
+    if (quantityAfter < 0) {
+      throw new Error(
+        `Adjustment would drive inventory item ${itemId} below zero (have ${quantityBefore}, change ${quantityChange})`
+      );
+    }
+
+    let update = supabase
+      .from('inventory_items')
+      .update({ quantity: quantityAfter })
+      .eq('id', itemId);
+    // Guard on the exact value we read; NULL must be matched with .is(), not .eq().
+    update = item.quantity === null || item.quantity === undefined
+      ? update.is('quantity', null)
+      : update.eq('quantity', item.quantity);
+
+    const { data, error: updateError } = await update.select().maybeSingle();
+
+    if (updateError) throw updateError;
+
+    if (data) {
+      updatedItem = data as InventoryItem;
+      break;
+    }
+    // No row matched: another writer changed the quantity between our read and
+    // write. Fall through to re-read and retry with the fresh value.
+  }
+
+  if (!updatedItem) {
+    throw new Error(
+      `Failed to adjust inventory item ${itemId} after ${MAX_ATTEMPTS} concurrent attempts`
+    );
+  }
+
+  // Write the ledger row only after the quantity change has committed, so a
+  // failed/rejected update can never leave a phantom transaction behind.
   const { data: user } = await supabase.auth.getUser();
-
   await createInventoryTransaction({
     item_id: itemId,
-    tenant_id: item.tenant_id,
+    tenant_id: updatedItem.tenant_id,
     transaction_type: transactionType,
     quantity: quantityChange,
     reference_type: 'manual',
@@ -430,15 +472,7 @@ export async function adjustInventoryQuantity(
     notes: [reason, notes].filter(Boolean).join(' - '),
   });
 
-  const { data, error: updateError } = await supabase
-    .from('inventory_items')
-    .update({ quantity: quantityAfter })
-    .eq('id', itemId)
-    .select()
-    .maybeSingle();
-
-  if (updateError) throw updateError;
-  return data;
+  return updatedItem;
 }
 
 export async function getInventoryPhotos(itemId: string) {

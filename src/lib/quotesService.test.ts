@@ -33,7 +33,8 @@ vi.mock('./taxDocumentService', () => ({
   persistDocumentTaxLines: vi.fn(() => Promise.resolve()),
 }));
 
-import { createQuote } from './quotesService';
+import { computeDocumentTotals } from './taxDocumentService';
+import { createQuote, duplicateQuote } from './quotesService';
 
 // Kernel parity pin (M-G): locks the canonical quote shape (12 × OMR 120.000 @5%,
 // no discount, 3-dp) that quotesService now routes through the fiscal kernel.
@@ -118,5 +119,77 @@ describe('createQuote — unit/item-code persistence (regression for the silent-
       unit_label: 'Piece',
       item_code: '998713',
     });
+  });
+});
+
+describe('duplicateQuote — preserves discount_type (regression for Bug 64)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getUser.mockResolvedValue({ data: { user: { id: 'user-1' } } });
+    resolveTenantId.mockResolvedValue('tenant-1');
+    rpc.mockResolvedValue({ data: 'Q-0002', error: null });
+  });
+
+  it('carries discount_type through to the totals computation and the persisted insert', async () => {
+    // Source quote is a 10% (percentage) discount. Dropping discount_type made the
+    // duplicate treat the stored `10` as a flat currency discount -> wrong total.
+    let quotesCall = 0;
+    let capturedQuoteInsert: Record<string, unknown>[] = [];
+
+    from.mockImplementation((table: string) => {
+      if (table === 'quotes') {
+        quotesCall += 1;
+        if (quotesCall === 1) {
+          // fetchQuoteById → source row read
+          return chain({
+            data: {
+              id: 'src-1',
+              quote_number: 'Q-src',
+              case_id: 'case-1',
+              customer_id: 'cust-1',
+              company_id: null,
+              discount_type: 'percentage',
+              discount_amount: 10,
+              tax_rate: 5,
+              valid_until: null,
+              terms: null,
+              notes: null,
+              currency: 'OMR',
+            },
+            error: null,
+          });
+        }
+        // createQuote → header insert
+        const c = chain({ data: { id: 'new-1', quote_number: 'Q-0002', total_amount: 210 }, error: null });
+        c.insert = vi.fn((rows: Record<string, unknown>[]) => {
+          capturedQuoteInsert = rows;
+          return c;
+        });
+        return c;
+      }
+      if (table === 'customer_company_relationships') {
+        return chain({ data: null, error: null });
+      }
+      if (table === 'quote_items') {
+        return chain({
+          data: [
+            { id: 'item-1', sort_order: 0, description: 'RAID recovery', quantity: 2, unit_price: 100, unit_code: null, unit_label: null, item_code: null, total: 200 },
+          ],
+          error: null,
+        });
+      }
+      return chain({ data: null, error: null });
+    });
+
+    await duplicateQuote('src-1');
+
+    // The totals engine must see the percentage semantics, not a fixed amount.
+    expect(computeDocumentTotals).toHaveBeenCalledWith(
+      expect.objectContaining({ discountType: 'percentage', discountAmount: 10 }),
+      expect.anything(),
+    );
+    // …and the duplicate must persist discount_type so later edits recompute correctly.
+    expect(capturedQuoteInsert).toHaveLength(1);
+    expect(capturedQuoteInsert[0]).toMatchObject({ discount_type: 'percentage', discount_amount: 10 });
   });
 });

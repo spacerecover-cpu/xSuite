@@ -89,6 +89,7 @@ export default function DonorSearchPage() {
       const { data } = await supabase
         .from('inventory_search_templates')
         .select('*')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
       if (data) setSearchTemplates(data);
