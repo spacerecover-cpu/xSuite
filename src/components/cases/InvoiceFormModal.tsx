@@ -405,6 +405,8 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
       ...prev,
       notes: quoteData.notes || prev.notes,
       discount_amount: quoteData.discount_amount ?? 0,
+      discount_type: quoteData.discount_type ?? prev.discount_type,
+      tax_rate: quoteData.tax_rate ?? prev.tax_rate,
     }));
 
     // Quote selection is an explicit action: refresh terms from the default

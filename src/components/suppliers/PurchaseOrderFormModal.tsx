@@ -8,6 +8,7 @@ import { useToast } from '../../hooks/useToast';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useTaxConfig } from '../../contexts/TenantConfigContext';
 import { resolveRateContext } from '../../lib/currencyService';
+import { roundMoney } from '../../lib/financialMath';
 import { buildPoBaseColumns } from '../../lib/purchaseOrderBase';
 import { logger } from '../../lib/logger';
 
@@ -43,7 +44,7 @@ interface PurchaseOrderFormModalProps {
 
 export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, purchaseOrder, supplierId }: PurchaseOrderFormModalProps) {
   const toast = useToast();
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, currencyFormat } = useCurrency();
   const taxConfig = useTaxConfig();
   const [loading, setLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string; supplier_number: string | null }>>([]);
@@ -168,10 +169,15 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
   };
 
   const calculateTotals = () => {
-    const subtotal = lineItems.reduce((sum, item) => sum + item.total, 0);
+    // Round every stored money field to the tenant currency's minor units (mirrors
+    // invoiceService/quotesService). Native columns must be currency-precise so the
+    // *_base shadows (buildPoBaseColumns → convertToBase, which rounds) still equal
+    // native at rate 1 — sub-cent noise here would break the base==native invariant.
+    const dp = currencyFormat.decimalPlaces;
+    const subtotal = roundMoney(lineItems.reduce((sum, item) => sum + item.total, 0), dp);
     // Fail-loud: tenant/country tax rate (percent), never a hardcoded 15%.
-    const tax = subtotal * (taxConfig.defaultRate / 100);
-    const total = subtotal + tax;
+    const tax = roundMoney(subtotal * (taxConfig.defaultRate / 100), dp);
+    const total = roundMoney(subtotal + tax, dp);
     return { subtotal, tax, total };
   };
 

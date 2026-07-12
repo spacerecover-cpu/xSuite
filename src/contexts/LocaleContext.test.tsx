@@ -1,4 +1,4 @@
-import { StrictMode } from 'react';
+import { StrictMode, useState } from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import i18n from '../lib/i18n';
@@ -22,7 +22,7 @@ vi.mock('./TenantConfigContext', () => ({
 // test stays hermetic and importing it does not pull in the real Supabase client.
 // vi.hoisted initialises the spy before the hoisted vi.mock factory runs.
 const { updateTenantUiLanguage } = vi.hoisted(() => ({
-  updateTenantUiLanguage: vi.fn(async () => {}),
+  updateTenantUiLanguage: vi.fn(async (_tenantId: string, _lang: string) => {}),
 }));
 vi.mock('../lib/tenantConfigService', () => ({ updateTenantUiLanguage }));
 
@@ -49,9 +49,37 @@ function SetLocaleButton() {
   );
 }
 
+// Surfaces whether setLocale rejected, so a swallowed persistence error is observable.
+function SetLocaleProbe() {
+  const { setLocale } = useLocale();
+  const [outcome, setOutcome] = useState('');
+  return (
+    <button
+      data-testid="outcome"
+      data-outcome={outcome}
+      onClick={async () => {
+        try {
+          await setLocale('ar');
+          setOutcome('resolved');
+        } catch {
+          setOutcome('rejected');
+        }
+      }}
+    >
+      flip-to-ar
+    </button>
+  );
+}
+
 beforeEach(() => {
   refreshConfig.mockClear();
   updateTenantUiLanguage.mockClear();
+  // A successful persist writes the tenant's ui_language; refreshConfig then makes
+  // it authoritative. Model that here so clearing the optimistic value resolves to
+  // the newly-persisted language rather than the pre-change mock config.
+  updateTenantUiLanguage.mockImplementation(async (_tenantId: string, lang: string) => {
+    mockConfig = configWithLang(lang);
+  });
   mockConfig = DEFAULT_TENANT_CONFIG;
   localStorage.clear();
   document.documentElement.dir = '';
@@ -148,6 +176,56 @@ describe('LocaleContext', () => {
     expect(i18n.language).toBe('ar');
     expect(localStorage.getItem('xsuite_locale_hint')).toBe('ar');
     // Now persistent: setLocale writes the tenant's ui_language then refreshes config.
+    expect(updateTenantUiLanguage).toHaveBeenCalledWith('tenant-1', 'ar');
+    expect(refreshConfig).toHaveBeenCalled();
+  });
+
+  it('rethrows and reverts the optimistic flip when persistence fails', async () => {
+    mockConfig = configWithLang('en');
+    updateTenantUiLanguage.mockRejectedValueOnce(new Error('RLS denied'));
+
+    await act(async () => {
+      render(
+        <LocaleProvider>
+          <SetLocaleProbe />
+        </LocaleProvider>
+      );
+    });
+
+    expect(document.documentElement.dir).toBe('ltr');
+
+    await act(async () => {
+      screen.getByTestId('outcome').click();
+    });
+
+    // The caller must see the rejection (so it can show an error toast), not a
+    // silently-swallowed success.
+    expect(screen.getByTestId('outcome')).toHaveAttribute('data-outcome', 'rejected');
+    // Optimistic state is reverted to the persisted tenant language.
+    expect(document.documentElement.dir).toBe('ltr');
+    expect(document.documentElement.lang).toBe('en');
+    expect(i18n.language).toBe('en');
+    expect(localStorage.getItem('xsuite_locale_hint')).toBe('en');
+    // refreshConfig is never reached because the write threw first.
+    expect(refreshConfig).not.toHaveBeenCalled();
+  });
+
+  it('clears optimistic state after a successful persist so refreshed config is authoritative', async () => {
+    mockConfig = configWithLang('en');
+
+    await act(async () => {
+      render(
+        <LocaleProvider>
+          <SetLocaleProbe />
+        </LocaleProvider>
+      );
+    });
+
+    await act(async () => {
+      screen.getByTestId('outcome').click();
+    });
+
+    expect(screen.getByTestId('outcome')).toHaveAttribute('data-outcome', 'resolved');
     expect(updateTenantUiLanguage).toHaveBeenCalledWith('tenant-1', 'ar');
     expect(refreshConfig).toHaveBeenCalled();
   });

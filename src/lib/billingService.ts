@@ -14,6 +14,20 @@ export interface SubscriptionWithPlan extends TenantSubscription {
   subscription_plans?: SubscriptionPlan;
 }
 
+// A subscription only entitles a tenant to its plan's features while it is
+// active or trialing. Cancelled / past_due / paused / suspended subscriptions
+// keep their row (and old plan_id) but must NOT grant paid feature access.
+const ACTIVE_SUBSCRIPTION_STATUSES = ['active', 'trialing'] as const;
+
+function isSubscriptionEntitled(
+  subscription: SubscriptionWithPlan | null
+): subscription is SubscriptionWithPlan {
+  return (
+    !!subscription &&
+    (ACTIVE_SUBSCRIPTION_STATUSES as readonly string[]).includes(subscription.status)
+  );
+}
+
 export interface PlanWithFeatures extends SubscriptionPlan {
   plan_features?: PlanFeature[];
 }
@@ -369,6 +383,30 @@ export async function applyCoupon(tenantId: string, couponCode: string): Promise
     throw new Error('No active subscription found');
   }
 
+  // Atomically claim a redemption slot with an optimistic compare-and-swap:
+  // only bump the counter when it still equals the value validateCoupon read.
+  // Concurrent redemptions therefore cannot both pass the max_redemptions cap
+  // or clobber each other's increment (lost update) — exactly one wins per read.
+  const currentCount = couponValidation.coupon.redemptions_count;
+  const casQuery = supabase
+    .from('billing_coupons')
+    .update({ redemptions_count: (currentCount ?? 0) + 1 })
+    .eq('id', couponValidation.coupon.id);
+  const { data: claimed, error: claimError } = await (
+    currentCount === null
+      ? casQuery.is('redemptions_count', null)
+      : casQuery.eq('redemptions_count', currentCount)
+  )
+    .select('id')
+    .maybeSingle();
+
+  if (claimError) throw claimError;
+  if (!claimed) {
+    // Zero rows matched: another redemption moved the counter first — the cap
+    // may now be reached. Do not insert a redemption row for this attempt.
+    throw new Error('Coupon has reached maximum redemptions');
+  }
+
   const { error } = await supabase.from('coupon_redemptions').insert({
     tenant_id: tenantId,
     coupon_id: couponValidation.coupon.id,
@@ -376,11 +414,6 @@ export async function applyCoupon(tenantId: string, couponCode: string): Promise
   });
 
   if (error) throw error;
-
-  await supabase
-    .from('billing_coupons')
-    .update({ redemptions_count: (couponValidation.coupon.redemptions_count || 0) + 1 })
-    .eq('id', couponValidation.coupon.id);
 }
 
 export async function getBillingInvoices(
@@ -447,6 +480,12 @@ export async function getCurrentUsage(tenantId: string): Promise<UsageMetrics> {
   const features = plan ? await getPlanFeatures(plan.id) : [];
   const featureMap = new Map(features.map((f) => [f.feature_key, f]));
 
+  // max_cases_per_month is a per-calendar-month quota, so count only cases
+  // created since the start of the current month (matches featureGateService).
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
   const [usersResult, casesResult, branchesResult] = await Promise.all([
     supabase
       .from('profiles')
@@ -457,7 +496,8 @@ export async function getCurrentUsage(tenantId: string): Promise<UsageMetrics> {
       .from('cases')
       .select('id', { count: 'exact', head: true })
       .eq('tenant_id', tenantId)
-      .is('deleted_at', null),
+      .is('deleted_at', null)
+      .gte('created_at', startOfMonth.toISOString()),
     supabase
       .from('branches')
       .select('id', { count: 'exact', head: true })
@@ -532,7 +572,7 @@ export async function hasFeatureAccess(
   featureKey: FeatureKey
 ): Promise<boolean> {
   const subscription = await getTenantSubscription(tenantId);
-  if (!subscription) return false;
+  if (!isSubscriptionEntitled(subscription)) return false;
 
   const { data } = await supabase
     .from('plan_features')
@@ -550,7 +590,7 @@ export async function getFeatureLimit(
   featureKey: FeatureKey
 ): Promise<number | null> {
   const subscription = await getTenantSubscription(tenantId);
-  if (!subscription) return 0;
+  if (!isSubscriptionEntitled(subscription)) return 0;
 
   const { data } = await supabase
     .from('plan_features')

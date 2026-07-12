@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useToast } from '../../hooks/useToast';
-import { issueCreditNote, applyCreditNote } from '../../lib/creditNoteService';
+import { issueCreditNote, applyCreditNote, voidCreditNote } from '../../lib/creditNoteService';
 import { RequirementFailuresPanel } from './RequirementFailuresPanel';
 import { parseRequirementFailures, type RequirementFailure } from '../../lib/taxDocumentService';
 import { logger } from '../../lib/logger';
@@ -107,7 +107,29 @@ export const CreditNoteModal: React.FC<CreditNoteModalProps> = ({ isOpen, onClos
         },
         [],
       );
-      await applyCreditNote(creditNote.id, [{ invoice_id: invoice.id, amount: roundMoney(amount) }]);
+      // Issuance and allocation are two separate RPCs. issue_credit_note has already
+      // persisted the credit note AND its -income ledger reversal by this point; if the
+      // allocation fails, that reversal is orphaned (the invoice balance is unchanged) and
+      // re-submitting would mint a SECOND credit note and a SECOND reversal — double-posting
+      // the income reversal for one economic credit. Compensate by voiding the just-issued
+      // credit note so the ledger nets back to zero and a retry starts from a clean slate.
+      try {
+        await applyCreditNote(creditNote.id, [{ invoice_id: invoice.id, amount: roundMoney(amount) }]);
+      } catch (applyErr) {
+        try {
+          await voidCreditNote(
+            creditNote.id,
+            'Automatic rollback: allocation to the invoice failed immediately after issuance',
+          );
+        } catch (voidErr) {
+          logger.error('Failed to roll back orphaned credit note after allocation failure:', voidErr);
+          throw new Error(
+            `Credit note ${creditNote.credit_note_number ?? creditNote.id} was issued but could not be ` +
+              'applied to the invoice, and automatic rollback failed. Void it manually before retrying.',
+          );
+        }
+        throw applyErr instanceof Error ? applyErr : new Error(String(applyErr));
+      }
       toast.success(`Credit note ${creditNote.credit_note_number ?? ''} issued`.trim());
       onSaved();
       handleClose();

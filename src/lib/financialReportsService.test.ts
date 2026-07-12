@@ -5,6 +5,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // thenable-builder pattern as paymentsService.test.ts).
 const { from } = vi.hoisted(() => ({ from: vi.fn() }));
 vi.mock('./supabaseClient', () => ({ supabase: { from } }));
+// generateCashFlowReport awaits getBaseCurrency() (its own DB round-trip) — stub it
+// so cash-flow tests stay focused on the report's own queries.
+vi.mock('./currencyService', () => ({ getBaseCurrency: vi.fn(async () => 'OMR') }));
 
 import {
   sumBankBalanceBase,
@@ -12,6 +15,9 @@ import {
   paidRevenueNetOfTax,
   generateProfitLossReport,
   generateInvoiceVsExpenseReport,
+  generateCashFlowReport,
+  generateInvoiceSummaryReport,
+  generateRevenueByCustomerReport,
 } from './financialReportsService';
 
 /** Thenable query builder: chainable filters; awaiting it yields {data}. */
@@ -22,6 +28,7 @@ function makeQuery(rows: Array<Record<string, unknown>>) {
     lte: vi.fn(() => builder),
     is: vi.fn(() => builder),
     in: vi.fn(() => builder),
+    eq: vi.fn(() => builder),
     not: vi.fn(() => builder),
     then: (resolve: (v: { data: unknown; error: null }) => void) =>
       resolve({ data: rows, error: null }),
@@ -130,5 +137,52 @@ describe('generateInvoiceVsExpenseReport (Bug 13 — revenue is realized cash, n
     // Base conversion: 40, never the native 100.
     expect(report.totals.revenue).toBe(40);
     expect(invoices.select).toHaveBeenCalledWith(expect.stringContaining('amount_paid_base'));
+  });
+});
+
+describe('generateCashFlowReport (Bug 47 — soft-deleted payments are not cash receipts)', () => {
+  it('excludes soft-deleted payments from operating receipts at the query', async () => {
+    const payments = makeQuery([{ amount: 5000, status: 'completed' }]);
+    const expenses = makeQuery([]);
+    const bankAccounts = makeQuery([]);
+    from.mockImplementation((table: string) =>
+      table === 'payments' ? payments : table === 'expenses' ? expenses : bankAccounts);
+
+    const report = await generateCashFlowReport('2026-01-01', '2026-12-31');
+
+    // Only real if the payments query filters out soft-deleted rows.
+    expect(payments.is).toHaveBeenCalledWith('deleted_at', null);
+    expect(report.operatingActivities.receipts).toBe(5000);
+    expect(report.netCashFlow).toBe(5000);
+  });
+});
+
+describe('generateInvoiceSummaryReport (Bug 48 — soft-deleted invoices/quotes inflate totals)', () => {
+  it('filters soft-deleted rows from both the invoices and quotes queries', async () => {
+    const invoices = makeQuery([
+      { status: 'paid', invoice_type: 'tax_invoice', total_amount: 2000, amount_paid: 2000, balance_due: 0 },
+    ]);
+    const quotes = makeQuery([{ status: 'converted' }]);
+    from.mockImplementation((table: string) => (table === 'invoices' ? invoices : quotes));
+
+    const report = await generateInvoiceSummaryReport('2026-01-01', '2026-12-31');
+
+    expect(invoices.is).toHaveBeenCalledWith('deleted_at', null);
+    expect(quotes.is).toHaveBeenCalledWith('deleted_at', null);
+    expect(report.totals.invoiced).toBe(2000);
+  });
+});
+
+describe('generateRevenueByCustomerReport (Bug 49 — soft-deleted invoices over-credit revenue)', () => {
+  it('excludes soft-deleted invoices from per-customer revenue at the query', async () => {
+    const invoices = makeQuery([
+      { amount_paid: 3000, customer: { id: 'c1', customer_name: 'Acme', email: 'a@b.co' } },
+    ]);
+    from.mockImplementation(() => invoices);
+
+    const rows = await generateRevenueByCustomerReport('2026-01-01', '2026-12-31');
+
+    expect(invoices.is).toHaveBeenCalledWith('deleted_at', null);
+    expect(rows[0].amount).toBe(3000);
   });
 });

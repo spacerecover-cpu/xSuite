@@ -167,6 +167,11 @@ export const fetchPaymentById = async (id: string) => {
       )
     `)
     .eq('id', id)
+    // void_payment soft-deletes a payment's allocations while leaving the payment
+    // row live (status='refunded'); without this the modal would render reversed
+    // allocations as still applied. Left-join filter — the payment still returns
+    // with an empty allocations array. Matches getCasePayments/fetchInvoicePaymentLedger.
+    .is('allocations.deleted_at', null)
     .maybeSingle();
 
   if (error) throw error;

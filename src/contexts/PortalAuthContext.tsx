@@ -106,35 +106,66 @@ export const PortalAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const location = useLocation();
 
   // Resolve session-timeout from tenant portal settings; refreshed when login
-  // happens. getPortalSettings has its own 5-minute cache.
-  const refreshTimeout = useCallback(async () => {
+  // happens. getPortalSettings has its own 5-minute cache. Returns the resolved
+  // timeout (minutes) so callers can gate the age check on the real value
+  // instead of the default.
+  const refreshTimeout = useCallback(async (): Promise<number> => {
+    let resolved = DEFAULT_TIMEOUT_MINUTES;
     try {
       const settings = await getPortalSettings();
       const minutes = settings?.portal_session_timeout;
       if (typeof minutes === 'number' && minutes > 0) {
-        setTimeoutMinutes(minutes);
-      } else {
-        setTimeoutMinutes(DEFAULT_TIMEOUT_MINUTES);
+        resolved = minutes;
       }
     } catch (err) {
       logger.error('Failed to load portal session timeout setting:', err);
-      setTimeoutMinutes(DEFAULT_TIMEOUT_MINUTES);
     }
+    setTimeoutMinutes(resolved);
+    return resolved;
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     const session = readSession();
-    if (session) {
-      const ageMs = Date.now() - session.last_activity_at;
-      // Initial check uses default; refreshTimeout will recheck after settings load.
-      if (ageMs > DEFAULT_TIMEOUT_MINUTES * 60_000) {
-        clearSession();
-      } else {
-        setCustomer(session.customer);
-      }
-    }
-    refreshTimeout().finally(() => setLoading(false));
+    // Resolve the tenant timeout FIRST, then decide whether the stored session
+    // is still valid. Gating restore on the resolved timeout (not the hardcoded
+    // 24h default) ensures a session already past the tenant's configured limit
+    // is never restored after a reload.
+    refreshTimeout()
+      .then((resolvedMinutes) => {
+        if (cancelled || !session) return;
+        const ageMs = Date.now() - session.last_activity_at;
+        if (ageMs > resolvedMinutes * 60_000) {
+          clearSession();
+        } else {
+          setCustomer(session.customer);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [refreshTimeout]);
+
+  // Re-validate an active session whenever the resolved timeout changes (e.g.
+  // the tenant lowers the limit mid-session). Without this, a timeout change
+  // would not expire an already-restored session until the next navigation.
+  useEffect(() => {
+    if (!customer) return;
+    const session = readSession();
+    if (!session) {
+      setCustomer(null);
+      return;
+    }
+    const ageMs = Date.now() - session.last_activity_at;
+    if (ageMs > timeoutMinutes * 60_000) {
+      clearSession();
+      setCustomer(null);
+      setError('Your session has expired. Please log in again.');
+    }
+  }, [timeoutMinutes, customer]);
 
   // On every route change, validate the timeout and refresh last_activity_at.
   useEffect(() => {

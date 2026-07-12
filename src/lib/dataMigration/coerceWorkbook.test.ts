@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { IMPORT_ORDER, type ParsedWorkbook, type RawRow } from './workbookContract';
-import { normalizeDateCell, normalizeInvoiceStatus, normalizeQuoteStatus, coerceWorkbook } from './coerceWorkbook';
+import {
+  normalizeDateCell,
+  normalizeInvoiceStatus,
+  normalizeQuoteStatus,
+  normalizeEnumCell,
+  coerceWorkbook,
+} from './coerceWorkbook';
 
 function empty(): ParsedWorkbook {
   return Object.fromEntries(IMPORT_ORDER.map((e) => [e, [] as RawRow[]])) as ParsedWorkbook;
@@ -150,6 +156,58 @@ describe('normalizeQuoteStatus (WP-C: quotes.status is CHECK-constrained now)', 
   it('passes blanks through', () => {
     expect(normalizeQuoteStatus(null)).toBeNull();
     expect(normalizeQuoteStatus('')).toBe('');
+  });
+});
+
+describe('normalizeEnumCell', () => {
+  it.each([
+    ['Approved', 'approved'],
+    ['PAID', 'paid'],
+    ['  Unpaid ', 'unpaid'],
+    ['Refund', 'refund'],
+    ['Advance_Adjustment', 'advance_adjustment'],
+  ])('lowercases + trims %p → %p', (input, expected) => {
+    expect(normalizeEnumCell(input)).toBe(expected);
+  });
+
+  it('passes blanks through as-is', () => {
+    expect(normalizeEnumCell(null)).toBeNull();
+    expect(normalizeEnumCell(undefined)).toBeNull();
+    expect(normalizeEnumCell('')).toBe('');
+    expect(normalizeEnumCell('   ')).toBe('');
+  });
+});
+
+describe('coerceWorkbook expense/credit-note/stock-sale enum pass', () => {
+  // Regression: these DB-CHECK-constrained enums are validated case-insensitively but were
+  // never normalized, so mixed-case legacy values passed the dry-run then failed at import.
+  it('lowercases expenses.status', () => {
+    const wb = empty();
+    wb.expenses = [
+      { legacy_id: 'E1', status: 'Approved' },
+      { legacy_id: 'E2', status: 'Paid' },
+    ];
+    coerceWorkbook(wb);
+    expect(wb.expenses.map((r) => r.status)).toEqual(['approved', 'paid']);
+  });
+
+  it('lowercases creditNotes.status and credit_type', () => {
+    const wb = empty();
+    wb.creditNotes = [
+      { legacy_id: 'C1', credit_note_number: 'CN-1', status: 'Issued', credit_type: 'Refund' },
+    ];
+    coerceWorkbook(wb);
+    expect(wb.creditNotes[0]).toMatchObject({ status: 'issued', credit_type: 'refund' });
+  });
+
+  it('lowercases stockSales.payment_status', () => {
+    const wb = empty();
+    wb.stockSales = [
+      { legacy_id: 'S1', sale_number: 'SALE-1', payment_status: 'Unpaid' },
+      { legacy_id: 'S2', sale_number: 'SALE-2', payment_status: 'PARTIAL' },
+    ];
+    coerceWorkbook(wb);
+    expect(wb.stockSales.map((r) => r.payment_status)).toEqual(['unpaid', 'partial']);
   });
 });
 

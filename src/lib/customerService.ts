@@ -61,6 +61,9 @@ export async function createCustomer(input: CreateCustomerInput): Promise<Custom
       .from('customer_company_relationships')
       .insert({ customer_id: newCustomer.id, company_id, is_primary: true } as RelationshipInsert);
     if (relError) throw relError;
+    // Populate the display-only denormalized name on creation, matching the
+    // other relationship mutators — templateContextService reads it directly.
+    await syncDenormalizedCompanyName(newCustomer.id);
   }
 
   return newCustomer;

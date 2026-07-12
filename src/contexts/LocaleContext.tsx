@@ -66,8 +66,11 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     try {
       await updateTenantUiLanguage(tenantId, next);
       await refreshConfig();
+      setOptimisticLang(null);
     } catch (err) {
-      logger.error('Failed to persist UI language:', err);
+      logger.error('Failed to persist UI language; reverting:', err);
+      setOptimisticLang(null);
+      throw err;
     }
   }, [tenantId, refreshConfig]);
 

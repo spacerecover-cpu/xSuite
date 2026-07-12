@@ -275,7 +275,7 @@ export async function checkItemAvailability(itemId: string): Promise<{
 
   const { data: item, error: itemError } = await supabase
     .from('inventory_items')
-    .select('quantity, status_type:master_inventory_status_types(name)')
+    .select('quantity, status_type:master_inventory_status_types(name, is_available_status)')
     .eq('id', itemId)
     .maybeSingle();
 
@@ -286,6 +286,33 @@ export async function checkItemAvailability(itemId: string): Promise<{
 
   if (!item) {
     return { available: false, reason: 'Inventory item not found' };
+  }
+
+  // A terminal/non-available disposition (Disposed, Defective, Written off, …) must
+  // block assignment even when quantity > 0 and no open assignment row exists —
+  // otherwise a dead/disposed donor is reported reassignable. Prefer the authoritative
+  // master_inventory_status_types.is_available_status flag, and also match by name for
+  // rows where the flag was never populated (same terminal names excluded by
+  // enrichItemsWithStockCount in inventoryService.ts).
+  const status = pickOne(
+    item.status_type as
+      | { name: string | null; is_available_status: boolean | null }
+      | { name: string | null; is_available_status: boolean | null }[]
+      | null
+  );
+  if (status) {
+    const statusName = (status.name ?? '').toLowerCase();
+    const nameIndicatesUnavailable =
+      statusName.includes('disposed') ||
+      statusName.includes('defective') ||
+      statusName.includes('written off') ||
+      statusName.includes('written-off');
+    if (status.is_available_status === false || nameIndicatesUnavailable) {
+      return {
+        available: false,
+        reason: `This item is not available for assignment (status: ${status.name ?? 'unknown'})`,
+      };
+    }
   }
 
   if ((item.quantity ?? 0) <= 0) {

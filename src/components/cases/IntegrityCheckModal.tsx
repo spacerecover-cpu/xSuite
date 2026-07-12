@@ -72,11 +72,9 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
   const determineResult = (): IntegrityCheckResult => {
     const hashMatch = expectedHash && actualHash ? expectedHash === actualHash : undefined;
 
-    if (anomalies.length > 0) return 'failed';
+    if (anomalies.length > 0 || hashMatch === false) return 'failed';
 
     if (sealIntact === false) return 'warning';
-
-    if (hashMatch === false) return 'failed';
 
     if (hashMatch === true && (sealIntact === true || sealIntact === undefined)) return 'passed';
 

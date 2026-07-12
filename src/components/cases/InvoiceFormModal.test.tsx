@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { InvoiceFormModal } from './InvoiceFormModal';
 import { resolveInvoiceTermsHtml } from '../../lib/invoiceTermsService';
+import { supabase } from '../../lib/supabaseClient';
 
 // --- Mocks ------------------------------------------------------------------
 
@@ -187,5 +188,55 @@ describe('InvoiceFormModal — default payment terms', () => {
     );
     await waitFor(() => expect(screen.getByText('DEFAULT TERMS')).toBeInTheDocument());
     expect(resolveMock).toHaveBeenCalled();
+  });
+});
+
+describe('InvoiceFormModal — quote conversion carries discount type and tax rate', () => {
+  // Preserve the module-default supabase.from so other tests keep the empty-chain stub.
+  const originalFrom = vi.mocked(supabase.from).getMockImplementation();
+  afterEach(() => {
+    if (originalFrom) vi.mocked(supabase.from).mockImplementation(originalFrom);
+  });
+
+  // Thenable + maybeSingle-able chain returning fixed rows, mirroring the file's stub.
+  const dataChain = (single: unknown, list: unknown[]) => {
+    const chain: Record<string, unknown> = {};
+    for (const m of ['select', 'eq', 'is', 'order', 'limit', 'in']) chain[m] = vi.fn(() => chain);
+    chain.maybeSingle = vi.fn(() => Promise.resolve({ data: single, error: null }));
+    chain.then = (resolve: (v: unknown) => unknown) => resolve({ data: list, error: null });
+    return chain;
+  };
+
+  it('previews a percentage-discounted quote with the quote discount type and tax rate', async () => {
+    // Quote: 15% discount off a $2000 subtotal (= $300), taxed at 10% (invoice default is 0%).
+    const quote = { id: 'q1', notes: 'From quote', discount_amount: 15, discount_type: 'percentage', tax_rate: 10 };
+    const quoteItem = { description: 'RAID rebuild', quantity: 1, unit_price: 2000, unit_code: null, unit_label: null, item_code: null, sort_order: 0 };
+
+    vi.mocked(supabase.from).mockImplementation(((table: string) => {
+      if (table === 'quotes') return dataChain(quote, [quote]);
+      if (table === 'quote_items') return dataChain(null, [quoteItem]);
+      return dataChain(null, []);
+    }) as unknown as typeof supabase.from);
+
+    const user = userEvent.setup();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <InvoiceFormModal
+          isOpen onClose={() => {}} onSave={vi.fn().mockResolvedValue(undefined)} caseId="case-1"
+          quotes={[{ id: 'q1', quote_number: 'QUOT-1', title: 'Recovery', total_amount: 2100 }]}
+        />
+      </QueryClientProvider>,
+    );
+
+    await user.selectOptions(screen.getByLabelText('Convert from an existing quote'), 'q1');
+
+    // Percentage semantics honored: 15% of $2000 = $300, not a flat $15.
+    await waitFor(() => expect(screen.getByText('-$300.00')).toBeInTheDocument());
+    expect(screen.getByText(/Discount \(15%\)/)).toBeInTheDocument();
+    expect(screen.getByText('$1700.00')).toBeInTheDocument();
+    // Tax rate follows the quote (10% of the $1700 net), not the invoice default of 0%.
+    expect(screen.getByText('$170.00')).toBeInTheDocument();
+    expect(screen.getByText('$1870.00')).toBeInTheDocument();
   });
 });

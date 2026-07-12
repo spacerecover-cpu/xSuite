@@ -539,6 +539,7 @@ export const CaseDetail: React.FC = () => {
               devices={devices as unknown as React.ComponentProps<typeof DeviceCheckoutModal>['devices']}
               customerName={caseData.customer?.customer_name || ''}
               customerMobileNumber={caseData.customer?.mobile_number || caseData.customer?.phone || ''}
+              currentRecoveryOutcome={caseData.recovery_outcome}
               onCheckoutComplete={() => {
                 queryClient.invalidateQueries({ queryKey: ['case', id] });
                 queryClient.invalidateQueries({ queryKey: ['case_devices', id] });

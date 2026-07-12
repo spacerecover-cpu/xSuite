@@ -257,6 +257,7 @@ export const generateCashFlowReport = async (
     supabase
       .from('payments')
       .select('amount, amount_base, status')
+      .is('deleted_at', null)
       .gte('payment_date', dateFrom)
       .lte('payment_date', dateTo)
       .eq('status', 'completed'),
@@ -307,11 +308,13 @@ export const generateInvoiceSummaryReport = async (
     supabase
       .from('invoices')
       .select('status, invoice_type, total_amount, total_amount_base, amount_paid, amount_paid_base, balance_due, balance_due_base')
+      .is('deleted_at', null)
       .gte('invoice_date', dateFrom)
       .lte('invoice_date', dateTo),
     supabase
       .from('quotes')
       .select('status')
+      .is('deleted_at', null)
       .gte('quote_date', dateFrom)
       .lte('quote_date', dateTo),
   ]);
@@ -378,6 +381,7 @@ export const generateRevenueByCustomerReport = async (
       amount_paid_base,
       customer:customers_enhanced(id, customer_name, email)
     `)
+    .is('deleted_at', null)
     .gte('invoice_date', dateFrom)
     .lte('invoice_date', dateTo);
 

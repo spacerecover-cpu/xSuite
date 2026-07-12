@@ -164,10 +164,28 @@ export function normalizeQuoteStatus(value: unknown): string | null {
 }
 
 /**
- * Apply {@link normalizeDateCell} to every `date`-typed column and
- * {@link normalizeInvoiceStatus} to `invoices.status`, in place, returning the same workbook.
- * All other cells are untouched (booleans go straight to the RPC's `::boolean` cast, which
- * already accepts Yes/No/etc.).
+ * Normalise a DB-CHECK-constrained enum cell that has no legacy display-name synonyms
+ * (expenses.status, creditNotes.status, creditNotes.credit_type, stockSales.payment_status)
+ * to its canonical lowercase token, trimming surrounding whitespace (blank → unchanged).
+ * The validator compares these case-insensitively (importValidator STATUS_ENUMS), so without
+ * this pass a mixed-case 'Approved'/'Paid'/'Unpaid' passes the dry-run and is then sent
+ * verbatim to the case-sensitive lowercase DB CHECK, failing only at import. Unlike invoices/
+ * quotes these columns only ever differ from the enum by case, so a plain lowercase suffices.
+ */
+export function normalizeEnumCell(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const s = String(value).trim();
+  if (s === '') return s;
+  return s.toLowerCase();
+}
+
+/**
+ * Apply {@link normalizeDateCell} to every `date`-typed column and the status normalisers to
+ * every DB-CHECK-constrained enum column the validator checks case-insensitively — in place,
+ * returning the same workbook. Covered enums: invoices.status ({@link normalizeInvoiceStatus}),
+ * quotes.status ({@link normalizeQuoteStatus}), and expenses.status / creditNotes.status +
+ * credit_type / stockSales.payment_status ({@link normalizeEnumCell}). All other cells are
+ * untouched (booleans go straight to the RPC's `::boolean` cast, which already accepts Yes/No/etc.).
  */
 export function coerceWorkbook(wb: ParsedWorkbook): ParsedWorkbook {
   for (const entity of IMPORT_ORDER) {
@@ -177,6 +195,9 @@ export function coerceWorkbook(wb: ParsedWorkbook): ParsedWorkbook {
     const dateKeys = ENTITY_COLUMNS[entity].filter((c) => c.type === 'date').map((c) => c.key);
     const isInvoices = entity === 'invoices';
     const isQuotes = entity === 'quotes';
+    const isExpenses = entity === 'expenses';
+    const isCreditNotes = entity === 'creditNotes';
+    const isStockSales = entity === 'stockSales';
 
     for (const row of rows as RawRow[]) {
       for (const key of dateKeys) {
@@ -184,6 +205,14 @@ export function coerceWorkbook(wb: ParsedWorkbook): ParsedWorkbook {
       }
       if (isInvoices && 'status' in row) row.status = normalizeInvoiceStatus(row.status);
       if (isQuotes && 'status' in row) row.status = normalizeQuoteStatus(row.status);
+      if (isExpenses && 'status' in row) row.status = normalizeEnumCell(row.status);
+      if (isCreditNotes) {
+        if ('status' in row) row.status = normalizeEnumCell(row.status);
+        if ('credit_type' in row) row.credit_type = normalizeEnumCell(row.credit_type);
+      }
+      if (isStockSales && 'payment_status' in row) {
+        row.payment_status = normalizeEnumCell(row.payment_status);
+      }
     }
   }
   return wb;

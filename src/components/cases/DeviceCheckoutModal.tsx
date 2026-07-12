@@ -30,6 +30,19 @@ interface Device {
 
 type CollectorRelationship = 'self' | 'authorized_agent' | 'company_rep' | 'courier';
 
+const RECOVERY_OUTCOMES = ['full', 'partial', 'unrecoverable', 'declined'] as const;
+
+/** Seed the Recovery Outcome dropdown from the case's recorded recovery_outcome.
+ *  log_case_checkout writes cases.recovery_outcome UNCONDITIONALLY from
+ *  p_recovery_outcome on every checkout batch, so a hardcoded 'full' silently
+ *  clobbers a recovery/QA-recorded 'partial'/'unrecoverable'/'declined'. Seeding
+ *  from the recorded value means a passive checkout writes the same value back.
+ *  Falls back to 'full' when the case has no recorded outcome yet (or an
+ *  unrecognized value). */
+function seedRecoveryOutcome(current?: string | null): string {
+  return current && (RECOVERY_OUTCOMES as readonly string[]).includes(current) ? current : 'full';
+}
+
 /** Compact "Returned · 20 Jun 2026" badge date for an already-collected device. */
 function formatReturned(iso: string | null | undefined): string {
   if (!iso) return '';
@@ -53,6 +66,10 @@ interface DeviceCheckoutModalProps {
   /** True when the tenant's documents regime requires a Rule 55 delivery
    *  challan at device checkout (deliveryChallanEnabled(regime.documents)). */
   challanEnabled?: boolean;
+  /** The case's currently recorded recovery_outcome (from recovery/QA). Seeds
+   *  the Recovery Outcome dropdown so a passive checkout does not overwrite a
+   *  recorded 'partial'/'unrecoverable'/'declined' with the default 'full'. */
+  currentRecoveryOutcome?: string | null;
 }
 
 export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
@@ -66,12 +83,15 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
   onCheckoutComplete,
   onShowCheckoutPreview,
   challanEnabled = false,
+  currentRecoveryOutcome,
 }) => {
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [collectorName, setCollectorName] = useState(customerName);
   const [collectorMobile, setCollectorMobile] = useState(customerMobileNumber || '');
   const [collectorId, setCollectorId] = useState('');
-  const [recoveryOutcome, setRecoveryOutcome] = useState<string>('full');
+  const [recoveryOutcome, setRecoveryOutcome] = useState<string>(() =>
+    seedRecoveryOutcome(currentRecoveryOutcome),
+  );
   const [relationship, setRelationship] = useState<CollectorRelationship>('self');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -107,6 +127,13 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
       cancelled = true;
     };
   }, [challanEnabled, isOpen, selectedDevices]);
+
+  // Re-seed the Recovery Outcome dropdown from the case's recorded value each
+  // time the modal opens, so a passive checkout preserves the recovery/QA
+  // outcome instead of silently overwriting it with the default 'full'.
+  useEffect(() => {
+    if (isOpen) setRecoveryOutcome(seedRecoveryOutcome(currentRecoveryOutcome));
+  }, [isOpen, currentRecoveryOutcome]);
 
   const challanEligibleSelected = selectedDevices.filter((id) => !labSuppliedIds.includes(id));
   const declaredTotal = challanEligibleSelected.reduce(
@@ -233,7 +260,7 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
       setCollectorName(customerName);
       setCollectorMobile(customerMobileNumber || '');
       setCollectorId('');
-      setRecoveryOutcome('full');
+      setRecoveryOutcome(seedRecoveryOutcome(currentRecoveryOutcome));
       setRelationship('self');
       setError('');
       setDeclaredValues({});

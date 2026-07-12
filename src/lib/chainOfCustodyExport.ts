@@ -7,6 +7,20 @@ export interface ExportOptions {
   watermark?: string;
 }
 
+// RFC 4180-compliant CSV field encoder. Custody exports carry user-controlled
+// free text (actor_name, action_description, evidence_reference); an embedded
+// double-quote left un-doubled breaks the quoted-field structure and misaligns
+// the actor/hash/signature columns of the legal record. A leading =, +, -, @,
+// tab or CR is also neutralized with a leading apostrophe so the field is not
+// executed as a formula when the export is opened in Excel/Sheets.
+function escapeCSVCell(value: unknown): string {
+  let cell = value === null || value === undefined ? '' : String(value);
+  if (/^[=+\-@\t\r]/.test(cell)) {
+    cell = `'${cell}`;
+  }
+  return `"${cell.replace(/"/g, '""')}"`;
+}
+
 export function exportToCSV(entries: ChainOfCustodyEntry[], caseNumber: string): void {
   const headers = [
     'Entry Number',
@@ -38,7 +52,7 @@ export function exportToCSV(entries: ChainOfCustodyEntry[], caseNumber: string):
 
   const csvContent = [
     headers.join(','),
-    ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
+    ...rows.map((row) => row.map((cell) => escapeCSVCell(cell)).join(',')),
   ].join('\n');
 
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
