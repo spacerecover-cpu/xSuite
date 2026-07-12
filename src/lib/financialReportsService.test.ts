@@ -11,6 +11,7 @@ import {
   closingBalanceIsIndicative,
   paidRevenueNetOfTax,
   generateProfitLossReport,
+  generateInvoiceVsExpenseReport,
 } from './financialReportsService';
 
 /** Thenable query builder: chainable filters; awaiting it yields {data}. */
@@ -21,6 +22,7 @@ function makeQuery(rows: Array<Record<string, unknown>>) {
     lte: vi.fn(() => builder),
     is: vi.fn(() => builder),
     in: vi.fn(() => builder),
+    not: vi.fn(() => builder),
     then: (resolve: (v: { data: unknown; error: null }) => void) =>
       resolve({ data: rows, error: null }),
   };
@@ -90,5 +92,43 @@ describe('generateProfitLossReport', () => {
     expect(invoices.is).toHaveBeenCalledWith('deleted_at', null);
     // ...and the tax/total basis needed to net is actually selected
     expect(invoices.select).toHaveBeenCalledWith(expect.stringContaining('tax_amount'));
+  });
+});
+
+describe('generateInvoiceVsExpenseReport (Bug 13 — revenue is realized cash, not billed total)', () => {
+  it('counts only the paid portion of an invoice, not the full billed total', async () => {
+    // One $10,000 invoice, "sent" and entirely unpaid → realized revenue is 0,
+    // not $10,000. A partially-paid invoice contributes only its paid portion.
+    const invoices = makeQuery([
+      { id: 'a', total_amount: 10000, amount_paid: 0, invoice_date: '2026-03-04', status: 'sent' },
+      { id: 'b', total_amount: 10000, amount_paid: 3000, invoice_date: '2026-03-20', status: 'partial' },
+    ]);
+    const expenses = makeQuery([
+      { id: 'e', amount: 1000, expense_date: '2026-03-10', status: 'approved' },
+    ]);
+    from.mockImplementation((table: string) => (table === 'invoices' ? invoices : expenses));
+
+    const report = await generateInvoiceVsExpenseReport('2026-03-01', '2026-03-31');
+
+    // Realized cash in = 0 + 3000, NOT the 20000 billed.
+    expect(report.totals.revenue).toBe(3000);
+    expect(report.totals.expense).toBe(1000);
+    expect(report.totals.net).toBe(2000);
+    // The paid-amount basis must actually be selected from the DB.
+    expect(invoices.select).toHaveBeenCalledWith(expect.stringContaining('amount_paid'));
+  });
+
+  it('uses the base-currency shadow of the paid amount when present', async () => {
+    const invoices = makeQuery([
+      { id: 'a', amount_paid: 100, amount_paid_base: 40, invoice_date: '2026-04-05', status: 'paid' },
+    ]);
+    const expenses = makeQuery([]);
+    from.mockImplementation((table: string) => (table === 'invoices' ? invoices : expenses));
+
+    const report = await generateInvoiceVsExpenseReport('2026-04-01', '2026-04-30');
+
+    // Base conversion: 40, never the native 100.
+    expect(report.totals.revenue).toBe(40);
+    expect(invoices.select).toHaveBeenCalledWith(expect.stringContaining('amount_paid_base'));
   });
 });

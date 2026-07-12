@@ -20,7 +20,7 @@ import { logger } from './logger';
  *  it (or calling maybeSingle) yields {data}. `rows` is the resolved payload. */
 function makeQuery(rows: unknown) {
   const builder: Record<string, unknown> = {};
-  for (const m of ['select', 'eq', 'in', 'is', 'lte', 'gte', 'order', 'limit']) {
+  for (const m of ['select', 'eq', 'in', 'is', 'lte', 'gte', 'order', 'limit', 'update', 'insert']) {
     builder[m] = vi.fn(() => builder);
   }
   builder.maybeSingle = vi.fn(() => Promise.resolve({ data: rows, error: null }));
@@ -102,6 +102,8 @@ describe('statutory social-security guard (Phase 0)', () => {
 
     from.mockImplementation((table: string) => {
       if (table === 'employees') return makeQuery([{ id: 'emp-1', tenant_id: 't-1', basic_salary: 1000 }]);
+      // The atomic claim (draft -> processing) reads back the still-draft row.
+      if (table === 'payroll_periods') return makeQuery({ id: 'period-1', status: 'draft' });
       if (table === 'payroll_records') {
         return {
           insert: (rows: Array<Record<string, unknown>>) => {
@@ -219,6 +221,8 @@ describe('processPayroll docks unauthorized absence (Phase 0 overpayment fix)', 
 
     from.mockImplementation((table: string) => {
       if (table === 'employees') return makeQuery([{ id: 'emp-1', tenant_id: 't-1', basic_salary: 1000 }]);
+      // The atomic claim (draft -> processing) reads back the still-draft row.
+      if (table === 'payroll_periods') return makeQuery({ id: 'period-1', status: 'draft' });
       if (table === 'payroll_records') {
         return {
           insert: (rows: Array<Record<string, unknown>>) => {
@@ -248,5 +252,60 @@ describe('processPayroll docks unauthorized absence (Phase 0 overpayment fix)', 
     await payrollService.processPayroll('period-1');
 
     expect(captured.records![0].net_salary).toBe(1000);
+  });
+});
+
+describe('processPayroll is idempotent under retry/concurrency (bug #19)', () => {
+  // The initial getPayrollPeriod read sees 'draft' (a stale read — the period was
+  // already claimed by a concurrent run or a prior partial run). `claimResult`
+  // drives what the atomic draft->processing CAS reads back: null means it matched
+  // zero rows (someone else won), an object means this caller won the claim.
+  function arrangeClaim(
+    claimResult: unknown,
+    captured: { inserted?: boolean; records?: Array<Record<string, unknown>> },
+  ) {
+    vi.spyOn(payrollService, 'getPayrollPeriod').mockResolvedValue(
+      { id: 'period-1', status: 'draft', start_date: '2026-06-01', end_date: '2026-06-30', period_name: 'Jun 2026' } as never,
+    );
+    vi.spyOn(payrollService, 'getPayrollSettings').mockResolvedValue(
+      { working_days_per_month: 22, working_hours_per_day: 8, overtime_rate_multiplier: { regular: 1.5, weekend: 1.5, holiday: 2 }, payment_day: 28, social_security_rate: undefined } as never,
+    );
+    vi.spyOn(payrollService, 'getEmployeeAttendance').mockResolvedValue(
+      { daysWorked: 22, daysAbsent: 0, daysLeave: 0, regularHours: 176, overtimeHours: 0 } as never,
+    );
+    vi.spyOn(payrollService, 'getActiveLoans').mockResolvedValue([] as never);
+
+    from.mockImplementation((table: string) => {
+      if (table === 'employees') return makeQuery([{ id: 'emp-1', tenant_id: 't-1', basic_salary: 1000 }]);
+      if (table === 'payroll_periods') return makeQuery(claimResult);
+      if (table === 'payroll_records') {
+        return {
+          insert: (rows: Array<Record<string, unknown>>) => {
+            captured.inserted = true;
+            captured.records = rows;
+            return { select: () => Promise.resolve({ data: rows, error: null }) };
+          },
+        } as unknown as ReturnType<typeof makeQuery>;
+      }
+      return makeQuery(null);
+    });
+  }
+
+  it('aborts when the period is no longer draft — no duplicate records inserted, no loans re-deducted', async () => {
+    const captured: { inserted?: boolean } = {};
+    arrangeClaim(null, captured); // claim CAS matches zero rows: already claimed
+
+    await expect(payrollService.processPayroll('period-1')).rejects.toThrow(/already being processed/i);
+    expect(captured.inserted).toBeUndefined(); // the records insert never ran
+  });
+
+  it('claims the period BEFORE inserting records on a fresh run', async () => {
+    const captured: { inserted?: boolean } = {};
+    arrangeClaim({ id: 'period-1', status: 'processing' }, captured); // claim CAS wins
+
+    const result = await payrollService.processPayroll('period-1');
+
+    expect(captured.inserted).toBe(true);
+    expect(result.success).toBe(true);
   });
 });

@@ -2,13 +2,15 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
+import { MFAChallenge } from './auth/MFAChallenge';
+import { PasswordChangeModal } from './users/PasswordChangeModal';
 
 interface ProtectedPlatformAdminRouteProps {
   children: React.ReactNode;
 }
 
 export const ProtectedPlatformAdminRoute: React.FC<ProtectedPlatformAdminRouteProps> = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, profile, loading, mfaPending, passwordResetRequired, recoveryPending, completeMFAChallenge, signOut } = useAuth();
 
   const { data: isPlatformAdmin, isLoading } = useQuery({
     queryKey: ['is-platform-admin', user?.id],
@@ -35,6 +37,25 @@ export const ProtectedPlatformAdminRoute: React.FC<ProtectedPlatformAdminRoutePr
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Session-level auth gates — mirror ProtectedRoute (recovery → MFA → forced
+  // reset) BEFORE any authorization decision. The /platform-admin tree is a
+  // sibling of the main app in App.tsx, so without these a deep link / restored
+  // aal1 session would walk straight past the second factor, an in-progress
+  // password recovery, or an admin-mandated password rotation into the
+  // highest-privilege cross-tenant console. is_platform_admin() is AAL-agnostic
+  // and cannot be relied on to enforce the second factor.
+  if (recoveryPending) {
+    return <Navigate to="/reset-password" replace />;
+  }
+
+  if (mfaPending) {
+    return <MFAChallenge onVerified={completeMFAChallenge} onCancel={() => void signOut()} />;
+  }
+
+  if (passwordResetRequired) {
+    return <PasswordChangeModal isOpen userName={profile?.full_name ?? ''} />;
   }
 
   if (!isPlatformAdmin) {

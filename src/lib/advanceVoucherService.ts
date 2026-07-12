@@ -22,11 +22,16 @@ export interface HeldAdvance {
  * returned so a fully-netted advance drops out of the picker.
  */
 export async function getHeldAdvancesForCase(caseId: string): Promise<HeldAdvance[]> {
+  // A voided advance is flipped to status='refunded' by void_payment (it leaves
+  // deleted_at NULL and posts no refund voucher), so guard on status here — else
+  // the reversed advance re-enters the picker as fresh applyable cash. Advances
+  // are always recorded 'completed' (createAdvancePayment / record_payment default).
   const { data: advances, error } = await supabase
     .from('payments')
     .select('id, payment_number, amount, currency, payment_kind')
     .eq('case_id', caseId)
     .eq('payment_kind', 'advance')
+    .eq('status', 'completed')
     .is('deleted_at', null);
   if (error) throw error;
   const rows = advances ?? [];

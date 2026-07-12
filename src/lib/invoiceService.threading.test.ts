@@ -96,3 +96,32 @@ describe('updateInvoice — buyer resolution semantics (P4 S2 review #7)', () =>
       expect.objectContaining({ customerId: null, companyId: null }), expect.anything());
   });
 });
+
+// Regression: a percentage document discount must reach computeDocumentTotals as
+// discountType:'percentage' (not the hardcoded null that made it flat currency).
+// Before the fix both paths passed discountType:null, so a 10% discount was applied
+// as $10 — inflating the stored total and contradicting the persisted discount_type.
+describe('createInvoice / updateInvoice — document discount type threading', () => {
+  it('createInvoice forwards discount_type to computeDocumentTotals (percentage stays percentage)', async () => {
+    await createInvoice(
+      { case_id: 'case-1', customer_id: 'cust-1', invoice_type: 'tax_invoice', invoice_date: '2026-07-05', tax_rate: 5, discount_type: 'percentage', discount_amount: 10 },
+      [{ description: 'Data recovery', quantity: 1, unit_price: 1000 }],
+    );
+    expect(computeTotalsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ discountType: 'percentage', discountAmount: 10 }),
+      expect.anything(),
+    );
+  });
+
+  it('updateInvoice forwards discount_type to computeDocumentTotals', async () => {
+    await updateInvoice(
+      'inv-1',
+      { tax_rate: 5, discount_type: 'percentage', discount_amount: 10 },
+      [{ description: 'x', quantity: 1, unit_price: 1000 }] as never,
+    );
+    expect(computeTotalsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ discountType: 'percentage', discountAmount: 10 }),
+      expect.anything(),
+    );
+  });
+});

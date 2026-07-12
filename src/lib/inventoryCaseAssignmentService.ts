@@ -375,35 +375,11 @@ function annotateNotes(existing: string | null, marker: string, usageNotes?: str
   return parts.join('\n').trim();
 }
 
-export async function markAssignmentAsDefective(
-  assignmentId: string,
-  defectReason: string,
-  usageNotes?: string
-): Promise<AssignmentWithDetails> {
-  const { data: existing, error: fetchError } = await supabase
-    .from('inventory_case_assignments')
-    .select('notes')
-    .eq('id', assignmentId)
-    .maybeSingle();
-
-  if (fetchError) {
-    logger.error('Error loading assignment before defect mark:', fetchError);
-    throw fetchError;
-  }
-
-  const composedNotes = annotateNotes(
-    existing?.notes ?? null,
-    `[defective] ${defectReason}`,
-    usageNotes
-  );
-
+async function fetchDecoratedAssignment(assignmentId: string): Promise<AssignmentWithDetails> {
+  // Re-hydrate the (now returned) assignment with its embeds after the release RPC,
+  // so callers keep the decorated AssignmentWithDetails shape they relied on.
   const { data, error } = await supabase
     .from('inventory_case_assignments')
-    .update({
-      returned_at: new Date().toISOString(),
-      notes: composedNotes,
-    })
-    .eq('id', assignmentId)
     .select(
       `
       *,
@@ -411,10 +387,11 @@ export async function markAssignmentAsDefective(
       case:cases (id, case_no, title, status)
     `
     )
+    .eq('id', assignmentId)
     .maybeSingle();
 
   if (error) {
-    logger.error('Error marking assignment as defective:', error);
+    logger.error('Error loading assignment after release:', error);
     throw error;
   }
 
@@ -426,50 +403,85 @@ export async function markAssignmentAsDefective(
   return decorate(data as AssignmentRowWithEmbeds, profiles);
 }
 
+export async function markAssignmentAsDefective(
+  assignmentId: string,
+  defectReason: string,
+  usageNotes?: string
+): Promise<AssignmentWithDetails> {
+  // Route the closure through the SAME atomic RPC as unassignInventoryItem — a bare
+  // UPDATE that only set returned_at would leave the item stuck "In Use" forever and
+  // write NO return chain-of-custody event (a checkout with no matching return, and a
+  // dead donor that checkItemAvailability would still report as reassignable). The RPC
+  // releases the item, writes the return custody event, and records case-history/audit
+  // in one transaction. The `[defective]` marker keeps deriveUsageResult()/the usage
+  // badge correct after re-fetch.
+  const noteMarker = annotateNotes(null, `[defective] ${defectReason}`, usageNotes);
+
+  const { data: released, error } = await supabase.rpc('unassign_inventory_from_case', {
+    p_assignment_id: assignmentId,
+    p_notes: noteMarker,
+  });
+
+  if (error) {
+    logger.error('Error marking assignment as defective:', error);
+    throw error;
+  }
+
+  // The shared RPC releases the asset back to "Available"; a defective donor must NOT
+  // be reassignable, so move the item to a non-available "Defective" disposition.
+  const itemId = (released as { item_id?: string } | null)?.item_id;
+  if (itemId) {
+    const { data: defectiveStatus, error: statusLookupError } = await supabase
+      .from('master_inventory_status_types')
+      .select('id')
+      .ilike('name', '%defective%')
+      .limit(1)
+      .maybeSingle();
+
+    if (statusLookupError) {
+      logger.error('Error resolving defective inventory status:', statusLookupError);
+      throw statusLookupError;
+    }
+
+    if (defectiveStatus?.id) {
+      const { error: statusError } = await supabase
+        .from('inventory_items')
+        .update({ status_id: defectiveStatus.id })
+        .eq('id', itemId);
+
+      if (statusError) {
+        logger.error('Error setting inventory item to defective status:', statusError);
+        throw statusError;
+      }
+    } else {
+      logger.warn('No "Defective" inventory status found; item left released after defect mark');
+    }
+  }
+
+  return fetchDecoratedAssignment(assignmentId);
+}
+
 export async function markAssignmentAsWorking(
   assignmentId: string,
   usageNotes?: string
 ): Promise<AssignmentWithDetails> {
-  const { data: existing, error: fetchError } = await supabase
-    .from('inventory_case_assignments')
-    .select('notes')
-    .eq('id', assignmentId)
-    .maybeSingle();
+  // Same atomic release path as markAssignmentAsDefective / unassignInventoryItem:
+  // the RPC flips the item status back to "Available", writes the return
+  // chain-of-custody event, and records case-history/audit. A working donor stays
+  // available for reuse.
+  const noteMarker = annotateNotes(null, '[working]', usageNotes);
 
-  if (fetchError) {
-    logger.error('Error loading assignment before working mark:', fetchError);
-    throw fetchError;
-  }
-
-  const composedNotes = annotateNotes(existing?.notes ?? null, '[working]', usageNotes);
-
-  const { data, error } = await supabase
-    .from('inventory_case_assignments')
-    .update({
-      returned_at: new Date().toISOString(),
-      notes: composedNotes,
-    })
-    .eq('id', assignmentId)
-    .select(
-      `
-      *,
-      inventory_item:inventory_items (${INVENTORY_ITEM_EMBED}),
-      case:cases (id, case_no, title, status)
-    `
-    )
-    .maybeSingle();
+  const { error } = await supabase.rpc('unassign_inventory_from_case', {
+    p_assignment_id: assignmentId,
+    p_notes: noteMarker,
+  });
 
   if (error) {
     logger.error('Error marking assignment as working:', error);
     throw error;
   }
 
-  if (!data) {
-    throw new Error('Assignment update returned no row');
-  }
-
-  const profiles = await fetchProfileMap([data.assigned_by]);
-  return decorate(data as AssignmentRowWithEmbeds, profiles);
+  return fetchDecoratedAssignment(assignmentId);
 }
 
 export async function getInventoryItemAssignments(

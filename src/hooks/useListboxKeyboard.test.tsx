@@ -128,6 +128,52 @@ describe('useListboxKeyboard', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it('Enter/Space while closed opens the panel and never selects', () => {
+    for (const key of ['Enter', ' ']) {
+      const { result, onOpen, onSelect, onClose } = setup({
+        open: false,
+        itemCount: 3,
+        multiple: false,
+      });
+      act(() => result.current.onKeyDown(keyEvent(key).event));
+      expect(onOpen).toHaveBeenCalledTimes(1);
+      expect(onSelect).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+    }
+  });
+
+  it('does not re-select a stale index when Enter is pressed on a refocused closed trigger', () => {
+    const onSelect = vi.fn();
+    const onOpen = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ open }: { open: boolean }) =>
+        useListboxKeyboard({
+          open,
+          itemCount: 3,
+          onOpen,
+          onClose: vi.fn(),
+          onSelect,
+          getOptionId: (i: number) => `opt-${i}`,
+        }),
+      { initialProps: { open: true } }
+    );
+
+    // Open panel: highlight the first option.
+    act(() => result.current.onKeyDown(keyEvent('ArrowDown').event));
+    expect(result.current.activeIndex).toBe(0);
+
+    // Selection closes the panel; the trigger refocuses (open -> false).
+    rerender({ open: false });
+    // Closing clears the stale highlight so nothing can be re-selected.
+    expect(result.current.activeIndex).toBe(-1);
+
+    // Habitual second Enter (e.g. to submit the form) must NOT overwrite the
+    // field with a stale index — it just re-opens the panel.
+    act(() => result.current.onKeyDown(keyEvent('Enter').event));
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
   it('Escape calls onClose and resets activeIndex to -1', () => {
     const { result, onClose } = setup({ itemCount: 3 });
     act(() => result.current.onKeyDown(keyEvent('ArrowDown').event)); // active = 0

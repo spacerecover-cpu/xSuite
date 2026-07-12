@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { fetchQuotesPage, getQuoteStats, toQuoteEditInitialData, createQuote as createQuoteService, updateQuoteStatus } from '../../lib/quotesService';
+import { fetchQuotesPage, getQuoteStats, toQuoteEditInitialData, createQuote as createQuoteService, updateQuote as updateQuoteService, updateQuoteStatus } from '../../lib/quotesService';
 import type { QuoteWithDetails, Quote as QuoteShape, QuoteItem as QuoteItemShape } from '../../lib/quotesService';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -11,7 +11,6 @@ import { KpiRow } from '../../components/templates/KpiRow';
 import { QuoteFormModal } from '../../components/cases/QuoteFormModal';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
-import { roundMoney } from '../../lib/financialMath';
 import { supabase } from '../../lib/supabaseClient';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
@@ -22,7 +21,6 @@ import { downloadCSV } from '../../lib/csvExport';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
-import type { Database } from '../../types/database.types';
 import {
   FileText,
   Plus,
@@ -39,9 +37,6 @@ import {
 } from 'lucide-react';
 import { formatDate } from '../../lib/format';
 import { logger } from '../../lib/logger';
-
-type QuoteUpdate = Database['public']['Tables']['quotes']['Update'];
-type QuoteItemInsert = Database['public']['Tables']['quote_items']['Insert'];
 
 const toNumber = (value: unknown, fallback = 0): number => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -713,42 +708,33 @@ export const QuotesListPage: React.FC = () => {
             const companyIdValue = toOptionalString(quoteData.company_id);
 
             if (editingQuote && editingQuote.id) {
-              const updatePayload: QuoteUpdate = {
-                status: statusRaw,
-                valid_until: validUntil,
+              // Route list-page edits through quotesService.updateQuote — the same
+              // recomputing path QuoteDetailPage uses. It re-derives subtotal/
+              // tax_amount/total_amount (and the *_base snapshot) from the edited
+              // line items via computeDocumentTotals, so the header totals never
+              // freeze out of sync with the stored items. A hand-rolled quotes.update
+              // here previously changed line items while leaving totals stale.
+              const quoteFields: Partial<QuoteShape> = {
+                status: statusRaw as QuoteShape['status'],
+                valid_until: validUntil ?? undefined,
                 tax_rate: taxRate,
                 discount_amount: discountAmountInput,
+                discount_type: discountTypeRaw as QuoteShape['discount_type'],
                 terms: termsValue,
-                notes: notesValue,
-                updated_at: new Date().toISOString(),
+                notes: notesValue ?? undefined,
               };
 
-              const { error } = await supabase
-                .from('quotes')
-                .update(updatePayload)
-                .eq('id', editingQuote.id);
-
-              if (error) throw error;
-
-              await supabase
-                .from('quote_items')
-                .update({ deleted_at: new Date().toISOString() })
-                .eq('quote_id', editingQuote.id);
-
-              const itemsToInsert: Array<Omit<QuoteItemInsert, 'tenant_id'>> = items.map((item, index) => ({
-                quote_id: editingQuote.id as string,
+              const quoteItems: QuoteItemShape[] = items.map((item, index) => ({
                 description: item.description,
                 quantity: item.quantity,
                 unit_price: item.unit_price,
-                total: roundMoney(item.quantity * item.unit_price, currencyConfig.decimalPlaces),
+                unit_code: item.unit_code ?? null,
+                unit_label: item.unit_label ?? null,
+                item_code: item.item_code ?? null,
                 sort_order: index,
               }));
 
-              const { error: itemsError } = await supabase
-                .from('quote_items')
-                .insert(itemsToInsert as QuoteItemInsert[]);
-
-              if (itemsError) throw itemsError;
+              await updateQuoteService(editingQuote.id, quoteFields, quoteItems);
             } else {
               // Route through quotesService.createQuote — the canonical create path
               // (mirrors CaseDetail.tsx / InvoicesListPage.tsx). A hand-rolled insert

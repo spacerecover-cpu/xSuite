@@ -490,19 +490,6 @@ export const payrollService = {
     void tenantId;
 
     if (records.length > 0) {
-      const { data: createdRecords, error: recordError } = await supabase
-        .from('payroll_records')
-        .insert(records)
-        .select();
-
-      if (recordError) throw recordError;
-
-      // Post loan repayments now that payroll_records are committed, so a
-      // records-insert failure above can never deduct loans without backing.
-      for (const repayment of pendingLoanRepayments) {
-        await this.recordLoanRepayment(repayment);
-      }
-
       // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency: records[] is built in this one processPayroll run under a single resolved rate context (rc); summing the document amounts is correct here
       const totalGross = records.reduce((sum, r) => sum + Number(r.total_earnings ?? 0), 0);
       // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency: records[] is built in this one processPayroll run under a single resolved rate context (rc); summing the document amounts is correct here
@@ -513,13 +500,58 @@ export const payrollService = {
       // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency: records[] is built in this one processPayroll run under a single resolved rate context (rc); summing the document amounts is correct here
       const totalNet = records.reduce((sum, r) => sum + Number(r.net_salary ?? 0), 0);
 
-      await this.updatePayrollPeriod(periodId, {
-        status: 'processing',
-        total_gross: totalGross,
-        total_deductions: totalDeductions,
-        total_net: totalNet,
-        employee_count: records.length,
-      });
+      // Idempotency + concurrency guard: CLAIM the period by flipping it out of
+      // 'draft' BEFORE inserting any payroll_records or posting loan repayments,
+      // conditional on it STILL being 'draft'. A single UPDATE ... WHERE
+      // status = 'draft' is atomic in Postgres, so of two concurrent runs — or a
+      // retry after a mid-run failure — exactly one matches the row and proceeds;
+      // every other caller matches zero rows and aborts here, before it can write
+      // a duplicate set of records or double-deduct a loan. Doing this write FIRST
+      // also relocates the previously-last, failure-prone period update to the
+      // front: if it fails (e.g. the transient network drop in the original bug)
+      // nothing else has been written yet, so a retry has nothing to duplicate.
+      //
+      // This is the app-level guard. A DB-side SECURITY DEFINER RPC (records +
+      // loans + status in ONE transaction) plus a partial unique constraint on
+      // payroll_records(period_id, employee_id) WHERE deleted_at IS NULL are the
+      // belt-and-suspenders backstop — see cross-file notes.
+      const { data: claimed, error: claimError } = await supabase
+        .from('payroll_periods')
+        .update({
+          status: 'processing',
+          total_gross: totalGross,
+          total_deductions: totalDeductions,
+          total_net: totalNet,
+          employee_count: records.length,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', periodId)
+        .eq('status', 'draft')
+        .is('deleted_at', null)
+        .select()
+        .maybeSingle();
+
+      if (claimError) throw claimError;
+      if (!claimed) {
+        // The period was already claimed by a concurrent run, or it left 'draft'
+        // between the initial read and this write. Do NOT insert a second set of
+        // records or re-run loan deductions.
+        throw new Error('Payroll period is already being processed');
+      }
+
+      const { data: createdRecords, error: recordError } = await supabase
+        .from('payroll_records')
+        .insert(records)
+        .select();
+
+      if (recordError) throw recordError;
+
+      // Post loan repayments now that the period is claimed and payroll_records
+      // are committed, so neither a records-insert failure nor a retry can
+      // deduct loans without a backing record.
+      for (const repayment of pendingLoanRepayments) {
+        await this.recordLoanRepayment(repayment);
+      }
 
       return {
         success: true,

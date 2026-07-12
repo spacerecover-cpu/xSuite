@@ -14,9 +14,16 @@ const sigSvc = vi.hoisted(() => ({
   listInstanceSignatures: vi.fn(async () => [] as { slot: string; id: string; document_instance_id: string; signed_at: string }[]),
 }));
 vi.mock('../../lib/documentSignatureService', () => sigSvc);
+// Per-call capture payloads so a test can simulate each slot's signer typing their own name.
+// When the queue is empty the mock falls back to the default typed 'Tech A' (existing tests).
+const modalMock = vi.hoisted(() => ({ queue: [] as { method: string; typedValue?: string }[] }));
 vi.mock('./SignatureCaptureModal', () => ({
   SignatureCaptureModal: ({ open, onCapture }: { open: boolean; onCapture: (s: unknown) => void }) =>
-    open ? <button onClick={() => onCapture({ method: 'typed', typedValue: 'Tech A' })}>mock-capture</button> : null,
+    open ? (
+      <button onClick={() => onCapture(modalMock.queue.shift() ?? { method: 'typed', typedValue: 'Tech A' })}>
+        mock-capture
+      </button>
+    ) : null,
 }));
 vi.mock('../../lib/reportPDFService', () => ({
   reportPDFService: { generateDocumentInstanceAsBlob: vi.fn(async () => ({ success: true, blob: new Blob(['x']) })) },
@@ -39,6 +46,7 @@ import { DocumentDraftReview } from './DocumentDraftReview';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  modalMock.queue = [];
   svc.getDocumentInstance.mockResolvedValue({ id: 'di-1', title: 'Eval', status: 'in_review', created_by: 'author', report_subtype: 'evaluation', case_id: 'c1' });
   svc.getDocumentInstanceSections.mockResolvedValue([{ section_key: 'findings', title: 'Findings', content: '', sort_order: 0, is_visible: true }]);
 });
@@ -164,6 +172,53 @@ describe('data_destruction approval queue', () => {
       'approved',
       expect.objectContaining({ signatureId: 'sig-app' }),
     );
+  });
+
+  it('attributes each destruction slot to its own signer, not the logged-in approver', async () => {
+    svc.getDocumentInstance.mockResolvedValue({
+      id: 'di-dd',
+      title: 'Data Destruction Certificate',
+      status: 'in_review',
+      created_by: 'author',
+      report_subtype: 'data_destruction',
+      case_id: 'c1',
+    });
+    sigSvc.listInstanceSignatures.mockResolvedValue([]);
+    sigSvc.captureStaffSignature
+      .mockResolvedValueOnce('sig-eng')
+      .mockResolvedValueOnce('sig-wit')
+      .mockResolvedValueOnce('sig-app');
+    // Each signer types their OWN name in the capture modal (the Type method's field).
+    modalMock.queue = [
+      { method: 'typed', typedValue: 'Olivia Operator' },
+      { method: 'typed', typedValue: 'Walter Witness' },
+      { method: 'typed', typedValue: 'Amy Approver' },
+    ];
+
+    render(<DocumentDraftReview isOpen onClose={vi.fn()} caseId="c1" instanceId="di-dd" onSaved={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: /approve/i }));
+    fireEvent.click(await screen.findByText('mock-capture')); // operator
+    await waitFor(() => expect(sigSvc.captureStaffSignature).toHaveBeenCalledTimes(1));
+    fireEvent.click(await screen.findByText('mock-capture')); // witness
+    await waitFor(() => expect(sigSvc.captureStaffSignature).toHaveBeenCalledTimes(2));
+    fireEvent.click(await screen.findByText('mock-capture')); // approver
+    await waitFor(() => expect(sigSvc.captureStaffSignature).toHaveBeenCalledTimes(3));
+
+    const bySlot = Object.fromEntries(
+      sigSvc.captureStaffSignature.mock.calls.map((c: unknown[]) => {
+        const a = c[0] as { slot: string; signerName: string };
+        return [a.slot, a.signerName];
+      }),
+    );
+    // Each slot is stamped with the name that slot's signer actually entered…
+    expect(bySlot.engineer).toBe('Olivia Operator');
+    expect(bySlot.witness).toBe('Walter Witness');
+    expect(bySlot.approver).toBe('Amy Approver');
+    // …so the three signatories are provably distinct and none is silently attributed
+    // to the logged-in approver's account name ('Reviewer' from the AuthContext mock).
+    const names = [bySlot.engineer, bySlot.witness, bySlot.approver];
+    expect(new Set(names).size).toBe(3);
+    expect(names).not.toContain('Reviewer');
   });
 });
 

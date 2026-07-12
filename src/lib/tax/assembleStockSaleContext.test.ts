@@ -74,4 +74,78 @@ describe('computeStockSaleTax (kernel parity for POS sales)', () => {
     expect(comp.rollups[0]).toMatchObject({ componentCode: 'VAT', rate: 5, taxAmount: 0.5 });
     expect(comp.totals.grandTotal).toBe(10.5);
   });
+
+  /** India multi-slab pack (in_gst). Regression for the slab + place-of-supply
+   *  bug: without narrowing, the split kernel selected EVERY standard row and
+   *  stacked all four slabs (5+12+18+28 = 63% across CGST/SGST/IGST). A counter
+   *  sale is intra-state, so the correct answer is CGST 9 + SGST 9 = 18 on ₹100. */
+  const IN_GST_SLABS = [5, 12, 18, 28].flatMap((slab, i) => {
+    const half = slab / 2;
+    return [
+      { id: `cgst-${slab}`, country_id: 'in', subdivision_id: null, component_code: 'CGST', component_label: 'CGST',
+        tax_category: 'standard', rate: half, applies_to: `gst_slab_${slab}`, valid_from: '2017-07-01', valid_to: null, sort_order: i * 3 },
+      { id: `sgst-${slab}`, country_id: 'in', subdivision_id: null, component_code: 'SGST', component_label: 'SGST',
+        tax_category: 'standard', rate: half, applies_to: `gst_slab_${slab}`, valid_from: '2017-07-01', valid_to: null, sort_order: i * 3 + 1 },
+      { id: `igst-${slab}`, country_id: 'in', subdivision_id: null, component_code: 'IGST', component_label: 'IGST',
+        tax_category: 'standard', rate: slab, applies_to: `gst_slab_${slab}`, valid_from: '2017-07-01', valid_to: null, sort_order: i * 3 + 2 },
+    ];
+  });
+
+  function wireIndiaTenant(rates: unknown[]) {
+    const legalEntitiesQuery = makeQuery([
+      { id: 'le-1', tenant_id: 'tenant-in', country_id: 'in', subdivision_id: 'in-ka',
+        tax_identifier: '29AAAAA0000A1Z5', is_primary: true },
+    ]);
+    const tenantQuery = makeQuery({
+      id: 'tenant-in', timezone: 'Asia/Kolkata', base_currency_code: 'INR',
+      resolved_country_config: {
+        'regime.tax': 'in_gst',
+        'tax.rounding_policy': { mode: 'half_up', level: 'head' },
+      },
+    });
+    const registrationsQuery = makeQuery([]);
+    const ratesQuery = makeQuery(rates);
+    from.mockImplementation((table: string) => {
+      switch (table) {
+        case 'legal_entities': return legalEntitiesQuery;
+        case 'tenants': return tenantQuery;
+        case 'legal_entity_tax_registrations': return registrationsQuery;
+        case 'geo_country_tax_rates': return ratesQuery;
+        default: throw new Error(`unexpected table: ${table}`);
+      }
+    });
+  }
+
+  it('narrows a split-levy (India GST) counter sale to intra-state CGST+SGST for its slab', async () => {
+    wireIndiaTenant(IN_GST_SLABS);
+
+    const comp = await computeStockSaleTax({
+      lines: [{ lineItemId: null, description: 'SATA cable', quantity: 1, unitPrice: 100,
+        lineDiscount: 0, unitCode: null, itemCode: null, treatment: 'standard', treatmentReasonCode: null }],
+      documentDiscount: 0,
+      taxInclusive: false,
+      taxRate: 18,
+    });
+
+    // Intra-state: exactly CGST + SGST at half the slab each — never IGST, and
+    // never the 63% stack of all four slabs.
+    expect(comp.rollups.map((r) => r.componentCode).sort()).toEqual(['CGST', 'SGST']);
+    expect(comp.rollups.find((r) => r.componentCode === 'CGST')).toMatchObject({ rate: 9, taxAmount: 9 });
+    expect(comp.rollups.find((r) => r.componentCode === 'SGST')).toMatchObject({ rate: 9, taxAmount: 9 });
+    expect(comp.totals.taxTotal).toBe(18);
+    expect(comp.totals.grandTotal).toBe(118);
+  });
+
+  it('refuses to guess a slab for a multi-slab pack when no taxRate is supplied', async () => {
+    wireIndiaTenant(IN_GST_SLABS);
+
+    await expect(
+      computeStockSaleTax({
+        lines: [{ lineItemId: null, description: 'SATA cable', quantity: 1, unitPrice: 100,
+          lineDiscount: 0, unitCode: null, itemCode: null, treatment: 'standard', treatmentReasonCode: null }],
+        documentDiscount: 0,
+        taxInclusive: false,
+      }),
+    ).rejects.toThrow(/must specify which slab/);
+  });
 });

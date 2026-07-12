@@ -3,6 +3,7 @@ import { logAuditTrail } from './auditTrailService';
 import { logger } from './logger';
 import type { Database } from '../types/database.types';
 import { assertPartyTaxNumberValid } from './regimes/partyTaxValidation';
+import { TERMINAL_TYPES } from './caseLifecycle';
 
 type CustomerRow = Database['public']['Tables']['customers_enhanced']['Row'];
 type CustomerInsert = Database['public']['Tables']['customers_enhanced']['Insert'];
@@ -293,7 +294,7 @@ async function getTerminalStatusNames(): Promise<string[]> {
   const { data, error } = await supabase
     .from('master_case_statuses')
     .select('name')
-    .in('type', ['completed', 'delivered', 'cancelled']);
+    .in('type', [...TERMINAL_TYPES]);
   if (error) throw error;
   return (data ?? []).map((s) => s.name);
 }

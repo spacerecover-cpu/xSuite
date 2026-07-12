@@ -57,7 +57,51 @@ vi.mock('./IntegrityCheckModal', () => ({
   IntegrityCheckModal: () => null,
 }));
 
-import { ChainOfCustodyTab } from './ChainOfCustodyTab';
+import { ChainOfCustodyTab, isTerminalCase } from './ChainOfCustodyTab';
+
+describe('ChainOfCustodyTab terminal-case transfer guard', () => {
+  it('treats terminal lifecycle phase types as terminal', () => {
+    expect(isTerminalCase('delivered')).toBe(true);
+    expect(isTerminalCase('closed')).toBe(true);
+    expect(isTerminalCase('no_solution')).toBe(true);
+    expect(isTerminalCase('cancelled')).toBe(true);
+  });
+
+  it('treats active lifecycle phase types as non-terminal', () => {
+    expect(isTerminalCase('intake')).toBe(false);
+    expect(isTerminalCase('recovery')).toBe(false);
+    expect(isTerminalCase('qa')).toBe(false);
+    expect(isTerminalCase('ready')).toBe(false);
+  });
+
+  // Regression for bug #4: transition_case_status writes status = the human
+  // status NAME, never the phase token. The old guard compared the NAME against
+  // {'delivered','cancelled'} and so never matched a terminal case — the
+  // Transfer Custody button stayed enabled on delivered/closed/cancelled cases.
+  it('recognizes the canonical terminal status NAMES when no phase is supplied', () => {
+    expect(isTerminalCase(null, 'Data Delivered')).toBe(true);
+    expect(isTerminalCase(null, 'Cancelled — Customer Declined')).toBe(true);
+    expect(isTerminalCase(null, 'Cancelled — Unrecoverable')).toBe(true);
+    expect(isTerminalCase(null, 'Closed — Device Returned')).toBe(true);
+    expect(isTerminalCase(null, 'Closed — Media Disposed')).toBe(true);
+    expect(isTerminalCase(null, 'No Solution — Future Follow-up')).toBe(true);
+  });
+
+  it('does not flag active status names or missing input as terminal', () => {
+    expect(isTerminalCase(null, 'In Recovery')).toBe(false);
+    expect(isTerminalCase(null, 'Awaiting Approval')).toBe(false);
+    expect(isTerminalCase(null, null)).toBe(false);
+    expect(isTerminalCase(null, undefined)).toBe(false);
+    expect(isTerminalCase(undefined, undefined)).toBe(false);
+  });
+
+  it('lets the authoritative phase win over the free-text status name', () => {
+    // Phase says active even though a stale/odd name looks delivered.
+    expect(isTerminalCase('recovery', 'Data Delivered')).toBe(false);
+    // Phase says terminal regardless of the name.
+    expect(isTerminalCase('delivered', 'In Recovery')).toBe(true);
+  });
+});
 
 describe('ChainOfCustodyTab per-device filter', () => {
   function makeClient() {

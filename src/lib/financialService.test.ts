@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // fetchFinancialSummary runs two parallel queries (invoices + expenses); mock the
 // client (env-throwing on import) and feed mixed-currency rows so the assertions
@@ -7,7 +7,7 @@ const { from } = vi.hoisted(() => ({ from: vi.fn() }));
 vi.mock('./supabaseClient', () => ({ supabase: { from }, resolveTenantId: vi.fn() }));
 vi.mock('./logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
-import { fetchFinancialSummary, fiscalYearBounds } from './financialService';
+import { fetchFinancialSummary, fiscalYearBounds, getFinancialYearDates } from './financialService';
 
 /** Thenable query builder: select/is/gte/lte are chainable; awaiting yields {data}. */
 function makeQuery(rows: Array<Record<string, unknown>>) {
@@ -107,5 +107,37 @@ describe('fiscalYearBounds (respects the tenant fiscal_year_start)', () => {
   it('defaults a blank/garbage fiscal-year-start to the calendar year', () => {
     const r = fiscalYearBounds('', new Date(2026, 6, 7));
     expect(r.thisYear).toEqual({ start: '2026-01-01', end: '2026-12-31' });
+  });
+});
+
+// Regression for the toISOString() day-drift: month/quarter boundaries were built at the
+// BROWSER's local midnight then converted to UTC, landing a day early for any UTC+ tenant
+// (Muscat/Riyadh/Dubai/Kolkata — the GCC market). Pin the runner to UTC+4 so the old code
+// would have produced 2026-06-30 for "this month start"; the fix keeps it on 2026-07-01.
+describe('getFinancialYearDates (date-only boundaries never drift for UTC+ tenants)', () => {
+  const originalTZ = process.env.TZ;
+  beforeEach(() => {
+    process.env.TZ = 'Asia/Muscat'; // UTC+4
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    process.env.TZ = originalTZ;
+  });
+
+  it('mid-month in a UTC+4 tenant keeps month/quarter on the right calendar day', () => {
+    vi.setSystemTime(new Date('2026-07-15T12:00:00Z')); // Jul 15 2026, 16:00 in Muscat
+    const r = getFinancialYearDates('01-01');
+    expect(r.thisMonth).toEqual({ start: '2026-07-01', end: '2026-07-31' });
+    expect(r.lastMonth).toEqual({ start: '2026-06-01', end: '2026-06-30' });
+    expect(r.thisQuarter).toEqual({ start: '2026-07-01', end: '2026-09-30' });
+  });
+
+  it('January rolls lastMonth back into the previous December (year underflow)', () => {
+    vi.setSystemTime(new Date('2026-01-15T12:00:00Z'));
+    const r = getFinancialYearDates('01-01');
+    expect(r.thisMonth).toEqual({ start: '2026-01-01', end: '2026-01-31' });
+    expect(r.lastMonth).toEqual({ start: '2025-12-01', end: '2025-12-31' });
+    expect(r.thisQuarter).toEqual({ start: '2026-01-01', end: '2026-03-31' });
   });
 });

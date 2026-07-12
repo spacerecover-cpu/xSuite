@@ -79,8 +79,10 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
           notes: purchaseOrder.notes || '',
           internal_notes: purchaseOrder.internal_notes || '',
         });
-        if (purchaseOrder.line_items) {
+        if (purchaseOrder.line_items && purchaseOrder.line_items.length > 0) {
           setLineItems(purchaseOrder.line_items);
+        } else if (purchaseOrder.id) {
+          loadExistingLineItems(purchaseOrder.id);
         }
       } else if (!purchaseOrder) {
         loadNextPONumber();
@@ -116,6 +118,31 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
       }
     } catch (error) {
       logger.error('Error loading next PO number:', error);
+    }
+  };
+
+  const loadExistingLineItems = async (poId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('purchase_order_items')
+        .select('id, description, quantity, unit_price, total')
+        .eq('purchase_order_id', poId)
+        .is('deleted_at', null)
+        .order('sort_order', { ascending: true });
+      if (error) throw error;
+      if (data && data.length > 0) {
+        setLineItems(
+          data.map((item) => ({
+            id: item.id,
+            description: item.description,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            total: item.total,
+          })),
+        );
+      }
+    } catch (error) {
+      logger.error('Error loading purchase order line items:', error);
     }
   };
 
@@ -191,6 +218,25 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
         updated_at: new Date().toISOString(),
       };
 
+      const tenantId = await resolveTenantId();
+
+      // Persist the itemization to purchase_order_items — the parent row only
+      // stores the rolled-up totals, so without these child rows the entered
+      // line items are lost and the detail page / Receive-into-Stock modal have
+      // nothing to read. Blank rows are dropped; sort_order preserves entry order.
+      const buildItemRows = (poId: string) =>
+        lineItems
+          .filter((item) => item.description.trim())
+          .map((item, index) => ({
+            purchase_order_id: poId,
+            tenant_id: tenantId,
+            description: item.description,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            total: item.total,
+            sort_order: index,
+          }));
+
       if (purchaseOrder && purchaseOrder.id) {
         const { error } = await supabase
           .from('purchase_orders')
@@ -198,19 +244,47 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
           .eq('id', purchaseOrder.id);
 
         if (error) throw error;
+
+        // Replace child rows (repo-standard soft-delete + re-insert) so edited
+        // itemization is reflected and stale rows never linger.
+        const { error: deleteItemsError } = await supabase
+          .from('purchase_order_items')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('purchase_order_id', purchaseOrder.id)
+          .is('deleted_at', null);
+        if (deleteItemsError) throw deleteItemsError;
+
+        const itemRows = buildItemRows(purchaseOrder.id);
+        if (itemRows.length > 0) {
+          const { error: itemsError } = await supabase
+            .from('purchase_order_items')
+            .insert(itemRows);
+          if (itemsError) throw itemsError;
+        }
+
         toast.success('Purchase order updated successfully');
       } else {
-        const tenantId = await resolveTenantId();
-
-        const { error } = await supabase
+        const { data: created, error } = await supabase
           .from('purchase_orders')
           .insert({
             ...poUpdate,
             tenant_id: tenantId,
             created_by: user.id,
-          });
+          })
+          .select('id')
+          .maybeSingle();
 
         if (error) throw error;
+        if (!created) throw new Error('Failed to create purchase order');
+
+        const itemRows = buildItemRows(created.id);
+        if (itemRows.length > 0) {
+          const { error: itemsError } = await supabase
+            .from('purchase_order_items')
+            .insert(itemRows);
+          if (itemsError) throw itemsError;
+        }
+
         toast.success('Purchase order created successfully');
       }
 

@@ -370,10 +370,17 @@ describe('line-item mappers (replace the old as-unknown-as array casts)', () => 
     expect(result[0].item_code).toBe('998713');
   });
 
-  it('toInvoiceItems computes line_total from quantity*unit_price (no DB column) and maps tax_rate', () => {
+  it('toInvoiceItems computes line_total as tax-exclusive net (no line discount) and maps tax_rate', () => {
     const result = toInvoiceItems([{ id: 'li1', description: 'Recovery', quantity: 3, unit_price: 50, tax_rate: 5 }]);
     expect(result[0].line_total).toBe(150);
     expect(result[0].tax_rate).toBe(5);
+  });
+
+  it('toInvoiceItems applies the per-line discount PERCENT so line totals reconcile with the stored Subtotal', () => {
+    // qty=1, unit_price=1000, discount=10% → net 900 (matches stored invoice_line_items.total base / invoices.subtotal),
+    // NOT the gross 1000 that quantity*unit_price would print.
+    const result = toInvoiceItems([{ id: 'li1', description: 'Recovery', quantity: 1, unit_price: 1000, tax_rate: 0, discount: 10 }]);
+    expect(result[0].line_total).toBe(900);
   });
 
   it('both mappers return [] for null/undefined input', () => {

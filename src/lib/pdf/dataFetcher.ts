@@ -26,6 +26,7 @@ import type { Database } from '../../types/database.types';
 import type { CurrencyConfig } from '../../types/tenantConfig';
 import { getTenantConfig } from '../tenantConfigService';
 import { renderCurrencyToken } from '../format';
+import { roundMoney } from '../financialMath';
 
 type QuotesRow = Database['public']['Tables']['quotes']['Row'];
 type InvoicesRow = Database['public']['Tables']['invoices']['Row'];
@@ -226,9 +227,13 @@ function toIdFullName(src: unknown): { id: string; full_name: string } | undefin
 
 // Line-item mappers — typed field extraction replaces the old
 // `as unknown as XItemData[]` casts so a column rename is a compile error.
-// Neither table has a `line_total` column: the quote builder computes the row
-// total itself, and the invoice builder falls back to quantity*unit_price, so
-// we compute it here to satisfy the required field without changing output.
+// `quote_items` has no line-total column, so the quote row total is computed
+// here. `invoice_line_items` does carry a stored `total` (tax-INCLUSIVE, post
+// line- and document-discount) plus a per-line `discount` PERCENT; the printed
+// tax-invoice Subtotal is the stored, discount-net header value, so the line
+// `line_total` must be the discount-adjusted, tax-EXCLUSIVE net to reconcile —
+// see toInvoiceItems (not gross quantity*unit_price, and not the tax-inclusive
+// stored `total`).
 export function toQuoteItems(rows: Partial<QuoteItemsRow>[] | null | undefined): QuoteItemData[] {
   return (rows ?? []).map(row => ({
     id: row.id ?? undefined,
@@ -244,13 +249,18 @@ export function toInvoiceItems(rows: Partial<InvoiceLineItemsRow>[] | null | und
   return (rows ?? []).map(row => {
     const quantity = row.quantity ?? 0;
     const unit_price = row.unit_price ?? 0;
+    // `discount` is a per-line PERCENT (invoiceService stores `item.discount_percent`).
+    // Render the discount-adjusted, tax-exclusive net so the summed lines reconcile
+    // with the stored, discount-net Subtotal — not the gross quantity*unit_price,
+    // and not the stored `total` (which is tax-INCLUSIVE).
+    const discountPct = row.discount ?? 0;
     return {
       id: row.id ?? undefined,
       description: row.description ?? '',
       quantity,
       unit_price,
       tax_rate: row.tax_rate ?? 0,
-      line_total: quantity * unit_price,
+      line_total: roundMoney(quantity * unit_price * (1 - discountPct / 100)),
       unit_label: row.unit_label ?? null,
       item_code: row.item_code ?? null,
     };

@@ -938,7 +938,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                     label={isServerDevice ? "Server/Array Problem" : "Device Problem"}
                     value={devices[0].device_problem_id}
                     onChange={(value) =>
-                      updateDevice('1', 'device_problem_id', value)
+                      updateDevice(devices[0].id, 'device_problem_id', value)
                     }
                     options={serviceProblems.map(sp => ({ id: sp.id, name: sp.name }))}
                     placeholder={isServerDevice ? "e.g., RAID array failure, cannot boot..." : "Select device problem..."}
@@ -952,7 +952,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                     <textarea
                       value={devices[0].recovery_requirements}
                       onChange={(e) =>
-                        updateDevice('1', 'recovery_requirements', e.target.value)
+                        updateDevice(devices[0].id, 'recovery_requirements', e.target.value)
                       }
                       rows={2}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-warning focus:border-warning text-sm"
@@ -970,7 +970,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                           type={showPassword ? 'text' : 'password'}
                           value={devices[0].device_password}
                           onChange={(e) =>
-                            updateDevice('1', 'device_password', e.target.value)
+                            updateDevice(devices[0].id, 'device_password', e.target.value)
                           }
                           className="w-full px-3 py-2 pr-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-warning focus:border-warning text-sm"
                           placeholder="Password needed to access encrypted data (if applicable)"
@@ -995,7 +995,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                     label="Encryption"
                     value={devices[0].encryption_type_id}
                     onChange={(value) =>
-                      updateDevice('1', 'encryption_type_id', value)
+                      updateDevice(devices[0].id, 'encryption_type_id', value)
                     }
                     options={[{ id: '', name: 'Not specified' }, ...deviceEncryption.map(de => ({ id: de.id, name: de.name }))]}
                     placeholder="Select encryption type..."

@@ -541,6 +541,8 @@ export const CaseDetail: React.FC = () => {
               customerMobileNumber={caseData.customer?.mobile_number || caseData.customer?.phone || ''}
               onCheckoutComplete={() => {
                 queryClient.invalidateQueries({ queryKey: ['case', id] });
+                queryClient.invalidateQueries({ queryKey: ['case_devices', id] });
+                queryClient.invalidateQueries({ queryKey: ['chain_of_custody', id] });
                 queryClient.invalidateQueries({ queryKey: ['case_history', id] });
               }}
               onShowCheckoutPreview={handleOpenCheckoutPreview}
@@ -1431,6 +1433,7 @@ export const CaseDetail: React.FC = () => {
                   caseId={id!}
                   caseNumber={caseData.case_no ?? ''}
                   caseStatus={caseData.status ?? null}
+                  casePhase={currentPhase}
                   caseDevices={(devices ?? []).map((d) => ({
                     id: d.id,
                     model: d.model ?? null,

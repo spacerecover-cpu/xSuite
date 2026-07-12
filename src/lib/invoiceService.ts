@@ -454,7 +454,7 @@ export const createInvoice = async (invoice: Partial<Invoice>, items: InvoiceIte
         unit_price: i.unit_price,
         discount_percent: i.discount_percent,
       })),
-      discountType: null,
+      discountType: invoice.discount_type ?? null,
       discountAmount: invoice.discount_amount || 0,
       taxRate: invoiceTaxRate,
       documentType: 'invoice',
@@ -685,7 +685,7 @@ export const updateInvoice = async (id: string, invoice: Partial<Invoice>, items
           unit_price: i.unit_price,
           discount_percent: i.discount_percent,
         })),
-        discountType: null,
+        discountType: invoice.discount_type ?? null,
         discountAmount: invoice.discount_amount || 0,
         taxRate: invoiceTaxRate,
         documentType: 'invoice',
@@ -930,6 +930,14 @@ export const convertQuoteToInvoice = async (
     invoice_date: await currentTenantToday(),
     due_date: dueDate,
     status: 'draft',
+    // Inherit the quote's tax + discount configuration so the converted invoice's
+    // total equals the approved quote total. createInvoice derives tax from the
+    // header tax_rate (per-item rates are ignored) and only applies percentage
+    // discount math when discount_type === 'percentage'; dropping these produced a
+    // zero-tax invoice and reinterpreted a percentage discount as a flat amount.
+    tax_rate: quote.tax_rate ?? 0,
+    tax_inclusive: quote.tax_inclusive ?? false,
+    discount_type: quote.discount_type as Invoice['discount_type'],
     discount_amount: quote.discount_amount ?? 0,
     currency: quote.currency,
     terms: quote.terms ?? '',
@@ -973,6 +981,7 @@ export const getInvoicesByCaseId = async (caseId: string) => {
     .from('invoices')
     .select('*')
     .eq('case_id', caseId)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
   if (error) throw error;

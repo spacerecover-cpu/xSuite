@@ -112,13 +112,22 @@ Deno.serve(async (req: Request) => {
 
       const { data: callerProfile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, tenant_id')
         .eq('id', user.id)
         .maybeSingle();
 
-      if (!callerProfile || !['owner', 'admin'].includes(callerProfile.role)) {
+      // A platform admin is role IN ('owner','admin') AND tenant_id IS NULL
+      // (matches is_platform_admin() / CLAUDE.md). A tenant-scoped owner/admin
+      // (tenant_id set) must NOT reach this bypass path — otherwise any tenant
+      // creator (stored with role='owner') could skip OTP + signup rate-limits
+      // and overwrite arbitrary un-onboarded accounts via updateUserById below.
+      if (
+        !callerProfile ||
+        callerProfile.tenant_id !== null ||
+        !['owner', 'admin'].includes(callerProfile.role)
+      ) {
         return new Response(
-          JSON.stringify({ error: 'Forbidden: Admin access required' }),
+          JSON.stringify({ error: 'Forbidden: Platform admin access required' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }

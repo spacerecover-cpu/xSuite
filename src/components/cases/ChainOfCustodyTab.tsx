@@ -39,6 +39,7 @@ import {
   formatActionType,
 } from '../../lib/chainOfCustodyService';
 import { formatDateTime } from '../../lib/format';
+import { TERMINAL_TYPES, type CaseStatusType } from '../../lib/caseLifecycle';
 import {
   exportToCSV,
   exportToJSON,
@@ -52,7 +53,10 @@ import { IntegrityCheckModal } from './IntegrityCheckModal';
 interface ChainOfCustodyTabProps {
   caseId: string;
   caseNumber: string;
+  /** Human-readable status NAME (e.g. "Data Delivered"). Fallback only. */
   caseStatus?: string | null;
+  /** Authoritative lifecycle PHASE type (master_case_statuses.type). */
+  casePhase?: CaseStatusType | string | null;
   caseDevices?: Array<{
     id: string;
     model?: string | null;
@@ -61,12 +65,29 @@ interface ChainOfCustodyTabProps {
   deviceId?: string;
 }
 
-const TERMINAL_CASE_STATUSES = new Set(['delivered', 'cancelled']);
+const TERMINAL_CASE_PHASES: ReadonlySet<string> = new Set(TERMINAL_TYPES);
 const TRANSFER_ELIGIBLE_ROLES = new Set(['technician', 'manager', 'admin', 'owner']);
 
-function isTerminalStatus(status?: string | null): boolean {
-  if (!status) return false;
-  return TERMINAL_CASE_STATUSES.has(status.toLowerCase());
+// A case is terminal when its lifecycle PHASE type is delivered/closed/
+// no_solution/cancelled. The gate MUST key off the phase — transition_case_status
+// and set_case_status write `status = v_to_status.name` (e.g. "Data Delivered",
+// "Closed — Device Returned"), so comparing the free-text status NAME against
+// phase tokens never matches. Prefer the resolved phase; if a caller hasn't
+// supplied it yet, fall back to recognizing the canonical terminal status names.
+export function isTerminalCase(
+  phase?: CaseStatusType | string | null,
+  statusName?: string | null,
+): boolean {
+  if (phase) return TERMINAL_CASE_PHASES.has(phase);
+  if (!statusName) return false;
+  const name = statusName.trim().toLowerCase();
+  return (
+    name.startsWith('cancelled') ||
+    name.startsWith('closed') ||
+    name.startsWith('no solution') ||
+    name === 'data delivered' ||
+    name === 'delivered'
+  );
 }
 
 function canPerformCustodyActions(role: string | null | undefined): boolean {
@@ -114,6 +135,7 @@ export const ChainOfCustodyTab: React.FC<ChainOfCustodyTabProps> = ({
   caseId,
   caseNumber,
   caseStatus,
+  casePhase,
   caseDevices = [],
   deviceId,
 }) => {
@@ -152,7 +174,7 @@ export const ChainOfCustodyTab: React.FC<ChainOfCustodyTabProps> = ({
   }, [custodyTransfers, currentUserId]);
 
   const canPerformActions = canPerformCustodyActions(role);
-  const caseIsTerminal = isTerminalStatus(caseStatus);
+  const caseIsTerminal = isTerminalCase(casePhase, caseStatus);
   const transferEnabled = canPerformActions && !caseIsTerminal;
   const integrityEnabled = canPerformActions && caseDevices.length > 0;
 
