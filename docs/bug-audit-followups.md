@@ -1,41 +1,86 @@
-# Bug Audit — Deferred Follow-ups
+# Bug Audit — Deferred Follow-ups (status)
 
 Companion to `docs/bug-audit-2026-07-12.md`. The audit's 90 code bugs were fixed
-across branches A–D (commits `d9b44b0`, `f1ce996`, `14c38c3`, `57242d0`). The items
-below could **not** be fully closed in application code this session because they
-require a Supabase migration (the Supabase MCP was not authenticated, so no
-migration/type-gen could be applied) or deeper cross-surface work. Each carries
-enough detail to action directly.
+across branches A–D (`d9b44b0`, `f1ce996`, `14c38c3`, `57242d0`). The
+migration-dependent follow-ups were then built out once the Supabase MCP was
+authorized. This file tracks their status.
 
-## A. Blocked on a Supabase migration (not applied this session)
+## ✅ Resolved (migration applied + service wired, on PR #419)
 
-| # | Area | What's needed |
+All 8 migrations were applied to the live project (`ssmbegiyjivrcwgcqutu`) and are
+recorded in `supabase/migrations.manifest.md`. Types regenerated (`2251931`);
+services wired (`5b8cb63`). Each function is `SECURITY DEFINER` with
+`SET search_path=public`, `REVOKE`d from `anon`, and enforces tenant/role internally.
+
+| # | Migration | What it fixes |
 |---|---|---|
-| 27 | `data_migration_export_rpc` | Customer export RPC emits JSON key `name`; contract/import expect `customer_name` → every exported Customer Name is blank and re-import fails. Forward migration to emit `customer_name`. |
-| 28 | `data_migration_export_rpc` | Device export RPC emits `serial`; contract/import expect `serial_number` → serials dropped on export. Forward migration to emit `serial_number`. |
-| 79 | `data_migration_finalize` | Advancing number sequences strips **all** non-digits instead of just the trailing suffix → counter over-inflated for year-prefixed numbers. Forward migration to strip only the suffix. |
-| 63 | `quotesService.permanentDeleteQuote` | Currently re-stamps `deleted_at` (a re-soft-delete), so the quote never leaves the Recycle Bin and each press resets the ~30-day purge timer. Add a SECURITY DEFINER `delete_quote_permanently(p_quote_id uuid)` RPC (mirror `delete_case_permanently`), regenerate types, then call it from `permanentDeleteQuote`; **or** add a `purged_at` column that `fetchDeletedQuotes` filters out. Hard `DELETE` is banned. |
-| 75 | `paypal-webhook` invoice numbering | `get_next_number` resolves tenant via `auth.uid()`, which is null under the webhook's service-role client, so the sequence never advances (falls back to `INV-${Date.now()}`). The wrong-arg-name + swallowed-error surface defects are already fixed; real sequential numbering needs a tenant-parameterized `get_next_number(p_tenant, p_scope)` or a session GUC/JWT claim carrying the tenant. |
-| 87 | `deliveryChallanService` | Non-atomic mint-then-append: a transient `log_case_history` failure throws after a number is minted, so a retry mints a fresh number and the consumed one becomes an unexplained gap; concurrent same-batch callers append duplicate rows. In-file re-read now converges the customer-facing number, but a SECURITY DEFINER RPC with an advisory lock / unique `(case_id, batch_id)` constraint is the real fix. |
+| 27 | `fix_export_customer_name_key` | Customer export now emits key `customer_name` (matched import contract) so exported names aren't blank. (#28 device `serial_number` was already correct live.) |
+| 79 | `fix_finalize_trailing_sequence_extract` | `data_migration_finalize` advances sequences from the trailing digit run, not all digits, so year/FY-prefixed numbers don't over-inflate the counter. |
+| 63 | `quote_permanent_purge` | `quotes.purged_at` + `delete_quote_permanently(uuid)`; `permanentDeleteQuote` stamps it and `fetchDeletedQuotes` filters it, so a purged quote leaves the recycle bin instead of resetting its 30-day timer. |
+| 75 | `get_next_number_for_tenant` | Tenant-parameterized numbering; the paypal-webhook mints invoice numbers under the service-role client. **Edge function still needs a deploy to take effect.** |
+| 19 | `payroll_records_unique_per_period_employee` | Partial unique index makes duplicate payroll records impossible at the DB level (0 dupes verified first). |
+| 40 | `atomic_account_balance_rpcs` | `execute_account_transfer` / `complete_account_transfer` / `adjust_account_balance` — row-locked atomic balance moves; concurrency lost-updates eliminated. |
+| 87 | `atomic_issue_delivery_challan` | Advisory-locked, idempotent mint-and-append in one transaction — no serial gaps on transient failure, no duplicate rows on concurrency. |
+| 35/36 | `stock_sale_reserved_and_discount_guards` | `record_stock_sale` guards on `quantity_available` (respects reservations) and caps a fixed discount at the subtotal. |
+| 6 | (code only, `5b8cb63`) | Per-slot `signer_user_id` (null for external operator/witness) + signer-name field for non-typed signing methods on destruction certificates. |
 
-## B. Harm closed in application code; DB backstop recommended
+## ⏳ Deferred — deploy-ordering (must apply AFTER the frontend deploys)
 
-These no longer reproduce the described failure through the UI, but a DB-side guard
-would make them un-bypassable (forensic-grade, per repo philosophy).
+**#53 — leave-balance DB trigger.** Batch B added *client-side* balance accounting
+that the currently-deployed frontend runs. A trigger that also mutates balances on
+`leave_requests` status changes would **double-count** every approval until the new
+frontend (with client accounting removed) is live. Sequence: **(1)** merge/deploy
+PR #419, **(2)** in the same or a follow-up change remove the client-side
+`applyLeaveBalanceDelta` calls in `leaveService.approve/reject/delete`, **(3)** then
+apply the trigger below. Until then the working client-side fix stays.
 
-| # | Area | Recommended backstop |
-|---|---|---|
-| 6 | `documentSignatureService.captureStaffSignature` | Operator/witness signature rows still carry the approver's `signer_user_id`. Add an optional per-slot `signerUserId` (null for an external signer) + a signer-name field in `SignatureCaptureModal` for non-typed methods. (Signer-**name** attribution is already fixed.) |
-| 35 / 36 | `record_stock_sale` RPC | Add an availability guard so reserved stock can't be sold (`on_hand - reserved`) and cap the fixed discount at subtotal server-side; also filter `getSaleableItems` on availability. (UI caps already applied.) |
-| 40 | `bankingService` transfers/disbursements | Non-atomic read-modify-write balance updates can lose concurrent updates. Add `execute_account_transfer` / `adjust_account_balance` SECURITY DEFINER RPCs using `SELECT ... FOR UPDATE` + atomic increments. (Partial-failure compensation already added.) |
-| 19 | `payrollService` period processing | Add a partial unique index `payroll_records(period_id, employee_id) WHERE deleted_at IS NULL` and an atomic SECURITY DEFINER RPC wrapping the status flip + record inserts + loan updates. (App-level compare-and-swap claim already added.) |
-| 53 | `leaveService` | Move leave-balance mutation into a DB trigger/RPC on `leave_requests` status changes so non-UI write paths also account correctly. (Client-side approve/reject/delete balance accounting already added.) |
-| — | `inventoryService` adjust | Optional: `adjust_inventory_quantity` RPC for single-transaction quantity + ledger insert. (Compare-and-set already prevents lost updates/negative/phantom; function is currently dead code.) |
+```sql
+-- Apply ONLY after the frontend no longer does client-side leave-balance accounting.
+CREATE OR REPLACE FUNCTION public.apply_leave_balance_on_status_change()
+ RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
+AS $fn$
+DECLARE v_delta numeric := 0; v_year int;
+BEGIN
+  -- approve: consume; leave-approved (reject/cancel/soft-delete): restore
+  IF (TG_OP = 'UPDATE') THEN
+    IF NEW.status = 'approved' AND OLD.status IS DISTINCT FROM 'approved'
+       AND NEW.deleted_at IS NULL THEN
+      v_delta := NEW.days;
+    ELSIF OLD.status = 'approved'
+       AND (NEW.status IS DISTINCT FROM 'approved' OR NEW.deleted_at IS NOT NULL) THEN
+      v_delta := -OLD.days;
+    END IF;
+  END IF;
+  IF v_delta <> 0 THEN
+    v_year := EXTRACT(YEAR FROM COALESCE(NEW.start_date, OLD.start_date))::int;
+    UPDATE leave_balances
+       SET used_days = GREATEST(0, COALESCE(used_days,0) + v_delta),
+           remaining_days = total_days - GREATEST(0, COALESCE(used_days,0) + v_delta),
+           updated_at = now()
+     WHERE tenant_id = NEW.tenant_id AND employee_id = NEW.employee_id
+       AND leave_type_id = NEW.leave_type_id AND year = v_year;
+  END IF;
+  RETURN NEW;
+END; $fn$;
+
+CREATE TRIGGER trg_leave_balance_on_status_change
+  AFTER UPDATE ON leave_requests
+  FOR EACH ROW EXECUTE FUNCTION apply_leave_balance_on_status_change();
+```
+
+## ⏳ Deferred — no value today
+
+**Inventory `adjust_inventory_quantity` RPC.** Would back `inventoryService`'s adjust
+helper, but that helper has 0 call sites (dead code). The batch-D compare-and-set
+already prevents lost updates / negative / phantom transactions. Add the RPC only when
+the helper gains real callers.
 
 ## Notes
 
-- Edge-function fixes (paypal-webhook, provision-tenant, portal/email functions) are
-  committed in the repo but must be **deployed** separately (Supabase MCP not authed).
+- **Edge-function deploys still required** for the code fixes to take effect:
+  `paypal-webhook` (#75 numbering + the batch-A signature/`amount_cents` fixes),
+  `provision-tenant`, and the portal/email functions. The SQL they rely on is live;
+  the Deno code is committed but not deployed.
 - Pre-existing, out-of-scope test issues (unchanged by this work, identical at baseline
   `65fa2ac`): the sandbox test runner has no Supabase env vars so ~24 suites fail to
-  import; and 3 assertions fail (`chainOfCustodyParity` ×2, `legacyTeardown`).
+  import, and 3 assertions fail (`chainOfCustodyParity` ×2, `legacyTeardown`).
