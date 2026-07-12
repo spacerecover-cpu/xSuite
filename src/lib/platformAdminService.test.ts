@@ -12,6 +12,7 @@ import {
   recordHealthMetrics,
   getTenantDetails,
   getDashboardStats,
+  getTenantsList,
 } from './platformAdminService';
 
 /**
@@ -203,6 +204,43 @@ describe('getDashboardStats (bug 13 — billing_interval must be month/year, not
     // price_monthly 100 + price_yearly 1200/12 (100) = mrr 200; arr = 200 * 12 = 2400.
     expect(stats.mrr).toBe(200);
     expect(stats.arr).toBe(2400);
+  });
+});
+
+/**
+ * Regression for bug 66 — the plan filter read t.subscription?.plan_code, but a
+ * tenant_subscriptions row has plan_id (a UUID), never a plan_code column, so the
+ * equality was always false and every plan filter returned zero tenants. The query
+ * must embed subscription_plans(code) and the filter must compare that real code.
+ */
+describe('getTenantsList (bug 66 — plan filter compares the real subscription plan code)', () => {
+  it('embeds subscription_plans(code) and returns only tenants matching the plan filter', async () => {
+    const tenants = [
+      {
+        id: 't1',
+        name: 'Starter Co',
+        tenant_subscriptions: [{ plan_id: 'p1', subscription_plans: { code: 'starter' } }],
+        profiles: [{ count: 3 }],
+      },
+      {
+        id: 't2',
+        name: 'Enterprise Co',
+        tenant_subscriptions: [{ plan_id: 'p2', subscription_plans: { code: 'enterprise' } }],
+        profiles: [{ count: 9 }],
+      },
+    ];
+    let tenantsQuery: Record<string, unknown> | undefined;
+    from.mockImplementation((table: string) => {
+      if (table === 'tenants') return (tenantsQuery = makeScopedQuery({ data: tenants }));
+      return makeScopedQuery({ data: [] });
+    });
+
+    const result = await getTenantsList({ plan: 'starter' });
+
+    // the embed must carry the plan code so there is a real value to filter on
+    expect(tenantsQuery!.select).toHaveBeenCalledWith(expect.stringContaining('subscription_plans'));
+    // only the starter tenant survives — before the fix both were dropped (length 0)
+    expect(result.map((t) => t.id)).toEqual(['t1']);
   });
 });
 

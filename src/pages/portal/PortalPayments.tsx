@@ -103,8 +103,16 @@ export const PortalPayments: React.FC = () => {
   });
 
   const list = payments ?? [];
+  // "Total Paid" must reflect money actually received: only completed payments count.
+  // Refunded/voided (void_payment sets status='refunded' without deleted_at), failed, and
+  // pending rows still render in the history below with their status badge for forensic
+  // transparency, but must never inflate the headline. Mirrors the sibling money-received
+  // aggregation in financialReportsService.generateCashFlowReport (filters status='completed').
   const totalPaid = list.reduce(
-    (sum, p) => sum + baseAmount(p as unknown as Record<string, unknown>, 'amount'),
+    (sum, p) =>
+      (p.status ?? '').toLowerCase() === 'completed'
+        ? sum + baseAmount(p as unknown as Record<string, unknown>, 'amount')
+        : sum,
     0,
   );
 

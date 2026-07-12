@@ -1495,12 +1495,22 @@ export async function generateCustomerCopyAsBlob(caseId: string): Promise<PDFBlo
       : buildCustomerCopyDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
     const filename = `Customer_Copy_${data.caseData.case_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 
-    return new Promise((resolve) => {
-      createPdfWithFonts(docDefinition).getBlob((blob: Blob) => {
-        const blobUrl = URL.createObjectURL(blob);
-        resolve({ success: true, blobUrl, blob, filename });
-      });
+    const blobPromise = new Promise<PDFBlobResult>((resolve, reject) => {
+      try {
+        createPdfWithFonts(docDefinition).getBlob((blob: Blob) => {
+          const blobUrl = URL.createObjectURL(blob);
+          resolve({ success: true, blobUrl, blob, filename });
+        }, undefined, (err: any) => {
+          console.error('[PDF Service] Error in getBlob callback:', err);
+          reject(err);
+        });
+      } catch (error) {
+        console.error('[PDF Service] Error creating PDF:', error);
+        reject(error);
+      }
     });
+
+    return await withTimeout(blobPromise, PDF_GENERATION_TIMEOUT, 'PDF blob generation timeout');
   } catch (error) {
     console.error('Error generating customer copy blob:', error);
     return {
@@ -1543,12 +1553,22 @@ export async function generateCheckoutFormAsBlob(caseId: string): Promise<PDFBlo
       : buildCheckoutFormDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption, stampImg, sigImg, signatureImages);
     const filename = `Checkout_Form_${data.caseData.case_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 
-    return new Promise((resolve) => {
-      createPdfWithFonts(docDefinition).getBlob((blob: Blob) => {
-        const blobUrl = URL.createObjectURL(blob);
-        resolve({ success: true, blobUrl, blob, filename });
-      });
+    const blobPromise = new Promise<PDFBlobResult>((resolve, reject) => {
+      try {
+        createPdfWithFonts(docDefinition).getBlob((blob: Blob) => {
+          const blobUrl = URL.createObjectURL(blob);
+          resolve({ success: true, blobUrl, blob, filename });
+        }, undefined, (err: any) => {
+          console.error('[PDF Service] Error in getBlob callback:', err);
+          reject(err);
+        });
+      } catch (error) {
+        console.error('[PDF Service] Error creating PDF:', error);
+        reject(error);
+      }
     });
+
+    return await withTimeout(blobPromise, PDF_GENERATION_TIMEOUT, 'PDF blob generation timeout');
   } catch (error) {
     console.error('Error generating checkout form blob:', error);
     return {
@@ -1586,12 +1606,22 @@ export async function generateCaseLabelAsBlob(caseId: string): Promise<PDFBlobRe
       : buildCaseLabelDocument(data, ctx, logoBase64, qrCodeBase64);
     const filename = `Label_${data.caseData.case_number}.pdf`;
 
-    return new Promise((resolve) => {
-      createPdfWithFonts(docDefinition).getBlob((blob: Blob) => {
-        const blobUrl = URL.createObjectURL(blob);
-        resolve({ success: true, blobUrl, blob, filename });
-      });
+    const blobPromise = new Promise<PDFBlobResult>((resolve, reject) => {
+      try {
+        createPdfWithFonts(docDefinition).getBlob((blob: Blob) => {
+          const blobUrl = URL.createObjectURL(blob);
+          resolve({ success: true, blobUrl, blob, filename });
+        }, undefined, (err: any) => {
+          console.error('[PDF Service] Error in getBlob callback:', err);
+          reject(err);
+        });
+      } catch (error) {
+        console.error('[PDF Service] Error creating PDF:', error);
+        reject(error);
+      }
     });
+
+    return await withTimeout(blobPromise, PDF_GENERATION_TIMEOUT, 'PDF blob generation timeout');
   } catch (error) {
     console.error('Error generating case label blob:', error);
     return {
@@ -1627,12 +1657,22 @@ export async function generateQuoteAsBlob(quoteId: string): Promise<PDFBlobResul
     const docDefinition = await buildQuoteViaEngine(data, ctx, logoBase64, qrCodeBase64);
     const filename = `Quote_${data.quoteData.quote_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 
-    return new Promise((resolve) => {
-      createPdfWithFonts(docDefinition).getBlob((blob: Blob) => {
-        const blobUrl = URL.createObjectURL(blob);
-        resolve({ success: true, blobUrl, blob, filename });
-      });
+    const blobPromise = new Promise<PDFBlobResult>((resolve, reject) => {
+      try {
+        createPdfWithFonts(docDefinition).getBlob((blob: Blob) => {
+          const blobUrl = URL.createObjectURL(blob);
+          resolve({ success: true, blobUrl, blob, filename });
+        }, undefined, (err: any) => {
+          console.error('[PDF Service] Error in getBlob callback:', err);
+          reject(err);
+        });
+      } catch (error) {
+        console.error('[PDF Service] Error creating PDF:', error);
+        reject(error);
+      }
     });
+
+    return await withTimeout(blobPromise, PDF_GENERATION_TIMEOUT, 'PDF blob generation timeout');
   } catch (error) {
     console.error('Error generating quote blob:', error);
     return {
@@ -1669,12 +1709,22 @@ export async function generateInvoiceAsBlob(invoiceId: string): Promise<PDFBlobR
     const invoiceType = data.invoiceData.invoice_type === 'proforma' ? 'Proforma' : 'Tax';
     const filename = `${invoiceType}_Invoice_${data.invoiceData.invoice_number}_${new Date().toISOString().split('T')[0]}.pdf`;
 
-    return new Promise((resolve) => {
-      createPdfWithFonts(docDefinition).getBlob((blob: Blob) => {
-        const blobUrl = URL.createObjectURL(blob);
-        resolve({ success: true, blobUrl, blob, filename });
-      });
+    const blobPromise = new Promise<PDFBlobResult>((resolve, reject) => {
+      try {
+        createPdfWithFonts(docDefinition).getBlob((blob: Blob) => {
+          const blobUrl = URL.createObjectURL(blob);
+          resolve({ success: true, blobUrl, blob, filename });
+        }, undefined, (err: any) => {
+          console.error('[PDF Service] Error in getBlob callback:', err);
+          reject(err);
+        });
+      } catch (error) {
+        console.error('[PDF Service] Error creating PDF:', error);
+        reject(error);
+      }
     });
+
+    return await withTimeout(blobPromise, PDF_GENERATION_TIMEOUT, 'PDF blob generation timeout');
   } catch (error) {
     console.error('Error generating invoice blob:', error);
     return {
@@ -1703,12 +1753,22 @@ export async function generatePaymentReceiptAsBlob(paymentId: string): Promise<P
       : buildPaymentReceiptDocument(data, ctx, logoBase64, qrCodeBase64, qrCodeCaption);
     const filename = `Payment_Receipt_${data.paymentData.receipt_number || paymentId}_${new Date().toISOString().split('T')[0]}.pdf`;
 
-    return new Promise((resolve) => {
-      createPdfWithFonts(docDefinition).getBlob((blob: Blob) => {
-        const blobUrl = URL.createObjectURL(blob);
-        resolve({ success: true, blobUrl, blob, filename });
-      });
+    const blobPromise = new Promise<PDFBlobResult>((resolve, reject) => {
+      try {
+        createPdfWithFonts(docDefinition).getBlob((blob: Blob) => {
+          const blobUrl = URL.createObjectURL(blob);
+          resolve({ success: true, blobUrl, blob, filename });
+        }, undefined, (err: any) => {
+          console.error('[PDF Service] Error in getBlob callback:', err);
+          reject(err);
+        });
+      } catch (error) {
+        console.error('[PDF Service] Error creating PDF:', error);
+        reject(error);
+      }
     });
+
+    return await withTimeout(blobPromise, PDF_GENERATION_TIMEOUT, 'PDF blob generation timeout');
   } catch (error) {
     console.error('Error generating payment receipt blob:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Failed to generate payment receipt' };
@@ -1728,12 +1788,22 @@ export async function generatePayslipAsBlob(recordId: string): Promise<PDFBlobRe
       : buildPayslipDocument(data, ctx);
     const filename = `Payslip_${data.payslipData.employee.employee_number}_${data.payslipData.payroll_period.period_name}.pdf`;
 
-    return new Promise((resolve) => {
-      createPdfWithFonts(docDefinition).getBlob((blob: Blob) => {
-        const blobUrl = URL.createObjectURL(blob);
-        resolve({ success: true, blobUrl, blob, filename });
-      });
+    const blobPromise = new Promise<PDFBlobResult>((resolve, reject) => {
+      try {
+        createPdfWithFonts(docDefinition).getBlob((blob: Blob) => {
+          const blobUrl = URL.createObjectURL(blob);
+          resolve({ success: true, blobUrl, blob, filename });
+        }, undefined, (err: any) => {
+          console.error('[PDF Service] Error in getBlob callback:', err);
+          reject(err);
+        });
+      } catch (error) {
+        console.error('[PDF Service] Error creating PDF:', error);
+        reject(error);
+      }
     });
+
+    return await withTimeout(blobPromise, PDF_GENERATION_TIMEOUT, 'PDF blob generation timeout');
   } catch (error) {
     console.error('Error generating payslip blob:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Failed to generate payslip' };
@@ -1764,12 +1834,22 @@ export async function generateChainOfCustodyAsBlob(
     }
     const filename = `Chain_of_Custody_${caseNumber}_${new Date().toISOString().split('T')[0]}.pdf`;
 
-    return new Promise((resolve) => {
-      createPdfWithFonts(docDefinition).getBlob((blob: Blob) => {
-        const blobUrl = URL.createObjectURL(blob);
-        resolve({ success: true, blobUrl, blob, filename });
-      });
+    const blobPromise = new Promise<PDFBlobResult>((resolve, reject) => {
+      try {
+        createPdfWithFonts(docDefinition).getBlob((blob: Blob) => {
+          const blobUrl = URL.createObjectURL(blob);
+          resolve({ success: true, blobUrl, blob, filename });
+        }, undefined, (err: any) => {
+          console.error('[PDF Service] Error in getBlob callback:', err);
+          reject(err);
+        });
+      } catch (error) {
+        console.error('[PDF Service] Error creating PDF:', error);
+        reject(error);
+      }
     });
+
+    return await withTimeout(blobPromise, PDF_GENERATION_TIMEOUT, 'PDF blob generation timeout');
   } catch (error) {
     console.error('Error generating chain of custody blob:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Failed to generate chain of custody' };

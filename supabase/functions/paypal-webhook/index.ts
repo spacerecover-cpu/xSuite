@@ -148,7 +148,14 @@ Deno.serve(async (req: Request) => {
     }
 
     const tenantId = event.resource?.custom_id;
-    const paypalSubscriptionId = event.resource?.id || event.resource?.billing_agreement_id;
+    // For subscription lifecycle events (BILLING.SUBSCRIPTION.*) the resource IS
+    // the subscription, so resource.id is the I-XXXX subscription id. For
+    // PAYMENT.SALE.* the resource is a sale/transaction object whose id is the
+    // transaction id — the owning subscription id lives in billing_agreement_id.
+    // Prefer billing_agreement_id (present only on sale events) so the
+    // tenant_subscriptions lookup by paypal_subscription_id (the sole consumer,
+    // in PAYMENT.SALE.COMPLETED) resolves; fall back to resource.id otherwise.
+    const paypalSubscriptionId = event.resource?.billing_agreement_id || event.resource?.id;
 
     if (!tenantId) {
       console.warn("No tenant ID in webhook event");
@@ -159,9 +166,12 @@ Deno.serve(async (req: Request) => {
     }
 
     // Record the event in the ledger. payload and tenant_id are NOT NULL, so
-    // this must run after tenantId is derived. The unique paypal_event_id acts
-    // as the idempotency guard: a duplicate delivery means we already recorded
-    // (and processed) this event, so short-circuit before re-applying state.
+    // this must run after tenantId is derived. The unique paypal_event_id gates
+    // re-delivery, but row EXISTENCE alone does not prove the prior delivery
+    // finished: processed_at is stamped only at the very end (below), so a
+    // duplicate whose processed_at is still NULL means an earlier attempt died
+    // mid-flight before applying its state transitions. Only skip when the
+    // earlier delivery actually completed; otherwise fall through and re-apply.
     const { error: insertError } = await supabase
       .from("billing_events")
       .insert({
@@ -175,13 +185,26 @@ Deno.serve(async (req: Request) => {
       const isDuplicate =
         insertError.code === '23505' || insertError.message.includes('duplicate');
       if (isDuplicate) {
-        console.log(`Duplicate webhook event ${event.id} — already recorded, skipping`);
-        return new Response(
-          JSON.stringify({ received: true }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        const { data: existing } = await supabase
+          .from("billing_events")
+          .select("processed_at")
+          .eq("paypal_event_id", event.id)
+          .maybeSingle();
+
+        if (existing?.processed_at) {
+          console.log(`Duplicate webhook event ${event.id} — already processed, skipping`);
+          return new Response(
+            JSON.stringify({ received: true }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        // Recorded but not completed on a prior attempt — reprocess so the
+        // state transitions below (which are idempotent set-to-value updates)
+        // actually get applied, then re-stamp processed_at at the end.
+        console.log(`Webhook event ${event.id} was recorded but not completed — reprocessing`);
+      } else {
+        console.error("Failed to insert billing event:", insertError);
       }
-      console.error("Failed to insert billing event:", insertError);
     }
 
     switch (event.event_type) {
@@ -298,8 +321,14 @@ Deno.serve(async (req: Request) => {
           // auth.uid()) cannot resolve a sequence. Use the tenant-explicit RPC
           // instead. NOTE: this edge function still requires a separate deploy
           // for this change to take effect.
+          // Bug #86: platform SaaS billing (the platform charging the tenant)
+          // is a distinct document family from the tenant's customer-facing
+          // tax invoices. It MUST use its own 'billing_invoices' scope — never
+          // the 'invoices' scope, which is the tenant's legal gapless tax series
+          // (EU VAT Art.226 / GCC). Drawing from 'invoices' would burn a number
+          // out of that series into a platform table the tenant never sees.
           const { data: nextNumber, error: numberError } = await supabase
-            .rpc("get_next_number_for_tenant", { p_tenant: tenantId, p_scope: "invoices" });
+            .rpc("get_next_number_for_tenant", { p_tenant: tenantId, p_scope: "billing_invoices" });
 
           if (numberError) {
             console.error("Failed to mint billing invoice number:", numberError);

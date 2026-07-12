@@ -149,15 +149,19 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
+      // Only send() may route to the revert. denomailer's send() resolves only
+      // after the server has ACCEPTED the message (DATA committed) — an
+      // irreversible act. close() (QUIT + socket teardown) runs in finally and
+      // can throw on a connection reset / already-closed socket AFTER a
+      // committed send; that must NOT revert the claim, or the frozen email is
+      // re-sent on the next tick.
       await smtpClient.send({
         from: gmailUser,
         to: recipient,
         subject: followUp.subject || "Follow-up",
         content: followUp.message,
       });
-      await smtpClient.close();
     } catch (smtpError) {
-      try { await smtpClient.close(); } catch { /* already closed */ }
       const message = smtpError instanceof Error ? smtpError.message : "SMTP error";
       const terminal = (followUp.attempt_count ?? 0) >= 3;
       // Release the claim so the send is retried on the next tick. Revert to
@@ -175,6 +179,10 @@ Deno.serve(async (req: Request) => {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
+    } finally {
+      // Never routes to the revert: a close() failure after a committed send is
+      // swallowed here so the claim stays 'sent'.
+      try { await smtpClient.close(); } catch { /* already closed / reset after DATA */ }
     }
     // Status already committed to 'sent' at claim time — no post-send flip
     // needed (that write is exactly the one whose failure caused re-sends).

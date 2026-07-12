@@ -815,7 +815,13 @@ export async function getSalesReport(startDate: string, endDate: string) {
   if (error) throw error;
 
   const sales = data ?? [];
-  const totalRevenue = sales.reduce((sum, s) => sum + baseAmount(s, 'total_amount'), 0);
+  // Net (pre-tax) revenue: total_amount is tax-INCLUSIVE (Subtotal − Discount + Tax), while
+  // totalCost below is tax-exclusive cost. Counting collected tax (a remittable liability) as
+  // revenue inflates Gross Profit/Margin, so strip tax_amount here: net = total − tax.
+  const totalRevenue = sales.reduce(
+    (sum, s) => sum + baseAmount(s, 'total_amount') - baseAmount(s, 'tax_amount'),
+    0,
+  );
   const totalCost = sales.reduce((sum, s) => {
     const items = (s as unknown as {
       stock_sale_items?: Array<{ quantity: number; stock_items?: { cost_price: number | null } | null }>;

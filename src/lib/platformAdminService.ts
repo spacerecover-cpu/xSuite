@@ -153,7 +153,7 @@ export async function getTenantsList(filters?: {
     .from('tenants')
     .select(`
       *,
-      tenant_subscriptions(*),
+      tenant_subscriptions(*, subscription_plans(code)),
       profiles(count)
     `)
     .order('created_at', { ascending: false });
@@ -192,7 +192,7 @@ export async function getTenantsList(filters?: {
   }));
 
   if (filters?.plan) {
-    results = results.filter(t => t.subscription?.plan_code === filters.plan);
+    results = results.filter(t => t.subscription?.subscription_plans?.code === filters.plan);
   }
 
   if (filters?.churnRisk) {

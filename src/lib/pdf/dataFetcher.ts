@@ -773,7 +773,7 @@ export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditN
       : Promise.resolve({ data: null }),
     supabase
       .from('credit_note_items')
-      .select('description, quantity, unit_price, total')
+      .select('description, quantity, unit_price, total, item_code, unit_label')
       .eq('credit_note_id', creditNoteId)
       .is('deleted_at', null)
       .order('sort_order', { ascending: true }),
@@ -785,7 +785,7 @@ export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditN
   const company = companyRes.data as { company_name?: string | null; name?: string | null } | null;
   const caseRow = caseRes.data as { case_no?: string | null } | null;
   const block = currencyToBlock(cfg.currency);
-  const items = (itemsRes.data ?? []) as Array<{ description?: string | null; quantity?: number | null; unit_price?: number | null; total?: number | null }>;
+  const items = (itemsRes.data ?? []) as Array<{ description?: string | null; quantity?: number | null; unit_price?: number | null; total?: number | null; item_code?: string | null; unit_label?: string | null }>;
 
   return {
     creditNoteData: {
@@ -813,6 +813,8 @@ export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditN
         quantity: typeof it.quantity === 'number' ? it.quantity : 0,
         unit_price: typeof it.unit_price === 'number' ? it.unit_price : 0,
         line_total: typeof it.total === 'number' ? it.total : 0,
+        item_code: it.item_code ?? null,
+        unit_label: it.unit_label ?? null,
       })),
       buyer_tax_number: cnRow.buyer_tax_number ?? null,
       buyer_tax_number_label: cnRow.buyer_tax_number_label ?? null,

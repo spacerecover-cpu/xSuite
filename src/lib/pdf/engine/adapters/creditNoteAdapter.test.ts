@@ -69,6 +69,32 @@ describe('toCreditNoteEngineData', () => {
     expect(row?.value).toContain('50');
   });
 
+  it('emits unit and itemCode row keys from the statutory line fields', () => {
+    // India (in_gst) forces the itemCode (HSN/SAC) + unit (UQC) columns visible;
+    // the adapter must populate them, or the revision-of-tax-invoice prints blank
+    // statutory cells. Mirrors invoiceAdapter.compliance.test.ts's parallel case.
+    const config = BUILT_IN_TEMPLATE_CONFIGS.credit_note;
+    const withStatutory: CreditNoteDocumentData = {
+      ...fixture,
+      creditNoteData: {
+        ...fixture.creditNoteData,
+        items: [
+          {
+            description: 'RAID recovery',
+            quantity: 1,
+            unit_price: 100,
+            line_total: 105,
+            unit_label: 'Piece',
+            item_code: '998713',
+          },
+        ],
+      },
+    };
+    const data = toCreditNoteEngineData(withStatutory, config);
+    expect(data.lineItems!.rows[0].unit).toBe('Piece');
+    expect(data.lineItems!.rows[0].itemCode).toBe('998713');
+  });
+
   it('honors a country-layer documentTitle override (TAX CREDIT NOTE ceremony)', () => {
     const config: DocumentTemplateConfig = {
       ...BUILT_IN_TEMPLATE_CONFIGS.credit_note,

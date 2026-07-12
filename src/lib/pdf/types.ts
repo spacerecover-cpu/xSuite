@@ -545,6 +545,8 @@ export interface CreditNoteLineItem {
   quantity: number;
   unit_price: number;
   line_total: number;
+  item_code?: string | null;
+  unit_label?: string | null;
 }
 
 export interface CreditNoteData {

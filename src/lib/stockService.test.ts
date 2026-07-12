@@ -77,6 +77,25 @@ describe('getSalesReport (cross-document revenue total must be base currency)', 
 
     expect(report.totalRevenue).toBe(88);
   });
+
+  it('Bug 68: excludes collected tax from revenue so Gross Profit/Margin are not inflated', async () => {
+    // 15% VAT: subtotal 100, cost 60 ⇒ total_amount 115, tax_amount 15.
+    // Net revenue must be 100 (not 115); profit 40 (not 55); margin 40% (not 47.8%).
+    const query = makeQuery([
+      {
+        total_amount: 115,
+        tax_amount: 15,
+        stock_sale_items: [{ quantity: 1, stock_items: { cost_price: 60 } }],
+      },
+    ]);
+    from.mockReturnValue(query);
+
+    const report = await getSalesReport('2020-01-01', '2020-12-31');
+
+    expect(report.totalRevenue).toBe(100);
+    expect(report.totalCost).toBe(60);
+    expect(report.totalProfit).toBe(40);
+  });
 });
 
 describe('getTodaysSales (cross-document revenue total must be base currency)', () => {

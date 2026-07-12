@@ -45,6 +45,7 @@ export async function getJobs(filters?: { status?: string; departmentId?: string
       departments (*),
       positions (*)
     `)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
   if (filters?.status) {
@@ -64,7 +65,8 @@ export async function getJobs(filters?: { status?: string; departmentId?: string
     const { data: candidateCounts } = await supabase
       .from('recruitment_candidates')
       .select('job_id')
-      .in('job_id', jobIds);
+      .in('job_id', jobIds)
+      .is('deleted_at', null);
 
     const countMap: Record<string, number> = {};
     (candidateCounts || []).forEach(c => {
@@ -84,6 +86,7 @@ export async function getJob(id: string) {
     .from('recruitment_jobs')
     .select(`*, departments (*), positions (*)`)
     .eq('id', id)
+    .is('deleted_at', null)
     .maybeSingle();
 
   if (error) throw error;
@@ -126,6 +129,7 @@ export async function getCandidates(jobId?: string) {
   let query = supabase
     .from('recruitment_candidates')
     .select(`*, recruitment_jobs (title, department_id)`)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
   if (jobId) {
@@ -175,8 +179,8 @@ export async function moveCandidateStage(id: string, stage: CandidateStage) {
 
 export async function getRecruitmentStats() {
   const [jobsResult, candidatesResult] = await Promise.all([
-    supabase.from('recruitment_jobs').select('status'),
-    supabase.from('recruitment_candidates').select('current_stage'),
+    supabase.from('recruitment_jobs').select('status').is('deleted_at', null),
+    supabase.from('recruitment_candidates').select('current_stage').is('deleted_at', null),
   ]);
 
   const jobs = jobsResult.data || [];

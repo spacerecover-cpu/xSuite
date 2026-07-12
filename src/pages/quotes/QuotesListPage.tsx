@@ -716,10 +716,13 @@ export const QuotesListPage: React.FC = () => {
               // here previously changed line items while leaving totals stale.
               const quoteFields: Partial<QuoteShape> = {
                 status: statusRaw as QuoteShape['status'],
+                title: typeof quoteData.title === 'string' ? quoteData.title : undefined,
+                client_reference: typeof quoteData.client_reference === 'string' ? quoteData.client_reference : undefined,
                 valid_until: validUntil ?? undefined,
                 tax_rate: taxRate,
                 discount_amount: discountAmountInput,
                 discount_type: discountTypeRaw as QuoteShape['discount_type'],
+                bank_account_id: typeof quoteData.bank_account_id === 'string' ? quoteData.bank_account_id : null,
                 terms: termsValue,
                 notes: notesValue ?? undefined,
               };
@@ -765,6 +768,9 @@ export const QuotesListPage: React.FC = () => {
                 description: item.description,
                 quantity: item.quantity,
                 unit_price: item.unit_price,
+                unit_code: item.unit_code ?? null,
+                unit_label: item.unit_label ?? null,
+                item_code: item.item_code ?? null,
                 sort_order: index,
               }));
 

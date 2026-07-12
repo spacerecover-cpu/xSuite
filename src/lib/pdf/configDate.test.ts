@@ -8,6 +8,14 @@ describe('toDateFnsFormat', () => {
     expect(toDateFnsFormat('YYYY-MM-DD')).toBe('yyyy-MM-dd');
     expect(toDateFnsFormat('DD-MM-YYYY')).toBe('dd-MM-yyyy');
   });
+  it('maps the European DD.MM.YYYY picker format instead of degrading to the default', () => {
+    expect(toDateFnsFormat('DD.MM.YYYY')).toBe('dd.MM.yyyy');
+  });
+  it('transliterates other CLDR-ish separators/orders (Y->y, D->d, months kept)', () => {
+    expect(toDateFnsFormat('YYYY.MM.DD')).toBe('yyyy.MM.dd');
+    expect(toDateFnsFormat('DD MMM YYYY')).toBe('dd MMM yyyy');
+    expect(toDateFnsFormat('YYYY/MM/DD')).toBe('yyyy/MM/dd');
+  });
   it('falls back to dd MMM yyyy for an empty/unknown stored format (current PDF default)', () => {
     expect(toDateFnsFormat(null)).toBe('dd MMM yyyy');
     expect(toDateFnsFormat('')).toBe('dd MMM yyyy');
@@ -23,6 +31,7 @@ describe('fmtDateWithConfig', () => {
   it('formats a date with the resolved country pattern', () => {
     expect(fmtDateWithConfig(d, { dateFormat: 'DD/MM/YYYY' })).toBe('09/03/2026');
     expect(fmtDateWithConfig(d, { dateFormat: 'MM/DD/YYYY' })).toBe('03/09/2026');
+    expect(fmtDateWithConfig(d, { dateFormat: 'DD.MM.YYYY' })).toBe('09.03.2026');
   });
   it('appends a HH:mm time suffix when withTime is set, after the configured date', () => {
     const out = fmtDateWithConfig(d, { dateFormat: 'DD/MM/YYYY' }, { withTime: true });

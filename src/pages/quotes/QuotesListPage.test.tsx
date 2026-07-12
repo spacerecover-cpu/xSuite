@@ -62,13 +62,26 @@ vi.mock('../../components/cases/QuoteFormModal', () => ({
       terms_and_conditions: null,
       notes: null,
     };
-    const items = [{ description: 'Logical recovery', quantity: 1, unit_price: 200 }];
+    // Per-line unit + HSN/SAC code the QuoteFormModal collects; the page's
+    // create branch used to drop these before handing items to createQuote.
+    const items = [{
+      description: 'Logical recovery',
+      quantity: 1,
+      unit_price: 200,
+      unit_code: 'GB',
+      unit_label: 'Gigabytes',
+      item_code: '998877',
+    }];
     return (
       <>
         <button onClick={() => onSave(basePayload, items)}>Trigger Quote Save</button>
         {/* Multi-currency tenant: the functional-currency <select> picked EUR. */}
         <button onClick={() => onSave({ ...basePayload, currency: 'EUR' }, items)}>
           Trigger Quote Save EUR
+        </button>
+        {/* Edit fills title / client reference / bank account — all editable in the modal. */}
+        <button onClick={() => onSave({ ...basePayload, title: 'RAID Rebuild', client_reference: 'PO-9988', bank_account_id: 'bank-77' }, items)}>
+          Trigger Quote Save With Refs
         </button>
       </>
     );
@@ -324,5 +337,74 @@ describe('QuotesListPage — inline Edit recomputes header totals via updateQuot
 
     // The stale path is gone: no direct quotes.insert on an edit.
     expect(insertedQuotePayload).not.toHaveBeenCalled();
+  });
+});
+
+// Regression guard for bug #77: the inline-edit branch's quoteFields object
+// dropped title / client_reference / bank_account_id — all editable in the modal
+// and all real `quotes` columns — so editing a quote's title from the list row
+// silently kept the old title. QuoteDetailPage's edit forwards them; the two
+// paths must agree.
+describe('QuotesListPage — inline Edit persists title, client_reference, bank_account_id', () => {
+  it('forwards the edited title/client_reference/bank_account_id to updateQuote', async () => {
+    vi.mocked(fetchQuotesPage).mockResolvedValue({
+      rows: [
+        {
+          id: 'quote-edit-1',
+          quote_number: 'QUOT-EDIT',
+          case_id: 'case-1',
+          customer_id: 'customer-1',
+          company_id: null,
+          status: 'draft',
+          total_amount: 100,
+          created_at: '2026-07-01T00:00:00Z',
+          valid_until: null,
+          customers: { customer_name: 'Acme' },
+        } as never,
+      ],
+      total: 1,
+    });
+    vi.mocked(updateQuote).mockClear();
+
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+    await user.click(await screen.findByRole('button', { name: 'Trigger Quote Save With Refs' }));
+
+    await waitFor(() => expect(vi.mocked(updateQuote)).toHaveBeenCalledTimes(1));
+
+    const [, quoteArg] = vi.mocked(updateQuote).mock.calls[0];
+    expect(quoteArg.title).toBe('RAID Rebuild');
+    expect(quoteArg.client_reference).toBe('PO-9988');
+    expect(quoteArg.bank_account_id).toBe('bank-77');
+  });
+});
+
+// Regression guard for bug #78: the create branch mapped only description/
+// quantity/unit_price/sort_order, dropping the per-line unit_code/unit_label/
+// item_code (HSN/SAC) the modal collects — so createQuote persisted them as null
+// even though the user entered them. The edit branch already carried them.
+describe('QuotesListPage — New Quote persists per-line unit + HSN/SAC item code', () => {
+  it('threads unit_code/unit_label/item_code through createQuote line items', async () => {
+    // Prior edit tests left fetchQuotesPage returning a row; restore the empty
+    // state so the (empty-state) "Create Quote" action is rendered.
+    vi.mocked(fetchQuotesPage).mockResolvedValue({ rows: [], total: 0 });
+    vi.mocked(createQuote).mockClear();
+
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Create Quote' }));
+    await user.click(await screen.findByRole('button', { name: 'Trigger Quote Save' }));
+
+    await waitFor(() => expect(vi.mocked(createQuote)).toHaveBeenCalledTimes(1));
+
+    const [, itemsArg] = vi.mocked(createQuote).mock.calls[0];
+    expect(itemsArg?.[0]).toMatchObject({
+      unit_code: 'GB',
+      unit_label: 'Gigabytes',
+      item_code: '998877',
+    });
   });
 });

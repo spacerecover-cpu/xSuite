@@ -170,6 +170,8 @@ export const StockItemDetail: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: stockKeys.item(id!) });
       queryClient.invalidateQueries({ queryKey: stockKeys.transactions(id) });
+      queryClient.invalidateQueries({ queryKey: stockKeys.items() });
+      queryClient.invalidateQueries({ queryKey: stockKeys.stats() });
       toast.success('Stock received successfully');
       setIsReceiveOpen(false);
       setReceiveForm({ quantity: '1', cost: '', notes: '' });
@@ -183,6 +185,8 @@ export const StockItemDetail: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: stockKeys.item(id!) });
       queryClient.invalidateQueries({ queryKey: stockKeys.transactions(id) });
+      queryClient.invalidateQueries({ queryKey: stockKeys.items() });
+      queryClient.invalidateQueries({ queryKey: stockKeys.stats() });
       toast.success('Stock usage recorded');
       setIsUsageOpen(false);
       setUsageForm({ quantity: '1', case_id: '', notes: '' });

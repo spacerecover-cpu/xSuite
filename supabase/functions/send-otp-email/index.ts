@@ -21,15 +21,6 @@ function makeCorsHeaders(req: Request) {
   };
 }
 
-let _corsHeaders: Record<string, string> = {};
-
-function jsonResponse(body: Record<string, unknown>, status: number) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ..._corsHeaders, "Content-Type": "application/json" },
-  });
-}
-
 function generateOtp(): string {
   const digits = '0123456789';
   let otp = '';
@@ -72,7 +63,11 @@ function getOtpEmailHtml(otp: string, companyName: string): string {
 
 Deno.serve(async (req: Request) => {
   const corsHeaders = makeCorsHeaders(req);
-  _corsHeaders = corsHeaders;
+  const jsonResponse = (body: Record<string, unknown>, status: number): Response =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
 
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });

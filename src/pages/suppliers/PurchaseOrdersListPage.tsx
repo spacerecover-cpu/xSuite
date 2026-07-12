@@ -152,20 +152,35 @@ export default function PurchaseOrdersListPage() {
         return count ?? 0;
       };
 
-      const [totalRes, pending, approved, moneyRes] = await Promise.all([
+      // Total Value sums total_amount_base across ALL non-deleted POs. An unranged
+      // select is capped by PostgREST at the server db-max-rows (~1000), which
+      // silently truncated the sum past that many POs; page through explicit ranges
+      // and accumulate until a short batch marks the end so large tenants stay
+      // correct. (A SQL SUM RPC — cf. get_quote_stats_base — is the preferred
+      // long-term shape but needs a migration + types regen.)
+      const sumTotalValueBase = async (): Promise<number> => {
+        const BATCH = 1000;
+        let total = 0;
+        for (let offset = 0; ; offset += BATCH) {
+          const { data, error } = await supabase
+            .from('purchase_orders')
+            .select('total_amount, total_amount_base')
+            .is('deleted_at', null)
+            .range(offset, offset + BATCH - 1);
+          if (error) throw error;
+          const rows = data ?? [];
+          total += rows.reduce((sum, o) => sum + baseAmount(o, 'total_amount'), 0);
+          if (rows.length < BATCH) break;
+        }
+        return total;
+      };
+
+      const [totalRes, pending, approved, totalValue] = await Promise.all([
         base(),
         countIn(pendingIds),
         countIn(approvedIds),
-        supabase
-          .from('purchase_orders')
-          .select('total_amount, total_amount_base')
-          .is('deleted_at', null),
+        sumTotalValueBase(),
       ]);
-
-      const totalValue = (moneyRes.data ?? []).reduce(
-        (sum, o) => sum + baseAmount(o, 'total_amount'),
-        0,
-      );
 
       return {
         total: totalRes.count ?? 0,
