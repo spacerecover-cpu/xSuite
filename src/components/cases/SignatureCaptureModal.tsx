@@ -8,6 +8,8 @@ export interface CapturedSignature {
   method: CaptureMethod;
   typedValue?: string;
   imageBlob?: Blob;
+  /** Signer's name for non-Type methods (drawn / uploaded_image / click_to_accept). */
+  signerName?: string;
 }
 
 interface SignatureCaptureModalProps {
@@ -30,6 +32,7 @@ export function SignatureCaptureModal({ open, onClose, title, onCapture, allowed
   const methods = METHODS.filter((m) => !allowedMethods || allowedMethods.includes(m.id));
   const [method, setMethod] = useState<CaptureMethod>(methods[0]?.id ?? 'typed');
   const [typedValue, setTypedValue] = useState('');
+  const [signerName, setSignerName] = useState('');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [accepted, setAccepted] = useState(false);
 
@@ -39,6 +42,7 @@ export function SignatureCaptureModal({ open, onClose, title, onCapture, allowed
 
   function resetState() {
     setTypedValue('');
+    setSignerName('');
     setUploadedFile(null);
     setAccepted(false);
     hasDrawn.current = false;
@@ -66,9 +70,12 @@ export function SignatureCaptureModal({ open, onClose, title, onCapture, allowed
 
   function isValid(): boolean {
     if (method === 'typed') return typedValue.trim().length > 0;
-    if (method === 'drawn') return hasDrawn.current;
-    if (method === 'uploaded_image') return uploadedFile !== null;
-    if (method === 'click_to_accept') return accepted;
+    // Non-Type methods must also capture the signer's name so every signature is
+    // attributed to a named signatory, not just the slot's role label.
+    const hasName = signerName.trim().length > 0;
+    if (method === 'drawn') return hasDrawn.current && hasName;
+    if (method === 'uploaded_image') return uploadedFile !== null && hasName;
+    if (method === 'click_to_accept') return accepted && hasName;
     return false;
   }
 
@@ -115,6 +122,7 @@ export function SignatureCaptureModal({ open, onClose, title, onCapture, allowed
   function handleApply() {
     if (!isValid()) return;
 
+    const name = signerName.trim();
     if (method === 'typed') {
       onCapture({ method: 'typed', typedValue: typedValue.trim() });
       onClose();
@@ -123,15 +131,15 @@ export function SignatureCaptureModal({ open, onClose, title, onCapture, allowed
       if (!canvas) return;
       canvas.toBlob((blob) => {
         if (blob) {
-          onCapture({ method: 'drawn', imageBlob: blob });
+          onCapture({ method: 'drawn', imageBlob: blob, signerName: name });
           onClose();
         }
       }, 'image/png');
     } else if (method === 'uploaded_image' && uploadedFile) {
-      onCapture({ method: 'uploaded_image', imageBlob: uploadedFile });
+      onCapture({ method: 'uploaded_image', imageBlob: uploadedFile, signerName: name });
       onClose();
     } else if (method === 'click_to_accept') {
-      onCapture({ method: 'click_to_accept' });
+      onCapture({ method: 'click_to_accept', signerName: name });
       onClose();
     }
   }
@@ -159,6 +167,26 @@ export function SignatureCaptureModal({ open, onClose, title, onCapture, allowed
             </button>
           ))}
         </div>
+
+        {/* Signer name — captured for every non-Type method so drawn/uploaded/accepted
+            signatures name their signatory (an external operator or witness) rather than
+            falling back to the slot's role label. */}
+        {method !== 'typed' && (
+          <div className="space-y-2">
+            <label htmlFor="sig-signer-name" className="block text-sm font-medium text-slate-700">
+              Signer name
+            </label>
+            <input
+              id="sig-signer-name"
+              type="text"
+              aria-label="Signer name"
+              value={signerName}
+              onChange={(e) => setSignerName(e.target.value)}
+              placeholder="Full name of signer"
+              className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+        )}
 
         {/* Method panels */}
         {method === 'typed' && (

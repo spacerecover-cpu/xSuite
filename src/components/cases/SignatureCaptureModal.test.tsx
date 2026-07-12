@@ -12,13 +12,28 @@ describe('SignatureCaptureModal', () => {
     expect(onCapture).toHaveBeenCalledWith(expect.objectContaining({ method: 'typed', typedValue: 'Tech A' }));
   });
 
-  it('captures a click-to-accept signature', () => {
+  it('captures a click-to-accept signature with a signer name', () => {
     const onCapture = vi.fn();
     render(<SignatureCaptureModal open onClose={vi.fn()} title="Approver signature" onCapture={onCapture} />);
     fireEvent.click(screen.getByRole('button', { name: /accept/i })); // switch to Accept method
+    // Non-Type methods require a distinct signer name.
+    fireEvent.change(screen.getByLabelText(/signer name/i), { target: { value: 'Walter Witness' } });
     fireEvent.click(screen.getByLabelText(/i confirm/i));
     fireEvent.click(screen.getByRole('button', { name: /apply signature/i }));
-    expect(onCapture).toHaveBeenCalledWith(expect.objectContaining({ method: 'click_to_accept' }));
+    expect(onCapture).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'click_to_accept', signerName: 'Walter Witness' }),
+    );
+  });
+
+  it('requires a signer name before a non-Type signature can be applied', () => {
+    const onCapture = vi.fn();
+    render(<SignatureCaptureModal open onClose={vi.fn()} title="Witness signature" onCapture={onCapture} />);
+    fireEvent.click(screen.getByRole('button', { name: /accept/i })); // switch to Accept method
+    fireEvent.click(screen.getByLabelText(/i confirm/i)); // accepted, but no name yet
+    expect(screen.getByRole('button', { name: /apply signature/i })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/signer name/i), { target: { value: 'Named Signer' } });
+    expect(screen.getByRole('button', { name: /apply signature/i })).not.toBeDisabled();
+    expect(onCapture).not.toHaveBeenCalled();
   });
 
   it('renders only the allowed methods when allowedMethods is set', () => {

@@ -260,13 +260,16 @@ export async function getStockItem(id: string): Promise<StockItemWithCategory | 
 
 export async function getSaleableItems(): Promise<StockItemWithCategory[]> {
   // is_featured column dropped from stock_items schema; order by name only.
+  // Filter on availability (generated quantity_available = quantity_on_hand -
+  // quantity_reserved), not raw on-hand, so fully-reserved items don't show in the
+  // sale grid (client-side complement to bugs #35/#36 oversell guards).
   const { data, error } = await supabase
     .from('stock_items')
     .select('*, stock_categories(*)')
     .or('item_type.eq.saleable,item_type.eq.both')
     .is('deleted_at', null)
     .eq('is_active', true)
-    .gt('current_quantity', 0)
+    .gt('quantity_available', 0)
     .order('name', { ascending: true });
   if (error) throw error;
   return (data ?? []) as StockItemWithCategory[];

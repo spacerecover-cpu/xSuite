@@ -13716,6 +13716,7 @@ export type Database = {
           notes: string | null
           pack_version_id: string | null
           place_of_supply_subdivision_id: string | null
+          purged_at: string | null
           quote_date: string | null
           quote_number: string | null
           quote_type: string | null
@@ -13772,6 +13773,7 @@ export type Database = {
           notes?: string | null
           pack_version_id?: string | null
           place_of_supply_subdivision_id?: string | null
+          purged_at?: string | null
           quote_date?: string | null
           quote_number?: string | null
           quote_type?: string | null
@@ -13828,6 +13830,7 @@ export type Database = {
           notes?: string | null
           pack_version_id?: string | null
           place_of_supply_subdivision_id?: string | null
+          purged_at?: string | null
           quote_date?: string | null
           quote_number?: string | null
           quote_type?: string | null
@@ -18457,6 +18460,42 @@ export type Database = {
         }
         Returns: undefined
       }
+      adjust_account_balance: {
+        Args: { p_account_id: string; p_amount: number; p_direction: string }
+        Returns: {
+          account_number: string | null
+          account_type: string | null
+          bank_name: string | null
+          branch_code: string | null
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          currency_id: string | null
+          current_balance: number | null
+          current_balance_base: number | null
+          deleted_at: string | null
+          employee_id: string | null
+          exchange_rate: number
+          iban: string | null
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          name: string
+          notes: string | null
+          opening_balance: number | null
+          opening_balance_base: number | null
+          rate_source: string
+          swift_code: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "bank_accounts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_validate_user_creation: { Args: { p_email: string }; Returns: Json }
       anonymize_customer_data: {
         Args: { p_customer_id: string }
@@ -18636,6 +18675,30 @@ export type Database = {
         Args: { p_resource: string; p_tenant_id: string }
         Returns: boolean
       }
+      complete_account_transfer: {
+        Args: { p_transfer_id: string }
+        Returns: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          from_account_id: string
+          id: string
+          notes: string | null
+          reference: string | null
+          status: string | null
+          tenant_id: string
+          to_account_id: string
+          transfer_date: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "account_transfers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       compute_realized_fx: {
         Args: {
           p_base_currency: string
@@ -18724,6 +18787,10 @@ export type Database = {
         Args: { p_case_id: string }
         Returns: undefined
       }
+      delete_quote_permanently: {
+        Args: { p_quote_id: string }
+        Returns: undefined
+      }
       disable_customer_portal_access: {
         Args: { p_customer_id: string }
         Returns: undefined
@@ -18746,6 +18813,38 @@ export type Database = {
           p_facts: Json
         }
         Returns: Json
+      }
+      execute_account_transfer: {
+        Args: {
+          p_amount: number
+          p_from: string
+          p_notes: string
+          p_reference: string
+          p_status: string
+          p_to: string
+          p_transfer_date: string
+        }
+        Returns: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          from_account_id: string
+          id: string
+          notes: string | null
+          reference: string | null
+          status: string | null
+          tenant_id: string
+          to_account_id: string
+          transfer_date: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "account_transfers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       export_customer_data: { Args: { p_customer_id: string }; Returns: Json }
       file_vat_return: {
@@ -18823,6 +18922,10 @@ export type Database = {
       }
       get_next_invoice_number: { Args: never; Returns: string }
       get_next_number: { Args: { p_scope: string }; Returns: string }
+      get_next_number_for_tenant: {
+        Args: { p_scope: string; p_tenant: string }
+        Returns: string
+      }
       get_next_po_number: { Args: never; Returns: string }
       get_next_receipt_number: { Args: never; Returns: string }
       get_next_supplier_number: { Args: never; Returns: string }
@@ -19002,6 +19105,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      issue_delivery_challan: {
+        Args: { p_batch_id: string; p_case_id: string; p_lines: Json }
+        Returns: Json
       }
       issue_tax_document: {
         Args: { p_doc_id: string; p_doc_type: string; p_dry_run?: boolean }

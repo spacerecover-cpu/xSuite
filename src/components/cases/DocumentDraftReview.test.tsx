@@ -220,6 +220,43 @@ describe('data_destruction approval queue', () => {
     expect(new Set(names).size).toBe(3);
     expect(names).not.toContain('Reviewer');
   });
+
+  it('attaches signer_user_id only to the approver slot, never to operator/witness', async () => {
+    svc.getDocumentInstance.mockResolvedValue({
+      id: 'di-dd',
+      title: 'Data Destruction Certificate',
+      status: 'in_review',
+      created_by: 'author',
+      report_subtype: 'data_destruction',
+      case_id: 'c1',
+    });
+    sigSvc.listInstanceSignatures.mockResolvedValue([]);
+    sigSvc.captureStaffSignature
+      .mockResolvedValueOnce('sig-eng')
+      .mockResolvedValueOnce('sig-wit')
+      .mockResolvedValueOnce('sig-app');
+
+    render(<DocumentDraftReview isOpen onClose={vi.fn()} caseId="c1" instanceId="di-dd" onSaved={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: /approve/i }));
+    fireEvent.click(await screen.findByText('mock-capture')); // operator
+    await waitFor(() => expect(sigSvc.captureStaffSignature).toHaveBeenCalledTimes(1));
+    fireEvent.click(await screen.findByText('mock-capture')); // witness
+    await waitFor(() => expect(sigSvc.captureStaffSignature).toHaveBeenCalledTimes(2));
+    fireEvent.click(await screen.findByText('mock-capture')); // approver
+    await waitFor(() => expect(sigSvc.captureStaffSignature).toHaveBeenCalledTimes(3));
+
+    const idBySlot = Object.fromEntries(
+      sigSvc.captureStaffSignature.mock.calls.map((c: unknown[]) => {
+        const a = c[0] as { slot: string; signerUserId: string | null };
+        return [a.slot, a.signerUserId];
+      }),
+    );
+    // Operator/witness are external signatories → null; only the approver is the
+    // authenticated system user ('reviewer' from the AuthContext mock).
+    expect(idBySlot.engineer).toBeNull();
+    expect(idBySlot.witness).toBeNull();
+    expect(idBySlot.approver).toBe('reviewer');
+  });
 });
 
 describe('idempotent approve — retry after transition failure', () => {

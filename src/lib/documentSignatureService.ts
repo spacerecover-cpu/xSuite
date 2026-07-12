@@ -23,6 +23,13 @@ export interface CaptureStaffSignatureParams {
   method: SignatureMethod;
   signerName: string;
   signerRole?: string;
+  /**
+   * Identity to attribute this signature to. Independent per slot: an external
+   * operator/witness who is not a system user must be null, so a destruction
+   * certificate's three signatories are provably distinct. Only the approver slot
+   * falls back to the authenticated user when this is omitted.
+   */
+  signerUserId?: string | null;
   typedValue?: string;
   imageBlob?: Blob;
 }
@@ -51,7 +58,10 @@ export async function captureStaffSignature(p: CaptureStaffSignatureParams): Pro
       document_instance_id: p.instanceId,
       slot: p.slot,
       method: p.method,
-      signer_user_id: user.id,
+      // Per-slot identity: coalesce to the passed value; only the approver slot
+      // falls back to the authenticated user. Operator/witness stay null when the
+      // signatory is not a system user, keeping the signatories identity-independent.
+      signer_user_id: p.signerUserId ?? (p.slot === 'approver' ? user.id : null),
       signer_name: p.signerName,
       signer_role: p.signerRole ?? null,
       typed_value: p.method === 'typed' ? (p.typedValue ?? null) : null,

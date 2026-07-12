@@ -72,13 +72,19 @@ describe('getCheckoutBatchId', () => {
   });
 });
 
-describe('issueDeliveryChallan — idempotent per checkout batch', () => {
-  it('allocates a number from the delivery_challan scope and appends one history row', async () => {
-    vi.mocked(supabase.from).mockReturnValue(chain({ data: [], error: null })); // no prior issuance
-    vi.mocked(supabase.rpc).mockImplementation(((fn: string) => {
-      if (fn === 'get_next_number') return Promise.resolve({ data: 'DC/25-26/0007', error: null });
-      return Promise.resolve({ data: undefined, error: null }); // log_case_history
-    }) as never);
+const CHALLAN_RESULT = {
+  kind: 'delivery_challan',
+  batch_id: 'batch-1',
+  challan_no: 'DC/25-26/0007',
+  lines: [{ device_id: 'dev-1', declared_value: 12000 }],
+  total_declared_value: 12000,
+  issued_at: '2026-07-05T10:00:00.000Z',
+  already_issued: false,
+};
+
+describe('issueDeliveryChallan — atomic RPC issuance (bug #87)', () => {
+  it('calls issue_delivery_challan with mapped lines and maps the returned jsonb', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: CHALLAN_RESULT, error: null } as never);
 
     const issued = await issueDeliveryChallan({
       caseId: 'case-1',
@@ -88,23 +94,21 @@ describe('issueDeliveryChallan — idempotent per checkout batch', () => {
 
     expect(issued.challanNo).toBe('DC/25-26/0007');
     expect(issued.totalDeclaredValue).toBe(12000);
-    expect(supabase.rpc).toHaveBeenCalledWith('get_next_number', { p_scope: 'delivery_challan' });
-    const histCall = vi.mocked(supabase.rpc).mock.calls.find((c) => c[0] === 'log_case_history');
-    expect(histCall).toBeDefined();
-    const args = histCall![1] as { p_action: string; p_case_id: string; p_details: string };
-    expect(args.p_action).toBe('delivery_challan_issued');
-    expect(args.p_case_id).toBe('case-1');
-    expect(JSON.parse(args.p_details)).toMatchObject({
-      kind: 'delivery_challan',
-      batch_id: 'batch-1',
-      challan_no: 'DC/25-26/0007',
-      lines: [{ device_id: 'dev-1', declared_value: 12000 }],
-      total_declared_value: 12000,
+    expect(issued.issuedAt).toBe('2026-07-05T10:00:00.000Z');
+    expect(issued.lines).toEqual([{ deviceId: 'dev-1', declaredValue: 12000 }]);
+    expect(supabase.rpc).toHaveBeenCalledTimes(1);
+    expect(supabase.rpc).toHaveBeenCalledWith('issue_delivery_challan', {
+      p_case_id: 'case-1',
+      p_batch_id: 'batch-1',
+      p_lines: [{ device_id: 'dev-1', declared_value: 12000 }],
     });
   });
 
-  it('re-issuing the same batch returns the recorded number and consumes NO new number', async () => {
-    vi.mocked(supabase.from).mockReturnValue(chain({ data: [HISTORY_ROW], error: null }));
+  it('returns the already-issued challan idempotently in a single rpc round-trip', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({
+      data: { ...CHALLAN_RESULT, already_issued: true },
+      error: null,
+    } as never);
 
     const issued = await issueDeliveryChallan({
       caseId: 'case-1',
@@ -113,38 +117,27 @@ describe('issueDeliveryChallan — idempotent per checkout batch', () => {
     });
 
     expect(issued.challanNo).toBe('DC/25-26/0007');
-    expect(supabase.rpc).not.toHaveBeenCalled();
+    expect(supabase.rpc).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(supabase.rpc).mock.calls.every((c) => c[0] === 'issue_delivery_challan')).toBe(true);
   });
 
-  it('reconciles to the canonical (earliest) row when a concurrent same-batch checkout already appended one', async () => {
-    // Pre-mint existence check finds nothing, so this caller proceeds to mint
-    // 0008. Between the check and the post-write re-read, a truly-concurrent
-    // checkout of the SAME batch landed an earlier row (0007). Reconciliation
-    // must return 0007 — the number this caller minted must NOT reach the
-    // customer, or the same handover would carry two statutory challans.
-    vi.mocked(supabase.from)
-      .mockReturnValueOnce(chain({ data: [], error: null })) // pre-mint check: none yet
-      .mockReturnValueOnce(chain({ data: [HISTORY_ROW], error: null })); // post-write reconcile: 0007
-    vi.mocked(supabase.rpc).mockImplementation(((fn: string) => {
-      if (fn === 'get_next_number') return Promise.resolve({ data: 'DC/25-26/0008', error: null });
-      return Promise.resolve({ data: undefined, error: null }); // log_case_history
-    }) as never);
+  it('throws when the rpc reports an error', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: { message: 'lock timeout' } } as never);
 
-    const issued = await issueDeliveryChallan({
-      caseId: 'case-1',
-      batchId: 'batch-1',
-      lines: [{ deviceId: 'dev-1', declaredValue: 12000 }],
-    });
-
-    expect(issued.challanNo).toBe('DC/25-26/0007');
-    expect(issued.challanNo).not.toBe('DC/25-26/0008');
+    await expect(
+      issueDeliveryChallan({
+        caseId: 'case-1',
+        batchId: 'batch-1',
+        lines: [{ deviceId: 'dev-1', declaredValue: 12000 }],
+      }),
+    ).rejects.toBeTruthy();
   });
 
-  it('refuses an empty line set', async () => {
-    vi.mocked(supabase.from).mockReturnValue(chain({ data: [], error: null }));
+  it('refuses an empty line set before touching the rpc', async () => {
     await expect(
       issueDeliveryChallan({ caseId: 'case-1', batchId: 'batch-1', lines: [] }),
     ).rejects.toThrow(/at least one customer-owned device/i);
+    expect(supabase.rpc).not.toHaveBeenCalled();
   });
 });
 

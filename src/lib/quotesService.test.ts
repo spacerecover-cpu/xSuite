@@ -34,7 +34,7 @@ vi.mock('./taxDocumentService', () => ({
 }));
 
 import { computeDocumentTotals } from './taxDocumentService';
-import { createQuote, duplicateQuote } from './quotesService';
+import { createQuote, duplicateQuote, permanentDeleteQuote } from './quotesService';
 
 // Kernel parity pin (M-G): locks the canonical quote shape (12 × OMR 120.000 @5%,
 // no discount, 3-dp) that quotesService now routes through the fiscal kernel.
@@ -119,6 +119,27 @@ describe('createQuote — unit/item-code persistence (regression for the silent-
       unit_label: 'Piece',
       item_code: '998713',
     });
+  });
+});
+
+describe('permanentDeleteQuote — permanent purge via RPC (Bug #63)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls delete_quote_permanently and does not re-soft-delete via .from().update()', async () => {
+    rpc.mockResolvedValue({ data: undefined, error: null });
+
+    await permanentDeleteQuote('quote-9');
+
+    expect(rpc).toHaveBeenCalledWith('delete_quote_permanently', { p_quote_id: 'quote-9' });
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it('throws when the purge RPC errors', async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'not permitted' } });
+
+    await expect(permanentDeleteQuote('quote-9')).rejects.toEqual({ message: 'not permitted' });
   });
 });
 

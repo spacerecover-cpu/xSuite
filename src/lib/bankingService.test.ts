@@ -3,10 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // getAccountBalanceSummary sums bank-account balances across documents; mock the
 // supabase client (env-throwing on import) and feed mixed-currency accounts so the
 // assertion proves base-currency summation, never the raw native balance.
-const { from, getUser, resolveTenantId } = vi.hoisted(() => ({
-  from: vi.fn(), getUser: vi.fn(), resolveTenantId: vi.fn(),
+const { from, rpc, getUser, resolveTenantId } = vi.hoisted(() => ({
+  from: vi.fn(), rpc: vi.fn(), getUser: vi.fn(), resolveTenantId: vi.fn(),
 }));
-vi.mock('./supabaseClient', () => ({ supabase: { from, auth: { getUser } }, resolveTenantId }));
+vi.mock('./supabaseClient', () => ({ supabase: { from, rpc, auth: { getUser } }, resolveTenantId }));
 vi.mock('./logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
 import { bankingService } from './bankingService';
@@ -102,97 +102,149 @@ describe('createTransfer — cross-currency guard (Phase 0)', () => {
   beforeEach(() => {
     getUser.mockResolvedValue({ data: { user: { id: 'u-1' } } });
     resolveTenantId.mockResolvedValue('t-1');
+    rpc.mockReset();
   });
 
-  it('throws before inserting when the two accounts have different currencies', async () => {
-    const insert = vi.fn(() => ({
-      select: () => ({ maybeSingle: () => Promise.resolve({ data: { id: 't', status: 'pending' }, error: null }) }),
-    }));
+  it('throws before dispatching the RPC when the two accounts have different currencies', async () => {
     from
       .mockReturnValueOnce(accountRead({ current_balance: 1000, currency: 'OMR' })) // source
-      .mockReturnValueOnce(accountRead({ currency: 'USD' }))                        // destination
-      .mockReturnValue({ insert });                                                // account_transfers — must NOT run
+      .mockReturnValueOnce(accountRead({ currency: 'USD' }));                       // destination
+    // execute_account_transfer must NOT run — the friendlier client guard fires first.
 
     await expect(
       bankingService.createTransfer({ amount: 500, from_account_id: 'a', to_account_id: 'b' }),
     ).rejects.toThrow(/Cross-currency transfers are not supported/);
-    expect(insert).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
   });
 
-  it('still allows same-currency transfers', async () => {
-    const captured: { row?: Record<string, unknown> } = {};
-    const insert = vi.fn((row: Record<string, unknown>) => {
-      captured.row = row;
-      // Return status 'pending' so the completed-transfer balance-update fan-out is skipped.
-      return { select: () => ({ maybeSingle: () => Promise.resolve({
-        data: { id: 't1', status: 'pending', from_account_id: 'a', to_account_id: 'b', amount: 500 }, error: null,
-      }) }) };
-    });
+  it('still allows same-currency transfers via the atomic RPC', async () => {
     from
       .mockReturnValueOnce(accountRead({ current_balance: 1000, currency: 'OMR' }))
-      .mockReturnValueOnce(accountRead({ currency: 'OMR' }))
-      .mockReturnValue({ insert });
+      .mockReturnValueOnce(accountRead({ currency: 'OMR' }));
+    rpc.mockResolvedValue({
+      data: { id: 't1', status: 'completed', from_account_id: 'a', to_account_id: 'b', amount: 500 },
+      error: null,
+    });
 
     const result = await bankingService.createTransfer({ amount: 500, from_account_id: 'a', to_account_id: 'b' });
 
-    expect(insert).toHaveBeenCalledTimes(1);
-    expect(captured.row).toMatchObject({ amount: 500, from_account_id: 'a', to_account_id: 'b' });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith('execute_account_transfer', {
+      p_from: 'a',
+      p_to: 'b',
+      p_amount: 500,
+      p_transfer_date: null,
+      p_reference: null,
+      p_notes: null,
+      p_status: 'completed',
+    });
     expect(result).toMatchObject({ id: 't1' });
   });
 });
 
-describe('createTransfer — non-atomic balance compensation on partial failure (BUG-40)', () => {
+describe('createTransfer — atomic balance move via RPC (BUG-40 regression)', () => {
+  const accountRead = (row: Record<string, unknown>) => {
+    const b: Record<string, unknown> = {
+      select: vi.fn(() => b),
+      eq: vi.fn(() => b),
+      maybeSingle: vi.fn().mockResolvedValue({ data: row, error: null }),
+    };
+    return b;
+  };
+
   beforeEach(() => {
     getUser.mockResolvedValue({ data: { user: { id: 'u-1' } } });
     resolveTenantId.mockResolvedValue('t-1');
+    rpc.mockReset();
   });
 
-  it('reverses the debit and voids the transfer when the credit leg fails', async () => {
-    const accountRead = (row: Record<string, unknown>) => {
-      const b: Record<string, unknown> = {
-        select: vi.fn(() => b),
-        eq: vi.fn(() => b),
-        maybeSingle: vi.fn().mockResolvedValue({ data: row, error: null }),
-      };
-      return b;
-    };
-    // updateAccountBalance is spied (never touches supabase here), so the only
-    // supabase.from calls are the two account reads and the transfer insert/void.
-    const bankReads = [
-      accountRead({ current_balance: 1000, currency: 'OMR' }), // source
-      accountRead({ currency: 'OMR' }),                        // destination
-    ];
-    const voidEq = vi.fn().mockResolvedValue({ error: null });
-    const voidUpdate = vi.fn(() => ({ eq: voidEq }));
-    const insert = vi.fn(() => ({
-      select: () => ({ maybeSingle: () => Promise.resolve({
-        data: { id: 't1', status: 'completed', from_account_id: 'a', to_account_id: 'b', amount: 500 },
-        error: null,
-      }) }),
-    }));
-    from.mockImplementation((table: string) =>
-      table === 'account_transfers' ? { insert, update: voidUpdate } : bankReads.shift(),
-    );
+  it('delegates a completed transfer to execute_account_transfer instead of non-atomic client-side balance moves', async () => {
+    from
+      .mockReturnValueOnce(accountRead({ current_balance: 1000, currency: 'OMR' })) // source
+      .mockReturnValueOnce(accountRead({ currency: 'OMR' }));                       // destination
+    rpc.mockResolvedValue({
+      data: { id: 't1', status: 'completed', from_account_id: 'a', to_account_id: 'b', amount: 500 },
+      error: null,
+    });
 
-    const balanceSpy = vi
-      .spyOn(bankingService, 'updateAccountBalance')
-      .mockImplementation(async (accountId: string, _amount: number, type: 'credit' | 'debit') => {
-        if (accountId === 'b' && type === 'credit') throw new Error('credit leg failed');
-      });
+    // The old read-modify-write + compensation is gone; the service must not touch
+    // updateAccountBalance itself — both legs move atomically inside the RPC's txn.
+    const balanceSpy = vi.spyOn(bankingService, 'updateAccountBalance');
+
+    const result = await bankingService.createTransfer({ amount: 500, from_account_id: 'a', to_account_id: 'b' });
+
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith('execute_account_transfer', {
+      p_from: 'a',
+      p_to: 'b',
+      p_amount: 500,
+      p_transfer_date: null,
+      p_reference: null,
+      p_notes: null,
+      p_status: 'completed',
+    });
+    expect(balanceSpy).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ id: 't1' });
+
+    balanceSpy.mockRestore();
+  });
+
+  it('throws (nothing applied) when the atomic RPC rejects, so a partial failure cannot understate cash', async () => {
+    from
+      .mockReturnValueOnce(accountRead({ current_balance: 1000, currency: 'OMR' }))
+      .mockReturnValueOnce(accountRead({ currency: 'OMR' }));
+    rpc.mockResolvedValue({ data: null, error: { message: 'insufficient balance' } });
+
+    const balanceSpy = vi.spyOn(bankingService, 'updateAccountBalance');
 
     await expect(
       bankingService.createTransfer({ amount: 500, from_account_id: 'a', to_account_id: 'b' }),
-    ).rejects.toThrow('credit leg failed');
-
-    // debit source -> attempt credit destination -> compensating credit back to source
-    expect(balanceSpy).toHaveBeenNthCalledWith(1, 'a', 500, 'debit');
-    expect(balanceSpy).toHaveBeenNthCalledWith(2, 'b', 500, 'credit');
-    expect(balanceSpy).toHaveBeenNthCalledWith(3, 'a', 500, 'credit');
-    // the persisted 'completed' transfer row is soft-voided so cash is not understated
-    expect(voidUpdate).toHaveBeenCalledWith(expect.objectContaining({ deleted_at: expect.any(String) }));
-    expect(voidEq).toHaveBeenCalledWith('id', 't1');
+    ).rejects.toBeTruthy();
+    // no client-side balance mutation happened — the whole move is the DB txn's job
+    expect(balanceSpy).not.toHaveBeenCalled();
 
     balanceSpy.mockRestore();
+  });
+});
+
+describe('completeTransfer / updateAccountBalance — atomic single-transaction RPCs (BUG-40)', () => {
+  beforeEach(() => {
+    getUser.mockResolvedValue({ data: { user: { id: 'u-1' } } });
+    resolveTenantId.mockResolvedValue('t-1');
+    rpc.mockReset();
+  });
+
+  it('completeTransfer delegates to complete_account_transfer (locks, validates, moves balances, sets completed)', async () => {
+    rpc.mockResolvedValue({
+      data: { id: 't9', status: 'completed', from_account_id: 'a', to_account_id: 'b', amount: 250 },
+      error: null,
+    });
+
+    const result = await bankingService.completeTransfer('t9');
+
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith('complete_account_transfer', { p_transfer_id: 't9' });
+    expect(result).toMatchObject({ id: 't9', status: 'completed' });
+  });
+
+  it('updateAccountBalance delegates to the atomic adjust_account_balance increment', async () => {
+    rpc.mockResolvedValue({ data: { id: 'acc-1', current_balance: 900 }, error: null });
+
+    await bankingService.updateAccountBalance('acc-1', 100, 'debit');
+
+    expect(rpc).toHaveBeenCalledWith('adjust_account_balance', {
+      p_account_id: 'acc-1',
+      p_amount: 100,
+      p_direction: 'debit',
+    });
+  });
+
+  it('updateAccountBalance throws when the RPC returns an error', async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'account not found' } });
+
+    await expect(
+      bankingService.updateAccountBalance('missing', 50, 'credit'),
+    ).rejects.toBeTruthy();
   });
 });
 
