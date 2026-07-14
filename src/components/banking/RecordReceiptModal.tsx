@@ -268,10 +268,15 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
       next.delete(inv.id);
     } else {
       // Default to settling the invoice, but never allocate more than the
-      // receipt has left to give.
-      const outstanding = inv.balance_due || 0;
+      // receipt has left to give. When the receipt is already fully allocated
+      // the slice is 0 — leave the invoice unselected rather than auto-filling
+      // its full outstanding (a bare `|| outstanding` fallback would treat that
+      // legitimate 0 as "unset" and over-allocate the receipt).
+      const outstanding = round3(inv.balance_due || 0);
       const left = round3(formData.amount - round3(Array.from(next.values()).reduce((s, v) => s + v, 0)));
-      next.set(inv.id, round3(Math.min(outstanding, Math.max(left, 0)) || outstanding));
+      const slice = round3(Math.min(outstanding, Math.max(left, 0)));
+      if (slice > 0) next.set(inv.id, slice);
+      else next.delete(inv.id);
     }
     setAllocations(next);
   };

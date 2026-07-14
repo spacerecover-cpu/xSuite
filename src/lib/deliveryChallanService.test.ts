@@ -152,7 +152,7 @@ describe('getIssuedChallan', () => {
   });
 });
 
-describe('assembleDeliveryChallanData — per-transfer device set only', () => {
+describe('assembleDeliveryChallanData — reprints the immutable issued record', () => {
   const issued: IssuedDeliveryChallan = {
     caseId: 'case-1',
     batchId: 'batch-1',
@@ -192,7 +192,7 @@ describe('assembleDeliveryChallanData — per-transfer device set only', () => {
     companySettings: {},
   } as unknown as ReceiptData;
 
-  it('itemizes ONLY the batch devices — a partial 12-drive checkout yields 3 lines', () => {
+  it('itemizes exactly the issued lines — a partial 12-drive checkout yields 3 lines', () => {
     const data = assembleDeliveryChallanData(receipt, issued, {
       name: 'Acme Films', address: '12 MG Road, Bengaluru 560001', gstin: '29ABCDE1234F1Z5', phone: null,
     });
@@ -205,20 +205,61 @@ describe('assembleDeliveryChallanData — per-transfer device set only', () => {
     expect(data.transport.collectorName).toBe('A. Kumar');
   });
 
-  it('drops a lab-supplied clone even if a declared value slipped into the lines', () => {
-    const withClone: IssuedDeliveryChallan = {
-      ...issued,
-      lines: [...issued.lines, { deviceId: 'clone-1', declaredValue: 5000 }],
-      totalDeclaredValue: 65000,
+  // Bug #45: a challan number is a statutory serial — a reprint must reproduce
+  // exactly what was issued. A post-issuance role edit must NOT silently drop a
+  // line / shrink the total / erase the e-way note on the reprinted document.
+  it('reprints the immutable issued set after a device role is edited to lab-supplied (bug #45)', () => {
+    const issuedTwo: IssuedDeliveryChallan = {
+      caseId: 'case-1',
+      batchId: 'batch-1',
+      challanNo: 'DC/25-26/0011',
+      issuedAt: '2026-07-05T10:00:00.000Z',
+      lines: [
+        { deviceId: 'dev-x', declaredValue: 30000 },
+        { deviceId: 'dev-y', declaredValue: 25000 },
+      ],
+      totalDeclaredValue: 55000,
     };
-    const data = assembleDeliveryChallanData(receipt, withClone, {
-      name: 'Acme Films', address: null, gstin: null, phone: null,
+    // dev-y's role has since been edited to a lab-supplied 'Clone Target'.
+    const mutated = {
+      caseData: {
+        id: 'case-1', case_no: 'CASE-0099', created_at: '2026-06-01', status: 'ready', priority: 'high',
+      },
+      devices: [
+        { id: 'dev-x', device_type: 'HDD', brand: 'Seagate', serial_number: 'SER-X', role: 'Patient', checkout_batch_id: 'batch-1' },
+        { id: 'dev-y', device_type: 'SSD', brand: 'Samsung', serial_number: 'SER-Y', role: 'Clone Target', checkout_batch_id: 'batch-1' },
+      ],
+      companySettings: {},
+    } as unknown as ReceiptData;
+
+    const data = assembleDeliveryChallanData(mutated, issuedTwo, {
+      name: 'Acme', address: null, gstin: null, phone: null,
     });
-    expect(data.lines.map((l) => l.serialNumber)).not.toContain('CLONE-1');
-    expect(data.totalDeclaredValue).toBe(60000);
+    expect(data.lines).toHaveLength(2);
+    expect(data.lines.map((l) => l.serialNumber)).toEqual(['SER-X', 'SER-Y']);
+    expect(data.totalDeclaredValue).toBe(55000);
+    expect(data.ewayNote).toMatch(/e-way bill/i);
   });
 
-  it('sets the e-way note at/above ₹50,000 total', () => {
+  it('still renders an issued line whose device is gone (soft-deleted), with a fallback description', () => {
+    const issuedGone: IssuedDeliveryChallan = {
+      ...issued,
+      lines: [...issued.lines, { deviceId: 'gone-1', declaredValue: 5000 }],
+      totalDeclaredValue: 65000,
+    };
+    const data = assembleDeliveryChallanData(receipt, issuedGone, {
+      name: 'Acme Films', address: null, gstin: null, phone: null,
+    });
+    expect(data.lines).toHaveLength(4);
+    const goneLine = data.lines[3];
+    expect(goneLine.description).toBe('Storage device');
+    expect(goneLine.serialNumber).toBeNull();
+    expect(goneLine.declaredValue).toBe(5000);
+    // Total comes from the immutable issued record, not a live-derived subset.
+    expect(data.totalDeclaredValue).toBe(65000);
+  });
+
+  it('sets the e-way note from the immutable issued total at/above ₹50,000', () => {
     const data = assembleDeliveryChallanData(receipt, issued, {
       name: 'Acme Films', address: null, gstin: null, phone: null,
     });

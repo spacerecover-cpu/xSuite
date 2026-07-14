@@ -1,4 +1,4 @@
-import { endOfWeek as endOfWeekFns, format } from 'date-fns';
+import { endOfWeek as endOfWeekFns, startOfMonth as startOfMonthFns, endOfMonth as endOfMonthFns, format } from 'date-fns';
 import { supabase } from './supabaseClient';
 import { sanitizeFilterValue } from './postgrestSanitizer';
 import { startOfWeekIso } from './weekDates';
@@ -51,6 +51,7 @@ export const timesheetService = {
         *,
         employee:employees!timesheets_employee_id_fkey(id, first_name, last_name, employee_number)
       `)
+      .is('deleted_at', null)
       .order('work_date', { ascending: false });
 
     if (filters?.status && filters.status !== 'all') {
@@ -91,6 +92,7 @@ export const timesheetService = {
         employee:employees!timesheets_employee_id_fkey(id, first_name, last_name, employee_number)
       `)
       .eq('id', id)
+      .is('deleted_at', null)
       .maybeSingle();
     if (error) throw error;
     return data as unknown as TimesheetWithEmployee | null;
@@ -188,11 +190,14 @@ export const timesheetService = {
 
   async getTimesheetStats(weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6): Promise<TimesheetStats> {
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    // Local-date based (date-fns format) so the month window matches the plain
+    // work_date column and doesn't shift a day earlier for UTC+ browsers, the
+    // same way the week window below is computed.
+    const startOfMonth = format(startOfMonthFns(now), 'yyyy-MM-dd');
     // Upper bound (last day of the current month) so future-dated entries — e.g.
     // a work_date in next month — don't inflate the current-month KPI. Mirrors
     // getMonthlySummary's [gte, lte] window.
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    const endOfMonth = format(endOfMonthFns(now), 'yyyy-MM-dd');
     // Honor the tenant's first-day-of-week instead of a hardcoded Monday, so the
     // "this week" hours window is correct for Sunday-start (Gulf/US) tenants.
     const startOfWeek = startOfWeekIso(now, weekStartsOn);
@@ -201,22 +206,25 @@ export const timesheetService = {
     const endOfWeek = format(endOfWeekFns(now, { weekStartsOn }), 'yyyy-MM-dd');
 
     const [totalRes, pendingRes, billableRes, weekRes] = await Promise.all([
-      supabase.from('timesheets').select('id', { count: 'exact', head: true }),
+      supabase.from('timesheets').select('id', { count: 'exact', head: true }).is('deleted_at', null),
       supabase
         .from('timesheets')
         .select('id', { count: 'exact', head: true })
-        .eq('status', 'submitted'),
+        .eq('status', 'submitted')
+        .is('deleted_at', null),
       supabase
         .from('timesheets')
         .select('hours')
         .eq('is_billable', true)
         .gte('work_date', startOfMonth)
-        .lte('work_date', endOfMonth),
+        .lte('work_date', endOfMonth)
+        .is('deleted_at', null),
       supabase
         .from('timesheets')
         .select('hours')
         .gte('work_date', startOfWeek)
-        .lte('work_date', endOfWeek),
+        .lte('work_date', endOfWeek)
+        .is('deleted_at', null),
     ]);
 
     const billableHours = (billableRes.data ?? []).reduce((sum, r) => sum + (r.hours ?? 0), 0);
@@ -235,8 +243,12 @@ export const timesheetService = {
     month: number,
     employeeId?: string
   ): Promise<TimesheetSummaryRow[]> {
-    const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
-    const endDate = new Date(year, month, 0).toISOString().split('T')[0];
+    // Local-date based (date-fns format) so the [start, end] window matches the
+    // plain work_date column and doesn't shift a day earlier for UTC+ tenants
+    // (which would drop the last day of the month and fold in the prior month's
+    // last day). new Date(year, month, 0) is the local last day of the month.
+    const startDate = format(new Date(year, month - 1, 1), 'yyyy-MM-dd');
+    const endDate = format(new Date(year, month, 0), 'yyyy-MM-dd');
 
     let query = supabase
       .from('timesheets')
@@ -246,6 +258,7 @@ export const timesheetService = {
       `)
       .gte('work_date', startDate)
       .lte('work_date', endDate)
+      .is('deleted_at', null)
       .order('work_date');
 
     if (employeeId) {

@@ -1,7 +1,9 @@
 import { supabase } from './supabaseClient';
 import type { Database } from '../types/database.types';
+import { getIntakeStatusForCreation } from './caseService';
 
 type OnboardingProgress = Database['public']['Tables']['onboarding_progress']['Row'];
+type CaseInsert = Database['public']['Tables']['cases']['Insert'];
 
 export type OnboardingStep =
   | 'company_info'
@@ -96,17 +98,6 @@ export const onboardingService = {
   },
 
   async seedDemoData(tenantId: string): Promise<void> {
-    const defaultTenantId = await supabase
-      .from('tenants')
-      .select('id')
-      .eq('slug', 'default')
-      .maybeSingle()
-      .then(res => res.data?.id);
-
-    if (!defaultTenantId) {
-      throw new Error('Default tenant not found for demo data');
-    }
-
     const { data: demoCustomer, error: customerError } = await supabase
       .from('customers_enhanced')
       .insert({
@@ -122,18 +113,23 @@ export const onboardingService = {
     if (customerError) throw customerError;
     if (!demoCustomer) throw new Error('Failed to create demo customer');
 
+    // The guard trigger on cases requires a matched active intake
+    // status_id + status name pair on INSERT (v1.3.0 lifecycle).
+    const intakeStatus = await getIntakeStatusForCreation();
+
+    const caseData: CaseInsert = {
+      tenant_id: tenantId,
+      customer_id: demoCustomer.id,
+      status: intakeStatus.name,
+      status_id: intakeStatus.id,
+      phase_entered_at: new Date().toISOString(),
+      subject: 'Demo Data Recovery Case',
+      description: 'This is a sample case to help you get started. Feel free to delete it.',
+    };
+
     const { error: caseError } = await supabase
       .from('cases')
-      .insert({
-        tenant_id: tenantId,
-        customer_id: demoCustomer.id,
-        service_type_id: null,
-        service_location_id: null,
-        priority_id: null,
-        status_id: null,
-        subject: 'Demo Data Recovery Case',
-        description: 'This is a sample case to help you get started. Feel free to delete it.',
-      } as never);
+      .insert(caseData);
 
     if (caseError) throw caseError;
   },

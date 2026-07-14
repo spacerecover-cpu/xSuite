@@ -16,6 +16,7 @@ import { useToast } from '../../../hooks/useToast';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useTenantFeatures } from '../../../contexts/TenantConfigContext';
 import { STAGE_FEATURE_BY_PHASE } from '../../../lib/features/registry';
+import { caseKeys } from '../../../lib/queryKeys';
 
 interface CaseStageBannerProps {
   caseId: string;
@@ -106,7 +107,12 @@ export function CaseStageBanner({
       toast.success('Case status updated');
       queryClient.invalidateQueries({ queryKey: ['case', caseId] });
       queryClient.invalidateQueries({ queryKey: ['case-allowed-transitions'] });
-      queryClient.invalidateQueries({ queryKey: ['case_job_history', caseId] });
+      // Refresh the History tab's Case Activity timeline. It has two readers:
+      // CaseActivityTab uses caseKeys.activity(caseId); useCaseQueries/CaseDetail
+      // use ['case_history', caseId]. The old ['case_job_history', caseId] key
+      // matched neither, so a banner transition left the timeline stale.
+      queryClient.invalidateQueries({ queryKey: caseKeys.activity(caseId) });
+      queryClient.invalidateQueries({ queryKey: ['case_history', caseId] });
       setPickerOpen(false);
       setReason('');
       setNotes('');

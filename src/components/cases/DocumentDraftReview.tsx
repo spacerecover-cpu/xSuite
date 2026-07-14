@@ -59,6 +59,30 @@ interface PendingSlot {
   signerRole: string;
 }
 
+// A data-destruction certificate attests three independent parties. These are the slots
+// that must be signed by three distinct, named people (separation of duties).
+const DESTRUCTION_SIGNATORY_SLOTS: SignatureSlot[] = ['engineer', 'witness', 'approver'];
+
+/**
+ * Validates that a data-destruction certificate's three signatories are distinct, named
+ * people. Returns an error message when a slot is unnamed or two slots share the same
+ * name (trimmed, case-insensitive); null when all three are distinct.
+ */
+function destructionSignatoryError(names: Record<string, string>): string | null {
+  const seen = new Map<string, SignatureSlot>();
+  for (const slot of DESTRUCTION_SIGNATORY_SLOTS) {
+    const norm = (names[slot] ?? '').trim().toLowerCase();
+    if (!norm) {
+      return 'Every signatory (operator, witness, approver) must be named before this destruction certificate can be approved.';
+    }
+    if (seen.has(norm)) {
+      return 'The operator, witness and approver must be three different people — the same name cannot sign more than one slot.';
+    }
+    seen.set(norm, slot);
+  }
+  return null;
+}
+
 export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
   isOpen,
   onClose,
@@ -84,6 +108,8 @@ export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
   const pendingSlots = useRef<PendingSlot[]>([]);
   // Collected signatureIds from queued slots (keyed by slot name)
   const capturedIds = useRef<Record<string, string>>({});
+  // Resolved signer names per slot — used to enforce distinct destruction signatories.
+  const capturedNames = useRef<Record<string, string>>({});
 
   // Reset all per-open state when the modal closes so re-opens start clean.
   useEffect(() => {
@@ -99,6 +125,7 @@ export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
     // Phase-6 signature queue reset — clear refs and modal state so a re-open starts clean.
     pendingSlots.current = [];
     capturedIds.current = {};
+    capturedNames.current = {};
     setSigning(false);
     setCurrentSlot(null);
   // previewUrl intentionally omitted — we only want this on isOpen toggle
@@ -233,6 +260,11 @@ export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
       // Always read current signatures first so we skip already-captured slots on retry.
       const existing = await listInstanceSignatures(id);
       const existingSlots = new Set(existing.map((s) => s.slot));
+      // Seed known signer names from persisted rows so distinctness is enforced across
+      // retries / re-opens (a later slot must not reuse an already-signed signatory).
+      for (const row of existing) {
+        if (row.signer_name) capturedNames.current[row.slot] = row.signer_name;
+      }
 
       const allRequired: PendingSlot[] =
         instance.report_subtype === 'data_destruction'
@@ -248,6 +280,14 @@ export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
 
       if (toCapture.length === 0) {
         // Every required slot already signed — go straight to transition (retry path).
+        // A destruction certificate must still prove three distinct signatories.
+        if (instance.report_subtype === 'data_destruction') {
+          const dupErr = destructionSignatoryError(capturedNames.current);
+          if (dupErr) {
+            toast.error(dupErr);
+            return;
+          }
+        }
         const approverRow = existing.find((s) => s.slot === 'approver');
         const approverSigId = capturedIds.current['approver'] ?? approverRow?.id;
         await transitionDocument(id, 'approved', { signatureId: approverSigId });
@@ -294,13 +334,36 @@ export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
   /** Called when SignatureCaptureModal fires onCapture for the current slot. */
   async function handleCapture(sig: CapturedSignature) {
     if (!id || !currentSlot) return;
+    const signerName = resolveSlotSignerName(currentSlot, sig);
+
+    // Separation-of-duties gate for destruction certificates: the operator, witness and
+    // approver must be three different, named people. Reject a blank or duplicate signatory
+    // BEFORE persisting, so no self-signed row is ever written and the same modal stays open
+    // for the current slot to accept a different signatory.
+    if (instance?.report_subtype === 'data_destruction') {
+      const norm = signerName.trim().toLowerCase();
+      const collides =
+        !!norm &&
+        Object.entries(capturedNames.current).some(
+          ([slotKey, name]) => slotKey !== currentSlot.slot && name.trim().toLowerCase() === norm,
+        );
+      if (!norm || collides) {
+        toast.error(
+          !norm
+            ? 'Please enter the signatory’s name.'
+            : 'The operator, witness and approver must be three different people — this name has already signed another slot.',
+        );
+        return;
+      }
+    }
+
     setBusy(true);
     try {
       const sigId = await captureStaffSignature({
         instanceId: id,
         slot: currentSlot.slot,
         method: sig.method,
-        signerName: resolveSlotSignerName(currentSlot, sig),
+        signerName,
         // Only the approver is the authenticated system user; operator/witness are
         // external signatories with no account, so their row's identity stays null.
         signerUserId: currentSlot.slot === 'approver' ? (user?.id ?? null) : null,
@@ -308,8 +371,9 @@ export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
         typedValue: sig.typedValue,
         imageBlob: sig.imageBlob,
       });
-      // Capture succeeded — record id and close modal for this slot.
+      // Capture succeeded — record id + name and close modal for this slot.
       capturedIds.current[currentSlot.slot] = sigId;
+      capturedNames.current[currentSlot.slot] = signerName;
       setSigning(false);
 
       // Pop the captured slot and check if more remain.
@@ -437,6 +501,7 @@ export const DocumentDraftReview: React.FC<DocumentDraftReviewProps> = ({
             setCurrentSlot(null);
             pendingSlots.current = [];
             capturedIds.current = {};
+            capturedNames.current = {};
           }}
           title={currentSlot.title}
           onCapture={handleCapture}

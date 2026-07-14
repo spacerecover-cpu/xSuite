@@ -13,6 +13,14 @@ import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
 
+type CustomerMatch = {
+  id: string;
+  customer_name: string;
+  email: string | null;
+  mobile_number: string | null;
+  customer_number: string | null;
+};
+
 const STATUS_STYLES: Record<string, { bg: string; text: string; icon: React.ReactNode }> = {
   pending: { bg: 'bg-warning-muted border-warning/30', text: 'text-warning', icon: <Clock className="w-4 h-4" /> },
   processing: { bg: 'bg-info-muted border-info/30', text: 'text-info', icon: <Loader2 className="w-4 h-4 animate-spin" /> },
@@ -28,7 +36,10 @@ export const GDPRCompliancePage: React.FC = () => {
   const [showNewRequest, setShowNewRequest] = useState(false);
   const [formData, setFormData] = useState({ type: 'export', email: '', name: '', notes: '' });
   const [customerSearch, setCustomerSearch] = useState('');
+  const [customerResults, setCustomerResults] = useState<CustomerMatch[]>([]);
+  const [searchingCustomer, setSearchingCustomer] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const selectedCustomer = customerResults.find(c => c.id === selectedCustomerId) ?? null;
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: gdprKeys.requests(),
@@ -84,9 +95,12 @@ export const GDPRCompliancePage: React.FC = () => {
       toast.error('Please search and select a customer first');
       return;
     }
+    const who = selectedCustomer
+      ? `${selectedCustomer.customer_name} (${selectedCustomer.email ?? selectedCustomer.customer_number ?? selectedCustomer.mobile_number ?? selectedCustomer.id})`
+      : 'this customer';
     const ok = await confirm({
       title: 'Anonymize Customer Data',
-      message: 'This will permanently anonymize all personal data for this customer. This cannot be undone. Continue?',
+      message: `This will permanently anonymize all personal data for ${who}. This cannot be undone. Continue?`,
       confirmLabel: 'Anonymize',
       tone: 'danger',
     });
@@ -106,19 +120,34 @@ export const GDPRCompliancePage: React.FC = () => {
 
   const searchCustomer = async () => {
     if (!customerSearch.trim()) return;
+    // Clear any prior selection so a stale pick from an earlier search can never
+    // leak into an irreversible anonymize / personal-data export.
+    setSelectedCustomerId(null);
+    setSearchingCustomer(true);
     const s = sanitizeFilterValue(customerSearch);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('customers_enhanced')
-      .select('id, customer_name, email')
+      .select('id, customer_name, email, mobile_number, customer_number')
       .or(`email.ilike.%${s}%,customer_name.ilike.%${s}%,mobile_number.ilike.%${s}%,customer_number.ilike.%${s}%`)
       .is('deleted_at', null)
-      .limit(1)
-      .maybeSingle();
-    if (data) {
-      setSelectedCustomerId(data.id);
-      toast.success(`Found: ${data.customer_name} (${data.email ?? 'no email'})`);
-    } else {
+      .order('customer_name', { ascending: true })
+      .order('id', { ascending: true })
+      .limit(25);
+    setSearchingCustomer(false);
+    if (error) {
+      setCustomerResults([]);
+      toast.error(error.message);
+      return;
+    }
+    const matches = data ?? [];
+    setCustomerResults(matches);
+    if (matches.length === 0) {
       toast.error('No customer found');
+    } else if (matches.length === 1) {
+      // Unambiguous single match — safe to auto-select.
+      setSelectedCustomerId(matches[0].id);
+    } else {
+      toast.error(`${matches.length} customers match — select the correct one below`);
     }
   };
 
@@ -213,14 +242,46 @@ export const GDPRCompliancePage: React.FC = () => {
           />
           <button
             onClick={searchCustomer}
-            className="px-4 py-2 text-sm bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 flex items-center gap-1"
+            disabled={searchingCustomer}
+            className="px-4 py-2 text-sm bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 disabled:opacity-50 flex items-center gap-1"
           >
-            <Search className="w-4 h-4" />
+            {searchingCustomer ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
             Search
           </button>
         </div>
-        {selectedCustomerId && (
-          <p className="text-xs text-success mt-1">Customer selected: {selectedCustomerId}</p>
+        {customerResults.length > 0 && (
+          <div className="mt-3 space-y-1">
+            {customerResults.length > 1 && (
+              <p className="text-xs text-warning flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                {customerResults.length} customers match — select the exact record before processing a request.
+              </p>
+            )}
+            <div className="border border-slate-200 rounded-md divide-y divide-slate-100 overflow-hidden">
+              {customerResults.map(c => {
+                const isSelected = c.id === selectedCustomerId;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setSelectedCustomerId(c.id)}
+                    className={`w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-slate-50 ${isSelected ? 'bg-success-muted' : ''}`}
+                  >
+                    <CheckCircle2 className={`w-4 h-4 flex-shrink-0 ${isSelected ? 'text-success' : 'text-slate-300'}`} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">
+                        {c.customer_name}
+                        {c.customer_number ? <span className="text-slate-400 font-normal"> · {c.customer_number}</span> : ''}
+                      </p>
+                      <p className="text-xs text-slate-500 truncate">
+                        {c.email ?? 'no email'}{c.mobile_number ? ` · ${c.mobile_number}` : ''}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         )}
       </div>
 

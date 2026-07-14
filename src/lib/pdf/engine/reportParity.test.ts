@@ -262,7 +262,7 @@ describe('Option B report — per-subtype coverage (all 8)', () => {
     }
   });
 
-  it('forensic renders the chain-of-custody TIMELINE (not a prose box)', () => {
+  it('forensic renders the chain-of-custody TIMELINE plus the authored narrative', () => {
     const data = makeData({
       report: { ...makeData().report, report_type: 'forensic' },
       sections: [
@@ -270,7 +270,7 @@ describe('Option B report — per-subtype coverage (all 8)', () => {
           id: 'sec-coc',
           section_key: 'chain_of_custody',
           section_title: 'Chain of Custody',
-          section_content: 'PROSE_THAT_MUST_NOT_RENDER',
+          section_content: 'CUSTODY_NARRATIVE_CONTEXT',
           section_order: 0,
         },
       ],
@@ -285,9 +285,11 @@ describe('Option B report — per-subtype coverage (all 8)', () => {
       ],
     });
     const texts = allTexts(renderEngine(data)).join('|');
+    // Timeline events render...
     expect(texts).toContain('Drive received at intake counter.');
     expect(texts).toContain('Sam Reception');
-    expect(texts).not.toContain('PROSE_THAT_MUST_NOT_RENDER');
+    // ...alongside the authored custody narrative (previously dropped).
+    expect(texts).toContain('CUSTODY_NARRATIVE_CONTEXT');
   });
 
   it('data_destruction renders operator + witness signature slots', () => {

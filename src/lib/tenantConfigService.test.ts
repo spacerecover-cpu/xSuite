@@ -115,6 +115,35 @@ describe('resolveTenantConfigFromLayers — engine path (fail-loud, no US litera
     expect(cfg.countryName).toBe('Oman');
   });
 
+  it('falls back to the embedded geo_countries row for tax number placeholder + postal code label when the snapshot lacks those keys', () => {
+    // The _apply_country_config snapshot builder writes tax.number_format but never
+    // tax.number_placeholder, and never address.postal_code_label — so those must
+    // resolve from the joined geo_countries row, not the generic fallbacks.
+    const layers = buildConfigLayers(
+      {
+        resolved_country_config: {
+          'currency.code': 'INR', 'tax.label': 'GST', 'tax.default_rate': 18,
+          'number_format.amount_in_words_minor_units': 2, 'locale.code': 'en-IN',
+          'datetime.date_format': 'dd/MM/yyyy', 'datetime.timezone': 'Asia/Kolkata',
+        },
+        country_config_overrides: {},
+      },
+    );
+    const cfg = resolveTenantConfigFromLayers(
+      {
+        ...baseRow,
+        country: {
+          code: 'IN', name: 'India',
+          tax_number_placeholder: '22AAAAA0000A1Z5',
+          postal_code_label: 'PIN Code',
+        },
+      },
+      layers,
+    );
+    expect(cfg.tax.numberPlaceholder).toBe('22AAAAA0000A1Z5');
+    expect(cfg.locale.postalCodeLabel).toBe('PIN Code');
+  });
+
   it('defaults currency display preferences to symbol/minus when no layer sets them', () => {
     const layers = buildConfigLayers(
       {

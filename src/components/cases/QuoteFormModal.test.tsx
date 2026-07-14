@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { QuoteFormModal } from './QuoteFormModal';
+import { supabase } from '../../lib/supabaseClient';
 
 // --- Mocks ------------------------------------------------------------------
 
@@ -74,6 +75,18 @@ describe('QuoteFormModal — unit select from master_unit_codes', () => {
   beforeEach(() => {
     toastError.mockReset();
     toastSuccess.mockReset();
+    (supabase.rpc as unknown as ReturnType<typeof vi.fn>).mockClear();
+  });
+
+  it('does not mint a quote number for preview (get_next_number advances the sequence)', async () => {
+    renderModal();
+
+    // Header shows a display-only hint, never a minted number burned per open.
+    await waitFor(() => expect(screen.getByText('Auto-assigned on save')).toBeInTheDocument());
+
+    const rpcMock = supabase.rpc as unknown as ReturnType<typeof vi.fn>;
+    const mintedForPreview = rpcMock.mock.calls.some(([fn]) => fn === 'get_next_number');
+    expect(mintedForPreview).toBe(false);
   });
 
   it('submits unit_code/unit_label from the selected unit and never a free-text "Service" literal', async () => {

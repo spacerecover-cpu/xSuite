@@ -251,14 +251,19 @@ export function toQuoteItems(rows: Partial<QuoteItemsRow>[] | null | undefined):
   }));
 }
 
-export function toInvoiceItems(rows: Partial<InvoiceLineItemsRow>[] | null | undefined): InvoiceItemData[] {
+export function toInvoiceItems(
+  rows: Partial<InvoiceLineItemsRow>[] | null | undefined,
+  decimalPlaces = 2,
+): InvoiceItemData[] {
   return (rows ?? []).map(row => {
     const quantity = row.quantity ?? 0;
     const unit_price = row.unit_price ?? 0;
     // `discount` is a per-line PERCENT (invoiceService stores `item.discount_percent`).
     // Render the discount-adjusted, tax-exclusive net so the summed lines reconcile
     // with the stored, discount-net Subtotal — not the gross quantity*unit_price,
-    // and not the stored `total` (which is tax-INCLUSIVE).
+    // and not the stored `total` (which is tax-INCLUSIVE). Round at the currency's
+    // decimal places (3 for OMR/KWD/BHD/JOD) so the recomputed net matches the
+    // stored line total / Subtotal the create path persisted at those same places.
     const discountPct = row.discount ?? 0;
     return {
       id: row.id ?? undefined,
@@ -266,7 +271,7 @@ export function toInvoiceItems(rows: Partial<InvoiceLineItemsRow>[] | null | und
       quantity,
       unit_price,
       tax_rate: row.tax_rate ?? 0,
-      line_total: roundMoney(quantity * unit_price * (1 - discountPct / 100)),
+      line_total: roundMoney(quantity * unit_price * (1 - discountPct / 100), decimalPlaces),
       unit_label: row.unit_label ?? null,
       item_code: row.item_code ?? null,
     };
@@ -768,7 +773,7 @@ export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditN
       : Promise.resolve({ data: null }),
     supabase
       .from('credit_note_items')
-      .select('description, quantity, unit_price, total')
+      .select('description, quantity, unit_price, total, item_code, unit_label')
       .eq('credit_note_id', creditNoteId)
       .is('deleted_at', null)
       .order('sort_order', { ascending: true }),
@@ -780,7 +785,7 @@ export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditN
   const company = companyRes.data as { company_name?: string | null; name?: string | null } | null;
   const caseRow = caseRes.data as { case_no?: string | null } | null;
   const block = currencyToBlock(cfg.currency);
-  const items = (itemsRes.data ?? []) as Array<{ description?: string | null; quantity?: number | null; unit_price?: number | null; total?: number | null }>;
+  const items = (itemsRes.data ?? []) as Array<{ description?: string | null; quantity?: number | null; unit_price?: number | null; total?: number | null; item_code?: string | null; unit_label?: string | null }>;
 
   return {
     creditNoteData: {
@@ -808,6 +813,8 @@ export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditN
         quantity: typeof it.quantity === 'number' ? it.quantity : 0,
         unit_price: typeof it.unit_price === 'number' ? it.unit_price : 0,
         line_total: typeof it.total === 'number' ? it.total : 0,
+        item_code: it.item_code ?? null,
+        unit_label: it.unit_label ?? null,
       })),
       buyer_tax_number: cnRow.buyer_tax_number ?? null,
       buyer_tax_number_label: cnRow.buyer_tax_number_label ?? null,
@@ -921,7 +928,7 @@ async function fetchInvoiceDetails(invoiceId: string): Promise<InvoiceData> {
     customer: customerRes.data,
     company: companyRes.data,
     customerAssociatedCompany,
-    items: toInvoiceItems(items),
+    items: toInvoiceItems(items, cfg.currency.decimalPlaces),
   });
 }
 

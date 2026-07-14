@@ -25,6 +25,7 @@ export function UsageLimitGuard({
     message?: string;
   } | null>(null);
   const [hasShownWarning, setHasShownWarning] = useState(false);
+  const [hasHandledBlock, setHasHandledBlock] = useState(false);
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -39,20 +40,22 @@ export function UsageLimitGuard({
     }
   }, [checkResult, hasShownWarning, showToast]);
 
+  useEffect(() => {
+    if (checkResult && !checkResult.allowed && !hasHandledBlock) {
+      onBlocked?.();
+      if (showToast) {
+        toast.error(checkResult.message || 'Plan limit reached');
+      }
+      setHasHandledBlock(true);
+    }
+  }, [checkResult, hasHandledBlock, showToast]);
+
   if (checkResult === null) {
     return <>{children}</>;
   }
 
   if (checkResult.allowed) {
     return <>{children}</>;
-  }
-
-  if (onBlocked) {
-    onBlocked();
-  }
-
-  if (showToast) {
-    toast.error(checkResult.message || 'Plan limit reached');
   }
 
   return (

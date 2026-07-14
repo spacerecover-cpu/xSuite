@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase, getTenantId } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../contexts/AuthContext';
 import { logger } from '../lib/logger';
 
 interface UseCasesRealtimeOptions {
@@ -15,14 +16,22 @@ interface UseCasesRealtimeOptions {
 
 export const useCasesRealtime = (options?: UseCasesRealtimeOptions) => {
   const queryClient = useQueryClient();
+  const { profile } = useAuth();
   const debounceTimers = useRef<{ [key: string]: NodeJS.Timeout }>({});
   const onListChangeRef = useRef(options?.onListChange);
   onListChangeRef.current = options?.onListChange;
 
+  // Resolve tenant identity from the reactive auth profile (localStorage mirrors
+  // this value) so the effect below re-runs when the tenant appears or changes.
+  // Reading getTenantId() once inside the effect stranded the subscription: on a
+  // late profile load / platform-admin session it was null at mount and never
+  // recovered, and a mid-session tenant switch left the channel bound to the
+  // stale filter. Mirrors useNotifications keying its realtime effect on userId.
+  const tenantId = profile?.tenant_id ?? null;
+
   useEffect(() => {
     // Scope the subscription to the current tenant so Postgres pre-filters before
     // RLS, instead of evaluating this subscriber against every tenant's writes.
-    const tenantId = getTenantId();
     if (!tenantId) return;
 
     const debouncedInvalidate = (queryKey: any[], delay: number = 500) => {
@@ -44,7 +53,7 @@ export const useCasesRealtime = (options?: UseCasesRealtimeOptions) => {
     };
 
     const casesChannel = supabase
-      .channel('cases-changes')
+      .channel(`cases-changes:${tenantId}`)
       .on(
         'postgres_changes',
         {
@@ -103,5 +112,5 @@ export const useCasesRealtime = (options?: UseCasesRealtimeOptions) => {
       debounceTimers.current = {};
       supabase.removeChannel(casesChannel);
     };
-  }, [queryClient]);
+  }, [queryClient, tenantId]);
 };

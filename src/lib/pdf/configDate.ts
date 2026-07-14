@@ -13,14 +13,23 @@ const KNOWN: Record<string, string> = {
 };
 
 /** Convert a stored `geo_countries.date_format` (uppercase CLDR-ish tokens) into a
- *  date-fns pattern. Unknown/empty -> the PDF default. An already-valid date-fns
- *  pattern (lowercase d/y present) passes through unchanged. */
+ *  date-fns pattern. Recognised CLDR day/month/year tokens (Y->y, D->d, M kept as-is
+ *  since date-fns months are uppercase) with their separators are transliterated, so
+ *  any picker/country format -- e.g. the European 'DD.MM.YYYY' -- maps correctly
+ *  instead of silently degrading to the default. An already-valid date-fns pattern
+ *  (lowercase d/y present) passes through unchanged. Unknown/empty -> the PDF default. */
 export function toDateFnsFormat(stored: string | null | undefined): string {
   const raw = (stored ?? '').trim();
   if (!raw) return DEFAULT_PDF_DATE_FNS;
   const upper = raw.toUpperCase();
   if (KNOWN[upper]) return KNOWN[upper];
   if (/[dy]/.test(raw)) return raw; // already date-fns-shaped (lowercase tokens)
+  // Generalized fallback: only when the string is composed solely of CLDR date
+  // tokens (Y/M/D) and common separators AND carries a day or year token. Lowercase
+  // Y->y and D->d; date-fns keeps months uppercase (M/MM/MMM), so leave M alone.
+  if (/^[YMD .\/-]+$/.test(upper) && /[YD]/.test(upper)) {
+    return upper.replace(/Y/g, 'y').replace(/D/g, 'd');
+  }
   return DEFAULT_PDF_DATE_FNS;
 }
 

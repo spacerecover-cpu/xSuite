@@ -176,6 +176,13 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     return groups;
   }, [visibleItems]);
 
+  // Flatten the grouped structure into the exact order the rows are rendered.
+  // The keyboard state (activeIndex), the highlight, aria, and the Enter target
+  // MUST all index into THIS list — grouping re-buckets items so its order can
+  // diverge from visibleItems, and indexing Enter against visibleItems would
+  // activate a different row than the one highlighted.
+  const flatItems = useMemo(() => groupedItems.flatMap((g) => g.items), [groupedItems]);
+
   const runItem = useCallback(
     (item: CommandItem) => {
       navigate(item.to);
@@ -193,7 +200,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setActiveIndex((i) => Math.min(i + 1, visibleItems.length - 1));
+      setActiveIndex((i) => Math.min(i + 1, flatItems.length - 1));
       return;
     }
     if (e.key === 'ArrowUp') {
@@ -203,7 +210,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     }
     if (e.key === 'Enter') {
       e.preventDefault();
-      const target = visibleItems[activeIndex];
+      const target = flatItems[activeIndex];
       if (target) runItem(target);
     }
   };
@@ -246,7 +253,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           aria-expanded
           aria-controls={LISTBOX_ID}
           aria-activedescendant={
-            visibleItems[activeIndex] ? `command-palette-option-${activeIndex}` : undefined
+            flatItems[activeIndex] ? `command-palette-option-${activeIndex}` : undefined
           }
           aria-autocomplete="list"
         />

@@ -636,16 +636,16 @@ export const BankingPage: React.FC = () => {
                   <div className="p-4">
                     <p className="text-sm text-slate-600 mb-4">{transfers.length} transfers found</p>
                     <div className="space-y-2">
-                      {transfers.map((transfer: AccountTransfer & { from_account?: { account_name: string }; to_account?: { account_name: string } }) => (
+                      {transfers.map((transfer: AccountTransfer & { from_account?: { name: string }; to_account?: { name: string } }) => (
                         <div
                           key={transfer.id}
                           className="border border-slate-200 rounded-lg p-3 hover:bg-slate-50"
                         >
                           <div className="flex justify-between items-start">
                             <div>
-                              <p className="font-semibold text-sm">{transfer.transfer_number}</p>
+                              <p className="font-semibold text-sm">{transfer.reference || `Transfer ${transfer.id.slice(0, 8)}`}</p>
                               <p className="text-xs text-slate-600">
-                                {transfer.from_account?.account_name} → {transfer.to_account?.account_name}
+                                {transfer.from_account?.name} → {transfer.to_account?.name}
                               </p>
                               <p className="text-xs text-slate-500 mt-1">
                                 {new Date(transfer.transfer_date).toLocaleDateString()}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Mail, Phone, Video, Calendar } from 'lucide-react';
+import { MessageSquare, Mail, Phone, Video } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -12,9 +12,6 @@ interface CommunicationData {
   type?: string;
   subject?: string;
   notes?: string;
-  communication_date?: string;
-  follow_up_required?: boolean;
-  follow_up_date?: string;
 }
 
 interface CommunicationFormModalProps {
@@ -32,9 +29,6 @@ export default function CommunicationFormModal({ isOpen, onClose, onSuccess, sup
     type: 'email',
     subject: '',
     notes: '',
-    communication_date: new Date().toISOString().split('T')[0],
-    follow_up_required: false,
-    follow_up_date: '',
   });
 
   useEffect(() => {
@@ -43,18 +37,12 @@ export default function CommunicationFormModal({ isOpen, onClose, onSuccess, sup
         type: communication.type || 'email',
         subject: communication.subject || '',
         notes: communication.notes || '',
-        communication_date: communication.communication_date?.split('T')[0] || new Date().toISOString().split('T')[0],
-        follow_up_required: communication.follow_up_required || false,
-        follow_up_date: communication.follow_up_date?.split('T')[0] || '',
       });
     } else if (isOpen) {
       setFormData({
         type: 'email',
         subject: '',
         notes: '',
-        communication_date: new Date().toISOString().split('T')[0],
-        follow_up_required: false,
-        follow_up_date: '',
       });
     }
   }, [isOpen, communication]);
@@ -160,19 +148,6 @@ export default function CommunicationFormModal({ isOpen, onClose, onSuccess, sup
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            <Calendar className="inline w-4 h-4 mr-1" />
-            Communication Date *
-          </label>
-          <Input
-            type="date"
-            value={formData.communication_date}
-            onChange={(e) => setFormData({ ...formData, communication_date: e.target.value })}
-            required
-          />
-        </div>
-
-        <div>
           <label htmlFor="supplier-comm-notes" className="block text-sm font-medium text-slate-700 mb-1">
             Notes / Details *
           </label>
@@ -185,32 +160,6 @@ export default function CommunicationFormModal({ isOpen, onClose, onSuccess, sup
             required
             placeholder="Detailed notes about the communication..."
           />
-        </div>
-
-        <div className="border-t pt-4">
-          <label className="flex items-center gap-2 mb-3">
-            <input
-              type="checkbox"
-              checked={formData.follow_up_required}
-              onChange={(e) => setFormData({ ...formData, follow_up_required: e.target.checked })}
-              className="w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
-            />
-            <span className="text-sm font-medium text-slate-700">Follow-up required</span>
-          </label>
-
-          {formData.follow_up_required && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Follow-up Date
-              </label>
-              <Input
-                type="date"
-                value={formData.follow_up_date}
-                onChange={(e) => setFormData({ ...formData, follow_up_date: e.target.value })}
-                min={new Date().toISOString().split('T')[0]}
-              />
-            </div>
-          )}
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t">

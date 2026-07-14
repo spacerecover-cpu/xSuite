@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { baseAmount, RECEIVABLE_INVOICE_EXCLUDED_STATUSES } from './financialMath';
+import { baseAmount, isReceivableInvoice, RECEIVABLE_INVOICE_EXCLUDED_STATUSES } from './financialMath';
 import { getBaseCurrency } from './currencyService';
 
 /** D8 — sum bank balances in base currency. A balance is a live position, so the
@@ -104,6 +104,10 @@ export const generateProfitLossReport = async (
     supabase
       .from('invoices')
       .select('amount_paid, amount_paid_base, total_amount, total_amount_base, tax_amount, tax_amount_base, status')
+      // A void/cancelled invoice is not realized revenue even if a stale amount_paid
+      // survives (it is never zeroed on status change) — exclude it as the Revenue-by-Case
+      // report does (EXP-014), so P&L and revenue-by-case reconcile for the same period.
+      .not('status', 'in', `(${RECEIVABLE_INVOICE_EXCLUDED_STATUSES.map((s) => `"${s}"`).join(',')})`)
       .is('deleted_at', null)
       .gte('invoice_date', dateFrom)
       .lte('invoice_date', dateTo),
@@ -120,6 +124,12 @@ export const generateProfitLossReport = async (
       .lte('expense_date', dateTo)
       .in('status', ['approved', 'paid']),
   ]);
+
+  // Supabase resolves a failed query as {data:null, error}; without these checks a
+  // silently-failed expenses fetch would read as 0 expenses and report revenue as pure
+  // profit. Throw as generateAgedReceivablesReport does.
+  if (invoicesResult.error) throw invoicesResult.error;
+  if (expensesResult.error) throw expensesResult.error;
 
   const invoices = invoicesResult.data || [];
   const expenses = expensesResult.data || [];
@@ -174,6 +184,10 @@ export const generateAgedReceivablesReport = async (): Promise<AgedReceivablesDa
       balance_due_base,
       customer:customers_enhanced(id, customer_name)
     `)
+    // Only real tax invoices are accounts-receivable — a proforma is a pre-bill that
+    // owes nothing yet (isReceivableInvoice / EXP-014). Without this a sent proforma
+    // (balance_due = total_amount, payments blocked) would be aged and counted as owed.
+    .eq('invoice_type', 'tax_invoice')
     .gt('balance_due', 0)
     .is('deleted_at', null)
     .in('status', ['sent', 'partial', 'overdue']);
@@ -274,6 +288,10 @@ export const generateCashFlowReport = async (
       .eq('is_active', true),
   ]);
 
+  if (paymentsResult.error) throw paymentsResult.error;
+  if (expensesResult.error) throw expensesResult.error;
+  if (bankAccountsResult.error) throw bankAccountsResult.error;
+
   const receipts = (paymentsResult.data || []).reduce((sum, p) => sum + baseAmount(p, 'amount'), 0);
   const payments = (expensesResult.data || []).reduce((sum, e) => sum + baseAmount(e, 'amount'), 0);
 
@@ -319,6 +337,9 @@ export const generateInvoiceSummaryReport = async (
       .lte('quote_date', dateTo),
   ]);
 
+  if (invoicesResult.error) throw invoicesResult.error;
+  if (quotesResult.error) throw quotesResult.error;
+
   const invoices = invoicesResult.data || [];
   const quotes = quotesResult.data || [];
 
@@ -341,10 +362,15 @@ export const generateInvoiceSummaryReport = async (
     byType[type].amount += baseAmount(inv, 'total_amount');
   });
 
-  const totalInvoiced = invoices.reduce((sum, inv) => sum + baseAmount(inv, 'total_amount'), 0);
-  const totalPaid = invoices.reduce((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
-  const totalOutstanding = invoices.reduce((sum, inv) => sum + baseAmount(inv, 'balance_due'), 0);
-  const totalOverdue = invoices
+  // Money totals count only real accounts-receivable tax invoices: a proforma owes
+  // nothing yet, and a converted proforma and the tax invoice it became are the SAME
+  // bill — summing both double-counts (isReceivableInvoice / EXP-014). The byStatus /
+  // byType breakdowns above intentionally stay over ALL invoice types.
+  const receivables = invoices.filter(isReceivableInvoice);
+  const totalInvoiced = receivables.reduce((sum, inv) => sum + baseAmount(inv, 'total_amount'), 0);
+  const totalPaid = receivables.reduce((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
+  const totalOutstanding = receivables.reduce((sum, inv) => sum + baseAmount(inv, 'balance_due'), 0);
+  const totalOverdue = receivables
     .filter(inv => inv.status === 'overdue')
     .reduce((sum, inv) => sum + baseAmount(inv, 'balance_due'), 0);
 
@@ -381,6 +407,9 @@ export const generateRevenueByCustomerReport = async (
       amount_paid_base,
       customer:customers_enhanced(id, customer_name, email)
     `)
+    // Exclude void/cancelled — a stale amount_paid on a voided invoice is not realized
+    // revenue (EXP-014), matching generateRevenueByCaseReport so the surfaces reconcile.
+    .not('status', 'in', `(${RECEIVABLE_INVOICE_EXCLUDED_STATUSES.map((s) => `"${s}"`).join(',')})`)
     .is('deleted_at', null)
     .gte('invoice_date', dateFrom)
     .lte('invoice_date', dateTo);

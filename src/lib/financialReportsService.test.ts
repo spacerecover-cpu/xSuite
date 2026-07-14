@@ -18,6 +18,7 @@ import {
   generateCashFlowReport,
   generateInvoiceSummaryReport,
   generateRevenueByCustomerReport,
+  generateAgedReceivablesReport,
 } from './financialReportsService';
 
 /** Thenable query builder: chainable filters; awaiting it yields {data}. */
@@ -29,9 +30,28 @@ function makeQuery(rows: Array<Record<string, unknown>>) {
     is: vi.fn(() => builder),
     in: vi.fn(() => builder),
     eq: vi.fn(() => builder),
+    gt: vi.fn(() => builder),
     not: vi.fn(() => builder),
     then: (resolve: (v: { data: unknown; error: null }) => void) =>
       resolve({ data: rows, error: null }),
+  };
+  return builder;
+}
+
+/** Thenable that resolves as a FAILED Supabase query: {data:null, error}. Supabase
+ *  never rejects — a report that ignores `.error` treats this as an empty dataset. */
+function makeErrorQuery(error: unknown) {
+  const builder: Record<string, unknown> = {
+    select: vi.fn(() => builder),
+    gte: vi.fn(() => builder),
+    lte: vi.fn(() => builder),
+    is: vi.fn(() => builder),
+    in: vi.fn(() => builder),
+    eq: vi.fn(() => builder),
+    gt: vi.fn(() => builder),
+    not: vi.fn(() => builder),
+    then: (resolve: (v: { data: null; error: unknown }) => void) =>
+      resolve({ data: null, error }),
   };
   return builder;
 }
@@ -100,6 +120,33 @@ describe('generateProfitLossReport', () => {
     // ...and the tax/total basis needed to net is actually selected
     expect(invoices.select).toHaveBeenCalledWith(expect.stringContaining('tax_amount'));
   });
+
+  it('throws when the expenses query fails instead of reporting revenue as pure profit (Bug 49)', async () => {
+    // Invoices succeed, expenses fail. Without an .error check, totalExpenses reads 0
+    // and the report claims grossProfit == full revenue with ~100% margin.
+    const invoices = makeQuery([
+      { amount_paid: 1000, total_amount: 1000, tax_amount: 0, status: 'paid' },
+    ]);
+    const expenses = makeErrorQuery({ message: 'expenses query failed' });
+    from.mockImplementation((table: string) => (table === 'invoices' ? invoices : expenses));
+
+    await expect(generateProfitLossReport('2026-01-01', '2026-12-31')).rejects.toBeTruthy();
+  });
+
+  it('excludes void/cancelled invoices from revenue at the query (Bug 50)', async () => {
+    const invoices = makeQuery([
+      { amount_paid: 500, total_amount: 500, tax_amount: 0, status: 'paid' },
+    ]);
+    const expenses = makeQuery([]);
+    from.mockImplementation((table: string) => (table === 'invoices' ? invoices : expenses));
+
+    const report = await generateProfitLossReport('2026-01-01', '2026-12-31');
+
+    // A voided-but-still-paid tax invoice must not be counted as realized revenue,
+    // so P&L reconciles with generateRevenueByCaseReport for the same period.
+    expect(invoices.not).toHaveBeenCalledWith('status', 'in', '("void","cancelled")');
+    expect(report.revenue.total).toBe(500);
+  });
 });
 
 describe('generateInvoiceVsExpenseReport (Bug 13 — revenue is realized cash, not billed total)', () => {
@@ -155,6 +202,16 @@ describe('generateCashFlowReport (Bug 47 — soft-deleted payments are not cash 
     expect(report.operatingActivities.receipts).toBe(5000);
     expect(report.netCashFlow).toBe(5000);
   });
+
+  it('throws when a bank-accounts / expenses query fails rather than under-reporting cash (Bug 49)', async () => {
+    const payments = makeQuery([{ amount: 5000, status: 'completed' }]);
+    const expenses = makeErrorQuery({ message: 'expenses query failed' });
+    const bankAccounts = makeQuery([]);
+    from.mockImplementation((table: string) =>
+      table === 'payments' ? payments : table === 'expenses' ? expenses : bankAccounts);
+
+    await expect(generateCashFlowReport('2026-01-01', '2026-12-31')).rejects.toBeTruthy();
+  });
 });
 
 describe('generateInvoiceSummaryReport (Bug 48 — soft-deleted invoices/quotes inflate totals)', () => {
@@ -171,6 +228,55 @@ describe('generateInvoiceSummaryReport (Bug 48 — soft-deleted invoices/quotes 
     expect(quotes.is).toHaveBeenCalledWith('deleted_at', null);
     expect(report.totals.invoiced).toBe(2000);
   });
+
+  it('excludes proforma & converted rows from money totals but keeps them in the byType breakdown (Bug 10 — no AR double-count)', async () => {
+    const invoices = makeQuery([
+      // A standalone sent proforma owes nothing yet (balance_due = total, payments blocked).
+      { status: 'sent', invoice_type: 'proforma', total_amount: 630, amount_paid: 0, balance_due: 630 },
+      // A converted proforma keeps its balance_due — but is the SAME bill as the tax invoice.
+      { status: 'converted', invoice_type: 'proforma', total_amount: 630, amount_paid: 0, balance_due: 630 },
+      // ...the tax invoice it became is the real accounts-receivable.
+      { status: 'sent', invoice_type: 'tax_invoice', total_amount: 630, amount_paid: 0, balance_due: 630 },
+    ]);
+    const quotes = makeQuery([]);
+    from.mockImplementation((table: string) => (table === 'invoices' ? invoices : quotes));
+
+    const report = await generateInvoiceSummaryReport('2026-01-01', '2026-12-31');
+
+    // Only the single tax invoice is real AR — not 1,890 (3 × 630).
+    expect(report.totals.invoiced).toBe(630);
+    expect(report.totals.outstanding).toBe(630);
+    // The byType breakdown still surfaces both proforma rows (informational).
+    expect(report.byType.find(t => t.type === 'Proforma')?.count).toBe(2);
+    expect(report.byType.find(t => t.type === 'Tax Invoice')?.count).toBe(1);
+  });
+
+  it('throws when the quotes query fails rather than silently reporting a 0% conversion rate (Bug 49)', async () => {
+    const invoices = makeQuery([
+      { status: 'paid', invoice_type: 'tax_invoice', total_amount: 2000, amount_paid: 2000, balance_due: 0 },
+    ]);
+    const quotes = makeErrorQuery({ message: 'quotes query failed' });
+    from.mockImplementation((table: string) => (table === 'invoices' ? invoices : quotes));
+
+    await expect(generateInvoiceSummaryReport('2026-01-01', '2026-12-31')).rejects.toBeTruthy();
+  });
+});
+
+describe('generateAgedReceivablesReport (Bug 9 — proforma invoices are not accounts-receivable)', () => {
+  it('ages only real tax invoices — the query filters invoice_type', async () => {
+    const invoices = makeQuery([
+      { id: 'i1', invoice_date: '2026-06-01', due_date: '2026-06-15', balance_due: 630,
+        customer: { id: 'c1', customer_name: 'Acme' } },
+    ]);
+    from.mockImplementation(() => invoices);
+
+    const report = await generateAgedReceivablesReport();
+
+    // Without this filter a sent proforma reliably matches (status 'sent',
+    // balance_due > 0) and is bucketed as money owed.
+    expect(invoices.eq).toHaveBeenCalledWith('invoice_type', 'tax_invoice');
+    expect(report.totals.total).toBe(630);
+  });
 });
 
 describe('generateRevenueByCustomerReport (Bug 49 — soft-deleted invoices over-credit revenue)', () => {
@@ -183,6 +289,19 @@ describe('generateRevenueByCustomerReport (Bug 49 — soft-deleted invoices over
     const rows = await generateRevenueByCustomerReport('2026-01-01', '2026-12-31');
 
     expect(invoices.is).toHaveBeenCalledWith('deleted_at', null);
+    expect(rows[0].amount).toBe(3000);
+  });
+
+  it('excludes void/cancelled invoices from per-customer revenue at the query (Bug 50)', async () => {
+    const invoices = makeQuery([
+      { amount_paid: 3000, customer: { id: 'c1', customer_name: 'Acme', email: 'a@b.co' } },
+    ]);
+    from.mockImplementation(() => invoices);
+
+    const rows = await generateRevenueByCustomerReport('2026-01-01', '2026-12-31');
+
+    // A stale amount_paid on a voided invoice must not over-credit the customer.
+    expect(invoices.not).toHaveBeenCalledWith('status', 'in', '("void","cancelled")');
     expect(rows[0].amount).toBe(3000);
   });
 });

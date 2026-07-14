@@ -41,6 +41,22 @@ export interface StockItemWithCategory extends StockItem {
   stock_categories?: StockCategory | null;
 }
 
+/**
+ * Canonical "low stock" predicate — the single source of truth shared by every
+ * low-stock consumer (getStockItems lowStock filter, getLowStockItems, and
+ * getStockStats.lowStockCount). "Low stock" means at or below the reorder point
+ * but NOT yet out of stock (current > 0); out-of-stock (current === 0) is its own
+ * mutually-exclusive bucket (getStockStats.outOfStockCount). Keeping these in one
+ * place stops the Low Stock tab rows, its badge count, and the KPI from disagreeing
+ * (previously the badge could read 0 while the tab listed an out-of-stock row).
+ */
+function isLowStockItem(
+  item: Pick<StockItem, 'current_quantity' | 'minimum_quantity'>,
+): boolean {
+  const current = item.current_quantity ?? 0;
+  return current > 0 && current <= (item.minimum_quantity ?? 0);
+}
+
 export interface StockSaleWithDetails extends StockSale {
   customers_enhanced?: { id: string; customer_name: string | null; email: string | null; phone: string | null } | null;
   cases?: { id: string; case_no: string | null; title: string | null } | null;
@@ -197,9 +213,7 @@ export async function getStockItems(filters?: StockFilters): Promise<StockItemWi
   let items = (data ?? []) as StockItemWithCategory[];
 
   if (filters?.lowStock) {
-    items = items.filter(
-      (item) => (item.current_quantity ?? 0) <= (item.minimum_quantity ?? 0)
-    );
+    items = items.filter(isLowStockItem);
   }
 
   return items;
@@ -284,7 +298,11 @@ export async function getLowStockItems(): Promise<StockItemWithCategory[]> {
   if (error) throw error;
 
   const items = (data ?? []) as StockItemWithCategory[];
-  return items.filter((item) => (item.current_quantity ?? 0) <= (item.minimum_quantity ?? 0));
+  // Returns the low-OR-out-of-stock UNION on purpose: its consumers
+  // (generateLowStockAlerts, which emits distinct out_of_stock vs low_stock
+  // alerts, and getLowStockCount) need both. The Low-Stock *tab/badge* uses the
+  // strict isLowStockItem predicate directly in getStockItems/getStockStats.
+  return items.filter((item) => isLowStockItem(item) || (item.current_quantity ?? 0) === 0);
 }
 
 export async function createStockItem(data: StockItemInsert): Promise<StockItem> {
@@ -770,7 +788,7 @@ export async function getStockStats(): Promise<StockStats> {
     (sum, i) => sum + ((i.current_quantity ?? 0) * (i.selling_price ?? 0)),
     0
   );
-  const lowStockCount = items.filter((i) => (i.current_quantity ?? 0) <= (i.minimum_quantity ?? 0) && (i.current_quantity ?? 0) > 0).length;
+  const lowStockCount = items.filter(isLowStockItem).length;
   const outOfStockCount = items.filter((i) => (i.current_quantity ?? 0) === 0).length;
   const revenueToday = salesToday.reduce((sum, s) => sum + baseAmount(s, 'total_amount'), 0);
 
@@ -815,7 +833,13 @@ export async function getSalesReport(startDate: string, endDate: string) {
   if (error) throw error;
 
   const sales = data ?? [];
-  const totalRevenue = sales.reduce((sum, s) => sum + baseAmount(s, 'total_amount'), 0);
+  // Net (pre-tax) revenue: total_amount is tax-INCLUSIVE (Subtotal − Discount + Tax), while
+  // totalCost below is tax-exclusive cost. Counting collected tax (a remittable liability) as
+  // revenue inflates Gross Profit/Margin, so strip tax_amount here: net = total − tax.
+  const totalRevenue = sales.reduce(
+    (sum, s) => sum + baseAmount(s, 'total_amount') - baseAmount(s, 'tax_amount'),
+    0,
+  );
   const totalCost = sales.reduce((sum, s) => {
     const items = (s as unknown as {
       stock_sale_items?: Array<{ quantity: number; stock_items?: { cost_price: number | null } | null }>;

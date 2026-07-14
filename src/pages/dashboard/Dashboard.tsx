@@ -58,9 +58,14 @@ export const Dashboard: React.FC = () => {
     queryKey: ['dashboard-case-stats', activeStatusNames, pendingStatusNames],
     enabled: activeStatusNames.length > 0,
     queryFn: async () => {
+      // Start of today in the browser's timezone, as a full timestamptz instant
+      // (parity with useSidebarBadges) — a bare UTC date string mis-buckets
+      // early-local-day cases across the UTC boundary.
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
       const [activeRes, todayRes, pendingRes] = await Promise.all([
         supabase.from('cases').select('id', { count: 'exact', head: true }).is('deleted_at', null).in('status', activeStatusNames),
-        supabase.from('cases').select('id', { count: 'exact', head: true }).is('deleted_at', null).gte('created_at', new Date().toISOString().split('T')[0]),
+        supabase.from('cases').select('id', { count: 'exact', head: true }).is('deleted_at', null).gte('created_at', startOfToday.toISOString()),
         supabase.from('cases').select('id', { count: 'exact', head: true }).is('deleted_at', null).in('status', pendingStatusNames),
       ]);
       return {

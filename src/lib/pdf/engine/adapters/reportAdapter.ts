@@ -607,9 +607,13 @@ function buildReportInfoColumns(data: ReportData, ctx: TranslationContext): Repo
 
 /** Build the ordered toned prose sections for the subtype, sourced from authored content. */
 function buildReportSections(data: ReportData, ctx: TranslationContext): ReportSectionsBlock {
-  const proseKeys = proseSectionKeysForSubtype(data.report.report_type).filter(
-    (k) => k !== 'chain_of_custody_notes',
-  );
+  // Forensic reports seed an editable `chain_of_custody_notes` narrative (seals,
+  // storage, transfers) the engineer authors as legally-relevant context for the
+  // custody ledger. Render it as a toned prose section in the subtype's section
+  // order — it precedes the auto-generated custody events table (the separate
+  // `custodyLog` block). Previously this key was filtered out here, so any
+  // content the engineer typed was silently dropped from the delivered PDF.
+  const proseKeys = proseSectionKeysForSubtype(data.report.report_type);
 
   // Index authored sections by canonical key (last write wins for duplicates).
   const authored = new Map<string, string>();

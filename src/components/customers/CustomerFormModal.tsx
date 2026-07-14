@@ -178,7 +178,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   });
 
   const { data: companySettings } = useQuery({
-    queryKey: ['company_settings'],
+    queryKey: ['company_settings', 'location'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('company_settings')

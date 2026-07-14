@@ -41,6 +41,7 @@ export interface UsageLimit {
 // ============ CACHE ============
 
 interface PlanCache {
+  tenantId: string;
   planId: string | null;
   planCode: string | null;
   features: Map<string, { enabled: boolean; limit: number | null }>;
@@ -81,7 +82,7 @@ export async function loadPlanCache(): Promise<void> {
     return;
   }
 
-  if (planCache && Date.now() < planCache.expiry) {
+  if (planCache && planCache.tenantId === tenantId && Date.now() < planCache.expiry) {
     return;
   }
 
@@ -101,6 +102,7 @@ export async function loadPlanCache(): Promise<void> {
 
     if (!subscription) {
       planCache = {
+        tenantId,
         planId: null,
         planCode: 'starter',
         features: new Map(),
@@ -123,6 +125,7 @@ export async function loadPlanCache(): Promise<void> {
     });
 
     planCache = {
+      tenantId,
       planId: subscription.plan_id,
       planCode: (subscription.subscription_plans as any)?.code || 'starter',
       features: featureMap,
@@ -243,7 +246,7 @@ export async function checkUsageLimit(limitKey: UsageLimitKey): Promise<UsageLim
       current = count || 0;
 
       const branchLimit = planCache?.features.get('multi_branch');
-      limit = branchLimit?.limit || null;
+      limit = branchLimit?.limit ?? null;
       break;
     }
 

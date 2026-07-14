@@ -50,15 +50,28 @@ if (themeHint && (THEMES as readonly string[]).includes(themeHint)) {
 }
 
 // Anti-flash (sibling of the theme block): apply the user's last-seen locale direction
-// synchronously before React mounts, so returning Arabic tenants paint RTL instead of
+// synchronously before React mounts, so returning RTL tenants paint RTL instead of
 // flashing the index.html `<html lang="en">` LTR default. LocaleProvider owns the
-// runtime writes; this only pre-seeds the first paint. First-timers / 'en' fall through
-// to the index.html default. CSP forbids inline scripts, so this bundled module is the
-// only pre-render hook (same constraint as the theme block above).
+// runtime writes; this only pre-seeds the first paint. First-timers / LTR languages
+// fall through to the index.html default. CSP forbids inline scripts, so this bundled
+// module is the only pre-render hook (same constraint as the theme block above).
+//
+// Direction is decided from a bundled RTL base-language set rather than a hardcoded
+// `=== 'ar'` — the app supports additional geo_languages (RTL_LANGS in locale.ts is
+// hydrated at runtime), so any RTL language (Hebrew, Urdu, Farsi, …) must pre-seed RTL
+// here too, otherwise it flashes LTR→RTL on every reload. The set covers the standard
+// Unicode RTL scripts; we key off the base subtag so region tags (e.g. ar-OM) still match.
+const RTL_BASE_LANGS = new Set<string>([
+  'ar', 'arc', 'ckb', 'dv', 'fa', 'he', 'iw', 'ji', 'ks', 'nqo',
+  'ps', 'sd', 'syr', 'ug', 'ur', 'yi',
+]);
 const localeHint = localStorage.getItem('xsuite_locale_hint');
-if (localeHint === 'ar') {
-  document.documentElement.dir = 'rtl';
-  document.documentElement.lang = 'ar';
+if (localeHint) {
+  const baseLang = localeHint.toLowerCase().split(/[-_]/)[0];
+  if (RTL_BASE_LANGS.has(baseLang)) {
+    document.documentElement.dir = 'rtl';
+    document.documentElement.lang = localeHint;
+  }
 }
 
 const queryClient = new QueryClient({

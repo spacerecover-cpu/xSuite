@@ -47,7 +47,7 @@ const statusConfig = {
 
 const typeConfig = {
   proforma: { label: 'Proforma Invoice', color: 'rgb(var(--color-cat-8))' },
-  tax: { label: 'Tax Invoice', color: '#0ea5e9' },
+  tax_invoice: { label: 'Tax Invoice', color: '#0ea5e9' },
 };
 
 export const InvoiceDetailPage: React.FC = () => {
@@ -225,12 +225,14 @@ export const InvoiceDetailPage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['invoice', id] });
     queryClient.invalidateQueries({ queryKey: ['invoice_payments', id] });
     queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    queryClient.invalidateQueries({ queryKey: ['invoice_stats'] });
     setShowPaymentModal(false);
   };
 
   const handleCreditNoteSaved = () => {
     queryClient.invalidateQueries({ queryKey: ['invoice', id] });
     queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    queryClient.invalidateQueries({ queryKey: ['invoice_stats'] });
     queryClient.invalidateQueries({ queryKey: creditNoteKeys.byInvoice(id!) });
     setShowCreditNoteModal(false);
   };

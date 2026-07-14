@@ -109,7 +109,7 @@ export function resolveTenantConfigFromLayers(
       label: get<string>('tax.label'), // required → throws if unresolved (D9)
       numberLabel: (snap['tax.number_label'] as string) || 'Tax ID',
       numberFormat: (snap['tax.number_format'] as string) || null,
-      numberPlaceholder: (snap['tax.number_placeholder'] as string) || null,
+      numberPlaceholder: (snap['tax.number_placeholder'] as string) || (countryRow?.tax_number_placeholder as string) || null,
       defaultRate: get<number>('tax.default_rate'), // required → throws (D10)
       invoiceRequired: (snap['tax.invoice_required'] as boolean) || false,
     },
@@ -126,7 +126,7 @@ export function resolveTenantConfigFromLayers(
       // UI language is a deliberate tenant choice, not a country fact (the seed of
       // the jurisdiction-derived-vs-tenant-chosen split, tenantConfigService.ts:108).
       languageCode: (base.ui_language as string) || 'en',
-      postalCodeLabel: (snap['address.postal_code_label'] as string) || 'Postal Code',
+      postalCodeLabel: (snap['address.postal_code_label'] as string) || (countryRow?.postal_code_label as string) || 'Postal Code',
     },
     regime: {
       tax: get<string>('regime.tax'),

@@ -152,6 +152,12 @@ export function toCreditNoteEngineData(
   const rows: Array<Record<string, string | number>> = (creditNoteData.items ?? []).map((item) => ({
     description: safeString(item.description),
     quantity: String(item.quantity ?? 1),
+    // Statutory HSN/SAC (item_code) + UQC (unit_label) cells. A country layer
+    // whose profile forces these columns visible (e.g. India in_gst) relies on
+    // the adapter emitting the keys — otherwise the forced columns print blank.
+    // Mirrors invoiceAdapter.ts:208-209 / quoteAdapter.ts:194-195.
+    unit: safeString(item.unit_label ?? ''),
+    itemCode: safeString(item.item_code ?? ''),
     unitPrice: money(item.unit_price ?? 0),
     lineTotal: money(item.line_total ?? item.quantity * item.unit_price),
   }));

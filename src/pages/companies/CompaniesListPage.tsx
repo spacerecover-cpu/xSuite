@@ -121,12 +121,20 @@ export const CompaniesListPage: React.FC = () => {
 
       const companiesWithContacts = await Promise.all(
         (data || []).map(async (company) => {
+          // NOTE: customer_company_relationships.is_primary is customer-scoped
+          // ("this company is that CUSTOMER's primary company"), not a company-scoped
+          // primary-contact flag, so a single company can have many is_primary=true rows.
+          // Filtering by it + maybeSingle() errored (PGRST116) on any company with 2+
+          // such contacts. There is no company-primary-contact concept, so pick a single
+          // representative contact: prefer a primary-flagged relationship, else the oldest.
           const { data: relationship } = await supabase
             .from('customer_company_relationships')
             .select('customers_enhanced (id, customer_name)')
             .eq('company_id', company.id)
-            .eq('is_primary', true)
             .is('deleted_at', null)
+            .order('is_primary', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: true })
+            .limit(1)
             .maybeSingle();
 
           return { ...company, primary_contact: relationship?.customers_enhanced || null };
@@ -195,7 +203,7 @@ export const CompaniesListPage: React.FC = () => {
   });
 
   const { data: companySettings } = useQuery({
-    queryKey: ['company_settings'],
+    queryKey: ['company_settings', 'location'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('company_settings')

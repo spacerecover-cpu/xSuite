@@ -66,6 +66,13 @@ function deriveSettlement(inv: InvoiceFinancials): Settlement {
 
 const isIssued = (status: string) => status !== 'draft' && !TERMINAL.includes(status as (typeof TERMINAL)[number]);
 
+// `due_date` is a calendar (date-only) value. Render an instant as its calendar
+// date ('YYYY-MM-DD') so overdue is a date-vs-date comparison, not date-vs-instant
+// — otherwise an invoice reads overdue the moment UTC-midnight of the due date
+// passes (a full day early/late depending on the tenant's UTC offset).
+const toIsoDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 export function getPaymentSummary(inv: InvoiceFinancials, now: Date = new Date()): PaymentSummary {
   const total = num(inv.total_amount);
   const paid = num(inv.amount_paid);
@@ -76,13 +83,15 @@ export function getPaymentSummary(inv: InvoiceFinancials, now: Date = new Date()
   const settlement = deriveSettlement(inv);
   const status = inv.status ?? 'draft';
 
-  const due = inv.due_date ? new Date(inv.due_date) : null;
+  // Overdue only once the calendar due date is strictly before today's date —
+  // never at UTC-midnight of the due date. Compare date-only strings.
+  const dueIso = inv.due_date ? inv.due_date.slice(0, 10) : null;
   const isOverdue =
     settlement !== 'paid' &&
     isIssued(status) &&
-    due != null &&
-    !Number.isNaN(due.getTime()) &&
-    due.getTime() < now.getTime();
+    dueIso != null &&
+    /^\d{4}-\d{2}-\d{2}$/.test(dueIso) &&
+    dueIso < toIsoDate(now);
 
   return { total, paid, balance, progress, settlement, isOverdue };
 }

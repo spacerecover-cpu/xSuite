@@ -78,7 +78,15 @@ export const CaseBackupDevicesTab: React.FC<CaseBackupDevicesTabProps> = ({
   const handleUsageSuccess = () => {
     setShowUsageModal(false);
     setUsageItem(null);
+    // recordStockUsage decrements quantity_on_hand, so more than this case's
+    // usage list goes stale: the Recommended Backup Devices grid on this tab
+    // (['stock-recommended', ...]) and the global stock items/stats/saleable
+    // caches (stockKeys.all) too. Note ['stock-recommended'] / ['stock-usage-case']
+    // are NOT prefixed by stockKeys.all (['stock']), so each must be invalidated
+    // explicitly — matching the broad-invalidation in handleSaleSuccess/onSaleCreated.
     queryClient.invalidateQueries({ queryKey: ['stock-usage-case', caseId] });
+    queryClient.invalidateQueries({ queryKey: ['stock-recommended'] });
+    queryClient.invalidateQueries({ queryKey: stockKeys.all });
   };
 
   const handleItemSelect = (item: StockItemWithCategory) => {

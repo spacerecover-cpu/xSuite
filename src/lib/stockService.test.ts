@@ -21,6 +21,8 @@ import {
   recordStockReceipt,
   cancelStockSale,
   bulkAdjustQuantities,
+  getStockItems,
+  getLowStockItems,
 } from './stockService';
 
 /**
@@ -65,6 +67,43 @@ describe('getStockStats (cross-document revenue total must be base currency)', (
   });
 });
 
+describe('Bug 110: Low Stock KPI badge count must agree with the Low Stock tab contents', () => {
+  // One shared low-stock predicate: at/below reorder point but > 0 (out-of-stock is
+  // its own mutually-exclusive bucket). The stats.lowStockCount badge and the tab rows
+  // (getStockItems lowStock) must return the SAME low-only set — previously the badge
+  // excluded out-of-stock while the tab list included it. getLowStockItems() instead
+  // returns the low-OR-out UNION, because its consumers (generateLowStockAlerts,
+  // getLowStockCount) need both buckets to emit distinct out_of_stock/low_stock alerts.
+  const items = [
+    { current_quantity: 2, minimum_quantity: 5, item_type: 'internal' }, // low (counts)
+    { current_quantity: 0, minimum_quantity: 5, item_type: 'internal' }, // out-of-stock (does NOT count as low)
+    { current_quantity: 10, minimum_quantity: 5, item_type: 'internal' }, // healthy
+  ];
+
+  it('getStockStats.lowStockCount excludes the out-of-stock item and matches outOfStockCount separately', async () => {
+    from
+      .mockReturnValueOnce(makeQuery(items))
+      .mockReturnValueOnce(makeQuery([])); // sales-today
+    const stats = await getStockStats();
+    expect(stats.lowStockCount).toBe(1);
+    expect(stats.outOfStockCount).toBe(1);
+  });
+
+  it('getStockItems({lowStock}) lists exactly the badge-counted rows (out-of-stock excluded)', async () => {
+    from.mockReturnValue(makeQuery(items));
+    const rows = await getStockItems({ lowStock: true });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].current_quantity).toBe(2);
+  });
+
+  it('getLowStockItems returns the low-OR-out union (alert consumers need both)', async () => {
+    from.mockReturnValue(makeQuery(items));
+    const rows = await getLowStockItems();
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.current_quantity).sort()).toEqual([0, 2]);
+  });
+});
+
 describe('getSalesReport (cross-document revenue total must be base currency)', () => {
   it('sums total_amount_base across mixed-currency sales, never the raw native total', async () => {
     const query = makeQuery([
@@ -76,6 +115,25 @@ describe('getSalesReport (cross-document revenue total must be base currency)', 
     const report = await getSalesReport('2020-01-01', '2020-12-31');
 
     expect(report.totalRevenue).toBe(88);
+  });
+
+  it('Bug 68: excludes collected tax from revenue so Gross Profit/Margin are not inflated', async () => {
+    // 15% VAT: subtotal 100, cost 60 ⇒ total_amount 115, tax_amount 15.
+    // Net revenue must be 100 (not 115); profit 40 (not 55); margin 40% (not 47.8%).
+    const query = makeQuery([
+      {
+        total_amount: 115,
+        tax_amount: 15,
+        stock_sale_items: [{ quantity: 1, stock_items: { cost_price: 60 } }],
+      },
+    ]);
+    from.mockReturnValue(query);
+
+    const report = await getSalesReport('2020-01-01', '2020-12-31');
+
+    expect(report.totalRevenue).toBe(100);
+    expect(report.totalCost).toBe(60);
+    expect(report.totalProfit).toBe(40);
   });
 });
 

@@ -80,6 +80,10 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
 
     if (!expectedHash && !actualHash && sealIntact === undefined) return 'not_applicable';
 
+    // Exactly one hash was provided, so no comparison could occur — this is not a
+    // verified pass. Flag it as unverified rather than falling through to 'passed'.
+    if ((!!expectedHash) !== (!!actualHash)) return 'warning';
+
     return 'passed';
   };
 

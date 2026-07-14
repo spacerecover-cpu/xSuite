@@ -172,20 +172,12 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
         if (existingQuoteNumber) {
           setQuoteNumber(existingQuoteNumber);
         } else {
-          // Fetch the next quote number from the system
-          try {
-            const { data: nextNumber, error } = await supabase
-              .rpc('get_next_number', { p_scope: 'quote' });
-
-            if (!error && typeof nextNumber === 'string' && nextNumber) {
-              setQuoteNumber(nextNumber);
-            } else {
-              setQuoteNumber('QT-000001');
-            }
-          } catch (error) {
-            logger.error('Error fetching next quote number:', error);
-            setQuoteNumber('QT-000001');
-          }
+          // Never fetch a number for preview: get_next_number MINTS (advances)
+          // the 'quote' sequence, so every modal open — and every in-modal case
+          // change (this effect re-runs on selectedCaseId) — burned a quote
+          // number that createQuote never used (it mints the real number via
+          // getNextQuoteNumber() at save time). Display-only hint.
+          setQuoteNumber('Auto-assigned on save');
         }
 
         const activeCaseId = caseId || selectedCaseId;

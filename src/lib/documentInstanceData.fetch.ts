@@ -136,16 +136,21 @@ async function fetchCaseContext(caseId: string): Promise<Partial<ReportData>> {
     catalog_device_capacities: NameEmbed;
     catalog_device_interfaces: NameEmbed;
     catalog_device_conditions: NameEmbed;
+    is_primary: boolean | null;
     model: string | null;
     serial_number: string | null;
     recovery_result: string | null;
   };
 
+  // Primary (patient) device first, then earliest — the Device Information block
+  // shows one device, and it must be the primary member, not whichever row was
+  // created first. Recoverability, however, is aggregated across the whole array.
   const { data: devices } = await supabase
     .from('case_devices')
-    .select('catalog_device_types!device_type_id(name), catalog_device_brands!brand_id(name), catalog_device_capacities!capacity_id(name), catalog_device_interfaces!interface_id(name), catalog_device_conditions!condition_id(name), model, serial_number, recovery_result')
+    .select('catalog_device_types!device_type_id(name), catalog_device_brands!brand_id(name), catalog_device_capacities!capacity_id(name), catalog_device_interfaces!interface_id(name), catalog_device_conditions!condition_id(name), is_primary, model, serial_number, recovery_result')
     .eq('case_id', caseId)
     .is('deleted_at', null)
+    .order('is_primary', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: true })
     .overrideTypes<DeviceWithEmbeds[]>();
 
@@ -164,7 +169,12 @@ async function fetchCaseContext(caseId: string): Promise<Partial<ReportData>> {
     .select('action, description, actor_name, created_at')
     .eq('case_id', caseId)
     .is('deleted_at', null)
+    // (created_at ASC, id ASC): a deterministic tiebreaker so tied-timestamp rows
+    // (e.g. an intake DEVICE_RECEIVED trigger event + a case-level event written
+    // in the same statement) get stable entry numbers that match the canonical
+    // Chain-of-Custody PDF (fetchChainOfCustodyEntries, dataFetcher.ts).
     .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
     .overrideTypes<CustodyRow[]>();
 
   return {
@@ -211,6 +221,57 @@ async function fetchCaseContext(caseId: string): Promise<Partial<ReportData>> {
             actor: { full_name: e.actor_name },
           }))
         : undefined,
-    recoverability: dev?.recovery_result ?? null,
+    recoverability: aggregateRecoverability((devices ?? []).map((d) => d.recovery_result)),
   };
+}
+
+type RecoverabilityCategory = 'recoverable' | 'partial' | 'unrecoverable' | 'pending' | 'other';
+
+/** Normalize a device's free-form `recovery_result` into a coarse category. */
+function classifyRecoverability(raw: string | null | undefined): RecoverabilityCategory | null {
+  if (!raw) return null;
+  const v = raw.trim().toLowerCase();
+  if (!v) return null;
+  if (v.includes('partial')) return 'partial';
+  if (v.includes('unrecover') || v === 'none') return 'unrecoverable';
+  if (v.includes('recover') || v === 'full') return 'recoverable';
+  if (v.includes('pending') || v.includes('donor')) return 'pending';
+  return 'other';
+}
+
+/**
+ * Case-level recoverability aggregated across EVERY device — a multi-device job
+ * (a RAID array or multi-drive case) must never inherit one member's outcome. A
+ * mix of recovered + lost members, or any explicitly-partial member, reports as
+ * partial. Returns a canonical label that {@link recoverabilityLabel} renders,
+ * the raw value when the vocabulary is unrecognised, or null when nothing is
+ * assessed (donors/pre-diagnosis devices carry no `recovery_result`).
+ */
+export function aggregateRecoverability(results: Array<string | null | undefined>): string | null {
+  const entries = results
+    .map((raw) => ({ raw: raw ?? null, cat: classifyRecoverability(raw) }))
+    .filter((e): e is { raw: string | null; cat: RecoverabilityCategory } => e.cat !== null);
+  if (entries.length === 0) return null;
+
+  const cats = new Set(entries.map((e) => e.cat));
+  const hasRecoverable = cats.has('recoverable');
+  const hasUnrecoverable = cats.has('unrecoverable');
+
+  // Some data saved AND some lost, or an explicitly-partial member → partial.
+  if (cats.has('partial') || (hasRecoverable && hasUnrecoverable)) return 'Partially Recoverable';
+
+  if (cats.size === 1) {
+    switch (entries[0].cat) {
+      case 'recoverable': return 'Recoverable';
+      case 'unrecoverable': return 'Unrecoverable';
+      case 'pending': return 'Pending';
+      case 'other': return entries[0].raw; // unknown vocabulary — preserve as-is
+    }
+  }
+
+  // A single determined outcome alongside pending/unknown members reports that
+  // outcome; anything still outstanding is Pending.
+  if (hasRecoverable) return 'Recoverable';
+  if (hasUnrecoverable) return 'Unrecoverable';
+  return 'Pending';
 }

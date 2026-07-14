@@ -109,6 +109,29 @@ describe('SystemNumbers fiscal fields (P3)', () => {
     expect(screen.getByLabelText(/fiscal year start/i)).toBeInTheDocument();
   });
 
+  it('persists reset_basis="never" literally so turning an existing reset off is not silently dropped', async () => {
+    renderPage();
+
+    // The 'case' row starts at reset_basis='fiscal_year'. Open its edit modal.
+    const caseHeading = await screen.findByRole('heading', { name: 'Case Number' });
+    const caseCard = caseHeading.closest('.rounded-lg') as HTMLElement;
+    fireEvent.click(within(caseCard).getByRole('button', { name: /edit sequence/i }));
+
+    // Switch the reset basis to "No automatic reset".
+    fireEvent.change(screen.getByLabelText(/reset basis/i), { target: { value: 'never' } });
+
+    // Save. The RPC must receive p_reset_basis:'never' — NOT undefined, which
+    // COALESCE(NULL, stored) discards, silently keeping the old 'fiscal_year'.
+    fireEvent.click(screen.getByRole('button', { name: /update sequence/i }));
+
+    await waitFor(() =>
+      expect(h.rpc).toHaveBeenCalledWith(
+        'update_number_sequence',
+        expect.objectContaining({ p_scope: 'case', p_reset_basis: 'never' }),
+      ),
+    );
+  });
+
   it('shows a templated indicator on a template row card instead of a legacy PREFIX-0000 next number', async () => {
     renderPage();
 

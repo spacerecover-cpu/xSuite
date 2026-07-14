@@ -57,6 +57,12 @@ export async function getCaseFinancialSummary(caseId: string): Promise<CaseFinan
       .in('status', ['approved', 'paid']),
   ]);
 
+  // A failed sub-query must not be silently treated as an empty result — that would
+  // understate totalInvoiced/outstandingBalance/etc. from partial data (showing $0 owed
+  // while money is outstanding). Propagate the first error before aggregating.
+  const summaryError = quotesResult.error || invoicesResult.error || expensesResult.error;
+  if (summaryError) throw summaryError;
+
   const quotes = quotesResult.data || [];
   const invoices = invoicesResult.data || [];
   const expenses = expensesResult.data || [];
@@ -147,9 +153,10 @@ export async function getCasePayments(caseId: string): Promise<CasePayment[]> {
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
-  if (error) {
-    return [];
-  }
+  // A query failure must not masquerade as "no payments" — returning [] here would render
+  // the case Finances tab as if the customer never paid. Propagate the error, matching
+  // getCaseExpenses above.
+  if (error) throw error;
 
   type AllocationRow = {
     id: string;

@@ -47,6 +47,22 @@ describe('getPaymentSummary', () => {
     // not past due yet
     expect(getPaymentSummary({ ...base, status: 'sent', due_date: '2026-06-30' }, now).isOverdue).toBe(false);
   });
+
+  it('compares due date as a calendar date, not against UTC-midnight of the due date', () => {
+    const dueToday = '2026-07-12';
+    // Local noon on the due date — due today, not overdue yet.
+    expect(
+      getPaymentSummary({ ...base, status: 'sent', due_date: dueToday }, new Date(2026, 6, 12, 12, 0, 0)).isOverdue,
+    ).toBe(false);
+    // The evening BEFORE the due date must never read as overdue.
+    expect(
+      getPaymentSummary({ ...base, status: 'sent', due_date: dueToday }, new Date(2026, 6, 11, 23, 30, 0)).isOverdue,
+    ).toBe(false);
+    // Once the calendar due date has fully passed, it is overdue.
+    expect(
+      getPaymentSummary({ ...base, status: 'sent', due_date: dueToday }, new Date(2026, 6, 13, 0, 30, 0)).isOverdue,
+    ).toBe(true);
+  });
 });
 
 describe('getInvoiceEditability', () => {

@@ -95,11 +95,15 @@ export const VATAuditPage: React.FC = () => {
     }
   };
 
+  // Fetch ALL record types for the selected period (scoped only by dateRange, never
+  // by the Records-table record-type dropdown). The headline KPI cards + salesRecords/
+  // purchaseRecords are derived from this full set, so changing the table's type filter
+  // can no longer zero out one side of the VAT position. The table itself applies the
+  // type filter client-side via displayRecords below.
   const { data: vatRecords = [], isLoading: vatLoading } = useQuery({
-    queryKey: ['vat_records', recordTypeFilter, dateRange],
+    queryKey: ['vat_records', dateRange],
     queryFn: async () => {
       const data = await fetchVATRecords({
-        recordType: recordTypeFilter !== 'all' ? recordTypeFilter : undefined,
         dateFrom: getDateFromFilter(),
       });
       return (data || []) as VATRecord[];
@@ -187,6 +191,12 @@ export const VATAuditPage: React.FC = () => {
   const totalVATCollected = salesRecords.reduce((sum, r) => sum + (r.vat_amount_base ?? r.vat_amount ?? 0), 0);
   const totalVATPaid = purchaseRecords.reduce((sum, r) => sum + (r.vat_amount_base ?? r.vat_amount ?? 0), 0);
   const netVATPosition = totalVATCollected - totalVATPaid;
+
+  // Records-table view: filter the full period set by the type dropdown client-side.
+  // KPI totals above stay on the full set, so this dropdown never skews them.
+  const displayRecords = recordTypeFilter === 'all'
+    ? vatRecords
+    : vatRecords.filter(r => r.record_type === recordTypeFilter);
 
   const getActionColor = (action: string) => {
     const colors: Record<string, string> = {
@@ -421,7 +431,7 @@ export const VATAuditPage: React.FC = () => {
                             </td>
                           </tr>
                         ))
-                      ) : vatRecords.length === 0 ? (
+                      ) : displayRecords.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="py-12 text-center">
                             <Calculator className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -429,7 +439,7 @@ export const VATAuditPage: React.FC = () => {
                           </td>
                         </tr>
                       ) : (
-                        vatRecords.map((record) => (
+                        displayRecords.map((record) => (
                           <tr key={record.id} className="hover:bg-slate-50 transition-colors">
                             <td className="py-3 px-4 text-sm text-slate-600">
                               {formatDate(record.created_at)}
@@ -447,7 +457,9 @@ export const VATAuditPage: React.FC = () => {
                               <p className="text-sm font-mono text-slate-600">{record.record_id?.substring(0, 8)}...</p>
                             </td>
                             <td className="py-3 px-4 text-right text-sm font-semibold text-primary">
-                              {formatCurrency(record.vat_amount)}
+                              {/* Base-currency figure so the row matches the KPI totals and the
+                                  tenant symbol formatCurrency applies; vat_amount is document-currency. */}
+                              {formatCurrency(record.vat_amount_base ?? record.vat_amount)}
                             </td>
                             <td className="py-3 px-4 text-center text-sm text-slate-600">
                               {formatTaxRatePercent(record.vat_rate)}

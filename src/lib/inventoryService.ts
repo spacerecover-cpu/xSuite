@@ -629,6 +629,26 @@ export async function touchInventorySearchTemplate(id: string): Promise<void> {
   }
 }
 
+/**
+ * Count inventory items currently committed to live cases: active
+ * (`returned_at IS NULL`) case assignments that have not been soft-deleted.
+ * Tenant scoping is enforced by RLS, matching every other query in this file.
+ */
+export async function getActiveCaseAssignmentCount(): Promise<number> {
+  const { count, error } = await supabase
+    .from('inventory_case_assignments')
+    .select('id', { count: 'exact', head: true })
+    .is('returned_at', null)
+    .is('deleted_at', null);
+
+  if (error) {
+    logger.error('Error counting active inventory case assignments:', error);
+    throw error;
+  }
+
+  return count ?? 0;
+}
+
 export async function getInventoryStatistics() {
   const { data: items, error } = await supabase
     .from('inventory_items')
@@ -655,10 +675,12 @@ export async function getInventoryStatistics() {
     return sum + ((item.purchase_price ?? 0) * (item.quantity ?? 0));
   }, 0);
 
+  const totalInUse = await getActiveCaseAssignmentCount();
+
   return {
     totalItems,
     totalInStock,
-    totalInUse: 0,
+    totalInUse,
     totalValue,
   };
 }
@@ -692,13 +714,15 @@ export async function getInventoryInsights(): Promise<InventoryInsights> {
   let pcbCount = 0;
   let totalValue = 0;
 
+  const totalInUse = await getActiveCaseAssignmentCount();
+
   if (!items) {
     return {
       hddCount: 0,
       ssdCount: 0,
       pcbCount: 0,
       totalValue: 0,
-      totalInUse: 0,
+      totalInUse,
     };
   }
 
@@ -744,6 +768,6 @@ export async function getInventoryInsights(): Promise<InventoryInsights> {
     ssdCount,
     pcbCount,
     totalValue,
-    totalInUse: 0,
+    totalInUse,
   };
 }

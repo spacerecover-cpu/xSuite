@@ -544,7 +544,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
   };
 
   const updateDevice = (id: string, field: keyof Device, value: string | number | boolean | string[] | null) => {
-    setDevices(devices.map(d => (d.id === id ? { ...d, [field]: value } : d)));
+    setDevices(prev => prev.map(d => (d.id === id ? { ...d, [field]: value } : d)));
   };
 
   const primaryDevice = devices[0];

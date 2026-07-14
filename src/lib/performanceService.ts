@@ -32,6 +32,7 @@ export async function getReviews(filters?: {
       ),
       reviewer:profiles!performance_reviews_reviewer_profile_fkey (id, full_name, avatar_url)
     `)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
   if (filters?.status) query = query.eq('status', filters.status);
@@ -68,6 +69,7 @@ export async function getReview(id: string) {
       reviewer:profiles!performance_reviews_reviewer_profile_fkey (id, full_name, avatar_url)
     `)
     .eq('id', id)
+    .is('deleted_at', null)
     .maybeSingle();
 
   if (error) throw error;
@@ -120,7 +122,8 @@ export async function completeReview(id: string) {
 export async function getPerformanceStats() {
   const { data: reviews } = await supabase
     .from('performance_reviews')
-    .select('status, overall_rating');
+    .select('status, overall_rating')
+    .is('deleted_at', null);
 
   const allReviews = reviews || [];
   const withRating = allReviews.filter(r => r.overall_rating != null);

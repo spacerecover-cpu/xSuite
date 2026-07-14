@@ -294,3 +294,131 @@ describe('allocateReceiptToInvoice — canonical status vocabulary + fail-loud (
     ).rejects.toBeTruthy();
   });
 });
+
+describe('createReceiptWithAllocations — atomic RPC credits the deposit account & posts income (BUG-7)', () => {
+  beforeEach(() => {
+    rpc.mockReset();
+  });
+
+  it('routes through create_receipt_with_allocations, carrying the selected deposit account as bank_account_id', async () => {
+    rpc.mockResolvedValue({
+      data: { id: 'r-1', receipt_number: 'RCPT-1', amount: 1000, status: 'completed' },
+      error: null,
+    });
+
+    const result = await bankingService.createReceiptWithAllocations(
+      {
+        amount: 1000,
+        receipt_date: '2026-07-12',
+        customer_id: 'cust-1',
+        account_id: 'acc-main-checking',
+        payment_method_id: 'pm-1',
+        reference_number: 'CHK-42',
+        notes: 'n',
+        status: 'completed',
+      },
+      [{ invoice_id: 'inv-100', allocated_amount: 1000 }],
+    );
+
+    // The whole point of the fix: invoice recompute, the bank-account balance
+    // credit, and the single append-only income posting must be ONE server
+    // transaction — never a client-side invoice update with the cash/ledger
+    // side skipped. The old body dropped account_id entirely, so the chosen
+    // deposit account was never credited.
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith('create_receipt_with_allocations', {
+      p_receipt: expect.objectContaining({
+        amount: 1000,
+        bank_account_id: 'acc-main-checking',
+        customer_id: 'cust-1',
+        payment_method: 'pm-1',
+        reference: 'CHK-42',
+        status: 'completed',
+      }),
+      p_allocations: [{ invoice_id: 'inv-100', amount: 1000 }],
+    });
+    // must no longer hand-roll the receipt/allocation/invoice writes client-side
+    expect(from).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ id: 'r-1' });
+  });
+
+  it('throws (nothing presented as recorded) when the atomic RPC rejects', async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'money conservation violated' } });
+
+    await expect(
+      bankingService.createReceiptWithAllocations(
+        { amount: 500, account_id: 'acc-1' },
+        [{ invoice_id: 'inv-1', allocated_amount: 500 }],
+      ),
+    ).rejects.toBeTruthy();
+  });
+
+  it('rejects an unallocated receipt instead of recording cash the ledger cannot attribute', async () => {
+    await expect(
+      bankingService.createReceiptWithAllocations({ amount: 500, account_id: 'acc-1' }, []),
+    ).rejects.toThrow(/at least one invoice/);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe('getCasesWithInvoices — deterministic order + full set for the Record Receipt picker (BUG-43)', () => {
+  /** Thenable invoices builder: select/not/is/gt/or/order chain; awaiting yields {data}. */
+  function makeInvoicesQuery(rows: Array<Record<string, unknown>>) {
+    const builder: Record<string, unknown> = {
+      select: vi.fn(() => builder),
+      not: vi.fn(() => builder),
+      is: vi.fn(() => builder),
+      gt: vi.fn(() => builder),
+      or: vi.fn(() => builder),
+      order: vi.fn(() => builder),
+      then: (resolve: (v: { data: unknown; error: null }) => void) =>
+        resolve({ data: rows, error: null }),
+    };
+    return builder;
+  }
+
+  /** One invoice with an embedded case carrying a prefixed, zero-padded case_number. */
+  function invoiceRow(n: number) {
+    const num = String(n).padStart(4, '0');
+    return {
+      id: `inv-${n}`,
+      invoice_number: `INV-${num}`,
+      total_amount: 100,
+      amount_paid: 0,
+      balance_due: 100,
+      status: 'issued',
+      case_id: `case-${n}`,
+      cases: {
+        id: `case-${n}`,
+        case_number: `CASE-${num}`,
+        title: `Case ${n}`,
+        customer_id: `cust-${n}`,
+        company_id: null,
+        customers_enhanced: { id: `cust-${n}`, customer_name: `Client ${n}`, email: null },
+        companies: null,
+      },
+    };
+  }
+
+  it('returns every case with an open invoice, sorted by case_number descending (not the parseInt no-op that truncated to 50 in DB order)', async () => {
+    // 70 distinct cases fed in ASCENDING case_number order. The old code did
+    // parseInt('CASE-0001')→NaN→0 for every case (a no-op sort), then slice(0,50),
+    // dropping CASE-0051..0070 and leaving the kept 50 in arbitrary insertion order.
+    const rows = Array.from({ length: 70 }, (_, i) => invoiceRow(i + 1));
+    const invoicesQuery = makeInvoicesQuery(rows);
+    from.mockReturnValue(invoicesQuery);
+
+    const result = await bankingService.getCasesWithInvoices({ hasOutstandingInvoices: true });
+
+    // Completeness: no case with an open invoice may be dropped from the picker.
+    expect(result).toHaveLength(70);
+    // Deterministic, meaningful order: newest (highest) case number first.
+    expect(result[0].case_number).toBe('CASE-0070');
+    expect(result[69].case_number).toBe('CASE-0001');
+    expect(result[0].client_name).toBe('Client 70');
+    // The high-numbered cases the old slice dropped are now present.
+    expect(result.map((c) => c.case_number)).toContain('CASE-0065');
+    // Server order is pinned so the fetch is deterministic, not arbitrary DB order.
+    expect(invoicesQuery.order).toHaveBeenCalledWith('created_at', { ascending: false });
+  });
+});

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import type { Theme } from '../types/tenantConfig';
-import { DEFAULT_THEME, THEMES } from '../types/tenantConfig';
+import { DEFAULT_THEME, THEMES, isResolvedConfig } from '../types/tenantConfig';
 import { useTenantConfig } from './TenantConfigContext';
 import { updateTenantTheme } from '../lib/tenantThemeService';
 import { logger } from '../lib/logger';
@@ -44,7 +44,7 @@ function readThemeHint(): Theme | null {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const { config, isLoading, refreshConfig } = useTenantConfig();
+  const { config, refreshConfig } = useTenantConfig();
   const tenantTheme = config.theme;
   const tenantId = config.tenantId;
 
@@ -54,12 +54,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // document.documentElement from the persisted hint before React mounts).
   const [hintTheme] = useState<Theme | null>(() => readThemeHint());
 
-  // While the tenant config is still loading, TenantConfigProvider serves
+  // Until the real tenant config resolves, TenantConfigProvider serves
   // DEFAULT_TENANT_CONFIG (theme: 'royal'). Applying that to the DOM would clobber
   // the hint main.tsx already stamped and flash returning non-royal tenants to
-  // Royal on every full reload. Keep the pre-mounted hint until the real config
-  // resolves, then switch to the tenant's actual theme.
-  const effectiveTheme = optimisticTheme ?? (isLoading ? (hintTheme ?? tenantTheme) : tenantTheme);
+  // Royal on every full reload. Guard on isResolvedConfig(), not isLoading: during
+  // the pre-profile auth window tenantId is undefined so loadConfig short-circuits
+  // with isLoading=false while config is still DEFAULT — that whole window would
+  // otherwise collapse to 'royal' and overwrite the persisted hint. Keep the
+  // pre-mounted hint until the config actually resolves, then switch to the tenant's
+  // actual theme. An in-flight optimistic change (setTheme) still wins.
+  const effectiveTheme = optimisticTheme ?? (isResolvedConfig(config) ? tenantTheme : (hintTheme ?? tenantTheme));
 
   useEffect(() => {
     applyThemeToDOM(effectiveTheme);

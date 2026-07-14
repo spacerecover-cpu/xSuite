@@ -13,6 +13,7 @@ import {
   Calendar, FileText, DollarSign, MessageSquare, Eye, Briefcase
 } from 'lucide-react';
 import { formatDate } from '../../lib/format';
+import { baseAmount } from '../../lib/financialMath';
 import { logger } from '../../lib/logger';
 import { updateCompany } from '../../lib/companyService';
 import { CustomerCasesTab } from '../../components/customers/CustomerCasesTab';
@@ -196,64 +197,55 @@ export const CompanyProfilePage: React.FC = () => {
     approvedQuotes: 0,
     lastInteraction: null,
   } } = useQuery({
-    queryKey: ['company_insights', id, contacts],
+    queryKey: ['company_insights', id],
     queryFn: async () => {
-      const customerIds = contacts.map(c => c.customers_enhanced?.id).filter(Boolean);
+      const empty = {
+        totalCases: 0,
+        completedCases: 0,
+        pendingCases: 0,
+        totalRevenue: 0,
+        totalQuotes: 0,
+        approvedQuotes: 0,
+        lastInteraction: null,
+      };
 
-      if (customerIds.length === 0) {
-        return {
-          totalCases: 0,
-          completedCases: 0,
-          pendingCases: 0,
-          totalRevenue: 0,
-          totalQuotes: 0,
-          approvedQuotes: 0,
-          lastInteraction: null,
-        };
-      }
+      if (!id) return empty;
 
       try {
+        // Scope KPIs to the company itself (company_id) — matching the Cases and
+        // Financial tabs below — NOT to every case of every linked contact, which
+        // would pull in that contact's personal cases and cases pinned to other
+        // companies, inflating the totals and contradicting the tabs.
         const { data: cases, error: casesError } = await supabase
           .from('cases')
           .select('id, status, created_at')
-          .in('customer_id', customerIds);
+          .eq('company_id', id)
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false });
 
         if (casesError) {
           logger.error('Error fetching cases:', casesError);
-          return {
-            totalCases: 0,
-            completedCases: 0,
-            pendingCases: 0,
-            totalRevenue: 0,
-            totalQuotes: 0,
-            approvedQuotes: 0,
-            lastInteraction: null,
-          };
+          return empty;
         }
 
-        const caseIds = cases?.map(c => c.id) || [];
+        // Quotes roll up by company_id too, so the Overview totals agree with the
+        // Financial tab's Quotes list. baseAmount() reads the *_base shadow for a
+        // currency-correct cross-document revenue sum.
+        const { data: quotes, error: quotesError } = await supabase
+          .from('quotes')
+          .select('total_amount, total_amount_base, status')
+          .eq('company_id', id)
+          .is('deleted_at', null);
 
         let totalRevenue = 0;
         let totalQuotes = 0;
         let approvedQuotes = 0;
 
-        if (caseIds.length > 0) {
-          const { data: quotes, error: quotesError } = await supabase
-            .from('case_quotes')
-            .select('total_amount, status')
-            .in('case_id', caseIds);
-
-          if (!quotesError && quotes) {
-            totalQuotes = quotes.length;
-            approvedQuotes = quotes.filter(q => q.status === 'approved' || q.status === 'accepted').length;
-            // TODO(country-engine): case_quotes has no total_amount_base shadow column,
-            // so this approved/accepted-quote revenue rollup is multi-currency-incorrect
-            // for a future non-base tenant. Blocked on a case_quotes base-shadow migration.
-            // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- BLOCKED: no total_amount_base on case_quotes (deferred migration); a no-op baseAmount would falsely silence a real gap
-            totalRevenue = quotes
-              .filter(q => q.status === 'approved' || q.status === 'accepted')
-              .reduce((sum, q) => sum + (parseFloat(q.total_amount?.toString() || '0')), 0);
-          }
+        if (!quotesError && quotes) {
+          totalQuotes = quotes.length;
+          const approved = quotes.filter(q => q.status === 'approved' || q.status === 'accepted');
+          approvedQuotes = approved.length;
+          totalRevenue = approved.reduce((sum, q) => sum + baseAmount(q, 'total_amount'), 0);
         }
 
         // Terminal case statuses: canonical names (Data Delivered, Closed — *,
@@ -277,19 +269,12 @@ export const CompanyProfilePage: React.FC = () => {
           totalRevenue,
           totalQuotes,
           approvedQuotes,
+          // cases is ordered created_at DESC, so [0] is the most recent case.
           lastInteraction: cases && cases.length > 0 ? cases[0].created_at : null,
         };
       } catch (error) {
         logger.error('Exception fetching cases:', error);
-        return {
-          totalCases: 0,
-          completedCases: 0,
-          pendingCases: 0,
-          totalRevenue: 0,
-          totalQuotes: 0,
-          approvedQuotes: 0,
-          lastInteraction: null,
-        };
+        return empty;
       }
     },
     enabled: !!id,

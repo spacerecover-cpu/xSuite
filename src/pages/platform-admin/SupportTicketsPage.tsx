@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Ticket, Search } from 'lucide-react';
@@ -12,6 +12,7 @@ import { TicketStatusBadge } from '../../components/platform-admin/tickets/Ticke
 import { TicketPriorityBadge } from '../../components/platform-admin/tickets/TicketPriorityBadge';
 import { getSupportTickets, getTicketStats, type TicketWithDetails } from '../../lib/platformAdminService';
 import { platformAdminKeys } from '../../lib/queryKeys';
+import { usePlatformAdmin } from '../../contexts/PlatformAdminContext';
 import { formatDistanceToNow } from 'date-fns';
 
 interface TicketColumn {
@@ -23,6 +24,7 @@ interface TicketColumn {
 
 export const SupportTicketsPage: React.FC = () => {
   const navigate = useNavigate();
+  const { admin } = usePlatformAdmin();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -39,14 +41,22 @@ export const SupportTicketsPage: React.FC = () => {
     status: statusFilter !== 'all' ? statusFilter : undefined,
     priority: priorityFilter !== 'all' ? priorityFilter : undefined,
     category: categoryFilter !== 'all' ? categoryFilter : undefined,
-    assignedTo: assignedToFilter !== 'all' ? assignedToFilter : undefined,
     search: searchQuery || undefined,
   };
 
-  const { data: tickets = [], isLoading } = useQuery({
+  const { data: allTickets = [], isLoading } = useQuery({
     queryKey: platformAdminKeys.ticketsList(filters),
     queryFn: () => getSupportTickets(filters),
   });
+
+  // The "Assigned To" filter is resolved client-side. support_tickets.assigned_to is a uuid
+  // column, but this dropdown offers the sentinels 'unassigned'/'me' (not uuids). Sending
+  // either to the server would raise "invalid input syntax for type uuid" and yield 0 rows.
+  const tickets = useMemo(() => {
+    if (assignedToFilter === 'unassigned') return allTickets.filter((t) => !t.assigned_to);
+    if (assignedToFilter === 'me') return allTickets.filter((t) => t.assigned_to === admin?.id);
+    return allTickets;
+  }, [allTickets, assignedToFilter, admin?.id]);
 
   const handleResetFilters = () => {
     setStatusFilter('all');

@@ -212,7 +212,11 @@ export const StockSalesPage: React.FC = () => {
             <option value="paid">Paid</option>
             <option value="pending">Pending</option>
             <option value="partial">Partial</option>
-            <option value="refunded">Refunded</option>
+            {/* No 'Refunded' option: cancel_stock_sale sets status='refunded' AND
+                deleted_at=now() on the same row, while getStockSales always filters
+                deleted_at IS NULL — so a 'refunded' filter is unsatisfiable and would
+                always show zero rows. Surfacing refunds needs getStockSales to include
+                soft-deleted rows (stockService.ts), out of scope for this view. */}
           </select>
 
           {(startDate || endDate || paymentStatus || customerSearch) && (

@@ -806,7 +806,8 @@ export const bankingService = {
         )
       `)
       .not('case_id', 'is', null)
-      .is('deleted_at', null);
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false });
 
     if (filters?.hasOutstandingInvoices) {
       query = query.gt('balance_due', 0);
@@ -890,13 +891,17 @@ export const bankingService = {
 
     const cases = Array.from(casesMap.values());
 
-    cases.sort((a, b) => {
-      const numA = parseInt(a.case_number ?? '') || 0;
-      const numB = parseInt(b.case_number ?? '') || 0;
-      return numB - numA;
-    });
+    // Case numbers are prefixed, zero-padded labels (e.g. 'CASE-0005'), so parseInt
+    // of the label is always NaN→0 — the old sort was a silent no-op that left the
+    // list in arbitrary DB order. Compare the full string with numeric-aware collation
+    // so higher (newer) numbers sort first. Return the full deduped set: the Record
+    // Receipt case picker fetches this once and searches it client-side, so the old
+    // slice(0, 50) silently hid cases with open invoices from the operator.
+    cases.sort((a, b) =>
+      (b.case_number ?? '').localeCompare(a.case_number ?? '', undefined, { numeric: true, sensitivity: 'base' }),
+    );
 
-    return cases.slice(0, 50).map((c) => ({
+    return cases.map((c) => ({
       ...c,
       client_name: c.customers_enhanced?.customer_name
         ?? c.companies?.company_name
@@ -972,76 +977,43 @@ export const bankingService = {
     receiptData: Partial<PaymentReceipt>,
     allocations: Array<{ invoice_id: string; allocated_amount: number }>
   ): Promise<PaymentReceipt> {
-    const { data: { user } } = await supabase.auth.getUser();
-
     if (typeof receiptData.amount !== 'number') {
       throw new Error('Receipt amount is required');
     }
-
-    const { data: receiptNumber } = await supabase.rpc('get_next_receipt_number');
-
-    const tenantId = await resolveTenantId();
-    const receiptInsert: PaymentReceiptInsert = {
-      amount: receiptData.amount,
-      receipt_number: typeof receiptNumber === 'string' ? receiptNumber : null,
-      receipt_date: receiptData.receipt_date ?? new Date().toISOString(),
-      customer_id: receiptData.customer_id ?? null,
-      payment_id: receiptData.payment_id ?? null,
-      notes: receiptData.notes ?? null,
-      created_by: user?.id ?? null,
-      tenant_id: tenantId,
-    };
-
-    const { data: receipt, error: receiptError } = await supabase
-      .from('payment_receipts')
-      .insert(receiptInsert)
-      .select()
-      .maybeSingle();
-
-    if (receiptError) throw receiptError;
-    if (!receipt) throw new Error('Failed to create payment receipt');
-
-    if (allocations.length > 0) {
-      const allocationRecords: ReceiptAllocationInsert[] = allocations.map((a) => ({
-        receipt_id: receipt.id,
-        invoice_id: a.invoice_id,
-        amount: a.allocated_amount,
-        created_by: user?.id ?? null,
-        tenant_id: tenantId,
-      }));
-
-      const { error: allocError } = await supabase
-        .from('receipt_allocations')
-        .insert(allocationRecords);
-
-      if (allocError) throw allocError;
-
-      for (const allocation of allocations) {
-        const { data: invoice } = await supabase
-          .from('invoices')
-          .select('amount_paid, balance_due, total_amount, status')
-          .eq('id', allocation.invoice_id)
-          .maybeSingle();
-
-        if (invoice) {
-          const newAmountPaid = (invoice.amount_paid ?? 0) + allocation.allocated_amount;
-          const newAmountDue = (invoice.balance_due ?? 0) - allocation.allocated_amount;
-
-          // Same fix as allocateReceiptToInvoice: canonical vocabulary
-          // (the CHECK rejected 'partially-paid') + fail loud on the update.
-          const { error: invoiceUpdateError } = await supabase
-            .from('invoices')
-            .update({
-              amount_paid: newAmountPaid,
-              balance_due: newAmountDue,
-              status: deriveInvoiceStatus(newAmountPaid, newAmountDue),
-            })
-            .eq('id', allocation.invoice_id);
-          if (invoiceUpdateError) throw invoiceUpdateError;
-        }
-      }
+    if (!allocations?.length) {
+      throw new Error('A receipt must be allocated to at least one invoice.');
     }
 
-    return receipt as PaymentReceipt;
+    // Route through the atomic create_receipt_with_allocations RPC — the SAME
+    // path receiptsService (the Invoice page) uses — so the invoice recompute,
+    // the deposit-account balance credit, and the single append-only income
+    // posting to financial_transactions all happen inside ONE transaction.
+    // The old client-side body recomputed the invoice but skipped the whole
+    // cash/ledger side (no bank/financial_transactions row, no account credit)
+    // and dropped the selected deposit account, so recovered cash and revenue
+    // silently vanished; it also wrote receipt_allocations against
+    // payment_receipts even though receipt_allocations.receipt_id FKs
+    // public.receipts. bank_account_id carries the chosen "Deposit to account".
+    const { data, error } = await supabase.rpc('create_receipt_with_allocations', {
+      p_receipt: {
+        amount: receiptData.amount,
+        receipt_date: receiptData.receipt_date ?? null,
+        customer_id: receiptData.customer_id ?? null,
+        payment_method: receiptData.payment_method_id ?? null,
+        reference: receiptData.reference_number ?? null,
+        notes: receiptData.notes ?? null,
+        status: receiptData.status ?? 'completed',
+        bank_account_id: receiptData.account_id ?? null,
+      },
+      p_allocations: allocations.map((a) => ({
+        invoice_id: a.invoice_id,
+        amount: a.allocated_amount,
+      })),
+    });
+
+    if (error) throw error;
+    if (!data) throw new Error('Failed to record receipt');
+
+    return data as unknown as PaymentReceipt;
   },
 };

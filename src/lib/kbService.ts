@@ -157,7 +157,8 @@ export async function getKBArticles(filters?: KBFilters): Promise<KBArticleWithD
   const { data: tagLinks } = await supabase
     .from('kb_article_tags')
     .select('article_id, kb_tags ( id, name, slug )')
-    .in('article_id', articleIds);
+    .in('article_id', articleIds)
+    .is('deleted_at', null);
 
   if (tagLinks) {
     const tagMap: Record<string, KBTag[]> = {};
@@ -198,7 +199,8 @@ export async function getKBArticleById(id: string): Promise<KBArticleWithDetails
   const { data: tagLinks } = await supabase
     .from('kb_article_tags')
     .select('article_id, kb_tags ( id, name, slug )')
-    .eq('article_id', id);
+    .eq('article_id', id)
+    .is('deleted_at', null);
 
   article.tags = tagLinks ? (tagLinks as any[]).map((l) => l.kb_tags).filter(Boolean) : [];
 
@@ -235,14 +237,15 @@ export async function createKBArticle(input: {
   if (error) throw error;
   if (!data) throw new Error('Failed to create article');
 
-  await supabase.from('kb_article_versions').insert({
+  const { error: versionError } = await supabase.from('kb_article_versions').insert({
     article_id: data.id,
     version_number: 1,
     title: data.title,
     content: data.content,
-    changed_by: input.author_id,
+    created_by: input.author_id,
     change_notes: input.change_notes || 'Initial version',
   } as never);
+  if (versionError) throw versionError;
 
   if (input.tag_ids && input.tag_ids.length > 0) {
     await supabase.from('kb_article_tags').insert(
@@ -267,7 +270,7 @@ export async function updateKBArticle(
     change_notes?: string;
   }
 ): Promise<KBArticle> {
-  const current = await supabase.from('kb_articles').select('version, title, content').eq('id', id).maybeSingle();
+  const current = await supabase.from('kb_articles').select('version, title, content, published_at').eq('id', id).maybeSingle();
   if (current.error) throw current.error;
 
   const currentVersion = current.data?.version || 1;
@@ -285,7 +288,7 @@ export async function updateKBArticle(
   if (input.is_featured !== undefined) update.is_featured = input.is_featured;
   if (input.status !== undefined) {
     update.status = input.status;
-    if (input.status === 'published' && !current.data) {
+    if (input.status === 'published' && !current.data?.published_at) {
       update.published_at = new Date().toISOString();
     }
   }
@@ -294,20 +297,36 @@ export async function updateKBArticle(
   if (error) throw error;
   if (!data) throw new Error('Failed to update article');
 
-  await supabase.from('kb_article_versions').insert({
+  const { error: versionError } = await supabase.from('kb_article_versions').insert({
     article_id: id,
     version_number: newVersion,
     title: data.title,
     content: data.content,
-    changed_by: input.author_id,
+    created_by: input.author_id,
     change_notes: input.change_notes || '',
   } as never);
+  if (versionError) throw versionError;
 
   if (input.tag_ids !== undefined) {
-    await supabase.from('kb_article_tags').update({ deleted_at: new Date().toISOString() } as never).eq('article_id', id);
-    if (input.tag_ids.length > 0) {
+    const { data: existingLinks } = await supabase
+      .from('kb_article_tags')
+      .select('id, tag_id')
+      .eq('article_id', id)
+      .is('deleted_at', null);
+
+    const existing = (existingLinks || []) as { id: string; tag_id: string }[];
+    const desired = new Set(input.tag_ids);
+    const activeTagIds = new Set(existing.map((l) => l.tag_id));
+
+    const removeIds = existing.filter((l) => !desired.has(l.tag_id)).map((l) => l.id);
+    if (removeIds.length > 0) {
+      await supabase.from('kb_article_tags').update({ deleted_at: new Date().toISOString() } as never).in('id', removeIds);
+    }
+
+    const addTagIds = input.tag_ids.filter((tag_id) => !activeTagIds.has(tag_id));
+    if (addTagIds.length > 0) {
       await supabase.from('kb_article_tags').insert(
-        input.tag_ids.map((tag_id) => ({ article_id: id, tag_id })) as never
+        addTagIds.map((tag_id) => ({ article_id: id, tag_id })) as never
       );
     }
   }

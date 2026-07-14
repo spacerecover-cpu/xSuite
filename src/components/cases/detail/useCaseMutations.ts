@@ -299,23 +299,16 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
       const deliveryDate = new Date();
       const retentionDeadline = new Date(deliveryDate.getTime() + retentionDays * 24 * 60 * 60 * 1000);
 
-      const cloneUpdate: CloneDriveUpdate = {
-        status: 'delivered',
-        delivered_date: deliveryDate.toISOString(),
-        delivered_by: profile?.id ?? null,
-        retention_days: retentionDays,
-        retention_deadline: retentionDeadline.toISOString(),
-        delivery_notes: deliveryNotes || null,
-        updated_at: deliveryDate.toISOString(),
-      };
-
-      const { error } = await supabase
-        .from('clone_drives')
-        .update(cloneUpdate)
-        .eq('id', cloneId);
-
-      if (error) throw error;
-
+      // Attempt the GATED case transition FIRST. The two writes here can't share
+      // a transaction (PostgREST auto-commits each request), so if the clone were
+      // written first and transition_case_status then raised — a missing edge, or
+      // the gate.payment_before_release check on an outstanding balance — the clone
+      // would be permanently 'delivered' with a started retention countdown while
+      // the case never advanced, AND it would drop out of the deliverable list, so
+      // the transition could never be re-driven. Doing the transition first makes a
+      // gate/edge failure abort before the clone is touched. If the (near-certain-to-
+      // succeed) clone write fails afterward, the case is already 'delivered', the
+      // clone is still deliverable, and re-running just re-does the clone write.
       if (updateCaseStatus && id) {
         // Direct cases.status UPDATE is blocked by the state-machine guard
         // trigger. Route through transition_case_status RPC instead. Resolve
@@ -338,6 +331,23 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
         });
         if (rpcError) throw rpcError;
       }
+
+      const cloneUpdate: CloneDriveUpdate = {
+        status: 'delivered',
+        delivered_date: deliveryDate.toISOString(),
+        delivered_by: profile?.id ?? null,
+        retention_days: retentionDays,
+        retention_deadline: retentionDeadline.toISOString(),
+        delivery_notes: deliveryNotes || null,
+        updated_at: deliveryDate.toISOString(),
+      };
+
+      const { error } = await supabase
+        .from('clone_drives')
+        .update(cloneUpdate)
+        .eq('id', cloneId);
+
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['case', id] });

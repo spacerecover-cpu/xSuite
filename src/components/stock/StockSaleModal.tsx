@@ -299,7 +299,10 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
 
   const discountAmount = (() => {
     const val = parseFloat(discountValue) || 0;
-    if (discountType === 'percentage') return (subtotal * val) / 100;
+    // Clamp the rate to 0–100 so a percentage can never exceed the subtotal —
+    // otherwise the discount overshoots and total (subtotal - discount + tax) goes negative,
+    // and the tax kernel receives a documentDiscount larger than the line subtotal.
+    if (discountType === 'percentage') return (subtotal * Math.min(Math.max(val, 0), 100)) / 100;
     if (discountType === 'fixed') return Math.min(val, subtotal);
     return 0;
   })();
@@ -375,14 +378,14 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
         payment_method: paymentMethod,
         notes: notes || null,
         discount_type: discountType === 'none' ? null : discountType,
-        // Cap a fixed discount at the subtotal so the persisted total matches the
-        // previewed total (which uses Math.min(val, subtotal)) and can never go negative.
-        // Percentage discounts carry the raw rate (the RPC applies it against subtotal).
+        // Clamp identically to the preview (low 0, high subtotal/100) so the persisted
+        // value always reproduces the previewed total — a negative input must not slip
+        // through as a surcharge. The RPC applies the percentage rate against the subtotal.
         discount_value:
           discountType === 'fixed'
-            ? Math.min(parseFloat(discountValue) || 0, subtotal) || null
+            ? Math.min(Math.max(parseFloat(discountValue) || 0, 0), subtotal) || null
             : discountType === 'percentage'
-              ? parseFloat(discountValue) || null
+              ? Math.min(Math.max(parseFloat(discountValue) || 0, 0), 100) || null
               : null,
         tax_inclusive: false,
         taxComputation,
@@ -560,6 +563,7 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
                     <input
                       type="number"
                       min="0"
+                      max={discountType === 'percentage' ? 100 : undefined}
                       step="0.01"
                       value={discountValue}
                       onChange={(e) => setDiscountValue(e.target.value)}

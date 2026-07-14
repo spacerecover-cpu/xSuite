@@ -23,9 +23,11 @@ export const VATReturnDetailModal: React.FC<VATReturnDetailModalProps> = ({ vatR
 
   useEffect(() => {
     if (!vatReturn) return;
+    let cancelled = false;
     Promise.all([getReturnLines(vatReturn.id), getReturnLedgerRows(vatReturn)])
-      .then(([l, r]) => { setLines(l); setLedger(r); })
-      .catch((e) => logger.error('Error loading return detail:', e));
+      .then(([l, r]) => { if (!cancelled) { setLines(l); setLedger(r); } })
+      .catch((e) => { if (!cancelled) logger.error('Error loading return detail:', e); });
+    return () => { cancelled = true; };
   }, [vatReturn]);
 
   if (!vatReturn) return null;

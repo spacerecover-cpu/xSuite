@@ -147,10 +147,14 @@ export const SystemNumbers: React.FC = () => {
       fiscal_year_anchor: string;
       max_length: string;
     }) => {
-      // The DB coalesces NULL args to the stored value, and each optional arg
-      // defaults to NULL, so omitting a field (undefined) is byte-identical to
-      // sending NULL. `strict` forbids `null` against the generated `string`/
-      // `number` arg types, so an empty field maps to `undefined` here.
+      // Optional args use COALESCE(p_arg, stored) in the RPC, so `undefined`
+      // (=> SQL NULL) means "keep the stored value". `reset_basis` is sent
+      // literally: 'never' is a real persistable state (not a clear), so
+      // COALESCE keeps it — mapping 'never' to `undefined` silently dropped the
+      // "turn the reset off" change. `format_template` / `fiscal_year_anchor`
+      // blank still maps to `undefined` ("keep") because COALESCE-to-stored
+      // cannot null a field back out; reverting a set template to the classic
+      // PREFIX-#### form needs a DB clear-sentinel (tracked cross-file).
       const { error } = await supabase
         .rpc('update_number_sequence', {
           p_scope: scope,
@@ -158,7 +162,7 @@ export const SystemNumbers: React.FC = () => {
           p_padding: padding,
           p_reset: reset_annually,
           p_format_template: format_template || undefined,
-          p_reset_basis: reset_basis === 'never' ? undefined : reset_basis,
+          p_reset_basis: reset_basis,
           p_fiscal_year_anchor: fiscal_year_anchor || undefined,
           p_max_length: max_length === '' ? undefined : Number(max_length),
         });

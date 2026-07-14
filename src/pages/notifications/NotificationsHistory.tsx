@@ -110,6 +110,21 @@ export function NotificationsHistory() {
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
+  // Clamp the page into range whenever the result set shrinks (e.g. dismissing
+  // the last row on the last page, or Mark-all-read under the Unread filter).
+  // Those mutations only invalidate — they never reset page — so without this
+  // the stale out-of-range page refetches zero rows while total drops to
+  // <= pageSize, hiding the pagination bar (and its Prev button) and stranding
+  // the user on a false "No notifications" empty page. Guarded on `data` being
+  // present so it never fires on the transient `total=0` while a freshly
+  // navigated (uncached) page is still loading, which would otherwise break
+  // forward navigation by yanking the user back to page 0.
+  useEffect(() => {
+    if (data && page > totalPages - 1) {
+      setPage(totalPages - 1);
+    }
+  }, [data, page, totalPages]);
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['notifications-history'] });
     queryClient.invalidateQueries({ queryKey: ['notifications', 'in_app'] });

@@ -34,15 +34,18 @@ export function TenantConfigProvider({ children }: { children: React.ReactNode }
     const sync = () => setPortalTenantId(getPortalTenantIdFromSession());
     window.addEventListener('storage', sync);
     window.addEventListener('focus', sync);
-    // Re-check on a short interval at startup to catch the login event
-    // (sessionStorage writes do not fire 'storage' in the same tab).
+    // Poll for the provider's lifetime to catch a same-tab portal login/logout.
+    // sessionStorage writes never fire 'storage' in the tab that wrote them, and
+    // an SPA-navigated portal login neither reloads nor blurs/refocuses the
+    // window — so 'storage' and 'focus' can both miss it. The interval is the
+    // only mechanism that reliably picks up a login that happens at any time.
+    // Do NOT hard-stop it (a prior 30s cutoff stranded slow logins on the
+    // default tenant config/theme with no way to recover until a blur/refocus).
     const intervalId = window.setInterval(sync, 1000);
-    const stopAfter = window.setTimeout(() => window.clearInterval(intervalId), 30_000);
     return () => {
       window.removeEventListener('storage', sync);
       window.removeEventListener('focus', sync);
       window.clearInterval(intervalId);
-      window.clearTimeout(stopAfter);
     };
   }, []);
 

@@ -128,7 +128,12 @@ export const RevenueDashboard: React.FC = () => {
   });
 
   const totalRevenue = revenueData.reduce<number>((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
-  const thisMonth = revenueData.filter((inv) => inv.invoice_date !== null && new Date(inv.invoice_date).getMonth() === new Date().getMonth());
+  const now = new Date();
+  const thisMonth = revenueData.filter((inv) => {
+    if (inv.invoice_date === null) return false;
+    const d = new Date(inv.invoice_date);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  });
   const thisMonthRevenue = thisMonth.reduce<number>((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
   const paidInvoices = revenueData.filter((inv) => inv.status === 'paid');
   const growthRate = prevPeriodRevenue > 0 ? ((totalRevenue - prevPeriodRevenue) / prevPeriodRevenue) * 100 : 0;

@@ -194,30 +194,35 @@ export async function fetchChallanConsignee(
   };
 }
 
-/** Pure assembly: challan lines are the issued batch's device set intersected
- *  with the case devices actually stamped with that checkout_batch_id, minus
- *  any lab-supplied roles (defense in depth — the UI already filters). */
+/** Pure assembly: a challan reprint reproduces the IMMUTABLE issued record. A
+ *  challan number is a statutory serial, so the set of lines, the per-line
+ *  declared VALUES, and the total are all read back from the append-only
+ *  issuance record (`issued.lines` / `issued.totalDeclaredValue`); the live
+ *  `receipt.devices` set is consulted ONLY to look up descriptive fields
+ *  (type/brand/model/serial). A post-issuance edit of a device's role or its
+ *  soft-deletion must never change what a previously-issued challan reprints —
+ *  so issued lines are NOT re-filtered against current role or existence state. */
 export function assembleDeliveryChallanData(
   receipt: ReceiptData,
   issued: IssuedDeliveryChallan,
   consignee: { name: string; address: string | null; gstin: string | null; phone: string | null },
 ): DeliveryChallanData {
-  const declaredByDevice = new Map(issued.lines.map((l) => [l.deviceId, l.declaredValue]));
-  const batchDevices = receipt.devices.filter(
-    (d) => d.checkout_batch_id === issued.batchId && declaredByDevice.has(d.id) && isCustomerOwnedRole(d.role),
-  );
+  const deviceById = new Map(receipt.devices.map((d) => [d.id, d]));
 
-  const lines = batchDevices.map((d) => ({
-    description: [d.device_type, d.brand, d.model].filter(Boolean).join(' ') || 'Storage device',
-    hsnCode: CHALLAN_DEFAULT_HSN,
-    quantity: 1,
-    unitCode: 'NOS',
-    serialNumber: d.serial_number ?? null,
-    declaredValue: declaredByDevice.get(d.id)!,
-  }));
-  const totalDeclaredValue = lines.reduce((sum, l) => sum + l.declaredValue, 0);
+  const lines = issued.lines.map((l) => {
+    const d = deviceById.get(l.deviceId);
+    return {
+      description: [d?.device_type, d?.brand, d?.model].filter(Boolean).join(' ') || 'Storage device',
+      hsnCode: CHALLAN_DEFAULT_HSN,
+      quantity: 1,
+      unitCode: 'NOS',
+      serialNumber: d?.serial_number ?? null,
+      declaredValue: l.declaredValue,
+    };
+  });
+  const totalDeclaredValue = issued.totalDeclaredValue;
 
-  const first = batchDevices[0];
+  const first = issued.lines.length > 0 ? deviceById.get(issued.lines[0].deviceId) : undefined;
   return {
     challanNo: issued.challanNo,
     challanDate: issued.issuedAt,

@@ -619,10 +619,27 @@ export const updateInvoice = async (id: string, invoice: Partial<Invoice>, items
     const restrictedData = sanitizeUuidFields(pickInvoicePersistFields(filtered));
     const { data, error } = await supabase.from('invoices').update(restrictedData).eq('id', id).select().maybeSingle();
     if (error) throw error;
+    // Append-only audit mandate: edits to financially-locked (issued/paid) invoices —
+    // the most sensitive documents — MUST leave an audit_trails row, exactly as the
+    // full-edit path below does. Without this the restricted branch silently mutated
+    // payment routing (due_date/terms/bank_account_id) with no forensic record.
+    await logAuditTrail('update', 'invoices', id, {}, restrictedData as Record<string, unknown>);
     return data;
   }
 
   let updateData: InvoiceUpdate = sanitizeUuidFields(pickInvoicePersistFields(invoice));
+
+  // Tax-invoice status is machine-owned. createInvoice forces 'draft' and the only
+  // legitimate transitions run through issueInvoice (draft→sent via issue_tax_document,
+  // which mints the number and posts vat_records), record/void payment, or
+  // updateInvoiceStatus — each with amount reconciliation. A tax invoice on this
+  // full-edit path is by definition an unpaid draft (getInvoiceEditability), so a
+  // free-form status from the edit form (e.g. picking 'Paid' with amount_paid still 0,
+  // or 'Sent' with no minted number) would desync status from the money and skip
+  // issuance. Never persist a caller-supplied status change here.
+  if (lockRow?.invoice_type === 'tax_invoice' && updateData.status !== undefined) {
+    delete updateData.status;
+  }
 
   if (items) {
     // Header totals now use the shared rounded helper (matching createInvoice).
@@ -1196,7 +1213,7 @@ export async function bulkSendInvoiceEmails(
   const { data: rows, error } = await supabase
     .from('invoices')
     .select(
-      'id, invoice_number, case_id, customers_enhanced:customer_id(customer_name, email)',
+      'id, invoice_number, status, case_id, customers_enhanced:customer_id(customer_name, email)',
     )
     .in('id', invoiceIds)
     .is('deleted_at', null);
@@ -1253,7 +1270,15 @@ export async function bulkSendInvoiceEmails(
             // failure would scare the user into resending.
             await supabase
               .from('invoices')
-              .update({ sent_at: new Date().toISOString(), status: 'sent' })
+              .update({
+                sent_at: new Date().toISOString(),
+                // Only advance draft→sent. `status` is a payment-derived workflow
+                // column (paid/partial/overdue/sent set elsewhere); unconditionally
+                // writing 'sent' when re-sending a copy would revert a fully-paid
+                // invoice to 'sent' with balance_due 0, hiding its settled/overdue
+                // state. Always stamp sent_at; never clobber a post-send status.
+                status: inv.status === 'draft' ? 'sent' : inv.status,
+              })
               .eq('id', inv.id);
             result = {
               invoiceId: inv.id,

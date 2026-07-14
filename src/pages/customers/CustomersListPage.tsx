@@ -47,6 +47,8 @@ interface Customer {
   geo_countries: { id: string; name: string } | null;
   geo_cities: { id: string; name: string } | null;
   customer_company_relationships?: Array<{
+    is_primary: boolean | null;
+    deleted_at: string | null;
     companies: {
       id: string;
       company_name: string | null;
@@ -170,6 +172,7 @@ export const CustomersListPage: React.FC = () => {
           geo_countries (id, name),
           geo_cities (id, name),
           customer_company_relationships (
+            is_primary, deleted_at,
             companies (id, company_name, company_number)
           )
         `, { count: 'exact' })
@@ -259,7 +262,7 @@ export const CustomersListPage: React.FC = () => {
   });
 
   const { data: companySettings } = useQuery({
-    queryKey: ['company_settings'],
+    queryKey: ['company_settings', 'location'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('company_settings')
@@ -743,16 +746,26 @@ export const CustomersListPage: React.FC = () => {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {customer.customer_company_relationships && customer.customer_company_relationships.length > 0 && customer.customer_company_relationships[0].companies ? (
-                          <div className="flex items-center gap-1 text-sm text-slate-700">
-                            <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                            <span className="truncate max-w-[150px]">
-                              {customer.customer_company_relationships[0].companies.company_name}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">-</span>
-                        )}
+                        {(() => {
+                          // Embeds are not auto-filtered for soft-deletes and have no
+                          // guaranteed order, so drop ended links and prefer the primary
+                          // (matching the company-resolution reads used elsewhere).
+                          const activeLinks = (customer.customer_company_relationships ?? []).filter(
+                            (rel) => !rel.deleted_at,
+                          );
+                          const company =
+                            (activeLinks.find((rel) => rel.is_primary) ?? activeLinks[0])?.companies ?? null;
+                          return company ? (
+                            <div className="flex items-center gap-1 text-sm text-slate-700">
+                              <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                              <span className="truncate max-w-[150px]">
+                                {company.company_name}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          );
+                        })()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {customer.portal_enabled ? (

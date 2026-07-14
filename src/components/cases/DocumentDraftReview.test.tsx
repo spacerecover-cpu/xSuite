@@ -126,6 +126,13 @@ describe('data_destruction approval queue', () => {
       .mockResolvedValueOnce('sig-eng')
       .mockResolvedValueOnce('sig-wit')
       .mockResolvedValueOnce('sig-app');
+    // Three distinct signatories — separation of duties requires the operator, witness and
+    // approver to be different people.
+    modalMock.queue = [
+      { method: 'typed', typedValue: 'Olivia Operator' },
+      { method: 'typed', typedValue: 'Walter Witness' },
+      { method: 'typed', typedValue: 'Amy Approver' },
+    ];
 
     render(<DocumentDraftReview isOpen onClose={vi.fn()} caseId="c1" instanceId="di-dd" onSaved={vi.fn()} />);
 
@@ -235,6 +242,12 @@ describe('data_destruction approval queue', () => {
       .mockResolvedValueOnce('sig-eng')
       .mockResolvedValueOnce('sig-wit')
       .mockResolvedValueOnce('sig-app');
+    // Distinct signatories so the separation-of-duties gate passes.
+    modalMock.queue = [
+      { method: 'typed', typedValue: 'Olivia Operator' },
+      { method: 'typed', typedValue: 'Walter Witness' },
+      { method: 'typed', typedValue: 'Amy Approver' },
+    ];
 
     render(<DocumentDraftReview isOpen onClose={vi.fn()} caseId="c1" instanceId="di-dd" onSaved={vi.fn()} />);
     fireEvent.click(await screen.findByRole('button', { name: /approve/i }));
@@ -256,6 +269,67 @@ describe('data_destruction approval queue', () => {
     expect(idBySlot.engineer).toBeNull();
     expect(idBySlot.witness).toBeNull();
     expect(idBySlot.approver).toBe('reviewer');
+  });
+
+  it('rejects a reused signatory name and only approves once three distinct people have signed', async () => {
+    svc.getDocumentInstance.mockResolvedValue({
+      id: 'di-dd',
+      title: 'Data Destruction Certificate',
+      status: 'in_review',
+      created_by: 'author',
+      report_subtype: 'data_destruction',
+      case_id: 'c1',
+    });
+    sigSvc.listInstanceSignatures.mockResolvedValue([]);
+    sigSvc.captureStaffSignature
+      .mockResolvedValueOnce('sig-eng')
+      .mockResolvedValueOnce('sig-wit')
+      .mockResolvedValueOnce('sig-app');
+    // One person tries to self-sign operator AND witness with the same name (a case/space
+    // variant), then a genuinely distinct witness and approver sign.
+    modalMock.queue = [
+      { method: 'typed', typedValue: 'John Smith' },    // operator — persists
+      { method: 'typed', typedValue: ' JOHN smith ' },  // witness — same person → rejected
+      { method: 'typed', typedValue: 'Walter Witness' },// witness — distinct → persists
+      { method: 'typed', typedValue: 'Amy Approver' },  // approver — distinct → persists
+    ];
+
+    render(<DocumentDraftReview isOpen onClose={vi.fn()} caseId="c1" instanceId="di-dd" onSaved={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: /approve/i }));
+
+    fireEvent.click(await screen.findByText('mock-capture')); // operator
+    await waitFor(() => expect(sigSvc.captureStaffSignature).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(await screen.findByText('mock-capture')); // witness (duplicate — refused, not persisted)
+    fireEvent.click(await screen.findByText('mock-capture')); // witness (distinct — persists)
+    await waitFor(() => expect(sigSvc.captureStaffSignature).toHaveBeenCalledTimes(2));
+
+    fireEvent.click(await screen.findByText('mock-capture')); // approver
+    await waitFor(() => expect(sigSvc.captureStaffSignature).toHaveBeenCalledTimes(3));
+
+    const bySlot = Object.fromEntries(
+      sigSvc.captureStaffSignature.mock.calls.map((c: unknown[]) => {
+        const a = c[0] as { slot: string; signerName: string };
+        return [a.slot, a.signerName];
+      }),
+    );
+    // The duplicate 'John Smith' witness attempt never persisted; the witness slot was only
+    // stamped once a second, distinct signatory signed — so all three signatories differ.
+    expect(bySlot.engineer).toBe('John Smith');
+    expect(bySlot.witness).toBe('Walter Witness');
+    expect(bySlot.approver).toBe('Amy Approver');
+    const names = [bySlot.engineer, bySlot.witness, bySlot.approver].map((n) => n.trim().toLowerCase());
+    expect(new Set(names).size).toBe(3);
+
+    // Approval only fires after three distinct signatories — with the approver's signatureId.
+    await waitFor(() =>
+      expect(svc.transitionDocument).toHaveBeenCalledWith(
+        'di-dd',
+        'approved',
+        expect.objectContaining({ signatureId: 'sig-app' }),
+      ),
+    );
+    expect(svc.transitionDocument).toHaveBeenCalledTimes(1);
   });
 });
 

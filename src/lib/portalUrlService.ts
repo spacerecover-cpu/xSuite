@@ -18,13 +18,24 @@ interface PortalSettings {
 }
 
 let cachedPortalSettings: PortalSettings | null = null;
+let cachedTenantId: string | null = null;
 let cacheTimestamp: number = 0;
 const CACHE_DURATION = 5 * 60 * 1000;
 
+function getActiveTenantId(): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  return localStorage.getItem('tenant_id');
+}
+
 export async function getPortalSettings(): Promise<PortalSettings | null> {
   const now = Date.now();
+  const tenantId = getActiveTenantId();
 
-  if (cachedPortalSettings && (now - cacheTimestamp) < CACHE_DURATION) {
+  if (
+    cachedPortalSettings &&
+    cachedTenantId === tenantId &&
+    (now - cacheTimestamp) < CACHE_DURATION
+  ) {
     return cachedPortalSettings;
   }
 
@@ -42,6 +53,7 @@ export async function getPortalSettings(): Promise<PortalSettings | null> {
 
     if (data?.portal_settings && Object.keys(data.portal_settings as object).length > 0) {
       cachedPortalSettings = data.portal_settings as unknown as PortalSettings;
+      cachedTenantId = tenantId;
       cacheTimestamp = now;
       return cachedPortalSettings;
     }
@@ -55,6 +67,7 @@ export async function getPortalSettings(): Promise<PortalSettings | null> {
 
 export function clearPortalSettingsCache(): void {
   cachedPortalSettings = null;
+  cachedTenantId = null;
   cacheTimestamp = 0;
 }
 

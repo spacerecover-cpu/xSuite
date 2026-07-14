@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plus, Search, Package, Zap, Edit2, Trash2, RefreshCw, Filter, MapPin, Printer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../hooks/useToast';
@@ -72,18 +72,34 @@ export default function InventoryListPage() {
   const [page, setPage] = useState(0);
   const pageSize = useListPageSize();
   const [total, setTotal] = useState(0);
+  const loadRequestIdRef = useRef(0);
+  const prevFilterKeyRef = useRef<string | null>(null);
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
   useEffect(() => {
+    // When any filter changes we must fetch from page 0. Resetting the page in a
+    // separate effect caused a stale fetch (old page) followed by a page-0 fetch —
+    // two concurrent requests whose responses could arrive out of order. Instead,
+    // when a filter changed while page > 0, reset the page here and skip the fetch;
+    // the page change re-triggers this effect with page 0 for a single, correct load.
+    const filterKey = JSON.stringify({
+      selectedCategory,
+      selectedStatus,
+      debouncedSearch,
+      pageSize,
+      advancedFilters,
+    });
+    const filtersChanged = prevFilterKeyRef.current !== filterKey;
+    prevFilterKeyRef.current = filterKey;
+    if (filtersChanged && page !== 0) {
+      setPage(0);
+      return;
+    }
     loadData();
   }, [selectedCategory, selectedStatus, debouncedSearch, page, pageSize, advancedFilters]);
-
-  useEffect(() => {
-    setPage(0);
-  }, [debouncedSearch, selectedCategory, selectedStatus, advancedFilters, pageSize]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -111,6 +127,7 @@ export default function InventoryListPage() {
   }, [editingStatusId]);
 
   const loadData = async () => {
+    const requestId = ++loadRequestIdRef.current;
     try {
       if (!isRefreshing) {
         setLoading(true);
@@ -133,6 +150,12 @@ export default function InventoryListPage() {
           getInventoryInsights(),
         ]);
 
+      // Ignore responses from superseded requests so a slow, out-of-order reply
+      // can't overwrite the current result set.
+      if (loadRequestIdRef.current !== requestId) {
+        return;
+      }
+
       setItems(itemsData?.rows || []);
       setTotal(itemsData?.total || 0);
       setCategories(categoriesData || []);
@@ -151,6 +174,9 @@ export default function InventoryListPage() {
         totalInUse: 0,
       });
     } catch (error: unknown) {
+      if (loadRequestIdRef.current !== requestId) {
+        return;
+      }
       setIsRefreshing(false);
       logger.error('Error loading inventory data:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to load inventory data. Please try again.';
@@ -173,8 +199,10 @@ export default function InventoryListPage() {
         totalInUse: 0,
       });
     } finally {
-      setLoading(false);
-      setIsRefreshing(false);
+      if (loadRequestIdRef.current === requestId) {
+        setLoading(false);
+        setIsRefreshing(false);
+      }
     }
   };
 

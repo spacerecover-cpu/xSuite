@@ -134,6 +134,35 @@ function numberPreview(deviceTypes: ReturnType<typeof useInventoryDeviceTypes>['
   return `${dt.inventory_prefix}-…`;
 }
 
+// catalog_device_types.family stores a canonical DeviceFamily KEY (underscore
+// form, e.g. 'head_stack', 'memory_card') — backfilled by migration
+// 20260629215312. Those keys must be used DIRECTLY: routing them through the
+// name-based resolveDeviceFamily() collapses 'memory_card' and 'head_stack' to
+// 'other' (its heuristics expect display names with spaces), which selects the
+// wrong technical field set AND an empty donor-part vocabulary — silently
+// dropping stored specs and soft-deleting recorded donor parts on edit/save.
+// Record<DeviceFamily, true> keeps this exhaustive: a new family in the union
+// won't compile until it is listed here.
+const DEVICE_FAMILY_KEYS: Record<DeviceFamily, true> = {
+  hdd: true, ssd: true, nvme: true, usb_flash: true, memory_card: true,
+  mobile: true, raid: true, nas: true, pcb: true, head_stack: true, other: true,
+};
+
+/**
+ * Resolve the DeviceFamily for a device-type row. Prefers the row's canonical
+ * `family` KEY; falls back to name-based resolution only when `family` is absent
+ * or (defensively) holds a legacy display name rather than a canonical key.
+ */
+export function familyFromDeviceType(
+  dt: { family?: string | null; name?: string | null } | undefined,
+): DeviceFamily {
+  const key = dt?.family?.trim().toLowerCase();
+  if (key && Object.prototype.hasOwnProperty.call(DEVICE_FAMILY_KEYS, key)) {
+    return key as DeviceFamily;
+  }
+  return resolveDeviceFamily(key || (dt?.name ?? ''));
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -217,9 +246,7 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
   // Resolve family from selected device type
   const resolveFamily = useCallback((typeId: string): DeviceFamily => {
     if (!typeId || !deviceTypes) return 'other';
-    const dt = deviceTypes.find(d => d.id === typeId);
-    if (dt?.family) return resolveDeviceFamily(dt.family);
-    return resolveDeviceFamily(dt?.name ?? '');
+    return familyFromDeviceType(deviceTypes.find(d => d.id === typeId));
   }, [deviceTypes]);
 
   const family = resolveFamily(form.device_type_id as string);
@@ -291,8 +318,8 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
         if (!item) return;
         setItemNumber(item.item_number ?? '');
 
-        const itemFamily = resolveDeviceFamily(
-          deviceTypes?.find(d => d.id === item.device_type_id)?.family ?? ''
+        const itemFamily = familyFromDeviceType(
+          deviceTypes?.find(d => d.id === item.device_type_id),
         );
         const techForm = hydrateInventorySpecs(
           itemFamily,

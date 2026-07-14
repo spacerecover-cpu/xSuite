@@ -307,13 +307,13 @@ export default function PurchaseOrderDetailPage() {
                   </label>
                   <p className="font-medium">{format(new Date(order.order_date), 'MMM dd, yyyy')}</p>
                 </div>
-                {order.expected_delivery && (
+                {order.expected_delivery_date && (
                   <div>
                     <label className="text-sm text-slate-500 flex items-center gap-1">
                       <Clock className="w-4 h-4" />
                       Expected Delivery
                     </label>
-                    <p className="font-medium">{format(new Date(order.expected_delivery), 'MMM dd, yyyy')}</p>
+                    <p className="font-medium">{format(new Date(order.expected_delivery_date), 'MMM dd, yyyy')}</p>
                   </div>
                 )}
                 {order.shipping_method && (
@@ -413,7 +413,7 @@ export default function PurchaseOrderDetailPage() {
             loadOrder(id);
             setShowEditModal(false);
           }}
-          purchaseOrder={order}
+          purchaseOrder={{ ...order, expected_delivery: order.expected_delivery_date }}
         />
       )}
 

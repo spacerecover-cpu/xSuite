@@ -147,6 +147,8 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
         category_id: categoryId,
         item_type: itemType,
         brand: brand.trim() || null,
+        model: model.trim() || null,
+        capacity: capacity.trim() || null,
         unit: unitOfMeasure.trim() || 'pcs',
         barcode: barcode.trim() || null,
         photos: trimmedImage ? [trimmedImage] : null,

@@ -720,7 +720,7 @@ export const CaseDetail: React.FC = () => {
             patientDeviceName={
               modals.selectedClone && devices.length > 0
                 ? (() => {
-                    const patientDevice = devices.find(d => d.id === modals.selectedClone.patient_device_id);
+                    const patientDevice = devices.find(d => d.id === (modals.selectedClone.device_id ?? modals.selectedClone.patient_device_id));
                     return patientDevice
                       ? `${patientDevice.device_type?.name || 'Device'} ${patientDevice.serial_number ? `(${patientDevice.serial_number})` : ''}`
                       : 'Unknown Device';
@@ -747,7 +747,7 @@ export const CaseDetail: React.FC = () => {
             patientDeviceName={
               modals.selectedClone && devices.length > 0
                 ? (() => {
-                    const patientDevice = devices.find(d => d.id === modals.selectedClone.patient_device_id);
+                    const patientDevice = devices.find(d => d.id === (modals.selectedClone.device_id ?? modals.selectedClone.patient_device_id));
                     return patientDevice
                       ? `${patientDevice.device_type?.name || 'Device'} ${patientDevice.serial_number ? `(${patientDevice.serial_number})` : ''}`
                       : 'Unknown Device';
