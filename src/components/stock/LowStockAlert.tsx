@@ -16,7 +16,7 @@ export function LowStockAlert({ count, onDismiss }: LowStockAlertProps) {
         <span className="font-semibold">{count} item{count !== 1 ? 's' : ''}</span> are running low on stock.
       </p>
       <Link
-        to="/resources/stock?filter=low-stock"
+        to="/stock?filter=low-stock"
         className="text-sm font-medium text-warning underline underline-offset-2 hover:text-warning/80 whitespace-nowrap"
       >
         View Low Stock

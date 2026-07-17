@@ -33,8 +33,20 @@ vi.mock('./taxDocumentService', () => ({
   persistDocumentTaxLines: vi.fn(() => Promise.resolve()),
 }));
 
+vi.mock('./pdf/pdfService', () => ({
+  generateQuoteAsBlob: vi.fn(() =>
+    Promise.resolve({ success: true, blob: new Blob(['pdf']), filename: 'q.pdf' }),
+  ),
+}));
+vi.mock('./emailDocumentService', () => ({
+  sendDocumentEmail: vi.fn(() => Promise.resolve({ success: true })),
+}));
+vi.mock('./emailTemplates', () => ({
+  getEmailTemplate: vi.fn(() => ({ subject: 's', body: 'b' })),
+}));
+
 import { computeDocumentTotals } from './taxDocumentService';
-import { createQuote, duplicateQuote, permanentDeleteQuote } from './quotesService';
+import { createQuote, duplicateQuote, permanentDeleteQuote, bulkSendQuoteEmails } from './quotesService';
 
 // Kernel parity pin (M-G): locks the canonical quote shape (12 × OMR 120.000 @5%,
 // no discount, 3-dp) that quotesService now routes through the fiscal kernel.
@@ -212,5 +224,55 @@ describe('duplicateQuote — preserves discount_type (regression for Bug 64)', (
     // …and the duplicate must persist discount_type so later edits recompute correctly.
     expect(capturedQuoteInsert).toHaveLength(1);
     expect(capturedQuoteInsert[0]).toMatchObject({ discount_type: 'percentage', discount_amount: 10 });
+  });
+});
+
+describe('bulkSendQuoteEmails — status write is gated (regression for re-send downgrade)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('does not downgrade an accepted quote to sent, but advances a draft to sent', async () => {
+    const rows = [
+      {
+        id: 'q-accepted',
+        quote_number: 'Q-ACC',
+        status: 'accepted',
+        case_id: null,
+        customers_enhanced: { customer_name: 'Alice', email: 'alice@example.com' },
+      },
+      {
+        id: 'q-draft',
+        quote_number: 'Q-DRAFT',
+        status: 'draft',
+        case_id: null,
+        customers_enhanced: { customer_name: 'Bob', email: 'bob@example.com' },
+      },
+    ];
+    const statusUpdates: { id: string; status: string }[] = [];
+
+    from.mockImplementation((table: string) => {
+      if (table === 'quotes') {
+        const c: Record<string, unknown> = {};
+        c.select = vi.fn(() => c);
+        c.in = vi.fn(() => c);
+        c.is = vi.fn(() => Promise.resolve({ data: rows, error: null }));
+        c.update = vi.fn((payload: { status: string }) => ({
+          eq: vi.fn((_col: string, val: string) => {
+            statusUpdates.push({ id: val, status: payload.status });
+            return Promise.resolve({ error: null });
+          }),
+        }));
+        return c;
+      }
+      return chain({ data: null, error: null });
+    });
+
+    const results = await bulkSendQuoteEmails(['q-accepted', 'q-draft']);
+
+    // Both rows are still emailed.
+    expect(results.map((r) => r.status)).toEqual(['sent', 'sent']);
+    // Only the draft's persisted status is advanced; accepted is never written.
+    expect(statusUpdates).toEqual([{ id: 'q-draft', status: 'sent' }]);
   });
 });

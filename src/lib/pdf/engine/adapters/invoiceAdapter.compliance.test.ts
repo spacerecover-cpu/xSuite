@@ -202,6 +202,42 @@ describe('invoiceAdapter compliance rendering', () => {
     expect(forcedCols.find((c) => c.key === 'itemCode')!.visible).toBe(true);
     expect(forcedCols.find((c) => c.key === 'unit')!.visible).toBe(true);
   });
+
+  it('honors a percentage document discount (subtotal × pct / 100), mirroring the quote adapter', () => {
+    // 10% of 1000 = 100 discount → net 900; a flat subtract-of-discount_amount would
+    // have printed only 10 (Net 990) and left the legal invoice internally
+    // inconsistent with the stored Total. Tax/total come from the STORED header.
+    const fixture = buildInvoiceFixture({
+      subtotal: 1000,
+      discount_type: 'percentage',
+      discount_amount: 10,
+      tax_amount: 0,
+      total_amount: 900,
+      tax_lines: [],
+    });
+    const data = toEngineData(fixture, omConfig());
+    const discountRow = data.totals!.find((t) => t.key === 'discount')!;
+    const netRow = data.totals!.find((t) => t.key === 'netAmount')!;
+    expect(discountRow.value).toContain('100'); // 10% of 1000, NOT 10
+    expect(discountRow.value).not.toContain('10.000');
+    expect(discountRow.label.en).toBe('Discount (10%):');
+    expect(netRow.value).toContain('900'); // net, NOT 990
+  });
+
+  it('treats a flat amount discount unchanged (discount_type default)', () => {
+    const fixture = buildInvoiceFixture({
+      subtotal: 1000,
+      discount_type: 'amount',
+      discount_amount: 100,
+      tax_amount: 0,
+      total_amount: 900,
+      tax_lines: [],
+    });
+    const data = toEngineData(fixture, omConfig());
+    const discountRow = data.totals!.find((t) => t.key === 'discount')!;
+    expect(discountRow.value).toContain('100');
+    expect(discountRow.label.en).toBe('Discount:');
+  });
 });
 
 // ---------------------------------------------------------------------------

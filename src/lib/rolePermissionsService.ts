@@ -1,4 +1,4 @@
-import { supabase, getTenantId } from './supabaseClient';
+import { supabase, getTenantId, resolveTenantId } from './supabaseClient';
 import { logger } from './logger';
 
 // Roles whose module access is resolved from role_module_permissions. owner/admin
@@ -212,7 +212,10 @@ class RolePermissionsService {
         return { success: false, error: 'Owner and Admin permissions cannot be modified' };
       }
 
+      const tenantId = await resolveTenantId();
+
       const updates = permissions.map(({ moduleId, canAccess }) => ({
+        tenant_id: tenantId,
         role,
         module_id: moduleId,
         can_access: canAccess,
@@ -221,7 +224,7 @@ class RolePermissionsService {
       const { error: upsertError } = await supabase
         .from('role_module_permissions')
         .upsert(updates as never, {
-          onConflict: 'role,module_id',
+          onConflict: 'tenant_id,role,module_id',
         });
 
       if (upsertError) {

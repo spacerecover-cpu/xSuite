@@ -261,6 +261,30 @@ Deno.serve(async (req: Request) => {
     if (action === "reset-password" && req.method === "POST") {
       const body: ResetPasswordRequest = await req.json();
 
+      // Tenant-scope the target: look up the target user's profile and require it
+      // to belong to the caller's tenant. Platform admins (tenant_id IS NULL with
+      // owner/admin role) may reset across tenants; tenant admins may not.
+      const { data: targetProfile } = await supabaseClient
+        .from("profiles")
+        .select("tenant_id")
+        .eq("id", body.userId)
+        .maybeSingle();
+
+      if (!targetProfile) {
+        return new Response(
+          JSON.stringify({ error: "Target user not found" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const callerIsPlatformAdmin = callerProfile.tenant_id === null;
+      if (!callerIsPlatformAdmin && targetProfile.tenant_id !== callerProfile.tenant_id) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden: target user is outside your tenant" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       const { error: pwError } = await supabaseClient.auth.admin.updateUserById(
         body.userId,
         { password: body.newPassword }

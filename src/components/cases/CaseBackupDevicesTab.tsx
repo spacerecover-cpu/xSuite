@@ -72,7 +72,7 @@ export const CaseBackupDevicesTab: React.FC<CaseBackupDevicesTabProps> = ({
     // quantity_on_hand and flips serials to 'sold', so serialNumbers/items/stats
     // (and salesByCase) all go stale — not just this case's sales list.
     queryClient.invalidateQueries({ queryKey: stockKeys.all });
-    navigate(`/resources/stock/sales/${saleId}`);
+    navigate(`/stock/sales/${saleId}`);
   };
 
   const handleUsageSuccess = () => {
@@ -228,7 +228,7 @@ export const CaseBackupDevicesTab: React.FC<CaseBackupDevicesTabProps> = ({
                         </td>
                         <td className="py-3 text-right">
                           <button
-                            onClick={() => navigate(`/resources/stock/sales/${sale.id}`)}
+                            onClick={() => navigate(`/stock/sales/${sale.id}`)}
                             className="text-slate-400 hover:text-primary transition-colors"
                           >
                             <ExternalLink className="w-4 h-4" />

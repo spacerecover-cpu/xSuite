@@ -112,7 +112,7 @@ export const CustomerPurchasesTab: React.FC<CustomerPurchasesTabProps> = ({ cust
                         </td>
                         <td className="py-3 text-right">
                           <button
-                            onClick={() => navigate(`/resources/stock/sales/${sale.id}`)}
+                            onClick={() => navigate(`/stock/sales/${sale.id}`)}
                             className="text-slate-400 hover:text-primary transition-colors"
                           >
                             <ExternalLink className="w-4 h-4" />

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchInvoicesPage, getInvoiceStats, createInvoice, updateInvoice, toInvoiceEditInitialData } from '../../lib/invoiceService';
+import { fetchInvoicesPage, getInvoiceStats, createInvoice, updateInvoice, toInvoiceEditInitialData, mapInvoiceLineItemRows } from '../../lib/invoiceService';
 import type { Invoice, InvoiceItem, InvoiceWithDetails } from '../../lib/invoiceService';
 import { getInvoiceEditability, canRecordPayment as invoiceCanRecordPayment } from '../../lib/invoicePermissions';
 import type { PaymentReceipt } from '../../lib/bankingService';
@@ -120,7 +120,10 @@ export const InvoicesListPage: React.FC<unknown> = () => {
         .eq('invoice_id', invoice.id)
         .is('deleted_at', null)
         .order('sort_order', { ascending: true });
-      setEditingInvoice({ ...data, invoice_line_items: items ?? [] } as unknown as InvoiceWithDetails);
+      // Normalize the raw rows (DB `discount` percent → `discount_percent`) so the
+      // form pre-fills each line's discount and saving preserves it instead of
+      // rewriting the line at 0%.
+      setEditingInvoice({ ...data, invoice_line_items: mapInvoiceLineItemRows(items) } as unknown as InvoiceWithDetails);
       setShowInvoiceModal(true);
     }
   };
