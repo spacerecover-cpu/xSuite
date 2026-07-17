@@ -277,6 +277,31 @@ export const fetchInvoices = async (filters?: {
   return rows;
 };
 
+/**
+ * Map raw `invoice_line_items` DB rows (columns `discount`, `total`) onto the
+ * caller-facing `InvoiceItem` shape (`discount_percent`, `line_total`), also
+ * hydrating the unit/item-code compliance fields. Any edit surface that re-fetches
+ * raw line rows to pre-fill the form MUST route them through this — seeding raw
+ * rows leaves `discount_percent` undefined, so a save silently rewrites the line
+ * at 0% discount and inflates the total.
+ */
+export const mapInvoiceLineItemRows = (
+  rows: InvoiceLineItemRow[] | null | undefined,
+): InvoiceItem[] =>
+  (rows ?? []).map((it) => ({
+    id: it.id,
+    description: it.description,
+    quantity: it.quantity ?? 0,
+    unit_price: it.unit_price,
+    tax_rate: it.tax_rate ?? 0,
+    discount_percent: it.discount ?? 0,
+    line_total: it.total,
+    sort_order: it.sort_order ?? 0,
+    unit_code: it.unit_code ?? null,
+    unit_label: it.unit_label ?? null,
+    item_code: it.item_code ?? null,
+  }));
+
 export const fetchInvoiceById = async (id: string): Promise<InvoiceWithDetails | null> => {
   const { data, error } = await supabase
     .from('invoices')
@@ -360,22 +385,7 @@ export const fetchInvoiceById = async (id: string): Promise<InvoiceWithDetails |
 
   if (itemsError) throw itemsError;
 
-  // Map DB columns (discount, total) → caller-facing InvoiceItem (discount_percent, line_total)
-  const mappedItems: InvoiceItem[] = (items ?? []).map((it: InvoiceLineItemRow) => ({
-    id: it.id,
-    description: it.description,
-    quantity: it.quantity ?? 0,
-    unit_price: it.unit_price,
-    tax_rate: it.tax_rate ?? 0,
-    discount_percent: it.discount ?? 0,
-    line_total: it.total,
-    sort_order: it.sort_order ?? 0,
-    // Hydrate the unit/item-code compliance fields on edit (mirrors quotesService.fetchQuoteById);
-    // without this, opening an invoice for edit blanks them and updateInvoice writes null.
-    unit_code: it.unit_code ?? null,
-    unit_label: it.unit_label ?? null,
-    item_code: it.item_code ?? null,
-  }));
+  const mappedItems: InvoiceItem[] = mapInvoiceLineItemRows(items);
 
   return {
     ...data,

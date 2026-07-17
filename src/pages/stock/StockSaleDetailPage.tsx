@@ -91,7 +91,7 @@ export const StockSaleDetailPage: React.FC = () => {
             variant="secondary"
             size="sm"
             className="mt-6 gap-2"
-            onClick={() => navigate('/resources/stock/sales')}
+            onClick={() => navigate('/stock/sales')}
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Sales
@@ -111,7 +111,7 @@ export const StockSaleDetailPage: React.FC = () => {
     <div className="p-6 max-w-5xl mx-auto space-y-6 print:p-0 print:space-y-4">
       <div className="flex items-center justify-between print:hidden">
         <button
-          onClick={() => navigate('/resources/stock/sales')}
+          onClick={() => navigate('/stock/sales')}
           className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />

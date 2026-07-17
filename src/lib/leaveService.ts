@@ -308,9 +308,18 @@ export const leaveService = {
   },
 
   async upsertLeaveBalance(payload: LeaveBalanceInsert): Promise<LeaveBalance> {
+    let tenantId = payload.tenant_id;
+    if (!tenantId) {
+      const { data: currentTenantId } = await supabase.rpc('get_current_tenant_id');
+      if (!currentTenantId) throw new Error('No current tenant');
+      tenantId = currentTenantId;
+    }
     const { data, error } = await supabase
       .from('leave_balances')
-      .upsert(payload, { onConflict: 'employee_id,leave_type_id,year' })
+      .upsert(
+        { ...payload, tenant_id: tenantId },
+        { onConflict: 'tenant_id,employee_id,leave_type_id,year' },
+      )
       .select()
       .maybeSingle();
     if (error) throw error;

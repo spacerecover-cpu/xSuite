@@ -87,7 +87,7 @@ export const StockValueWidget: React.FC = () => {
       )}
 
       <button
-        onClick={() => navigate('/resources/stock/reports')}
+        onClick={() => navigate('/stock/reports')}
         className="mt-4 flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
       >
         View stock reports

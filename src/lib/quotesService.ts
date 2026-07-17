@@ -958,7 +958,7 @@ export async function bulkSendQuoteEmails(
   const { data: rows, error } = await supabase
     .from('quotes')
     .select(
-      'id, quote_number, case_id, customers_enhanced:customer_id(customer_name, email)',
+      'id, quote_number, status, case_id, customers_enhanced:customer_id(customer_name, email)',
     )
     .in('id', quoteIds)
     .is('deleted_at', null);
@@ -1012,11 +1012,15 @@ export async function bulkSendQuoteEmails(
           if (send.success) {
             // Best-effort status update — quotes table has no sent_at
             // column (unlike invoices). Don't fail the row if this
-            // errors; the email already went out.
-            await supabase
-              .from('quotes')
-              .update({ status: 'sent' })
-              .eq('id', q.id);
+            // errors; the email already went out. Only advance a
+            // pre-send status to 'sent'; never downgrade an
+            // accepted/converted/rejected/expired quote on a re-send.
+            if (q.status === 'draft' || q.status === 'sent') {
+              await supabase
+                .from('quotes')
+                .update({ status: 'sent' })
+                .eq('id', q.id);
+            }
             result = {
               quoteId: q.id,
               quoteNumber: q.quote_number,

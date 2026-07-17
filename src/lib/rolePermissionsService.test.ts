@@ -7,6 +7,7 @@ const rpc = vi.fn(async (_name: string) => ({
   data: [{ module_id: 'm1', module_slug: 'cases', module_name: 'Cases' }],
   error: null,
 }));
+const upsert = vi.fn(async (_rows?: unknown, _opts?: unknown) => ({ error: null }));
 
 vi.mock('./supabaseClient', () => ({
   supabase: {
@@ -20,9 +21,11 @@ vi.mock('./supabaseClient', () => ({
           }),
         }),
       }),
+      upsert: (rows: any, opts: any) => upsert(rows, opts),
     }),
   },
   getTenantId: () => tenantId,
+  resolveTenantId: async () => tenantId,
 }));
 vi.mock('./logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
@@ -63,5 +66,34 @@ describe('rolePermissionsService cache isolation', () => {
     await rolePermissionsService.getAllModules(); // re-warm timestamp
     await rolePermissionsService.getRolePermissions('technician');
     expect(accessibleRpcCalls()).toBe(2);
+  });
+});
+
+describe('updateRolePermissions tenant stamping (T12)', () => {
+  beforeEach(() => {
+    upsert.mockClear();
+    tenantId = 'tenant-A';
+  });
+
+  it('stamps tenant_id on every upserted row and conflicts on the full unique key', async () => {
+    const result = await rolePermissionsService.updateRolePermissions('technician', [
+      { moduleId: 'm1', canAccess: true },
+      { moduleId: 'm2', canAccess: false },
+    ]);
+
+    expect(result.success).toBe(true);
+    expect(upsert).toHaveBeenCalledTimes(1);
+
+    const [rows, opts] = upsert.mock.calls[0] as [any[], any];
+    // The table's only unique key is UNIQUE (tenant_id, role, module_id);
+    // conflicting on 'role,module_id' would be rejected by Postgres (42P10).
+    expect(opts.onConflict).toBe('tenant_id,role,module_id');
+    // tenant_id is NOT NULL with no default and no stamping trigger, so every
+    // row must carry the current tenant id or the INSERT fails.
+    expect(rows).toHaveLength(2);
+    rows.forEach((row) => {
+      expect(row.tenant_id).toBe('tenant-A');
+      expect(row.role).toBe('technician');
+    });
   });
 });

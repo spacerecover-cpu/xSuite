@@ -306,6 +306,12 @@ export interface InvoiceData {
   tax_rate?: number;
   tax_amount: number;
   discount_amount: number;
+  /** How `discount_amount` is expressed: a flat currency 'amount' (default) or a
+   *  'percentage' of the subtotal. Mirrors QuoteData.discount_type so the invoice
+   *  adapter can resolve a percentage document discount to its absolute value.
+   *  Optional (defaults to 'amount' at the adapter) so existing InvoiceData
+   *  fixtures/literals stay valid. */
+  discount_type?: 'amount' | 'percentage';
   total_amount: number;
   amount_paid: number;
   balance_due: number;

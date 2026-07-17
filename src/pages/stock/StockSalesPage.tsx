@@ -108,13 +108,13 @@ export const StockSalesPage: React.FC = () => {
   );
 
   const handleViewDetail = (sale: StockSaleWithDetails) => {
-    navigate(`/resources/stock/sales/${sale.id}`);
+    navigate(`/stock/sales/${sale.id}`);
   };
 
   const handleSaleSuccess = (saleId: string) => {
     queryClient.invalidateQueries({ queryKey: stockKeys.sales() });
     queryClient.invalidateQueries({ queryKey: stockKeys.stats() });
-    navigate(`/resources/stock/sales/${saleId}`);
+    navigate(`/stock/sales/${saleId}`);
   };
 
   return (

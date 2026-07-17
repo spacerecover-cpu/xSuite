@@ -307,6 +307,9 @@ Deno.serve(async (req: Request) => {
 
       case "PAYMENT.SALE.COMPLETED": {
         const amount = parseFloat(event.resource?.amount?.total || "0");
+        // PayPal sends amount.total as a DOLLARS string (e.g. "49.99"); the
+        // billing_invoices money columns are integer CENTS, so convert before insert.
+        const amountCents = Math.round(amount * 100);
         const currency = event.resource?.amount?.currency || "USD";
 
         const { data: subscription } = await supabase
@@ -342,9 +345,9 @@ Deno.serve(async (req: Request) => {
               subscription_id: subscription.id,
               invoice_number: nextNumber || `INV-${Date.now()}`,
               invoice_date: nowIso,
-              subtotal: amount,
-              total: amount,
-              amount_paid: amount,
+              subtotal: amountCents,
+              total: amountCents,
+              amount_paid: amountCents,
               amount_due: 0,
               paid_at: nowIso,
               currency,

@@ -203,7 +203,7 @@ export const Dashboard: React.FC = () => {
         </button>
 
         <button
-          onClick={() => navigate('/resources/stock/reports')}
+          onClick={() => navigate('/stock/reports')}
           className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 text-left hover:shadow-md transition-all group"
         >
           <div className="flex items-center gap-3 mb-2">

@@ -288,7 +288,7 @@ export const StockItemDetail: React.FC = () => {
       <div className="p-6 text-center">
         <Package className="w-12 h-12 text-slate-300 mx-auto mb-3" />
         <p className="text-slate-500 font-medium">Item not found</p>
-        <Button onClick={() => navigate('/resources/stock')} className="mt-4" size="sm">
+        <Button onClick={() => navigate('/stock')} className="mt-4" size="sm">
           Back to Stock
         </Button>
       </div>
@@ -313,7 +313,7 @@ export const StockItemDetail: React.FC = () => {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-5">
         <button
-          onClick={() => navigate('/resources/stock')}
+          onClick={() => navigate('/stock')}
           className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 transition-colors text-sm font-medium mb-4"
         >
           <ChevronLeft className="w-4 h-4" />

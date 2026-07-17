@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchInvoiceById, convertProformaToTaxInvoice, getConversionHistory, updateInvoice, toInvoiceEditInitialData, getPaymentHistory, issueInvoice } from '../../lib/invoiceService';
+import { fetchInvoiceById, convertProformaToTaxInvoice, getConversionHistory, updateInvoice, toInvoiceEditInitialData, getPaymentHistory, issueInvoice, mapInvoiceLineItemRows } from '../../lib/invoiceService';
 import type { Invoice, InvoiceItem, InvoiceWithDetails } from '../../lib/invoiceService';
 import { getInvoiceEditability, canRecordPayment as invoiceCanRecordPayment, canIssueInvoice as invoiceCanIssue, canCreditInvoice as invoiceCanCredit, getPaymentSummary } from '../../lib/invoicePermissions';
 import { PaymentSummaryBar } from '../../components/financial/PaymentSummaryBar';
@@ -272,7 +272,10 @@ export const InvoiceDetailPage: React.FC = () => {
       .eq('invoice_id', id)
       .is('deleted_at', null)
       .order('sort_order', { ascending: true });
-    setEditingInvoice({ ...data, invoice_line_items: items ?? [] } as unknown as InvoiceWithDetails);
+    // Normalize the raw rows (DB `discount` percent → `discount_percent`) so the
+    // form pre-fills each line's discount and saving preserves it instead of
+    // rewriting the line at 0%.
+    setEditingInvoice({ ...data, invoice_line_items: mapInvoiceLineItemRows(items) } as unknown as InvoiceWithDetails);
     setShowEditModal(true);
   };
 
@@ -629,6 +632,7 @@ export const InvoiceDetailPage: React.FC = () => {
                 invoice_date: invoicePayload.invoice_date,
                 due_date: invoicePayload.due_date,
                 status: invoicePayload.status,
+                currency: invoicePayload.currency,
                 payment_terms: invoicePayload.payment_terms,
                 notes: invoicePayload.notes,
                 internal_notes: invoicePayload.internal_notes,

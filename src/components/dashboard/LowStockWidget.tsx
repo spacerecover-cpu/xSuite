@@ -72,7 +72,7 @@ export const LowStockWidget: React.FC = () => {
       )}
 
       <button
-        onClick={() => navigate('/resources/stock')}
+        onClick={() => navigate('/stock')}
         className="mt-4 flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
       >
         View all stock items

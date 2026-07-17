@@ -218,7 +218,13 @@ export function toEngineData(
   // (e.g. a fully-credited invoice) is honored instead of triggering a fallback.
   const subtotal = invoiceData.subtotal ?? 0;
   const discountAmount = invoiceData.discount_amount ?? 0;
-  const discountedSubtotal = subtotal - discountAmount;
+  // Discount honors `discount_type` ('amount' | 'percentage') exactly like the
+  // quote adapter: a percentage document discount is resolved to its absolute
+  // value (subtotal × pct / 100) for the printed Discount / Net Amount rows and
+  // the no-rollup tax-summary taxable base, so the legal invoice reconciles.
+  const discountType = invoiceData.discount_type || 'amount';
+  const discountValue = discountType === 'percentage' ? (subtotal * discountAmount) / 100 : discountAmount;
+  const discountedSubtotal = subtotal - discountValue;
   const storedTax = invoiceData.tax_amount ?? 0;
   const totalAmount = invoiceData.total_amount ?? (discountedSubtotal + storedTax);
   const amountPaid = invoiceData.amount_paid ?? 0;
@@ -245,8 +251,15 @@ export function toEngineData(
   if (on('subtotal')) {
     totals.push({ ...tl('subtotal', 'Subtotal:', 'المجموع الفرعي:'), value: money(subtotal) });
   }
-  if (on('discount') && discountAmount > 0) {
-    totals.push({ ...tl('discount', 'Discount:', 'الخصم:'), value: `- ${money(discountAmount)}` });
+  if (on('discount') && discountValue > 0) {
+    const dline = tl('discount', 'Discount:', 'الخصم:');
+    const discountLabel: LabelText =
+      tLabels.discount
+        ? dline.label // explicit override wins, even for a percentage discount
+        : discountType === 'percentage'
+          ? { en: `Discount (${discountAmount}%):`, ar: `الخصم (${discountAmount}%):` }
+          : dline.label;
+    totals.push({ key: 'discount', label: discountLabel, value: `- ${money(discountValue)}` });
     totals.push({ ...tl('netAmount', 'Net Amount:', 'صافي المبلغ:'), value: money(discountedSubtotal) });
   }
   if (on('vat')) {

@@ -10,7 +10,7 @@ vi.mock('../companySettingsService', () => ({ getOrCreateCompanySettings: vi.fn(
 
 import { supabase } from '../supabaseClient';
 import { getOrCreateCompanySettings } from '../companySettingsService';
-import { toQuoteData, toInvoiceData, toCaseData, toPaymentReceiptData, toPayslipData, toQuoteItems, toInvoiceItems, currencyToBlock, fetchDocumentTaxLines, fetchCompanySettings } from './dataFetcher';
+import { toQuoteData, toInvoiceData, toCaseData, toPaymentReceiptData, toPayslipData, toQuoteItems, toInvoiceItems, currencyToBlock, resolveDocumentCurrency, fetchDocumentTaxLines, fetchCompanySettings } from './dataFetcher';
 
 // Wires supabase.from('document_tax_lines').select(...).eq(...).eq(...).is(...).order(...)
 // to resolve with `result`, and returns the spies so callers can assert on args.
@@ -117,6 +117,74 @@ describe('currencyToBlock — resolved CurrencyConfig → document currency bloc
   });
 });
 
+// Wires supabase.from('master_currency_codes').select(...).eq('code', X).maybeSingle()
+// to resolve with `result`, mirroring mockDocumentTaxLinesQuery's swap-in pattern.
+function mockCurrencyLookup(result: { data: unknown; error: unknown }) {
+  const maybeSingle = vi.fn().mockResolvedValue(result);
+  const eq = vi.fn(() => ({ maybeSingle }));
+  const select = vi.fn(() => ({ eq }));
+  const from = vi.fn(() => ({ select }));
+  (supabase as unknown as { from: typeof from }).from = from;
+  return { from, select, eq, maybeSingle };
+}
+
+const USD: CurrencyConfig = {
+  code: 'USD',
+  symbol: '$',
+  name: 'US Dollar',
+  decimalPlaces: 2,
+  decimalSeparator: '.',
+  thousandsSeparator: ',',
+  position: 'before',
+  displayMode: 'symbol',
+  negativeFormat: 'minus',
+};
+
+describe('resolveDocumentCurrency — the DOCUMENT currency, not the tenant base (kills the base-currency leak, #20)', () => {
+  it('renders a EUR document in EUR (€), NOT the USD base symbol', async () => {
+    mockCurrencyLookup({ data: { code: 'EUR', symbol: '€', name: 'Euro', decimal_places: 2 }, error: null });
+    const cfg = await resolveDocumentCurrency(USD, 'EUR');
+    expect(cfg.code).toBe('EUR');
+    expect(cfg.symbol).toBe('€');
+    expect(currencyToBlock(cfg).currency_symbol).toBe('€');
+    expect(currencyToBlock(cfg).currency_symbol).not.toBe('$');
+  });
+
+  it('uses the DOCUMENT currency decimal places, not the base (base OMR 3dp → USD doc 2dp)', async () => {
+    mockCurrencyLookup({ data: { code: 'USD', symbol: '$', name: 'US Dollar', decimal_places: 2 }, error: null });
+    const cfg = await resolveDocumentCurrency(OMR, 'USD');
+    expect(cfg.decimalPlaces).toBe(2);
+    expect(currencyToBlock(cfg).decimal_places).toBe(2);
+    expect(cfg.symbol).toBe('$');
+  });
+
+  it('short-circuits (no DB hit) when the document currency equals the base', async () => {
+    const from = vi.fn();
+    (supabase as unknown as { from: typeof from }).from = from;
+    const cfg = await resolveDocumentCurrency(USD, 'USD');
+    expect(cfg).toBe(USD);
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it('returns the base config when the document has no currency', async () => {
+    expect(await resolveDocumentCurrency(USD, null)).toBe(USD);
+    expect(await resolveDocumentCurrency(USD, undefined)).toBe(USD);
+  });
+
+  it('falls back to the base config for an unknown currency (never fabricates a symbol)', async () => {
+    mockCurrencyLookup({ data: null, error: null });
+    const cfg = await resolveDocumentCurrency(USD, 'XYZ');
+    expect(cfg).toBe(USD);
+  });
+
+  it('falls back to the base decimal places when the reference row omits decimal_places', async () => {
+    mockCurrencyLookup({ data: { code: 'EUR', symbol: '€', name: 'Euro', decimal_places: null }, error: null });
+    const cfg = await resolveDocumentCurrency(OMR, 'EUR');
+    expect(cfg.decimalPlaces).toBe(3);
+    expect(cfg.symbol).toBe('€');
+  });
+});
+
 describe('toQuoteData — customer/company contract (regression: customer info shows N/A)', () => {
   it('populates customer from a separately-fetched customer row', () => {
     const result = toQuoteData(QUOTE_ROW, {
@@ -196,6 +264,18 @@ describe('toQuoteData — customer/company contract (regression: customer info s
     const result = toQuoteData(QUOTE_ROW, { currency: OMR });
     expect(result.quote_date).toBeNull();
   });
+
+  it('threads the real discount_type (percentage) instead of hardcoding "amount"', () => {
+    // Regression (#18): a 10% discount was printed as -10.00 because the builder
+    // hardcoded discount_type:'amount'. The adapter resolves percentage as
+    // subtotal×pct/100 only if this flag reaches it.
+    const result = toQuoteData({ ...QUOTE_ROW, discount_type: 'percentage', discount_amount: 10 }, { currency: OMR });
+    expect(result.discount_type).toBe('percentage');
+  });
+
+  it('defaults discount_type to "amount" when the row has none', () => {
+    expect(toQuoteData(QUOTE_ROW, { currency: OMR }).discount_type).toBe('amount');
+  });
 });
 
 describe('toInvoiceData — customer/company/bank contract', () => {
@@ -236,6 +316,17 @@ describe('toInvoiceData — customer/company/bank contract', () => {
   it('leaves customer undefined when none is provided', () => {
     const result = toInvoiceData(INVOICE_ROW, { currency: OMR });
     expect(result.customer).toBeUndefined();
+  });
+
+  it('threads the real discount_type (percentage) onto InvoiceData', () => {
+    // Regression (#19): InvoiceData had no discount_type, so a percentage document
+    // discount rendered flat (Net 990 instead of 900). The flag must reach the adapter.
+    const result = toInvoiceData({ ...INVOICE_ROW, discount_type: 'percentage' }, { currency: OMR });
+    expect(result.discount_type).toBe('percentage');
+  });
+
+  it('defaults discount_type to "amount" when the row has none', () => {
+    expect(toInvoiceData(INVOICE_ROW, { currency: OMR }).discount_type).toBe('amount');
   });
 
 });

@@ -362,23 +362,19 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
       }
 
       if (submitIsDonorRole && selectedDonorInventoryId && deviceId) {
-        const donor = donorInventory.find(d => d.id === selectedDonorInventoryId);
-        if (donor) {
-          const { error: assignmentError } = await supabase
-            .from('inventory_case_assignments')
-            .insert([{
-              tenant_id: profile?.tenant_id ?? '',
-              item_id: selectedDonorInventoryId,
-              case_id: caseId,
-              assigned_by: profile?.id ?? null,
-              purpose: 'donor_part',
-              notes: `Donor for case device ${deviceId}`,
-            }]);
+        // Route the donor assignment through the atomic RPC — never a raw insert.
+        // The RPC does the single-custody availability check (so a donor already
+        // assigned to another live case can't be double-booked), flips the item to
+        // In Use, and writes the DEVICE_CHECKED_OUT chain-of-custody event in one
+        // transaction. A failed assignment (already assigned / unavailable) must
+        // surface to the user, so propagate the error rather than swallow it.
+        const { error: assignmentError } = await supabase.rpc('assign_inventory_to_case', {
+          p_item_id: selectedDonorInventoryId,
+          p_case_id: caseId,
+          p_notes: `Donor for case device ${deviceId}`,
+        });
 
-          if (assignmentError) {
-            logger.error('Error creating inventory case assignment:', assignmentError);
-          }
-        }
+        if (assignmentError) throw assignmentError;
       }
 
       // Persist component diagnostics for non-donor roles only. Donors have no

@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { getNextCaseNumber } from '../../lib/caseService';
 import { MessageCircle, Printer, FileText, Tag, CheckCircle2, Copy, User, HardDrive, FileStack, AlertCircle, Package, Activity, Settings, History, Users, DollarSign, Trash2, Grid2x2 as Grid, Eye, Mail, RotateCcw, CircleHelp, SlidersHorizontal } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
@@ -46,10 +45,9 @@ import { QuoteFormModal } from '../../components/cases/QuoteFormModal';
 import { InvoiceFormModal } from '../../components/cases/InvoiceFormModal';
 import { ConvertProformaToTaxModal } from '../../components/cases/ConvertProformaToTaxModal';
 import { RecordPaymentModal } from '../../components/financial/RecordPaymentModal';
-import { createQuote as createQuoteService, type Quote as QuoteShape, type QuoteItem as QuoteItemShape } from '../../lib/quotesService';
+import { createQuote as createQuoteService, updateQuote as updateQuoteService, type Quote as QuoteShape, type QuoteItem as QuoteItemShape } from '../../lib/quotesService';
 import { createInvoice as createInvoiceService, updateInvoice as updateInvoiceService, convertProformaToTaxInvoice, type Invoice as InvoiceShape, type InvoiceItem as InvoiceItemShape } from '../../lib/invoiceService';
 import type { Payment as PaymentShape } from '../../lib/paymentsService';
-import type { Database } from '../../types/database.types';
 import { CaseOverviewTab } from '../../components/cases/detail/CaseOverviewTab';
 import { lazyWithRetry } from '../../lib/lazyWithRetry';
 import { ContentLoadingFallback } from '../../components/shared/ContentLoadingFallback';
@@ -94,7 +92,7 @@ export const CaseDetail: React.FC = () => {
   const { config: tenantConfig } = useTenantConfig();
   const modals = useCaseModals();
 
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, currencyFormat } = useCurrency();
 
   const {
     caseData, isLoading, caseError,
@@ -836,45 +834,36 @@ export const CaseDetail: React.FC = () => {
                   const payloadEditingId = typeof quoteData.id === 'string' && quoteData.id ? quoteData.id : undefined;
                   const editingQuoteId = payloadEditingId ?? stateEditingId;
                   if (editingQuoteId) {
-                    // Edit path — patch quote + replace line items inline
-                    const updatePayload: Database['public']['Tables']['quotes']['Update'] = {
-                      status: typeof quoteData.status === 'string' ? quoteData.status : 'draft',
-                      valid_until: typeof quoteData.valid_until === 'string' && quoteData.valid_until ? quoteData.valid_until : null,
+                    // Edit path — route through quotesService.updateQuote (the same
+                    // recomputing path QuotesListPage uses). It re-derives subtotal/
+                    // tax_amount/total_amount (+ the *_base snapshot) from the edited
+                    // items via computeDocumentTotals and preserves the full per-line
+                    // fields (unit_code/unit_label/item_code) + currency. A hand-rolled
+                    // quotes.update here previously left header totals frozen out of
+                    // sync with the items and dropped those fields on every edit.
+                    const quoteFields: Partial<QuoteShape> = {
+                      status: (typeof quoteData.status === 'string' ? quoteData.status : 'draft') as QuoteShape['status'],
+                      title: typeof quoteData.title === 'string' ? quoteData.title : undefined,
+                      client_reference: typeof quoteData.client_reference === 'string' ? quoteData.client_reference : undefined,
+                      valid_until: typeof quoteData.valid_until === 'string' && quoteData.valid_until ? quoteData.valid_until : undefined,
                       tax_rate: typeof quoteData.tax_rate === 'number' ? quoteData.tax_rate : 0,
                       discount_amount: typeof quoteData.discount_amount === 'number' ? quoteData.discount_amount : 0,
-                      discount_type: typeof quoteData.discount_type === 'string' ? quoteData.discount_type : 'fixed',
-                      title: typeof quoteData.title === 'string' ? quoteData.title : null,
-                      client_reference: typeof quoteData.client_reference === 'string' ? quoteData.client_reference : null,
+                      discount_type: (typeof quoteData.discount_type === 'string' ? quoteData.discount_type : 'fixed') as QuoteShape['discount_type'],
                       bank_account_id: typeof quoteData.bank_account_id === 'string' ? quoteData.bank_account_id : null,
-                      terms: typeof quoteData.terms_and_conditions === 'string' ? quoteData.terms_and_conditions : null,
-                      notes: typeof quoteData.notes === 'string' ? quoteData.notes : null,
-                      updated_at: new Date().toISOString(),
+                      terms: typeof quoteData.terms_and_conditions === 'string' ? quoteData.terms_and_conditions : undefined,
+                      notes: typeof quoteData.notes === 'string' ? quoteData.notes : undefined,
+                      currency: typeof quoteData.currency === 'string' && quoteData.currency ? quoteData.currency : undefined,
                     };
-                    const { error: upErr } = await supabase
-                      .from('quotes')
-                      .update(updatePayload)
-                      .eq('id', editingQuoteId);
-                    if (upErr) throw upErr;
-
-                    await supabase
-                      .from('quote_items')
-                      .update({ deleted_at: new Date().toISOString() })
-                      .eq('quote_id', editingQuoteId);
-
-                    const itemsToInsert = items.map((item, index) => ({
-                      quote_id: editingQuoteId,
+                    const quoteItems: QuoteItemShape[] = items.map((item, index) => ({
                       description: item.description,
                       quantity: item.quantity,
                       unit_price: item.unit_price,
-                      total: Math.round(item.quantity * item.unit_price * 100) / 100,
+                      unit_code: item.unit_code ?? null,
+                      unit_label: item.unit_label ?? null,
+                      item_code: item.item_code ?? null,
                       sort_order: index,
-                    })) as Database['public']['Tables']['quote_items']['Insert'][];
-                    if (itemsToInsert.length > 0) {
-                      const { error: itemsErr } = await supabase
-                        .from('quote_items')
-                        .insert(itemsToInsert);
-                      if (itemsErr) throw itemsErr;
-                    }
+                    }));
+                    await updateQuoteService(editingQuoteId, quoteFields, quoteItems);
                     toast.success('Quote updated successfully');
                   } else {
                     // Create path — use service so number generation + totals are centralised
@@ -892,11 +881,17 @@ export const CaseDetail: React.FC = () => {
                       bank_account_id: typeof quoteData.bank_account_id === 'string' ? quoteData.bank_account_id : null,
                       terms: typeof quoteData.terms_and_conditions === 'string' ? quoteData.terms_and_conditions : undefined,
                       notes: typeof quoteData.notes === 'string' ? quoteData.notes : undefined,
+                      currency: typeof quoteData.currency === 'string' && quoteData.currency
+                        ? quoteData.currency
+                        : (currencyFormat.currencyCode || undefined),
                     };
                     const quoteItems: QuoteItemShape[] = items.map((item, index) => ({
                       description: item.description,
                       quantity: item.quantity,
                       unit_price: item.unit_price,
+                      unit_code: item.unit_code ?? null,
+                      unit_label: item.unit_label ?? null,
+                      item_code: item.item_code ?? null,
                       sort_order: index,
                     }));
                     await createQuoteService(newQuote, quoteItems);

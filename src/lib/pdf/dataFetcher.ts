@@ -173,6 +173,37 @@ export function currencyToBlock(c: CurrencyConfig): NonNullable<QuoteData['accou
 }
 
 /**
+ * The currency a DOCUMENT is denominated in — its own `currency` code, NOT the
+ * tenant's base currency. A EUR invoice raised by a USD-base tenant must print '€'
+ * and EUR minor units, so the document's currency-intrinsic fields (code, symbol,
+ * decimal places) are looked up from `master_currency_codes` and layered over the
+ * base config, which keeps the tenant's locale-driven position/separators/display
+ * mode. Falls back to the base config when the document has no currency, matches
+ * the base, or names a currency the reference table doesn't know (never fabricate
+ * a symbol). This is the single seam the four financial-document fetchers use so a
+ * foreign-currency document never renders in the base currency.
+ */
+export async function resolveDocumentCurrency(
+  base: CurrencyConfig,
+  docCode: string | null | undefined,
+): Promise<CurrencyConfig> {
+  if (!docCode || docCode === base.code) return base;
+  const { data } = await supabase
+    .from('master_currency_codes')
+    .select('code, symbol, name, decimal_places')
+    .eq('code', docCode)
+    .maybeSingle();
+  if (!data) return base;
+  return {
+    ...base,
+    code: data.code,
+    symbol: data.symbol ?? '',
+    name: data.name ?? data.code,
+    decimalPlaces: data.decimal_places ?? base.decimalPlaces,
+  };
+}
+
+/**
  * One row of the Phase 1 `document_tax_lines` ledger for a document. Rollup
  * rows (`line_item_id IS NULL`) and per-line rows both come back, ordered by
  * `sequence`; consumers filter for the shape they need. Numeric columns are
@@ -540,7 +571,7 @@ export function toQuoteData(
     tax_rate: quoteRow.tax_rate ?? 0,
     tax_amount: quoteRow.tax_amount ?? 0,
     discount_amount: quoteRow.discount_amount ?? 0,
-    discount_type: 'amount',
+    discount_type: quoteRow.discount_type === 'percentage' ? 'percentage' : 'amount',
     total_amount: quoteRow.total_amount ?? 0,
     notes: quoteRow.notes ?? undefined,
     created_at: quoteRow.created_at ?? '',
@@ -654,9 +685,10 @@ async function fetchQuoteDetails(quoteId: string): Promise<QuoteData> {
   // Currency is resolved through the Country Engine (single source of truth), not
   // the legacy accounting_locales table. quotes.tenant_id scopes the resolution.
   const cfg = await getTenantConfig(quoteRow.tenant_id);
+  const currency = await resolveDocumentCurrency(cfg.currency, quoteRow.currency);
 
   return toQuoteData(quoteRow, {
-    currency: cfg.currency,
+    currency,
     customer: customerRes.data,
     company: companyRes.data,
     createdByProfile: createdByRes.data,
@@ -697,6 +729,7 @@ export function toInvoiceData(
     tax_rate: invoiceRow.tax_rate ?? undefined,
     tax_amount: invoiceRow.tax_amount ?? 0,
     discount_amount: invoiceRow.discount_amount ?? 0,
+    discount_type: invoiceRow.discount_type === 'percentage' ? 'percentage' : 'amount',
     total_amount: invoiceRow.total_amount ?? 0,
     amount_paid: invoiceRow.amount_paid ?? 0,
     balance_due: invoiceRow.balance_due ?? 0,
@@ -757,6 +790,7 @@ export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditN
   // Related records fetched separately (mirrors fetchInvoiceDetails — no embed/alias drift).
   // Currency from the Country Engine (single source), not accounting_locales.
   const cfg = await getTenantConfig(cnRow.tenant_id);
+  const currency = await resolveDocumentCurrency(cfg.currency, cnRow.currency);
   const [settings, invoiceRes, customerRes, companyRes, caseRes, itemsRes, taxLines] = await Promise.all([
     fetchCompanySettings(),
     cnRow.invoice_id
@@ -784,7 +818,7 @@ export async function fetchCreditNoteData(creditNoteId: string): Promise<CreditN
   const customer = customerRes.data as { customer_name?: string | null } | null;
   const company = companyRes.data as { company_name?: string | null; name?: string | null } | null;
   const caseRow = caseRes.data as { case_no?: string | null } | null;
-  const block = currencyToBlock(cfg.currency);
+  const block = currencyToBlock(currency);
   const items = (itemsRes.data ?? []) as Array<{ description?: string | null; quantity?: number | null; unit_price?: number | null; total?: number | null; item_code?: string | null; unit_label?: string | null }>;
 
   return {
@@ -922,13 +956,14 @@ async function fetchInvoiceDetails(invoiceId: string): Promise<InvoiceData> {
 
   // Currency from the Country Engine (single source), not accounting_locales.
   const cfg = await getTenantConfig(invoiceRow.tenant_id);
+  const currency = await resolveDocumentCurrency(cfg.currency, invoiceRow.currency);
 
   return toInvoiceData(invoiceRow, {
-    currency: cfg.currency,
+    currency,
     customer: customerRes.data,
     company: companyRes.data,
     customerAssociatedCompany,
-    items: toInvoiceItems(items, cfg.currency.decimalPlaces),
+    items: toInvoiceItems(items, currency.decimalPlaces),
   });
 }
 
@@ -1039,11 +1074,14 @@ async function fetchPaymentDetails(paymentId: string): Promise<PaymentReceiptDat
     caseInfo = invoiceData?.cases ?? null;
   }
 
-  // Currency from the Country Engine (single source), not accounting_locales.
+  // Currency from the Country Engine (single source), not accounting_locales. The
+  // receipt is denominated in the payment's own currency (which tracks the invoice
+  // it settles), not the tenant base currency.
   const cfg = await getTenantConfig(paymentData.tenant_id);
+  const currency = await resolveDocumentCurrency(cfg.currency, paymentData.currency);
 
   return toPaymentReceiptData(paymentData, {
-    currency: cfg.currency,
+    currency,
     invoice: paymentData.invoices,
     customer: customerRow,
     bankAccounts: paymentData.bank_accounts,

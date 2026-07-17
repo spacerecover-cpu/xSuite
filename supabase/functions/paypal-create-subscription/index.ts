@@ -188,6 +188,17 @@ Deno.serve(async (req: Request) => {
       throw new Error("Plan not found");
     }
 
+    // A tenant has a single tenant_subscriptions row (onConflict: tenant_id). If
+    // it already carries an entitling PayPal subscription, creating a new one and
+    // overwriting paypal_subscription_id would strand the old subscription: PayPal
+    // keeps billing it and its webhooks would match no row. Capture it here so we
+    // can cancel it at PayPal before the upsert replaces the id.
+    const { data: existingSubscription } = await supabase
+      .from("tenant_subscriptions")
+      .select("paypal_subscription_id, status")
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+
     const paypalPlanId = billingInterval === 'month'
       ? plan.paypal_plan_monthly_id
       : plan.paypal_plan_yearly_id;
@@ -201,6 +212,44 @@ Deno.serve(async (req: Request) => {
       paypalClientSecret,
       paypalApiUrl
     );
+
+    // Plan change: cancel any pre-existing entitling PayPal subscription BEFORE
+    // creating/upserting the new one, so PayPal doesn't double-bill and the old
+    // subscription id isn't lost when the row's paypal_subscription_id is
+    // overwritten. Entitling statuses mirror billingService ACTIVE_SUBSCRIPTION_STATUSES.
+    const ENTITLING_STATUSES = ['active', 'trialing'];
+    if (
+      existingSubscription?.paypal_subscription_id &&
+      ENTITLING_STATUSES.includes(existingSubscription.status as string)
+    ) {
+      const cancelResponse = await fetch(
+        `${paypalApiUrl}/v1/billing/subscriptions/${existingSubscription.paypal_subscription_id}/cancel`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ reason: "Superseded by plan change" }),
+        }
+      );
+
+      // PayPal returns 204 on success. Treat 404/422 (already gone / not
+      // cancellable) as acceptable — the goal is that the old subscription is no
+      // longer billing. Any other failure means it may still bill, so abort
+      // rather than create a second concurrently-billing subscription.
+      if (
+        !cancelResponse.ok &&
+        cancelResponse.status !== 204 &&
+        cancelResponse.status !== 404 &&
+        cancelResponse.status !== 422
+      ) {
+        const errorText = await cancelResponse.text();
+        throw new Error(
+          `Failed to cancel existing PayPal subscription before plan change: ${errorText}`
+        );
+      }
+    }
 
     const defaultReturnUrl = `${req.headers.get("origin") || "http://localhost:5173"}/settings/billing?success=true`;
     const defaultCancelUrl = `${req.headers.get("origin") || "http://localhost:5173"}/settings/billing?cancelled=true`;
@@ -256,8 +305,11 @@ Deno.serve(async (req: Request) => {
         // Must be one of tenant_subscriptions_status_check
         // ('trialing','active','past_due','cancelled','unpaid'). The subscription
         // is created but not yet approved/billed; the ACTIVATED webhook promotes
-        // it to 'active'. 'pending' is NOT a valid status and fails the CHECK.
-        status: 'trialing',
+        // it to 'active'. Use 'unpaid' — a constraint-valid status that is NOT in
+        // billingService ACTIVE_SUBSCRIPTION_STATUSES, so an abandoned approval
+        // does not grant free plan entitlement. 'trialing' WOULD entitle;
+        // 'pending' is NOT a valid status and fails the CHECK.
+        status: 'unpaid',
         billing_interval: billingInterval,
         paypal_subscription_id: subscriptionData.id,
         created_at: new Date().toISOString(),
