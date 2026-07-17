@@ -1,0 +1,30 @@
+# Supabase CLI project configuration.
+#
+# PURPOSE: pin per-function `verify_jwt` so `supabase functions deploy` cannot
+# silently flip a function's auth gate. The CLI defaults `verify_jwt = true`, so
+# a deploy without an explicit block here would break any function that must be
+# callable WITHOUT a user JWT — e.g. provision-tenant (self-service signup sends
+# no Authorization header), the PayPal webhook (external caller), the OTP mailer,
+# and portal-login (mints the portal JWT). Only functions that need `false` are
+# listed; every other function keeps the secure default (`true`).
+
+project_id = "ssmbegiyjivrcwgcqutu"
+
+# Self-service tenant signup calls this with only an apikey (no Authorization
+# header); verify_jwt=true rejects it at the gateway before the handler runs.
+[functions.provision-tenant]
+verify_jwt = false
+
+# Called by PayPal's servers, which cannot present a Supabase JWT; the handler
+# verifies the PayPal webhook signature itself.
+[functions.paypal-webhook]
+verify_jwt = false
+
+# Called during signup before any session exists.
+[functions.send-otp-email]
+verify_jwt = false
+
+# Authenticates a portal customer and mints the portal-scoped JWT; the caller
+# has no JWT yet.
+[functions.portal-login]
+verify_jwt = false
