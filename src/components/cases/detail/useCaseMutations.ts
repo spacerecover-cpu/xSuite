@@ -354,6 +354,9 @@ export function useCaseMutations({ id, caseData, devices, modals }: UseCaseMutat
       queryClient.invalidateQueries({ queryKey: ['case', id] });
       queryClient.invalidateQueries({ queryKey: ['clone_drives', id] });
       queryClient.invalidateQueries({ queryKey: ['resource_clone_drives'] });
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries({ queryKey: [CASE_COMMAND_STATS_KEY] });
+      queryClient.invalidateQueries({ queryKey: ['case_history', id] });
       modals.setShowMarkAsDeliveredModal(false);
       modals.setSelectedClone(null);
     },

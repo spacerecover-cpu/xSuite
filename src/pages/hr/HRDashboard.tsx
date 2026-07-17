@@ -22,9 +22,9 @@ export const HRDashboard: React.FC = () => {
   const loadStats = async () => {
     try {
       const [employeesResult, jobsResult, reviewsResult] = await Promise.all([
-        supabase.from('employees').select('employment_status', { count: 'exact' }),
-        supabase.from('recruitment_jobs').select('status', { count: 'exact' }).eq('status', 'open'),
-        supabase.from('performance_reviews').select('status', { count: 'exact' }).eq('status', 'draft'),
+        supabase.from('employees').select('employment_status', { count: 'exact' }).is('deleted_at', null),
+        supabase.from('recruitment_jobs').select('status', { count: 'exact' }).eq('status', 'open').is('deleted_at', null),
+        supabase.from('performance_reviews').select('status', { count: 'exact' }).eq('status', 'draft').is('deleted_at', null),
       ]);
 
       const activeCount = employeesResult.data?.filter(e => e.employment_status === 'active').length || 0;
@@ -81,7 +81,7 @@ export const HRDashboard: React.FC = () => {
             </div>
             <div className="space-y-3">
               <a
-                href="/hr/employees/new"
+                href="/hr/employees"
                 className="block p-4 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors"
               >
                 <h3 className="font-medium text-slate-900">Add New Employee</h3>

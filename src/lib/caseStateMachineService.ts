@@ -181,13 +181,24 @@ export function suggestNextAction(
   if (!currentPhase || !callerRole) return null;
   if (allowed.length === 0) return null;
 
-  // Prefer the canonical forward edge per phase. The seeded transitions
-  // table puts forward edges first by sort_order, so the first non-cancel,
-  // non-reopen entry is what we want.
-  const forward = allowed.find(
-    (a) => a.to_phase !== 'cancelled' && !a.is_reopen,
-  );
-  return forward ?? null;
+  // Prefer the canonical forward edge. getAllowedTransitions orders entries by
+  // destination-status sort_order, not edge direction, so the first non-cancel
+  // non-reopen entry can be a BACKWARD move (e.g. awaiting_approval lists
+  // quoting before approved, qa lists recovery before ready). Resolve direction
+  // from the linear PHASE_ORDER pipeline and pick the nearest on-track phase
+  // ahead of the current one.
+  const currentIdx = PHASE_ORDER.indexOf(currentPhase);
+  const forward = allowed
+    .filter(
+      (a) =>
+        a.to_phase !== 'cancelled' &&
+        !a.is_reopen &&
+        PHASE_ORDER.indexOf(a.to_phase) > currentIdx,
+    )
+    .sort(
+      (a, b) => PHASE_ORDER.indexOf(a.to_phase) - PHASE_ORDER.indexOf(b.to_phase),
+    );
+  return forward[0] ?? null;
 }
 
 function isCasePhase(value: string): value is CasePhase {

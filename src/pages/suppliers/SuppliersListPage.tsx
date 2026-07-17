@@ -131,15 +131,32 @@ export default function SuppliersListPage() {
     queryFn: async () => {
       const base = () =>
         supabase.from('suppliers').select('*', { count: 'exact', head: true }).is('deleted_at', null);
-      const [totalRes, activeRes, poRes] = await Promise.all([
+      // Total Spend sums total_amount_base across ALL non-deleted POs. An unranged
+      // select is capped by PostgREST at the server db-max-rows (~1000), which
+      // silently truncated the sum past that many POs; page through explicit ranges
+      // and accumulate until a short batch marks the end so large tenants stay
+      // correct (matching PurchaseOrdersListPage's Total Value).
+      const sumTotalSpendBase = async (): Promise<number> => {
+        const BATCH = 1000;
+        let total = 0;
+        for (let offset = 0; ; offset += BATCH) {
+          const { data, error } = await supabase
+            .from('purchase_orders')
+            .select('total_amount, total_amount_base')
+            .is('deleted_at', null)
+            .range(offset, offset + BATCH - 1);
+          if (error) throw error;
+          const rows = data ?? [];
+          total += rows.reduce((sum, po) => sum + baseAmount(po, 'total_amount'), 0);
+          if (rows.length < BATCH) break;
+        }
+        return total;
+      };
+      const [totalRes, activeRes, totalSpend] = await Promise.all([
         base(),
         base().eq('is_active', true),
-        supabase
-          .from('purchase_orders')
-          .select('total_amount, total_amount_base')
-          .is('deleted_at', null),
+        sumTotalSpendBase(),
       ]);
-      const totalSpend = (poRes.data ?? []).reduce((sum, po) => sum + baseAmount(po, 'total_amount'), 0);
       return { total: totalRes.count ?? 0, active: activeRes.count ?? 0, totalSpend };
     },
   });

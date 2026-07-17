@@ -265,12 +265,15 @@ Deno.serve(async (req: Request) => {
       throw guardErr;
     }
 
-    // Check for duplicate slug
+    // Check for duplicate slug. tenants_slug_key is an UNFILTERED UNIQUE constraint,
+    // so a slug from a soft-deleted (rolled-back/admin-deleted) tenant stays globally
+    // reserved — do NOT filter deleted_at here, or such a slug would pass this guard,
+    // burn the single-use OTP below, then 500 at the tenant INSERT on a raw
+    // duplicate-key violation while the UI still shows it as available.
     const { data: existingTenant } = await supabase
       .from('tenants')
       .select('id')
       .eq('slug', slug)
-      .is('deleted_at', null)
       .maybeSingle();
 
     if (existingTenant) {
@@ -414,6 +417,11 @@ Deno.serve(async (req: Request) => {
 
     if (profileError) {
       console.error('Profile update failed:', profileError);
+      // FAIL-LOUD: without the tenant-bound profile the owner logs in tenant-less
+      // (get_current_tenant_id() resolves nothing) while the tenant + slug survive.
+      // Roll back so the slug is freed and the owner can retry (see rollbackProvision).
+      await rollbackProvision(supabase, tenant.id, userId, !existingUser);
+      throw new Error(`Provisioning failed: profiles upsert: ${profileError.message}`);
     }
 
     // countryData was fetched + guarded above (fail-loud). It is non-stub here,

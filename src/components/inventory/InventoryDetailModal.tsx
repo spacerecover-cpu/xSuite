@@ -31,7 +31,7 @@ import { useToast } from '../../hooks/useToast';
 import type { Database } from '../../types/database.types';
 import { getItemDonorParts } from '../../lib/inventory/donorPartsService';
 import { getDonorParts } from '../../lib/inventory/donorParts';
-import { resolveDeviceFamily } from '../../lib/devices/deviceFamily';
+import { familyFromDeviceType } from './InventoryItemWizard';
 import { useInventoryDeviceTypes } from '../../lib/inventory/inventoryCatalogQueries';
 import type { DonorPartRow } from '../../lib/inventory/donorPartsService';
 import { Wrench } from 'lucide-react';
@@ -259,6 +259,13 @@ export default function InventoryDetailModal({
       setAssignmentLoading(false);
     }
   };
+
+  const specDetails = (item.technical_details as Record<string, unknown> | null) ?? {};
+  const specString = (k: string): string | undefined =>
+    typeof specDetails[k] === 'string' && specDetails[k] ? (specDetails[k] as string) : undefined;
+  const firmwareVersion = specString('firmware_version');
+  const pcbNumber = specString('pcb_number');
+  const headMap = specString('physical_head_map');
 
   return (
     <>
@@ -575,22 +582,22 @@ export default function InventoryDetailModal({
                       <dd className="text-xs font-medium text-slate-900 mt-0.5">{item.capacity.name}</dd>
                     </div>
                   )}
-                  {item.firmware_version && (
+                  {firmwareVersion && (
                     <div>
                       <dt className="text-xs text-slate-500">Firmware</dt>
-                      <dd className="text-xs font-medium text-slate-900 mt-0.5">{item.firmware_version}</dd>
+                      <dd className="text-xs font-medium text-slate-900 mt-0.5">{firmwareVersion}</dd>
                     </div>
                   )}
-                  {item.pcb_number && (
+                  {pcbNumber && (
                     <div>
                       <dt className="text-xs text-slate-500">PCB Number</dt>
-                      <dd className="text-xs font-medium text-slate-900 mt-0.5">{item.pcb_number}</dd>
+                      <dd className="text-xs font-medium text-slate-900 mt-0.5">{pcbNumber}</dd>
                     </div>
                   )}
-                  {item.head_map && (
+                  {headMap && (
                     <div>
                       <dt className="text-xs text-slate-500">Head Map</dt>
-                      <dd className="text-xs font-medium text-slate-900 mt-0.5">{item.head_map}</dd>
+                      <dd className="text-xs font-medium text-slate-900 mt-0.5">{headMap}</dd>
                     </div>
                   )}
                 </dl>
@@ -651,7 +658,7 @@ export default function InventoryDetailModal({
               {/* Donor Parts */}
               {item.is_donor && donorParts.length > 0 && (() => {
                 const dt = deviceTypes?.find(d => d.id === item.device_type_id);
-                const family = resolveDeviceFamily(dt?.family ?? dt?.name ?? '');
+                const family = familyFromDeviceType(dt);
                 const vocab = getDonorParts(family);
                 const labelByKey = new Map(vocab.map(p => [p.key, p.label]));
                 return (

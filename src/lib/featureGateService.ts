@@ -222,6 +222,7 @@ export async function checkUsageLimit(limitKey: UsageLimitKey): Promise<UsageLim
         .from('cases')
         .select('id', { count: 'exact', head: true })
         .eq('tenant_id', tenantId)
+        .is('deleted_at', null)
         .gte('created_at', startOfMonth.toISOString());
       current = count || 0;
       limit = planCache?.features.get('max_cases_per_month')?.limit ?? null;
@@ -270,6 +271,7 @@ export async function checkUsageLimit(limitKey: UsageLimitKey): Promise<UsageLim
         .from('expenses')
         .select('id', { count: 'exact', head: true })
         .eq('tenant_id', tenantId)
+        .is('deleted_at', null)
         .gte('created_at', startOfMonth.toISOString());
       current = count || 0;
       limit = planCache?.features.get('max_expenses_per_month')?.limit ?? null;

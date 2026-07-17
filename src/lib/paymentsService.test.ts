@@ -12,6 +12,7 @@ vi.mock('./currencyService', () => ({
 }));
 vi.mock('./auditTrailService', () => ({ logAuditTrail: vi.fn() }));
 vi.mock('./chainOfCustodyService', () => ({ logInvoicePayment: vi.fn() }));
+vi.mock('./tenantToday', () => ({ currentTenantToday: vi.fn(() => Promise.resolve('2026-07-01')) }));
 
 import { getPaymentStats, createPayment, fetchPaymentById } from './paymentsService';
 
@@ -47,6 +48,19 @@ describe('getPaymentStats (D7 — cross-document totals must be base currency)',
     expect(stats.totalAmount).toBe(88); // the *Base field, not a raw native sum
     expect(stats.completedAmount).toBe(88);
     expect(stats.thisMonthAmount).toBe(88);
+  });
+
+  it('anchors p_today/p_month_start on the tenant-local day, not the browser UTC day', async () => {
+    rpc.mockResolvedValue({ data: null, error: null });
+
+    await getPaymentStats();
+
+    // currentTenantToday() is mocked to a fixed tenant-local day (2026-07-01);
+    // month-start must be derived from it, never from new Date().toISOString().
+    expect(rpc).toHaveBeenCalledWith(
+      'get_payment_stats_base',
+      expect.objectContaining({ p_today: '2026-07-01', p_month_start: '2026-07-01' }),
+    );
   });
 
   it('defaults every field to 0 when the RPC returns no row', async () => {

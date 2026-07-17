@@ -5,6 +5,7 @@ import { validateWorkbook } from './importValidator';
 import {
   type EntityType,
   type ParsedWorkbook,
+  type RawRow,
   type WorkbookDomain,
   IMPORT_ORDER,
   DOMAIN_ENTITIES,
@@ -60,18 +61,69 @@ const ERROR_FIELD = '_error';
 export const ERROR_SHEET_NAME = 'Import Errors';
 
 /**
- * Downloadable error report: the standard workbook of the failed rows (so it stays re-importable
- * after the operator fixes them) PLUS a leading "Import Errors" sheet keyed by legacy_id that
- * spells out WHY each row failed. Without this sheet the reason (stamped as ERROR_FIELD) is lost —
- * buildWorkbook only writes ENTITY_COLUMNS cells and silently drops the non-contract key.
+ * Failed child rows routinely reference PARENTS that imported successfully and are therefore
+ * absent from failedRows (e.g. a duplicate-primary relationship fails while its customer and
+ * company inserted). Rebuilding the error workbook from failedRows alone would drop those parents,
+ * and re-uploading it dead-ends at the in-file FK validator (importValidator) which can no longer
+ * resolve them. So pull every parent row the failed rows transitively reference — matched by
+ * legacy_id across the ORIGINAL source workbook — back into the report. On re-import those parents
+ * dedup (skipped_duplicate) and repopulate the run's entity_map, letting the corrected children
+ * resolve. Parents are keyed by `*_legacy_id` columns, exactly what parseWorkbook emits.
  */
-function buildErrorReport(failedRows: ParsedWorkbook, domain: WorkbookDomain): ArrayBuffer {
-  const base = buildWorkbook(failedRows, {
+function withReferencedParents(
+  source: ParsedWorkbook,
+  failedRows: ParsedWorkbook,
+  domain: WorkbookDomain,
+): ParsedWorkbook {
+  const entities = DOMAIN_ENTITIES[domain];
+  const sourceByLegacy = new Map<string, { entity: EntityType; row: RawRow }>();
+  for (const entity of entities) {
+    for (const row of source[entity] ?? []) {
+      if (row.legacy_id == null || String(row.legacy_id) === '') continue;
+      sourceByLegacy.set(String(row.legacy_id), { entity, row });
+    }
+  }
+
+  const out = emptyWorkbook();
+  const included = new Set<string>();
+  const queue: Array<{ entity: EntityType; row: RawRow }> = [];
+  const enqueue = (entity: EntityType, row: RawRow) => {
+    const key = `${entity}:${String(row.legacy_id)}`;
+    if (included.has(key)) return;
+    included.add(key);
+    out[entity].push(row);
+    queue.push({ entity, row });
+  };
+
+  for (const entity of entities) for (const row of failedRows[entity] ?? []) enqueue(entity, row);
+
+  while (queue.length > 0) {
+    const { row } = queue.shift()!;
+    for (const [key, value] of Object.entries(row)) {
+      if (key === 'legacy_id' || !key.endsWith('_legacy_id')) continue;
+      if (value == null || String(value) === '') continue;
+      const parent = sourceByLegacy.get(String(value));
+      if (parent) enqueue(parent.entity, parent.row);
+    }
+  }
+  return out;
+}
+
+/**
+ * Downloadable error report: the standard workbook of the failed rows PLUS the parent rows they
+ * reference (so it stays re-importable after the operator fixes them — see withReferencedParents)
+ * PLUS a leading "Import Errors" sheet keyed by legacy_id that spells out WHY each row failed.
+ * Without that sheet the reason (stamped as ERROR_FIELD) is lost — buildWorkbook only writes
+ * ENTITY_COLUMNS cells and silently drops the non-contract key.
+ */
+function buildErrorReport(source: ParsedWorkbook, failedRows: ParsedWorkbook, domain: WorkbookDomain): ArrayBuffer {
+  const reimportRows = withReferencedParents(source, failedRows, domain);
+  const base = buildWorkbook(reimportRows, {
     domain,
     sourceTenant: '',
     exportedAt: new Date().toISOString(),
     schemaVersion: WORKBOOK_SCHEMA_VERSION,
-    counts: Object.fromEntries(IMPORT_ORDER.map((e) => [e, failedRows[e].length])) as Record<EntityType, number>,
+    counts: Object.fromEntries(IMPORT_ORDER.map((e) => [e, reimportRows[e].length])) as Record<EntityType, number>,
   });
 
   const wb = XLSX.read(base, { type: 'array' });
@@ -167,7 +219,7 @@ export async function runImport(
   if (finErr) throw finErr;
 
   const hasFailures = entities.some((e) => failedRows[e].length > 0);
-  const errorReport = hasFailures ? buildErrorReport(failedRows, domain) : undefined;
+  const errorReport = hasFailures ? buildErrorReport(wb, failedRows, domain) : undefined;
 
   onProgress({ entity: lastEntity, processed: 0, total: 0, phase: 'done' });
   return { runId: runId as string, counts, errorReport };

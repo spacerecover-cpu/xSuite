@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
 import { authStorageAdapter, AUTH_STORAGE_KEY, hasStoredAuthSession, resetSessionPersistence } from '../lib/authStorage';
@@ -59,6 +60,7 @@ const isAuthDeadError = (err: unknown): boolean => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -290,6 +292,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // different user on the same device can't inherit them (H6, L5).
           rolePermissionsService.clearCache();
           localStorage.removeItem('tenant_id');
+          // Wipe the server-state cache too: the QueryClient is a module
+          // singleton and its keys are tenant-agnostic (['cases','list',…]), so
+          // a different-tenant user signing in on the same browser within gcTime
+          // would otherwise transiently render the previous tenant's cached rows.
+          queryClient.clear();
           // Back to the default so out-of-band session creation (recovery
           // links, future OAuth) lands persistent unless the user opts out
           // again at the next sign-in.
@@ -303,7 +310,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [fetchProfile, checkMFAStatus]);
+  }, [fetchProfile, checkMFAStatus, queryClient]);
 
   // M8: attach the signed-in user to telemetry so captured errors / RLS
   // denials carry id + tenant + role context; clear it on sign-out.

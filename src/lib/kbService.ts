@@ -325,9 +325,14 @@ export async function updateKBArticle(
 
     const addTagIds = input.tag_ids.filter((tag_id) => !activeTagIds.has(tag_id));
     if (addTagIds.length > 0) {
-      await supabase.from('kb_article_tags').insert(
-        addTagIds.map((tag_id) => ({ article_id: id, tag_id })) as never
+      // Upsert (not insert): the full UNIQUE(article_id, tag_id) constraint means a
+      // previously-removed tag still occupies its pair as a soft-deleted row, so a
+      // plain insert would raise 23505. onConflict resurrects it (deleted_at = null).
+      const { error: addError } = await supabase.from('kb_article_tags').upsert(
+        addTagIds.map((tag_id) => ({ article_id: id, tag_id, deleted_at: null })) as never,
+        { onConflict: 'article_id,tag_id' }
       );
+      if (addError) throw addError;
     }
   }
 

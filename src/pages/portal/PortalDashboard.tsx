@@ -11,6 +11,23 @@ import { FileText, DollarSign, MessageSquare, Clock } from 'lucide-react';
 import { formatDate } from '../../lib/format';
 import { useCurrency } from '../../hooks/useCurrency';
 import { fetchPortalVisibility, getVisibleCaseIds, getCaseIdsWithFlag } from '../../lib/portalVisibility';
+import { TERMINAL_TYPES, type CaseStatusType } from '../../lib/caseLifecycle';
+
+/**
+ * Classify portal cases by canonical lifecycle phase (master_case_statuses.type),
+ * not by the display-name string in cases.status. "Active" = still in the
+ * pipeline (non-terminal); "completed" = data delivered or case closed.
+ */
+export function computePortalCaseStats(rows: { type: string | null }[]) {
+  const total = rows.length;
+  const active = rows.filter(
+    (r) => r.type != null && !TERMINAL_TYPES.includes(r.type as CaseStatusType)
+  ).length;
+  const completed = rows.filter(
+    (r) => r.type === 'delivered' || r.type === 'closed'
+  ).length;
+  return { total, active, completed };
+}
 
 export const PortalDashboard: React.FC = () => {
   const { t } = useTranslation();
@@ -58,19 +75,18 @@ export const PortalDashboard: React.FC = () => {
 
       const { data, error } = await supabase
         .from('cases')
-        .select('id, status')
+        .select('id, master_case_statuses:master_case_statuses!cases_status_id_fkey(type)')
         .in('id', visibleCaseIds);
 
       if (error) throw error;
 
-      const rows = data ?? [];
-      const total = rows.length;
-      const active = rows.filter((c) =>
-        ['received', 'diagnosis', 'in-progress', 'in_progress', 'waiting-approval'].includes(c.status || '')
-      ).length;
-      const completed = rows.filter((c) => ['completed', 'delivered'].includes(c.status || '')).length;
+      const rows = (data ?? []).map((c) => {
+        const statusRel = (c as { master_case_statuses?: unknown }).master_case_statuses;
+        const rel = Array.isArray(statusRel) ? statusRel[0] : statusRel;
+        return { type: (rel as { type?: string | null } | null | undefined)?.type ?? null };
+      });
 
-      return { total, active, completed };
+      return computePortalCaseStats(rows);
     },
     enabled: !!customer?.id,
   });

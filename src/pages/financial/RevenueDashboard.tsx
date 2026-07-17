@@ -8,11 +8,13 @@ import { FinancialModuleHeader } from '../../components/financial/FinancialModul
 import { StatCard } from '../../components/shared/StatCard';
 import { formatDate } from '../../lib/format';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useDateTimeConfig } from '../../contexts/TenantConfigContext';
+import { tenantToday, tenantTodayMonth, addDaysIso, addMonthsIso } from '../../lib/tenantToday';
 import {
   generateRevenueByCustomerReport,
   generateRevenueByCaseReport,
 } from '../../lib/financialReportsService';
-import { baseAmount } from '../../lib/financialMath';
+import { baseAmount, RECEIVABLE_INVOICE_EXCLUDED_STATUSES } from '../../lib/financialMath';
 import { TrendingUp, BarChart3, Plus, Search, Users, Briefcase } from 'lucide-react';
 
 type RevenueInvoiceRow = {
@@ -45,36 +47,37 @@ type CaseRevenueRow = {
 export const RevenueDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { formatCurrency } = useCurrency();
+  const { timezone } = useDateTimeConfig();
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState<string>('month');
   const [viewMode, setViewMode] = useState<'invoices' | 'customers' | 'cases'>('invoices');
 
-  const getDateRange = () => {
-    const now = new Date();
-    let startDate: Date;
+  // Period bounds are anchored on the tenant's local "today" (never the browser's
+  // local midnight -> toISOString(), which shifts every boundary a day early for UTC+
+  // tenants — see financialService.getFinancialYearDates + tenantToday.ts).
+  const dateRange = useMemo(() => {
+    const today = tenantToday(timezone);
+    let from: string;
     switch (dateFilter) {
       case 'today':
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        from = today;
         break;
       case 'week':
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        from = addDaysIso(today, -7);
         break;
       case 'month':
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        from = addMonthsIso(today, -1);
         break;
       case 'year':
-        startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+        from = addMonthsIso(today, -12);
         break;
       default:
-        startDate = new Date(2020, 0, 1);
+        from = '2020-01-01';
     }
-    return {
-      from: startDate.toISOString().split('T')[0],
-      to: new Date().toISOString().split('T')[0],
-    };
-  };
+    return { from, to: today };
+  }, [dateFilter, timezone]);
 
-  const dateRange = useMemo(() => getDateRange(), [dateFilter]);
+  const excludedStatusFilter = `(${RECEIVABLE_INVOICE_EXCLUDED_STATUSES.map((s) => `"${s}"`).join(',')})`;
 
   const { data: revenueData = [], isLoading } = useQuery<RevenueInvoiceRow[]>({
     queryKey: ['revenue_data', dateFilter],
@@ -92,6 +95,8 @@ export const RevenueDashboard: React.FC = () => {
           status,
           customer:customers_enhanced(customer_name)
         `)
+        .is('deleted_at', null)
+        .not('status', 'in', excludedStatusFilter)
         .gte('invoice_date', dateRange.from)
         .order('invoice_date', { ascending: false });
 
@@ -121,20 +126,32 @@ export const RevenueDashboard: React.FC = () => {
       const { data } = await supabase
         .from('invoices')
         .select('amount_paid, amount_paid_base')
+        .is('deleted_at', null)
+        .not('status', 'in', excludedStatusFilter)
         .gte('invoice_date', prevStart.toISOString().split('T')[0])
         .lt('invoice_date', prevEnd.toISOString().split('T')[0]);
       return (data || []).reduce<number>((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
     },
   });
 
-  const totalRevenue = revenueData.reduce<number>((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
-  const now = new Date();
-  const thisMonth = revenueData.filter((inv) => {
-    if (inv.invoice_date === null) return false;
-    const d = new Date(inv.invoice_date);
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  // "This Month" is always the current calendar month-to-date, independent of the
+  // period filter above (so selecting Today/This Week does not shrink it).
+  const monthStart = `${tenantTodayMonth(timezone)}-01`;
+  const { data: thisMonthRevenue = 0 } = useQuery<number>({
+    queryKey: ['revenue_this_month', monthStart],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('amount_paid, amount_paid_base')
+        .is('deleted_at', null)
+        .not('status', 'in', excludedStatusFilter)
+        .gte('invoice_date', monthStart);
+      if (error) throw error;
+      return (data || []).reduce<number>((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
+    },
   });
-  const thisMonthRevenue = thisMonth.reduce<number>((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
+
+  const totalRevenue = revenueData.reduce<number>((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
   const paidInvoices = revenueData.filter((inv) => inv.status === 'paid');
   const growthRate = prevPeriodRevenue > 0 ? ((totalRevenue - prevPeriodRevenue) / prevPeriodRevenue) * 100 : 0;
 

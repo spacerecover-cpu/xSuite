@@ -14,6 +14,7 @@ import { formatDate } from '../../lib/format';
 import { KpiRow } from '../../components/templates/KpiRow';
 import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCustomerPickerRows } from '../../lib/pickerSearch';
 import { logger } from '../../lib/logger';
 import { Skeleton } from '../../components/ui/Skeleton';
 
@@ -42,13 +43,6 @@ interface Company {
 interface Industry {
   id: string;
   name: string;
-}
-
-interface Customer {
-  id: string;
-  customer_name: string;
-  email: string | null;
-  mobile_number: string | null;
 }
 
 interface Country {
@@ -102,25 +96,42 @@ export const CompaniesListPage: React.FC = () => {
   });
 
   const { data: companies = [], isLoading, error: companiesError } = useQuery({
-    queryKey: ['companies'],
+    // Scoped away from the bare ['companies'] key used by the customer-picker
+    // projection (CustomersListPage / CustomerFormModal cache a truncated
+    // id/company_number/company_name select there); sharing the key made this
+    // page render that projection within its staleTime. Bare-['companies']
+    // invalidations still prefix-match this key.
+    queryKey: ['companies', 'full'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('companies')
-        .select(`
-          *,
-          master_industries (id, name),
-          geo_countries (name),
-          geo_cities (name)
-        `)
-        .order('created_at', { ascending: false });
+      // PostgREST caps an unranged select at db-max-rows (~1000), silently
+      // hiding companies past that count from the list, search, and KPIs.
+      // Page through explicit ranges until a short batch marks the end.
+      const BATCH = 1000;
+      const rows: Record<string, unknown>[] = [];
+      for (let offset = 0; ; offset += BATCH) {
+        const { data, error } = await supabase
+          .from('companies')
+          .select(`
+            *,
+            master_industries (id, name),
+            geo_countries (name),
+            geo_cities (name)
+          `)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + BATCH - 1);
 
-      if (error) {
-        logger.error('Error fetching companies:', error);
-        throw error;
+        if (error) {
+          logger.error('Error fetching companies:', error);
+          throw error;
+        }
+
+        const batch = data ?? [];
+        rows.push(...batch);
+        if (batch.length < BATCH) break;
       }
 
       const companiesWithContacts = await Promise.all(
-        (data || []).map(async (company) => {
+        rows.map(async (company) => {
           // NOTE: customer_company_relationships.is_primary is customer-scoped
           // ("this company is that CUSTOMER's primary company"), not a company-scoped
           // primary-contact flag, so a single company can have many is_primary=true rows.
@@ -130,7 +141,7 @@ export const CompaniesListPage: React.FC = () => {
           const { data: relationship } = await supabase
             .from('customer_company_relationships')
             .select('customers_enhanced (id, customer_name)')
-            .eq('company_id', company.id)
+            .eq('company_id', company.id as string)
             .is('deleted_at', null)
             .order('is_primary', { ascending: false, nullsFirst: false })
             .order('created_at', { ascending: true })
@@ -160,19 +171,12 @@ export const CompaniesListPage: React.FC = () => {
     },
   });
 
-  const { data: customers = [] } = useQuery({
-    queryKey: ['customers_for_company'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('customers_enhanced')
-        .select('id, customer_name, email, mobile_number')
-        .eq('is_active', true)
-        .order('customer_name');
-
-      if (error) throw error;
-      return data as Customer[];
-    },
-  });
+  // Server-side picker search — a fetch-all is capped at ~1000 rows by
+  // PostgREST (hiding most customers) and, filtering only is_active, would keep
+  // bulk-archived (deleted_at set, is_active still true) customers selectable.
+  // The shared hook filters deleted_at + pages search server-side.
+  const { rows: customers, onSearchTermChange: onCustomerSearch } =
+    useCustomerPickerRows(formData.primary_contact_id || undefined);
 
   const { data: countries = [] } = useQuery({
     queryKey: ['countries'],
@@ -745,6 +749,7 @@ export const CompaniesListPage: React.FC = () => {
             label="Primary Contact"
             value={formData.primary_contact_id}
             onChange={(value) => setFormData({ ...formData, primary_contact_id: value })}
+            onSearchTermChange={onCustomerSearch}
             options={[
               { id: '', name: 'No contact' },
               ...customers.map((c) => ({

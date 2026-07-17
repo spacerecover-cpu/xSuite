@@ -43,6 +43,29 @@ function rateLimitResponse(headers: Record<string, string>, retryAfter: number) 
   );
 }
 
+// Look up an existing auth user by email across ALL pages. auth.admin.listUsers()
+// returns only one page at GoTrue's server-capped perPage, so an orphaned account
+// past the first page was invisible — silently breaking orphan-recovery and pushing
+// the flow onto createUser where the duplicate email throws a 500. We page until the
+// email is found or the list is exhausted, using GoTrue's own nextPage signal so a
+// server-capped perPage cannot cause an early exit that misses users.
+async function findAuthUserByEmail(
+  supabase: ReturnType<typeof createClient>,
+  email: string
+): Promise<{ id: string; email?: string } | undefined> {
+  const target = email.toLowerCase();
+  const perPage = 1000;
+  for (let page = 1; ; page++) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+    if (error) throw error;
+    const users = (data?.users ?? []) as Array<{ id: string; email?: string }>;
+    const match = users.find((u) => u.email?.toLowerCase() === target);
+    if (match) return match;
+    const nextPage = (data as { nextPage?: number | null } | null)?.nextPage;
+    if (!nextPage && users.length < perPage) return undefined;
+  }
+}
+
 function makeCorsHeaders(req: Request) {
   return {
     "Access-Control-Allow-Origin": getAllowedOrigin(req),
@@ -142,14 +165,7 @@ Deno.serve(async (req: Request) => {
         throw new Error("A user with this email already exists");
       }
 
-      const { data: existingAuthUsers } = await supabaseClient.auth.admin.listUsers({
-        page: 1,
-        perPage: 1,
-      });
-      const allUsers = existingAuthUsers?.users || [];
-      const existingAuthUser = allUsers.find(
-        (u) => u.email?.toLowerCase() === body.email.toLowerCase()
-      );
+      const existingAuthUser = await findAuthUserByEmail(supabaseClient, body.email);
 
       if (existingAuthUser) {
         console.log(`[CREATE USER] Orphaned auth user found, updating profile for ${body.email}`);

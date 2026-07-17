@@ -8,6 +8,8 @@ vi.mock('../supabaseClient', () => ({ supabase: { rpc } }));
 // The real workbookBuilder is used so the error report is a genuine, inspectable xlsx.
 
 import { ERROR_SHEET_NAME, runImport } from './importClient';
+import { parseWorkbook } from './workbookParser';
+import { validateWorkbook } from './importValidator';
 
 function empty(): ParsedWorkbook {
   return Object.fromEntries(IMPORT_ORDER.map((e) => [e, [] as RawRow[]])) as ParsedWorkbook;
@@ -92,6 +94,49 @@ describe('runImport orchestration', () => {
     const cu1 = rows.find((r) => r['Record Ref'] === 'CU1');
     expect(cu1, 'failed legacy_id CU1 should appear in the errors sheet').toBeTruthy();
     expect(cu1!['Import Error']).toBe('bad'); // the reason, not a numeric count, survives
+  });
+
+  it('keeps the error workbook re-importable when only a child row fails (parents included)', async () => {
+    // Parents (customer, company) insert OK; the relationships child fails at the DB
+    // (e.g. duplicate-primary). The downloadable error report must still carry those parents
+    // so re-uploading it passes the in-file FK validator.
+    rpc.mockImplementation((fn: string, args: Record<string, unknown>) => {
+      if (fn === 'data_migration_create_run') return Promise.resolve({ data: 'run-1', error: null });
+      if (fn === 'data_migration_finalize') return Promise.resolve({ data: {}, error: null });
+      const entity = args.p_entity_type as string;
+      const rows = args.p_rows as Array<{ legacy_id: string }>;
+      return Promise.resolve({
+        data: {
+          results: rows.map((r) => {
+            const failed = entity === 'relationships';
+            return {
+              legacy_id: r.legacy_id,
+              new_id: failed ? null : 'n-' + r.legacy_id,
+              status: failed ? 'error' : 'inserted',
+              error: failed ? 'duplicate primary company' : null,
+            };
+          }),
+        },
+        error: null,
+      });
+    });
+
+    const wb = empty();
+    wb.companies = [{ legacy_id: 'CO1', name: 'Acme' }];
+    wb.customers = [{ legacy_id: 'CU1', customer_name: 'Jo' }];
+    wb.relationships = [{ legacy_id: 'R1', customer_legacy_id: 'CU1', company_legacy_id: 'CO1', is_primary: 'TRUE' }];
+
+    const summary = await runImport(wb, { filename: 'x.xlsx', hash: 'h' }, () => {}, 'records');
+    expect(summary.errorReport).toBeInstanceOf(ArrayBuffer);
+
+    const reparsed = parseWorkbook(summary.errorReport!);
+    expect(reparsed.relationships.map((r) => r.legacy_id)).toContain('R1');
+    // Parents that imported OK are pulled back in so the child's FK resolves.
+    expect(reparsed.customers.map((r) => r.legacy_id)).toContain('CU1');
+    expect(reparsed.companies.map((r) => r.legacy_id)).toContain('CO1');
+
+    const report = validateWorkbook(reparsed, 'records');
+    expect(report.ok, 'error workbook must pass in-file FK validation for re-import').toBe(true);
   });
 
   it('counts skipped_duplicate rows on resume', async () => {

@@ -53,9 +53,20 @@ export function useDocumentCompliance(
     staleTime: 5 * 60 * 1000,
   });
   const linesQuery = useQuery({
-    queryKey: documentComplianceKeys.taxLines(docType, documentId),
+    // The always-mounted print-parity preview never gets its own invalidateQueries
+    // call, so the header tax fingerprint is folded into the key: when an edit
+    // rewrites document_tax_lines it also rewrites the stored header tax_amount, and
+    // the refreshed fallback here flips the key, forcing a refetch of the rollup rows
+    // that keeps the on-screen VAT component reconciled with the header total.
+    // staleTime 0 lets window-focus/reconnect pick up other-user edits immediately.
+    queryKey: [
+      ...documentComplianceKeys.taxLines(docType, documentId),
+      fallback.taxAmount,
+      fallback.taxRate,
+    ],
     queryFn: () => fetchDocumentTaxLines(docType, documentId as string),
     enabled: documentId != null,
+    staleTime: 0,
   });
 
   const inputs = inputsQuery.data;

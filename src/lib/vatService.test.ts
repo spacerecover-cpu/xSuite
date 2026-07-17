@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { from, insertMock } = vi.hoisted(() => ({ from: vi.fn(), insertMock: vi.fn() }));
-vi.mock('./supabaseClient', () => ({ supabase: { from } }));
+const { from, insertMock, getUserMock } = vi.hoisted(() => ({ from: vi.fn(), insertMock: vi.fn(), getUserMock: vi.fn() }));
+vi.mock('./supabaseClient', () => ({ supabase: { from, auth: { getUser: getUserMock } } }));
 
 import {
   createVATRecordFromPurchase, createVATRecordFromInvoice, calculateVATForPeriod,
   getVATRecordsByReturn, getQuarterlyVATSummary, fetchHsnLineAggregates,
   fetchInterStateB2CAggregates, composeGstrSupplementaryBoxes,
+  updateVATReturnStatus,
 } from './vatService';
 
 // A thenable query builder: every chain method returns the builder; awaiting it at
@@ -47,7 +48,47 @@ function makeRecordsQuery(rows: Array<Record<string, unknown>>) {
 beforeEach(() => {
   from.mockReset();
   insertMock.mockClear();
+  getUserMock.mockReset();
+  getUserMock.mockResolvedValue({ data: { user: { id: 'user-9' } }, error: null });
   from.mockReturnValue(makeInsertQuery()); // default path for the existing writer tests
+});
+
+/** update-path builder: .update(patch).eq().select().maybeSingle() → { data: patch }. */
+function makeUpdateQuery(captured: { patch?: Record<string, unknown> }) {
+  return {
+    update: (patch: Record<string, unknown>) => {
+      captured.patch = patch;
+      return {
+        eq: () => ({
+          select: () => ({ maybeSingle: () => Promise.resolve({ data: patch, error: null }) }),
+        }),
+      };
+    },
+  } as Record<string, unknown>;
+}
+
+describe('updateVATReturnStatus (submitted-at/by stamping)', () => {
+  it('stamps submitted_at and the current user on the submitted transition with no explicit actor', async () => {
+    const captured: { patch?: Record<string, unknown> } = {};
+    from.mockReturnValue(makeUpdateQuery(captured));
+    await updateVATReturnStatus('ret-1', 'submitted');
+    expect(captured.patch?.status).toBe('submitted');
+    expect(captured.patch?.submitted_at).toEqual(expect.any(String));
+    expect(captured.patch?.submitted_by).toBe('user-9');
+  });
+  it('honours an explicit actor when provided', async () => {
+    const captured: { patch?: Record<string, unknown> } = {};
+    from.mockReturnValue(makeUpdateQuery(captured));
+    await updateVATReturnStatus('ret-1', 'submitted', 'actor-2');
+    expect(captured.patch?.submitted_by).toBe('actor-2');
+    expect(getUserMock).not.toHaveBeenCalled();
+  });
+  it('does not stamp submitted fields on a non-submitted transition', async () => {
+    const captured: { patch?: Record<string, unknown> } = {};
+    from.mockReturnValue(makeUpdateQuery(captured));
+    await updateVATReturnStatus('ret-1', 'paid');
+    expect(captured.patch).toEqual({ status: 'paid' });
+  });
 });
 
 describe('input-VAT writer (D1)', () => {

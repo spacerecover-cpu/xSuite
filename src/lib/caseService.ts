@@ -33,6 +33,15 @@ export async function deleteCaseService(caseId: string): Promise<DeleteCaseResul
   }
 
   try {
+    // Capture identifying fields before the row is soft-deleted so success
+    // feedback can name the case. delete_case_permanently RETURNS void, so the
+    // RPC yields no payload to source these from.
+    const { data: caseRow } = await supabase
+      .from('cases')
+      .select('case_number, subject')
+      .eq('id', caseId)
+      .maybeSingle();
+
     const { data, error } = await supabase.rpc('delete_case_permanently', {
       p_case_id: caseId,
     });
@@ -41,11 +50,31 @@ export async function deleteCaseService(caseId: string): Promise<DeleteCaseResul
       throw error;
     }
 
-    if (!data) {
-      throw new Error('No data returned from deletion');
+    // The RPC RETURNS void (types: Returns undefined), so `data` is null on
+    // success — absence of a payload is NOT a failure signal. If a future
+    // revision returns a result object, pass it through; otherwise synthesize.
+    if (data && typeof data === 'object') {
+      return data as DeleteCaseResult;
     }
 
-    return data as DeleteCaseResult;
+    return {
+      success: true,
+      case_number: caseRow?.case_number ?? '',
+      case_title: caseRow?.subject ?? '',
+      log_id: '',
+      deleted_counts: {
+        devices: 0,
+        attachments: 0,
+        communications: 0,
+        quotes: 0,
+        reports: 0,
+        notes: 0,
+        clones: 0,
+        inventory_assignments: 0,
+        portal_visibility: 0,
+      },
+      total_records_deleted: 0,
+    };
   } catch (error: any) {
     logger.error('Error deleting case:', error);
     throw new Error(error.message || 'Failed to delete case');
@@ -214,6 +243,16 @@ export async function duplicateCase(
       .insert(devicesToInsert);
     if (devicesError) {
       logger.error('Error duplicating devices:', devicesError);
+      // Non-atomic two-step write: the case row already committed. Roll it back
+      // (soft delete) so a device-less intake case — which never fired the
+      // custody-baseline trigger — is not stranded in the active pipeline.
+      const { error: rollbackError } = await supabase
+        .from('cases')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', newCase.id);
+      if (rollbackError) {
+        logger.error('Failed to roll back orphaned case after device duplication error:', rollbackError);
+      }
       throw new Error(`Failed to duplicate devices: ${devicesError.message}`);
     }
   }

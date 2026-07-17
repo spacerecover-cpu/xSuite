@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MapPin, Plus, ChevronRight, ChevronDown, Pencil, Trash2, ToggleLeft, ToggleRight, Loader2, X, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/useToast';
@@ -10,7 +10,6 @@ import { Skeleton } from '../../components/ui/Skeleton';
 import { HierarchicalLocationPicker } from '../../components/inventory/HierarchicalLocationPicker';
 import { buildLocationTree } from '../../lib/inventory/locationTree';
 import type { LocationNode } from '../../lib/inventory/locationTree';
-import { useInventoryLocations } from '../../lib/inventory/inventoryCatalogQueries';
 import { supabase, getTenantId } from '../../lib/supabaseClient';
 import type { Database } from '../../types/database.types';
 import { useNavigate } from 'react-router-dom';
@@ -132,7 +131,22 @@ export default function InventoryLocationsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { data: locations = [], isLoading } = useInventoryLocations();
+  // Management surface: include inactive (non-deleted) locations so a deactivated
+  // location stays visible and can be reactivated, and its children keep their
+  // parent in the tree instead of being promoted to root.
+  const { data: locations = [], isLoading } = useQuery<InventoryLocationRow[]>({
+    queryKey: ['inventory', 'locations', 'manage'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('inventory_locations')
+        .select('*')
+        .is('deleted_at', null)
+        .order('name');
+      if (error) throw error;
+      return (data ?? []) as InventoryLocationRow[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
   const tree = buildLocationTree(locations);
 
   const canEdit = EDITOR_ROLES.includes(profile?.role as typeof EDITOR_ROLES[number]);

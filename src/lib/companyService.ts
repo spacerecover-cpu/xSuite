@@ -87,6 +87,22 @@ export async function createCompany(
   if (!newCompany) throw new Error('Failed to create company');
 
   if (primaryContactId) {
+    // A customer can hold only one primary company (uq_customer_primary_company).
+    // Demote any existing live primary first so this selection wins, rather than
+    // tripping a 23505 that would silently drop the user's chosen contact.
+    const { data: existingPrimary } = await supabase
+      .from('customer_company_relationships')
+      .select('id')
+      .eq('customer_id', primaryContactId)
+      .eq('is_primary', true)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (existingPrimary) {
+      await supabase
+        .from('customer_company_relationships')
+        .update({ is_primary: false })
+        .eq('id', existingPrimary.id);
+    }
     const { error: relError } = await supabase
       .from('customer_company_relationships')
       .insert({ customer_id: primaryContactId, company_id: newCompany.id, is_primary: true } as RelationshipInsert);

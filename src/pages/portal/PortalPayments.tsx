@@ -64,7 +64,7 @@ function statusBadgeVariant(status: string | null): StatusBadgeVariant {
 export const PortalPayments: React.FC = () => {
   const { t } = useTranslation();
   const { customer } = usePortalAuth();
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, formatCurrencyIn } = useCurrency();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
@@ -263,7 +263,7 @@ export const PortalPayments: React.FC = () => {
                     </div>
 
                     <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2 sm:gap-3 flex-shrink-0">
-                      <p className="text-lg font-bold text-slate-900">{formatCurrency(payment.amount ?? 0)}</p>
+                      <p className="text-lg font-bold text-slate-900">{formatCurrencyIn(payment.amount ?? 0, payment.currency)}</p>
                       <Button
                         type="button"
                         variant="secondary"

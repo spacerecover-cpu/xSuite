@@ -664,9 +664,10 @@ export const getExpenseStats = async (filters?: {
   const baseAmt = (e: { amount: number | null; amount_base: number | null; exchange_rate: number | null }) =>
     Number(e.amount_base ?? (e.amount ?? 0) * (e.exchange_rate ?? 1));
 
-  const thisMonth = new Date();
-  thisMonth.setDate(1);
-  const thisMonthStart = thisMonth.toISOString().split('T')[0];
+  // Anchor "this month" on the tenant-local calendar month, not the browser's
+  // UTC-converted local date — new Date()->setDate(1)->toISOString() mis-buckets a
+  // day of expenses at month boundaries for non-UTC tenants (timezone off-by-one).
+  const thisMonthStart = `${(await currentTenantToday()).slice(0, 7)}-01`;
 
   const approvedExpenses = rows.filter(e => e.status === 'approved' || e.status === 'paid');
 

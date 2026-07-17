@@ -133,14 +133,23 @@ export const CaseFilesTab: React.FC<CaseFilesTabProps> = ({ caseId, attachments,
 
     setDeletingId(attachment.id);
     try {
-      await supabase.storage.from(BUCKET).remove([attachment.file_url]);
-
-      const { error } = await supabase
+      // Delete the ledger row FIRST and confirm a row was actually removed. The
+      // DELETE policy is admin-only, so a non-admin's delete matches 0 rows with
+      // no error — surface that instead of falsely reporting success. Removing
+      // the record before the blob also avoids orphaning the row's pointer.
+      const { data: deleted, error } = await supabase
         .from('case_attachments')
         .delete()
-        .eq('id', attachment.id);
+        .eq('id', attachment.id)
+        .select('id');
 
       if (error) throw error;
+      if (!deleted || deleted.length === 0) {
+        throw new Error('You do not have permission to delete this file, or it was already removed.');
+      }
+
+      const { error: storageError } = await supabase.storage.from(BUCKET).remove([attachment.file_url]);
+      if (storageError) throw storageError;
 
       toast.success('File deleted');
       queryClient.invalidateQueries({ queryKey: ['case_attachments', caseId] });

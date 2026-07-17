@@ -223,6 +223,7 @@ export const InvoiceDetailPage: React.FC = () => {
 
   const handlePaymentRecorded = () => {
     queryClient.invalidateQueries({ queryKey: ['invoice', id] });
+    queryClient.invalidateQueries({ queryKey: ['invoice_for_payment', id] });
     queryClient.invalidateQueries({ queryKey: ['invoice_payments', id] });
     queryClient.invalidateQueries({ queryKey: ['invoices'] });
     queryClient.invalidateQueries({ queryKey: ['invoice_stats'] });
@@ -599,6 +600,7 @@ export const InvoiceDetailPage: React.FC = () => {
             invoice_number: invoice.invoice_number,
             total_amount: invoice.total_amount,
             amount_paid: invoice.amount_paid,
+            credited_amount: (invoice as { credited_amount?: number | null }).credited_amount,
             balance_due: invoice.balance_due,
             tax_amount: invoice.tax_amount,
             currency: invoice.currency,

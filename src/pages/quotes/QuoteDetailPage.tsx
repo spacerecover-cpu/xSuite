@@ -149,6 +149,7 @@ export const QuoteDetailPage: React.FC = () => {
       await updateQuote(id!, {
         title: typeof quoteData.title === 'string' ? quoteData.title : undefined,
         status: typeof quoteData.status === 'string' ? (quoteData.status as Quote['status']) : 'draft',
+        currency: typeof quoteData.currency === 'string' && quoteData.currency ? quoteData.currency : undefined,
         valid_until: typeof quoteData.valid_until === 'string' ? quoteData.valid_until : undefined,
         client_reference: typeof quoteData.client_reference === 'string' ? quoteData.client_reference : undefined,
         tax_rate: typeof quoteData.tax_rate === 'number' ? quoteData.tax_rate : undefined,
@@ -645,8 +646,18 @@ export const QuoteDetailPage: React.FC = () => {
                       description: i.description,
                       quantity: i.quantity ?? 0,
                       unit_price: i.unit_price,
+                      unit_code: i.unit_code,
+                      unit_label: i.unit_label,
+                      item_code: i.item_code,
+                      tax_treatment: i.tax_treatment ?? undefined,
+                      treatment_reason_code: i.treatment_reason_code,
                     }));
-                    await updateQuote(id!, quote as unknown as Partial<Quote>, [...current, ...newItems]);
+                    const added = newItems.map((n) => ({
+                      description: n.description?.trim() ? n.description : n.name,
+                      quantity: n.quantity,
+                      unit_price: n.unit_price,
+                    }));
+                    await updateQuote(id!, quote as unknown as Partial<Quote>, [...current, ...added]);
                     queryClient.invalidateQueries({ queryKey: ['quote', id] });
                     toast.success(`${newItems.length} device${newItems.length !== 1 ? 's' : ''} added to quote`);
                   }}

@@ -361,6 +361,40 @@ describe('createReceiptWithAllocations — atomic RPC credits the deposit accoun
   });
 });
 
+describe('getReceipts — reads the canonical receipts table the Record Payment flow writes to', () => {
+  /** Thenable receipts builder: select/is/gte/lte/eq/order chain; awaiting yields {data}. */
+  function makeReceiptsQuery(rows: Array<Record<string, unknown>>) {
+    const builder: Record<string, unknown> = {
+      select: vi.fn(() => builder),
+      is: vi.fn(() => builder),
+      gte: vi.fn(() => builder),
+      lte: vi.fn(() => builder),
+      eq: vi.fn(() => builder),
+      order: vi.fn(() => builder),
+      then: (resolve: (v: { data: unknown; error: null }) => void) =>
+        resolve({ data: rows, error: null }),
+    };
+    return builder;
+  }
+
+  beforeEach(() => from.mockReset());
+
+  it("queries public.receipts (where create_receipt_with_allocations inserts), not the stale payment_receipts register", async () => {
+    const tables: string[] = [];
+    from.mockImplementation((table: string) => {
+      tables.push(table);
+      return makeReceiptsQuery([{ id: 'r-1', receipt_number: 'RCPT-1', amount: 500, status: 'completed' }]);
+    });
+
+    const receipts = await bankingService.getReceipts();
+
+    expect(tables).toContain('receipts');
+    expect(tables).not.toContain('payment_receipts');
+    expect(receipts).toHaveLength(1);
+    expect(receipts[0].id).toBe('r-1');
+  });
+});
+
 describe('getCasesWithInvoices — deterministic order + full set for the Record Receipt picker (BUG-43)', () => {
   /** Thenable invoices builder: select/not/is/gt/or/order chain; awaiting yields {data}. */
   function makeInvoicesQuery(rows: Array<Record<string, unknown>>) {

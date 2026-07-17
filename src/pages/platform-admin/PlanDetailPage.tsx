@@ -168,26 +168,31 @@ const PlanDetailsForm: React.FC<{ plan: Database['public']['Tables']['subscripti
 
   const updateMutation = useMutation({
     mutationFn: () => {
-      let parsedFeatures = formData.features;
-      let parsedLimits = formData.limits;
+      let parsedFeatures: unknown;
+      let parsedLimits: unknown;
       try {
         parsedFeatures = JSON.parse(featuresJson);
-      } catch { /* keep existing */ }
+      } catch {
+        throw new Error('Features JSON is not valid — fix the syntax before saving.');
+      }
       try {
         parsedLimits = JSON.parse(limitsJson);
-      } catch { /* keep existing */ }
+      } catch {
+        throw new Error('Limits JSON is not valid — fix the syntax before saving.');
+      }
 
       return updateSubscriptionPlan(plan.id, {
         ...formData,
-        features: parsedFeatures,
-        limits: parsedLimits,
+        features: parsedFeatures as PlanUpdate['features'],
+        limits: parsedLimits as PlanUpdate['limits'],
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: platformAdminKeys.plans() });
       toast.success('Plan updated successfully');
     },
-    onError: () => toast.error('Failed to update plan'),
+    onError: (err: unknown) =>
+      toast.error(err instanceof Error ? err.message : 'Failed to update plan'),
   });
 
   const updateField = (field: keyof PlanUpdate, value: unknown) => {

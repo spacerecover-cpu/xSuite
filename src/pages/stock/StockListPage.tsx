@@ -162,9 +162,7 @@ export const StockListPage: React.FC = () => {
   };
 
   const handleRecordUsage = (item: StockItemWithCategory) => {
-    setTransactionItem(item);
-    setTransactionMode('usage');
-    setTransactionModalOpen(true);
+    navigate(`/stock/${item.id}`);
   };
 
   const handleDelete = (item: StockItemWithCategory) => {

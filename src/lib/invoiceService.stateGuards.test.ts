@@ -120,24 +120,37 @@ describe('updateInvoice — Bug 53: caller status is not persisted on a tax invo
 });
 
 describe('bulkSendInvoiceEmails — Bug 54: re-send never clobbers a settled status', () => {
-  it('a paid invoice keeps status=paid and only stamps sent_at', async () => {
+  it('a non-draft invoice only stamps sent_at and never writes status (the pre-loop snapshot is stale)', async () => {
     state.emailRows = [{
-      id: 'inv-paid', invoice_number: 'INV-1', status: 'paid', case_id: 'c1',
+      id: 'inv-paid', invoice_number: 'INV-1', status: 'paid', invoice_type: 'tax_invoice', case_id: 'c1',
       customers_enhanced: { customer_name: 'Acme', email: 'a@b.com' },
     }];
     const results = await bulkSendInvoiceEmails(['inv-paid']);
     expect(results[0].status).toBe('sent'); // the send outcome, not the invoice status
     const payload = lastInvoiceUpdate();
     expect(payload).toHaveProperty('sent_at');
-    expect(payload.status).toBe('paid');
+    // The fetched 'paid' is a stale snapshot from before the (slow) loop; writing
+    // it back could revert a mid-batch payment. Omit status entirely.
+    expect(payload).not.toHaveProperty('status');
   });
 
-  it('a draft invoice is advanced to sent', async () => {
+  it('a draft PROFORMA is advanced to sent', async () => {
     state.emailRows = [{
-      id: 'inv-draft', invoice_number: null, status: 'draft', case_id: 'c2',
+      id: 'inv-draft', invoice_number: 'PRO-1', status: 'draft', invoice_type: 'proforma', case_id: 'c2',
       customers_enhanced: { customer_name: 'Acme', email: 'a@b.com' },
     }];
     await bulkSendInvoiceEmails(['inv-draft']);
     expect(lastInvoiceUpdate().status).toBe('sent');
+  });
+
+  it('a draft TAX invoice is NOT advanced to sent (issuance mints the number + posts VAT)', async () => {
+    state.emailRows = [{
+      id: 'inv-draft-tax', invoice_number: null, status: 'draft', invoice_type: 'tax_invoice', case_id: 'c3',
+      customers_enhanced: { customer_name: 'Acme', email: 'a@b.com' },
+    }];
+    await bulkSendInvoiceEmails(['inv-draft-tax']);
+    const payload = lastInvoiceUpdate();
+    expect(payload).toHaveProperty('sent_at');
+    expect(payload).not.toHaveProperty('status');
   });
 });

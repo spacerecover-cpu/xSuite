@@ -185,6 +185,27 @@ describe('generateInvoiceVsExpenseReport (Bug 13 — revenue is realized cash, n
     expect(report.totals.revenue).toBe(40);
     expect(invoices.select).toHaveBeenCalledWith(expect.stringContaining('amount_paid_base'));
   });
+
+  it('excludes void/cancelled invoices at the query so it reconciles with the P&L', async () => {
+    const invoices = makeQuery([]);
+    const expenses = makeQuery([]);
+    from.mockImplementation((table: string) => (table === 'invoices' ? invoices : expenses));
+
+    await generateInvoiceVsExpenseReport('2026-05-01', '2026-05-31');
+
+    // Same status filter the sibling revenue reports carry (commit 037faa7),
+    // so a voided invoice's stale amount_paid is never booked as revenue.
+    expect(invoices.not).toHaveBeenCalledWith(
+      'status',
+      'in',
+      expect.stringContaining('"void"'),
+    );
+    expect(invoices.not).toHaveBeenCalledWith(
+      'status',
+      'in',
+      expect.stringContaining('"cancelled"'),
+    );
+  });
 });
 
 describe('generateCashFlowReport (Bug 47 — soft-deleted payments are not cash receipts)', () => {

@@ -113,4 +113,30 @@ describe('QuoteFormModal — unit select from master_unit_codes', () => {
     const serialized = JSON.stringify({ payload, items });
     expect(serialized).not.toContain('Service');
   });
+
+  it('clamps a fixed discount larger than the subtotal so the persisted discount_amount never exceeds it', async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderModal();
+
+    await user.type(screen.getByPlaceholderText(TITLE_PLACEHOLDER), 'Recovery Quote');
+    await user.type(screen.getByPlaceholderText(DESCRIPTION_PLACEHOLDER), 'Logical recovery');
+
+    // One line of 300.00 (qty 1 x price 300) → subtotal 300.
+    const priceInput = screen.getByPlaceholderText('Price');
+    await user.clear(priceInput);
+    await user.type(priceInput, '300');
+
+    // Type a fixed discount of 500 — larger than the 300 subtotal.
+    const discountInput = screen.getByLabelText('Discount');
+    await user.clear(discountInput);
+    await user.type(discountInput, '500');
+
+    await user.click(screen.getByRole('button', { name: /create quote/i }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    const [payload] = onSave.mock.calls[0] as [Record<string, unknown>, unknown];
+    // Persisted discount is clamped to the subtotal, never the raw 500 that
+    // would drive negative tax_amount / total_amount server-side.
+    expect(payload.discount_amount).toBe(300);
+  });
 });

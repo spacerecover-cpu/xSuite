@@ -43,6 +43,17 @@ export interface TimesheetSummaryRow {
   entries: TimesheetWithEmployee[];
 }
 
+async function appendReviewNote(id: string, label: string, reviewNote: string): Promise<string> {
+  const { data } = await supabase
+    .from('timesheets')
+    .select('notes')
+    .eq('id', id)
+    .maybeSingle();
+  const existing = (data?.notes ?? '').trim();
+  const line = `[${label}] ${reviewNote}`;
+  return existing ? `${existing}\n\n${line}` : line;
+}
+
 export const timesheetService = {
   async getTimesheets(filters?: TimesheetFilters): Promise<TimesheetWithEmployee[]> {
     let query = supabase
@@ -143,15 +154,21 @@ export const timesheetService = {
   },
 
   async approveTimesheet(id: string, approverId: string, notes?: string): Promise<Timesheet> {
+    const update: TimesheetUpdate = {
+      status: 'approved',
+      approved_by: approverId,
+      approved_date: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    // timesheets has no dedicated review-notes column, so a reviewer note is
+    // appended to (never overwrites) the employee's own note. A blank review
+    // note leaves the employee's note untouched.
+    const reviewNote = notes?.trim();
+    if (reviewNote) update.notes = await appendReviewNote(id, 'Approved', reviewNote);
+
     const { data, error } = await supabase
       .from('timesheets')
-      .update({
-        status: 'approved',
-        approved_by: approverId,
-        approved_date: new Date().toISOString(),
-        notes: notes ?? null,
-        updated_at: new Date().toISOString(),
-      })
+      .update(update)
       .eq('id', id)
       .select()
       .maybeSingle();
@@ -161,15 +178,18 @@ export const timesheetService = {
   },
 
   async rejectTimesheet(id: string, approverId: string, notes?: string): Promise<Timesheet> {
+    const update: TimesheetUpdate = {
+      status: 'rejected',
+      approved_by: approverId,
+      approved_date: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    const reviewNote = notes?.trim();
+    if (reviewNote) update.notes = await appendReviewNote(id, 'Rejected', reviewNote);
+
     const { data, error } = await supabase
       .from('timesheets')
-      .update({
-        status: 'rejected',
-        approved_by: approverId,
-        approved_date: new Date().toISOString(),
-        notes: notes ?? null,
-        updated_at: new Date().toISOString(),
-      })
+      .update(update)
       .eq('id', id)
       .select()
       .maybeSingle();

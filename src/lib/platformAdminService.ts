@@ -47,7 +47,7 @@ export interface TicketWithDetails extends SupportTicket {
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   const [tenantsRes, subscriptionsRes, usersRes, activeUsersRes, ticketsRes] = await Promise.all([
-    supabase.from('tenants').select('id, status', { count: 'exact', head: true }),
+    supabase.from('tenants').select('id, status', { count: 'exact', head: true }).is('deleted_at', null),
     supabase.from('tenant_subscriptions').select('status'),
     supabase.from('profiles').select('id', { count: 'exact', head: true }),
     supabase.from('user_activity_sessions')
@@ -156,6 +156,7 @@ export async function getTenantsList(filters?: {
       tenant_subscriptions(*, subscription_plans(code)),
       profiles(count)
     `)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
   if (filters?.status) {
@@ -354,11 +355,13 @@ export async function recordHealthMetrics(tenantId: string): Promise<void> {
 }
 
 export async function suspendTenant(tenantId: string): Promise<void> {
-  await supabase.from('tenants').update({ status: 'suspended' }).eq('id', tenantId);
+  const { error } = await supabase.from('tenants').update({ status: 'suspended' }).eq('id', tenantId);
+  if (error) throw error;
 }
 
 export async function reactivateTenant(tenantId: string): Promise<void> {
-  await supabase.from('tenants').update({ status: 'active' }).eq('id', tenantId);
+  const { error } = await supabase.from('tenants').update({ status: 'active' }).eq('id', tenantId);
+  if (error) throw error;
 }
 
 // support_tickets.customer_id FKs to auth.users (not profiles), so PostgREST

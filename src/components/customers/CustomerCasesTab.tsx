@@ -63,7 +63,9 @@ export function CustomerCasesTab({ customerId, companyId }: CustomerCasesTabProp
   });
 
   // Status buckets for the summary strip. The "open" bucket is anything not
-  // delivered/completed/cancelled — covers the long tail of in-flight states.
+  // delivered/closed/cancelled — covers the long tail of in-flight states.
+  // Terminal `closed` phases ("Closed — Device Returned"/"Closed — Media
+  // Disposed") count as finished, not open.
   const summary = (() => {
     let open = 0;
     let delivered = 0;
@@ -71,7 +73,7 @@ export function CustomerCasesTab({ customerId, companyId }: CustomerCasesTabProp
     for (const c of cases) {
       const s = (c.status ?? '').toLowerCase();
       if (s.includes('cancel')) cancelled++;
-      else if (s.includes('deliver') || s.includes('complete')) delivered++;
+      else if (s.includes('deliver') || s.includes('complete') || s.startsWith('closed')) delivered++;
       else open++;
     }
     return { open, delivered, cancelled };

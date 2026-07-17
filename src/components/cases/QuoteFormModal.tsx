@@ -347,10 +347,19 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
     return sum + item.quantity * item.unit_price;
   }, 0);
 
+  // Clamp the discount so it can never exceed the subtotal (fixed) or 100%
+  // (percentage). Without this a discount larger than the subtotal overshoots
+  // and net/tax/total go negative, and the tax kernel receives a
+  // documentDiscount larger than the line subtotal — persisting a quote with
+  // negative tax_amount/total_amount (quotes carry no non-negative DB CHECK).
+  const clampedDiscountAmount = quoteData.discount_type === 'percentage'
+    ? Math.min(Math.max(quoteData.discount_amount, 0), 100)
+    : Math.min(Math.max(quoteData.discount_amount, 0), subtotal);
+
   // Calculate discount based on type
   const discountValue = quoteData.discount_type === 'percentage'
-    ? (subtotal * quoteData.discount_amount) / 100
-    : quoteData.discount_amount;
+    ? (subtotal * clampedDiscountAmount) / 100
+    : clampedDiscountAmount;
 
   // Apply discount to subtotal first, then calculate VAT on discounted amount
   const discountedSubtotal = subtotal - discountValue;
@@ -392,6 +401,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
       await onSave(
         {
           ...quoteData,
+          discount_amount: clampedDiscountAmount,
           id: editingId,
           case_id: activeCaseId,
           customer_id: customerId || selectedCase?.customer_id || null,
@@ -695,6 +705,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                   </label>
                   <input
                     type="number"
+                    aria-label="Discount"
                     value={quoteData.discount_amount}
                     onChange={(e) =>
                       setQuoteData({ ...quoteData, discount_amount: parseFloat(e.target.value) || 0 })

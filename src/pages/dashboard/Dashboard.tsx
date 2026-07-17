@@ -16,6 +16,7 @@ import { useFeature } from '../../hooks/useFeatureGate';
 import { getCurrentPlanCode } from '../../lib/featureGateService';
 import { useTenantFeatures } from '../../contexts/TenantConfigContext';
 import { StatCard } from '../../components/shared/StatCard';
+import { TERMINAL_TYPES } from '../../lib/caseLifecycle';
 
 export const Dashboard: React.FC = () => {
   const { profile } = useAuth();
@@ -46,9 +47,8 @@ export const Dashboard: React.FC = () => {
     staleTime: 10 * 60 * 1000,
   });
 
-  const terminalTypes = ['delivered', 'closed', 'cancelled'];
   const activeStatusNames = caseStatuses
-    .filter((s) => !terminalTypes.includes(s.type ?? ''))
+    .filter((s) => !(TERMINAL_TYPES as readonly string[]).includes(s.type ?? ''))
     .map((s) => s.name);
   const pendingStatusNames = caseStatuses
     .filter((s) => s.type === 'intake' || s.type === 'diagnosis')
@@ -83,7 +83,8 @@ export const Dashboard: React.FC = () => {
       const { count } = await supabase
         .from('customers_enhanced')
         .select('id', { count: 'exact', head: true })
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .is('deleted_at', null);
       return count ?? 0;
     },
     staleTime: 300000,

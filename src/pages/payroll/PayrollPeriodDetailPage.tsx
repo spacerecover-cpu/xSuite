@@ -55,6 +55,7 @@ export default function PayrollPeriodDetailPage() {
     mutationFn: () => payrollService.approvePayrollPeriod(id!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: payrollKeys.period(id!) });
+      queryClient.invalidateQueries({ queryKey: payrollKeys.records(id!) });
       toast.success('Payroll period approved successfully');
       setShowApproveDialog(false);
     },
@@ -67,6 +68,7 @@ export default function PayrollPeriodDetailPage() {
     mutationFn: () => payrollService.markPayrollPeriodAsPaid(id!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: payrollKeys.period(id!) });
+      queryClient.invalidateQueries({ queryKey: payrollKeys.records(id!) });
       toast.success('Payroll period marked as paid');
       setShowPayDialog(false);
     },

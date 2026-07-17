@@ -297,6 +297,7 @@ export const CustomersListPage: React.FC = () => {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers_enhanced'] });
+      queryClient.invalidateQueries({ queryKey: ['customer_stats'] });
       setIsModalOpen(false);
       resetForm();
     },
@@ -331,6 +332,7 @@ export const CustomersListPage: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers_enhanced'] });
+      queryClient.invalidateQueries({ queryKey: ['customer_stats'] });
       setIsEditModalOpen(false);
       setEditingCustomer(null);
     },
@@ -463,6 +465,7 @@ export const CustomersListPage: React.FC = () => {
       toast.success(`Archived ${n} customer${n === 1 ? '' : 's'}`);
       selection.clear();
       queryClient.invalidateQueries({ queryKey: ['customers_enhanced'] });
+      queryClient.invalidateQueries({ queryKey: ['customer_stats'] });
     } catch (err) {
       toast.error((err as Error).message || 'Failed to archive customers');
     } finally {

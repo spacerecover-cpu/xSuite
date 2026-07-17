@@ -480,16 +480,29 @@ export async function initiateCustodyTransfer(params: {
     throw new Error('Custody transfer insert returned no row');
   }
 
-  await logChainOfCustody({
-    caseId: params.caseId,
-    actionCategory: 'transfer',
-    actionType: 'CUSTODY_TRANSFER_INITIATED',
-    actionDescription: `Custody transfer initiated to ${params.toCustodianName}`,
-    metadata: {
-      transfer_id: data.id,
-      reason: params.transferReason,
-    },
-  });
+  // The transfer row is already committed. A ledger-write failure here must not
+  // re-throw: throwing would surface an error that invites the user to retry and
+  // insert a SECOND pending_acceptance transfer (the table is client-append-only
+  // with no cancel path). Log the ledger gap instead and return the transfer.
+  // (Atomic initiate + ledger commit needs a SECURITY DEFINER RPC — see accept/
+  // reject's respond_to_custody_transfer; tracked for a follow-up migration.)
+  try {
+    await logChainOfCustody({
+      caseId: params.caseId,
+      actionCategory: 'transfer',
+      actionType: 'CUSTODY_TRANSFER_INITIATED',
+      actionDescription: `Custody transfer initiated to ${params.toCustodianName}`,
+      metadata: {
+        transfer_id: data.id,
+        reason: params.transferReason,
+      },
+    });
+  } catch (logError) {
+    logger.error('Custody transfer committed but ledger event failed to write:', {
+      transferId: data.id,
+      error: logError,
+    });
+  }
 
   return mapCustodyTransferRow(data);
 }

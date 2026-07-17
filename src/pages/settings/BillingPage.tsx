@@ -142,8 +142,8 @@ export default function BillingPage() {
             <p className="font-medium text-danger">Subscription Cancelled</p>
             <p className="text-sm text-danger mt-1">
               Your subscription has been cancelled.
-              {subscription?.cancelled_at &&
-                ` You have access until ${format(new Date(subscription.cancelled_at), 'MMM d, yyyy')}.`}
+              {subscription?.current_period_end &&
+                ` You have access until ${format(new Date(subscription.current_period_end), 'MMM d, yyyy')}.`}
             </p>
           </div>
         </div>

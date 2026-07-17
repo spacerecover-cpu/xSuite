@@ -106,9 +106,7 @@ export function AdjustmentFormModal({ onClose }: Props) {
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="bonus">Bonus</option>
-              <option value="commission">Commission</option>
               <option value="advance">Salary Advance</option>
-              <option value="penalty">Penalty</option>
               <option value="reimbursement">Reimbursement</option>
               <option value="deduction">Deduction</option>
               <option value="other">Other</option>

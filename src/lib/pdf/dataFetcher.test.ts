@@ -276,6 +276,11 @@ describe('toQuoteData — customer/company contract (regression: customer info s
   it('defaults discount_type to "amount" when the row has none', () => {
     expect(toQuoteData(QUOTE_ROW, { currency: OMR }).discount_type).toBe('amount');
   });
+
+  it('carries the persisted client_reference so the PDF Reference row matches the preview', () => {
+    const result = toQuoteData({ ...QUOTE_ROW, client_reference: 'PO-4711' }, { currency: OMR });
+    expect(result.client_reference).toBe('PO-4711');
+  });
 });
 
 describe('toInvoiceData — customer/company/bank contract', () => {
@@ -327,6 +332,11 @@ describe('toInvoiceData — customer/company/bank contract', () => {
 
   it('defaults discount_type to "amount" when the row has none', () => {
     expect(toInvoiceData(INVOICE_ROW, { currency: OMR }).discount_type).toBe('amount');
+  });
+
+  it('carries the persisted client_reference so the PDF Reference row matches the preview', () => {
+    const result = toInvoiceData({ ...INVOICE_ROW, client_reference: 'PO-4711' }, { currency: OMR });
+    expect(result.client_reference).toBe('PO-4711');
   });
 
 });

@@ -8,23 +8,34 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // class: every company write must flow through createCompany / updateCompany.
 
 const captured: { insert?: Record<string, unknown>; update?: Record<string, unknown> } = {};
+// Ordered log of writes against customer_company_relationships, so a test can
+// assert the existing primary is demoted BEFORE the new primary is inserted.
+const relOps: Array<{ op: 'insert' | 'update'; payload: Record<string, unknown> }> = [];
+// Mutable stand-in for "the primary company this customer already holds".
+const relState: { existingPrimary: Record<string, unknown> | null } = { existingPrimary: null };
 
 vi.mock('./supabaseClient', () => {
   const makeChain = (table: string) => {
     const chain: Record<string, unknown> = {};
     chain.insert = vi.fn((payload: Record<string, unknown>) => {
       if (table === 'companies') captured.insert = payload;
+      if (table === 'customer_company_relationships') relOps.push({ op: 'insert', payload });
       return chain;
     });
     chain.update = vi.fn((payload: Record<string, unknown>) => {
       if (table === 'companies') captured.update = payload;
+      if (table === 'customer_company_relationships') relOps.push({ op: 'update', payload });
       return chain;
     });
     chain.eq = vi.fn(() => chain);
+    chain.is = vi.fn(() => chain);
     chain.select = vi.fn(() => chain);
-    chain.maybeSingle = vi.fn(() =>
-      Promise.resolve({ data: { id: 'co-1', name: 'Acme', company_name: 'Acme' }, error: null }),
-    );
+    chain.maybeSingle = vi.fn(() => {
+      if (table === 'customer_company_relationships') {
+        return Promise.resolve({ data: relState.existingPrimary, error: null });
+      }
+      return Promise.resolve({ data: { id: 'co-1', name: 'Acme', company_name: 'Acme' }, error: null });
+    });
     return chain;
   };
   return {
@@ -43,6 +54,8 @@ describe('companyService — never writes the generated company_name column', ()
   beforeEach(() => {
     captured.insert = undefined;
     captured.update = undefined;
+    relOps.length = 0;
+    relState.existingPrimary = null;
   });
 
   it('createCompany strips company_name from the insert payload', async () => {
@@ -66,5 +79,23 @@ describe('companyService — never writes the generated company_name column', ()
 
   it('updateCompany requires an id', async () => {
     await expect(updateCompany('', { name: 'x' })).rejects.toThrow('Company id is required');
+  });
+
+  it('createCompany demotes the contact\'s existing primary before linking the new one', async () => {
+    // The picked contact already holds a primary company; a raw is_primary:true
+    // insert would trip uq_customer_primary_company (23505) and be swallowed,
+    // silently dropping the user's choice.
+    relState.existingPrimary = { id: 'rel-old' };
+
+    await createCompany({ name: 'Acme', company_name: 'Acme' }, 'cust-9');
+
+    const demote = relOps.find((o) => o.op === 'update');
+    const link = relOps.find((o) => o.op === 'insert');
+    expect(demote).toBeDefined();
+    expect(demote?.payload.is_primary).toBe(false);
+    expect(link).toBeDefined();
+    expect(link?.payload).toMatchObject({ customer_id: 'cust-9', is_primary: true });
+    // demote must happen before the insert
+    expect(relOps.indexOf(demote!)).toBeLessThan(relOps.indexOf(link!));
   });
 });

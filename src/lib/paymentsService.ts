@@ -5,6 +5,7 @@ import { sanitizeFilterValue } from './postgrestSanitizer';
 import { buildPaymentSearchOr } from './searchResolvers';
 import { logger } from './logger';
 import { resolveRateContext } from './currencyService';
+import { currentTenantToday } from './tenantToday';
 
 export interface Payment {
   id?: string;
@@ -382,12 +383,12 @@ export const getPaymentStats = async (filters?: {
   // One SQL aggregation (get_payment_stats_base) instead of fetching every payment
   // row and reducing in JS. The RPC filters deleted_at IS NULL (the old query did
   // not — audit F8) and computes `today` from payment_date's date (the old
-  // string-vs-timestamptz compare was ~always 0). today/month-start are passed in
-  // (browser tz, parity). Money is base-currency (coalesce(amount_base, amount)).
-  const today = new Date().toISOString().split('T')[0];
-  const thisMonth = new Date();
-  thisMonth.setDate(1);
-  const thisMonthStart = thisMonth.toISOString().split('T')[0];
+  // string-vs-timestamptz compare was ~always 0). Money is base-currency
+  // (coalesce(amount_base, amount)). today/month-start anchor on the tenant-local
+  // calendar day — new Date().toISOString() emits the UTC day, which mis-buckets a
+  // day of payments at month/day boundaries for non-UTC tenants (timezone off-by-one).
+  const today = await currentTenantToday();
+  const thisMonthStart = `${today.slice(0, 7)}-01`;
 
   const { data, error } = await supabase.rpc('get_payment_stats_base', {
     p_date_from: filters?.dateFrom ?? undefined,
