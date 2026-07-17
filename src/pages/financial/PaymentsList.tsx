@@ -151,7 +151,7 @@ export const PaymentsList: React.FC = () => {
             startDate = new Date(0);
         }
 
-        query = query.gte('payment_date', startDate.toISOString().split('T')[0]);
+        query = query.gte('payment_date', startDate.toISOString());
       }
 
       const { data, error, count } = await query;

@@ -5,8 +5,12 @@ vi.mock('./supabaseClient', () => ({ supabase: { rpc, from } }));
 vi.mock('./logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
+vi.mock('./rateLimiter', () => ({
+  checkRateLimit: () => ({ allowed: true }),
+  RATE_LIMITS: { CASE_DELETION: {} },
+}));
 
-import { duplicateCase, getNextCaseNumber } from './caseService';
+import { duplicateCase, getNextCaseNumber, deleteCaseService } from './caseService';
 
 function mockCasesInsert(newCase: Record<string, unknown>) {
   const chain: Record<string, unknown> = {};
@@ -90,5 +94,77 @@ describe('duplicateCase — case number sourcing', () => {
     rpc.mockResolvedValue({ data: 'C-0021', error: null });
     await expect(getNextCaseNumber()).resolves.toBe('C-0021');
     expect(rpc).toHaveBeenCalledWith('get_next_number', { p_scope: 'case' });
+  });
+});
+
+describe('duplicateCase — orphan rollback on device insert failure', () => {
+  beforeEach(() => {
+    rpc.mockReset();
+    from.mockReset();
+  });
+
+  it('soft-deletes the just-created case when the devices insert fails', async () => {
+    const casesChain: Record<string, unknown> = {};
+    casesChain.insert = vi.fn(() => casesChain);
+    casesChain.select = vi.fn(() => casesChain);
+    casesChain.maybeSingle = vi.fn(() =>
+      Promise.resolve({ data: { id: 'new-9', case_number: 'C-0030' }, error: null }),
+    );
+    const rollbackUpdate = vi.fn(() => ({ eq: rollbackEq }));
+    const rollbackEq = vi.fn(() => Promise.resolve({ error: null }));
+    casesChain.update = rollbackUpdate;
+
+    const failingDevices = { insert: vi.fn(() => Promise.resolve({ error: { message: 'boom' } })) };
+
+    from.mockImplementation((table: string) => {
+      if (table === 'cases') return casesChain;
+      if (table === 'master_case_statuses') return mockIntakeStatuses();
+      return failingDevices;
+    });
+
+    await expect(
+      duplicateCase({ customer_id: 'c1' }, [{ id: 'd1', model: 'X' }], { id: 'u1', tenantId: 't1' }, 'C-0030'),
+    ).rejects.toThrow(/Failed to duplicate devices/);
+
+    expect(rollbackUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ deleted_at: expect.any(String) }),
+    );
+    expect(rollbackEq).toHaveBeenCalledWith('id', 'new-9');
+  });
+});
+
+describe('deleteCaseService — void RPC contract', () => {
+  beforeEach(() => {
+    rpc.mockReset();
+    from.mockReset();
+  });
+
+  it('resolves with the case number when delete_case_permanently returns void (null data)', async () => {
+    const casesSelect: Record<string, unknown> = {};
+    casesSelect.select = vi.fn(() => casesSelect);
+    casesSelect.eq = vi.fn(() => casesSelect);
+    casesSelect.maybeSingle = vi.fn(() =>
+      Promise.resolve({ data: { case_number: 'C-0042', subject: 'RAID job' }, error: null }),
+    );
+    from.mockImplementation((table: string) => (table === 'cases' ? casesSelect : {}));
+    rpc.mockResolvedValue({ data: null, error: null });
+
+    const result = await deleteCaseService('case-1');
+
+    expect(rpc).toHaveBeenCalledWith('delete_case_permanently', { p_case_id: 'case-1' });
+    expect(result.success).toBe(true);
+    expect(result.case_number).toBe('C-0042');
+    expect(result.case_title).toBe('RAID job');
+  });
+
+  it('still throws when the RPC reports an error', async () => {
+    const casesSelect: Record<string, unknown> = {};
+    casesSelect.select = vi.fn(() => casesSelect);
+    casesSelect.eq = vi.fn(() => casesSelect);
+    casesSelect.maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    from.mockImplementation(() => casesSelect);
+    rpc.mockResolvedValue({ data: null, error: { message: 'RLS denied' } });
+
+    await expect(deleteCaseService('case-1')).rejects.toThrow(/RLS denied/);
   });
 });

@@ -148,8 +148,35 @@ vi.mock('../../components/cases/InvoiceFormModal', () => ({
     ) : null,
 }));
 
+// Capture the props the detail page forwards to CreditNoteModal so a regression
+// test can assert credited_amount (needed for cumulative VAT proration) is passed.
+const captured = vi.hoisted(() => ({ creditNote: null as Record<string, unknown> | null }));
+
+vi.mock('../../components/financial/CreditNoteModal', () => ({
+  CreditNoteModal: (props: { isOpen: boolean } & Record<string, unknown>) => {
+    if (props.isOpen) captured.creditNote = props;
+    return props.isOpen ? <div data-testid="credit-note-modal" /> : null;
+  },
+}));
+
+vi.mock('../../components/banking/RecordReceiptModal', () => ({
+  RecordReceiptModal: (props: {
+    isOpen: boolean;
+    onSave: (d: Record<string, unknown>) => Promise<void>;
+  }) =>
+    props.isOpen ? (
+      <button type="button" onClick={() => void props.onSave({ amount: 100 })}>
+        stub-record-receipt
+      </button>
+    ) : null,
+}));
+
+vi.mock('../../lib/receiptsService', () => ({
+  receiptsService: { createReceiptWithAllocations: vi.fn(async () => ({})) },
+}));
+
 import { InvoiceDetailPage } from './InvoiceDetailPage';
-import { updateInvoice } from '../../lib/invoiceService';
+import { updateInvoice, fetchInvoiceById } from '../../lib/invoiceService';
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -185,5 +212,42 @@ describe('InvoiceDetailPage edit', () => {
     await openEditAndSave();
     const items = vi.mocked(updateInvoice).mock.calls[0][2] as Array<{ discount_percent?: number }>;
     expect(items[0].discount_percent).toBe(10);
+  });
+});
+
+// An issued, partially-credited tax invoice: credited_amount must reach the
+// CreditNoteModal so its cumulative VAT proration telescopes correctly, and the
+// Record Payment path must be reachable.
+const ISSUED_INVOICE = {
+  ...INVOICE,
+  status: 'sent',
+  invoice_type: 'tax_invoice' as const,
+  total_amount: 100,
+  amount_paid: 0,
+  balance_due: 100,
+  tax_amount: 10,
+  credited_amount: 50,
+};
+
+describe('InvoiceDetailPage financial modal plumbing', () => {
+  it('forwards credited_amount to CreditNoteModal for cumulative VAT proration', async () => {
+    captured.creditNote = null;
+    vi.mocked(fetchInvoiceById).mockResolvedValueOnce(ISSUED_INVOICE as never);
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: /create credit note/i }));
+    await screen.findByTestId('credit-note-modal');
+    expect(((captured.creditNote as Record<string, unknown> | null)?.invoice as { credited_amount?: number }).credited_amount).toBe(50);
+  });
+
+  it('invalidates the Record Payment modal query after a receipt is recorded', async () => {
+    vi.mocked(fetchInvoiceById).mockResolvedValueOnce(ISSUED_INVOICE as never);
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, 'invalidateQueries');
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: /record payment/i }));
+    fireEvent.click(await screen.findByText('stub-record-receipt'));
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['invoice_for_payment', 'inv-1'] }),
+    );
+    invalidateSpy.mockRestore();
   });
 });

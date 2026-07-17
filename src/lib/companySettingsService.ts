@@ -191,12 +191,23 @@ const DEFAULT_COMPANY_SETTINGS: Omit<CompanySettings, 'id'> = {
 };
 
 let cachedSettings: CompanySettings | null = null;
+let cachedTenantId: string | null = null;
 let cacheTimestamp: number = 0;
 const CACHE_DURATION_MS = 5 * 60 * 1000;
 
+function getActiveTenantId(): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  return localStorage.getItem('tenant_id');
+}
+
 export async function getOrCreateCompanySettings(): Promise<CompanySettings> {
   const now = Date.now();
-  if (cachedSettings && (now - cacheTimestamp) < CACHE_DURATION_MS) {
+  const tenantId = getActiveTenantId();
+  if (
+    cachedSettings &&
+    cachedTenantId === tenantId &&
+    (now - cacheTimestamp) < CACHE_DURATION_MS
+  ) {
     return cachedSettings;
   }
 
@@ -214,6 +225,7 @@ export async function getOrCreateCompanySettings(): Promise<CompanySettings> {
 
     if (data) {
       cachedSettings = data as CompanySettings;
+      cachedTenantId = tenantId;
       cacheTimestamp = now;
       return cachedSettings;
     }
@@ -234,6 +246,7 @@ export async function getOrCreateCompanySettings(): Promise<CompanySettings> {
 
         if (existingData) {
           cachedSettings = existingData as CompanySettings;
+          cachedTenantId = tenantId;
           cacheTimestamp = now;
           return cachedSettings;
         }
@@ -243,6 +256,7 @@ export async function getOrCreateCompanySettings(): Promise<CompanySettings> {
     }
 
     cachedSettings = newData as CompanySettings;
+    cachedTenantId = tenantId;
     cacheTimestamp = now;
     return cachedSettings;
   } catch (err) {
@@ -253,6 +267,7 @@ export async function getOrCreateCompanySettings(): Promise<CompanySettings> {
 
 export function invalidateCompanySettingsCache(): void {
   cachedSettings = null;
+  cachedTenantId = null;
   cacheTimestamp = 0;
 }
 

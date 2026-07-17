@@ -42,6 +42,10 @@ vi.mock('../../hooks/useCurrency', () => ({
 vi.mock('../../hooks/useToast', () => ({
   useToast: () => ({ error: vi.fn(), success: vi.fn(), info: vi.fn() }),
 }));
+// Muscat (UTC+4): tenant-local day runs ahead of the UTC calendar day.
+vi.mock('../../contexts/TenantConfigContext', () => ({
+  useDateTimeConfig: () => ({ timezone: 'Asia/Muscat' }),
+}));
 vi.mock('../../lib/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
 import { RecordPaymentModal } from './RecordPaymentModal';
@@ -126,5 +130,21 @@ describe('RecordPaymentModal withholding (WP-L3 TDS, AD-7 universal collapsed se
       [{ invoice_id: 'i1', amount: 100 }],
       null,
     );
+  });
+});
+
+describe('RecordPaymentModal payment-date default (tenant-timezone tax point)', () => {
+  it('seeds payment_date from the tenant-local day, not the UTC calendar day', () => {
+    // 2026-07-31 20:30 UTC == 2026-08-01 00:30 in Muscat (UTC+4): the UTC day is
+    // still July, the tenant-local day has rolled to August.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-31T20:30:00Z'));
+    try {
+      renderModal();
+      const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement;
+      expect(dateInput.value).toBe('2026-08-01');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

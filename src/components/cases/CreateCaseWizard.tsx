@@ -392,6 +392,9 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
       if (formData.service_type_id) {
         caseData.service_type_id = formData.service_type_id;
       }
+      if (formData.service_location_id) {
+        caseData.service_location_id = formData.service_location_id;
+      }
       if (profile?.id) {
         caseData.created_by = profile.id;
 

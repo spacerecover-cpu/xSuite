@@ -168,7 +168,7 @@ export const KBCenterPage: React.FC = () => {
     setEditingArticle(null);
   };
 
-  const isAdmin = profile?.role === 'admin';
+  const isAdmin = profile?.role === 'owner' || profile?.role === 'admin';
 
   return (
     <div className="min-h-screen bg-slate-50">

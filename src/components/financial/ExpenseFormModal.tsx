@@ -68,17 +68,9 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
       const { data, error } = await supabase
         .from('cases')
         .select('id, case_no, title')
-        .in('status', ['Open', 'In Progress'])
         .order('created_at', { ascending: false })
         .limit(100);
-      if (error) {
-        const { data: allCases } = await supabase
-          .from('cases')
-          .select('id, case_no, title')
-          .order('created_at', { ascending: false })
-          .limit(100);
-        return allCases || [];
-      }
+      if (error) throw error;
       return data || [];
     },
   });

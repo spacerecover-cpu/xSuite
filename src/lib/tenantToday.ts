@@ -58,3 +58,14 @@ export async function currentTenantToday(): Promise<string> {
 export function clearTenantTodayCache(): void {
   timezoneCache = null;
 }
+
+// The cache is tenant-scoped state with no tenant key. Login does not reload the
+// page, so a same-tab logout -> login as a different tenant would otherwise reuse
+// the previous tenant's timezone and stamp document dates / VAT periods in the
+// wrong zone. Drop the cache on any auth transition; the next read re-fetches
+// under the new session's RLS.
+supabase.auth?.onAuthStateChange?.((event) => {
+  if (event === 'SIGNED_OUT' || event === 'SIGNED_IN') {
+    timezoneCache = null;
+  }
+});

@@ -193,9 +193,9 @@ export const updateVATReturnStatus = async (
 ) => {
   const updateData: Partial<VATReturn> = { status };
 
-  if (status === 'submitted' && submittedBy) {
+  if (status === 'submitted') {
     updateData.submitted_at = new Date().toISOString();
-    updateData.submitted_by = submittedBy;
+    updateData.submitted_by = submittedBy ?? (await supabase.auth.getUser()).data.user?.id ?? null;
   }
 
   return updateVATReturn(id, updateData);

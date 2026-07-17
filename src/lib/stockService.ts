@@ -2,6 +2,7 @@ import { supabase, getTenantId } from './supabaseClient';
 import type { Database, Json } from '../types/database.types';
 import { sanitizeFilterValue } from './postgrestSanitizer';
 import { baseAmount } from './financialMath';
+import { addDaysIso } from './tenantToday';
 import type { TaxComputation } from './regimes/types';
 
 function requireTenantId(): string {
@@ -493,7 +494,10 @@ export async function getStockSales(filters?: SalesFilters): Promise<StockSaleWi
   if (filters?.customer_id) query = query.eq('customer_id', filters.customer_id);
   if (filters?.case_id) query = query.eq('case_id', filters.case_id);
   if (filters?.startDate) query = query.gte('sale_date', filters.startDate);
-  if (filters?.endDate) query = query.lte('sale_date', filters.endDate);
+  // endDate is a date-only 'YYYY-MM-DD' from a date picker; sale_date is timestamptz, so a
+  // .lte bound casts to that day's midnight and drops every same-day sale. Use an exclusive
+  // next-day lower bound to include the whole selected end day.
+  if (filters?.endDate) query = query.lt('sale_date', addDaysIso(filters.endDate, 1));
 
   const { data, error } = await query;
   if (error) throw error;
@@ -765,13 +769,18 @@ export async function approveStockAdjustment(id: string, approvedBy: string): Pr
 // ============================================================
 
 export async function getStockStats(): Promise<StockStats> {
+  // Start of today in the browser's timezone as a full timestamptz instant — a bare UTC date
+  // string ('YYYY-MM-DD') anchors to UTC midnight, mis-bucketing sales rung between local
+  // midnight and the UTC offset (parity with the Dashboard today-count fix).
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
   const [itemsResult, salesTodayResult] = await Promise.all([
     supabase.from('stock_items').select('*').is('deleted_at', null).eq('is_active', true),
     supabase
       .from('stock_sales')
       .select('total_amount, total_amount_base')
       .is('deleted_at', null)
-      .gte('sale_date', new Date().toISOString().split('T')[0]),
+      .gte('sale_date', startOfToday.toISOString()),
   ]);
 
   const items = (itemsResult.data ?? []) as StockItem[];
@@ -828,7 +837,7 @@ export async function getSalesReport(startDate: string, endDate: string) {
     .select('*, stock_sale_items(quantity, unit_price, total, item_id, stock_items(cost_price))')
     .is('deleted_at', null)
     .gte('sale_date', startDate)
-    .lte('sale_date', endDate)
+    .lt('sale_date', addDaysIso(endDate, 1))
     .order('sale_date', { ascending: false });
   if (error) throw error;
 
@@ -862,7 +871,7 @@ export async function getTopSellingItems(startDate: string, endDate: string, lim
     .is('deleted_at', null)
     .is('stock_sales.deleted_at', null)
     .gte('stock_sales.sale_date', startDate)
-    .lte('stock_sales.sale_date', endDate);
+    .lt('stock_sales.sale_date', addDaysIso(endDate, 1));
   if (error) throw error;
 
   const map = new Map<string, { name: string; brand: string | null; sku: string | null; totalQty: number; totalRevenue: number }>();

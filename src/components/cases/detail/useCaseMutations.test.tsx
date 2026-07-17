@@ -71,3 +71,43 @@ describe('updateAssignedEngineerMutation payload', () => {
     expect(payload).toHaveProperty('updated_at');
   });
 });
+
+describe('markAsDeliveredMutation cache invalidation', () => {
+  beforeEach(() => {
+    from.mockReset();
+    update.mockReset();
+    eq.mockReset();
+    // clone_drives.update(...).eq('id', ...) resolves with no error
+    eq.mockImplementation(() => Promise.resolve({ error: null }));
+    update.mockImplementation(() => ({ eq }));
+    from.mockImplementation(() => ({ update }));
+  });
+
+  it('invalidates command-center and history keys after a delivery', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
+    const localWrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client }, children);
+
+    const { result } = renderHook(
+      () => useCaseMutations({ id: 'case-1', caseData: null, devices: [], modals: noopModals }),
+      { wrapper: localWrapper },
+    );
+
+    await result.current.markAsDeliveredMutation.mutateAsync({
+      cloneId: 'clone-1',
+      updateCaseStatus: false,
+      deliveryNotes: '',
+      retentionDays: 30,
+    });
+
+    await waitFor(() =>
+      expect(result.current.markAsDeliveredMutation.isSuccess).toBe(true),
+    );
+
+    const invalidatedKeys = invalidateSpy.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
+    expect(invalidatedKeys).toContain(JSON.stringify(['cases']));
+    expect(invalidatedKeys).toContain(JSON.stringify(['case_history', 'case-1']));
+    expect(invalidatedKeys.some((k) => k.includes('command'))).toBe(true);
+  });
+});

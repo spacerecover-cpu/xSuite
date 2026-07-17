@@ -104,7 +104,8 @@ export const ClientPortalSettings: React.FC = () => {
       const { count, error } = await supabase
         .from('customers_enhanced')
         .select('*', { count: 'exact', head: true })
-        .eq('portal_enabled', true);
+        .eq('portal_enabled', true)
+        .is('deleted_at', null);
 
       if (error) throw error;
       return count || 0;

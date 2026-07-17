@@ -71,6 +71,7 @@ export const ImportWizard: React.FC<Props> = ({ domain, onClose }) => {
   const [step, setStep] = useState<WizardStep>('upload');
   const [dragOver, setDragOver] = useState(false);
   const [parsing, setParsing] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
   const [parsedWb, setParsedWb] = useState<ParsedWorkbook | null>(null);
   const [fileMeta, setFileMeta] = useState<FileMeta | null>(null);
   const [validation, setValidation] = useState<ValidationReport | null>(null);
@@ -81,6 +82,7 @@ export const ImportWizard: React.FC<Props> = ({ domain, onClose }) => {
 
   async function handleFile(file: File) {
     setParsing(true);
+    setParseError(null);
     try {
       const buf = await file.arrayBuffer();
       const [hash, rawWb] = await Promise.all([
@@ -119,6 +121,12 @@ export const ImportWizard: React.FC<Props> = ({ domain, onClose }) => {
       setFileMeta({ filename: file.name, hash });
       setValidation(report);
       setStep('validate');
+    } catch (err) {
+      setParseError(
+        err instanceof Error
+          ? `Could not read this file: ${err.message}`
+          : 'Could not read this file. Make sure it is a valid .xlsx workbook.',
+      );
     } finally {
       setParsing(false);
     }
@@ -212,6 +220,13 @@ export const ImportWizard: React.FC<Props> = ({ domain, onClose }) => {
                 </>
               )}
             </div>
+
+            {parseError && (
+              <div className="mt-4 flex items-start gap-2 rounded-lg border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
+                <XCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>{parseError}</span>
+              </div>
+            )}
 
             {/* Template download — so users know the exact sheets & columns to fill in */}
             <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">

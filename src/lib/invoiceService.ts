@@ -749,7 +749,15 @@ export const updateInvoice = async (id: string, invoice: Partial<Invoice>, items
       place_of_supply_subdivision_id: placeOfSupplySubdivisionId,
     };
 
-    await supabase.from('invoice_line_items').update({ deleted_at: new Date().toISOString() }).eq('invoice_id', id);
+    // postgrest-js surfaces DB errors in the result rather than throwing, so this
+    // soft-delete's error MUST be inspected: if it silently failed (constraint /
+    // RLS denial) while the insert below still ran, the old + new line-item rows
+    // would both stay active and the PDF would print doubled items. Abort instead.
+    const { error: clearItemsError } = await supabase
+      .from('invoice_line_items')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('invoice_id', id);
+    if (clearItemsError) throw clearItemsError;
 
     const tenantId = await resolveTenantId();
     // Same kernel-sourced per-line mapping as createInvoice: tax_amount/total come
@@ -983,21 +991,40 @@ export const convertQuoteToInvoice = async (
     tax_rate: quote.tax_rate ?? 0,
   }));
 
-  const createdInvoice = await createInvoice(newInvoice, items);
-
-  const { error: updateError } = await supabase
+  // Atomically CLAIM the quote for conversion BEFORE creating the invoice. The
+  // .neq guard makes this a compare-and-set: only the first caller flips
+  // (non-converted → converted) and gets a row back; a concurrent tab or a
+  // stale-cache re-click matches 0 rows and is rejected here — before any
+  // createInvoice runs — so a single accepted quote can never spawn two
+  // case-linked (double-billable) invoices. There is no DB uniqueness on
+  // converted_from_quote_id to backstop this, so the guard must live here.
+  const { data: claimed, error: claimError } = await supabase
     .from('quotes')
-    .update({
-      status: 'converted',
-    })
+    .update({ status: 'converted' })
     .eq('id', quoteId)
-    .neq('status', 'converted');
+    .neq('status', 'converted')
+    .select('id')
+    .maybeSingle();
 
-  if (updateError) {
-    throw new Error(`Failed to update quote status after conversion: ${updateError.message}`);
+  if (claimError) {
+    throw new Error(`Failed to update quote status after conversion: ${claimError.message}`);
+  }
+  if (!claimed) {
+    throw new Error('This quote has already been converted to an invoice.');
   }
 
-  return createdInvoice;
+  try {
+    return await createInvoice(newInvoice, items);
+  } catch (err) {
+    // Creation failed after we claimed the quote — release the claim so the
+    // conversion can be retried instead of stranding the quote as 'converted'
+    // with no invoice.
+    await supabase
+      .from('quotes')
+      .update({ status: quote.status })
+      .eq('id', quoteId);
+    throw err;
+  }
 };
 
 export const getInvoicesByCaseId = async (caseId: string) => {
@@ -1223,7 +1250,7 @@ export async function bulkSendInvoiceEmails(
   const { data: rows, error } = await supabase
     .from('invoices')
     .select(
-      'id, invoice_number, status, case_id, customers_enhanced:customer_id(customer_name, email)',
+      'id, invoice_number, status, invoice_type, case_id, customers_enhanced:customer_id(customer_name, email)',
     )
     .in('id', invoiceIds)
     .is('deleted_at', null);
@@ -1278,16 +1305,26 @@ export async function bulkSendInvoiceEmails(
             // Mark sent. Don't fail the whole row if the status update
             // errors — the email already went out; surfacing a noisy
             // failure would scare the user into resending.
+            //
+            // Status is machine-owned. `status` is fetched ONCE before this
+            // sequential loop (which then generates a heavy PDF per row), so
+            // `inv.status` is a stale pre-loop snapshot — writing it back on a
+            // non-draft row would revert a payment recorded mid-batch (e.g. a
+            // now-'paid' invoice back to the fetched 'sent', balance_due 0). And
+            // a draft TAX invoice must reach 'sent' only via issueInvoice
+            // (issue_tax_document mints the number + posts vat_records); flipping
+            // it here would bypass issuance while marking it payable. So: always
+            // stamp sent_at, and only advance draft PROFORMAs to 'sent'; for every
+            // other row omit `status` entirely and leave the DB's current value.
+            const statusPatch =
+              inv.status === 'draft' && inv.invoice_type !== 'tax_invoice'
+                ? { status: 'sent' as const }
+                : {};
             await supabase
               .from('invoices')
               .update({
                 sent_at: new Date().toISOString(),
-                // Only advance draft→sent. `status` is a payment-derived workflow
-                // column (paid/partial/overdue/sent set elsewhere); unconditionally
-                // writing 'sent' when re-sending a copy would revert a fully-paid
-                // invoice to 'sent' with balance_due 0, hiding its settled/overdue
-                // state. Always stamp sent_at; never clobber a post-send status.
-                status: inv.status === 'draft' ? 'sent' : inv.status,
+                ...statusPatch,
               })
               .eq('id', inv.id);
             result = {

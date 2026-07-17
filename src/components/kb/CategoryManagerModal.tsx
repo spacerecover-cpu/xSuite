@@ -84,7 +84,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOp
     mutationFn: () =>
       updateKBCategory(editingId!, {
         name: form.name,
-        description: form.description || undefined,
+        description: form.description.trim(),
         parent_id: form.parent_id || null,
         color: form.color,
         sort_order: parseInt(form.sort_order) || 0,

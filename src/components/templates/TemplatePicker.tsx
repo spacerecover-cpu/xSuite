@@ -68,7 +68,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
     staleTime: 60 * 1000,
   });
 
-  const { data: context } = useQuery({
+  const { data: context, isLoading: contextLoading } = useQuery({
     queryKey: templateKeys.context(contextRefs as Record<string, unknown>),
     queryFn: () => buildTemplateContext(contextRefs),
     enabled: templates.length > 0,
@@ -140,8 +140,10 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
               const template = templates.find((t) => t.id === id);
               if (template) applyTemplate(template);
             }}
-            disabled={disabled || templatesLoading}
-            placeholder={templatesLoading ? 'Loading templates…' : 'Choose a template…'}
+            disabled={disabled || templatesLoading || contextLoading}
+            placeholder={
+              templatesLoading || contextLoading ? 'Loading templates…' : 'Choose a template…'
+            }
             options={templates.map((t) => ({
               value: t.id,
               label: t.isDefault ? `${t.name} (Default)` : t.name,

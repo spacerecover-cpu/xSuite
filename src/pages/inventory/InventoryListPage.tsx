@@ -632,11 +632,16 @@ export default function InventoryListPage() {
                               <span className="text-slate-500">Interface:</span> {item.interface.name}
                             </div>
                           )}
-                          {item.pcb_number && (
-                            <div className="text-slate-900">
-                              <span className="text-slate-500">PCB:</span>{item.pcb_number}
-                            </div>
-                          )}
+                          {(() => {
+                            const pcb =
+                              (item.technical_details as { pcb_number?: string } | null)?.pcb_number ??
+                              item.pcb_number;
+                            return pcb ? (
+                              <div className="text-slate-900">
+                                <span className="text-slate-500">PCB:</span> {pcb}
+                              </div>
+                            ) : null;
+                          })()}
                         </div>
                       </td>
 

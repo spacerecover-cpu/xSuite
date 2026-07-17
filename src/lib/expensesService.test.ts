@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // getExpensesByCategory wraps a supabase query; mock the client (env-throwing on
 // import) and feed mixed-currency rows so the assertion proves base-currency summation.
@@ -22,8 +22,10 @@ import {
   deleteExpense,
   getExpenseLedgerReconciliation,
   approveExpense,
+  getExpenseStats,
 } from './expensesService';
 import { getBaseCurrency, getCurrencyDecimals } from './currencyService';
+import { currentTenantToday } from './tenantToday';
 
 /** Thenable query builder: select/in/gte/lte are chainable; awaiting yields {data}. */
 function makeQuery(rows: Array<Record<string, unknown>>) {
@@ -69,6 +71,30 @@ describe('getExpensesByCategory (cross-document totals must be base currency)', 
     const result = await getExpensesByCategory();
 
     expect(result).toEqual([{ id: 'ops', name: 'Operations', amount: 70 }]);
+  });
+});
+
+describe('getExpenseStats thisMonthAmount (tenant-local month boundary, not UTC-converted local date)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('buckets "this month" on the tenant calendar month even when the browser clock is a later month', async () => {
+    // Browser wall clock sits in a LATER month (August) than the tenant's local
+    // "today" (July). The pre-fix code derived thisMonthStart from new Date() (August),
+    // wrongly EXCLUDING July expenses from the July KPI. The fix reads currentTenantToday().
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-15T12:00:00Z'));
+    vi.mocked(currentTenantToday).mockResolvedValue('2026-07-05');
+
+    const query = makeQuery([
+      { amount: 100, amount_base: 100, exchange_rate: 1, status: 'approved', expense_date: '2026-07-10', category_id: 'ops' },
+      { amount: 40, amount_base: 40, exchange_rate: 1, status: 'approved', expense_date: '2026-06-20', category_id: 'ops' },
+    ]);
+    from.mockReturnValue(query);
+
+    const stats = await getExpenseStats();
+
+    // July 10 expense counts toward July's "this month"; June 20 does not.
+    expect(stats.thisMonthAmount).toBe(100);
   });
 });
 

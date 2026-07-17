@@ -56,9 +56,15 @@ export const LabelStudio: React.FC<LabelStudioProps> = ({ entity, label, onBack 
   const effectivePrefs = prefs ?? DEFAULT_LABEL_PRINTING_PREFS;
 
   const [config, setConfig] = useState<LabelEntityConfig | null>(null);
-  // Seed local edit state once the prefs load (or on entity change).
+  // Seed local edit state once the prefs load, and re-seed only when the entity
+  // changes — NOT on every prefs refetch (a window-focus refetch that returns a
+  // concurrently-saved change must not clobber the admin's unsaved edits).
+  const seededEntityRef = useRef<LabelEntity | null>(null);
   useEffect(() => {
-    if (prefs) setConfig(labelEntityConfig(prefs, entity));
+    if (prefs && seededEntityRef.current !== entity) {
+      setConfig(labelEntityConfig(prefs, entity));
+      seededEntityRef.current = entity;
+    }
   }, [prefs, entity]);
 
   const cfg = config ?? labelEntityConfig(effectivePrefs, entity);
@@ -69,7 +75,11 @@ export const LabelStudio: React.FC<LabelStudioProps> = ({ entity, label, onBack 
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const next = mergeEntityConfig(effectivePrefs, entity, cfg);
+      // Merge into the tenant's ACTUAL saved prefs, never the fallback default —
+      // saving against DEFAULT_LABEL_PRINTING_PREFS would reset the other two
+      // entities' designs to factory defaults.
+      if (!prefs) throw new Error('Label settings are still loading.');
+      const next = mergeEntityConfig(prefs, entity, cfg);
       queryClient.setQueryData(settingsKeys.labelPrinting(), next);
       await setLabelPrintingPrefs(next);
     },
@@ -162,7 +172,7 @@ export const LabelStudio: React.FC<LabelStudioProps> = ({ entity, label, onBack 
             <RotateCcw className="mr-2 h-4 w-4" />
             Reset
           </Button>
-          <Button size="sm" onClick={() => saveMutation.mutate()} isLoading={saveMutation.isPending} loadingLabel="Saving">
+          <Button size="sm" onClick={() => saveMutation.mutate()} disabled={!prefs} isLoading={saveMutation.isPending} loadingLabel="Saving">
             <Save className="mr-2 h-4 w-4" />
             Save &amp; deploy
           </Button>

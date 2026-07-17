@@ -53,6 +53,13 @@ export async function buildCaseSearchOr(s: string, signal?: AbortSignal): Promis
 
   const [customers, devices] = await Promise.all([customersQuery, devicesQuery]);
 
+  // Surface pre-resolution failures instead of silently degrading to
+  // case-field-only matches (which would render "no cases" for a customer who
+  // has open jobs). Aborted scans (superseded term) are expected — let them pass.
+  const isAbort = (e: { message?: string } | null) => !!e?.message?.includes('AbortError');
+  if (customers.error && !isAbort(customers.error)) throw customers.error;
+  if (devices.error && !isAbort(devices.error)) throw devices.error;
+
   const customerIds = (customers.data ?? []).map((r) => r.id);
   const deviceCaseIds = [...new Set((devices.data ?? []).map((r) => r.case_id).filter(Boolean))] as string[];
   return buildCaseSearchOrParts(s, customerIds, deviceCaseIds);

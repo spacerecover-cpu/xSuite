@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -21,6 +21,7 @@ import { sanitizeHtml } from '../../lib/sanitizeHtml';
 import { LineItemTemplateFormModal } from '../../components/templates/LineItemTemplateFormModal';
 import { renderTemplate, SAMPLE_CONTEXT } from '../../lib/templateEngine';
 import { logger } from '../../lib/logger';
+import { useToast } from '../../hooks/useToast';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Database } from '../../types/database.types';
 
@@ -56,11 +57,18 @@ export const TemplateTypeDetail: React.FC = () => {
   const [templateType, setTemplateType] = useState<TemplateType | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  // Stable per-selection reference so the modal's initialData effect only re-fires
+  // when the selected template actually changes (not on every parent re-render).
+  const templateInitialData = useMemo(
+    () => (selectedTemplate ? { ...selectedTemplate } : undefined),
+    [selectedTemplate]
+  );
   const [showPreview, setShowPreview] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showFormModal, setShowFormModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const { profile } = useAuth();
+  const toast = useToast();
 
   useEffect(() => {
     if (typeCode) {
@@ -116,13 +124,14 @@ export const TemplateTypeDetail: React.FC = () => {
         .update({ is_active: false })
         .eq('id', selectedTemplate.id);
 
-      if (!error) {
-        setShowDeleteConfirm(false);
-        setSelectedTemplate(null);
-        await loadData();
-      }
+      if (error) throw error;
+
+      setShowDeleteConfirm(false);
+      setSelectedTemplate(null);
+      await loadData();
     } catch (error) {
       logger.error('Error deleting template:', error);
+      toast.error('Failed to delete template. Please try again.');
     }
   };
 
@@ -145,11 +154,12 @@ export const TemplateTypeDetail: React.FC = () => {
         .from('document_templates')
         .insert(insertPayload);
 
-      if (!error) {
-        await loadData();
-      }
+      if (error) throw error;
+
+      await loadData();
     } catch (error) {
       logger.error('Error duplicating template:', error);
+      toast.error('Failed to duplicate template. Please try again.');
     }
   };
 
@@ -429,7 +439,7 @@ export const TemplateTypeDetail: React.FC = () => {
             setSelectedTemplate(null);
           }}
           onSave={handleSaveTemplate}
-          initialData={selectedTemplate ? { ...selectedTemplate } : undefined}
+          initialData={templateInitialData}
           templateTypeId={templateType.id}
           isLineItemType={false}
           typeCode={templateType.code}

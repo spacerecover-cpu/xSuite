@@ -17,6 +17,7 @@ import {
   getSalesReport,
   getTodaysSales,
   getTopSellingItems,
+  getStockSales,
   createStockSale,
   recordStockReceipt,
   cancelStockSale,
@@ -36,6 +37,7 @@ function makeQuery(rows: Array<Record<string, unknown>>) {
     eq: vi.fn(() => builder),
     gte: vi.fn(() => builder),
     lte: vi.fn(() => builder),
+    lt: vi.fn(() => builder),
     order: vi.fn(() => builder),
     then: (resolve: (v: { data: unknown; error: null }) => void) =>
       resolve({ data: rows, error: null }),
@@ -166,13 +168,52 @@ describe('getTopSellingItems (Bug 65: exclude cancelled/refunded sales and honou
     expect(query.is).toHaveBeenCalledWith('deleted_at', null);
     // parent sale not cancelled/refunded (cancel_stock_sale soft-deletes the parent only)
     expect(query.is).toHaveBeenCalledWith('stock_sales.deleted_at', null);
-    // date range applied through the parent sale_date (was previously ignored)
+    // date range applied through the parent sale_date (was previously ignored). The end bound is
+    // an exclusive next-day .lt so same-day sales (sale_date is timestamptz) are not dropped.
     expect(query.gte).toHaveBeenCalledWith('stock_sales.sale_date', '2020-01-01');
-    expect(query.lte).toHaveBeenCalledWith('stock_sales.sale_date', '2020-12-31');
+    expect(query.lt).toHaveBeenCalledWith('stock_sales.sale_date', '2021-01-01');
+    expect(query.lte).not.toHaveBeenCalledWith('stock_sales.sale_date', '2020-12-31');
 
     expect(result).toEqual([
       { id: 'i1', name: 'WD 2TB', brand: 'WD', sku: 'WD2', totalQty: 3, totalRevenue: 300 },
     ]);
+  });
+});
+
+describe('date-only end bound is inclusive of the whole selected day (timestamptz sale_date)', () => {
+  it('getStockSales widens endDate to an exclusive next-day .lt so same-day sales are not dropped', async () => {
+    const query = makeQuery([]);
+    from.mockReturnValue(query);
+    await getStockSales({ endDate: '2020-06-30' });
+    expect(query.lt).toHaveBeenCalledWith('sale_date', '2020-07-01');
+    expect(query.lte).not.toHaveBeenCalledWith('sale_date', '2020-06-30');
+  });
+
+  it('getSalesReport uses an exclusive next-day .lt for the end bound', async () => {
+    const query = makeQuery([]);
+    from.mockReturnValue(query);
+    await getSalesReport('2020-01-01', '2020-12-31');
+    expect(query.lt).toHaveBeenCalledWith('sale_date', '2021-01-01');
+    expect(query.lte).not.toHaveBeenCalledWith('sale_date', '2020-12-31');
+  });
+});
+
+describe("getStockStats today's-sales bound is a local-timezone instant, not a bare UTC date", () => {
+  it('anchors the sale_date lower bound to local start-of-day as a full ISO timestamp', async () => {
+    const itemsQuery = makeQuery([]);
+    const salesQuery = makeQuery([]);
+    from.mockReturnValueOnce(itemsQuery).mockReturnValueOnce(salesQuery);
+
+    await getStockStats();
+
+    const bound = (salesQuery.gte as ReturnType<typeof vi.fn>).mock.calls.find(
+      (c) => c[0] === 'sale_date',
+    )?.[1] as string;
+    // A full timestamptz instant (contains the time component), never a bare 'YYYY-MM-DD'.
+    expect(bound).toMatch(/T\d{2}:\d{2}/);
+    const expected = new Date();
+    expected.setHours(0, 0, 0, 0);
+    expect(bound).toBe(expected.toISOString());
   });
 });
 
@@ -211,6 +252,7 @@ describe('createStockSale (Task 26: kernel tax parity — p_tax_lines threading)
     // record_stock_sale's `line_item_id IS NULL` header/ledger filter double-count the tax.
     expect(taxLines).toHaveLength(taxComputation.rollups.length); // 1, not 2
     expect(taxLines.every((l) => l.line_item_id === null)).toBe(true);
+    // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single computation, single-currency test fixture: asserts the one POS sale's rollup tax total
     expect(taxLines.reduce((s, l) => s + l.tax_amount, 0)).toBe(0.5); // rollup total, NOT doubled 1.0
     expect(taxLines[0]).toMatchObject({ component_label: 'VAT', regime_key: 'simple_vat', plugin_version: '1.0.0' });
   });

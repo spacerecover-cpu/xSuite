@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -66,6 +66,33 @@ interface CompanySettings {
   clone_defaults?: CloneDefaults;
 }
 
+// The only company_settings sections this page renders editable inputs for.
+// Saving must send ONLY these so it never round-trips (and thus clobbers) a
+// mount-time snapshot of columns owned by other surfaces — metadata,
+// portal_settings, portal_maintenance_mode, date_format, accounting_locale,
+// banking_info, localization (the Localization Center owns those).
+export const GENERAL_SETTINGS_OWNED_SECTIONS = [
+  'basic_info',
+  'location',
+  'contact_info',
+  'online_presence',
+  'legal_compliance',
+  'branding',
+  'clone_defaults',
+] as const;
+
+export const buildGeneralSettingsPayload = (
+  formData: Partial<Record<string, unknown>>,
+): Partial<Record<string, unknown>> => {
+  const payload: Record<string, unknown> = {};
+  for (const key of GENERAL_SETTINGS_OWNED_SECTIONS) {
+    if (formData[key] !== undefined) {
+      payload[key] = formData[key];
+    }
+  }
+  return payload;
+};
+
 // Coerce arbitrary JSON values to a string for text-input display.
 const toStr = (v: unknown): string => {
   if (v === null || v === undefined) return '';
@@ -125,6 +152,12 @@ export const GeneralSettings: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [, setUploadingFiles] = useState<Set<string>>(new Set());
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  // Mirror of hasUnsavedChanges readable inside the seeding effect without
+  // adding it to the dependency array (which would re-run seeding on edit).
+  const hasUnsavedChangesRef = useRef(false);
+  useEffect(() => {
+    hasUnsavedChangesRef.current = hasUnsavedChanges;
+  }, [hasUnsavedChanges]);
   const [openSections, setOpenSections] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('generalSettings_openSections');
     return saved ? new Set(JSON.parse(saved)) : new Set(['basic_info']);
@@ -192,6 +225,11 @@ export const GeneralSettings: React.FC = () => {
   });
 
   useEffect(() => {
+    // A ['company_settings'] refetch (logo/QR upload invalidation, window-refocus,
+    // a sibling save) would otherwise re-seed formData and wipe unsaved field edits.
+    // Skip re-seeding whenever the user has pending edits; the initial seed still
+    // runs because there are no unsaved changes at mount.
+    if (formData && hasUnsavedChangesRef.current) return;
     if (!isLoading) {
       const defaults: Partial<CompanySettings> = {
         basic_info: {},
@@ -291,16 +329,19 @@ export const GeneralSettings: React.FC = () => {
       // Refresh session to ensure we have a valid, non-expired token
       const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
 
+      let activeSession = session;
       if (refreshError) {
         logger.error('Session refresh error:', refreshError);
-        // Try to get existing session as fallback
+        // Refresh can fail transiently (network blip, refresh-token rotation raced
+        // by another tab) while the current token is still valid — fall back to it.
         const { data: { session: existingSession } } = await supabase.auth.getSession();
         if (!existingSession) {
           throw new Error('Authentication session expired. Please log out and log in again.');
         }
+        activeSession = existingSession;
       }
 
-      if (!session) {
+      if (!activeSession) {
         throw new Error('You are not authenticated. Please log in again.');
       }
 
@@ -308,7 +349,7 @@ export const GeneralSettings: React.FC = () => {
       const { data: userProfile, error: profileError } = await supabase
         .from('profiles')
         .select('role, is_active')
-        .eq('id', session.user.id)
+        .eq('id', activeSession.user.id)
         .maybeSingle();
 
       if (profileError) {
@@ -354,7 +395,7 @@ export const GeneralSettings: React.FC = () => {
       const { data: profile } = await supabase
         .from('profiles')
         .select('tenant_id')
-        .eq('id', session.user.id)
+        .eq('id', activeSession.user.id)
         .maybeSingle();
 
       if (!profile?.tenant_id) {
@@ -425,12 +466,47 @@ export const GeneralSettings: React.FC = () => {
     }
 
     setIsSaving(true);
-    // Document language now lives in the Localization Center (its Document tab is the
-    // sole writer of company_settings.localization). Exclude it here so saving General
-    // Settings never round-trips or clobbers a value edited there.
-    const { localization: _omitLocalization, ...payload } = formData;
-    void _omitLocalization;
+    // Send only the sections this page owns. Spreading the whole mount-time row
+    // would round-trip (and clobber) columns written by sibling settings surfaces
+    // — metadata (table columns, stat cards, tax registration, label printing),
+    // portal_settings, portal_maintenance_mode, date_format, accounting_locale,
+    // and localization (owned by the Localization Center).
+    const payload = buildGeneralSettingsPayload(formData) as Partial<CompanySettings>;
     updateMutation.mutate(payload);
+  };
+
+  // Persist a branding change immediately (uploads save on the spot). Mirrors the
+  // save mutation's update-then-insert fallback so a tenant with no company_settings
+  // row yet actually gets one instead of silently updating 0 rows.
+  const persistBranding = async (updatedBranding: JsonObject): Promise<boolean> => {
+    const { data: updateData, error: updateError } = await supabase
+      .from('company_settings')
+      .update({ branding: updatedBranding } as CompanySettingsUpdate)
+      .not('id', 'is', null)
+      .select();
+
+    if (updateError) {
+      logger.error('Branding persist (update) error:', updateError);
+      return false;
+    }
+    if (updateData && updateData.length > 0) return true;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', user?.id ?? '')
+      .maybeSingle();
+    if (!profile?.tenant_id) return false;
+
+    const { error: insertError } = await supabase
+      .from('company_settings')
+      .insert({ branding: updatedBranding, tenant_id: profile.tenant_id } as CompanySettingsInsert);
+    if (insertError) {
+      logger.error('Branding persist (insert) error:', insertError);
+      return false;
+    }
+    return true;
   };
 
   const handleLogoUpload = async (
@@ -520,15 +596,18 @@ export const GeneralSettings: React.FC = () => {
           branding: updatedBranding,
         });
 
-        await supabase
-          .from('company_settings')
-          .update({ branding: updatedBranding } as CompanySettingsUpdate)
-          .not('id', 'is', null);
-
-        queryClient.invalidateQueries({ queryKey: ['company_settings'] });
+        const persisted = await persistBranding(updatedBranding);
+        if (persisted) {
+          queryClient.invalidateQueries({ queryKey: ['company_settings'] });
+        } else {
+          toast.error('The image uploaded but could not be saved. Please try again.');
+        }
+      } else if (!result.success) {
+        toast.error(result.error || 'Upload failed. Please try again.');
       }
     } catch (error) {
       logger.error('Logo upload error:', error);
+      toast.error('Upload failed. Please try again.');
     } finally {
       setUploadingFiles(prev => {
         const newSet = new Set(prev);
@@ -583,15 +662,18 @@ export const GeneralSettings: React.FC = () => {
           branding: updatedBranding,
         });
 
-        await supabase
-          .from('company_settings')
-          .update({ branding: updatedBranding } as CompanySettingsUpdate)
-          .not('id', 'is', null);
-
-        queryClient.invalidateQueries({ queryKey: ['company_settings'] });
+        const persisted = await persistBranding(updatedBranding);
+        if (persisted) {
+          queryClient.invalidateQueries({ queryKey: ['company_settings'] });
+        } else {
+          toast.error('The QR code uploaded but could not be saved. Please try again.');
+        }
+      } else if (!result.success) {
+        toast.error(result.error || 'Upload failed. Please try again.');
       }
     } catch (error) {
       logger.error('QR code upload error:', error);
+      toast.error('Upload failed. Please try again.');
     } finally {
       setUploadingFiles(prev => {
         const newSet = new Set(prev);

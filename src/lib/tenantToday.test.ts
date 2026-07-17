@@ -2,12 +2,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const maybeSingle = vi.fn();
+const { maybeSingle, onAuthStateChange } = vi.hoisted(() => ({
+  maybeSingle: vi.fn(),
+  onAuthStateChange: vi.fn((_cb?: (event: string) => void) => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
+}));
 vi.mock('./supabaseClient', () => ({
   supabase: {
     from: vi.fn(() => ({
       select: vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle })) })),
     })),
+    auth: { onAuthStateChange },
   },
 }));
 
@@ -77,6 +81,20 @@ describe('getTenantTimezone / currentTenantToday', () => {
   it('throws loudly when no timezone is configured', async () => {
     maybeSingle.mockResolvedValue({ data: null, error: null });
     await expect(getTenantTimezone()).rejects.toThrow('no timezone');
+  });
+
+  it('clears the cached timezone on auth transition (same-tab tenant switch)', async () => {
+    maybeSingle.mockResolvedValue({ data: { timezone: 'Asia/Muscat' }, error: null });
+    expect(await getTenantTimezone()).toBe('Asia/Muscat');
+    expect(maybeSingle).toHaveBeenCalledTimes(1);
+
+    // module registered a listener at import; simulate logout -> login as tenant 2
+    const cb = onAuthStateChange.mock.calls[0][0] as (event: string) => void;
+    cb('SIGNED_OUT');
+
+    maybeSingle.mockResolvedValue({ data: { timezone: 'America/New_York' }, error: null });
+    expect(await getTenantTimezone()).toBe('America/New_York');
+    expect(maybeSingle).toHaveBeenCalledTimes(2);
   });
 
   it('currentTenantToday composes both', async () => {

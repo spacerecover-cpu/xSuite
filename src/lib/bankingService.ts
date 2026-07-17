@@ -325,20 +325,17 @@ export const bankingService = {
     status?: string;
     is_reconciled?: boolean;
   }): Promise<PaymentReceipt[]> {
-    // NOTE: payment_receipts has no account_id, status, or is_reconciled columns
-    // in the v1.0.0 schema. Those filters are silently ignored. TODO(B8): when
-    // payment_receipts is extended with bank_account_id / status fields, restore.
+    // The Record Payment flow records receipts via create_receipt_with_allocations,
+    // which inserts into public.receipts — read that canonical table so the register
+    // reflects newly recorded receipts. (The legacy payment_receipts table is no
+    // longer written by any flow.) receipts has no bank_account_id / is_reconciled
+    // columns, so those filters are silently ignored. TODO(B8): honour them if added.
     void filters?.account_id;
-    void filters?.status;
     void filters?.is_reconciled;
 
     let query = supabase
-      .from('payment_receipts')
-      .select(`
-        *,
-        customer:customers_enhanced!payment_receipts_customer_id_fkey(id, customer_name, email),
-        payment:payments!payment_receipts_payment_id_fkey(id, payment_number, amount)
-      `)
+      .from('receipts')
+      .select('*')
       .is('deleted_at', null)
       .order('receipt_date', { ascending: false });
 
@@ -348,6 +345,10 @@ export const bankingService = {
 
     if (filters?.end_date) {
       query = query.lte('receipt_date', filters.end_date);
+    }
+
+    if (filters?.status) {
+      query = query.eq('status', filters.status);
     }
 
     const { data, error } = await query;

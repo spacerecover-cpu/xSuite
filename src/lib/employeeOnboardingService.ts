@@ -40,6 +40,8 @@ export async function getChecklists() {
       positions!for_position_id (*),
       onboarding_checklist_items (*)
     `)
+    .is('deleted_at', null)
+    .is('onboarding_checklist_items.deleted_at', null)
     .order('name');
 
   if (error) throw error;
@@ -55,6 +57,8 @@ export async function getChecklist(id: string) {
     .from('onboarding_checklists')
     .select(`*, positions!for_position_id (*), onboarding_checklist_items (*)`)
     .eq('id', id)
+    .is('deleted_at', null)
+    .is('onboarding_checklist_items.deleted_at', null)
     .maybeSingle();
 
   if (error) throw error;
@@ -99,7 +103,7 @@ export async function getChecklistItems(checklistId: string) {
     .select('*')
     .eq('checklist_id', checklistId)
     .is('deleted_at', null)
-    .order('order_index');
+    .order('sort_order');
 
   if (error) throw error;
   return (data || []) as OnboardingChecklistItem[];

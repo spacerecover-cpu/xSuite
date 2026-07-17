@@ -7,6 +7,7 @@ import { Card } from '../../components/ui/Card';
 import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/ui/Badge';
 import { SearchableSelect } from '../../components/ui/SearchableSelect';
+import InventoryDetailModal from '../../components/inventory/InventoryDetailModal';
 import { supabase, getTenantId } from '../../lib/supabaseClient';
 import { logger } from '../../lib/logger';
 import { getDonorPartsForItems } from '../../lib/inventory/donorPartsService';
@@ -57,6 +58,7 @@ export default function DonorSearchPage() {
   const [capacities, setCapacities] = useState<Array<{ id: string; name: string }>>([]);
   const [searchTemplates, setSearchTemplates] = useState<SearchTemplateRow[]>([]);
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [detailItemId, setDetailItemId] = useState<string | null>(null);
   const [templateName, setTemplateName] = useState('');
   const [templateDescription, setTemplateDescription] = useState('');
   const templateNameRef = useRef<HTMLInputElement>(null);
@@ -494,7 +496,11 @@ export default function DonorSearchPage() {
                     </div>
 
                     <div className="col-span-12 lg:col-span-1 flex lg:flex-col lg:items-end gap-2">
-                      <Button size="sm" className="w-full lg:w-auto">
+                      <Button
+                        size="sm"
+                        className="w-full lg:w-auto"
+                        onClick={() => setDetailItemId(drive.id)}
+                      >
                         View Details
                       </Button>
                     </div>
@@ -574,6 +580,14 @@ export default function DonorSearchPage() {
           </div>
         </form>
       </Modal>
+
+      {detailItemId && (
+        <InventoryDetailModal
+          isOpen={!!detailItemId}
+          onClose={() => setDetailItemId(null)}
+          itemId={detailItemId}
+        />
+      )}
     </div>
   );
 }

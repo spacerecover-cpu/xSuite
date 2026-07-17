@@ -60,6 +60,14 @@ export const StockSaleDetailPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: stockKeys.sale(id!) });
       queryClient.invalidateQueries({ queryKey: stockKeys.sales() });
       queryClient.invalidateQueries({ queryKey: stockKeys.stats() });
+      queryClient.invalidateQueries({ queryKey: stockKeys.items() });
+      queryClient.invalidateQueries({ queryKey: stockKeys.transactions() });
+      (sale?.stock_sale_items ?? []).forEach((line) => {
+        if (line.item_id) {
+          queryClient.invalidateQueries({ queryKey: stockKeys.item(line.item_id) });
+          queryClient.invalidateQueries({ queryKey: stockKeys.transactions(line.item_id) });
+        }
+      });
       setConfirmCancel(false);
     },
     onError: (err: Error) => {

@@ -43,6 +43,14 @@ const clearPermissionCache = vi.fn();
 vi.mock('../lib/rolePermissionsService', () => ({ rolePermissionsService: { clearCache: () => clearPermissionCache() } }));
 const setSentryUser = vi.fn();
 vi.mock('../lib/logger', () => ({ logger: { error: vi.fn() }, setSentryUser: (u: unknown) => setSentryUser(u) }));
+const clearQueryCache = vi.fn();
+// useQueryClient returns a stable client reference in the real app; keep the
+// mock stable too or AuthProvider's subscribe effect (which lists queryClient
+// as a dep) would re-run every render.
+const queryClientStub = { clear: clearQueryCache };
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => queryClientStub,
+}));
 
 const APPROVED = {
   id: 'u1', full_name: 'T', role: 'admin', is_active: true,
@@ -74,6 +82,7 @@ describe('AuthContext', () => {
     signOutMock.mockClear();
     clearPermissionCache.mockClear();
     setSentryUser.mockClear();
+    clearQueryCache.mockClear();
   });
 
   it('loads an approved profile on boot', async () => {
@@ -164,6 +173,15 @@ describe('AuthContext', () => {
 
     fireEvent.click(screen.getByText('logout'));
     await waitFor(() => expect(clearPermissionCache).toHaveBeenCalled());
+  });
+
+  it('clears the TanStack query cache on sign-out so a different-tenant login cannot see cached rows', async () => {
+    maybeSingleImpl = async () => ({ data: APPROVED, error: null });
+    render(<AuthProvider><Harness /></AuthProvider>);
+    await waitFor(() => expect(state()).toBe('approved|false|yes'));
+
+    fireEvent.click(screen.getByText('logout'));
+    await waitFor(() => expect(clearQueryCache).toHaveBeenCalled());
   });
 
   it('flags an expired session (not a manual logout) for the login page (H4)', async () => {

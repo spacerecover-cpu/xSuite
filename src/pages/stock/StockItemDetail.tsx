@@ -6,6 +6,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
+import { SearchableSelect } from '../../components/ui/SearchableSelect';
 import { Skeleton } from '../../components/ui/Skeleton';
 import {
   getStockItem,
@@ -15,6 +16,7 @@ import {
   recordStockUsage,
   updateStockItem,
 } from '../../lib/stockService';
+import { getCasesForAssignment } from '../../lib/inventoryCaseAssignmentService';
 import { stockKeys } from '../../lib/queryKeys';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useToast } from '../../hooks/useToast';
@@ -163,6 +165,18 @@ export const StockItemDetail: React.FC = () => {
     enabled: !!id && activeTab === 'serials',
   });
 
+  const { data: usageCases = [], isLoading: isUsageCasesLoading } = useQuery({
+    queryKey: ['cases', 'for-assignment'],
+    queryFn: getCasesForAssignment,
+    enabled: isUsageOpen,
+  });
+
+  const usageCaseOptions = usageCases.map((c) => ({
+    id: c.id,
+    name: `${c.case_no} - ${c.title}${c.customer_name ? ` (${c.customer_name})` : ''}`,
+    keywords: [c.case_no, c.customer_name].filter(Boolean).join(' '),
+  }));
+
 
   const receiveMutation = useMutation({
     mutationFn: ({ qty, cost, notes }: { qty: number; cost?: number; notes?: string }) =>
@@ -260,7 +274,7 @@ export const StockItemDetail: React.FC = () => {
       return;
     }
     if (!usageForm.case_id.trim()) {
-      toast.error('Please enter a Case ID');
+      toast.error('Please select a case');
       return;
     }
     await usageMutation.mutateAsync({
@@ -859,12 +873,15 @@ export const StockItemDetail: React.FC = () => {
             value={usageForm.quantity}
             onChange={(e) => setUsageForm((f) => ({ ...f, quantity: e.target.value }))}
           />
-          <Input
-            label="Case ID"
+          <SearchableSelect
+            label="Case"
             required
             value={usageForm.case_id}
-            onChange={(e) => setUsageForm((f) => ({ ...f, case_id: e.target.value }))}
-            placeholder="e.g. CASE-0042"
+            onChange={(value) => setUsageForm((f) => ({ ...f, case_id: value }))}
+            options={usageCaseOptions}
+            placeholder={isUsageCasesLoading ? 'Loading cases...' : 'Search cases...'}
+            disabled={isUsageCasesLoading}
+            emptyMessage="No active cases found"
           />
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>

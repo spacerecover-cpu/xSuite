@@ -240,7 +240,7 @@ export const StockAdjustmentsPage: React.FC = () => {
           <Filter className="w-4 h-4 text-slate-400" />
           <span className="text-sm font-medium text-slate-600">Filter by status:</span>
           <div className="flex items-center gap-2">
-            {['', 'draft', 'approved', 'cancelled'].map((s) => (
+            {['', 'draft', 'approved'].map((s) => (
               <button
                 key={s}
                 onClick={() => setStatusFilter(s)}

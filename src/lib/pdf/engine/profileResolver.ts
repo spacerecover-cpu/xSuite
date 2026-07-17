@@ -20,8 +20,20 @@ export interface ComplianceRenderInputs {
   sellerTaxNumber: string | null;
 }
 
-let cache: { at: number; value: ComplianceRenderInputs } | null = null;
-const CACHE_TTL_MS = 60_000; // one render/generation batch; cleared explicitly on tenant switch
+let cache: { at: number; tenantKey: string | null; value: ComplianceRenderInputs } | null = null;
+const CACHE_TTL_MS = 60_000; // one render/generation batch; re-keyed per tenant, cleared on tenant switch
+
+/** The active session's tenant, sourced from the same localStorage key AuthContext
+ *  sets on sign-in and removes on sign-out. Used to bind the render cache to a tenant
+ *  so a second tenant signing into the same SPA tab within the TTL cannot read the
+ *  prior tenant's seller tax-registration/compliance profile. */
+function currentTenantKey(): string | null {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage.getItem('tenant_id') : null;
+  } catch {
+    return null;
+  }
+}
 
 export function clearComplianceRenderCache(): void {
   cache = null;
@@ -64,7 +76,10 @@ export function assertProfileResolved(
  *  matching countryFactsService) and on profile (generic_invoice) -- never fabricates,
  *  never throws on missing/unresolvable config. Cached ~60s; clear on tenant switch. */
 export async function resolveComplianceRenderInputs(): Promise<ComplianceRenderInputs> {
-  if (cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.value;
+  const tenantKey = currentTenantKey();
+  if (cache && cache.tenantKey === tenantKey && Date.now() - cache.at < CACHE_TTL_MS) {
+    return cache.value;
+  }
 
   registerAllRegimePlugins();
 
@@ -82,7 +97,7 @@ export async function resolveComplianceRenderInputs(): Promise<ComplianceRenderI
       sellerRegistered: false,
       sellerTaxNumber: null,
     };
-    cache = { at: Date.now(), value };
+    cache = { at: Date.now(), tenantKey, value };
     return value;
   }
 
@@ -118,6 +133,6 @@ export async function resolveComplianceRenderInputs(): Promise<ComplianceRenderI
     sellerTaxNumber,
   };
   assertProfileResolved(profileKey, value.profile, value.sellerRegistered);
-  cache = { at: Date.now(), value };
+  cache = { at: Date.now(), tenantKey, value };
   return value;
 }

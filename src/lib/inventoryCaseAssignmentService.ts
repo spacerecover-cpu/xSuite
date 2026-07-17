@@ -448,6 +448,38 @@ export async function markAssignmentAsDefective(
   // badge correct after re-fetch.
   const noteMarker = annotateNotes(null, `[defective] ${defectReason}`, usageNotes);
 
+  // Resolve the target dispositions BEFORE releasing the donor. The shared RPC has no
+  // target-status parameter, so releasing the asset and re-flagging it as defective are
+  // unavoidably two steps; doing the catalog reads up front means a lookup failure can no
+  // longer leave the item released-and-reassignable — it shrinks the write window to the
+  // single UPDATE below. (Full atomicity would require the RPC to accept the disposition.)
+  const [
+    { data: defectiveStatus, error: statusLookupError },
+    { data: damagedCondition, error: conditionLookupError },
+  ] = await Promise.all([
+    supabase
+      .from('master_inventory_status_types')
+      .select('id')
+      .ilike('name', '%defective%')
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('master_inventory_condition_types')
+      .select('id')
+      .ilike('name', '%damaged%')
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (statusLookupError) {
+    logger.error('Error resolving defective inventory status:', statusLookupError);
+    throw statusLookupError;
+  }
+  if (conditionLookupError) {
+    logger.error('Error resolving damaged inventory condition:', conditionLookupError);
+    throw conditionLookupError;
+  }
+
   const { data: released, error } = await supabase.rpc('unassign_inventory_from_case', {
     p_assignment_id: assignmentId,
     p_notes: noteMarker,
@@ -459,33 +491,31 @@ export async function markAssignmentAsDefective(
   }
 
   // The shared RPC releases the asset back to "Available"; a defective donor must NOT
-  // be reassignable, so move the item to a non-available "Defective" disposition.
+  // be reassignable, so move the item to a non-available "Defective" disposition and set
+  // its condition to "Damaged" (both changes the Mark Defective modal promises to apply).
   const itemId = (released as { item_id?: string } | null)?.item_id;
   if (itemId) {
-    const { data: defectiveStatus, error: statusLookupError } = await supabase
-      .from('master_inventory_status_types')
-      .select('id')
-      .ilike('name', '%defective%')
-      .limit(1)
-      .maybeSingle();
+    const itemUpdate: { status_id?: string; condition_id?: string } = {};
+    if (defectiveStatus?.id) itemUpdate.status_id = defectiveStatus.id;
+    if (damagedCondition?.id) itemUpdate.condition_id = damagedCondition.id;
 
-    if (statusLookupError) {
-      logger.error('Error resolving defective inventory status:', statusLookupError);
-      throw statusLookupError;
-    }
-
-    if (defectiveStatus?.id) {
+    if (itemUpdate.status_id || itemUpdate.condition_id) {
       const { error: statusError } = await supabase
         .from('inventory_items')
-        .update({ status_id: defectiveStatus.id })
+        .update(itemUpdate)
         .eq('id', itemId);
 
       if (statusError) {
         logger.error('Error setting inventory item to defective status:', statusError);
         throw statusError;
       }
-    } else {
+    }
+
+    if (!defectiveStatus?.id) {
       logger.warn('No "Defective" inventory status found; item left released after defect mark');
+    }
+    if (!damagedCondition?.id) {
+      logger.warn('No "Damaged" inventory condition found; condition left unchanged after defect mark');
     }
   }
 

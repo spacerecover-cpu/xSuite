@@ -110,11 +110,13 @@ export const CandidateFormModal: React.FC<Props> = ({ isOpen, onClose, candidate
         notes: data.notes || null,
         cover_letter: data.cover_letter || null,
         job_id: job.id,
-        applied_date: new Date().toISOString().split('T')[0],
       } as Database['public']['Tables']['recruitment_candidates']['Insert'];
       return isEditing
         ? updateCandidate(candidate!.id, payload)
-        : createCandidate(payload);
+        : createCandidate({
+            ...payload,
+            applied_date: new Date().toISOString().split('T')[0],
+          });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: recruitmentKeys.all });

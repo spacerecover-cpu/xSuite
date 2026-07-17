@@ -15,8 +15,9 @@ vi.mock('../lib/pdf/engine/profileResolver', () => ({
   })),
   clearComplianceRenderCache: vi.fn(),
 }));
-vi.mock('../lib/pdf/dataFetcher', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+// Mock only the export the hook uses; do NOT spread the real module — it imports
+// supabaseClient at load time, which throws without env vars (and is unneeded here).
+vi.mock('../lib/pdf/dataFetcher', () => ({
   fetchDocumentTaxLines: vi.fn(async () => [{
     line_item_id: null, component_code: 'VAT', component_label: 'VAT 5%', rate: 5,
     taxable_base: 1440, tax_amount: 72, tax_treatment: 'standard',
@@ -54,6 +55,40 @@ describe('useDocumentCompliance', () => {
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.taxRows).toEqual([{ label: 'VAT 5%', amount: 4.75 }]);
+  });
+
+  it('refetches tax rollups when the stored header tax changes after an edit (no stale VAT row)', async () => {
+    // The always-mounted print-parity preview never receives its own invalidateQueries
+    // call. When an edit rewrites document_tax_lines it also rewrites the header
+    // tax_amount, so folding that fallback into the query key forces a refetch and keeps
+    // the on-screen VAT component reconciled with the refreshed header total.
+    const { fetchDocumentTaxLines } = await import('../lib/pdf/dataFetcher');
+    vi.mocked(fetchDocumentTaxLines)
+      .mockResolvedValueOnce([{
+        line_item_id: null, component_code: 'VAT', component_label: 'VAT 5%', rate: 5,
+        taxable_base: 1440, tax_amount: 72, tax_treatment: 'standard',
+        treatment_reason_code: null, sequence: 0, backfilled: false, rule_trace: null,
+      }])
+      .mockResolvedValueOnce([{
+        line_item_id: null, component_code: 'VAT', component_label: 'VAT 5%', rate: 5,
+        taxable_base: 2000, tax_amount: 100, tax_treatment: 'standard',
+        treatment_reason_code: null, sequence: 0, backfilled: false, rule_trace: null,
+      }]);
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const sharedWrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+
+    const { result, rerender } = renderHook(
+      ({ taxAmount }: { taxAmount: number }) =>
+        useDocumentCompliance('invoice', 'inv-edit', { taxRate: 5, taxAmount }),
+      { wrapper: sharedWrapper, initialProps: { taxAmount: 72 } },
+    );
+    await waitFor(() => expect(result.current.taxRows).toEqual([{ label: 'VAT 5%', amount: 72 }]));
+
+    rerender({ taxAmount: 100 });
+    await waitFor(() => expect(result.current.taxRows).toEqual([{ label: 'VAT 5%', amount: 100 }]));
   });
 
   it('derives the title and band from countryTemplateOverride, not profile.documentTitle directly', async () => {

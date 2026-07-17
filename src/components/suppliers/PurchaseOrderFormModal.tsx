@@ -251,21 +251,54 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
 
         if (error) throw error;
 
-        // Replace child rows (repo-standard soft-delete + re-insert) so edited
-        // itemization is reflected and stale rows never linger.
-        const { error: deleteItemsError } = await supabase
+        // Reconcile child rows by id so receive tracking (received_quantity,
+        // stock_item_id) on already-received lines survives an edit. Existing
+        // rows are updated in place, new rows inserted, and only rows the user
+        // removed are soft-deleted — never blanket delete+re-insert, which would
+        // reset received_quantity/stock_item_id to NULL.
+        const persisted = lineItems.filter((item) => item.description.trim());
+        const keptIds = persisted
+          .map((item) => item.id)
+          .filter((id): id is string => !!id);
+
+        const removeQuery = supabase
           .from('purchase_order_items')
           .update({ deleted_at: new Date().toISOString() })
           .eq('purchase_order_id', purchaseOrder.id)
           .is('deleted_at', null);
+        const { error: deleteItemsError } = keptIds.length > 0
+          ? await removeQuery.not('id', 'in', `(${keptIds.join(',')})`)
+          : await removeQuery;
         if (deleteItemsError) throw deleteItemsError;
 
-        const itemRows = buildItemRows(purchaseOrder.id);
-        if (itemRows.length > 0) {
-          const { error: itemsError } = await supabase
-            .from('purchase_order_items')
-            .insert(itemRows);
-          if (itemsError) throw itemsError;
+        for (let index = 0; index < persisted.length; index++) {
+          const item = persisted[index];
+          if (item.id) {
+            const { error: updateItemError } = await supabase
+              .from('purchase_order_items')
+              .update({
+                description: item.description,
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                total: item.total,
+                sort_order: index,
+              })
+              .eq('id', item.id);
+            if (updateItemError) throw updateItemError;
+          } else {
+            const { error: insertItemError } = await supabase
+              .from('purchase_order_items')
+              .insert({
+                purchase_order_id: purchaseOrder.id,
+                tenant_id: tenantId,
+                description: item.description,
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                total: item.total,
+                sort_order: index,
+              });
+            if (insertItemError) throw insertItemError;
+          }
         }
 
         toast.success('Purchase order updated successfully');

@@ -303,7 +303,7 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
     // otherwise the discount overshoots and total (subtotal - discount + tax) goes negative,
     // and the tax kernel receives a documentDiscount larger than the line subtotal.
     if (discountType === 'percentage') return (subtotal * Math.min(Math.max(val, 0), 100)) / 100;
-    if (discountType === 'fixed') return Math.min(val, subtotal);
+    if (discountType === 'fixed') return Math.min(Math.max(val, 0), subtotal);
     return 0;
   })();
 

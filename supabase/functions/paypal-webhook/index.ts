@@ -330,33 +330,52 @@ Deno.serve(async (req: Request) => {
           // the 'invoices' scope, which is the tenant's legal gapless tax series
           // (EU VAT Art.226 / GCC). Drawing from 'invoices' would burn a number
           // out of that series into a platform table the tenant never sees.
-          const { data: nextNumber, error: numberError } = await supabase
-            .rpc("get_next_number_for_tenant", { p_tenant: tenantId, p_scope: "billing_invoices" });
-
-          if (numberError) {
-            console.error("Failed to mint billing invoice number:", numberError);
-          }
-
-          const nowIso = new Date().toISOString();
-          const { error: invoiceError } = await supabase
+          // Idempotency guard: this handler INSERTs (not upsert), and the
+          // reprocess-on-unprocessed-duplicate path above can re-enter it after a
+          // crash-then-retry. billing_invoices has no unique constraint on
+          // paypal_transaction_id, so an unguarded INSERT would mint a SECOND paid
+          // platform invoice (and burn a billing_invoices sequence number) for the
+          // same PayPal transaction. Skip the insert (and the number mint) when one
+          // already exists.
+          const transactionId = event.resource?.id;
+          const { data: existingInvoice } = await supabase
             .from("billing_invoices")
-            .insert({
-              tenant_id: tenantId,
-              subscription_id: subscription.id,
-              invoice_number: nextNumber || `INV-${Date.now()}`,
-              invoice_date: nowIso,
-              subtotal: amountCents,
-              total: amountCents,
-              amount_paid: amountCents,
-              amount_due: 0,
-              paid_at: nowIso,
-              currency,
-              status: 'paid',
-              paypal_transaction_id: event.resource?.id,
-            });
+            .select("id")
+            .eq("tenant_id", tenantId)
+            .eq("paypal_transaction_id", transactionId)
+            .maybeSingle();
 
-          if (invoiceError) {
-            console.error("Failed to insert billing invoice:", invoiceError);
+          if (existingInvoice) {
+            console.log(`Billing invoice for PayPal transaction ${transactionId} already exists — skipping insert`);
+          } else {
+            const { data: nextNumber, error: numberError } = await supabase
+              .rpc("get_next_number_for_tenant", { p_tenant: tenantId, p_scope: "billing_invoices" });
+
+            if (numberError) {
+              console.error("Failed to mint billing invoice number:", numberError);
+            }
+
+            const nowIso = new Date().toISOString();
+            const { error: invoiceError } = await supabase
+              .from("billing_invoices")
+              .insert({
+                tenant_id: tenantId,
+                subscription_id: subscription.id,
+                invoice_number: nextNumber || `INV-${Date.now()}`,
+                invoice_date: nowIso,
+                subtotal: amountCents,
+                total: amountCents,
+                amount_paid: amountCents,
+                amount_due: 0,
+                paid_at: nowIso,
+                currency,
+                status: 'paid',
+                paypal_transaction_id: transactionId,
+              });
+
+            if (invoiceError) {
+              console.error("Failed to insert billing invoice:", invoiceError);
+            }
           }
 
           await supabase

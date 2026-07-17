@@ -26,8 +26,14 @@ import { useCurrency } from '../../hooks/useCurrency';
 const getTodayIso = (): string => new Date().toISOString().split('T')[0];
 
 const getMonthStartIso = (): string => {
+  // Build the local-calendar month start directly. Going through
+  // Date.toISOString() would serialize local midnight of the 1st as the UTC
+  // instant, shifting to the previous month's last day for any UTC+ tenant and
+  // over-including that day in the "This Month" revenue KPI all month long.
   const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}-01`;
 };
 
 export const StockSalesPage: React.FC = () => {
@@ -112,8 +118,11 @@ export const StockSalesPage: React.FC = () => {
   };
 
   const handleSaleSuccess = (saleId: string) => {
-    queryClient.invalidateQueries({ queryKey: stockKeys.sales() });
-    queryClient.invalidateQueries({ queryKey: stockKeys.stats() });
+    // record_stock_sale decrements quantity_on_hand and flips sold serials out of
+    // 'in_stock', so invalidate the whole stock namespace (serial pickers,
+    // items/saleable lists, sales, stats) — not just sales()/stats() — to avoid
+    // re-offering a just-sold serial from a still-fresh cache.
+    queryClient.invalidateQueries({ queryKey: stockKeys.all });
     navigate(`/stock/sales/${saleId}`);
   };
 

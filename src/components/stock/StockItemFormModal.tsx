@@ -42,6 +42,26 @@ const inputClass =
 
 const labelClass = 'block text-sm font-medium text-slate-700 mb-1';
 
+function specificationsToRows(specs: unknown): SpecRow[] {
+  if (specs && typeof specs === 'object' && !Array.isArray(specs)) {
+    const rows = Object.entries(specs as Record<string, unknown>).map(([key, value]) => ({
+      key,
+      value: value == null ? '' : String(value),
+    }));
+    if (rows.length > 0) return rows;
+  }
+  return [{ key: '', value: '' }];
+}
+
+function rowsToSpecifications(rows: SpecRow[]): Record<string, string> | null {
+  const specs: Record<string, string> = {};
+  for (const { key, value } of rows) {
+    const k = key.trim();
+    if (k) specs[k] = value.trim();
+  }
+  return Object.keys(specs).length > 0 ? specs : null;
+}
+
 export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
   isOpen,
   onClose,
@@ -95,16 +115,16 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
       setBarcode(item.barcode ?? '');
       setImageUrl(item.photos?.[0] ?? '');
       setIsActive(item.is_active ?? true);
-      setIsFeatured(false);
+      setIsFeatured(item.is_featured ?? false);
       setCostPrice(item.cost_price != null ? String(item.cost_price) : '');
       setSellingPrice(item.selling_price != null ? String(item.selling_price) : '');
-      setTaxInclusive(false);
-      setWarrantyMonths('');
+      setTaxInclusive(item.tax_inclusive ?? false);
+      setWarrantyMonths(item.warranty_months != null ? String(item.warranty_months) : '');
       setMinimumQuantity(String(item.minimum_quantity ?? 0));
       setReorderQuantity(item.reorder_quantity != null ? String(item.reorder_quantity) : '');
-      setLocation('');
+      setLocation(item.location ?? '');
       setNotes(item.notes ?? '');
-      setSpecRows([{ key: '', value: '' }]);
+      setSpecRows(specificationsToRows(item.specifications));
     } else {
       setName('');
       setDescription('');
@@ -155,8 +175,13 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
         is_active: isActive,
         cost_price: costPrice !== '' ? parseFloat(costPrice) : null,
         selling_price: isSaleable && sellingPrice !== '' ? parseFloat(sellingPrice) : null,
+        tax_inclusive: taxInclusive,
+        warranty_months: warrantyMonths !== '' ? parseInt(warrantyMonths, 10) : null,
         minimum_quantity: parseInt(minimumQuantity, 10) || 0,
         reorder_quantity: reorderQuantity !== '' ? parseInt(reorderQuantity, 10) : null,
+        location: location.trim() || null,
+        is_featured: isSaleable ? isFeatured : false,
+        specifications: rowsToSpecifications(specRows),
         notes: notes.trim() || null,
       } as StockItemInsert;
 

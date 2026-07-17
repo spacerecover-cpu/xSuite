@@ -44,9 +44,12 @@ vi.mock('./emailDocumentService', () => ({
 vi.mock('./emailTemplates', () => ({
   getEmailTemplate: vi.fn(() => ({ subject: 's', body: 'b' })),
 }));
+vi.mock('./tenantConfigService', () => ({
+  getTenantConfig: vi.fn(() => Promise.resolve({ currency: { symbol: 'ر.ع.', code: 'OMR', position: 'before', decimalPlaces: 3 } })),
+}));
 
 import { computeDocumentTotals } from './taxDocumentService';
-import { createQuote, duplicateQuote, permanentDeleteQuote, bulkSendQuoteEmails } from './quotesService';
+import { createQuote, duplicateQuote, permanentDeleteQuote, bulkSendQuoteEmails, getQuotesByCaseId, updateQuote } from './quotesService';
 
 // Kernel parity pin (M-G): locks the canonical quote shape (12 × OMR 120.000 @5%,
 // no discount, 3-dp) that quotesService now routes through the fiscal kernel.
@@ -274,5 +277,144 @@ describe('bulkSendQuoteEmails — status write is gated (regression for re-send 
     expect(results.map((r) => r.status)).toEqual(['sent', 'sent']);
     // Only the draft's persisted status is advanced; accepted is never written.
     expect(statusUpdates).toEqual([{ id: 'q-draft', status: 'sent' }]);
+  });
+});
+
+describe('getQuotesByCaseId — excludes soft-deleted quotes', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('filters deleted_at IS NULL so trashed quotes never reach the Case Detail tab', async () => {
+    let quotesChain: Record<string, unknown> | null = null;
+    from.mockImplementation((table: string) => {
+      if (table === 'quotes') {
+        quotesChain = chain({ data: [], error: null });
+        return quotesChain;
+      }
+      return chain({ data: null, error: null });
+    });
+
+    await getQuotesByCaseId('case-1');
+
+    expect(quotesChain).not.toBeNull();
+    expect((quotesChain!.is as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('deleted_at', null);
+  });
+});
+
+describe('duplicateQuote — carries title, client_reference, bank_account_id', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getUser.mockResolvedValue({ data: { user: { id: 'user-1' } } });
+    resolveTenantId.mockResolvedValue('tenant-1');
+    rpc.mockResolvedValue({ data: 'Q-0003', error: null });
+  });
+
+  it('persists the source quote title/client_reference/bank_account_id on the duplicate', async () => {
+    let quotesCall = 0;
+    let capturedQuoteInsert: Record<string, unknown>[] = [];
+
+    from.mockImplementation((table: string) => {
+      if (table === 'quotes') {
+        quotesCall += 1;
+        if (quotesCall === 1) {
+          return chain({
+            data: {
+              id: 'src-1',
+              quote_number: 'Q-src',
+              case_id: 'case-1',
+              customer_id: 'cust-1',
+              company_id: null,
+              title: 'RAID-5 Recovery Service',
+              client_reference: 'PO-9988',
+              bank_account_id: '11111111-1111-1111-1111-111111111111',
+              discount_type: 'fixed',
+              discount_amount: 0,
+              tax_rate: 5,
+              valid_until: null,
+              terms: null,
+              notes: null,
+              currency: 'OMR',
+            },
+            error: null,
+          });
+        }
+        const c = chain({ data: { id: 'new-1', quote_number: 'Q-0003', total_amount: 210 }, error: null });
+        c.insert = vi.fn((rows: Record<string, unknown>[]) => {
+          capturedQuoteInsert = rows;
+          return c;
+        });
+        return c;
+      }
+      if (table === 'customer_company_relationships') {
+        return chain({ data: null, error: null });
+      }
+      if (table === 'quote_items') {
+        return chain({
+          data: [{ id: 'item-1', sort_order: 0, description: 'x', quantity: 1, unit_price: 100, unit_code: null, unit_label: null, item_code: null, total: 100 }],
+          error: null,
+        });
+      }
+      return chain({ data: null, error: null });
+    });
+
+    await duplicateQuote('src-1');
+
+    expect(capturedQuoteInsert).toHaveLength(1);
+    expect(capturedQuoteInsert[0]).toMatchObject({
+      title: 'RAID-5 Recovery Service',
+      client_reference: 'PO-9988',
+      bank_account_id: '11111111-1111-1111-1111-111111111111',
+    });
+  });
+});
+
+describe('updateQuote — compensates a failed item re-insert', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resolveTenantId.mockResolvedValue('tenant-1');
+  });
+
+  it('restores the soft-deleted items when the replacement insert fails', async () => {
+    const itemUpdates: Array<{ payload: Record<string, unknown>; eqs: Array<[string, unknown]> }> = [];
+
+    from.mockImplementation((table: string) => {
+      if (table === 'quotes') {
+        return chain({ data: { currency: 'OMR', exchange_rate: 1, rate_source: 'derived', customer_id: 'cust-1', company_id: null }, error: null });
+      }
+      if (table === 'quote_items') {
+        const c: Record<string, unknown> = {};
+        c.select = vi.fn(() => c);
+        // insert fails → triggers compensation
+        c.insert = vi.fn(() => ({
+          select: vi.fn(() => Promise.resolve({ data: null, error: { message: 'insert failed' } })),
+        }));
+        c.update = vi.fn((payload: Record<string, unknown>) => {
+          const eqs: Array<[string, unknown]> = [];
+          const eqChain = {
+            eq: vi.fn((col: string, val: unknown) => {
+              eqs.push([col, val]);
+              return eqChain;
+            }),
+            then: (resolve: (v: unknown) => unknown) => resolve({ error: null }),
+          };
+          itemUpdates.push({ payload, eqs });
+          return eqChain;
+        });
+        return c;
+      }
+      return chain({ data: null, error: null });
+    });
+
+    await expect(
+      updateQuote('q-1', { discount_type: 'fixed', discount_amount: 0, tax_rate: 5 }, [
+        { description: 'x', quantity: 1, unit_price: 100 },
+      ]),
+    ).rejects.toEqual({ message: 'insert failed' });
+
+    // First update soft-deletes (deleted_at set); the compensation restores (deleted_at null).
+    const restore = itemUpdates.find((u) => u.payload.deleted_at === null);
+    expect(restore).toBeTruthy();
+    expect(restore!.eqs).toContainEqual(['quote_id', 'q-1']);
   });
 });

@@ -327,18 +327,19 @@ export const ArticleEditorModal: React.FC<ArticleEditorModalProps> = ({ isOpen, 
         <Button variant="secondary" onClick={onClose} disabled={isPending}>Cancel</Button>
         <div className="flex items-center gap-2">
           <Button
-            variant="secondary"
-            onClick={() => handleSave('draft')}
-            disabled={isPending}
-          >
-            Save as Draft
-          </Button>
-          <Button
             variant="primary"
-            onClick={() => handleSave('published')}
+            onClick={() => handleSave(status)}
             disabled={isPending}
           >
-            {isPending ? 'Saving...' : article?.status === 'published' ? 'Update' : 'Publish'}
+            {isPending
+              ? 'Saving...'
+              : status === 'published'
+                ? article?.status === 'published'
+                  ? 'Update'
+                  : 'Publish'
+                : article
+                  ? 'Save as Draft'
+                  : 'Save Draft'}
           </Button>
         </div>
       </div>

@@ -1,5 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { buildCaseSearchOrParts, applyCaseListFilters } from './caseSearch';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const fromMock = vi.fn();
+vi.mock('./supabaseClient', () => ({ supabase: { from: (...a: unknown[]) => fromMock(...a) } }));
+
+import { buildCaseSearchOrParts, applyCaseListFilters, buildCaseSearchOr } from './caseSearch';
 
 /** Minimal fake PostgREST filter builder that records the filter calls made. */
 function fakeQuery() {
@@ -21,6 +25,56 @@ function fakeQuery() {
   };
   return q;
 }
+
+/** Chainable, thenable builder resolving to the given {data,error} result. */
+function resultBuilder(result: { data: unknown; error: unknown }) {
+  const b: Record<string, unknown> = {};
+  for (const m of ['select', 'or', 'is', 'ilike', 'limit', 'abortSignal']) {
+    b[m] = () => b;
+  }
+  b.then = (onFulfilled: (r: unknown) => unknown) => Promise.resolve(result).then(onFulfilled);
+  return b;
+}
+
+describe('buildCaseSearchOr error handling', () => {
+  beforeEach(() => fromMock.mockReset());
+
+  it('throws when the customer pre-resolution query errors (never silently degrades)', async () => {
+    fromMock.mockImplementation((table: string) =>
+      table === 'customers_enhanced'
+        ? resultBuilder({ data: null, error: { message: 'statement timeout', code: '57014' } })
+        : resultBuilder({ data: [], error: null }),
+    );
+    await expect(buildCaseSearchOr('kashi')).rejects.toMatchObject({ code: '57014' });
+  });
+
+  it('throws when the device-serial scan errors', async () => {
+    fromMock.mockImplementation((table: string) =>
+      table === 'case_devices'
+        ? resultBuilder({ data: null, error: { message: 'boom', code: 'XX000' } })
+        : resultBuilder({ data: [], error: null }),
+    );
+    await expect(buildCaseSearchOr('SN1')).rejects.toMatchObject({ code: 'XX000' });
+  });
+
+  it('does not throw on an aborted (superseded) scan', async () => {
+    fromMock.mockImplementation(() =>
+      resultBuilder({ data: null, error: { message: 'AbortError: aborted', code: '' } }),
+    );
+    await expect(buildCaseSearchOr('x')).resolves.toContain('case_no.ilike.%x%');
+  });
+
+  it('returns the folded filter when both scans succeed', async () => {
+    fromMock.mockImplementation((table: string) =>
+      table === 'customers_enhanced'
+        ? resultBuilder({ data: [{ id: 'c1' }], error: null })
+        : resultBuilder({ data: [{ case_id: 'k1' }], error: null }),
+    );
+    await expect(buildCaseSearchOr('x')).resolves.toBe(
+      'case_no.ilike.%x%,client_reference.ilike.%x%,subject.ilike.%x%,customer_id.in.(c1),id.in.(k1)',
+    );
+  });
+});
 
 describe('buildCaseSearchOrParts', () => {
   it('always searches case_no, client_reference and subject', () => {

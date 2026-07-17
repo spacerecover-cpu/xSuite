@@ -643,7 +643,11 @@ export const updateQuote = async (id: string, quote: Partial<Quote>, items?: Quo
       place_of_supply_subdivision_id: placeOfSupplySubdivisionId,
     };
 
-    await supabase.from('quote_items').update({ deleted_at: new Date().toISOString() }).eq('quote_id', id);
+    // Soft-delete the current items with a known timestamp so we can compensate
+    // (restore them) if the replacement insert fails — otherwise a mid-operation
+    // insert failure would strand the quote with zero live items but a stale header.
+    const itemsDeletedAt = new Date().toISOString();
+    await supabase.from('quote_items').update({ deleted_at: itemsDeletedAt }).eq('quote_id', id);
 
     const tenantId = await resolveTenantId();
     const itemsWithQuoteId: QuoteItemInsert[] = items.map((item, index) => {
@@ -669,7 +673,16 @@ export const updateQuote = async (id: string, quote: Partial<Quote>, items?: Quo
       .insert(itemsWithQuoteId)
       .select('id, sort_order');
 
-    if (itemsError) throw itemsError;
+    if (itemsError) {
+      // Restore the items we just soft-deleted so the quote isn't left with zero
+      // live line items against its unchanged (stale) header.
+      await supabase
+        .from('quote_items')
+        .update({ deleted_at: null })
+        .eq('quote_id', id)
+        .eq('deleted_at', itemsDeletedAt);
+      throw itemsError;
+    }
 
     // Ordered id array aligned to the kernel's `idx:<n>` sentinels (sort_order === n),
     // so persistDocumentTaxLines relabels each component row to its real line-item id.
@@ -861,14 +874,18 @@ export const duplicateQuote = async (sourceId: string) => {
   const sourceQuote = await fetchQuoteById(sourceId);
   if (!sourceQuote) throw new Error('Source quote not found');
 
-  // Note: title/description/terms_and_conditions/template_id/accounting_locale_id/bank_account_id
-  // are no longer persisted (columns removed in v1.0.0). Carry forward only fields that map to
-  // real `quotes` columns. `terms` is the canonical replacement for `terms_and_conditions`.
+  // Carry forward only fields that map to real `quotes` columns. `terms` is the
+  // canonical replacement for `terms_and_conditions`. description/template_id/
+  // accounting_locale_id remain non-persisted; title/client_reference/
+  // bank_account_id are real columns (pickQuotePersistFields) and must be copied.
   const newQuote: Quote = {
     case_id: sourceQuote.case_id,
     customer_id: sourceQuote.customer_id,
     company_id: sourceQuote.company_id,
     status: 'draft',
+    title: sourceQuote.title,
+    client_reference: sourceQuote.client_reference,
+    bank_account_id: sourceQuote.bank_account_id,
     valid_until: sourceQuote.valid_until,
     tax_rate: sourceQuote.tax_rate,
     discount_amount: sourceQuote.discount_amount,
@@ -899,6 +916,7 @@ export const getQuotesByCaseId = async (caseId: string) => {
     .from('quotes')
     .select('*')
     .eq('case_id', caseId)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
   if (error) throw error;

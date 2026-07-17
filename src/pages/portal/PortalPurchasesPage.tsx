@@ -17,6 +17,23 @@ type StockItemEmbed = {
   sku: string | null;
 } | null;
 
+// "Total Spent" must reflect money actually received: only fully-paid sales count.
+// record_stock_sale stamps status='paid' when settled, 'pending' when unpaid but
+// added to an invoice; the vocabulary is pending/paid/partial/refunded/cancelled with
+// no 'completed'. Unpaid/refunded/cancelled rows still render below with their status
+// badge for transparency but must never inflate the headline. Mirrors the sibling
+// money-received aggregation in PortalPayments (filters status='completed').
+export const computeTotalSpent = (
+  sales: ReadonlyArray<Record<string, unknown>>,
+): number =>
+  sales.reduce(
+    (sum, s) =>
+      String(s.status ?? '').toLowerCase() === 'paid'
+        ? sum + baseAmount(s, 'total_amount')
+        : sum,
+    0,
+  );
+
 export const PortalPurchasesPage: React.FC = () => {
   const { t } = useTranslation();
   const { customer } = usePortalAuth();
@@ -53,7 +70,7 @@ export const PortalPurchasesPage: React.FC = () => {
     enabled: !!customer?.id,
   });
 
-  const totalSpent = (purchases ?? []).reduce((sum, s) => sum + baseAmount(s, 'total_amount'), 0);
+  const totalSpent = computeTotalSpent(purchases ?? []);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -123,7 +140,7 @@ export const PortalPurchasesPage: React.FC = () => {
                     <div className="flex items-center gap-3 mb-2">
                       <span className="font-semibold text-slate-900 text-sm">{sale.sale_number ?? `Sale #${sale.id.slice(0, 8)}`}</span>
                       {sale.status && (
-                        <Badge color={sale.status === 'completed' ? 'success' : sale.status === 'pending' ? 'warning' : 'default'}>
+                        <Badge variant={sale.status === 'paid' ? 'success' : sale.status === 'pending' ? 'warning' : 'default'}>
                           {sale.status}
                         </Badge>
                       )}

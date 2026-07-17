@@ -6,6 +6,7 @@ import { formatDate } from '../../lib/format';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { format } from 'date-fns';
 import { useListPageSize } from '../../hooks/useListPageSize';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { baseAmount } from '../../lib/financialMath';
@@ -87,7 +88,7 @@ export const TransactionsList: React.FC = () => {
       default:
         return undefined;
     }
-    return startDate.toISOString().split('T')[0];
+    return format(startDate, 'yyyy-MM-dd');
   };
 
   useEffect(() => {

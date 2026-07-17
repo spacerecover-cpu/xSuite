@@ -13,6 +13,8 @@ import {
   getTenantDetails,
   getDashboardStats,
   getTenantsList,
+  suspendTenant,
+  reactivateTenant,
 } from './platformAdminService';
 
 /**
@@ -302,6 +304,64 @@ describe('getTenantsList (bug 66 — plan filter compares the real subscription 
     expect(tenantsQuery!.select).toHaveBeenCalledWith(expect.stringContaining('subscription_plans'));
     // only the starter tenant survives — before the fix both were dropped (length 0)
     expect(result.map((t) => t.id)).toEqual(['t1']);
+  });
+});
+
+/**
+ * Regression — the platform-admin Tenants list and totalTenants KPI must exclude
+ * soft-deleted (failed-provision rollback) tenants: both queries need
+ * .is('deleted_at', null). Otherwise dead carcasses inflate the KPI and appear in
+ * the operable Tenants list.
+ */
+describe('soft-deleted tenants are excluded', () => {
+  it('getTenantsList filters the tenants query to non-deleted rows', async () => {
+    let tenantsQuery: Record<string, unknown> | undefined;
+    from.mockImplementation((table: string) => {
+      if (table === 'tenants') return (tenantsQuery = makeScopedQuery({ data: [] }));
+      return makeScopedQuery({ data: [] });
+    });
+
+    await getTenantsList();
+
+    expect(tenantsQuery!.is).toHaveBeenCalledWith('deleted_at', null);
+  });
+
+  it('getDashboardStats filters the tenants count to non-deleted rows', async () => {
+    let tenantsQuery: Record<string, unknown> | undefined;
+    from.mockImplementation((table: string) => {
+      if (table === 'tenants') return (tenantsQuery = makeQuery({ count: 0 }));
+      return makeQuery({ data: [], count: 0 });
+    });
+
+    await getDashboardStats();
+
+    expect(tenantsQuery!.is).toHaveBeenCalledWith('deleted_at', null);
+  });
+});
+
+/**
+ * Regression — suspendTenant/reactivateTenant must surface a failed UPDATE instead of
+ * swallowing the result, so a DB-level failure does not fire a false success toast.
+ */
+describe('suspendTenant / reactivateTenant propagate DB errors', () => {
+  function makeErroringUpdate() {
+    const builder: Record<string, unknown> = {
+      update: vi.fn(() => builder),
+      eq: vi.fn(() =>
+        Promise.resolve({ data: null, error: { message: 'update failed' }, count: null }),
+      ),
+    };
+    return builder;
+  }
+
+  it('suspendTenant throws when the UPDATE errors', async () => {
+    from.mockImplementation(() => makeErroringUpdate());
+    await expect(suspendTenant('tenant-1')).rejects.toBeTruthy();
+  });
+
+  it('reactivateTenant throws when the UPDATE errors', async () => {
+    from.mockImplementation(() => makeErroringUpdate());
+    await expect(reactivateTenant('tenant-1')).rejects.toBeTruthy();
   });
 });
 

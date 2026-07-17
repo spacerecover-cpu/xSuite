@@ -8,7 +8,7 @@ import { Modal } from '../../components/ui/Modal';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useDateTimeConfig } from '../../contexts/TenantConfigContext';
 import { getFinancialYearDates } from '../../lib/financialService';
-import { baseAmount } from '../../lib/financialMath';
+import { baseAmount, RECEIVABLE_INVOICE_EXCLUDED_STATUSES } from '../../lib/financialMath';
 import { sumBase, groupSumBase } from './reportsDashboardRollup';
 import {
   generateProfitLossReport,
@@ -225,6 +225,8 @@ export const ReportsDashboard: React.FC = () => {
     setInvoiceVsExpenseData(null);
   };
 
+  const excludedInvoiceStatusFilter = `(${RECEIVABLE_INVOICE_EXCLUDED_STATUSES.map((s) => `"${s}"`).join(',')})`;
+
   const { data: reportData, isLoading } = useQuery({
     queryKey: ['financial_report', dateRange],
     queryFn: async () => {
@@ -234,6 +236,8 @@ export const ReportsDashboard: React.FC = () => {
         supabase
           .from('invoices')
           .select('total_amount, total_amount_base, amount_paid, amount_paid_base, status, invoice_date')
+          .not('status', 'in', excludedInvoiceStatusFilter)
+          .is('deleted_at', null)
           .gte('invoice_date', start)
           .lte('invoice_date', end),
         supabase
@@ -244,6 +248,9 @@ export const ReportsDashboard: React.FC = () => {
           .lte('expense_date', end)
           .in('status', ['approved', 'paid']),
       ]);
+
+      if (invoicesResult.error) throw invoicesResult.error;
+      if (expensesResult.error) throw expensesResult.error;
 
       const invoices = invoicesResult.data || [];
       const expenses = expensesResult.data || [];
@@ -271,6 +278,8 @@ export const ReportsDashboard: React.FC = () => {
       const { data, error } = await supabase
         .from('invoices')
         .select('status, total_amount, total_amount_base')
+        .not('status', 'in', excludedInvoiceStatusFilter)
+        .is('deleted_at', null)
         .gte('invoice_date', start)
         .lte('invoice_date', end);
 
@@ -321,6 +330,8 @@ export const ReportsDashboard: React.FC = () => {
       const { data, error } = await supabase
         .from('invoices')
         .select('customer_id, amount_paid, amount_paid_base, customers_enhanced(customer_name)')
+        .not('status', 'in', excludedInvoiceStatusFilter)
+        .is('deleted_at', null)
         .gte('invoice_date', start)
         .lte('invoice_date', end);
 

@@ -210,15 +210,19 @@ export const TenantOverviewTab: React.FC<TenantOverviewTabProps> = ({
                 <span className="text-sm text-slate-600">Users</span>
               </div>
               <span className="text-sm font-medium text-slate-900">
-                {userCount} / {userLimit}
+                {userLimit > 0 ? `${userCount} / ${userLimit}` : userCount}
               </span>
             </div>
-            <div className="w-full bg-slate-200 rounded-full h-2">
-              <div
-                className={`h-2 rounded-full transition-all ${getProgressColor(userPercentage)}`}
-                style={{ width: `${Math.min(userPercentage, 100)}%` }}
-              />
-            </div>
+            {userLimit > 0 ? (
+              <div className="w-full bg-slate-200 rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full transition-all ${getProgressColor(userPercentage)}`}
+                  style={{ width: `${Math.min(userPercentage, 100)}%` }}
+                />
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400">No limit configured</p>
+            )}
           </div>
 
           <div>
@@ -228,15 +232,19 @@ export const TenantOverviewTab: React.FC<TenantOverviewTabProps> = ({
                 <span className="text-sm text-slate-600">Cases</span>
               </div>
               <span className="text-sm font-medium text-slate-900">
-                {caseCount} / {caseLimit}
+                {caseLimit > 0 ? `${caseCount} / ${caseLimit}` : caseCount}
               </span>
             </div>
-            <div className="w-full bg-slate-200 rounded-full h-2">
-              <div
-                className={`h-2 rounded-full transition-all ${getProgressColor(casePercentage)}`}
-                style={{ width: `${Math.min(casePercentage, 100)}%` }}
-              />
-            </div>
+            {caseLimit > 0 ? (
+              <div className="w-full bg-slate-200 rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full transition-all ${getProgressColor(casePercentage)}`}
+                  style={{ width: `${Math.min(casePercentage, 100)}%` }}
+                />
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400">No limit configured</p>
+            )}
           </div>
 
           <div>
@@ -246,15 +254,21 @@ export const TenantOverviewTab: React.FC<TenantOverviewTabProps> = ({
                 <span className="text-sm text-slate-600">Storage</span>
               </div>
               <span className="text-sm font-medium text-slate-900">
-                {storageUsed.toFixed(2)} GB / {storageLimit} GB
+                {storageLimit > 0
+                  ? `${storageUsed.toFixed(2)} GB / ${storageLimit} GB`
+                  : `${storageUsed.toFixed(2)} GB`}
               </span>
             </div>
-            <div className="w-full bg-slate-200 rounded-full h-2">
-              <div
-                className={`h-2 rounded-full transition-all ${getProgressColor(storagePercentage)}`}
-                style={{ width: `${Math.min(storagePercentage, 100)}%` }}
-              />
-            </div>
+            {storageLimit > 0 ? (
+              <div className="w-full bg-slate-200 rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full transition-all ${getProgressColor(storagePercentage)}`}
+                  style={{ width: `${Math.min(storagePercentage, 100)}%` }}
+                />
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400">No limit configured</p>
+            )}
           </div>
         </div>
       </Card>

@@ -12,6 +12,8 @@ import {
 } from '../../lib/paymentsService';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useToast } from '../../hooks/useToast';
+import { useDateTimeConfig } from '../../contexts/TenantConfigContext';
+import { tenantToday } from '../../lib/tenantToday';
 import {
   DollarSign,
   Calendar,
@@ -84,9 +86,10 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 }) => {
   const { formatCurrency, currencyFormat } = useCurrency();
   const toast = useToast();
+  const { timezone } = useDateTimeConfig();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [kind, setKind] = useState<'standard' | 'advance'>(initialKind);
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentDate, setPaymentDate] = useState(() => tenantToday(timezone));
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const [selectedCaseId, setSelectedCaseId] = useState<string>(preselectedCaseId || '');
   const [paymentMethodId, setPaymentMethodId] = useState<string>('');
@@ -347,7 +350,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   const handleClose = () => {
     setKind(initialKind);
-    setPaymentDate(new Date().toISOString().split('T')[0]);
+    setPaymentDate(tenantToday(timezone));
     setTotalAmount(0);
     setSelectedCaseId(preselectedCaseId || '');
     setPaymentMethodId('');

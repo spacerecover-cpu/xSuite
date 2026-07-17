@@ -29,7 +29,9 @@ function loadPersistedData(): { step: number; formData: OnboardingFormData } | n
 
 function persistData(step: number, formData: OnboardingFormData) {
   try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ step, formData }));
+    // Never write credentials to Web Storage; they do not need to survive a step change.
+    const { password: _password, confirmPassword: _confirmPassword, ...safeFormData } = formData;
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ step, formData: safeFormData }));
   } catch {
     // sessionStorage may be unavailable
   }
@@ -42,7 +44,9 @@ export function useOnboardingFlow() {
   const persisted = useRef(loadPersistedData());
   const [step, setStep] = useState(persisted.current?.step ?? 0);
   const [formData, setFormData] = useState<OnboardingFormData>(
-    persisted.current?.formData ?? DEFAULT_FORM_DATA
+    persisted.current?.formData
+      ? { ...DEFAULT_FORM_DATA, ...persisted.current.formData }
+      : DEFAULT_FORM_DATA
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);

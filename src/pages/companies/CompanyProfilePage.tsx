@@ -13,6 +13,7 @@ import {
   Calendar, FileText, DollarSign, MessageSquare, Eye, Briefcase
 } from 'lucide-react';
 import { formatDate } from '../../lib/format';
+import { useCurrency } from '../../hooks/useCurrency';
 import { baseAmount } from '../../lib/financialMath';
 import { logger } from '../../lib/logger';
 import { updateCompany } from '../../lib/companyService';
@@ -75,6 +76,7 @@ export const CompanyProfilePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { formatCurrency } = useCurrency();
   const [activeTab, setActiveTab] = useState<'overview' | 'contacts' | 'cases' | 'financial' | 'communications'>('overview');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({
@@ -542,7 +544,7 @@ export const CompanyProfilePage: React.FC = () => {
         stats={[
           {
             label: 'Total Revenue',
-            value: `$${companyInsights?.totalRevenue?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`,
+            value: formatCurrency(companyInsights?.totalRevenue || 0),
             tone: 'success',
             icon: DollarSign,
             sub: 'From approved quotes',

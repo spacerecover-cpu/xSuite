@@ -686,6 +686,7 @@ export const generateInvoiceVsExpenseReport = async (
       .from('invoices')
       .select('id, amount_paid, amount_paid_base, invoice_date, paid_at, status')
       .is('deleted_at', null)
+      .not('status', 'in', `(${RECEIVABLE_INVOICE_EXCLUDED_STATUSES.map((s) => `"${s}"`).join(',')})`)
       .gte('invoice_date', dateFrom)
       .lte('invoice_date', dateTo),
     supabase

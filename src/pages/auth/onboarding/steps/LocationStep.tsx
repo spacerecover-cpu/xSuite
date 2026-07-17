@@ -76,6 +76,12 @@ export const LocationStep = ({
     updateField('uiLanguage', resolveUiLanguageDefault(c?.language_code));
     updateField('fiscalYearStart', c?.fiscal_year_start ?? '');
     updateField('timezone', c?.timezone ?? '');
+    // Reset jurisdiction fields: a stale subdivision/tax number from a previously
+    // selected country would otherwise be submitted to provision-tenant and hard-fail
+    // signup (subdivision does not belong to the new country) with no UI to clear it.
+    updateField('subdivisionId', '');
+    updateField('taxNumber', '');
+    updateField('legalEntityType', '');
   };
 
   const activeLanguage = formData.uiLanguage || resolveUiLanguageDefault(selectedCountry?.language_code);

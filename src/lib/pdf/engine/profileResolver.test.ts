@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const rows: Record<string, unknown[]> = {};
 
+const store: Record<string, string> = {};
+(globalThis as { localStorage?: unknown }).localStorage = {
+  getItem: (k: string) => (k in store ? store[k] : null),
+  setItem: (k: string, v: string) => { store[k] = v; },
+  removeItem: (k: string) => { delete store[k]; },
+  clear: () => { for (const k of Object.keys(store)) delete store[k]; },
+};
+
 vi.mock('../../supabaseClient', () => {
   const chain = (table: string) => {
     const result = { data: rows[table] ?? [], error: null };
@@ -63,5 +71,26 @@ describe('resolveComplianceRenderInputs', () => {
     const inputs = await resolveComplianceRenderInputs();
     expect(inputs.facts).toBeNull();
     expect(inputs.profile.key).toBe('generic_invoice');
+  });
+
+  it('does not serve one tenant a cached compliance profile after another tenant signs into the same tab', async () => {
+    localStorage.setItem('tenant_id', 't-1');
+    const t1 = await resolveComplianceRenderInputs();
+    expect(t1.sellerTaxNumber).toBe('OM1100000000');
+    expect(t1.profile.key).toBe('gcc_tax_invoice');
+
+    // Tenant 2 signs into the same SPA tab within the TTL; RLS now scopes to t-2.
+    localStorage.setItem('tenant_id', 't-2');
+    rows['legal_entities'] = [{
+      id: 'le-2', country_id: 'gb-uuid', tax_identifier: 'GB999999999',
+      is_primary: true, tenant_id: 't-2',
+    }];
+    rows['tenants'] = [{ id: 't-2', timezone: 'UTC', resolved_country_config: {} }];
+
+    const t2 = await resolveComplianceRenderInputs();
+    expect(t2.sellerTaxNumber).toBe('GB999999999');
+    expect(t2.profile.key).toBe('generic_invoice');
+
+    localStorage.removeItem('tenant_id');
   });
 });

@@ -142,7 +142,9 @@ export const BankingPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['payment_receipts'] });
       queryClient.invalidateQueries({ queryKey: ['bank_accounts'] });
       queryClient.invalidateQueries({ queryKey: ['balance_summary'] });
-      queryClient.invalidateQueries({ queryKey: ['invoices_by_case'] });
+      queryClient.invalidateQueries({ queryKey: ['open_invoices_by_case'] });
+      queryClient.invalidateQueries({ queryKey: ['settled_invoices_by_case'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice_for_payment'] });
       queryClient.invalidateQueries({ queryKey: ['cases_with_invoices'] });
       queryClient.invalidateQueries({ queryKey: ['bank_transactions'] });
       setShowReceiptModal(false);

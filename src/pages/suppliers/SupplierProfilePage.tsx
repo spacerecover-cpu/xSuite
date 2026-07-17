@@ -17,6 +17,7 @@ import SupplierFormModal from '../../components/suppliers/SupplierFormModal';
 import CommunicationFormModal from '../../components/suppliers/CommunicationFormModal';
 import ContactFormModal from '../../components/suppliers/ContactFormModal';
 import DocumentUploadModal from '../../components/suppliers/DocumentUploadModal';
+import PurchaseOrderFormModal from '../../components/suppliers/PurchaseOrderFormModal';
 import { supabase } from '../../lib/supabaseClient';
 import { useToast } from '../../hooks/useToast';
 import { useCurrency } from '../../hooks/useCurrency';
@@ -57,6 +58,7 @@ export default function SupplierProfilePage() {
   const [showCommunicationModal, setShowCommunicationModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [showPOModal, setShowPOModal] = useState(false);
   const [editingContact, setEditingContact] = useState<SupplierContactRow | null>(null);
   const [contacts, setContacts] = useState<SupplierContactRow[]>([]);
   const [communications, setCommunications] = useState<SupplierCommunicationRow[]>([]);
@@ -139,6 +141,7 @@ export default function SupplierProfilePage() {
       .from('supplier_contacts')
       .select('*')
       .eq('supplier_id', id)
+      .is('deleted_at', null)
       .order('is_primary', { ascending: false });
     setContacts(data ?? []);
   };
@@ -149,6 +152,7 @@ export default function SupplierProfilePage() {
       .from('supplier_communications')
       .select('*')
       .eq('supplier_id', id)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
     setCommunications(data ?? []);
   };
@@ -159,6 +163,7 @@ export default function SupplierProfilePage() {
       .from('supplier_documents')
       .select('*')
       .eq('supplier_id', id)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
     setDocuments(data ?? []);
   };
@@ -169,6 +174,7 @@ export default function SupplierProfilePage() {
       .from('supplier_performance_metrics')
       .select('*')
       .eq('supplier_id', id)
+      .is('deleted_at', null)
       .order('period_end', { ascending: false });
     setPerformance(data ?? []);
   };
@@ -179,6 +185,7 @@ export default function SupplierProfilePage() {
       .from('purchase_orders')
       .select('*, status:master_purchase_order_statuses(name, color)')
       .eq('supplier_id', id)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
     setOrders((data ?? []) as PurchaseOrderWithStatus[]);
   };
@@ -255,6 +262,10 @@ export default function SupplierProfilePage() {
                 email: supplier.email ?? undefined,
                 phone: supplier.phone ?? undefined,
                 address: supplier.address ?? undefined,
+                address_line1: supplier.address_line1 ?? undefined,
+                address_line2: supplier.address_line2 ?? undefined,
+                subdivision_id: supplier.subdivision_id ?? null,
+                postal_code: supplier.postal_code ?? undefined,
                 website: supplier.website ?? undefined,
                 category_id: supplier.category_id ?? undefined,
                 payment_terms_id: supplier.payment_terms_id ?? undefined,
@@ -315,6 +326,18 @@ export default function SupplierProfilePage() {
               onSuccess={() => {
                 loadDocuments();
                 setShowDocumentModal(false);
+              }}
+              supplierId={id}
+            />
+          )}
+
+          {showPOModal && id && (
+            <PurchaseOrderFormModal
+              isOpen={showPOModal}
+              onClose={() => setShowPOModal(false)}
+              onSuccess={() => {
+                loadOrders();
+                setShowPOModal(false);
               }}
               supplierId={id}
             />
@@ -381,7 +404,7 @@ export default function SupplierProfilePage() {
           />
         )}
         {activeTab === 'performance' && <PerformanceTab supplier={supplier} performance={performance} />}
-        {activeTab === 'orders' && <OrdersTab orders={orders} supplierId={id ?? ''} />}
+        {activeTab === 'orders' && <OrdersTab orders={orders} onCreate={() => setShowPOModal(true)} />}
         {activeTab === 'audit' && <AuditTab auditTrail={auditTrail} />}
       </div>
     </DetailPageTemplate>
@@ -789,7 +812,7 @@ function PerformanceTab({ supplier, performance }: { supplier: SupplierWithRelat
   );
 }
 
-function OrdersTab({ orders, supplierId }: { orders: PurchaseOrderWithStatus[]; supplierId: string }) {
+function OrdersTab({ orders, onCreate }: { orders: PurchaseOrderWithStatus[]; onCreate: () => void }) {
   const navigate = useNavigate();
   const { formatCurrency } = useCurrency();
 
@@ -837,7 +860,7 @@ function OrdersTab({ orders, supplierId }: { orders: PurchaseOrderWithStatus[]; 
       <div className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-slate-900">Purchase Orders</h3>
-          <Button size="sm" onClick={() => navigate('/purchase-orders/new', { state: { supplierId } })}>
+          <Button size="sm" onClick={onCreate}>
             <Package className="w-4 h-4 mr-2" />
             Create PO
           </Button>

@@ -85,7 +85,7 @@ export const userManagementService = {
 
       const { data: currentUser } = await supabase.auth.getUser();
       if (currentUser.user && oldProfile) {
-        await supabase.rpc('log_audit_trail', {
+        const { error: auditError } = await supabase.rpc('log_audit_trail', {
           p_action: 'update',
           p_record_type: 'profiles',
           p_record_id: userId,
@@ -102,6 +102,9 @@ export const userManagementService = {
             is_active: userData.is_active,
           } as never,
         });
+        if (auditError) {
+          throw new Error(auditError.message);
+        }
       }
 
       return { success: true };
