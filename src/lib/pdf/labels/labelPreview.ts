@@ -11,8 +11,12 @@ import type { InventoryItemWithDetails } from '../../inventory/inventoryLabelTyp
 import type { StockLabelItem } from './labelContent';
 import { getLabelSize } from './labelSizes';
 import { resolveLabelImages, buildLabelBlobUrl, buildLabelBase64 } from './labelPrintService';
+import type { CompactLabelOptions } from './compactLabelDocument';
 import { caseLabelContents, stockLabelContent, inventoryLabelContent } from './labelContent';
 import { sampleReceiptData } from '../engine/sampleData';
+
+/** Fixed so the Studio preview is stable (not a live-ticking clock). */
+const SAMPLE_PRINTED_AT = new Date('2026-07-18T14:32:00Z');
 
 const SAMPLE_STOCK: StockLabelItem = {
   name: 'Samsung 870 EVO 500GB',
@@ -29,6 +33,7 @@ const SAMPLE_INVENTORY: InventoryItemWithDetails = {
   model: 'ST2000DM008',
   barcode: '4066512345678',
   qr_value: 'INV-00013',
+  created_at: '2026-07-01T09:00:00Z',
   brand: { name: 'Seagate' },
   device_type: { name: 'HDD 3.5"' },
   capacity: { name: '2 TB' },
@@ -44,7 +49,7 @@ async function sampleLabelImages(entity: LabelEntity, config: LabelEntityConfig)
       ? caseLabelContents(sampleReceiptData(), size, config.fields).slice(0, 1)
       : entity === 'stock'
         ? [stockLabelContent(SAMPLE_STOCK, { priceText: '1,234.50', locationName: 'Shelf A-3', companyName: 'Space Data Recovery' }, config.fields)]
-        : [inventoryLabelContent(SAMPLE_INVENTORY, config.fields)];
+        : [inventoryLabelContent(SAMPLE_INVENTORY, config.fields, { printedAt: SAMPLE_PRINTED_AT })];
   const labels = await resolveLabelImages(mapped, size, {
     showQr: config.showQr,
     showBarcode: config.showBarcode,
@@ -52,14 +57,23 @@ async function sampleLabelImages(entity: LabelEntity, config: LabelEntityConfig)
   return { size, labels };
 }
 
+/** The engine options (alignment + icon) the preview must render, from a config. */
+function previewOptions(config: LabelEntityConfig): CompactLabelOptions {
+  return {
+    idAlign: config.idAlign,
+    icon: config.showIcon ? config.icon ?? null : null,
+    iconPosition: config.iconPosition,
+  };
+}
+
 /** Render one representative label for `entity` under `config`; returns a blob URL. */
 export async function previewLabelBlob(entity: LabelEntity, config: LabelEntityConfig): Promise<string> {
   const { size, labels } = await sampleLabelImages(entity, config);
-  return buildLabelBlobUrl(labels, size, 'Roboto');
+  return buildLabelBlobUrl(labels, size, 'Roboto', previewOptions(config));
 }
 
 /** Render one representative label as base64 PDF for the QZ Tray Test print. */
 export async function previewLabelBase64(entity: LabelEntity, config: LabelEntityConfig): Promise<string> {
   const { size, labels } = await sampleLabelImages(entity, config);
-  return buildLabelBase64(labels, size, 'Roboto');
+  return buildLabelBase64(labels, size, 'Roboto', previewOptions(config));
 }
