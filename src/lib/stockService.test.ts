@@ -24,7 +24,9 @@ import {
   bulkAdjustQuantities,
   getStockItems,
   getLowStockItems,
+  fetchAllStockItemsForLabels,
 } from './stockService';
+import { MAX_BULK_LABEL_ITEMS } from './inventoryService';
 
 /**
  * Thenable query builder: every chained filter returns the builder; awaiting it
@@ -326,5 +328,40 @@ describe('FU-4: non-atomic stock writes route through atomic RPCs', () => {
         { id: 'b', new_quantity: 0, reason: 'damaged' },
       ],
     });
+  });
+});
+
+describe('fetchAllStockItemsForLabels (bulk-label gather across pages)', () => {
+  // getStockItemsPage (no lowStock) chains .select().is().order()[.or/.eq]?.range();
+  // the terminal .range resolves one page of {data,count}. Bare intra-module calls
+  // can't be spied via the namespace, so drive the real page fn off the `from` mock.
+  function makePagedQuery(rows: Array<Record<string, unknown>>, count: number) {
+    const builder: Record<string, unknown> = {
+      select: vi.fn(() => builder),
+      is: vi.fn(() => builder),
+      eq: vi.fn(() => builder),
+      or: vi.fn(() => builder),
+      order: vi.fn(() => builder),
+      range: vi.fn(() => Promise.resolve({ data: rows, count, error: null })),
+    };
+    return builder;
+  }
+
+  it('pages through all matching stock items until total', async () => {
+    from
+      .mockReturnValueOnce(makePagedQuery(new Array(200).fill({ id: 'x' }), 350))
+      .mockReturnValueOnce(makePagedQuery(new Array(150).fill({ id: 'y' }), 350));
+    const { items, truncated } = await fetchAllStockItemsForLabels({});
+    expect(items).toHaveLength(350);
+    expect(truncated).toBe(false);
+    expect(from).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops at MAX_BULK_LABEL_ITEMS and marks the set truncated', async () => {
+    from.mockImplementation(() => makePagedQuery(new Array(200).fill({ id: 'z' }), 10000));
+    const { items, truncated } = await fetchAllStockItemsForLabels({});
+    expect(items).toHaveLength(MAX_BULK_LABEL_ITEMS);
+    expect(truncated).toBe(true);
+    expect(from).toHaveBeenCalledTimes(MAX_BULK_LABEL_ITEMS / 200);
   });
 });

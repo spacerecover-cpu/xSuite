@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Search, Package, Zap, Edit2, Trash2, RefreshCw, Filter, MapPin, Printer } from 'lucide-react';
+import { Plus, Search, Package, Zap, Edit2, Trash2, RefreshCw, Filter, MapPin, Printer, CheckSquare, Square, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../hooks/useToast';
 import { useListPageSize } from '../../hooks/useListPageSize';
@@ -20,10 +20,13 @@ import {
   getInventoryInsights,
   updateInventoryItem,
   deleteInventoryItem,
+  fetchAllInventoryItemsForLabels,
   type InventoryCategory,
   type InventoryStatusType,
   type InventoryInsights,
 } from '../../lib/inventoryService';
+import { useListSelectionEnabled } from '../../hooks/useListSelectionEnabled';
+import { BulkLabelPrintModal } from '../../components/labels/BulkLabelPrintModal';
 import { format } from 'date-fns';
 import { logger } from '../../lib/logger';
 
@@ -72,6 +75,10 @@ export default function InventoryListPage() {
   const [page, setPage] = useState(0);
   const pageSize = useListPageSize();
   const [total, setTotal] = useState(0);
+  const selectionEnabled = useListSelectionEnabled();
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkPrintOpen, setBulkPrintOpen] = useState(false);
   const loadRequestIdRef = useRef(0);
   const prevFilterKeyRef = useRef<string | null>(null);
   useEffect(() => {
@@ -125,6 +132,15 @@ export default function InventoryListPage() {
       document.removeEventListener('keydown', handleEscape);
     };
   }, [editingStatusId]);
+
+  // Hiding checkboxes (tenant preference) drops any in-flight selection so
+  // bulk actions can't act on rows the user can no longer see or unselect.
+  useEffect(() => {
+    if (!selectionEnabled) {
+      setSelectionMode(false);
+      setSelectedIds(new Set());
+    }
+  }, [selectionEnabled]);
 
   const loadData = async () => {
     const requestId = ++loadRequestIdRef.current;
@@ -228,8 +244,46 @@ export default function InventoryListPage() {
     ) {
       return;
     }
+    if (selectionMode) {
+      toggleSelected(item.id);
+      return;
+    }
     setSelectedItemId(item.id);
     setIsDetailModalOpen(true);
+  };
+
+  const selectedItems = items.filter((i) => selectedIds.has(i.id));
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === items.length && items.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(items.map((i) => i.id)));
+    }
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    clearSelection();
+  };
+
+  const openBulkPrint = () => {
+    if (selectedIds.size < 1) {
+      toast.error('Select at least 1 item to print labels');
+      return;
+    }
+    setBulkPrintOpen(true);
   };
 
   const handleDetailModalClose = () => {
@@ -344,6 +398,15 @@ export default function InventoryListPage() {
         <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
         {isRefreshing ? 'Refreshing...' : 'Refresh'}
       </Button>
+      {selectionEnabled && (
+        <Button
+          variant={selectionMode ? 'primary' : 'secondary'}
+          onClick={() => (selectionMode ? exitSelectionMode() : setSelectionMode(true))}
+        >
+          <CheckSquare className="w-4 h-4 mr-2" />
+          {selectionMode ? 'Exit Select' : 'Bulk Select'}
+        </Button>
+      )}
       <Button onClick={() => setIsAddModalOpen(true)} variant="primary">
         <Plus className="w-4 h-4 mr-2" />
         Add Item
@@ -547,10 +610,60 @@ export default function InventoryListPage() {
   );
 
   const tableNode = (
-    <div className="overflow-x-auto">
+    <>
+      {selectionMode && (
+        <div className="px-4 py-3 bg-info-muted/40 border-b border-info/20 flex flex-wrap items-center gap-3">
+          <button
+            onClick={toggleSelectAll}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 hover:text-primary transition-colors"
+          >
+            {selectedIds.size === items.length && items.length > 0 ? (
+              <CheckSquare className="w-4 h-4 text-primary" />
+            ) : (
+              <Square className="w-4 h-4 text-slate-400" />
+            )}
+            {selectedIds.size === items.length && items.length > 0 ? 'Deselect all' : 'Select all'}
+          </button>
+          <span className="text-sm text-slate-600">
+            <span className="font-semibold text-primary">{selectedIds.size}</span> selected
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="gap-1.5"
+              onClick={openBulkPrint}
+              disabled={selectedIds.size < 1}
+            >
+              <Printer className="w-4 h-4" />
+              Print Labels
+            </Button>
+            <button
+              onClick={clearSelection}
+              disabled={selectedIds.size === 0}
+              className="p-1 rounded hover:bg-white/60 text-slate-500 hover:text-slate-700 disabled:opacity-40 transition-colors"
+              title="Clear selection"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+      <div className="overflow-x-auto">
       <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
+                    {selectionMode && (
+                      <th className="px-6 py-4 text-left w-10">
+                        <button onClick={toggleSelectAll} className="text-slate-400 hover:text-primary">
+                          {selectedIds.size === items.length && items.length > 0 ? (
+                            <CheckSquare className="w-4 h-4 text-primary" />
+                          ) : (
+                            <Square className="w-4 h-4" />
+                          )}
+                        </button>
+                      </th>
+                    )}
                     <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                       Item Details
                     </th>
@@ -585,8 +698,21 @@ export default function InventoryListPage() {
                     <tr
                       key={item.id}
                       onClick={(e) => handleRowClick(item, e)}
-                      className="hover:bg-slate-50 transition-colors cursor-pointer"
+                      className={`transition-colors cursor-pointer ${
+                        selectionMode && selectedIds.has(item.id)
+                          ? 'bg-info-muted/30 hover:bg-info-muted/50'
+                          : 'hover:bg-slate-50'
+                      }`}
                     >
+                      {selectionMode && (
+                        <td className="px-6 py-4">
+                          {selectedIds.has(item.id) ? (
+                            <CheckSquare className="w-4 h-4 text-primary" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-300" />
+                          )}
+                        </td>
+                      )}
                       <td className="px-6 py-4">
                         <div className="space-y-1.5">
                           <div className="text-sm font-semibold text-slate-900">
@@ -761,7 +887,8 @@ export default function InventoryListPage() {
                   ))}
                 </tbody>
               </table>
-    </div>
+      </div>
+    </>
   );
 
   return (
@@ -807,6 +934,22 @@ export default function InventoryListPage() {
           onDelete={handleDeleteItem}
           onChangeStatus={handleChangeItemStatus}
           itemName={getDeletingItemName()}
+        />
+      )}
+
+      {bulkPrintOpen && (
+        <BulkLabelPrintModal
+          entity="inventory"
+          selected={selectedItems as never}
+          fetchAllFiltered={() =>
+            fetchAllInventoryItemsForLabels({
+              category_id: selectedCategory || undefined,
+              status_id: selectedStatus || undefined,
+              search: debouncedSearch || undefined,
+              ...advancedFilters,
+            })
+          }
+          onClose={() => setBulkPrintOpen(false)}
         />
       )}
 

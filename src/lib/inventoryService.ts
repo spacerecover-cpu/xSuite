@@ -210,6 +210,28 @@ export async function getInventoryItemsPage(filters?: InventoryFilters & { page?
   return { rows, total: count ?? 0 };
 }
 
+/** Max items a single bulk-label operation will gather (guards a runaway relabel). */
+export const MAX_BULK_LABEL_ITEMS = 5000;
+
+/** Gather every inventory item matching `filters` (across pages) for bulk labels,
+ *  capped at MAX_BULK_LABEL_ITEMS. `truncated` is true if the cap clipped the set. */
+export async function fetchAllInventoryItemsForLabels(
+  filters?: InventoryFilters,
+): Promise<{ items: Awaited<ReturnType<typeof getInventoryItemsPage>>['rows']; truncated: boolean }> {
+  const pageSize = 200;
+  const items: Awaited<ReturnType<typeof getInventoryItemsPage>>['rows'] = [];
+  let page = 0;
+  let total = Infinity;
+  while (items.length < total && items.length < MAX_BULK_LABEL_ITEMS) {
+    const { rows, total: t } = await getInventoryItemsPage({ ...filters, page, pageSize });
+    total = t;
+    items.push(...rows);
+    if (rows.length < pageSize) break;
+    page += 1;
+  }
+  return { items: items.slice(0, MAX_BULK_LABEL_ITEMS), truncated: total > MAX_BULK_LABEL_ITEMS };
+}
+
 type EnrichableItem = { model: string | null; [key: string]: unknown };
 type StockCountRow = {
   model: string | null;

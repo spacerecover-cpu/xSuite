@@ -4,6 +4,7 @@ import { sanitizeFilterValue } from './postgrestSanitizer';
 import { baseAmount } from './financialMath';
 import { addDaysIso } from './tenantToday';
 import type { TaxComputation } from './regimes/types';
+import { MAX_BULK_LABEL_ITEMS } from './inventoryService';
 
 function requireTenantId(): string {
   const tid = getTenantId();
@@ -260,6 +261,24 @@ export async function getStockItemsPage(
   const { data, error, count } = await query.range(page * pageSize, (page + 1) * pageSize - 1);
   if (error) throw error;
   return { rows: (data ?? []) as StockItemWithCategory[], total: count ?? 0 };
+}
+
+/** Gather every stock item matching `filters` for bulk labels, capped like inventory. */
+export async function fetchAllStockItemsForLabels(
+  filters?: StockFilters,
+): Promise<{ items: StockItemWithCategory[]; truncated: boolean }> {
+  const pageSize = 200;
+  const items: StockItemWithCategory[] = [];
+  let page = 0;
+  let total = Infinity;
+  while (items.length < total && items.length < MAX_BULK_LABEL_ITEMS) {
+    const { rows, total: t } = await getStockItemsPage(filters, page, pageSize);
+    total = t;
+    items.push(...rows);
+    if (rows.length < pageSize) break;
+    page += 1;
+  }
+  return { items: items.slice(0, MAX_BULK_LABEL_ITEMS), truncated: total > MAX_BULK_LABEL_ITEMS };
 }
 
 export async function getStockItem(id: string): Promise<StockItemWithCategory | null> {
