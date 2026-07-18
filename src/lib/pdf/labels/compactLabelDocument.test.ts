@@ -207,6 +207,52 @@ describe('buildCompactLabelDocument', () => {
   });
 });
 
+describe('idAlign + icon options', () => {
+  const ICON_PNG = 'data:image/png;base64,icon';
+
+  it('applies the configured identifier alignment on a strip', () => {
+    const doc = buildCompactLabelDocument([label()], getLabelSize('nb_15x26'), 'Roboto', { idAlign: 'center' });
+    // The identifier renders as a text block whose `text` is a spans array
+    // (id + optional index chip); pdfmake applies `alignment` at that block
+    // level, so assert on the wrapper node carrying the id span.
+    let alignment: unknown;
+    walk(doc.content, (n) => {
+      if (Array.isArray(n.text) && (n.text as Array<Record<string, unknown>>).some((s) => s.text === 'CASE-0042')) {
+        alignment = n.alignment;
+      }
+    });
+    expect(alignment).toBe('center');
+  });
+
+  it('stamps an absolute-positioned icon in the requested corner, once per label', () => {
+    const doc = buildCompactLabelDocument(
+      [label(), label()],
+      getLabelSize('nb_15x26'),
+      'Roboto',
+      { icon: ICON_PNG, iconPosition: 'top-left' },
+    );
+    const iconNodes: Array<Record<string, unknown>> = [];
+    walk(doc.content, (n) => {
+      if (n.image === ICON_PNG && n.absolutePosition) iconNodes.push(n);
+    });
+    expect(iconNodes).toHaveLength(2); // one per page/label
+    const pos = iconNodes[0].absolutePosition as { x: number; y: number };
+    expect(pos.x).toBeGreaterThan(0);
+    expect(pos.y).toBeGreaterThan(0);
+    expect(pos.x).toBeLessThan(mmToPt(26) / 2); // left corner
+    expect(pos.y).toBeLessThan(mmToPt(15) / 2); // top corner
+  });
+
+  it('adds no icon node when no icon is supplied', () => {
+    const doc = buildCompactLabelDocument([label()], getLabelSize('nb_15x26'), 'Roboto', {});
+    let count = 0;
+    walk(doc.content, (n) => {
+      if (n.absolutePosition) count += 1;
+    });
+    expect(count).toBe(0);
+  });
+});
+
 describe('fitFontSize', () => {
   it('keeps the base size when text fits', () => {
     expect(fitFontSize('CASE-0042', 200, 11, 5)).toBe(11);

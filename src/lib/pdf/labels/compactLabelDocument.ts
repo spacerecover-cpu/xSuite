@@ -20,6 +20,7 @@
 import type { Content, ContentImage, ContentText, TDocumentDefinitions } from 'pdfmake/interfaces';
 import type { LabelSizePreset } from './labelSizes';
 import { labelMarginPt, mmToPt, sizeClass, supportsBarcode } from './labelSizes';
+import type { IdAlign, IconPosition } from './labelSizes';
 
 export interface CompactLabelContent {
   /** Primary identifier (CASE-0042 / INV-00013 / STK-0005) — always rendered, dominant. */
@@ -82,6 +83,7 @@ function idRow(
   minPt: number,
   /** Explicit rendered size (e.g. capped by an available height budget). */
   sizeOverride?: number,
+  align: IdAlign = 'left',
 ): ContentText {
   const indexText = label.index ? ` ${label.index}` : '';
   const indexSize = Math.max(minPt, basePt * 0.5);
@@ -97,7 +99,7 @@ function idRow(
   const idText = truncate(label.id, maxWidthPt - indexWidth, size, 0.6);
   const spans: Content[] = [{ text: idText, bold: true, fontSize: size, color: INK }];
   if (indexText) spans.push({ text: indexText, fontSize: indexSize, color: INK });
-  return { text: spans, noWrap: true, lineHeight: LINE_HEIGHT };
+  return { text: spans, noWrap: true, lineHeight: LINE_HEIGHT, alignment: align };
 }
 
 function metaLine(text: string, maxWidthPt: number, fontSize: number, bold = false): ContentText {
@@ -124,6 +126,19 @@ function hairline(widthPt: number): Content {
 /** Below this side length a printed QR drops under ~6.3mm and stops scanning reliably. */
 const MIN_QR_SIDE_PT = 18;
 
+/** Fixed footprint for the optional brand icon, clamped to fit tiny stock. */
+const ICON_MM = 5;
+
+function iconNode(dataUrl: string, size: LabelSizePreset, position: IconPosition): Content {
+  const margin = labelMarginPt(size);
+  const pageW = mmToPt(size.widthMm);
+  const pageH = mmToPt(size.heightMm);
+  const sidePt = Math.min(mmToPt(ICON_MM), pageW - margin * 2, pageH - margin * 2);
+  const x = position.endsWith('left') ? margin : pageW - margin - sidePt;
+  const y = position.startsWith('top') ? margin : pageH - margin - sidePt;
+  return { image: dataUrl, width: sidePt, height: sidePt, absolutePosition: { x, y } };
+}
+
 /**
  * Strips are too short for a title block: the mapper encodes priority in
  * `lines`, and only the first two fit.
@@ -133,7 +148,7 @@ const MIN_QR_SIDE_PT = 18;
  * that way, so the identifier spans the full width on top and the QR drops
  * into the bottom row — omitted entirely if it would print too small to scan.
  */
-function buildStrip(label: CompactLabelContent, contentW: number, contentH: number): Content {
+function buildStrip(label: CompactLabelContent, contentW: number, contentH: number, align: IdAlign): Content {
   const gap = 3;
   const metaSize = 5;
 
@@ -141,7 +156,7 @@ function buildStrip(label: CompactLabelContent, contentW: number, contentH: numb
   if (label.qrDataUrl && sideBySideTextW >= 45) {
     const qrSide = contentH;
     const idSize = idRowSize(label, sideBySideTextW, 10, 5.5);
-    const textStack: Content[] = [idRow(label, sideBySideTextW, 10, 5.5)];
+    const textStack: Content[] = [idRow(label, sideBySideTextW, 10, 5.5, undefined, align)];
     let remaining = contentH - lineBoxPt(idSize);
     for (const line of (label.lines ?? []).slice(0, 2)) {
       if (remaining < lineBoxPt(metaSize)) break;
@@ -177,7 +192,7 @@ function buildStrip(label: CompactLabelContent, contentW: number, contentH: numb
     ? Math.max(5.5, Math.min(widthFit, Math.floor((topH / LINE_FACTOR) * 2) / 2))
     : widthFit;
 
-  const stack: Content[] = [idRow(label, contentW, 11, 5.5, idSize)];
+  const stack: Content[] = [idRow(label, contentW, 11, 5.5, idSize, align)];
   const metaW = qrSide ? contentW - qrSide - gap : contentW;
   const metaBudgetH = qrSide ? qrSide : contentH - lineBoxPt(idSize) - 2;
   const maxMetaLines = Math.min(2, Math.max(0, Math.floor(metaBudgetH / lineBoxPt(metaSize))));
@@ -236,7 +251,7 @@ function buildSquare(label: CompactLabelContent, contentW: number, contentH: num
   return { stack };
 }
 
-function buildCard(label: CompactLabelContent, size: LabelSizePreset, contentW: number, contentH: number): Content {
+function buildCard(label: CompactLabelContent, size: LabelSizePreset, contentW: number, contentH: number, align: IdAlign): Content {
   const barcode = supportsBarcode(size) && label.barcodeDataUrl ? label.barcodeDataUrl : null;
   const barcodeH = barcode ? mmToPt(6) + 2 : 0;
   const textZoneH = contentH - barcodeH;
@@ -251,7 +266,7 @@ function buildCard(label: CompactLabelContent, size: LabelSizePreset, contentW: 
   const idBase = 12;
   const idSize = fitFontSize(label.id, textW, idBase, 5.5);
   const ruleH = 5;
-  const textStack: Content[] = [idRow(label, textW, idBase, 5.5), hairline(textW)];
+  const textStack: Content[] = [idRow(label, textW, idBase, 5.5, undefined, align), hairline(textW)];
 
   let consumed = lineBoxPt(idSize) + ruleH;
   if (label.title) {
@@ -293,10 +308,17 @@ function buildCard(label: CompactLabelContent, size: LabelSizePreset, contentW: 
   };
 }
 
+export interface CompactLabelOptions {
+  idAlign?: IdAlign;
+  icon?: string | null;
+  iconPosition?: IconPosition;
+}
+
 export function buildCompactLabelDocument(
   labels: CompactLabelContent[],
   size: LabelSizePreset,
   fontFamily = 'Roboto',
+  opts: CompactLabelOptions = {},
 ): TDocumentDefinitions {
   const margin = labelMarginPt(size);
   const pageW = mmToPt(size.widthMm);
@@ -304,15 +326,18 @@ export function buildCompactLabelDocument(
   const contentW = pageW - margin * 2;
   const contentH = pageH - margin * 2;
   const cls = sizeClass(size);
+  const align: IdAlign = opts.idAlign ?? 'left';
 
   const pages: Content[] = labels.map((label, i) => {
     const body =
       cls === 'strip'
-        ? buildStrip(label, contentW, contentH)
+        ? buildStrip(label, contentW, contentH, align)
         : cls === 'square'
           ? buildSquare(label, contentW, contentH)
-          : buildCard(label, size, contentW, contentH);
-    return i === 0 ? { stack: [body] } : { stack: [body], pageBreak: 'before' };
+          : buildCard(label, size, contentW, contentH, align);
+    const pageContent: Content[] = [body];
+    if (opts.icon) pageContent.push(iconNode(opts.icon, size, opts.iconPosition ?? 'top-right'));
+    return i === 0 ? { stack: pageContent } : { stack: pageContent, pageBreak: 'before' };
   });
 
   return {
