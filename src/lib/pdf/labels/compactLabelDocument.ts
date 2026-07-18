@@ -209,10 +209,15 @@ function buildStrip(label: CompactLabelContent, contentW: number, contentH: numb
       columnGap: gap,
       margin: [0, 1, 0, 0],
     });
-  } else {
-    stack.push(...metaStack);
+    return { stack };
   }
-  return { stack };
+  stack.push(...metaStack);
+  // No QR anchors the height, so a sparse label (identifier only) would hug the
+  // top and leave the rest of the label blank. Center the id + meta block
+  // vertically within the label height.
+  const usedH = lineBoxPt(idSize) + metaStack.length * lineBoxPt(metaSize);
+  const topPad = Math.max(0, (contentH - usedH) / 2);
+  return { stack, margin: [0, topPad, 0, 0] };
 }
 
 function buildSquare(label: CompactLabelContent, contentW: number, contentH: number): Content {
@@ -291,6 +296,13 @@ function buildCard(label: CompactLabelContent, size: LabelSizePreset, contentW: 
     textStack.push({ ...metaLine(footer, textW, 4.5), margin: [0, 1.5, 0, 0] });
   }
 
+  // With no QR to anchor the height, center the text block vertically so a
+  // sparse card (identifier only) sits mid-label instead of hugging the top;
+  // keep it top-aligned when a barcode occupies the bottom band.
+  const renderedLines = Math.min(lineBudget, (label.lines ?? []).length);
+  const usedTextH = consumed + renderedLines * perLine + footerH;
+  const centerPad = barcode ? 0 : Math.max(0, (textZoneH - usedTextH) / 2);
+
   const body: Content =
     qrSide && label.qrDataUrl
       ? {
@@ -300,7 +312,7 @@ function buildCard(label: CompactLabelContent, size: LabelSizePreset, contentW: 
           ],
           columnGap: gap,
         }
-      : { stack: textStack };
+      : { stack: textStack, margin: [0, centerPad, 0, 0] };
 
   if (!barcode) return { stack: [body] };
   return {

@@ -121,6 +121,16 @@ interface LabelEntityConfig {
 - `printInventoryLabels` additionally computes `const printedAt = new Date()` and passes it into `inventoryLabelContent(item, cfg.fields, { printedAt })`.
 - `labelPreview.ts`: `SAMPLE_INVENTORY.created_at` gets a fixed value; `sampleLabelImages` passes a fixed `printedAt` and forwards `idAlign` + (icon when `showIcon`) + `iconPosition` into `buildLabelBlobUrl` / `buildLabelBase64`.
 
+### Follow-up refinement — vertical centering of sparse labels
+
+Horizontal `idAlign` alone left a sparse label (e.g. identifier only, QR + fields
+off) hugging the top of the stock with blank space below. The `strip` and `card`
+layouts now vertically center their content when nothing anchors the height:
+each computes the used content height and adds a top margin of
+`max(0, (available − used) / 2)`. It self-corrects (a full label ⇒ `~0` pad, no
+overflow risk since `top + content < available`) and is gated off when a barcode
+occupies the bottom band. `square` already centers, so it is untouched.
+
 ---
 
 ## Files
