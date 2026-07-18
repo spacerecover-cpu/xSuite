@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Search, Package, Zap, Edit2, Trash2, RefreshCw, Filter, MapPin, Printer, CheckSquare, Square, X } from 'lucide-react';
+import { Plus, Search, Package, Zap, Edit2, Trash2, RefreshCw, Filter, MapPin, Printer, CheckSquare, MinusSquare, Square, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../hooks/useToast';
 import { useListPageSize } from '../../hooks/useListPageSize';
@@ -29,6 +29,7 @@ import { useListSelectionEnabled } from '../../hooks/useListSelectionEnabled';
 import { BulkLabelPrintModal } from '../../components/labels/BulkLabelPrintModal';
 import { format } from 'date-fns';
 import { logger } from '../../lib/logger';
+import { pageAllSelected, pageSomeSelected, toggleOne, togglePage } from '../../lib/listSelection';
 
 type InventoryRow = Awaited<ReturnType<typeof getInventoryItemsPage>>['rows'][number];
 
@@ -77,7 +78,10 @@ export default function InventoryListPage() {
   const [total, setTotal] = useState(0);
   const selectionEnabled = useListSelectionEnabled();
   const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Selection is a Map keyed by row id → row object, so a selection built up
+  // across pages survives paging (the list only holds the current page) and can
+  // still be printed. The header "select all" is page-scoped (see listSelection).
+  const [selectedRows, setSelectedRows] = useState<Map<string, InventoryRow>>(() => new Map());
   const [bulkPrintOpen, setBulkPrintOpen] = useState(false);
   const loadRequestIdRef = useRef(0);
   const prevFilterKeyRef = useRef<string | null>(null);
@@ -138,7 +142,7 @@ export default function InventoryListPage() {
   useEffect(() => {
     if (!selectionEnabled) {
       setSelectionMode(false);
-      setSelectedIds(new Set());
+      setSelectedRows(new Map());
     }
   }, [selectionEnabled]);
 
@@ -235,7 +239,7 @@ export default function InventoryListPage() {
     loadData();
   };
 
-  const handleRowClick = (item: { id: string }, e: React.MouseEvent) => {
+  const handleRowClick = (item: InventoryRow, e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (
       target.closest('.status-dropdown') ||
@@ -245,33 +249,24 @@ export default function InventoryListPage() {
       return;
     }
     if (selectionMode) {
-      toggleSelected(item.id);
+      toggleSelected(item);
       return;
     }
     setSelectedItemId(item.id);
     setIsDetailModalOpen(true);
   };
 
-  const selectedItems = items.filter((i) => selectedIds.has(i.id));
+  const selectedItems = Array.from(selectedRows.values());
+  const allOnPageSelected = pageAllSelected(selectedRows, items);
+  const someOnPageSelected = pageSomeSelected(selectedRows, items);
 
-  const toggleSelected = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const toggleSelected = (item: InventoryRow) => setSelectedRows((prev) => toggleOne(prev, item));
 
-  const toggleSelectAll = () => {
-    if (selectedIds.size === items.length && items.length > 0) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(items.map((i) => i.id)));
-    }
-  };
+  // Select/deselect only the current page, preserving selections on other pages.
+  const toggleSelectAll = () =>
+    setSelectedRows((prev) => togglePage(prev, items, allOnPageSelected));
 
-  const clearSelection = () => setSelectedIds(new Set());
+  const clearSelection = () => setSelectedRows(new Map());
 
   const exitSelectionMode = () => {
     setSelectionMode(false);
@@ -279,7 +274,7 @@ export default function InventoryListPage() {
   };
 
   const openBulkPrint = () => {
-    if (selectedIds.size < 1) {
+    if (selectedRows.size < 1) {
       toast.error('Select at least 1 item to print labels');
       return;
     }
@@ -617,15 +612,17 @@ export default function InventoryListPage() {
             onClick={toggleSelectAll}
             className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 hover:text-primary transition-colors"
           >
-            {selectedIds.size === items.length && items.length > 0 ? (
+            {allOnPageSelected ? (
               <CheckSquare className="w-4 h-4 text-primary" />
+            ) : someOnPageSelected ? (
+              <MinusSquare className="w-4 h-4 text-primary" />
             ) : (
               <Square className="w-4 h-4 text-slate-400" />
             )}
-            {selectedIds.size === items.length && items.length > 0 ? 'Deselect all' : 'Select all'}
+            {allOnPageSelected ? 'Deselect all on page' : 'Select all on page'}
           </button>
           <span className="text-sm text-slate-600">
-            <span className="font-semibold text-primary">{selectedIds.size}</span> selected
+            <span className="font-semibold text-primary">{selectedRows.size}</span> selected
           </span>
           <div className="flex items-center gap-2 ml-auto">
             <Button
@@ -633,14 +630,14 @@ export default function InventoryListPage() {
               size="sm"
               className="gap-1.5"
               onClick={openBulkPrint}
-              disabled={selectedIds.size < 1}
+              disabled={selectedRows.size < 1}
             >
               <Printer className="w-4 h-4" />
               Print Labels
             </Button>
             <button
               onClick={clearSelection}
-              disabled={selectedIds.size === 0}
+              disabled={selectedRows.size === 0}
               className="p-1 rounded hover:bg-white/60 text-slate-500 hover:text-slate-700 disabled:opacity-40 transition-colors"
               title="Clear selection"
             >
@@ -655,9 +652,16 @@ export default function InventoryListPage() {
                   <tr>
                     {selectionMode && (
                       <th className="px-6 py-4 text-left w-10">
-                        <button onClick={toggleSelectAll} className="text-slate-400 hover:text-primary">
-                          {selectedIds.size === items.length && items.length > 0 ? (
+                        <button
+                          onClick={toggleSelectAll}
+                          className="text-slate-400 hover:text-primary"
+                          aria-label={allOnPageSelected ? 'Deselect all on page' : 'Select all on page'}
+                          title={allOnPageSelected ? 'Deselect all on page' : 'Select all on page'}
+                        >
+                          {allOnPageSelected ? (
                             <CheckSquare className="w-4 h-4 text-primary" />
+                          ) : someOnPageSelected ? (
+                            <MinusSquare className="w-4 h-4 text-primary" />
                           ) : (
                             <Square className="w-4 h-4" />
                           )}
@@ -699,14 +703,14 @@ export default function InventoryListPage() {
                       key={item.id}
                       onClick={(e) => handleRowClick(item, e)}
                       className={`transition-colors cursor-pointer ${
-                        selectionMode && selectedIds.has(item.id)
+                        selectionMode && selectedRows.has(item.id)
                           ? 'bg-info-muted/30 hover:bg-info-muted/50'
                           : 'hover:bg-slate-50'
                       }`}
                     >
                       {selectionMode && (
                         <td className="px-6 py-4">
-                          {selectedIds.has(item.id) ? (
+                          {selectedRows.has(item.id) ? (
                             <CheckSquare className="w-4 h-4 text-primary" />
                           ) : (
                             <Square className="w-4 h-4 text-slate-300" />

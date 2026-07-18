@@ -18,6 +18,7 @@ import {
   TrendingUp,
   Printer,
   CheckSquare,
+  MinusSquare,
   Square,
   X,
 } from 'lucide-react';
@@ -50,6 +51,7 @@ import { useToast } from '../../hooks/useToast';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
 import { formatCurrencyWithConfig } from '../../lib/format';
+import { pageAllSelected, pageSomeSelected, toggleOne, togglePage } from '../../lib/listSelection';
 import { useListPageSize } from '../../hooks/useListPageSize';
 
 type TabId = 'all' | 'saleable' | 'internal' | 'low_stock';
@@ -89,7 +91,10 @@ export const StockListPage: React.FC = () => {
   const [deletingItem, setDeletingItem] = useState<StockItemWithCategory | null>(null);
 
   const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Selection is a Map keyed by row id → row object, so a selection built up
+  // across pages survives paging (the list only holds the current page) and can
+  // still be printed. The header "select all" is page-scoped (see listSelection).
+  const [selectedRows, setSelectedRows] = useState<Map<string, StockItemWithCategory>>(() => new Map());
   const [scanModalOpen, setScanModalOpen] = useState(false);
   const [bulkAdjustOpen, setBulkAdjustOpen] = useState(false);
   const [bulkPriceOpen, setBulkPriceOpen] = useState(false);
@@ -189,29 +194,18 @@ export const StockListPage: React.FC = () => {
 
   const showGrid = activeTab === 'saleable' && viewMode === 'grid';
 
-  const selectedItems = useMemo(
-    () => items.filter((item) => selectedIds.has(item.id)),
-    [items, selectedIds]
-  );
+  const selectedItems = useMemo(() => Array.from(selectedRows.values()), [selectedRows]);
+  const allOnPageSelected = pageAllSelected(selectedRows, items);
+  const someOnPageSelected = pageSomeSelected(selectedRows, items);
 
-  const toggleSelected = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const toggleSelected = (item: StockItemWithCategory) =>
+    setSelectedRows((prev) => toggleOne(prev, item));
 
-  const toggleSelectAll = () => {
-    if (selectedIds.size === items.length && items.length > 0) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(items.map((i) => i.id)));
-    }
-  };
+  // Select/deselect only the current page, preserving selections on other pages.
+  const toggleSelectAll = () =>
+    setSelectedRows((prev) => togglePage(prev, items, allOnPageSelected));
 
-  const clearSelection = () => setSelectedIds(new Set());
+  const clearSelection = () => setSelectedRows(new Map());
 
   const exitSelectionMode = () => {
     setSelectionMode(false);
@@ -225,7 +219,7 @@ export const StockListPage: React.FC = () => {
   };
 
   const openBulkAdjust = () => {
-    if (selectedIds.size < 2) {
+    if (selectedRows.size < 2) {
       toast.error('Select at least 2 items for bulk adjustment');
       return;
     }
@@ -233,7 +227,7 @@ export const StockListPage: React.FC = () => {
   };
 
   const openBulkPrice = () => {
-    if (selectedIds.size < 2) {
+    if (selectedRows.size < 2) {
       toast.error('Select at least 2 items for bulk price update');
       return;
     }
@@ -241,7 +235,7 @@ export const StockListPage: React.FC = () => {
   };
 
   const openPrintLabels = () => {
-    if (selectedIds.size < 1) {
+    if (selectedRows.size < 1) {
       toast.error('Select at least 1 item to print labels');
       return;
     }
@@ -427,15 +421,17 @@ export const StockListPage: React.FC = () => {
               onClick={toggleSelectAll}
               className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 hover:text-primary transition-colors"
             >
-              {selectedIds.size === items.length && items.length > 0 ? (
+              {allOnPageSelected ? (
                 <CheckSquare className="w-4 h-4 text-primary" />
+              ) : someOnPageSelected ? (
+                <MinusSquare className="w-4 h-4 text-primary" />
               ) : (
                 <Square className="w-4 h-4 text-slate-400" />
               )}
-              {selectedIds.size === items.length && items.length > 0 ? 'Deselect all' : 'Select all'}
+              {allOnPageSelected ? 'Deselect all on page' : 'Select all on page'}
             </button>
             <span className="text-sm text-slate-600">
-              <span className="font-semibold text-primary">{selectedIds.size}</span> selected
+              <span className="font-semibold text-primary">{selectedRows.size}</span> selected
             </span>
             <div className="flex items-center gap-2 ml-auto">
               <Button
@@ -443,7 +439,7 @@ export const StockListPage: React.FC = () => {
                 size="sm"
                 className="gap-1.5"
                 onClick={openPrintLabels}
-                disabled={selectedIds.size < 1}
+                disabled={selectedRows.size < 1}
               >
                 <Printer className="w-4 h-4" />
                 Print Labels
@@ -453,7 +449,7 @@ export const StockListPage: React.FC = () => {
                 size="sm"
                 className="gap-1.5"
                 onClick={openBulkAdjust}
-                disabled={selectedIds.size < 2}
+                disabled={selectedRows.size < 2}
               >
                 <SlidersHorizontal className="w-4 h-4" />
                 Bulk Adjust
@@ -463,14 +459,14 @@ export const StockListPage: React.FC = () => {
                 size="sm"
                 className="gap-1.5"
                 onClick={openBulkPrice}
-                disabled={selectedIds.size < 2}
+                disabled={selectedRows.size < 2}
               >
                 <TrendingUp className="w-4 h-4" />
                 Bulk Price
               </Button>
               <button
                 onClick={clearSelection}
-                disabled={selectedIds.size === 0}
+                disabled={selectedRows.size === 0}
                 className="p-1 rounded hover:bg-white/60 text-slate-500 hover:text-slate-700 disabled:opacity-40 transition-colors"
                 title="Clear selection"
               >
@@ -495,8 +491,8 @@ export const StockListPage: React.FC = () => {
           ) : showGrid ? (
             <SaleableItemsGrid
               items={items}
-              onSelect={(item) => (selectionMode ? toggleSelected(item.id) : handleEdit(item))}
-              selectedIds={selectionMode ? Array.from(selectedIds) : []}
+              onSelect={(item) => (selectionMode ? toggleSelected(item) : handleEdit(item))}
+              selectedIds={selectionMode ? Array.from(selectedRows.keys()) : []}
             />
           ) : selectionMode ? (
             <div className="overflow-x-auto">
@@ -504,9 +500,16 @@ export const StockListPage: React.FC = () => {
                 <thead className="bg-slate-50">
                   <tr>
                     <th className="px-4 py-3 text-left w-10">
-                      <button onClick={toggleSelectAll} className="text-slate-400 hover:text-primary">
-                        {selectedIds.size === items.length && items.length > 0 ? (
+                      <button
+                        onClick={toggleSelectAll}
+                        className="text-slate-400 hover:text-primary"
+                        aria-label={allOnPageSelected ? 'Deselect all on page' : 'Select all on page'}
+                        title={allOnPageSelected ? 'Deselect all on page' : 'Select all on page'}
+                      >
+                        {allOnPageSelected ? (
                           <CheckSquare className="w-4 h-4 text-primary" />
+                        ) : someOnPageSelected ? (
+                          <MinusSquare className="w-4 h-4 text-primary" />
                         ) : (
                           <Square className="w-4 h-4" />
                         )}
@@ -534,11 +537,11 @@ export const StockListPage: React.FC = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-100">
                   {items.map((item, idx) => {
-                    const isSelected = selectedIds.has(item.id);
+                    const isSelected = selectedRows.has(item.id);
                     return (
                       <tr
                         key={item.id}
-                        onClick={() => toggleSelected(item.id)}
+                        onClick={() => toggleSelected(item)}
                         className={`cursor-pointer transition-colors ${
                           isSelected
                             ? 'bg-info-muted/30 hover:bg-info-muted/50'
