@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { Content, TDocumentDefinitions } from 'pdfmake/interfaces';
 import { buildCompactLabelDocument, fitFontSize } from './compactLabelDocument';
 import type { CompactLabelContent } from './compactLabelDocument';
-import { getLabelSize, mmToPt } from './labelSizes';
+import { getLabelSize, mmToPt, labelMarginPt } from './labelSizes';
 
 const QR_PNG = 'data:image/png;base64,qr';
 const BARCODE_PNG = 'data:image/png;base64,code128';
@@ -287,6 +287,31 @@ describe('vertical centering of sparse labels', () => {
     const outer = page.stack[0] as { stack: Content[] };
     const textBody = outer.stack[0] as { margin?: number[] };
     expect(Array.isArray(textBody.margin) && textBody.margin![1] > 0).toBe(true);
+  });
+});
+
+describe('idScale (identifier font size)', () => {
+  const idOnly = () => label({ qrDataUrl: null, title: null, lines: [], index: undefined });
+  const idFont = (doc: TDocumentDefinitions) =>
+    collectTexts(doc).find((t) => t.text === 'CASE-0042')?.fontSize as number;
+
+  it('scales a short identifier up above the Normal size', () => {
+    const norm = buildCompactLabelDocument([idOnly()], getLabelSize('nb_15x26'), 'Roboto', { idScale: 1 });
+    const large = buildCompactLabelDocument([idOnly()], getLabelSize('nb_15x26'), 'Roboto', { idScale: 1.5 });
+    expect(idFont(large)).toBeGreaterThan(idFont(norm));
+  });
+
+  it('scales the identifier down below the Normal size', () => {
+    const norm = buildCompactLabelDocument([idOnly()], getLabelSize('nb_15x26'), 'Roboto', { idScale: 1 });
+    const small = buildCompactLabelDocument([idOnly()], getLabelSize('nb_15x26'), 'Roboto', { idScale: 0.85 });
+    expect(idFont(small)).toBeLessThan(idFont(norm));
+  });
+
+  it('never lets a scaled-up identifier line exceed the label height on short stock', () => {
+    const size = getLabelSize('nb_12x40'); // 40×12mm strip
+    const doc = buildCompactLabelDocument([idOnly()], size, 'Roboto', { idScale: 2 });
+    const contentH = mmToPt(size.heightMm) - 2 * labelMarginPt(size);
+    expect(idFont(doc) * 1.35).toBeLessThanOrEqual(contentH + 0.5); // LINE_FACTOR = 1.35
   });
 });
 

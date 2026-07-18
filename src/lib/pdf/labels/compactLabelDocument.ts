@@ -47,6 +47,11 @@ const LINE_HEIGHT = 1.08;
 const LINE_FACTOR = 1.35;
 const lineBoxPt = (fontSize: number) => fontSize * LINE_FACTOR;
 
+/** Clamp an id size so its line box fits `availH`, never below `minPt`. */
+function heightCappedIdSize(idSize: number, availH: number, minPt: number): number {
+  return Math.max(minPt, Math.min(idSize, Math.floor((availH / LINE_FACTOR) * 2) / 2));
+}
+
 /**
  * Largest font size (in 0.5pt steps) at which `text` fits `maxWidthPt` on one
  * line, clamped to [minPt, basePt]. Uses a bold-sans average glyph width of
@@ -148,15 +153,15 @@ function iconNode(dataUrl: string, size: LabelSizePreset, position: IconPosition
  * that way, so the identifier spans the full width on top and the QR drops
  * into the bottom row — omitted entirely if it would print too small to scan.
  */
-function buildStrip(label: CompactLabelContent, contentW: number, contentH: number, align: IdAlign): Content {
+function buildStrip(label: CompactLabelContent, contentW: number, contentH: number, align: IdAlign, idScale: number): Content {
   const gap = 3;
   const metaSize = 5;
 
   const sideBySideTextW = contentW - contentH - gap;
   if (label.qrDataUrl && sideBySideTextW >= 45) {
     const qrSide = contentH;
-    const idSize = idRowSize(label, sideBySideTextW, 10, 5.5);
-    const textStack: Content[] = [idRow(label, sideBySideTextW, 10, 5.5, undefined, align)];
+    const idSize = heightCappedIdSize(idRowSize(label, sideBySideTextW, 10 * idScale, 5.5), contentH, 5.5);
+    const textStack: Content[] = [idRow(label, sideBySideTextW, 10 * idScale, 5.5, idSize, align)];
     let remaining = contentH - lineBoxPt(idSize);
     for (const line of (label.lines ?? []).slice(0, 2)) {
       if (remaining < lineBoxPt(metaSize)) break;
@@ -187,12 +192,12 @@ function buildStrip(label: CompactLabelContent, contentW: number, contentH: numb
     ? Math.max(MIN_QR_SIDE_PT, Math.min(contentH * 0.55, contentH - lineBoxPt(7) - gapV))
     : 0;
   const topH = qrSide ? contentH - qrSide - gapV : contentH;
-  const widthFit = idRowSize(label, contentW, 11, 5.5);
+  const widthFit = idRowSize(label, contentW, 11 * idScale, 5.5);
   const idSize = qrSide
     ? Math.max(5.5, Math.min(widthFit, Math.floor((topH / LINE_FACTOR) * 2) / 2))
-    : widthFit;
+    : heightCappedIdSize(widthFit, contentH, 5.5);
 
-  const stack: Content[] = [idRow(label, contentW, 11, 5.5, idSize, align)];
+  const stack: Content[] = [idRow(label, contentW, 11 * idScale, 5.5, idSize, align)];
   const metaW = qrSide ? contentW - qrSide - gap : contentW;
   const metaBudgetH = qrSide ? qrSide : contentH - lineBoxPt(idSize) - 2;
   const maxMetaLines = Math.min(2, Math.max(0, Math.floor(metaBudgetH / lineBoxPt(metaSize))));
@@ -220,13 +225,13 @@ function buildStrip(label: CompactLabelContent, contentW: number, contentH: numb
   return { stack, margin: [0, topPad, 0, 0] };
 }
 
-function buildSquare(label: CompactLabelContent, contentW: number, contentH: number): Content {
+function buildSquare(label: CompactLabelContent, contentW: number, contentH: number, idScale: number): Content {
   // Show the discriminating meta, not just the title: on a case label `title`
   // is the customer (always present) while `lines[0]` is the device serial — so
   // keying only off `title` silently dropped the serial from every square case
   // label. Render the title AND the first meta line (typically the serial),
   // each only while the height budget allows, so the device data survives.
-  const idSize = fitFontSize(label.id, contentW, 9, 5);
+  const idSize = heightCappedIdSize(fitFontSize(label.id, contentW, 9 * idScale, 5), contentH, 5);
   const metaSize = 5;
   const metaCandidates = [label.title, label.lines?.[0]].filter(
     (m): m is string => !!m && m.trim().length > 0,
@@ -241,7 +246,7 @@ function buildSquare(label: CompactLabelContent, contentW: number, contentH: num
       stack.push({ ...qrNode(label.qrDataUrl, qrSide, true), margin: [0, 0, 0, 2] });
     }
   }
-  stack.push({ ...idRow(label, contentW, 9, 5), alignment: 'center' });
+  stack.push({ ...idRow(label, contentW, 9 * idScale, 5, idSize), alignment: 'center' });
   // Budget the remaining height for meta lines so a second line never overflows.
   const usedH = stack.reduce<number>((h, n) => {
     const img = n as { height?: number };
@@ -256,7 +261,7 @@ function buildSquare(label: CompactLabelContent, contentW: number, contentH: num
   return { stack };
 }
 
-function buildCard(label: CompactLabelContent, size: LabelSizePreset, contentW: number, contentH: number, align: IdAlign): Content {
+function buildCard(label: CompactLabelContent, size: LabelSizePreset, contentW: number, contentH: number, align: IdAlign, idScale: number): Content {
   const barcode = supportsBarcode(size) && label.barcodeDataUrl ? label.barcodeDataUrl : null;
   const barcodeH = barcode ? mmToPt(6) + 2 : 0;
   const textZoneH = contentH - barcodeH;
@@ -268,10 +273,10 @@ function buildCard(label: CompactLabelContent, size: LabelSizePreset, contentW: 
   if (qrSide < MIN_QR_SIDE_PT) qrSide = 0;
   const textW = contentW - (qrSide ? qrSide + gap : 0);
 
-  const idBase = 12;
-  const idSize = fitFontSize(label.id, textW, idBase, 5.5);
+  const idBase = 12 * idScale;
+  const idSize = heightCappedIdSize(fitFontSize(label.id, textW, idBase, 5.5), textZoneH, 5.5);
   const ruleH = 5;
-  const textStack: Content[] = [idRow(label, textW, idBase, 5.5, undefined, align), hairline(textW)];
+  const textStack: Content[] = [idRow(label, textW, idBase, 5.5, idSize, align), hairline(textW)];
 
   let consumed = lineBoxPt(idSize) + ruleH;
   if (label.title) {
@@ -324,6 +329,7 @@ export interface CompactLabelOptions {
   idAlign?: IdAlign;
   icon?: string | null;
   iconPosition?: IconPosition;
+  idScale?: number;
 }
 
 export function buildCompactLabelDocument(
@@ -339,14 +345,15 @@ export function buildCompactLabelDocument(
   const contentH = pageH - margin * 2;
   const cls = sizeClass(size);
   const align: IdAlign = opts.idAlign ?? 'left';
+  const idScale = opts.idScale ?? 1;
 
   const pages: Content[] = labels.map((label, i) => {
     const body =
       cls === 'strip'
-        ? buildStrip(label, contentW, contentH, align)
+        ? buildStrip(label, contentW, contentH, align, idScale)
         : cls === 'square'
-          ? buildSquare(label, contentW, contentH)
-          : buildCard(label, size, contentW, contentH, align);
+          ? buildSquare(label, contentW, contentH, idScale)
+          : buildCard(label, size, contentW, contentH, align, idScale);
     const pageContent: Content[] = [body];
     if (opts.icon) pageContent.push(iconNode(opts.icon, size, opts.iconPosition ?? 'top-right'));
     return i === 0 ? { stack: pageContent } : { stack: pageContent, pageBreak: 'before' };
