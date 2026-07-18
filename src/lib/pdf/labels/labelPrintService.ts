@@ -36,6 +36,8 @@ export interface LabelPrintOptions {
   /** Full design override — the LabelStudio previews an unsaved config through
    *  the exact print path so preview == print. */
   config?: LabelEntityConfig;
+  /** Override the emitted PDF filename (used for chunked bulk part-files). */
+  filename?: string;
 }
 
 export interface LabelPrintResult {
@@ -274,9 +276,10 @@ export async function printStockLabelBatch(
     const images = await resolveLabelImages(mapped, cfg.size, { isRTL, showQr: cfg.showQr, showBarcode: cfg.showBarcode });
     const labels = withCopies(images, cfg.copies);
     const filename =
-      entries.length === 1
+      opts.filename ??
+      (entries.length === 1
         ? `stock-label-${entries[0].item.sku ?? entries[0].item.name.replace(/\s+/g, '-')}.pdf`
-        : 'stock-labels.pdf';
+        : 'stock-labels.pdf');
     await buildAndEmit(labels, cfg.size, fontFamily, opts.output ?? 'print', filename, emitOptions(cfg));
     return { success: true };
   } catch (error) {
@@ -301,7 +304,8 @@ export async function printInventoryLabels(
     const labels = withCopies(images, cfg.copies);
     const first = items[0];
     const filename =
-      items.length === 1 ? `inv-label-${first.item_number ?? first.id}.pdf` : 'inventory-labels.pdf';
+      opts.filename ??
+      (items.length === 1 ? `inv-label-${first.item_number ?? first.id}.pdf` : 'inventory-labels.pdf');
     await buildAndEmit(labels, cfg.size, fontFamily, opts.output ?? 'print', filename, emitOptions(cfg));
     return { success: true };
   } catch (error) {
