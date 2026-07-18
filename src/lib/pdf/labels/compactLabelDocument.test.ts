@@ -253,6 +253,43 @@ describe('idAlign + icon options', () => {
   });
 });
 
+describe('vertical centering of sparse labels', () => {
+  it('centers an identifier-only strip vertically (non-zero top margin)', () => {
+    const doc = buildCompactLabelDocument(
+      [label({ qrDataUrl: null, title: null, lines: [], index: undefined })],
+      getLabelSize('nb_15x26'),
+    );
+    const page = (doc.content as Content[])[0] as { stack: Content[] };
+    const body = page.stack[0] as { margin?: number[] };
+    expect(Array.isArray(body.margin)).toBe(true);
+    expect(body.margin![1]).toBeGreaterThan(0);
+  });
+
+  it('barely pads a full strip (top margin stays small)', () => {
+    const doc = buildCompactLabelDocument(
+      [label({ qrDataUrl: null, title: null, lines: ['one', 'two'], index: undefined })],
+      getLabelSize('nb_15x26'),
+    );
+    const page = (doc.content as Content[])[0] as { stack: Content[] };
+    const body = page.stack[0] as { margin?: number[] };
+    const top = Array.isArray(body.margin) ? body.margin[1] : 0;
+    expect(top).toBeLessThan(8);
+  });
+
+  it('centers a sparse no-QR card vertically', () => {
+    const doc = buildCompactLabelDocument(
+      [label({ qrDataUrl: null, title: null, lines: [], footer: null, index: undefined })],
+      getLabelSize('nb_50x30'),
+    );
+    const page = (doc.content as Content[])[0] as { stack: Content[] };
+    // buildCard wraps its text block, so the centering margin is one level in:
+    // page.stack[0] = { stack: [ textBody ] }.
+    const outer = page.stack[0] as { stack: Content[] };
+    const textBody = outer.stack[0] as { margin?: number[] };
+    expect(Array.isArray(textBody.margin) && textBody.margin![1] > 0).toBe(true);
+  });
+});
+
 describe('fitFontSize', () => {
   it('keeps the base size when text fits', () => {
     expect(fitFontSize('CASE-0042', 200, 11, 5)).toBe(11);
