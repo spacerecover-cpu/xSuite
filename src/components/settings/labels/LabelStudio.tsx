@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Save, RotateCcw, Loader2, QrCode, Barcode as BarcodeIcon, Printer, Copy } from 'lucide-react';
+import { ArrowLeft, Save, RotateCcw, Loader2, QrCode, Barcode as BarcodeIcon, Printer, Copy, AlignLeft, AlignCenter, AlignRight, ImagePlus, Trash2 } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
 import { useToast } from '../../../hooks/useToast';
@@ -18,6 +18,8 @@ import {
   type LabelPrintingPrefs,
 } from '../../../lib/labelPrefsService';
 import { LABEL_SIZE_GROUPS, LABEL_SIZE_PRESETS, getLabelSize, sizeClass, supportsBarcode } from '../../../lib/pdf/labels/labelSizes';
+import type { IdAlign, IconPosition } from '../../../lib/pdf/labels/labelSizes';
+import { fileToLabelIconDataUrl } from '../../../lib/pdf/labels/labelIcon';
 
 interface LabelStudioProps {
   entity: LabelEntity;
@@ -75,7 +77,12 @@ export const LabelStudio: React.FC<LabelStudioProps> = ({ entity, label, onBack 
   const size = getLabelSize(cfg.sizeId);
   const barcodeCapable = supportsBarcode(size);
 
-  const patch = (p: Partial<LabelEntityConfig>) => setConfig((c) => ({ ...(c ?? cfg), ...p }));
+  const patch = (p: Partial<LabelEntityConfig>) => {
+    // A local edit makes this entity user-owned: stamp it seeded so the initial
+    // prefs-load seed can't clobber an edit made before the query settled.
+    seededEntityRef.current = entity;
+    setConfig((c) => ({ ...(c ?? cfg), ...p }));
+  };
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -147,7 +154,7 @@ export const LabelStudio: React.FC<LabelStudioProps> = ({ entity, label, onBack 
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entity, cfg.sizeId, cfg.showQr, cfg.showBarcode, JSON.stringify(cfg.fields)]);
+  }, [entity, cfg.sizeId, cfg.showQr, cfg.showBarcode, cfg.idAlign, cfg.showIcon, cfg.iconPosition, cfg.icon, JSON.stringify(cfg.fields)]);
 
   useEffect(
     () => () => {
@@ -275,6 +282,102 @@ export const LabelStudio: React.FC<LabelStudioProps> = ({ entity, label, onBack 
               checked={cfg.autoPrint}
               onChange={(v) => patch({ autoPrint: v })}
             />
+          </div>
+
+          {/* Identifier alignment */}
+          <div className="space-y-2 border-t border-slate-100 pt-4">
+            <p className="text-sm font-semibold text-slate-800">Identifier alignment</p>
+            <p className="-mt-1 text-xs text-slate-500">Where the code prints (strip &amp; card stock; square is always centered).</p>
+            <div className="inline-flex overflow-hidden rounded-lg border border-slate-200">
+              {([
+                { v: 'left', Icon: AlignLeft },
+                { v: 'center', Icon: AlignCenter },
+                { v: 'right', Icon: AlignRight },
+              ] as const).map(({ v, Icon }) => (
+                <button
+                  key={v}
+                  type="button"
+                  aria-label={`Align ${v}`}
+                  aria-pressed={cfg.idAlign === v}
+                  onClick={() => patch({ idAlign: v as IdAlign })}
+                  className={[
+                    'flex h-9 w-11 items-center justify-center transition-colors',
+                    cfg.idAlign === v ? 'bg-primary text-primary-foreground' : 'bg-white text-slate-600 hover:bg-slate-50',
+                  ].join(' ')}
+                >
+                  <Icon className="h-4 w-4" />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Brand icon */}
+          <div className="space-y-3 border-t border-slate-100 pt-4">
+            <p className="text-sm font-semibold text-slate-800">Brand icon</p>
+            <p className="-mt-2 text-xs text-slate-500">
+              A small favicon-style mark, converted to crisp 1-bit for thermal printing. Shared across all label types.
+            </p>
+            <div className="flex items-center gap-3">
+              {cfg.icon ? (
+                <img src={cfg.icon} alt="Label icon" className="h-10 w-10 rounded border border-slate-200 bg-white object-contain p-0.5" />
+              ) : (
+                <div className="flex h-10 w-10 items-center justify-center rounded border border-dashed border-slate-300 text-slate-400">
+                  <ImagePlus className="h-4 w-4" />
+                </div>
+              )}
+              <label className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                {cfg.icon ? 'Replace' : 'Upload icon'}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/svg+xml"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!file) return;
+                    try {
+                      const icon = await fileToLabelIconDataUrl(file);
+                      patch({ icon });
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : 'Could not process that image.');
+                    }
+                  }}
+                />
+              </label>
+              {cfg.icon && (
+                <button
+                  type="button"
+                  onClick={() => patch({ icon: undefined })}
+                  className="inline-flex items-center gap-1 rounded-lg px-2 py-2 text-sm font-medium text-danger hover:bg-danger-muted"
+                >
+                  <Trash2 className="h-4 w-4" /> Remove
+                </button>
+              )}
+            </div>
+            <ToggleRow
+              icon={ImagePlus}
+              label="Show icon on this label"
+              hint={cfg.icon ? 'Stamped in the chosen corner.' : 'Upload an icon first.'}
+              checked={!!cfg.icon && cfg.showIcon}
+              disabled={!cfg.icon}
+              onChange={(v) => patch({ showIcon: v })}
+            />
+            {cfg.icon && cfg.showIcon && (
+              <div>
+                <label htmlFor="icon-pos" className="mb-1 block text-xs font-medium text-slate-600">Corner</label>
+                <select
+                  id="icon-pos"
+                  value={cfg.iconPosition}
+                  onChange={(e) => patch({ iconPosition: e.target.value as IconPosition })}
+                  className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="top-left">Top left</option>
+                  <option value="top-right">Top right</option>
+                  <option value="bottom-left">Bottom left</option>
+                  <option value="bottom-right">Bottom right</option>
+                </select>
+              </div>
+            )}
           </div>
         </Card>
 
