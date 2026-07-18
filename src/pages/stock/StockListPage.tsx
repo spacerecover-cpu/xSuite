@@ -27,6 +27,7 @@ import {
   getStockItemsPage,
   getStockStats,
   deleteStockItem,
+  fetchAllStockItemsForLabels,
   type StockItemWithCategory,
   type StockFilters,
 } from '../../lib/stockService';
@@ -43,10 +44,12 @@ import { SaleableItemsGrid } from '../../components/stock/SaleableItemsGrid';
 import { BarcodeLookupInput } from '../../components/stock/BarcodeLookupInput';
 import { BulkAdjustmentModal } from '../../components/stock/BulkAdjustmentModal';
 import { BulkPriceUpdateModal } from '../../components/stock/BulkPriceUpdateModal';
-import { PrintLabelsModal } from '../../components/stock/PrintLabelsModal';
+import { BulkLabelPrintModal } from '../../components/labels/BulkLabelPrintModal';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useToast } from '../../hooks/useToast';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
+import { formatCurrencyWithConfig } from '../../lib/format';
 import { useListPageSize } from '../../hooks/useListPageSize';
 
 type TabId = 'all' | 'saleable' | 'internal' | 'low_stock';
@@ -60,6 +63,7 @@ const TABS: { id: TabId; label: string }[] = [
 
 export const StockListPage: React.FC = () => {
   const { formatCurrency } = useCurrency();
+  const currency = useCurrencyConfig();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -90,6 +94,9 @@ export const StockListPage: React.FC = () => {
   const [bulkAdjustOpen, setBulkAdjustOpen] = useState(false);
   const [bulkPriceOpen, setBulkPriceOpen] = useState(false);
   const [printLabelsOpen, setPrintLabelsOpen] = useState(false);
+  const [showPrice, setShowPrice] = useState(true);
+  const [locationName, setLocationName] = useState('');
+  const [companyName, setCompanyName] = useState('');
 
   useEffect(() => {
     if (searchParams.get('filter') === 'low-stock') {
@@ -681,8 +688,58 @@ export const StockListPage: React.FC = () => {
       )}
 
       {printLabelsOpen && selectedItems.length > 0 && (
-        <PrintLabelsModal
-          items={selectedItems}
+        <BulkLabelPrintModal
+          entity="stock"
+          selected={selectedItems}
+          fetchAllFiltered={() => fetchAllStockItemsForLabels(filters)}
+          extraFields={
+            <div className="space-y-4 border-t border-slate-100 pt-4">
+              <h4 className="text-sm font-semibold text-slate-700">Label content</h4>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Company Name</label>
+                <input
+                  type="text"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Your company name (optional)"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Location</label>
+                <input
+                  type="text"
+                  value={locationName}
+                  onChange={(e) => setLocationName(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Storage location (optional)"
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showPrice}
+                  onChange={(e) => setShowPrice(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-primary"
+                />
+                Show Price
+              </label>
+            </div>
+          }
+          onRun={(items, run) =>
+            import('../../lib/pdf/labels/bulkLabelPrint').then(({ printStockLabelsBulk }) =>
+              printStockLabelsBulk(
+                items.map((item) => ({
+                  item,
+                  priceText:
+                    showPrice && item.selling_price != null
+                      ? formatCurrencyWithConfig(item.selling_price, currency)
+                      : null,
+                })),
+                { ...run, locationName: locationName || undefined, companyName: companyName || undefined },
+              )
+            )
+          }
           onClose={() => setPrintLabelsOpen(false)}
         />
       )}
