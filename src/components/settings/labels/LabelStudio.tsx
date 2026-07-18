@@ -306,8 +306,10 @@ export const LabelStudio: React.FC<LabelStudioProps> = ({ entity, label, onBack 
             </div>
           </Card>
           <p className="mt-3 px-1 text-xs text-slate-500">
-            Print at 100% scale. Set your label printer as default for one-touch printing (or run Chrome in
-            kiosk-printing mode to skip the dialog).
+            Print at 100% scale. For silent, exact-size printing straight to a thermal printer, enable{' '}
+            <span className="font-medium text-slate-600">Direct label printing</span> in Settings →
+            Preferences (installs the free QZ Tray helper). Otherwise labels open in the browser print
+            dialog.
           </p>
         </div>
       </div>
