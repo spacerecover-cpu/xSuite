@@ -10,7 +10,7 @@ import type { LabelEntity, LabelEntityConfig } from '../../labelPrefsService';
 import type { InventoryItemWithDetails } from '../../inventory/inventoryLabelTypes';
 import type { StockLabelItem } from './labelContent';
 import { getLabelSize } from './labelSizes';
-import { resolveLabelImages, buildLabelBlobUrl } from './labelPrintService';
+import { resolveLabelImages, buildLabelBlobUrl, buildLabelBase64 } from './labelPrintService';
 import { caseLabelContents, stockLabelContent, inventoryLabelContent } from './labelContent';
 import { sampleReceiptData } from '../engine/sampleData';
 
@@ -35,8 +35,9 @@ const SAMPLE_INVENTORY: InventoryItemWithDetails = {
   storage_location: { name: 'Shelf B-12' },
 };
 
-/** Render one representative label for `entity` under `config`; returns a blob URL. */
-export async function previewLabelBlob(entity: LabelEntity, config: LabelEntityConfig): Promise<string> {
+/** Map + rasterize one representative label for `entity` under `config`. Shared
+ *  by the iframe preview (blob URL) and the QZ Test print (base64). */
+async function sampleLabelImages(entity: LabelEntity, config: LabelEntityConfig) {
   const size = getLabelSize(config.sizeId);
   const mapped =
     entity === 'case'
@@ -44,10 +45,21 @@ export async function previewLabelBlob(entity: LabelEntity, config: LabelEntityC
       : entity === 'stock'
         ? [stockLabelContent(SAMPLE_STOCK, { priceText: '1,234.50', locationName: 'Shelf A-3', companyName: 'Space Data Recovery' }, config.fields)]
         : [inventoryLabelContent(SAMPLE_INVENTORY, config.fields)];
-
   const labels = await resolveLabelImages(mapped, size, {
     showQr: config.showQr,
     showBarcode: config.showBarcode,
   });
+  return { size, labels };
+}
+
+/** Render one representative label for `entity` under `config`; returns a blob URL. */
+export async function previewLabelBlob(entity: LabelEntity, config: LabelEntityConfig): Promise<string> {
+  const { size, labels } = await sampleLabelImages(entity, config);
   return buildLabelBlobUrl(labels, size, 'Roboto');
+}
+
+/** Render one representative label as base64 PDF for the QZ Tray Test print. */
+export async function previewLabelBase64(entity: LabelEntity, config: LabelEntityConfig): Promise<string> {
+  const { size, labels } = await sampleLabelImages(entity, config);
+  return buildLabelBase64(labels, size, 'Roboto');
 }

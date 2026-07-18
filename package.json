@@ -46,6 +46,7 @@
     "lucide-react": "^1.7.0",
     "pdfmake": "^0.2.20",
     "qrcode": "^1.5.4",
+    "qz-tray": "^2.2.6",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-easy-crop": "^5.5.3",

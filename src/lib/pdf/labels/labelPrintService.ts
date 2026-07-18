@@ -141,7 +141,13 @@ async function buildAndEmit(
   const pdf = createPdfWithFonts(buildCompactLabelDocument(labels, size, fontFamily));
   if (output === 'download') pdf.download(filename);
   else if (output === 'open') pdf.open();
-  else pdf.print();
+  else {
+    // Direct print: hand the exact-size PDF to QZ Tray (silent, correct size).
+    // If QZ isn't installed/running, fall back to the browser print dialog.
+    const { tryQzPrint } = await import('./qzPrintService');
+    const handled = await tryQzPrint(pdf, size);
+    if (!handled) pdf.print();
+  }
 }
 
 /** Render labels to a blob object-URL for the LabelStudio live preview iframe.
@@ -163,6 +169,21 @@ export async function buildLabelBlobUrl(
       (err: unknown) => reject(err instanceof Error ? err : new Error('Label preview render failed')),
     );
   });
+}
+
+/** Same builder as printing, returned as a raw base64 PDF (no data: prefix) for
+ *  the QZ Tray pixel-print path (LabelStudio Test print / direct print). */
+export async function buildLabelBase64(
+  labels: CompactLabelContent[],
+  size: LabelSizePreset,
+  fontFamily: string,
+): Promise<string> {
+  const [{ createPdfWithFonts }, { buildCompactLabelDocument }] = await Promise.all([
+    import('../fonts'),
+    import('./compactLabelDocument'),
+  ]);
+  const pdf = createPdfWithFonts(buildCompactLabelDocument(labels, size, fontFamily));
+  return new Promise<string>((resolve) => pdf.getBase64((data: string) => resolve(data)));
 }
 
 /**

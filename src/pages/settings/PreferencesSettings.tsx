@@ -21,6 +21,7 @@ import {
   type LabelPrintingPrefs,
 } from '../../lib/labelPrefsService';
 import { LABEL_SIZE_PRESETS } from '../../lib/pdf/labels/labelSizes';
+import { DirectPrintCard } from '../../components/settings/labels/DirectPrintCard';
 
 const LABEL_ENTITIES: Array<{ key: LabelEntity; label: string; hint: string }> = [
   { key: 'case', label: 'Case labels', hint: 'One label per device at intake' },
@@ -262,6 +263,8 @@ export const PreferencesSettings: React.FC = () => {
       </div>
 
       <LabelPrintingCard />
+
+      <DirectPrintCard />
 
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
         <div className="flex items-start justify-between gap-6">
