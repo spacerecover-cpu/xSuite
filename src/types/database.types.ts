@@ -10460,9 +10460,11 @@ export type Database = {
           category: string | null
           created_at: string
           description: string | null
+          feature_flag_key: string | null
           icon: string | null
           id: string
           is_active: boolean
+          is_gateable: boolean
           name: string
           order_index: number | null
           parent_id: string | null
@@ -10474,9 +10476,11 @@ export type Database = {
           category?: string | null
           created_at?: string
           description?: string | null
+          feature_flag_key?: string | null
           icon?: string | null
           id?: string
           is_active?: boolean
+          is_gateable?: boolean
           name: string
           order_index?: number | null
           parent_id?: string | null
@@ -10488,9 +10492,11 @@ export type Database = {
           category?: string | null
           created_at?: string
           description?: string | null
+          feature_flag_key?: string | null
           icon?: string | null
           id?: string
           is_active?: boolean
+          is_gateable?: boolean
           name?: string
           order_index?: number | null
           parent_id?: string | null
@@ -12869,6 +12875,48 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "plan_features_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plan_modules: {
+        Row: {
+          created_at: string
+          id: string
+          is_included: boolean
+          module_id: string
+          plan_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_included?: boolean
+          module_id: string
+          plan_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_included?: boolean
+          module_id?: string
+          plan_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_modules_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "master_modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_modules_plan_id_fkey"
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "subscription_plans"
@@ -17129,6 +17177,47 @@ export type Database = {
           },
         ]
       }
+      tenant_module_entitlements: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          enabled: boolean
+          id: string
+          module_slug: string
+          source: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          enabled: boolean
+          id?: string
+          module_slug: string
+          source?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          enabled?: boolean
+          id?: string
+          module_slug?: string
+          source?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_module_entitlements_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_payment_methods: {
         Row: {
           bank_last4: string | null
@@ -19105,6 +19194,13 @@ export type Database = {
         }[]
       }
       get_system_setting: { Args: { p_key: string }; Returns: string }
+      get_tenant_module_entitlements: {
+        Args: never
+        Returns: {
+          enabled: boolean
+          module_slug: string
+        }[]
+      }
       get_tenant_storage_bytes: {
         Args: { p_tenant_id: string }
         Returns: number
@@ -19553,6 +19649,10 @@ export type Database = {
         }
       }
       refresh_pack_staleness: { Args: never; Returns: undefined }
+      refresh_tenant_module_entitlements: {
+        Args: { p_tenant_id: string }
+        Returns: undefined
+      }
       reject_quote: {
         Args: { p_quote_id: string; p_reason?: string }
         Returns: undefined
@@ -19807,6 +19907,10 @@ export type Database = {
       }
       tenant_feature_enabled: {
         Args: { p_key: string; p_tenant_id: string }
+        Returns: boolean
+      }
+      tenant_module_enabled: {
+        Args: { p_module_slug: string }
         Returns: boolean
       }
       test_tenant_isolation: {
