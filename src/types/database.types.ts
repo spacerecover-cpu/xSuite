@@ -8093,6 +8093,8 @@ export type Database = {
           capacity_id: string | null
           category_id: string | null
           condition_id: string | null
+          converted_at: string | null
+          converted_by: string | null
           created_at: string
           created_by: string | null
           deleted_at: string | null
@@ -8103,6 +8105,7 @@ export type Database = {
           head_map: string | null
           id: string
           interface_id: string | null
+          inventory_source: string
           is_donor: boolean | null
           item_category_id: string | null
           item_number: string | null
@@ -8118,6 +8121,8 @@ export type Database = {
           qr_value: string | null
           quantity: number | null
           serial_number: string | null
+          source_case_device_id: string | null
+          source_case_id: string | null
           status_id: string | null
           supplier_id: string | null
           technical_details: Json
@@ -8131,6 +8136,8 @@ export type Database = {
           capacity_id?: string | null
           category_id?: string | null
           condition_id?: string | null
+          converted_at?: string | null
+          converted_by?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
@@ -8141,6 +8148,7 @@ export type Database = {
           head_map?: string | null
           id?: string
           interface_id?: string | null
+          inventory_source?: string
           is_donor?: boolean | null
           item_category_id?: string | null
           item_number?: string | null
@@ -8156,6 +8164,8 @@ export type Database = {
           qr_value?: string | null
           quantity?: number | null
           serial_number?: string | null
+          source_case_device_id?: string | null
+          source_case_id?: string | null
           status_id?: string | null
           supplier_id?: string | null
           technical_details?: Json
@@ -8169,6 +8179,8 @@ export type Database = {
           capacity_id?: string | null
           category_id?: string | null
           condition_id?: string | null
+          converted_at?: string | null
+          converted_by?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
@@ -8179,6 +8191,7 @@ export type Database = {
           head_map?: string | null
           id?: string
           interface_id?: string | null
+          inventory_source?: string
           is_donor?: boolean | null
           item_category_id?: string | null
           item_number?: string | null
@@ -8194,6 +8207,8 @@ export type Database = {
           qr_value?: string | null
           quantity?: number | null
           serial_number?: string | null
+          source_case_device_id?: string | null
+          source_case_id?: string | null
           status_id?: string | null
           supplier_id?: string | null
           technical_details?: Json
@@ -8231,6 +8246,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "inventory_items_converted_by_fkey"
+            columns: ["converted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "inventory_items_device_type_id_fkey"
             columns: ["device_type_id"]
             isOneToOne: false
@@ -8256,6 +8278,20 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_items_source_case_device_id_fkey"
+            columns: ["source_case_device_id"]
+            isOneToOne: false
+            referencedRelation: "case_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_items_source_case_id_fkey"
+            columns: ["source_case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
             referencedColumns: ["id"]
           },
           {
@@ -18565,6 +18601,51 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      approve_expense: {
+        Args: { p_expense_id: string }
+        Returns: {
+          amount: number
+          amount_base: number | null
+          approved_at: string | null
+          approved_by: string | null
+          bank_account_id: string | null
+          case_id: string | null
+          category_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          deleted_at: string | null
+          description: string | null
+          exchange_rate: number
+          expense_date: string | null
+          expense_number: string | null
+          id: string
+          is_billable: boolean | null
+          notes: string | null
+          paid_at: string | null
+          rate_source: string
+          receipt_url: string | null
+          reference: string | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string | null
+          status: string | null
+          submitted_at: string | null
+          submitted_by: string | null
+          tax_amount: number | null
+          tax_amount_base: number | null
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+          vendor: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "expenses"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       approve_quote: { Args: { p_quote_id: string }; Returns: undefined }
       archive_expense: {
         Args: { p_expense_id: string; p_reason?: string }
@@ -18707,6 +18788,21 @@ export type Database = {
           p_payment_rate: number
         }
         Returns: number
+      }
+      convert_case_device_to_inventory: {
+        Args: {
+          p_allow_duplicate?: boolean
+          p_case_device_id: string
+          p_case_id: string
+          p_condition_id?: string
+          p_is_donor?: boolean
+          p_legal_basis?: string
+          p_location_id?: string
+          p_name?: string
+          p_notes?: string
+          p_status_id?: string
+        }
+        Returns: Json
       }
       convert_proforma_invoice_to_tax_invoice: {
         Args: { p_due_date?: string; p_invoice_id: string; p_notes?: string }
@@ -19537,6 +19633,88 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      save_invoice_with_lines: {
+        Args: {
+          p_header: Json
+          p_invoice_id: string
+          p_items: Json
+          p_mode: string
+          p_tax_lines: Json
+        }
+        Returns: {
+          amount_paid: number | null
+          amount_paid_base: number | null
+          balance_due: number | null
+          balance_due_base: number | null
+          bank_account_id: string | null
+          business_unit_id: string | null
+          buyer_address: Json | null
+          buyer_tax_number: string | null
+          buyer_tax_number_label: string | null
+          case_id: string | null
+          client_reference: string | null
+          company_id: string | null
+          converted_at: string | null
+          converted_from_quote_id: string | null
+          converted_to_invoice_id: string | null
+          created_at: string
+          created_by: string | null
+          credited_amount: number
+          credited_amount_base: number
+          currency: string | null
+          customer_id: string | null
+          deleted_at: string | null
+          discount_amount: number | null
+          discount_type: string
+          due_date: string | null
+          exchange_rate: number
+          expected_withholding: number | null
+          footer: string | null
+          id: string
+          invoice_date: string | null
+          invoice_number: string | null
+          invoice_type: string | null
+          is_proforma: boolean | null
+          legal_entity_id: string | null
+          notations: Json | null
+          notes: string | null
+          pack_version_id: string | null
+          paid_at: string | null
+          payment_status: string | null
+          place_of_supply_subdivision_id: string | null
+          proforma_invoice_id: string | null
+          rate_source: string
+          regime_snapshot: Json | null
+          reverse_charge: boolean | null
+          seller_tax_number: string | null
+          sent_at: string | null
+          status: string
+          status_id: string | null
+          subtotal: number | null
+          subtotal_base: number | null
+          supply_date: string | null
+          tax_amount: number | null
+          tax_amount_base: number | null
+          tax_inclusive: boolean
+          tax_rate: number | null
+          tax_regime_key: string | null
+          template_version_id: string | null
+          tenant_id: string
+          terms: string | null
+          title: string | null
+          total_amount: number | null
+          total_amount_base: number | null
+          updated_at: string
+          updated_by: string | null
+          voided_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "invoices"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       search_donor_drives: {
         Args: { p_criteria: Json }
         Returns: {
@@ -19545,6 +19723,8 @@ export type Database = {
           capacity_id: string | null
           category_id: string | null
           condition_id: string | null
+          converted_at: string | null
+          converted_by: string | null
           created_at: string
           created_by: string | null
           deleted_at: string | null
@@ -19555,6 +19735,7 @@ export type Database = {
           head_map: string | null
           id: string
           interface_id: string | null
+          inventory_source: string
           is_donor: boolean | null
           item_category_id: string | null
           item_number: string | null
@@ -19570,6 +19751,8 @@ export type Database = {
           qr_value: string | null
           quantity: number | null
           serial_number: string | null
+          source_case_device_id: string | null
+          source_case_id: string | null
           status_id: string | null
           supplier_id: string | null
           technical_details: Json

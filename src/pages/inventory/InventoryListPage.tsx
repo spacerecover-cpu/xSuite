@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Plus, Search, Package, Zap, Edit2, Trash2, RefreshCw, Filter, MapPin, Printer, CheckSquare, MinusSquare, Square, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '../../hooks/useToast';
 import { useListPageSize } from '../../hooks/useListPageSize';
 import { Button } from '../../components/ui/Button';
@@ -35,6 +35,7 @@ type InventoryRow = Awaited<ReturnType<typeof getInventoryItemsPage>>['rows'][nu
 
 export default function InventoryListPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
 
   const { data: deviceTypes = [] } = useInventoryDeviceTypes();
@@ -85,6 +86,18 @@ export default function InventoryListPage() {
   const [bulkPrintOpen, setBulkPrintOpen] = useState(false);
   const loadRequestIdRef = useRef(0);
   const prevFilterKeyRef = useRef<string | null>(null);
+  // Deep link: /inventory?item=<id> (e.g. from a case's "In inventory" indicator
+  // or right after a case→inventory conversion) opens that item's detail modal.
+  useEffect(() => {
+    const itemParam = searchParams.get('item');
+    if (!itemParam) return;
+    setSelectedItemId(itemParam);
+    setIsDetailModalOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('item');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
     return () => clearTimeout(timer);

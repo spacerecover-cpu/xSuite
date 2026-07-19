@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { getNextCaseNumber } from '../../lib/caseService';
-import { MessageCircle, Printer, FileText, Tag, CheckCircle2, Copy, User, HardDrive, FileStack, AlertCircle, Package, Activity, Settings, History, Users, DollarSign, Trash2, Grid2x2 as Grid, Eye, Mail, RotateCcw, CircleHelp, SlidersHorizontal } from 'lucide-react';
+import { MessageCircle, Printer, FileText, Tag, CheckCircle2, Copy, User, HardDrive, FileStack, AlertCircle, Package, PackagePlus, Activity, Settings, History, Users, DollarSign, Trash2, Grid2x2 as Grid, Eye, Mail, RotateCcw, CircleHelp, SlidersHorizontal } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
@@ -30,6 +30,8 @@ import { MarkNoSolutionModal } from '../../components/cases/MarkNoSolutionModal'
 import { LabelPrintDialog } from '../../components/labels/LabelPrintDialog';
 import type { LabelEntityConfig } from '../../lib/labelPrefsService';
 import { StartReRecoveryModal } from '../../components/cases/StartReRecoveryModal';
+import { ConvertToInventoryModal } from '../../components/cases/ConvertToInventoryModal';
+import { getInventoryConvertedFromCase } from '../../lib/caseInventoryConversionService';
 import { DeleteCaseConfirmationModal } from '../../components/cases/DeleteCaseConfirmationModal';
 import { DeviceFormModal } from '../../components/cases/DeviceFormModal';
 import { MarkAsDeliveredModal } from '../../components/cases/MarkAsDeliveredModal';
@@ -128,6 +130,14 @@ export const CaseDetail: React.FC = () => {
     retry: false,
   });
 
+  // Inventory items harvested from this case's devices — drives the "In inventory"
+  // header indicator and the convert modal's already-converted markers.
+  const { data: convertedInventory = [] } = useQuery({
+    queryKey: ['case', id, 'converted-inventory'],
+    queryFn: () => getInventoryConvertedFromCase(id!),
+    enabled: !!id,
+  });
+
   // Holds a pending submission while the SpaceInsufficientWarningModal asks
   // the user to confirm before we INSERT into clone_drives.
   const handleCreateCloneSubmit = (values: CreateCloneDriveFormValues) => {
@@ -169,6 +179,7 @@ export const CaseDetail: React.FC = () => {
   const [showLabelOptions, setShowLabelOptions] = useState(false);
   const [labelPrinting, setLabelPrinting] = useState(false);
   const [showReRecoveryModal, setShowReRecoveryModal] = useState(false);
+  const [showConvertModal, setShowConvertModal] = useState(false);
   const [issueRequirementFailures, setIssueRequirementFailures] = useState<RequirementFailure[]>([]);
   const [showIssueBlockModal, setShowIssueBlockModal] = useState(false);
   const [showIssueWarnConfirm, setShowIssueWarnConfirm] = useState(false);
@@ -378,6 +389,12 @@ export const CaseDetail: React.FC = () => {
   const currentPhase = caseStatuses.find((s) => s.id === caseData.status_id)?.type ?? null;
   const canParkNoSolution = currentPhase === 'recovery' || currentPhase === 'diagnosis';
   const canReRecover = ['delivered', 'closed', 'cancelled', 'no_solution'].includes(currentPhase ?? '');
+  // Convert an uncollected device to inventory: only from a finished case, and not
+  // for read-only viewers. (The RPC enforces the terminal-phase gate too.)
+  const canConvertToInventory =
+    ['delivered', 'closed', 'cancelled', 'no_solution', 'completed'].includes(currentPhase ?? '') &&
+    profile?.role !== 'viewer';
+  const firstConvertedItem = convertedInventory[0];
 
   return (
     <DetailPageTemplate
@@ -398,6 +415,18 @@ export const CaseDetail: React.FC = () => {
               >
                 <RotateCcw className="h-3 w-3" aria-hidden="true" />
                 Re-recovery
+              </button>
+            )}
+            {firstConvertedItem && (
+              <button
+                type="button"
+                onClick={() => navigate(`/inventory?item=${firstConvertedItem.id}`)}
+                className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-200"
+                title="A device from this case was converted to inventory — open it"
+              >
+                <Package className="h-3 w-3" aria-hidden="true" />
+                In inventory: {firstConvertedItem.item_number ?? 'view'}
+                {convertedInventory.length > 1 ? ` +${convertedInventory.length - 1}` : ''}
               </button>
             )}
           </div>
@@ -487,6 +516,17 @@ export const CaseDetail: React.FC = () => {
               >
                 <RotateCcw className="w-4 h-4 md:mr-2" />
                 <span className="hidden md:inline">Re-Recovery</span>
+              </Button>
+            )}
+            {canConvertToInventory && (
+              <Button
+                onClick={() => setShowConvertModal(true)}
+                variant="secondary"
+                size="sm"
+                title="Uncollected device — convert it to lab inventory (donor stock)"
+              >
+                <PackagePlus className="w-4 h-4 md:mr-2" />
+                <span className="hidden md:inline">To Inventory</span>
               </Button>
             )}
             {profile?.role === 'admin' && (
@@ -599,6 +639,19 @@ export const CaseDetail: React.FC = () => {
               customerName={caseData.customer?.customer_name || 'Unknown'}
               actor={{ id: profile.id ?? null, tenantId: profile.tenant_id }}
               onCreated={(newCaseId) => navigate(`/cases/${newCaseId}`)}
+            />
+          )}
+
+          {/* Convert an uncollected device to inventory (donor stock) */}
+          {showConvertModal && (
+            <ConvertToInventoryModal
+              isOpen={showConvertModal}
+              onClose={() => setShowConvertModal(false)}
+              caseId={id!}
+              caseNumber={caseData.case_no ?? ''}
+              customerName={caseData.customer?.customer_name || 'Unknown'}
+              devices={devices as unknown as React.ComponentProps<typeof ConvertToInventoryModal>['devices']}
+              onConverted={(itemId) => navigate(`/inventory?item=${itemId}`)}
             />
           )}
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Edit, Package, MapPin, History, TrendingUp, Info, Briefcase, CheckCircle2, XCircle, ChevronDown, ChevronUp, Zap, Printer, SlidersHorizontal } from 'lucide-react';
+import { Edit, Package, MapPin, History, TrendingUp, Info, Briefcase, CheckCircle2, XCircle, ChevronDown, ChevronUp, Zap, Printer, SlidersHorizontal, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -74,6 +75,7 @@ export default function InventoryDetailModal({
   const [showAssignToCaseModal, setShowAssignToCaseModal] = useState(false);
 
   const toast = useToast();
+  const navigate = useNavigate();
   const [cases, setCases] = useState<CaseOption[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string>('');
   const [assignmentNotes, setAssignmentNotes] = useState('');
@@ -655,6 +657,54 @@ export default function InventoryDetailModal({
                   </div>
                 </dl>
               </Card>
+              {/* Source case — provenance for items converted from a completed case */}
+              {item.inventory_source === 'case_conversion' && item.source_case_id && (() => {
+                const tech = (item.technical_details ?? {}) as Record<string, unknown>;
+                const sourceCaseNumber =
+                  typeof tech.source_case_number === 'string' ? tech.source_case_number : null;
+                const sourceCustomer =
+                  typeof tech.source_customer_name === 'string' ? tech.source_customer_name : null;
+                return (
+                  <Card className="p-4">
+                    <div className="flex items-center mb-3">
+                      <Briefcase className="w-4 h-4 text-primary mr-2" />
+                      <h3 className="text-sm font-semibold text-slate-900">Source Case</h3>
+                    </div>
+                    <dl className="space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <dt className="text-xs text-slate-500">Converted from</dt>
+                        <dd>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/cases/${item.source_case_id}`)}
+                            className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
+                          >
+                            {sourceCaseNumber ? `Case #${sourceCaseNumber}` : 'View case'}
+                            <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                          </button>
+                        </dd>
+                      </div>
+                      {sourceCustomer && (
+                        <div className="flex items-center justify-between gap-3">
+                          <dt className="text-xs text-slate-500">Original customer</dt>
+                          <dd className="text-xs font-medium text-slate-700">{sourceCustomer}</dd>
+                        </div>
+                      )}
+                      {item.converted_at && (
+                        <div className="flex items-center justify-between gap-3">
+                          <dt className="text-xs text-slate-500">Converted on</dt>
+                          <dd className="text-xs font-medium text-slate-900">
+                            {format(new Date(item.converted_at), 'MMM d, yyyy')}
+                          </dd>
+                        </div>
+                      )}
+                    </dl>
+                    <p className="mt-2 text-xs text-slate-400">
+                      Internal reference only — this item is a lab asset.
+                    </p>
+                  </Card>
+                );
+              })()}
               {/* Donor Parts */}
               {item.is_donor && donorParts.length > 0 && (() => {
                 const dt = deviceTypes?.find(d => d.id === item.device_type_id);
