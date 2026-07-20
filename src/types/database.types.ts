@@ -8109,6 +8109,7 @@ export type Database = {
           is_donor: boolean | null
           item_category_id: string | null
           item_number: string | null
+          legacy_case_ref: string | null
           location_id: string | null
           min_quantity: number | null
           model: string | null
@@ -8152,6 +8153,7 @@ export type Database = {
           is_donor?: boolean | null
           item_category_id?: string | null
           item_number?: string | null
+          legacy_case_ref?: string | null
           location_id?: string | null
           min_quantity?: number | null
           model?: string | null
@@ -8195,6 +8197,7 @@ export type Database = {
           is_donor?: boolean | null
           item_category_id?: string | null
           item_number?: string | null
+          legacy_case_ref?: string | null
           location_id?: string | null
           min_quantity?: number | null
           model?: string | null
@@ -19853,6 +19856,7 @@ export type Database = {
           is_donor: boolean | null
           item_category_id: string | null
           item_number: string | null
+          legacy_case_ref: string | null
           location_id: string | null
           min_quantity: number | null
           model: string | null

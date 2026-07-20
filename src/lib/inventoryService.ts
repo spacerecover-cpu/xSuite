@@ -98,6 +98,7 @@ function applyInventoryFilters(
       `item_number.ilike.%${s}%,` +
       `serial_number.ilike.%${s}%,` +
       `model.ilike.%${s}%,` +
+      `legacy_case_ref.ilike.%${s}%,` +
       `barcode.ilike.%${s}%`
     );
   }

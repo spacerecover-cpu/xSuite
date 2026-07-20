@@ -68,6 +68,9 @@ interface InventoryForm {
   capacity_id: string;
   interface_id: string;
   condition_id: string;
+  // Optional free-text reference to the device's original case in a legacy/old ERP
+  // system (for devices migrated into inventory with no matching xSuite cases row).
+  legacy_case_ref: string;
   // Technical fields (dynamic per family) — stored into technical_details
   [key: string]: unknown;
   // Inventory details
@@ -92,6 +95,7 @@ const EMPTY_FORM: InventoryForm = {
   capacity_id: '',
   interface_id: '',
   condition_id: '',
+  legacy_case_ref: '',
   status_id: '',
   quantity: 1,
   min_quantity: 0,
@@ -335,6 +339,7 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
           capacity_id: item.capacity_id ?? '',
           interface_id: item.interface_id ?? '',
           condition_id: item.condition_id ?? '',
+          legacy_case_ref: item.legacy_case_ref ?? '',
           status_id: item.status_id ?? '',
           quantity: item.quantity ?? 1,
           min_quantity: item.min_quantity ?? 0,
@@ -416,6 +421,7 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
         capacity_id: (form.capacity_id as string) || null,
         interface_id: (form.interface_id as string) || null,
         condition_id: (form.condition_id as string) || null,
+        legacy_case_ref: (form.legacy_case_ref as string).trim() || null,
         status_id: (form.status_id as string) || null,
         quantity: form.quantity as number,
         min_quantity: form.min_quantity as number,
@@ -590,6 +596,19 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                     />
                   </div>
                 ))}
+
+                {/* Legacy Case ID — optional free-text reference to the device's
+                    original case in an old ERP (no matching xSuite cases row). */}
+                <div>
+                  <Input
+                    label="Legacy Case ID"
+                    value={form.legacy_case_ref as string}
+                    onChange={e => setField('legacy_case_ref', e.target.value)}
+                    placeholder="e.g. old ERP case ref"
+                    maxLength={100}
+                    size="sm"
+                  />
+                </div>
               </div>
             </div>
 

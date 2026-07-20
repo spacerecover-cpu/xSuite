@@ -578,6 +578,12 @@ export default function InventoryDetailModal({
                       <dd className="text-xs font-medium text-slate-900 mt-0.5">{item.serial_number}</dd>
                     </div>
                   )}
+                  {item.legacy_case_ref && (
+                    <div>
+                      <dt className="text-xs text-slate-500">Legacy Case ID</dt>
+                      <dd className="text-xs font-medium text-slate-900 mt-0.5">{item.legacy_case_ref}</dd>
+                    </div>
+                  )}
                   {item.capacity && (
                     <div>
                       <dt className="text-xs text-slate-500">Capacity</dt>
