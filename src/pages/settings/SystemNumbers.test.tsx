@@ -147,3 +147,43 @@ describe('SystemNumbers fiscal fields (P3)', () => {
     expect(within(invoicesCard).getByText('INVO-10193')).toBeInTheDocument();
   });
 });
+
+describe('SystemNumbers inline prefix/padding editing', () => {
+  beforeEach(() => h.rpc.mockClear());
+
+  it('editing the prefix inline reveals Save and persists prefix + padding via update_number_sequence', async () => {
+    renderPage();
+    await screen.findByRole('heading', { name: 'Tax Invoice Number' });
+
+    // No Save affordance until a cell is dirtied.
+    expect(screen.queryByRole('button', { name: /save prefix & padding/i })).toBeNull();
+
+    const prefixInput = screen.getByLabelText('Tax Invoice Number prefix') as HTMLInputElement;
+    fireEvent.change(prefixInput, { target: { value: 'newx' } });
+    expect(prefixInput.value).toBe('NEWX'); // upper-cased inline
+
+    const saveBtn = await screen.findByRole('button', { name: /save prefix & padding/i });
+    fireEvent.click(saveBtn);
+
+    // Inline save touches ONLY prefix + padding; advanced fields are left to
+    // COALESCE-to-stored (sent as undefined).
+    await waitFor(() =>
+      expect(h.rpc).toHaveBeenCalledWith(
+        'update_number_sequence',
+        expect.objectContaining({ p_scope: 'invoices', p_prefix: 'NEWX', p_padding: 4 }),
+      ),
+    );
+  });
+
+  it('Discard reverts an inline edit without calling the RPC', async () => {
+    renderPage();
+    await screen.findByRole('heading', { name: 'Tax Invoice Number' });
+
+    const prefixInput = screen.getByLabelText('Tax Invoice Number prefix') as HTMLInputElement;
+    fireEvent.change(prefixInput, { target: { value: 'ZZZ' } });
+    fireEvent.click(await screen.findByRole('button', { name: /discard changes/i }));
+
+    expect(prefixInput.value).toBe('INVO');
+    expect(h.rpc).not.toHaveBeenCalledWith('update_number_sequence', expect.anything());
+  });
+});

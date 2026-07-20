@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
@@ -8,7 +7,7 @@ import { Input } from '../../components/ui/Input';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/ui/Badge';
-import { ChevronLeft, Hash, Search, ArrowRight, Edit2 } from 'lucide-react';
+import { ChevronLeft, Search, Edit2, Check, X } from 'lucide-react';
 import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
@@ -105,6 +104,24 @@ export const SystemNumbers: React.FC = () => {
   const [debouncedTemplate, setDebouncedTemplate] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  // Per-scope inline edit drafts for the table's Prefix/Padding cells. A scope is
+  // "dirty" while a draft differs from its stored row; Save persists just those two
+  // fields (advanced format/reset stay untouched via COALESCE in the RPC).
+  const [drafts, setDrafts] = useState<Record<string, { prefix: string; padding: number }>>({});
+
+  const setDraft = (key: string, seq: NumberSequence, patch: Partial<{ prefix: string; padding: number }>) => {
+    setDrafts((prev) => {
+      const base = prev[key] ?? { prefix: seq.prefix, padding: seq.padding };
+      return { ...prev, [key]: { ...base, ...patch } };
+    });
+  };
+  const cancelDraft = (key: string) => {
+    setDrafts((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
 
   const { data: sequences = [], isLoading } = useQuery({
     queryKey: ['number_sequences'],
@@ -206,6 +223,46 @@ export const SystemNumbers: React.FC = () => {
     },
   });
 
+  // Inline table save: persists ONLY prefix + padding (leaving advanced format /
+  // reset fields as stored via COALESCE-to-stored in the RPC). Separate from the
+  // modal mutation so it never touches modal state.
+  const inlineSaveMutation = useMutation({
+    mutationFn: async (vars: { scope: string; prefix: string; padding: number; reset_annually: boolean; reset_basis: string }) => {
+      const { error } = await supabase.rpc('update_number_sequence', {
+        p_scope: vars.scope,
+        p_prefix: vars.prefix,
+        p_padding: vars.padding,
+        p_reset: vars.reset_annually,
+        p_reset_basis: vars.reset_basis,
+        p_format_template: undefined,
+        p_fiscal_year_anchor: undefined,
+        p_max_length: undefined,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['number_sequences'] });
+      cancelDraft(vars.scope);
+      toast.success('Number sequence updated successfully');
+    },
+    onError: (error: Error) => {
+      logger.error('Failed inline number-sequence save:', error);
+      toast.error(`Failed to update: ${error.message || 'Unknown error occurred'}`);
+    },
+  });
+
+  const handleInlineSave = (key: string, seq: NumberSequence) => {
+    const draft = drafts[key];
+    if (!draft) return;
+    inlineSaveMutation.mutate({
+      scope: key,
+      prefix: draft.prefix,
+      padding: draft.padding,
+      reset_annually: seq.reset_annually,
+      reset_basis: seq.reset_basis ?? 'never',
+    });
+  };
+
   const handleEdit = (sequence: NumberSequence) => {
     setEditingSequence(sequence);
     setFormData({
@@ -265,7 +322,9 @@ export const SystemNumbers: React.FC = () => {
   const scopeCards: ScopeCard[] = [
     ...SCOPE_REGISTRY.map(s => ({ key: s.key, label: s.label, description: s.description, category: s.category })),
     ...sequences
-      .filter(seq => !registryKeys.has(seq.scope))
+      // `inventory:<uuid>` sequences are managed per device type on the Inventory
+      // Defaults page, not here — keep them out of this generic list.
+      .filter(seq => !registryKeys.has(seq.scope) && !seq.scope.startsWith('inventory:'))
       .map(seq => ({ key: seq.scope, label: prettifyScope(seq.scope), description: '', category: 'Other' })),
   ];
 
@@ -332,20 +391,6 @@ export const SystemNumbers: React.FC = () => {
                 Number Sequences ({filteredSequenceTypes.length})
               </h2>
               <p className="text-slate-500 text-sm">Configure prefixes and current numbers for automatic numbering</p>
-              <div className="mt-3 flex items-center gap-2 text-sm text-slate-500 bg-info-muted border border-info/20 rounded-lg px-4 py-2.5">
-                <Hash className="w-4 h-4 text-info shrink-0" />
-                <span>
-                  <strong className="font-medium text-slate-700">Inventory item numbers</strong> are now configured
-                  per device type.{' '}
-                  <Link
-                    to="/settings/inventory"
-                    className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
-                  >
-                    Manage Inventory Number Sequences
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
-                </span>
-              </div>
             </div>
 
             {isLoading ? (
@@ -371,16 +416,16 @@ export const SystemNumbers: React.FC = () => {
                     </div>
 
                     <div className="overflow-x-auto">
-                      <table className="w-full min-w-[760px] text-sm">
+                      <table className="w-full min-w-[880px] table-fixed text-sm">
                         <thead>
                           <tr className="text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
                             <th scope="col" className="px-4 py-2 font-semibold">Sequence</th>
-                            <th scope="col" className="px-3 py-2 font-semibold">Prefix</th>
-                            <th scope="col" className="px-3 py-2 font-semibold">Padding</th>
-                            <th scope="col" className="px-3 py-2 font-semibold">Next number</th>
-                            <th scope="col" className="px-3 py-2 font-semibold">Current</th>
-                            <th scope="col" className="px-3 py-2 font-semibold">Status</th>
-                            <th scope="col" className="w-10 px-3 py-2"><span className="sr-only">Edit</span></th>
+                            <th scope="col" className="w-36 px-3 py-2 font-semibold">Prefix</th>
+                            <th scope="col" className="w-24 px-3 py-2 font-semibold">Padding</th>
+                            <th scope="col" className="w-40 px-3 py-2 font-semibold">Next number</th>
+                            <th scope="col" className="w-36 px-3 py-2 font-semibold">Current</th>
+                            <th scope="col" className="w-28 px-3 py-2 font-semibold">Status</th>
+                            <th scope="col" className="w-16 px-3 py-2"><span className="sr-only">Edit</span></th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -401,28 +446,50 @@ export const SystemNumbers: React.FC = () => {
                               fiscal_year_anchor: null,
                               max_length: null,
                             };
+                            const draft = drafts[type.key];
+                            const effPrefix = draft ? draft.prefix : displaySeq.prefix;
+                            const effPadding = draft ? draft.padding : displaySeq.padding;
+                            const isDirty = !!draft && (draft.prefix !== displaySeq.prefix || draft.padding !== displaySeq.padding);
+                            const rowSaving = inlineSaveMutation.isPending && inlineSaveMutation.variables?.scope === type.key;
 
                             return (
-                              <tr key={type.key} className="group transition-colors hover:bg-slate-50">
-                                <td className="px-4 py-2.5 align-top">
-                                  <h3 className="text-sm font-semibold text-slate-900" title={type.label}>
+                              <tr key={type.key} className="group align-middle transition-colors hover:bg-slate-50">
+                                <td className="px-4 py-2 align-middle">
+                                  <h3 className="truncate text-sm font-semibold text-slate-900" title={type.label}>
                                     {type.label}
                                   </h3>
                                   {type.description && (
-                                    <p className="mt-0.5 text-xs text-slate-500">{type.description}</p>
+                                    <p className="mt-0.5 truncate text-xs text-slate-500">{type.description}</p>
                                   )}
                                 </td>
-                                <td className="whitespace-nowrap px-3 py-2.5 font-mono text-slate-700">{displaySeq.prefix}</td>
-                                <td className="px-3 py-2.5 font-mono text-slate-600 tabular-nums">{displaySeq.padding}</td>
-                                <td className="px-3 py-2.5">
+                                <td className="px-3 py-2 align-middle">
+                                  <input
+                                    aria-label={`${type.label} prefix`}
+                                    value={effPrefix}
+                                    onChange={(e) => setDraft(type.key, displaySeq, { prefix: e.target.value.toUpperCase() })}
+                                    className="w-24 rounded-md border border-slate-200 bg-white px-2 py-1 font-mono text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/40"
+                                  />
+                                </td>
+                                <td className="px-3 py-2 align-middle">
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={10}
+                                    aria-label={`${type.label} padding`}
+                                    value={effPadding}
+                                    onChange={(e) => setDraft(type.key, displaySeq, { padding: Math.max(1, Math.min(10, parseInt(e.target.value) || displaySeq.padding)) })}
+                                    className="w-16 rounded-md border border-slate-200 bg-white px-2 py-1 font-mono text-sm tabular-nums text-slate-700 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/40"
+                                  />
+                                </td>
+                                <td className="px-3 py-2 align-middle">
                                   <Badge variant="success" size="sm" className="font-mono">
-                                    {formatNumber(displaySeq)}
+                                    {formatNumber({ ...displaySeq, prefix: effPrefix, padding: effPadding })}
                                   </Badge>
                                 </td>
-                                <td className="whitespace-nowrap px-3 py-2.5 font-mono text-slate-500">
+                                <td className="whitespace-nowrap px-3 py-2 align-middle font-mono text-slate-500">
                                   {hasStarted ? formatCurrentNumber(displaySeq) : '—'}
                                 </td>
-                                <td className="px-3 py-2.5">
+                                <td className="px-3 py-2 align-middle">
                                   {hasStarted ? (
                                     <Badge variant="info" size="sm">Active</Badge>
                                   ) : hasRow ? (
@@ -431,14 +498,37 @@ export const SystemNumbers: React.FC = () => {
                                     <span className="text-xs font-medium text-slate-400">Not yet used</span>
                                   )}
                                 </td>
-                                <td className="px-3 py-2.5 text-right">
-                                  <button
-                                    onClick={() => handleEdit(displaySeq)}
-                                    title="Edit sequence"
-                                    className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                                  >
-                                    <Edit2 className="h-3.5 w-3.5" />
-                                  </button>
+                                <td className="px-3 py-2 align-middle">
+                                  {isDirty ? (
+                                    <div className="flex items-center justify-end gap-1">
+                                      <button
+                                        onClick={() => handleInlineSave(type.key, displaySeq)}
+                                        disabled={rowSaving}
+                                        title="Save prefix & padding"
+                                        className="rounded-md p-1.5 text-success transition-colors hover:bg-success-muted disabled:opacity-50"
+                                      >
+                                        <Check className="h-4 w-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => cancelDraft(type.key)}
+                                        disabled={rowSaving}
+                                        title="Discard changes"
+                                        className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="flex justify-end">
+                                      <button
+                                        onClick={() => handleEdit(displaySeq)}
+                                        title="Edit sequence"
+                                        className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                                      >
+                                        <Edit2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  )}
                                 </td>
                               </tr>
                             );
