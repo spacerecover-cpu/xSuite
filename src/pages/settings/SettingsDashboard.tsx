@@ -16,8 +16,10 @@ const tintBg = (hex: string): string => {
 
 const SettingsCategoryCard: React.FC<{
   category: SettingsCategory;
+  accent: string;
   onClick: () => void;
-}> = ({ category, onClick }) => {
+}> = ({ category, accent, onClick }) => {
+  const hasCount = category.tables.length > 0;
   const { data: count, isLoading } = useQuery({
     queryKey: settingsKeys.categoryCount(category.id),
     queryFn: async () => {
@@ -39,7 +41,7 @@ const SettingsCategoryCard: React.FC<{
       const counts = await Promise.all(promises);
       return counts.reduce((sum, c) => sum + c, 0);
     },
-    enabled: category.tables.length > 0,
+    enabled: hasCount,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
@@ -47,44 +49,55 @@ const SettingsCategoryCard: React.FC<{
   return (
     <button
       onClick={onClick}
-      className="group relative flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition-all hover:border-primary/40 hover:shadow-md"
+      className="group flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition-all hover:border-primary/40 hover:shadow-md"
     >
       <div
         className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg"
-        style={{ backgroundColor: tintBg(category.backgroundColor) }}
+        style={{ backgroundColor: tintBg(accent) }}
       >
-        <category.icon className="h-[18px] w-[18px]" style={{ color: category.backgroundColor }} />
+        <category.icon className="h-[18px] w-[18px]" style={{ color: accent }} />
       </div>
 
       <div className="min-w-0 flex-1">
-        <h3 className="pr-4 text-sm font-semibold leading-tight text-slate-900">
-          {category.title}
-        </h3>
-        <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-slate-400">
-          {category.description}
-        </p>
-        <div className="mt-1.5 flex items-center gap-1">
-          {category.tables.length > 0 ? (
-            <>
-              <span className="text-xs font-bold" style={{ color: category.backgroundColor }}>
-                {isLoading ? (
-                  <span
-                    className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-200"
-                    style={{ borderTopColor: category.backgroundColor }}
-                  />
-                ) : (
-                  count ?? 0
-                )}
-              </span>
-              <span className="text-xs font-medium text-slate-400">items</span>
-            </>
-          ) : (
-            <span className="text-xs font-medium text-slate-500">{category.actionLabel}</span>
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="text-sm font-semibold leading-tight text-slate-900">
+            {category.title}
+          </h3>
+          {/* Count is scale metadata, not an action — muted neutral pill so it no
+              longer competes with the single action affordance below. */}
+          {hasCount && (
+            <span className="mt-0.5 inline-flex shrink-0 items-baseline gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xxs font-semibold text-slate-600">
+              {isLoading ? (
+                <span
+                  className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-200"
+                  style={{ borderTopColor: accent }}
+                />
+              ) : (
+                <span className="tabular-nums">{count ?? 0}</span>
+              )}
+              {category.countUnit && !isLoading && (
+                <span className="font-medium text-slate-500">{category.countUnit}</span>
+              )}
+            </span>
           )}
         </div>
-      </div>
 
-      <ChevronRight className="absolute right-3 top-3 h-4 w-4 text-slate-300 transition-colors group-hover:text-primary" />
+        <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-slate-500">
+          {category.description}
+        </p>
+
+        {/* Single navigation affordance for the whole-card button. */}
+        <div
+          className="mt-2 flex items-center gap-1 text-xs font-semibold"
+          style={{ color: accent }}
+        >
+          {category.actionLabel}
+          <ChevronRight
+            className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5"
+            aria-hidden="true"
+          />
+        </div>
+      </div>
     </button>
   );
 };
@@ -121,6 +134,7 @@ export const SettingsDashboard: React.FC = () => {
 
   const sections = SETTINGS_GROUPS.map((group) => ({
     label: group.label,
+    accent: group.accent,
     categories: group.categoryIds
       .map((id) => categoryById.get(id))
       .filter((c): c is SettingsCategory => Boolean(c)),
@@ -129,7 +143,7 @@ export const SettingsDashboard: React.FC = () => {
   // Defensive: surface any category not assigned to a group rather than dropping it.
   const ungrouped = SETTINGS_CATEGORIES.filter((c) => !groupedIds.has(c.id));
   if (ungrouped.length > 0) {
-    sections.push({ label: 'More', categories: ungrouped });
+    sections.push({ label: 'More', accent: '#475569', categories: ungrouped });
   }
 
   return (
@@ -164,6 +178,7 @@ export const SettingsDashboard: React.FC = () => {
                 <SettingsCategoryCard
                   key={category.id}
                   category={category}
+                  accent={section.accent}
                   onClick={() => handleCategoryClick(category.id)}
                 />
               ))}

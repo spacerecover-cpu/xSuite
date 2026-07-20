@@ -65,6 +65,9 @@ export interface SettingsCategory {
   tables: MasterDataTable[];
   actionLabel: string;
   description?: string;
+  // Accurate noun for the row count (e.g. "options", "records"). Falls back to a
+  // generic label only when unset. Ignored for categories with no `tables`.
+  countUnit?: string;
 }
 
 export const SETTINGS_CATEGORIES: SettingsCategory[] = [
@@ -140,6 +143,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
       'master_inventory_condition_types',
     ],
     actionLabel: 'Manage Categories',
+    countUnit: 'options',
     description: 'Manage storage device specifications and inventory settings',
   },
   {
@@ -160,6 +164,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     borderColor: '#10b981',
     tables: ['catalog_service_types', 'catalog_service_problems', 'master_case_priorities', 'master_case_statuses', 'catalog_service_locations', 'catalog_device_conditions', 'catalog_device_roles'],
     actionLabel: 'Manage Categories',
+    countUnit: 'options',
     description: 'Manage service types, case priorities, and status workflows',
   },
   {
@@ -189,6 +194,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
       'master_payment_methods',
     ],
     actionLabel: 'Manage Categories',
+    countUnit: 'records',
     description: 'Manage customer groups and financial configurations',
   },
   {
@@ -203,6 +209,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
       'master_purchase_order_statuses',
     ],
     actionLabel: 'Manage Categories',
+    countUnit: 'options',
     description: 'Manage supplier categories, payment terms, and purchase order statuses',
   },
   {
@@ -320,6 +327,11 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
 export interface SettingsGroup {
   id: string;
   label: string;
+  // One accent hue per group so the dashboard reads as structured sections rather
+  // than a wall of per-card pastels. The dashboard applies this to every card in
+  // the group (icon + soft tint); per-category backgroundColor is still used by
+  // the category detail pages.
+  accent: string;
   categoryIds: string[];
 }
 
@@ -327,12 +339,15 @@ export interface SettingsGroup {
 // appear in exactly one group; the dashboard renders any unlisted category under
 // a trailing "More" section so nothing silently disappears.
 export const SETTINGS_GROUPS: SettingsGroup[] = [
-  { id: 'workspace', label: 'Workspace', categoryIds: ['appearance', 'preferences', 'table-columns', 'features', 'general-settings', 'notifications'] },
-  { id: 'operations', label: 'Operations', categoryIds: ['device-media', 'inventory-settings', 'case-service', 'case-lifecycle', 'procurement'] },
-  { id: 'finance', label: 'Client & Finance', categoryIds: ['client-financial', 'localization', 'tax-registration'] },
-  { id: 'documents', label: 'Documents & Reports', categoryIds: ['templates', 'documents', 'labels'] },
-  { id: 'system', label: 'System & Data', categoryIds: ['system-numbers', 'import-export', 'client-portal'] },
-  { id: 'compliance', label: 'Security & Compliance', categoryIds: ['security', 'gdpr'] },
+  // Accents are 600/700-level so the same hue is legible as icon, tint, and the
+  // action-label text (AA on white); the soft tint comes from the 12% alpha, not
+  // a lighter hue.
+  { id: 'workspace', label: 'Workspace', accent: '#475569', categoryIds: ['appearance', 'preferences', 'table-columns', 'features', 'general-settings', 'notifications'] },
+  { id: 'operations', label: 'Operations', accent: '#1d4ed8', categoryIds: ['device-media', 'inventory-settings', 'case-service', 'case-lifecycle', 'procurement'] },
+  { id: 'finance', label: 'Client & Finance', accent: '#0f766e', categoryIds: ['client-financial', 'localization', 'tax-registration'] },
+  { id: 'documents', label: 'Documents & Reports', accent: '#be185d', categoryIds: ['templates', 'documents', 'labels'] },
+  { id: 'system', label: 'System & Data', accent: '#0369a1', categoryIds: ['system-numbers', 'import-export', 'client-portal'] },
+  { id: 'compliance', label: 'Security & Compliance', accent: '#047857', categoryIds: ['security', 'gdpr'] },
 ];
 
 export const TENANT_SCOPED_TABLES: MasterDataTable[] = ['inventory_locations', 'customer_groups'];
