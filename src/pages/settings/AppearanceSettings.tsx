@@ -72,9 +72,11 @@ const THEME_OPTIONS: readonly ThemeOption[] = [
   },
 ] as const;
 
+// Arabic / right-to-left (RTL) is intentionally not offered as a selectable
+// interface language here. The engine's RTL rendering support stays intact for
+// any tenant already on 'ar'; this only removes the choice from the picker.
 const LANGUAGE_OPTIONS: { id: 'en' | 'ar'; label: string; note: string }[] = [
   { id: 'en', label: 'English', note: 'Left-to-right (LTR)' },
-  { id: 'ar', label: 'العربية', note: 'Right-to-left (RTL)' },
 ];
 
 export const AppearanceSettings: React.FC = () => {
