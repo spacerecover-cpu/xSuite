@@ -383,7 +383,6 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 usePortal
               />
           </div>
-          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <SearchableSelect
@@ -475,8 +474,6 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm resize-none transition-shadow bg-white"
               placeholder="Private notes visible only to staff"
             />
-          </div>
-          </div>
           </div>
 
           {/* ── Footer ── */}
