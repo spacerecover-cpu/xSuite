@@ -58,6 +58,25 @@ export const SCOPE_REGISTRY = [
   { key: 'payroll_bank_file', label: 'Payroll Bank File Number', description: 'Payroll bank-file batches', category: 'HR' },
 ] as const;
 
+// Section order for the grouped tables; any live category not listed (defensive)
+// is appended after these.
+const CATEGORY_ORDER = ['Operations', 'Financial', 'Business Partners', 'Inventory', 'Reports', 'HR', 'Other'];
+
+// Turn a raw live scope with no registry entry into a readable label:
+// `inventory:6b24638d-…` -> "Inventory · 6b24638d"; `credit_note` -> "Credit Note".
+function prettifyScope(scope: string): string {
+  if (scope.includes(':')) {
+    const [base, rest] = scope.split(':');
+    const head = base.charAt(0).toUpperCase() + base.slice(1);
+    return rest ? `${head} · ${rest.slice(0, 8)}` : head;
+  }
+  return scope
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
 // Allowed `reset_basis` values are enforced by the DB CHECK in
 // `update_number_sequence` — keep this list in lockstep with it.
 const RESET_BASIS_OPTIONS: { value: string; label: string }[] = [
@@ -247,7 +266,7 @@ export const SystemNumbers: React.FC = () => {
     ...SCOPE_REGISTRY.map(s => ({ key: s.key, label: s.label, description: s.description, category: s.category })),
     ...sequences
       .filter(seq => !registryKeys.has(seq.scope))
-      .map(seq => ({ key: seq.scope, label: seq.scope, description: '', category: 'Other' })),
+      .map(seq => ({ key: seq.scope, label: prettifyScope(seq.scope), description: '', category: 'Other' })),
   ];
 
   const categories = ['All', ...Array.from(new Set(scopeCards.map(c => c.category)))];
@@ -258,6 +277,15 @@ export const SystemNumbers: React.FC = () => {
     const matchesCategory = selectedCategory === 'All' || type.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  // Group the (filtered) sequences into ordered category sections for the tables.
+  const orderedCategories = [
+    ...CATEGORY_ORDER,
+    ...Array.from(new Set(filteredSequenceTypes.map(t => t.category))).filter(c => !CATEGORY_ORDER.includes(c)),
+  ];
+  const groupedSections = orderedCategories
+    .map(category => ({ category, rows: filteredSequenceTypes.filter(t => t.category === category) }))
+    .filter(section => section.rows.length > 0);
 
   return (
     <div className="min-h-screen p-6 bg-gradient-to-br from-slate-50 via-white to-slate-50">
@@ -321,78 +349,105 @@ export const SystemNumbers: React.FC = () => {
             </div>
 
             {isLoading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <Skeleton key={i} className="h-32 w-full rounded-lg" />
+              <div className="space-y-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full rounded-lg" />
                 ))}
               </div>
+            ) : groupedSections.length === 0 ? (
+              <div className="py-16 text-center">
+                <p className="text-sm text-slate-500">No sequences match your search.</p>
+              </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {filteredSequenceTypes.map((type) => {
-                  const sequence = sequences.find(s => s.scope === type.key);
-                  const hasRow = !!sequence;
-                  const hasStarted = !!sequence && sequence.current_value > 0;
-                  const displaySeq: NumberSequence = sequence || {
-                    id: '',
-                    scope: type.key,
-                    prefix: type.key.replace(/_/g, '').toUpperCase().slice(0, 4),
-                    padding: 4,
-                    current_value: 0,
-                    reset_annually: false,
-                    created_at: '',
-                    format_template: null,
-                    reset_basis: null,
-                    fiscal_year_anchor: null,
-                    max_length: null,
-                  };
-
-                  return (
-                    <div
-                      key={type.key}
-                      className="rounded-lg border border-slate-200 bg-surface-muted p-3 hover:shadow-md hover:border-slate-300 transition-all"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <h3 className="text-sm font-semibold text-slate-900 truncate" title={type.label}>
-                            {type.label}
-                          </h3>
-                          <Badge variant="default" size="sm" className="mt-1">
-                            {type.category}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          {hasStarted ? (
-                            <Badge variant="info" size="sm">Active</Badge>
-                          ) : hasRow ? (
-                            <Badge variant="secondary" size="sm">Configured</Badge>
-                          ) : (
-                            <span className="text-xs font-medium text-slate-400">Not yet used</span>
-                          )}
-                          <button
-                            onClick={() => handleEdit(displaySeq)}
-                            className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                            title="Edit sequence"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="mt-2 flex items-center justify-between">
-                        <span className="text-xs text-slate-500">Next number</span>
-                        <Badge variant="success" size="sm" className="font-mono">
-                          {formatNumber(displaySeq)}
-                        </Badge>
-                      </div>
-
-                      <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500 border-t border-slate-200 pt-2">
-                        <span>Prefix <span className="block font-mono text-slate-700 truncate">{displaySeq.prefix}</span></span>
-                        <span>Padding <span className="block font-mono text-slate-700">{displaySeq.padding}</span></span>
-                        <span>Current <span className="block font-mono text-slate-700">{hasStarted ? formatCurrentNumber(displaySeq) : '—'}</span></span>
-                      </div>
+              <div className="space-y-7">
+                {groupedSections.map((section) => (
+                  <section key={section.category}>
+                    <div className="mb-2 flex items-center gap-2 px-1">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        {section.category}
+                      </span>
+                      <span className="text-xs font-medium text-slate-400 tabular-nums">{section.rows.length}</span>
+                      <span className="h-px flex-1 bg-slate-200" aria-hidden="true" />
                     </div>
-                  );
-                })}
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[760px] text-sm">
+                        <thead>
+                          <tr className="text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                            <th scope="col" className="px-4 py-2 font-semibold">Sequence</th>
+                            <th scope="col" className="px-3 py-2 font-semibold">Prefix</th>
+                            <th scope="col" className="px-3 py-2 font-semibold">Padding</th>
+                            <th scope="col" className="px-3 py-2 font-semibold">Next number</th>
+                            <th scope="col" className="px-3 py-2 font-semibold">Current</th>
+                            <th scope="col" className="px-3 py-2 font-semibold">Status</th>
+                            <th scope="col" className="w-10 px-3 py-2"><span className="sr-only">Edit</span></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {section.rows.map((type) => {
+                            const sequence = sequences.find((s) => s.scope === type.key);
+                            const hasRow = !!sequence;
+                            const hasStarted = !!sequence && sequence.current_value > 0;
+                            const displaySeq: NumberSequence = sequence || {
+                              id: '',
+                              scope: type.key,
+                              prefix: type.key.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 4),
+                              padding: 4,
+                              current_value: 0,
+                              reset_annually: false,
+                              created_at: '',
+                              format_template: null,
+                              reset_basis: null,
+                              fiscal_year_anchor: null,
+                              max_length: null,
+                            };
+
+                            return (
+                              <tr key={type.key} className="group transition-colors hover:bg-slate-50">
+                                <td className="px-4 py-2.5 align-top">
+                                  <h3 className="text-sm font-semibold text-slate-900" title={type.label}>
+                                    {type.label}
+                                  </h3>
+                                  {type.description && (
+                                    <p className="mt-0.5 text-xs text-slate-500">{type.description}</p>
+                                  )}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-2.5 font-mono text-slate-700">{displaySeq.prefix}</td>
+                                <td className="px-3 py-2.5 font-mono text-slate-600 tabular-nums">{displaySeq.padding}</td>
+                                <td className="px-3 py-2.5">
+                                  <Badge variant="success" size="sm" className="font-mono">
+                                    {formatNumber(displaySeq)}
+                                  </Badge>
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-2.5 font-mono text-slate-500">
+                                  {hasStarted ? formatCurrentNumber(displaySeq) : '—'}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  {hasStarted ? (
+                                    <Badge variant="info" size="sm">Active</Badge>
+                                  ) : hasRow ? (
+                                    <Badge variant="secondary" size="sm">Configured</Badge>
+                                  ) : (
+                                    <span className="text-xs font-medium text-slate-400">Not yet used</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2.5 text-right">
+                                  <button
+                                    onClick={() => handleEdit(displaySeq)}
+                                    title="Edit sequence"
+                                    className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                                  >
+                                    <Edit2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                ))}
               </div>
             )}
           </div>

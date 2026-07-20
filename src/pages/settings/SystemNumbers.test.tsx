@@ -57,7 +57,8 @@ function renderPage() {
 
 function cardFor(name: string): HTMLElement {
   const heading = screen.getByRole('heading', { name });
-  return heading.closest('.rounded-lg') as HTMLElement;
+  // Each sequence is a table row grouped under its category section.
+  return heading.closest('tr') as HTMLElement;
 }
 
 describe('SystemNumbers scope registry', () => {
@@ -84,7 +85,7 @@ describe('SystemNumbers fiscal fields (P3)', () => {
 
     // Open the (legacy, empty-template) invoices sequence's edit modal.
     const invoicesHeading = await screen.findByRole('heading', { name: 'Tax Invoice Number' });
-    const invoicesCard = invoicesHeading.closest('.rounded-lg') as HTMLElement;
+    const invoicesCard = invoicesHeading.closest('tr') as HTMLElement;
     fireEvent.click(within(invoicesCard).getByRole('button', { name: /edit sequence/i }));
 
     // Typing a format template drives a LIVE server-side preview, not a
@@ -114,7 +115,7 @@ describe('SystemNumbers fiscal fields (P3)', () => {
 
     // The 'case' row starts at reset_basis='fiscal_year'. Open its edit modal.
     const caseHeading = await screen.findByRole('heading', { name: 'Case Number' });
-    const caseCard = caseHeading.closest('.rounded-lg') as HTMLElement;
+    const caseCard = caseHeading.closest('tr') as HTMLElement;
     fireEvent.click(within(caseCard).getByRole('button', { name: /edit sequence/i }));
 
     // Switch the reset basis to "No automatic reset".
