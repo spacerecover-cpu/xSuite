@@ -147,7 +147,7 @@ export const SettingsDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 p-6">
       <div className="mb-5 animate-fade-in">
         <div className="flex items-center gap-3">
           <div
