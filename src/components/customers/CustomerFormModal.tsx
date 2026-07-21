@@ -326,30 +326,28 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
               onBlur={() => handleBlur('email')}
               error={touched.email ? errors.email : undefined}
             />
-            {/* Mobile + a compact affordance to reveal the alternative phone. */}
-            <div className="flex items-start gap-2">
-              <div className="flex-1">
-                <PhoneInput
-                  label="Mobile Number"
-                  floatingLabel
-                  value={formData.mobile_number}
-                  onChange={(val) => handleFieldChange('mobile_number', val)}
-                  countries={countries}
-                  selectedCountryId={formData.country_id}
-                  placeholder="e.g. 9123 4567"
-                />
-              </div>
+            {/* Mobile with a plain + above it to reveal the alternative phone. */}
+            <div className="relative">
               {!showAltPhone && (
                 <button
                   type="button"
                   onClick={() => setShowAltPhone(true)}
                   title="Add alternative phone number"
                   aria-label="Add alternative phone number"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-300 text-primary transition-colors hover:border-primary hover:bg-primary/5"
+                  className="absolute -top-5 right-0 text-primary transition-colors hover:text-primary/80"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
               )}
+              <PhoneInput
+                label="Mobile Number"
+                floatingLabel
+                value={formData.mobile_number}
+                onChange={(val) => handleFieldChange('mobile_number', val)}
+                countries={countries}
+                selectedCountryId={formData.country_id}
+                placeholder="e.g. 9123 4567"
+              />
             </div>
           </div>
 
