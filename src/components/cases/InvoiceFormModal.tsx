@@ -567,7 +567,10 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={initialData ? 'Edit Invoice' : 'Create New Invoice'}
+      subtitle={initialData ? "Update this invoice's line items and terms." : 'Build the invoice line items and terms.'}
+      icon={FileText}
       size="xl"
+      showClose
       headerBadges={headerBadges}
       closeOnBackdrop={false}
       footer={
@@ -1129,11 +1132,11 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
         label="Catalog"
         className="max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
       >
-            <div className="flex items-center gap-2 p-4 border-b border-slate-200">
+            <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-200">
               <Search className="w-5 h-5 text-primary" />
               <h3 className="text-lg font-semibold text-slate-900">Quick Add from Catalog</h3>
             </div>
-            <div className="p-4">
+            <div className="px-5 py-4">
               <Input
                 placeholder="Search services, descriptions, or categories..."
                 value={searchQuery}
@@ -1141,7 +1144,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                 leftIcon={<Search className="w-4 h-4" />}
               />
             </div>
-            <div className="flex-1 overflow-y-auto px-4 pb-4">
+            <div className="flex-1 overflow-y-auto px-5 pb-4">
               <div className="space-y-2">
                 {catalogLoading ? (
                   <div className="text-center py-8 text-sm text-slate-500">Loading templates...</div>
@@ -1183,7 +1186,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                 )}
               </div>
             </div>
-            <div className="shrink-0 flex items-center justify-end gap-3 border-t border-slate-200 px-4 py-3">
+            <div className="shrink-0 flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-3">
               <Button type="button" variant="secondary" onClick={() => setShowCatalog(false)}>
                 Done
               </Button>
