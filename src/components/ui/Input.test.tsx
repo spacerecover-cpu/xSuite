@@ -109,9 +109,11 @@ describe('Input', () => {
       expect(el.className).toMatch(/text-sm/);
     });
 
-    it('default size keeps the standard control padding (no regression)', () => {
+    it('default size keeps the 36px standard control height (no regression)', () => {
       render(<Input aria-label="g" />);
-      expect(screen.getByLabelText('g').className).toMatch(/py-2/);
+      const el = screen.getByLabelText('g');
+      expect(el.className).toMatch(/h-9/);
+      expect(el.className).toMatch(/text-sm/);
     });
   });
 });
