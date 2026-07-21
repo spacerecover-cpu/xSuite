@@ -94,7 +94,7 @@ export function Modal({
       className={cn(widthClass, 'flex flex-col overflow-hidden')}
     >
       {title && (
-        <div className="no-print flex items-center justify-between p-3 border-b border-border">
+        <div className="no-print flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-3">
             {Icon && (
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
@@ -124,9 +124,9 @@ export function Modal({
           )}
         </div>
       )}
-      <div className="p-4 overflow-y-auto flex-1">{children}</div>
+      <div className="px-5 py-4 overflow-y-auto flex-1">{children}</div>
       {footer && (
-        <div className="no-print shrink-0 border-t border-border px-4 py-3">{footer}</div>
+        <div className="no-print shrink-0 border-t border-border px-5 py-3">{footer}</div>
       )}
     </Dialog>
   );

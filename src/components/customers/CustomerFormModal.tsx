@@ -319,7 +319,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         {/* Reference layout (2026-07-20): flat paired rows sized to fit the
             viewport with no scrolling; structured address + tax live behind
             the collapsed disclosure so the at-rest form matches the mock. */}
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             ref={customerNameRef}
             label="Name"
@@ -429,7 +429,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
               Additional address & tax details (optional)
             </button>
             {!detailsCollapsed && (
-              <div className="mt-2 space-y-3">
+              <div className="mt-3 space-y-4">
                 <AddressFields
                   value={addressValue}
                   onChange={(next) => setFormData((f) => ({ ...f, ...next }))}
@@ -489,7 +489,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200">
+          <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-200">
             <Button type="button" variant="secondary" onClick={handleClose}>
               Cancel
             </Button>

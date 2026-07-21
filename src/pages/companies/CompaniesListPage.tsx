@@ -705,7 +705,7 @@ export const CompaniesListPage: React.FC = () => {
         maxWidth="xl"
         showClose
       >
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             label="Company Name"
             value={formData.company_name}
@@ -839,7 +839,7 @@ export const CompaniesListPage: React.FC = () => {
             </div>
           )}
 
-          <div className="flex gap-2.5 justify-end pt-3 border-t">
+          <div className="flex gap-2.5 justify-end pt-4 border-t">
             <Button
               type="button"
               variant="secondary"
@@ -877,7 +877,7 @@ export const CompaniesListPage: React.FC = () => {
         maxWidth="xl"
         showClose
       >
-        <form onSubmit={handleEditSubmit} className="space-y-3">
+        <form onSubmit={handleEditSubmit} className="space-y-4">
           <Input
             label="Company Name"
             value={formData.company_name}
@@ -980,7 +980,7 @@ export const CompaniesListPage: React.FC = () => {
             />
           </div>
 
-          <div className="flex gap-3 justify-end pt-3 border-t">
+          <div className="flex gap-3 justify-end pt-4 border-t">
             <Button
               type="button"
               variant="secondary"

@@ -819,7 +819,7 @@ export const CustomersListPage: React.FC = () => {
             />
           </div>
 
-          <div className="flex gap-3 justify-end pt-3 border-t">
+          <div className="flex gap-3 justify-end pt-4 border-t">
             <Button
               type="button"
               variant="secondary"

@@ -98,7 +98,7 @@ export function Dialog({
         aria-labelledby={labelledBy}
         aria-label={labelledBy ? undefined : label}
         className={cn(
-          'relative z-10 mx-4 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-surface shadow-xl',
+          'relative z-10 mx-4 max-h-[calc(100vh-4rem)] w-full max-w-lg overflow-y-auto rounded-lg bg-surface shadow-xl',
           className,
         )}
       >
