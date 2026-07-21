@@ -8,6 +8,9 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
+  /** Title size. 'default' = text-lg (18px, the standard); 'sm' = text-base
+   *  (16px) for denser forms that opt in. */
+  titleSize?: 'default' | 'sm';
   /** Optional one-line helper under the title (e.g. "Enter customer details to get started."). */
   subtitle?: string;
   children: ReactNode;
@@ -74,6 +77,7 @@ export function Modal({
   isOpen,
   onClose,
   title,
+  titleSize = 'default',
   subtitle,
   children,
   size = 'md',
@@ -112,7 +116,7 @@ export function Modal({
               </div>
             )}
             <div>
-              <h2 id={titleId} className="text-lg font-semibold text-slate-900">{title}</h2>
+              <h2 id={titleId} className={cn('font-semibold text-slate-900', titleSize === 'sm' ? 'text-base' : 'text-lg')}>{title}</h2>
               {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
             </div>
             {headerBadges && <div className="flex items-center gap-2 ms-2">{headerBadges}</div>}

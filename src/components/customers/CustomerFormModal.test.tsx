@@ -121,9 +121,7 @@ describe('CustomerFormModal — inline Add New Company', () => {
     renderModal();
 
     await user.type(screen.getByLabelText(/^name/i), 'Jane Doe');
-    // Structured address lives behind the collapsed details disclosure
-    // (reference layout keeps the at-rest form to a single Address field).
-    await user.click(screen.getByRole('button', { name: /additional address & tax details/i }));
+    // The structured address block is always visible below the main fields.
     await user.type(screen.getByLabelText('Address line 1'), 'Bldg 12');
     await user.type(screen.getByLabelText('Postal Code'), '133');
     await user.click(screen.getByRole('button', { name: /create customer/i }));
@@ -156,7 +154,6 @@ describe('CustomerFormModal — tax registration number (GSTIN) capture', () => 
     });
     renderModal();
     await user.type(screen.getByLabelText(/^name/i), 'Jane Doe');
-    await user.click(screen.getByRole('button', { name: /additional address & tax details/i }));
     await user.type(screen.getByLabelText(/tax registration number/i), '29ABCDE1234F1Z5');
     await user.click(screen.getByRole('button', { name: /create customer/i }));
     expect(await screen.findByText(/check character is invalid/i)).toBeInTheDocument();
@@ -167,7 +164,6 @@ describe('CustomerFormModal — tax registration number (GSTIN) capture', () => 
     const user = userEvent.setup();
     renderModal();
     await user.type(screen.getByLabelText(/^name/i), 'Jane Doe');
-    await user.click(screen.getByRole('button', { name: /additional address & tax details/i }));
     await user.type(screen.getByLabelText(/tax registration number/i), '29AAACX0000X1ZW');
     await user.click(screen.getByRole('button', { name: /create customer/i }));
     await waitFor(() =>

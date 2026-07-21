@@ -17,8 +17,6 @@ import {
   User,
   UserPlus,
   Building2,
-  ChevronDown,
-  ChevronUp,
   Loader2,
   Plus,
   X,
@@ -70,7 +68,6 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   const queryClient = useQueryClient();
   const { profile } = useAuth();
   const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false);
-  const [detailsCollapsed, setDetailsCollapsed] = useState(true);
   const [showAltPhone, setShowAltPhone] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -266,7 +263,6 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     });
     setErrors({});
     setTouched({});
-    setDetailsCollapsed(true);
     setShowAltPhone(false);
   };
 
@@ -314,15 +310,15 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         title="Add New Customer"
         subtitle="Enter customer details to get started."
         icon={User}
+        titleSize="sm"
         maxWidth="xl"
         showClose
         initialFocusRef={customerNameRef}
         closeOnBackdrop={false}
       >
-        {/* Reference layout (2026-07-20): flat paired rows sized to fit the
-            viewport with no scrolling; structured address + tax live behind
-            the collapsed disclosure so the at-rest form matches the mock. */}
-        <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Reference layout: flat paired rows with floating labels; the
+            address/tax block is always visible below the main fields. */}
+        <form onSubmit={handleSubmit} className="space-y-6">
           <Input
             ref={customerNameRef}
             label="Name"
@@ -464,39 +460,32 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
             placeholder="Enter full address"
           />
 
-          <div>
-            <button
-              type="button"
-              onClick={() => setDetailsCollapsed((prev) => !prev)}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors py-0.5"
-            >
-              {detailsCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-              Additional address & tax details (optional)
-            </button>
-            {!detailsCollapsed && (
-              <div className="mt-4 space-y-5">
-                <AddressFields
-                  value={addressValue}
-                  onChange={(next) => setFormData((f) => ({ ...f, ...next }))}
-                  countryId={formData.country_id || null}
-                  floatingLabel
+          <div className="border-t border-slate-200 pt-4">
+            <p className="mb-4 text-xs font-medium text-slate-500">
+              Additional address &amp; tax details (optional)
+            </p>
+            <div className="space-y-6">
+              <AddressFields
+                value={addressValue}
+                onChange={(next) => setFormData((f) => ({ ...f, ...next }))}
+                countryId={formData.country_id || null}
+                floatingLabel
+              />
+              <div className="relative">
+                <input
+                  id="customer-tax-number"
+                  className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={formData.tax_number}
+                  onChange={(e) => handleFieldChange('tax_number', e.target.value)}
+                  onBlur={() => handleBlur('tax_number')}
                 />
-                <div className="relative">
-                  <input
-                    id="customer-tax-number"
-                    className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    value={formData.tax_number}
-                    onChange={(e) => handleFieldChange('tax_number', e.target.value)}
-                    onBlur={() => handleBlur('tax_number')}
-                  />
-                  <label htmlFor="customer-tax-number" className={FLOATING_LABEL_CLS}>
-                    {(countries.find((c) => c.id === formData.country_id) as { tax_number_label?: string | null } | undefined)
-                      ?.tax_number_label ?? 'Tax Registration Number'}
-                  </label>
-                  {errors.tax_number && <p className="mt-1 text-xs text-danger">{errors.tax_number}</p>}
-                </div>
+                <label htmlFor="customer-tax-number" className={FLOATING_LABEL_CLS}>
+                  {(countries.find((c) => c.id === formData.country_id) as { tax_number_label?: string | null } | undefined)
+                    ?.tax_number_label ?? 'Tax Registration Number'}
+                </label>
+                {errors.tax_number && <p className="mt-1 text-xs text-danger">{errors.tax_number}</p>}
               </div>
-            )}
+            </div>
           </div>
 
           <label htmlFor="customer-portal-enabled" className="flex cursor-pointer select-none items-start gap-2.5">
@@ -533,19 +522,19 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
           )}
 
           <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-200">
-            <Button type="button" variant="secondary" onClick={handleClose}>
+            <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={handleClose}>
               Cancel
             </Button>
             <UsageLimitGuard limitKey="max_customers" showToast={true}>
-              <Button type="submit" disabled={createMutation.isPending}>
+              <Button type="submit" size="sm" className="text-xs" disabled={createMutation.isPending}>
                 {createMutation.isPending ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                     Creating...
                   </>
                 ) : (
                   <>
-                    <UserPlus className="w-4 h-4 mr-1.5" />
+                    <UserPlus className="w-3.5 h-3.5 mr-1.5" />
                     Create Customer
                   </>
                 )}
