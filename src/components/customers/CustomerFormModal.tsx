@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
-import { createCustomer } from '../../lib/customerService';
+import { createCustomer, getNextCustomerNumberPreview } from '../../lib/customerService';
 import { createCompany } from '../../lib/companyService';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -156,6 +156,14 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     },
   });
 
+  // Non-consuming preview of the number the next created customer will get.
+  const { data: nextCustomerNumber } = useQuery({
+    queryKey: ['customer_number_preview'],
+    queryFn: getNextCustomerNumberPreview,
+    enabled: isOpen,
+    staleTime: 0,
+  });
+
   const filteredCities = cities.filter(
     (city) => !formData.country_id || city.country_id === formData.country_id
   );
@@ -210,6 +218,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     },
     onSuccess: (newCustomer) => {
       queryClient.invalidateQueries({ queryKey: ['customers_enhanced'] });
+      queryClient.invalidateQueries({ queryKey: ['customer_number_preview'] });
       queryClient.invalidateQueries({ queryKey: ['customers_for_cases'] });
       resetForm();
       if (onSuccess && newCustomer) onSuccess(newCustomer as unknown as Record<string, unknown>);
@@ -299,6 +308,17 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         titleSize="sm"
         maxWidth="xl"
         showClose
+        headerAction={
+          nextCustomerNumber ? (
+            <span
+              title="The number this customer will be assigned"
+              className="flex items-center gap-1.5 rounded-md border border-info/30 bg-info-muted px-2 py-1"
+            >
+              <span className="text-xxs font-medium uppercase tracking-wide text-slate-500">Next No.</span>
+              <span className="font-mono text-xs font-semibold text-info">{nextCustomerNumber}</span>
+            </span>
+          ) : undefined
+        }
         initialFocusRef={customerNameRef}
         closeOnBackdrop={false}
       >

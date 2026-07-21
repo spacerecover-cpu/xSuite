@@ -12,7 +12,10 @@ const { createCompanySpy, createCustomerSpy } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../lib/companyService', () => ({ createCompany: createCompanySpy }));
-vi.mock('../../lib/customerService', () => ({ createCustomer: createCustomerSpy }));
+vi.mock('../../lib/customerService', () => ({
+  createCustomer: createCustomerSpy,
+  getNextCustomerNumberPreview: vi.fn(async () => 'CUST-0001'),
+}));
 
 vi.mock('../../lib/geoSubdivisionService', () => ({
   listSubdivisions: vi.fn(async () => []),
@@ -107,6 +110,11 @@ describe('CustomerFormModal — inline Add New Company', () => {
     await waitFor(() =>
       expect(screen.queryByPlaceholderText('Enter company name')).not.toBeInTheDocument(),
     );
+  });
+
+  it('shows the next customer number preview in the header', async () => {
+    renderModal();
+    expect(await screen.findByText('CUST-0001')).toBeInTheDocument();
   });
 
   it('persists structured address fields alongside the legacy address blob', async () => {

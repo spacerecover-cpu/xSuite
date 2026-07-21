@@ -9,6 +9,39 @@ type CustomerRow = Database['public']['Tables']['customers_enhanced']['Row'];
 type CustomerInsert = Database['public']['Tables']['customers_enhanced']['Insert'];
 type RelationshipInsert = Database['public']['Tables']['customer_company_relationships']['Insert'];
 
+/**
+ * Non-consuming preview of the next customer number. Mirrors the DB
+ * `get_next_number('customers')` legacy branch (all sequences have a NULL
+ * format_template): `prefix || '-' || LPAD(current_value + 1, padding)`, with
+ * an annual-reset short-circuit. Read-only — the real number is allocated at
+ * insert time by `get_next_customer_number()`.
+ */
+export async function getNextCustomerNumberPreview(): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('number_sequences')
+    .select('prefix, padding, current_value, reset_annually, last_reset_year')
+    .eq('scope', 'customers')
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    logger.error('Failed to preview next customer number:', error);
+    return null;
+  }
+  const prefix = data?.prefix ?? 'CUST';
+  const padding = data?.padding ?? 4;
+  const currentYear = new Date().getFullYear();
+  let nextVal: number;
+  if (!data) {
+    nextVal = 1;
+  } else if (data.reset_annually && (data.last_reset_year == null || data.last_reset_year < currentYear)) {
+    nextVal = 1;
+  } else {
+    nextVal = (data.current_value ?? 0) + 1;
+  }
+  return `${prefix}-${String(nextVal).padStart(padding, '0')}`;
+}
+
 export interface CreateCustomerInput {
   customer_name: string;
   email?: string | null;
