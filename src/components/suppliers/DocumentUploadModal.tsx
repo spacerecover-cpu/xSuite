@@ -108,7 +108,14 @@ export default function DocumentUploadModal({ isOpen, onClose, onSuccess, suppli
   ];
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Upload Document">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Upload Document"
+      subtitle="Select a file and enter the document details."
+      icon={Upload}
+      showClose
+    >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="supplier-doc-type" className="block text-sm font-medium text-slate-700 mb-1">

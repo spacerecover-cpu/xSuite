@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Receipt, Calendar, FileText } from 'lucide-react';
+import { Receipt, Calendar, FileText, FileCheck } from 'lucide-react';
 
 interface ConvertProformaToTaxModalProps {
   isOpen: boolean;
@@ -53,7 +53,10 @@ export const ConvertProformaToTaxModal: React.FC<ConvertProformaToTaxModalProps>
       isOpen={isOpen}
       onClose={onClose}
       title="Convert Proforma to Tax Invoice"
+      subtitle="Convert this proforma to a tax invoice."
+      icon={FileCheck}
       size="lg"
+      showClose
       closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit} className="space-y-6">

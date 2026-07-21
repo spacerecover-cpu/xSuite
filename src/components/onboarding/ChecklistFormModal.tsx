@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Trash2, GripVertical, ListChecks } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -176,7 +176,10 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
       isOpen={isOpen}
       onClose={onClose}
       title={isEditing ? 'Edit Checklist' : 'New Onboarding Checklist'}
+      subtitle={isEditing ? "Update this checklist's details." : 'Enter the checklist details and add its items.'}
+      icon={ListChecks}
       size="lg"
+      showClose
       closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-5">

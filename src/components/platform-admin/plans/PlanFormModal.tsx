@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
+import { Package } from 'lucide-react';
 import { createSubscriptionPlan } from '../../../lib/billingService';
 import { platformAdminKeys } from '../../../lib/queryKeys';
 import { useToast } from '../../../hooks/useToast';
@@ -70,7 +71,10 @@ export const PlanFormModal: React.FC<PlanFormModalProps> = ({ isOpen, onClose })
       isOpen={isOpen}
       onClose={onClose}
       title="Create Subscription Plan"
+      subtitle="Enter the plan details to create it."
+      icon={Package}
       size="lg"
+      showClose
       closeOnBackdrop={false}
       initialFocusRef={nameInputRef}
     >

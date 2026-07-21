@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Phone, Briefcase } from 'lucide-react';
+import { User, UserPlus, Mail, Phone, Briefcase } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -120,7 +120,15 @@ export default function ContactFormModal({ isOpen, onClose, onSuccess, supplierI
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={contact ? 'Edit Contact' : 'Add New Contact'} closeOnBackdrop={false}>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={contact ? 'Edit Contact' : 'Add New Contact'}
+      subtitle={contact ? "Update this contact's details." : "Enter the contact's details to add them."}
+      icon={UserPlus}
+      showClose
+      closeOnBackdrop={false}
+    >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Package, Calendar, DollarSign, FileText } from 'lucide-react';
+import { Plus, Trash2, Package, Calendar, DollarSign, FileText, ClipboardList } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -344,7 +344,10 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
       isOpen={isOpen}
       onClose={onClose}
       title={purchaseOrder ? 'Edit Purchase Order' : 'Create Purchase Order'}
+      subtitle={purchaseOrder ? "Update this purchase order's details." : 'Enter the purchase order details to create it.'}
+      icon={ClipboardList}
       maxWidth="5xl"
+      showClose
       closeOnBackdrop={false}
       footer={
         <div className="flex items-center justify-end gap-3">

@@ -315,6 +315,9 @@ export default function InventorySettingsPage() {
         isOpen={editModal !== null}
         onClose={() => setEditModal(null)}
         title={editModal ? `Edit Sequence — ${editModal.deviceType.name}` : ''}
+        subtitle={editModal ? "Update this device type's numbering sequence." : ''}
+        icon={Hash}
+        showClose
       >
         {editModal && (
           <form onSubmit={handleSequenceSave} className="space-y-6">

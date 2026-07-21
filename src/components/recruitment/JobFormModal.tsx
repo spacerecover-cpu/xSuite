@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Briefcase } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -158,7 +159,16 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={isEditing ? 'Edit Job' : 'Post New Job'} size="lg" closeOnBackdrop={false}>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isEditing ? 'Edit Job' : 'Post New Job'}
+      subtitle={isEditing ? "Update this job's details." : 'Enter the job details to post it.'}
+      icon={Briefcase}
+      size="lg"
+      showClose
+      closeOnBackdrop={false}
+    >
       <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">

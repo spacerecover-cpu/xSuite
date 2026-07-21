@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { UserPlus } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -133,7 +134,10 @@ export const CandidateFormModal: React.FC<Props> = ({ isOpen, onClose, candidate
       isOpen={isOpen}
       onClose={onClose}
       title={isEditing ? 'Edit Candidate' : `Add Candidate — ${job.title}`}
+      subtitle={isEditing ? "Update this candidate's details." : "Enter the candidate's details to add them."}
+      icon={UserPlus}
       size="lg"
+      showClose
       closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-4">

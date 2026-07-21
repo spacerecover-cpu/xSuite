@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
+import { Ticket } from 'lucide-react';
 import { createCoupon, updateCoupon } from '../../../lib/billingService';
 import { platformAdminKeys } from '../../../lib/queryKeys';
 import { useToast } from '../../../hooks/useToast';
@@ -65,7 +66,10 @@ export const CouponFormModal: React.FC<CouponFormModalProps> = ({ isOpen, onClos
       isOpen={isOpen}
       onClose={onClose}
       title={isEditing ? 'Edit Coupon' : 'Create Coupon'}
+      subtitle={isEditing ? "Update this coupon's details." : 'Enter the coupon details to create it.'}
+      icon={Ticket}
       size="md"
+      showClose
       closeOnBackdrop={false}
       initialFocusRef={codeInputRef}
     >

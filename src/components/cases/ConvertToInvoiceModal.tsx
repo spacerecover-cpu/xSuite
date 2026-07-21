@@ -60,7 +60,10 @@ export const ConvertToInvoiceModal: React.FC<ConvertToInvoiceModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Convert Quote to Invoice"
+      subtitle="Convert this quote into an invoice."
+      icon={FileText}
       size="lg"
+      showClose
       closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit} className="space-y-6">

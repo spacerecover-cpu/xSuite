@@ -2,7 +2,7 @@ import React, { useState, useRef, useId } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Lock, AlertCircle, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { userManagementService } from '../../lib/userManagementService';
 import { validatePassword } from '../auth/shared/passwordPolicy';
 import { PasswordStrengthMeter } from '../auth/shared/PasswordStrengthMeter';
@@ -75,6 +75,8 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
       isOpen={isOpen}
       onClose={() => {}}
       title="Change Your Password"
+      subtitle="Set a new password for this account."
+      icon={KeyRound}
       size="md"
       closeOnBackdrop={false}
       closeOnEscape={false}

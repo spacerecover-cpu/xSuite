@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { SlidersHorizontal } from 'lucide-react';
 import { payrollService } from '../../lib/payrollService';
 import { payrollKeys } from '../../lib/queryKeys';
 import { Button } from '../ui/Button';
@@ -81,7 +82,14 @@ export function AdjustmentFormModal({ onClose }: Props) {
   }));
 
   return (
-    <Modal isOpen onClose={onClose} title="Add Payroll Adjustment">
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Add Payroll Adjustment"
+      subtitle="Enter the payroll adjustment details to record it."
+      icon={SlidersHorizontal}
+      showClose
+    >
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <SearchableSelect

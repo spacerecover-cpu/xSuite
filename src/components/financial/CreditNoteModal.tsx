@@ -187,7 +187,10 @@ export const CreditNoteModal: React.FC<CreditNoteModalProps> = ({ isOpen, onClos
       isOpen={isOpen}
       onClose={handleClose}
       title={`Credit note${invoice.invoice_number ? ` for ${invoice.invoice_number}` : ''}`}
+      subtitle="Enter the credit note details to issue it."
+      icon={FileMinus}
       size="md"
+      showClose
       closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit} className="space-y-4">

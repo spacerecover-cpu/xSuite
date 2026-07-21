@@ -2,7 +2,7 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Package, User, Phone, CreditCard, Printer, FileText } from 'lucide-react';
+import { Package, User, Phone, CreditCard, Printer, FileText, PackageCheck } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { logger } from '../../lib/logger';
 import {
@@ -271,7 +271,7 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Device Checkout" closeOnBackdrop={false} initialFocusRef={firstFieldRef}>
+    <Modal isOpen={isOpen} onClose={handleClose} title="Device Checkout" subtitle="Check this device out and record its return." icon={PackageCheck} showClose closeOnBackdrop={false} initialFocusRef={firstFieldRef}>
       <form
         className="space-y-6"
         onSubmit={(e) => {

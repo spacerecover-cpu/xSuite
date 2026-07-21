@@ -841,6 +841,9 @@ export const CompanyProfilePage: React.FC = () => {
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         title="Edit Company"
+        subtitle="Update this company's details."
+        icon={Building2}
+        showClose
       >
         <form onSubmit={handleSubmitEdit} className="space-y-4">
           <Input

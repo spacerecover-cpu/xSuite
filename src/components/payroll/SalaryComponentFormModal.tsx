@@ -1,5 +1,6 @@
 import { useId, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Wallet } from 'lucide-react';
 import { payrollService } from '../../lib/payrollService';
 import { payrollKeys } from '../../lib/queryKeys';
 import { Button } from '../ui/Button';
@@ -81,7 +82,16 @@ export function SalaryComponentFormModal({ component, onClose }: Props) {
   };
 
   return (
-    <Modal isOpen onClose={onClose} title={isEditing ? 'Edit Salary Component' : 'Add Salary Component'} closeOnBackdrop={false} initialFocusRef={nameFieldRef}>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={isEditing ? 'Edit Salary Component' : 'Add Salary Component'}
+      subtitle={isEditing ? "Update this salary component's details." : 'Enter the salary component details to add it.'}
+      icon={Wallet}
+      showClose
+      closeOnBackdrop={false}
+      initialFocusRef={nameFieldRef}
+    >
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>

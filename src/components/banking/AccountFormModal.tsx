@@ -6,7 +6,7 @@ import { Input } from '../ui/Input';
 import { supabase } from '../../lib/supabaseClient';
 import { BankAccount } from '../../lib/bankingService';
 import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
-import { Building, Wallet, Smartphone, AlertCircle } from 'lucide-react';
+import { Building, Wallet, Smartphone, AlertCircle, Landmark } from 'lucide-react';
 import { logger } from '../../lib/logger';
 
 interface AccountFormModalProps {
@@ -191,7 +191,10 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={initialData ? 'Edit Account' : 'Add New Account'}
+      subtitle={initialData ? "Update this account's details." : 'Enter the account details to add it.'}
+      icon={Landmark}
       size="large"
+      showClose
       closeOnBackdrop={false}
       footer={
         <div className="flex items-center justify-end gap-3">

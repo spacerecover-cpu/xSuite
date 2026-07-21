@@ -5,7 +5,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { RichTextEditor, type RichTextEditorHandle } from '../ui/RichTextEditor';
-import { DollarSign, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { DollarSign, Eye, EyeOff, AlertTriangle, ListPlus } from 'lucide-react';
 import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
 import { logger } from '../../lib/logger';
 import { useToast } from '../../hooks/useToast';
@@ -193,7 +193,10 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
             ? 'Edit Template'
             : 'Create Template'
       }
+      subtitle={initialData ? "Update this template's details." : 'Enter the template details to create it.'}
+      icon={ListPlus}
       size="large"
+      showClose
       closeOnBackdrop={false}
       initialFocusRef={firstFieldRef}
     >

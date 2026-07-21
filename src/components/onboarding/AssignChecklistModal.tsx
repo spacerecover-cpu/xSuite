@@ -1,6 +1,7 @@
 import React, { useEffect, useId } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ClipboardList } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -82,7 +83,14 @@ export const AssignChecklistModal: React.FC<Props> = ({
   });
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Assign Onboarding Checklist">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Assign Onboarding Checklist"
+      subtitle="Assign an onboarding checklist to this employee."
+      icon={ClipboardList}
+      showClose
+    >
       <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-4">
         <div>
           <label htmlFor={employeeFieldId} className="block text-sm font-medium text-slate-700 mb-1">

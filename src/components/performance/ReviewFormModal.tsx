@@ -1,7 +1,7 @@
 import React, { useEffect, useId } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Star } from 'lucide-react';
+import { Star, ClipboardCheck } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -203,7 +203,10 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
       isOpen={isOpen}
       onClose={onClose}
       title={isEditing ? 'Edit Performance Review' : 'New Performance Review'}
+      subtitle={isEditing ? "Update this performance review's details." : 'Enter the performance review details to get started.'}
+      icon={ClipboardCheck}
       size="lg"
+      showClose
       closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-4">

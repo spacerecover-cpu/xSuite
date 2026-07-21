@@ -6,7 +6,7 @@ import { Input } from '../ui/Input';
 import { bankingService } from '../../lib/bankingService';
 import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
 import { formatCurrencyWithConfig } from '../../lib/format';
-import { AlertCircle, ArrowRight } from 'lucide-react';
+import { AlertCircle, ArrowRight, ArrowLeftRight } from 'lucide-react';
 
 interface TransferFundsModalProps {
   isOpen: boolean;
@@ -90,7 +90,7 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Transfer Funds" size="large">
+    <Modal isOpen={isOpen} onClose={onClose} title="Transfer Funds" subtitle="Move funds from one account to another." icon={ArrowLeftRight} size="large" showClose>
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
           <div className="bg-danger-muted border border-danger/30 rounded-lg p-3 flex items-start gap-2">

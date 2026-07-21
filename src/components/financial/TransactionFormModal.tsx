@@ -13,6 +13,7 @@ import {
   TrendingUp,
   TrendingDown,
   Save,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { logger } from '../../lib/logger';
 import { useToast } from '../../hooks/useToast';
@@ -111,7 +112,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="New Transaction" size="md" closeOnBackdrop={false} initialFocusRef={firstFieldRef}>
+    <Modal isOpen={isOpen} onClose={handleClose} title="New Transaction" subtitle="Enter the transaction details to record it." icon={ArrowLeftRight} size="md" showClose closeOnBackdrop={false} initialFocusRef={firstFieldRef}>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
           <button

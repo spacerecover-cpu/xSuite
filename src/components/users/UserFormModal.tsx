@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useId } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Mail, User, Phone, Shield, Lock } from 'lucide-react';
+import { Mail, User, Phone, Shield, Lock, UserCog } from 'lucide-react';
 
 interface UserFormModalProps {
   isOpen: boolean;
@@ -118,7 +118,10 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={mode === 'create' ? 'Add New User' : 'Edit User'}
+      subtitle={mode === 'create' ? 'Enter the user details to create the account.' : "Update this user's details."}
+      icon={UserCog}
       size="lg"
+      showClose
       closeOnBackdrop={false}
       initialFocusRef={firstFieldRef}
     >

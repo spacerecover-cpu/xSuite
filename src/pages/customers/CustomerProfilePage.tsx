@@ -572,6 +572,9 @@ export const CustomerProfilePage: React.FC = () => {
             isOpen={isEditModalOpen}
             onClose={() => setIsEditModalOpen(false)}
             title="Edit Customer"
+            subtitle="Update this customer's details."
+            icon={User}
+            showClose
           >
             <form onSubmit={handleSubmitEdit} className="space-y-4">
               <div className="max-w-sm">

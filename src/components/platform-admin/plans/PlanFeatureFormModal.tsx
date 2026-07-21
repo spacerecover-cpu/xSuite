@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
+import { ListPlus } from 'lucide-react';
 import { createPlanFeature, updatePlanFeature } from '../../../lib/billingService';
 import { platformAdminKeys } from '../../../lib/queryKeys';
 import { useToast } from '../../../hooks/useToast';
@@ -92,7 +93,10 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={isEditing ? 'Edit Feature' : 'Add Feature'}
+      subtitle={isEditing ? "Update this feature's details." : 'Enter the feature details to add it.'}
+      icon={ListPlus}
       size="md"
+      showClose
       closeOnBackdrop={false}
       initialFocusRef={firstFieldRef}
     >

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useId } from 'react';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, HandCoins } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { payrollService } from '../../lib/payrollService';
@@ -145,7 +145,15 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Create New Loan" closeOnBackdrop={false}>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Create New Loan"
+      subtitle="Enter the loan details to set it up."
+      icon={HandCoins}
+      showClose
+      closeOnBackdrop={false}
+    >
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="md:col-span-2">
