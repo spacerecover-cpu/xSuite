@@ -252,7 +252,7 @@ export const CreateCloneDriveModal: React.FC<CreateCloneDriveModalProps> = ({
               value={values.deviceId}
               onChange={(e) => update('deviceId', e.target.value)}
               disabled={isLoading || devices.length === 0}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${
+              className={`h-9 w-full px-3 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${
                 errors.deviceId ? 'border-danger' : 'border-slate-300'
               }`}
             >
@@ -349,7 +349,7 @@ export const CreateCloneDriveModal: React.FC<CreateCloneDriveModalProps> = ({
                 update('storageType', e.target.value as CreateCloneDriveFormValues['storageType'])
               }
               disabled={isLoading}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              className="h-9 w-full px-3 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
             >
               {STORAGE_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>
@@ -370,7 +370,7 @@ export const CreateCloneDriveModal: React.FC<CreateCloneDriveModalProps> = ({
                 update('imageFormat', e.target.value as CreateCloneDriveFormValues['imageFormat'])
               }
               disabled={isLoading}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              className="h-9 w-full px-3 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
             >
               {IMAGE_FORMATS.map((f) => (
                 <option key={f.value} value={f.value}>
@@ -391,7 +391,7 @@ export const CreateCloneDriveModal: React.FC<CreateCloneDriveModalProps> = ({
                 update('resourceCloneDriveId', e.target.value === '' ? null : e.target.value)
               }
               disabled={isLoading}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              className="h-9 w-full px-3 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="">— None —</option>
               {resourceDrives.map((d) => (
@@ -425,7 +425,7 @@ export const CreateCloneDriveModal: React.FC<CreateCloneDriveModalProps> = ({
 
         <input type="hidden" value={caseId} readOnly />
 
-        <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+        <div className="flex justify-end gap-2 pt-4 border-t border-slate-200">
           <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>
             Cancel
           </Button>

@@ -351,7 +351,7 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={8}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary resize-none"
+              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary resize-none"
               placeholder="Email message..."
               disabled={isSending}
             />

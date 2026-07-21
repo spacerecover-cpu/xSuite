@@ -118,7 +118,7 @@ export default function DocumentUploadModal({ isOpen, onClose, onSuccess, suppli
             id="supplier-doc-type"
             value={formData.document_type}
             onChange={(e) => setFormData({ ...formData, document_type: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            className="w-full h-9 px-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
             required
           >
             {documentTypes.map((type) => (
@@ -141,7 +141,7 @@ export default function DocumentUploadModal({ isOpen, onClose, onSuccess, suppli
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             Select File * (Max 10MB)
           </label>
 

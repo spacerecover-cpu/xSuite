@@ -230,7 +230,7 @@ export const CreditNoteModal: React.FC<CreditNoteModalProps> = ({ isOpen, onClos
             id="cn-reason"
             value={reasonCode}
             onChange={(e) => setReasonCode(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
           >
             {REASON_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -249,7 +249,7 @@ export const CreditNoteModal: React.FC<CreditNoteModalProps> = ({ isOpen, onClos
             value={reasonNotes}
             onChange={(e) => setReasonNotes(e.target.value)}
             rows={2}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             placeholder="Optional explanation for the audit trail…"
           />
         </div>
@@ -269,7 +269,7 @@ export const CreditNoteModal: React.FC<CreditNoteModalProps> = ({ isOpen, onClos
         </div>
 
         {exceedsBalance && (
-          <p className="flex items-center gap-1.5 text-sm text-danger" role="alert">
+          <p className="flex items-center gap-1.5 text-xs text-danger" role="alert">
             <AlertTriangle className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
             Credit exceeds the outstanding balance by {formatCurrency(amount - balance)}. Refunds beyond the
             balance aren’t supported yet.

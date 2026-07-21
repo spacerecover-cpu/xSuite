@@ -108,7 +108,7 @@ export default function CommunicationFormModal({ isOpen, onClose, onSuccess, sup
     <Modal isOpen={isOpen} onClose={onClose} title={communication ? 'Edit Communication' : 'Log Communication'} closeOnBackdrop={false}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             Communication Type *
           </label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -155,7 +155,7 @@ export default function CommunicationFormModal({ isOpen, onClose, onSuccess, sup
             id="supplier-comm-notes"
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
             rows={4}
             required
             placeholder="Detailed notes about the communication..."

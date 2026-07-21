@@ -111,7 +111,7 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
                   type="text"
                   value={formData.feature_key}
                   onChange={(e) => setFormData((p) => ({ ...p, feature_key: e.target.value }))}
-                  className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="flex-1 border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="custom_feature_key"
                   required
                 />
@@ -125,7 +125,7 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
                   ref={firstFieldRef}
                   value={formData.feature_key}
                   onChange={(e) => setFormData((p) => ({ ...p, feature_key: e.target.value }))}
-                  className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="flex-1 border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   required
                 >
                   <option value="">Select a feature key...</option>
@@ -148,7 +148,7 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
                 type="text"
                 value={formData.feature_name}
                 onChange={(e) => setFormData((p) => ({ ...p, feature_name: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 required
               />
             </div>
@@ -160,7 +160,7 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
                 dir="rtl"
                 value={formData.feature_name_ar}
                 onChange={(e) => setFormData((p) => ({ ...p, feature_name_ar: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
           </div>
@@ -173,7 +173,7 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
                 type="text"
                 value={formData.limit_type}
                 onChange={(e) => setFormData((p) => ({ ...p, limit_type: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="e.g. users, cases, storage"
               />
             </div>
@@ -189,7 +189,7 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
                     limit_value: e.target.value ? parseInt(e.target.value) : null,
                   }))
                 }
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="Unlimited"
               />
             </div>
@@ -204,7 +204,7 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
               onChange={(e) =>
                 setFormData((p) => ({ ...p, display_order: parseInt(e.target.value) || 0 }))
               }
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
 

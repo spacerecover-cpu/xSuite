@@ -102,7 +102,7 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
         )}
 
         <div>
-          <label htmlFor={currentPasswordId} className="block text-sm font-medium text-slate-700 mb-2">
+          <label htmlFor={currentPasswordId} className="block text-sm font-medium text-slate-700 mb-1">
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4" />
               Current Password
@@ -130,7 +130,7 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
         </div>
 
         <div>
-          <label htmlFor={newPasswordId} className="block text-sm font-medium text-slate-700 mb-2">
+          <label htmlFor={newPasswordId} className="block text-sm font-medium text-slate-700 mb-1">
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4" />
               New Password
@@ -158,7 +158,7 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
         </div>
 
         <div>
-          <label htmlFor={confirmPasswordId} className="block text-sm font-medium text-slate-700 mb-2">
+          <label htmlFor={confirmPasswordId} className="block text-sm font-medium text-slate-700 mb-1">
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4" />
               Confirm New Password

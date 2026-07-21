@@ -150,10 +150,10 @@ export const SendMessageModal: React.FC<SendMessageModalProps> = ({
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={7}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             placeholder={`Write or pick a template — the message is sent from your ${isWhatsApp ? 'WhatsApp' : 'phone'}, and logged here.`}
           />
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-slate-500">
             xSuite logs this communication on the {caseId ? 'case' : 'customer'}; the message
             itself is sent from your device.
           </p>

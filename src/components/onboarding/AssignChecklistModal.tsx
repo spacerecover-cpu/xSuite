@@ -92,7 +92,7 @@ export const AssignChecklistModal: React.FC<Props> = ({
             id={employeeFieldId}
             {...register('employee_id', { required: 'Select an employee' })}
             disabled={!!preselectedEmployeeId}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-slate-50"
+            className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-slate-50"
           >
             <option value="">Select employee...</option>
             {employees.map(e => (
@@ -114,7 +114,7 @@ export const AssignChecklistModal: React.FC<Props> = ({
           <select
             id={checklistFieldId}
             {...register('checklist_id', { required: 'Select a checklist' })}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="">Select checklist...</option>
             {checklists.map(c => (

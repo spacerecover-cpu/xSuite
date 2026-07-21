@@ -913,7 +913,7 @@ export const CompanyProfilePage: React.FC = () => {
           />
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Internal Notes
             </label>
             <textarea
@@ -925,7 +925,7 @@ export const CompanyProfilePage: React.FC = () => {
             />
           </div>
 
-          <div className="flex gap-3 justify-end pt-3 border-t">
+          <div className="flex gap-3 justify-end pt-4 border-t">
             <Button
               type="button"
               variant="secondary"

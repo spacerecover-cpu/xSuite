@@ -293,7 +293,7 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
                   id={fid('itemType')}
                   value={itemType}
                   onChange={(e) => setItemType(e.target.value as 'internal' | 'saleable' | 'both')}
-                  className={inputClass}
+                  className="w-full h-9 px-3 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                 >
                   <option value="internal">Internal Use</option>
                   <option value="saleable">Saleable</option>
@@ -514,14 +514,14 @@ export const StockItemFormModal: React.FC<StockItemFormModalProps> = ({
                     value={row.key}
                     onChange={(e) => updateSpecRow(index, 'key', e.target.value)}
                     placeholder="Key"
-                    className="flex-1 px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="flex-1 h-9 px-3 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                   <input
                     type="text"
                     value={row.value}
                     onChange={(e) => updateSpecRow(index, 'value', e.target.value)}
                     placeholder="Value"
-                    className="flex-1 px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="flex-1 h-9 px-3 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                   <button
                     type="button"

@@ -89,7 +89,7 @@ export const ChangeClientModal: React.FC<ChangeClientModalProps> = ({
 
         {/* New Client Selection */}
         <div>
-          <label className="block text-sm font-semibold text-slate-900 mb-2">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             Select New Client
           </label>
           <SearchableSelect

@@ -208,7 +208,7 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Check Type <span className="text-danger">*</span>
             </label>
             <SearchableSelect
@@ -220,7 +220,7 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
           </div>
           {devices.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Device (Optional)</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Device (Optional)</label>
               <SearchableSelect
                 options={devices.map((d) => ({ id: d.id, name: d.name }))}
                 value={selectedDevice}
@@ -232,13 +232,13 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
         </div>
 
         <div>
-          <label htmlFor={checkReasonId} className="block text-sm font-medium text-slate-700 mb-2">Check Reason</label>
+          <label htmlFor={checkReasonId} className="block text-sm font-medium text-slate-700 mb-1">Check Reason</label>
           <textarea
             id={checkReasonId}
             value={checkReason}
             onChange={(e) => setCheckReason(e.target.value)}
             rows={2}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
             placeholder="Describe the reason for this integrity check..."
           />
         </div>
@@ -251,7 +251,7 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
 
           <div className="grid grid-cols-3 gap-4 mb-3">
             <div className="col-span-3">
-              <label className="block text-sm font-medium text-slate-700 mb-2">Hash Algorithm</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Hash Algorithm</label>
               <SearchableSelect
                 options={[
                   { id: 'SHA-256', name: 'SHA-256' },
@@ -266,7 +266,7 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor={expectedHashId} className="block text-sm font-medium text-slate-700 mb-2">Expected Hash</label>
+              <label htmlFor={expectedHashId} className="block text-sm font-medium text-slate-700 mb-1">Expected Hash</label>
               <Input
                 id={expectedHashId}
                 type="text"
@@ -277,7 +277,7 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
               />
             </div>
             <div>
-              <label htmlFor={actualHashId} className="block text-sm font-medium text-slate-700 mb-2">Actual Hash</label>
+              <label htmlFor={actualHashId} className="block text-sm font-medium text-slate-700 mb-1">Actual Hash</label>
               <Input
                 id={actualHashId}
                 type="text"
@@ -311,7 +311,7 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
 
           <div className="grid grid-cols-2 gap-4 mb-3">
             <div>
-              <label htmlFor={sealNumberId} className="block text-sm font-medium text-slate-700 mb-2">Seal Number</label>
+              <label htmlFor={sealNumberId} className="block text-sm font-medium text-slate-700 mb-1">Seal Number</label>
               <Input
                 id={sealNumberId}
                 type="text"
@@ -321,7 +321,7 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Seal Condition</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Seal Condition</label>
               <div className="flex gap-2">
                 <button
                   onClick={() => setSealIntact(true)}
@@ -348,13 +348,13 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
           </div>
 
           <div>
-            <label htmlFor={physicalConditionId} className="block text-sm font-medium text-slate-700 mb-2">Physical Condition</label>
+            <label htmlFor={physicalConditionId} className="block text-sm font-medium text-slate-700 mb-1">Physical Condition</label>
             <textarea
               id={physicalConditionId}
               value={physicalCondition}
               onChange={(e) => setPhysicalCondition(e.target.value)}
               rows={2}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               placeholder="Document the physical condition of the evidence..."
             />
           </div>
@@ -398,13 +398,13 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
         </div>
 
         <div>
-          <label htmlFor={findingsId} className="block text-sm font-medium text-slate-700 mb-2">Findings</label>
+          <label htmlFor={findingsId} className="block text-sm font-medium text-slate-700 mb-1">Findings</label>
           <textarea
             id={findingsId}
             value={findings}
             onChange={(e) => setFindings(e.target.value)}
             rows={3}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
             placeholder="Document your findings from this integrity check..."
           />
         </div>

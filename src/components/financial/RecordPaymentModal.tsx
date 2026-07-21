@@ -385,7 +385,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Record Payment" size="lg" closeOnBackdrop={false}>
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="payment-case" className="block text-sm font-medium text-slate-700 mb-1">
             Case <span className="text-danger">*</span>
@@ -396,7 +396,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
               id="payment-case"
               value={selectedCaseId}
               onChange={(e) => handleCaseChange(e.target.value)}
-              className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full h-9 pl-10 pr-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               required
             >
               <option value="">Select Case</option>
@@ -525,7 +525,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 value={paymentMethodId}
                 onChange={(e) => setPaymentMethodId(e.target.value)}
                 aria-invalid={showErrors && methodMissing}
-                className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary ${
+                className={`w-full h-9 pl-10 pr-3 text-sm border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary ${
                   showErrors && methodMissing ? 'border-danger bg-danger-muted/40' : 'border-slate-300'
                 }`}
                 required
@@ -559,7 +559,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
               value={bankAccountId}
               onChange={(e) => setBankAccountId(e.target.value)}
               aria-invalid={showErrors && accountMissing}
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary ${
+              className={`w-full h-9 px-3 text-sm border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary ${
                 showErrors && accountMissing ? 'border-danger bg-danger-muted/40' : 'border-slate-300'
               }`}
               required
@@ -599,7 +599,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         {kind === 'standard' && (
           <>
         <div>
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-1">
             <label className="block text-sm font-medium text-slate-700">
               Invoice Allocation <span className="text-danger">*</span>
             </label>
@@ -811,12 +811,12 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={2}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             placeholder="Optional payment notes..."
           />
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
           {kind === 'standard' && (methodMissing || accountMissing) ? (
             <span className="mr-auto flex items-center gap-1.5 text-xs font-medium text-danger">
               <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />

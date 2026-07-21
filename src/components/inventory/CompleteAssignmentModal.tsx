@@ -110,7 +110,7 @@ export function CompleteAssignmentModal({
         </div>
 
         <div>
-          <label htmlFor={usageNotesId} className="block text-xs font-medium text-slate-700 mb-1">
+          <label htmlFor={usageNotesId} className="block text-sm font-medium text-slate-700 mb-1">
             Performance Notes (Optional)
           </label>
           <textarea
@@ -119,7 +119,7 @@ export function CompleteAssignmentModal({
             value={usageNotes}
             onChange={(e) => setUsageNotes(e.target.value)}
             rows={2}
-            className="w-full px-2 py-1.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-xs"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
             placeholder="How did this donor perform? Any observations or recommendations for future use..."
             disabled={loading}
           />
@@ -147,7 +147,7 @@ export function CompleteAssignmentModal({
           </div>
         </div>
 
-        <div className="flex justify-end space-x-2 pt-2 border-t border-slate-200">
+        <div className="flex justify-end space-x-2 pt-4 border-t border-slate-200">
           <Button
             onClick={handleClose}
             variant="secondary"

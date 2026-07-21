@@ -194,7 +194,7 @@ export default function ContactFormModal({ isOpen, onClose, onSuccess, supplierI
             id="supplier-contact-notes"
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
             rows={3}
             placeholder="Additional notes about this contact..."
           />

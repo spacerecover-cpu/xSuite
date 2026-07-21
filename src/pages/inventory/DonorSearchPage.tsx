@@ -545,7 +545,7 @@ export default function DonorSearchPage() {
           className="space-y-4"
         >
           <div>
-            <label htmlFor={templateNameId} className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={templateNameId} className="block text-sm font-medium text-slate-700 mb-1">
               Template Name
             </label>
             <Input
@@ -558,7 +558,7 @@ export default function DonorSearchPage() {
             />
           </div>
           <div>
-            <label htmlFor={templateDescriptionId} className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={templateDescriptionId} className="block text-sm font-medium text-slate-700 mb-1">
               Description (Optional)
             </label>
             <textarea
@@ -567,7 +567,7 @@ export default function DonorSearchPage() {
               onChange={(e) => setTemplateDescription(e.target.value)}
               placeholder="Describe this search template..."
               rows={3}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
           <div className="flex justify-end space-x-3 pt-4 border-t border-slate-200">

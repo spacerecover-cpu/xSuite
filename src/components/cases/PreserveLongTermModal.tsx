@@ -201,7 +201,7 @@ export const PreserveLongTermModal: React.FC<PreserveLongTermModalProps> = ({
 
           <div className="space-y-2.5 mb-4">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+              <label className="block text-sm font-medium text-slate-700 mb-1">
                 Reason for Long-term Preservation *
               </label>
               <div className="grid grid-cols-4 gap-1.5 mb-2">

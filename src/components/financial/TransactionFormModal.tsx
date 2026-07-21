@@ -178,7 +178,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
               />
             </div>
             {amountError && (
-              <p className="mt-1 text-sm text-danger">{amountError}</p>
+              <p className="mt-1 text-xs text-danger">{amountError}</p>
             )}
           </div>
         </div>
@@ -197,13 +197,13 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
                 setDescriptionError(null);
               }}
               rows={2}
-              className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full pl-10 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               placeholder="Transaction description..."
               required
             />
           </div>
           {descriptionError && (
-            <p className="mt-1 text-sm text-danger">{descriptionError}</p>
+            <p className="mt-1 text-xs text-danger">{descriptionError}</p>
           )}
         </div>
 
@@ -218,7 +218,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
                 id="transaction-category"
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                className="w-full h-9 pl-10 pr-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               >
                 <option value="">Select Category</option>
                 {categories.map((cat) => (
@@ -238,7 +238,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
               id="transaction-bank-account"
               value={bankAccountId}
               onChange={(e) => setBankAccountId(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             >
               <option value="">Select Account</option>
               {bankAccounts.map((account) => (
@@ -271,7 +271,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={2}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             placeholder="Additional notes..."
           />
         </div>

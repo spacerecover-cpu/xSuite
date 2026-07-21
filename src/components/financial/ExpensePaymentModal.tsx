@@ -105,7 +105,7 @@ export const ExpensePaymentModal: React.FC<ExpensePaymentModalProps> = ({
               onChange={(e) => setBankAccountId(e.target.value)}
               required
               disabled={isLoading || eligibleAccounts.length === 0}
-              className="w-full rounded-lg border border-border bg-surface py-2 ps-9 pe-3 text-sm text-slate-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60"
+              className="w-full h-9 rounded-lg border border-border bg-surface ps-9 pe-3 text-sm text-slate-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60"
             >
               <option value="">{isLoading ? 'Loading accounts…' : 'Select an account'}</option>
               {eligibleAccounts.map((a) => (

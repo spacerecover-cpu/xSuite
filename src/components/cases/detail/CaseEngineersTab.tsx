@@ -220,10 +220,10 @@ export const CaseEngineersTab: React.FC<CaseEngineersTabProps> = ({ caseId, case
               value={roleText}
               onChange={(e) => setRoleText(e.target.value)}
               placeholder="e.g. Lead Technician, QA Reviewer..."
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="h-9 w-full px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
             />
           </div>
-          <div className="flex gap-3 justify-end pt-2 border-t border-slate-100">
+          <div className="flex gap-3 justify-end pt-4 border-t border-slate-100">
             <Button
               variant="secondary"
               onClick={() => {

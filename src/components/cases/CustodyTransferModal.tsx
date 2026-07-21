@@ -201,7 +201,7 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">
                 Transfer To <span className="text-danger">*</span>
               </label>
               <SearchableSelect
@@ -220,7 +220,7 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
             </div>
 
             <div>
-              <label htmlFor="custody-transfer-reason" className="block text-sm font-medium text-slate-700 mb-2">
+              <label htmlFor="custody-transfer-reason" className="block text-sm font-medium text-slate-700 mb-1">
                 Transfer Reason <span className="text-danger">*</span>
               </label>
               <textarea
@@ -228,14 +228,14 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
                 value={transferReason}
                 onChange={(e) => setTransferReason(e.target.value)}
                 rows={3}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="Describe the reason for this custody transfer..."
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   Transfer Method
                 </label>
                 <Input
@@ -246,7 +246,7 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   Transfer Location
                 </label>
                 <Input
@@ -260,7 +260,7 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="custody-condition-before" className="block text-sm font-medium text-slate-700 mb-2">
+                <label htmlFor="custody-condition-before" className="block text-sm font-medium text-slate-700 mb-1">
                   Condition Before Transfer
                 </label>
                 <textarea
@@ -268,12 +268,12 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
                   value={conditionBefore}
                   onChange={(e) => setConditionBefore(e.target.value)}
                   rows={2}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="Document current condition..."
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Seal Number</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Seal Number</label>
                 <Input
                   type="text"
                   value={sealNumber}
@@ -311,7 +311,7 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">
                 Seal Condition <span className="text-danger">*</span>
               </label>
               <div className="flex gap-4">
@@ -349,7 +349,7 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
             </div>
 
             <div>
-              <label htmlFor="custody-condition-after" className="block text-sm font-medium text-slate-700 mb-2">
+              <label htmlFor="custody-condition-after" className="block text-sm font-medium text-slate-700 mb-1">
                 Condition After Transfer
               </label>
               <textarea
@@ -357,14 +357,14 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
                 value={conditionAfter}
                 onChange={(e) => setConditionAfter(e.target.value)}
                 rows={3}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="Document condition upon receipt..."
               />
             </div>
 
             {sealIntact === false && (
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   New Seal Number
                 </label>
                 <Input
@@ -392,7 +392,7 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
             </div>
 
             <div>
-              <label htmlFor="custody-rejection-reason" className="block text-sm font-medium text-slate-700 mb-2">
+              <label htmlFor="custody-rejection-reason" className="block text-sm font-medium text-slate-700 mb-1">
                 Rejection Reason <span className="text-danger">*</span>
               </label>
               <textarea
@@ -400,7 +400,7 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 rows={4}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-danger focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-danger focus:border-transparent"
                 placeholder="Provide a detailed reason for rejecting this transfer..."
               />
             </div>

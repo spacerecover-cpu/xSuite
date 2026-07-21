@@ -184,7 +184,7 @@ export const CandidateFormModal: React.FC<Props> = ({ isOpen, onClose, candidate
             <select
               id="candidate-stage"
               {...register('current_stage')}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
               {CANDIDATE_STAGES.map(s => (
                 <option key={s} value={s}>{stageLabels[s]}</option>
@@ -196,7 +196,7 @@ export const CandidateFormModal: React.FC<Props> = ({ isOpen, onClose, candidate
             <select
               id="candidate-rating"
               {...register('rating')}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="">No rating</option>
               {[1, 2, 3, 4, 5].map(n => (

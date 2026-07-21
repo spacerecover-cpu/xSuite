@@ -91,7 +91,7 @@ export const ConvertToInvoiceModal: React.FC<ConvertToInvoiceModalProps> = ({
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-3">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Invoice Type *
             </label>
             <div className="grid grid-cols-2 gap-3">
@@ -148,7 +148,7 @@ export const ConvertToInvoiceModal: React.FC<ConvertToInvoiceModalProps> = ({
           </div>
 
           <div>
-            <label htmlFor="convert-invoice-notes" className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor="convert-invoice-notes" className="block text-sm font-medium text-slate-700 mb-1">
               Additional Notes (Optional)
             </label>
             <textarea

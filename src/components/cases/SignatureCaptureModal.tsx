@@ -183,7 +183,7 @@ export function SignatureCaptureModal({ open, onClose, title, onCapture, allowed
               value={signerName}
               onChange={(e) => setSignerName(e.target.value)}
               placeholder="Full name of signer"
-              className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-ring"
+              className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
         )}
@@ -201,7 +201,7 @@ export function SignatureCaptureModal({ open, onClose, title, onCapture, allowed
               value={typedValue}
               onChange={(e) => setTypedValue(e.target.value)}
               placeholder="Full name"
-              className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-ring"
+              className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
         )}

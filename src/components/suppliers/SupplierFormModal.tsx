@@ -277,7 +277,7 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
               id={categorySelectId}
               value={formData.category_id}
               onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full h-9 px-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
             >
               <option value="">Select Category</option>
               {categories.map((cat) => (
@@ -419,7 +419,7 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
               id={paymentTermsSelectId}
               value={formData.payment_terms_id}
               onChange={(e) => setFormData({ ...formData, payment_terms_id: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full h-9 px-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
             >
               <option value="">Select Payment Terms</option>
               {paymentTerms.map((term) => (
@@ -450,7 +450,7 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
               rows={3}
               placeholder="Brief description of the supplier and products/services..."
             />

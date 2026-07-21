@@ -111,7 +111,7 @@ const RequestLeaveModal: React.FC<RequestLeaveModalProps> = ({
             <select
               value={form.employee_id}
               onChange={e => setForm(p => ({ ...p, employee_id: e.target.value }))}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               required
             >
               <option value="">Select employee...</option>
@@ -129,7 +129,7 @@ const RequestLeaveModal: React.FC<RequestLeaveModalProps> = ({
           <select
             value={form.leave_type_id}
             onChange={e => setForm(p => ({ ...p, leave_type_id: e.target.value }))}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             required
           >
             <option value="">Select leave type...</option>
@@ -148,7 +148,7 @@ const RequestLeaveModal: React.FC<RequestLeaveModalProps> = ({
               type="date"
               value={form.start_date}
               onChange={e => setForm(p => ({ ...p, start_date: e.target.value }))}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               required
             />
           </div>
@@ -159,7 +159,7 @@ const RequestLeaveModal: React.FC<RequestLeaveModalProps> = ({
               value={form.end_date}
               min={form.start_date}
               onChange={e => setForm(p => ({ ...p, end_date: e.target.value }))}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               required
             />
           </div>
@@ -356,7 +356,7 @@ const LeaveTypeFormModal: React.FC<LeaveTypeFormModalProps> = ({ isOpen, onClose
             value={form.name}
             onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
             placeholder="e.g. Annual Leave"
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             required
           />
         </div>
@@ -380,7 +380,7 @@ const LeaveTypeFormModal: React.FC<LeaveTypeFormModalProps> = ({ isOpen, onClose
             onChange={e => setForm(p => ({ ...p, default_days: Number(e.target.value) }))}
             min={0}
             max={365}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
 
@@ -498,7 +498,7 @@ const AllocateBalanceModal: React.FC<AllocateBalanceModalProps> = ({
           <select
             value={form.employee_id}
             onChange={e => setForm(p => ({ ...p, employee_id: e.target.value }))}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             required
           >
             <option value="">Select employee...</option>
@@ -515,7 +515,7 @@ const AllocateBalanceModal: React.FC<AllocateBalanceModalProps> = ({
           <select
             value={form.leave_type_id}
             onChange={e => setForm(p => ({ ...p, leave_type_id: e.target.value }))}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             required
           >
             <option value="">Select leave type...</option>
@@ -534,7 +534,7 @@ const AllocateBalanceModal: React.FC<AllocateBalanceModalProps> = ({
               onChange={e => setForm(p => ({ ...p, year: Number(e.target.value) }))}
               min={2020}
               max={2099}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
           <div>
@@ -544,7 +544,7 @@ const AllocateBalanceModal: React.FC<AllocateBalanceModalProps> = ({
               value={form.total_days}
               onChange={e => setForm(p => ({ ...p, total_days: Number(e.target.value) }))}
               min={0}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
         </div>

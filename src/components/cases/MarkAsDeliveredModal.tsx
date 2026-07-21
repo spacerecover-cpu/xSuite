@@ -190,7 +190,7 @@ export const MarkAsDeliveredModal: React.FC<MarkAsDeliveredModalProps> = ({
                 <div className="flex gap-2">
                   <Clock className="w-4 h-4 text-warning flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <div className="text-xs font-medium text-warning mb-1">
+                    <div className="text-sm font-medium text-warning mb-1">
                       Retention Period (days)
                     </div>
                     <Input
@@ -214,7 +214,7 @@ export const MarkAsDeliveredModal: React.FC<MarkAsDeliveredModalProps> = ({
 
           <div className="space-y-2.5 mb-4">
             <div>
-              <label htmlFor="mark-delivered-notes" className="block text-xs font-medium text-slate-700 mb-1.5">
+              <label htmlFor="mark-delivered-notes" className="block text-sm font-medium text-slate-700 mb-1">
                 Delivery Notes (Optional)
               </label>
               <Input

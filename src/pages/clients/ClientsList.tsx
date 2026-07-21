@@ -133,7 +133,7 @@ export const ClientsList: React.FC = () => {
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Type
             </label>
             <div className="flex gap-4">

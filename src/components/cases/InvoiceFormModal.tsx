@@ -596,7 +596,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
         </div>
       }
     >
-      <form id="invoiceForm" onSubmit={handleSubmit} className="space-y-3">
+      <form id="invoiceForm" onSubmit={handleSubmit} className="space-y-4">
 
         {isRestricted && (
           <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning-muted px-3 py-2 text-sm text-warning">
@@ -619,7 +619,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                 id={caseSelectId}
                 value={selectedCaseId}
                 onChange={(e) => handleCaseSelection(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
+                className="h-9 w-full px-3 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
                 required
               >
                 <option value="">Select a case...</option>
@@ -700,7 +700,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                   disabled={isRestricted}
                   value={invoiceData.status}
                   onChange={(e) => setInvoiceData({ ...invoiceData, status: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="h-9 w-full px-3 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
                 >
                   <option value="draft">Draft</option>
                   <option value="sent">Sent</option>
@@ -773,7 +773,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                   disabled={isRestricted}
                   value={invoiceData.currency || baseCurrency}
                   onChange={(e) => setInvoiceData((d) => ({ ...d, currency: e.target.value }))}
-                  className="rounded border border-border bg-surface px-3 py-2 text-sm"
+                  className="h-9 rounded border border-border bg-surface px-3 text-sm"
                 >
                   {currencies.map((c) => (
                     <option key={c.code} value={c.code}>{c.code}{c.isBase ? ' (base)' : ''}</option>
@@ -929,7 +929,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                     }
                     min="0"
                     step="0.01"
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary border-slate-300"
+                    className="h-9 w-full px-3 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-primary border-slate-300"
                   />
                 </div>
                 <div>
@@ -1025,14 +1025,14 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
             </div>
             <div className="space-y-3">
               <div>
-                <label htmlFor={bankAccountId} className="block text-xs font-medium text-slate-700 mb-1.5">
+                <label htmlFor={bankAccountId} className="block text-sm font-medium text-slate-700 mb-1">
                   Bank Account
                 </label>
                 <select
                   id={bankAccountId}
                   value={invoiceData.bank_account_id || ''}
                   onChange={(e) => setInvoiceData({ ...invoiceData, bank_account_id: e.target.value || null })}
-                  className="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="h-9 w-full px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   disabled={bankAccountsLoading}
                 >
                   <option value="">None selected</option>
@@ -1048,8 +1048,8 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="block text-xs font-medium text-slate-700">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="block text-sm font-medium text-slate-700">
                     Invoice Terms
                   </span>
                   <div className="flex items-center gap-3">

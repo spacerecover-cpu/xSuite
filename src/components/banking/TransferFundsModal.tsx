@@ -116,12 +116,12 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
 
         <div className="grid grid-cols-[1fr,auto,1fr] gap-4 items-end">
           <div>
-            <label htmlFor={fromAccountId} className="block text-sm font-medium text-slate-700 mb-1.5">From Account</label>
+            <label htmlFor={fromAccountId} className="block text-sm font-medium text-slate-700 mb-1">From Account</label>
             <select
               id={fromAccountId}
               value={formData.from_account_id}
               onChange={(e) => setFormData({ ...formData, from_account_id: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               required
             >
               <option value="">Select Source</option>
@@ -132,7 +132,7 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
               ))}
             </select>
             {fromAccount && (
-              <p className="mt-1 text-xs text-slate-600">
+              <p className="mt-1 text-xs text-slate-500">
                 Type: <span className="font-medium capitalize">{fromAccount.account_type}</span>
               </p>
             )}
@@ -143,12 +143,12 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
           </div>
 
           <div>
-            <label htmlFor={toAccountId} className="block text-sm font-medium text-slate-700 mb-1.5">To Account</label>
+            <label htmlFor={toAccountId} className="block text-sm font-medium text-slate-700 mb-1">To Account</label>
             <select
               id={toAccountId}
               value={formData.to_account_id}
               onChange={(e) => setFormData({ ...formData, to_account_id: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               required
             >
               <option value="">Select Destination</option>
@@ -161,7 +161,7 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
                 ))}
             </select>
             {toAccount && (
-              <p className="mt-1 text-xs text-slate-600">
+              <p className="mt-1 text-xs text-slate-500">
                 Type: <span className="font-medium capitalize">{toAccount.account_type}</span>
               </p>
             )}
@@ -185,13 +185,13 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
         />
 
         <div>
-          <label htmlFor={descriptionId} className="block text-sm font-medium text-slate-700 mb-1.5">Description</label>
+          <label htmlFor={descriptionId} className="block text-sm font-medium text-slate-700 mb-1">Description</label>
           <textarea
             id={descriptionId}
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             rows={3}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             placeholder="Reason for transfer..."
           />
         </div>

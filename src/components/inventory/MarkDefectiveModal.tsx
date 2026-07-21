@@ -130,7 +130,7 @@ export function MarkDefectiveModal({
         </div>
 
         <div>
-          <label htmlFor={defectReasonId} className="block text-xs font-medium text-slate-700 mb-1">
+          <label htmlFor={defectReasonId} className="block text-sm font-medium text-slate-700 mb-1">
             Defect Reason <span className="text-danger">*</span>
           </label>
           <Input
@@ -141,7 +141,7 @@ export function MarkDefectiveModal({
             onChange={(e) => setDefectReason(e.target.value)}
             placeholder="E.g., Heads failed during recovery"
             disabled={loading}
-            className="text-xs"
+            className="text-sm"
           />
           <p className="text-xs text-slate-500 mt-0.5">
             Describe what went wrong with this donor part.
@@ -168,7 +168,7 @@ export function MarkDefectiveModal({
         </div>
 
         <div>
-          <label htmlFor={usageNotesId} className="block text-xs font-medium text-slate-700 mb-1">
+          <label htmlFor={usageNotesId} className="block text-sm font-medium text-slate-700 mb-1">
             Additional Notes (Optional)
           </label>
           <textarea
@@ -176,7 +176,7 @@ export function MarkDefectiveModal({
             value={usageNotes}
             onChange={(e) => setUsageNotes(e.target.value)}
             rows={2}
-            className="w-full px-2 py-1.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-xs"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
             placeholder="Provide additional details about the failure, diagnostic results, or any other relevant information..."
             disabled={loading}
           />
@@ -209,7 +209,7 @@ export function MarkDefectiveModal({
           </p>
         </div>
 
-        <div className="flex justify-end space-x-2 pt-2 border-t border-slate-200">
+        <div className="flex justify-end space-x-2 pt-4 border-t border-slate-200">
           <Button
             onClick={handleClose}
             variant="secondary"

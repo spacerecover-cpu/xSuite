@@ -324,14 +324,14 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
             </h3>
 
             <div>
-              <label htmlFor={statusFieldId} className="block text-sm font-medium text-slate-700 mb-2">
+              <label htmlFor={statusFieldId} className="block text-sm font-medium text-slate-700 mb-1">
                 Status
               </label>
               <select
                 id={statusFieldId}
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="available">Available</option>
                 <option value="in_use">In Use</option>
@@ -373,13 +373,13 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
         </div>
 
         <div>
-          <label htmlFor={notesFieldId} className="block text-sm font-medium text-slate-700 mb-2">Notes</label>
+          <label htmlFor={notesFieldId} className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
           <textarea
             id={notesFieldId}
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             rows={3}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             placeholder="Additional information about this drive..."
           />
         </div>

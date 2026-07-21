@@ -215,7 +215,7 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
             id={employeeFieldId}
             {...register('employee_id', { required: 'Select an employee' })}
             disabled={isEditing}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-slate-50"
+            className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-slate-50"
           >
             <option value="">Select employee...</option>
             {employees.map((e: { id: string; first_name: string; last_name: string; employee_number?: string | null }) => (
@@ -260,7 +260,7 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Overall Rating</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Overall Rating</label>
           <StarPicker value={rating} onChange={setRating} />
         </div>
 
@@ -325,7 +325,7 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
           <select
             id={statusFieldId}
             {...register('status')}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="draft">Draft</option>
             <option value="submitted">Submitted</option>

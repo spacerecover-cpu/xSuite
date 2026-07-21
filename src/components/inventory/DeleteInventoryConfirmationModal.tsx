@@ -86,7 +86,7 @@ export default function DeleteInventoryConfirmationModal({
           <AlertTriangle className="h-8 w-8 text-danger" />
         </div>
 
-        <h3 className="text-2xl font-bold text-slate-900 mb-2">
+        <h3 className="text-lg font-semibold text-slate-900 mb-2">
           Delete Inventory Item?
         </h3>
 
@@ -109,14 +109,14 @@ export default function DeleteInventoryConfirmationModal({
           </div>
         ) : (
           <div className="mb-6">
-            <label htmlFor={statusSelectId} className="block text-left text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={statusSelectId} className="block text-left text-sm font-medium text-slate-700 mb-1">
               Change Status To:
             </label>
             <select
               id={statusSelectId}
               value={selectedStatusId}
               onChange={(e) => setSelectedStatusId(e.target.value)}
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-base"
+              className="w-full h-9 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
               disabled={loading}
             >
               {statusTypes.map((status) => (

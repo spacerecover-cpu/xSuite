@@ -131,7 +131,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor={fullNameId} className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={fullNameId} className="block text-sm font-medium text-slate-700 mb-1">
               <div className="flex items-center gap-2">
                 <User className="w-4 h-4" />
                 Full Name
@@ -149,7 +149,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
           </div>
 
           <div>
-            <label htmlFor={emailId} className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={emailId} className="block text-sm font-medium text-slate-700 mb-1">
               <div className="flex items-center gap-2">
                 <Mail className="w-4 h-4" />
                 Email
@@ -183,7 +183,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
 
           {mode === 'create' && (
             <div>
-              <label htmlFor={passwordId} className="block text-sm font-medium text-slate-700 mb-2">
+              <label htmlFor={passwordId} className="block text-sm font-medium text-slate-700 mb-1">
                 <div className="flex items-center gap-2">
                   <Lock className="w-4 h-4" />
                   Password
@@ -202,7 +202,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
           )}
 
           <div>
-            <label htmlFor={phoneId} className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={phoneId} className="block text-sm font-medium text-slate-700 mb-1">
               <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4" />
                 Phone Number
@@ -218,7 +218,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
           </div>
 
           <div>
-            <label htmlFor={roleId} className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={roleId} className="block text-sm font-medium text-slate-700 mb-1">
               <div className="flex items-center gap-2">
                 <Shield className="w-4 h-4" />
                 Role
@@ -233,7 +233,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                   role: e.target.value as UserFormData['role'],
                 })
               }
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               required
             >
               <option value="admin">Admin</option>
@@ -246,7 +246,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
 
           {formData.role === 'technician' && (
             <div>
-              <label htmlFor={caseAccessLevelId} className="block text-sm font-medium text-slate-700 mb-2">
+              <label htmlFor={caseAccessLevelId} className="block text-sm font-medium text-slate-700 mb-1">
                 Case Access Level
               </label>
               <select
@@ -258,7 +258,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                     case_access_level: e.target.value as 'restricted' | 'full',
                   })
                 }
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               >
                 <option value="full">Full Access - Can view all cases</option>
                 <option value="restricted">Restricted - Only own/assigned cases</option>
@@ -272,14 +272,14 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
           )}
 
           <div>
-            <label htmlFor={statusId} className="block text-sm font-medium text-slate-700 mb-2">Status</label>
+            <label htmlFor={statusId} className="block text-sm font-medium text-slate-700 mb-1">Status</label>
             <select
               id={statusId}
               value={formData.is_active ? 'active' : 'inactive'}
               onChange={(e) =>
                 setFormData({ ...formData, is_active: e.target.value === 'active' })
               }
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             >
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>

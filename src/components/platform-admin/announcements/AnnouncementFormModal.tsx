@@ -159,7 +159,7 @@ export const AnnouncementFormModal: React.FC<AnnouncementFormModalProps> = ({
     <Modal isOpen={isOpen} onClose={onClose} maxWidth="7xl" closeOnBackdrop={false}>
       <form onSubmit={handleSubmit} className="flex flex-col h-[90vh]">
         <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-200">
-          <h2 className="text-2xl font-bold text-slate-900">
+          <h2 className="text-lg font-semibold text-slate-900">
             {announcement ? 'Edit Announcement' : 'Create Announcement'}
           </h2>
         </div>
@@ -167,7 +167,7 @@ export const AnnouncementFormModal: React.FC<AnnouncementFormModalProps> = ({
         <div className="flex-1 overflow-y-auto">
           <div className="grid grid-cols-2 gap-8">
             <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-slate-900">Announcement Details</h3>
+              <h3 className="text-sm font-semibold text-slate-900">Announcement Details</h3>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -202,7 +202,7 @@ export const AnnouncementFormModal: React.FC<AnnouncementFormModalProps> = ({
                   placeholder="Enter announcement content"
                   rows={4}
                   required
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                 />
               </div>
 
@@ -215,7 +215,7 @@ export const AnnouncementFormModal: React.FC<AnnouncementFormModalProps> = ({
                   placeholder="أدخل محتوى الإعلان"
                   rows={4}
                   dir="rtl"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                 />
               </div>
 
@@ -225,7 +225,7 @@ export const AnnouncementFormModal: React.FC<AnnouncementFormModalProps> = ({
                   <select
                     value={type}
                     onChange={(e) => setType(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full h-9 px-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     <option value="info">Info</option>
                     <option value="warning">Warning</option>
@@ -240,7 +240,7 @@ export const AnnouncementFormModal: React.FC<AnnouncementFormModalProps> = ({
                   <select
                     value={targetAudience}
                     onChange={(e) => setTargetAudience(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full h-9 px-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     <option value="all">All</option>
                     <option value="starter">Starter</option>
@@ -294,7 +294,7 @@ export const AnnouncementFormModal: React.FC<AnnouncementFormModalProps> = ({
               <div className="space-y-3">
                 <h4 className="text-sm font-medium text-slate-700">Schedule</h4>
                 <div>
-                  <label htmlFor="announcement-starts-at" className="block text-sm text-slate-600 mb-1">
+                  <label htmlFor="announcement-starts-at" className="block text-sm font-medium text-slate-700 mb-1">
                     Starts At <span className="text-danger">*</span>
                   </label>
                   <input
@@ -303,17 +303,17 @@ export const AnnouncementFormModal: React.FC<AnnouncementFormModalProps> = ({
                     value={startsAt}
                     onChange={(e) => setStartsAt(e.target.value)}
                     required
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full h-9 px-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div>
-                  <label htmlFor="announcement-ends-at" className="block text-sm text-slate-600 mb-1">Ends At (optional)</label>
+                  <label htmlFor="announcement-ends-at" className="block text-sm font-medium text-slate-700 mb-1">Ends At (optional)</label>
                   <input
                     id="announcement-ends-at"
                     type="datetime-local"
                     value={endsAt}
                     onChange={(e) => setEndsAt(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full h-9 px-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -332,7 +332,7 @@ export const AnnouncementFormModal: React.FC<AnnouncementFormModalProps> = ({
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-slate-900">Live Preview</h3>
+              <h3 className="text-sm font-semibold text-slate-900">Live Preview</h3>
               <div className="sticky top-0">
                 <AnnouncementPreview
                   titleEn={titleEn}

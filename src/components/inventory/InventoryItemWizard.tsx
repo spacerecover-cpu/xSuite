@@ -107,7 +107,7 @@ const EMPTY_FORM: InventoryForm = {
   location_id: '',
 };
 
-const SECTION_HEAD = 'text-xs font-bold uppercase tracking-wider text-primary mb-3';
+const SECTION_HEAD = 'text-sm font-semibold text-slate-900 mb-3';
 
 // Identity fields shown in inventory (device_type_id is rendered specially above).
 // Module-level: BASIC_FIELDS is a static constant, so this never needs recomputing per render.
@@ -798,12 +798,12 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Notes</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
                   <textarea
                     value={form.notes as string}
                     onChange={e => setField('notes', e.target.value)}
                     rows={2}
-                    className="w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-none"
+                    className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-none"
                     placeholder="Optional notes…"
                   />
                 </div>
@@ -819,7 +819,7 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
             )}
 
             {/* ── Actions ───────────────────────────────────────── */}
-            <div className="flex justify-end gap-3 pt-2 border-t border-border">
+            <div className="flex justify-end gap-3 pt-4 border-t border-border">
               <Button type="button" variant="secondary" onClick={handleClose} disabled={submitting}>
                 Cancel
               </Button>

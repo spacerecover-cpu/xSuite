@@ -345,7 +345,7 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
                 id={relationshipId}
                 value={relationship}
                 onChange={(e) => handleRelationshipChange(e.target.value as CollectorRelationship)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-success focus:border-success"
+                className="h-9 w-full px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-success focus:border-success"
               >
                 <option value="self">The customer (in person)</option>
                 <option value="authorized_agent">Authorized agent (on behalf of the customer)</option>
@@ -397,14 +397,14 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
         </div>
 
         <div className="bg-accent/10 border border-accent/30 rounded-lg p-4">
-          <label htmlFor={recoveryOutcomeId} className="block text-sm font-medium text-accent-foreground mb-2">
+          <label htmlFor={recoveryOutcomeId} className="block text-sm font-medium text-accent-foreground mb-1">
             Recovery Outcome
           </label>
           <select
             id={recoveryOutcomeId}
             value={recoveryOutcome}
             onChange={(e) => setRecoveryOutcome(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
+            className="h-9 w-full px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
           >
             <option value="full">Full Recovery - All data recovered successfully</option>
             <option value="partial">Partial Recovery - Some data recovered</option>

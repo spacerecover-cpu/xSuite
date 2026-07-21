@@ -767,7 +767,7 @@ export const CategoryDetail: React.FC = () => {
                 locations={parentPickerRows}
                 placeholder="None — top-level location"
               />
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-xs text-slate-500">
                 Nest this location under a Rack or Shelf to build the storage tree.
               </p>
             </div>

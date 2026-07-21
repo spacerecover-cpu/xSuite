@@ -124,7 +124,7 @@ export const ChangeCompanyModal: React.FC<ChangeCompanyModalProps> = ({
 
         {/* New Company Selection */}
         <div>
-          <label className="block text-sm font-semibold text-slate-900 mb-2">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             Select New Company
           </label>
           <SearchableSelect

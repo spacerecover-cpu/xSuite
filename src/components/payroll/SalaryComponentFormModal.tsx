@@ -85,7 +85,7 @@ export function SalaryComponentFormModal({ component, onClose }: Props) {
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor={nameFieldId} className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={nameFieldId} className="block text-sm font-medium text-slate-700 mb-1">
               Name <span className="text-danger">*</span>
             </label>
             <Input
@@ -98,14 +98,14 @@ export function SalaryComponentFormModal({ component, onClose }: Props) {
           </div>
 
           <div>
-            <label htmlFor={typeFieldId} className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={typeFieldId} className="block text-sm font-medium text-slate-700 mb-1">
               Component Type <span className="text-danger">*</span>
             </label>
             <select
               id={typeFieldId}
               value={formData.type}
               onChange={(e) => handleChange('type', e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="earning">Earning</option>
               <option value="allowance">Allowance</option>
@@ -115,14 +115,14 @@ export function SalaryComponentFormModal({ component, onClose }: Props) {
           </div>
 
           <div>
-            <label htmlFor={calculationFieldId} className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={calculationFieldId} className="block text-sm font-medium text-slate-700 mb-1">
               Calculation Type <span className="text-danger">*</span>
             </label>
             <select
               id={calculationFieldId}
               value={formData.calculation_type}
               onChange={(e) => handleChange('calculation_type', e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="fixed">Fixed Amount</option>
               <option value="percentage">Percentage</option>
@@ -131,7 +131,7 @@ export function SalaryComponentFormModal({ component, onClose }: Props) {
 
           {formData.calculation_type === 'percentage' && (
             <div>
-              <label htmlFor={percentageFieldId} className="block text-sm font-medium text-slate-700 mb-2">
+              <label htmlFor={percentageFieldId} className="block text-sm font-medium text-slate-700 mb-1">
                 Percentage (%)
               </label>
               <Input

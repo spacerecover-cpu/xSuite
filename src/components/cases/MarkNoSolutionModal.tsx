@@ -11,7 +11,7 @@ import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
 
 const inputClass =
-  'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary bg-white';
+  'h-9 w-full px-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary bg-white';
 
 /** Default review horizon for a parked no-solution case. */
 const DEFAULT_FOLLOWUP_MONTHS = 6;
@@ -165,7 +165,7 @@ export const MarkNoSolutionModal: React.FC<MarkNoSolutionModalProps> = ({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="e.g. Controller SM2258 not yet supported; revisit when tooling lands."
-            className={inputClass}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary bg-white"
           />
         </div>
 
@@ -186,7 +186,7 @@ export const MarkNoSolutionModal: React.FC<MarkNoSolutionModalProps> = ({
           </label>
           {scheduleFollowUp && (
             <div className="mt-3 pl-7">
-              <label htmlFor="ns-followup" className="mb-1 block text-xs font-medium text-slate-600">
+              <label htmlFor="ns-followup" className="mb-1 block text-sm font-medium text-slate-700">
                 Review on
               </label>
               <input
@@ -194,7 +194,7 @@ export const MarkNoSolutionModal: React.FC<MarkNoSolutionModalProps> = ({
                 type="date"
                 value={followUpDate}
                 onChange={(e) => setFollowUpDate(e.target.value)}
-                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-primary focus:ring-2 focus:ring-primary"
+                className="h-9 rounded-lg border border-slate-300 px-3 text-sm focus:border-primary focus:ring-2 focus:ring-primary"
               />
             </div>
           )}

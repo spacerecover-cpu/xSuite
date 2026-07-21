@@ -89,10 +89,10 @@ export const ApplyAdvanceModal: React.FC<ApplyAdvanceModalProps> = ({
             <Wallet className="w-4.5 h-4.5 text-success" />
           </div>
           <div className="min-w-0">
-            <h2 id={TITLE_ID} className="text-base font-bold text-slate-900">
+            <h2 id={TITLE_ID} className="text-lg font-semibold text-slate-900">
               Apply advance {advance.payment_number ?? ''}
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-sm text-slate-500 mt-0.5">
               Unapplied balance{' '}
               <span className="font-semibold text-slate-700 tabular-nums">
                 {formatCurrencyWithConfig(advance.unappliedBalance, currencyConfig)}
@@ -108,14 +108,14 @@ export const ApplyAdvanceModal: React.FC<ApplyAdvanceModalProps> = ({
         ) : (
           <div className="space-y-3">
             <div>
-              <label htmlFor={INVOICE_ID} className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor={INVOICE_ID} className="block text-sm font-medium text-slate-700 mb-1">
                 Invoice
               </label>
               <select
                 id={INVOICE_ID}
                 value={invoiceId}
                 onChange={(e) => handleSelectInvoice(e.target.value)}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 {invoices.map((inv) => (
                   <option key={inv.id} value={inv.id}>
@@ -126,7 +126,7 @@ export const ApplyAdvanceModal: React.FC<ApplyAdvanceModalProps> = ({
             </div>
 
             <div>
-              <label htmlFor={AMOUNT_ID} className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor={AMOUNT_ID} className="block text-sm font-medium text-slate-700 mb-1">
                 Amount
               </label>
               <input
@@ -140,9 +140,9 @@ export const ApplyAdvanceModal: React.FC<ApplyAdvanceModalProps> = ({
                 aria-describedby={`${AMOUNT_ID}-hint`}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 tabular-nums focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 tabular-nums focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               />
-              <p id={`${AMOUNT_ID}-hint`} className="text-xs text-slate-400 mt-1">
+              <p id={`${AMOUNT_ID}-hint`} className="text-xs text-slate-500 mt-1">
                 Up to{' '}
                 <span className="font-medium text-slate-600 tabular-nums">
                   {formatCurrencyWithConfig(max, currencyConfig)}

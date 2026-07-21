@@ -59,12 +59,12 @@ export const BulkAdjustmentModal: React.FC<Props> = ({ selectedItems, onClose })
     <Modal isOpen onClose={onClose} title={`Bulk Quantity Adjustment — ${selectedItems.length} items`} size="md">
       <div className="space-y-5">
         <div>
-          <label htmlFor={reasonFieldId} className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+          <label htmlFor={reasonFieldId} className="block text-sm font-medium text-slate-700 mb-1">
             Adjustment Reason <span className="text-danger">*</span>
           </label>
           <select
             id={reasonFieldId}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+            className="w-full h-9 px-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
           >
@@ -79,7 +79,7 @@ export const BulkAdjustmentModal: React.FC<Props> = ({ selectedItems, onClose })
         </div>
 
         <div>
-          <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
+          <p className="text-sm font-semibold text-slate-900 mb-2">
             Adjust Quantities
           </p>
           <div className="border border-slate-200 rounded-lg overflow-hidden max-h-64 overflow-y-auto">
@@ -134,7 +134,7 @@ export const BulkAdjustmentModal: React.FC<Props> = ({ selectedItems, onClose })
           )}
         </div>
 
-        <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+        <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
           <Button
             variant="primary"

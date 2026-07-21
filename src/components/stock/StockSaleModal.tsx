@@ -436,7 +436,7 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Or search by name, brand, SKU..."
-              className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full h-9 pl-9 pr-3 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
 
@@ -552,7 +552,7 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
                     onChange={(e) =>
                       setDiscountType(e.target.value as 'none' | 'percentage' | 'fixed')
                     }
-                    className="flex-1 text-xs border border-slate-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="flex-1 text-sm border border-slate-300 rounded-md h-9 px-3 focus:outline-none focus:ring-1 focus:ring-primary"
                   >
                     <option value="none">No Discount</option>
                     <option value="percentage">Percentage %</option>
@@ -568,7 +568,7 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
                       value={discountValue}
                       onChange={(e) => setDiscountValue(e.target.value)}
                       placeholder={discountType === 'percentage' ? '%' : 'Amount'}
-                      className="w-24 text-xs border border-slate-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="w-24 text-sm border border-slate-300 rounded-md h-9 px-3 focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   )}
                 </div>
@@ -623,7 +623,7 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
                   value={customerSearch}
                   onChange={(e) => setCustomerSearch(e.target.value)}
                   placeholder="Type to search customers..."
-                  className="mt-1 w-full px-3 py-1.5 border border-slate-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-primary text-slate-600"
+                  className="mt-1 w-full h-9 px-3 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary text-slate-600"
                 />
               </div>
 
@@ -642,7 +642,7 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
                   id={paymentMethodFieldId}
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full h-9 px-3 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="cash">Cash</option>
                   <option value="card">Card</option>
@@ -667,7 +667,7 @@ export const StockSaleModal: React.FC<StockSaleModalProps> = ({
             </div>
           </div>
 
-          <div className="pt-2 border-t border-slate-200">
+          <div className="pt-4 border-t border-slate-200">
             <Button
               onClick={handleSubmit}
               disabled={submitting || cart.length === 0 || !selectedCustomerId || (taxComputeFailed && packPinned)}

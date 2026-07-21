@@ -219,7 +219,7 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               rows={2}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               placeholder="Brief description of the service..."
             />
           </div>
@@ -247,7 +247,7 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
                     }
                     required
                     placeholder={`0.${'0'.repeat(decimalPlaces)}`}
-                    className={`w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${
+                    className={`w-full h-9 px-3 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${
                       currencyConfig.position === 'before' ? 'pl-12' : currencyConfig.position === 'after' ? 'pr-16' : ''
                     }`}
                   />

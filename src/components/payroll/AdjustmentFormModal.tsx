@@ -96,14 +96,14 @@ export function AdjustmentFormModal({ onClose }: Props) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor={typeFieldId} className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={typeFieldId} className="block text-sm font-medium text-slate-700 mb-1">
               Type <span className="text-danger">*</span>
             </label>
             <select
               id={typeFieldId}
               value={formData.type}
               onChange={(e) => handleChange('type', e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="bonus">Bonus</option>
               <option value="advance">Salary Advance</option>
@@ -114,7 +114,7 @@ export function AdjustmentFormModal({ onClose }: Props) {
           </div>
 
           <div>
-            <label htmlFor={amountFieldId} className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={amountFieldId} className="block text-sm font-medium text-slate-700 mb-1">
               Amount (OMR) <span className="text-danger">*</span>
             </label>
             <Input
@@ -129,7 +129,7 @@ export function AdjustmentFormModal({ onClose }: Props) {
         </div>
 
         <div>
-          <label htmlFor={descriptionFieldId} className="block text-sm font-medium text-slate-700 mb-2">
+          <label htmlFor={descriptionFieldId} className="block text-sm font-medium text-slate-700 mb-1">
             Description <span className="text-danger">*</span>
           </label>
           <textarea
@@ -137,7 +137,7 @@ export function AdjustmentFormModal({ onClose }: Props) {
             value={formData.description}
             onChange={(e) => handleChange('description', e.target.value)}
             placeholder="Enter reason for adjustment..."
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
             rows={3}
           />
         </div>

@@ -209,7 +209,7 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
             <select
               id={positionFieldId}
               {...register('for_position_id')}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="">Any position</option>
               {positions.map(p => (
@@ -231,7 +231,7 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
 
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-semibold text-slate-800">Checklist Items</h4>
+            <h4 className="text-sm font-semibold text-slate-900">Checklist Items</h4>
             <button
               type="button"
               onClick={addItem}

@@ -836,7 +836,7 @@ export const StockItemDetail: React.FC = () => {
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
             <Button
               variant="secondary"
               onClick={() => setIsReceiveOpen(false)}
@@ -894,7 +894,7 @@ export const StockItemDetail: React.FC = () => {
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
             <Button
               variant="secondary"
               onClick={() => setIsUsageOpen(false)}
@@ -979,7 +979,7 @@ export const StockItemDetail: React.FC = () => {
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
             <Button variant="secondary" onClick={() => setIsEditOpen(false)} disabled={isSaving}>
               Cancel
             </Button>

@@ -185,7 +185,7 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Qty Received</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Qty Received</label>
                   <Input
                     type="number"
                     min="0"
@@ -205,7 +205,7 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Unit Cost</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Unit Cost</label>
                   <Input
                     type="number"
                     min="0"
@@ -218,7 +218,7 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   Serial Numbers <span className="text-slate-400">(optional — cap at received qty)</span>
                 </label>
                 {/* Centralized SerialNumberInput handles Enter/comma to add,
@@ -236,7 +236,7 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
           })}
         </div>
 
-        <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+        <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>

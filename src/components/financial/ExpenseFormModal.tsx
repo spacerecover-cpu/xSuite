@@ -214,7 +214,7 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
               />
             </div>
             {amountError && (
-              <p className="mt-1 text-sm text-danger">{amountError}</p>
+              <p className="mt-1 text-xs text-danger">{amountError}</p>
             )}
           </div>
         </div>
@@ -230,7 +230,7 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
                 id="expense-currency"
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                className="w-full h-9 pl-10 pr-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               >
                 {currency && !currencyCodes.some((c) => c.code === currency) && (
                   <option value={currency}>{currency}</option>
@@ -277,13 +277,13 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
                 setDescriptionError(null);
               }}
               rows={2}
-              className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full pl-10 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               placeholder="What was this expense for?"
               required
             />
           </div>
           {descriptionError && (
-            <p className="mt-1 text-sm text-danger">{descriptionError}</p>
+            <p className="mt-1 text-xs text-danger">{descriptionError}</p>
           )}
         </div>
 
@@ -310,7 +310,7 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
                 id="expense-category"
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                className="w-full h-9 pl-10 pr-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               >
                 <option value="">Select Category</option>
                 {categories.map((cat) => (
@@ -333,7 +333,7 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
               id="expense-case"
               value={caseId}
               onChange={(e) => setCaseId(e.target.value)}
-              className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full h-9 pl-10 pr-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             >
               <option value="">No Case</option>
               {cases.map((c) => (
@@ -385,7 +385,7 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={2}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             placeholder="Additional notes..."
           />
         </div>

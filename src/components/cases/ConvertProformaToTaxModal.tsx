@@ -96,7 +96,7 @@ export const ConvertProformaToTaxModal: React.FC<ConvertProformaToTaxModalProps>
           </div>
 
           <div>
-            <label htmlFor="convert-proforma-notes" className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor="convert-proforma-notes" className="block text-sm font-medium text-slate-700 mb-1">
               Additional Notes (Optional)
             </label>
             <textarea

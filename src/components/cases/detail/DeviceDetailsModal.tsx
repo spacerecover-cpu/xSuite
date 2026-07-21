@@ -61,7 +61,7 @@ function Section({
   // body lays out as balanced columns that fit one window without scrolling.
   return (
     <section className="mb-4 break-inside-avoid rounded-xl border border-border bg-surface p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
+      <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
         <span className={cn('flex h-6 w-6 items-center justify-center rounded-md', tone)}>
           <Icon className="h-3.5 w-3.5" />
         </span>
@@ -248,7 +248,7 @@ export function DeviceDetailsModal({ device, deviceIndex, caseId, isOpen, onClos
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 id={titleId} className="text-lg font-bold tracking-tight text-slate-900">
+                <h2 id={titleId} className="text-lg font-semibold text-slate-900">
                   {t('devices.detail.deviceN', {
                     defaultValue: 'Device {{n}}: {{type}}',
                     n: deviceIndex + 1,
@@ -263,7 +263,7 @@ export function DeviceDetailsModal({ device, deviceIndex, caseId, isOpen, onClos
                 )}
               </div>
               {(device.brand?.name || device.model) && (
-                <p className="mt-0.5 truncate text-sm text-slate-600">
+                <p className="mt-0.5 truncate text-sm text-slate-500">
                   {[device.brand?.name, device.model].filter(Boolean).join(' ')}
                 </p>
               )}

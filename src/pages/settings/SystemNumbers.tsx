@@ -631,7 +631,7 @@ export const SystemNumbers: React.FC = () => {
                   id="reset_basis"
                   value={formData.reset_basis}
                   onChange={(e) => setFormData({ ...formData, reset_basis: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="w-full h-9 px-3 text-sm border border-slate-300 rounded-md bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   {RESET_BASIS_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>

@@ -177,7 +177,7 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
             <select
               id="job-department"
               {...register('department_id')}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="">Select department...</option>
               {departments.map(d => (
@@ -191,7 +191,7 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
             <select
               id="job-position"
               {...register('position_id')}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="">Select position...</option>
               {positions.map(p => (
@@ -207,7 +207,7 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
             <select
               id="job-employment-type"
               {...register('employment_type')}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
               {EMPLOYMENT_TYPES.map(t => (
                 <option key={t} value={t}>{employmentTypeLabels[t]}</option>
@@ -220,7 +220,7 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
             <select
               id="job-status"
               {...register('status')}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
               {JOB_STATUSES.map(s => (
                 <option key={s} value={s}>{statusLabels[s]}</option>

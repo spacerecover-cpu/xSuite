@@ -697,26 +697,26 @@ export const StockListPage: React.FC = () => {
           fetchAllFiltered={() => fetchAllStockItemsForLabels(filters)}
           extraFields={
             <div className="space-y-4 border-t border-slate-100 pt-4">
-              <h4 className="text-sm font-semibold text-slate-700">Label content</h4>
+              <h4 className="text-sm font-semibold text-slate-900">Label content</h4>
               <div>
-                <label htmlFor="stock-label-company" className="block text-xs font-medium text-slate-600 mb-1">Company Name</label>
+                <label htmlFor="stock-label-company" className="block text-sm font-medium text-slate-700 mb-1">Company Name</label>
                 <input
                   id="stock-label-company"
                   type="text"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full h-9 px-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="Your company name (optional)"
                 />
               </div>
               <div>
-                <label htmlFor="stock-label-location" className="block text-xs font-medium text-slate-600 mb-1">Location</label>
+                <label htmlFor="stock-label-location" className="block text-sm font-medium text-slate-700 mb-1">Location</label>
                 <input
                   id="stock-label-location"
                   type="text"
                   value={locationName}
                   onChange={(e) => setLocationName(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full h-9 px-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="Storage location (optional)"
                 />
               </div>

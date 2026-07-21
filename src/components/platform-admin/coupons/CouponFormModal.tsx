@@ -85,7 +85,7 @@ export const CouponFormModal: React.FC<CouponFormModalProps> = ({ isOpen, onClos
                 type="text"
                 value={formData.code}
                 onChange={(e) => setFormData((p) => ({ ...p, code: e.target.value.toUpperCase() }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="SAVE20"
                 required
               />
@@ -97,7 +97,7 @@ export const CouponFormModal: React.FC<CouponFormModalProps> = ({ isOpen, onClos
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="20% off first year"
               />
             </div>
@@ -110,7 +110,7 @@ export const CouponFormModal: React.FC<CouponFormModalProps> = ({ isOpen, onClos
                 id="coupon-discount-type"
                 value={formData.discount_type}
                 onChange={(e) => setFormData((p) => ({ ...p, discount_type: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="percentage">Percentage (%)</option>
                 <option value="fixed">Fixed Amount ($)</option>
@@ -124,7 +124,7 @@ export const CouponFormModal: React.FC<CouponFormModalProps> = ({ isOpen, onClos
                 step="0.01"
                 value={formData.discount_value}
                 onChange={(e) => setFormData((p) => ({ ...p, discount_value: parseFloat(e.target.value) || 0 }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 required
               />
             </div>
@@ -138,7 +138,7 @@ export const CouponFormModal: React.FC<CouponFormModalProps> = ({ isOpen, onClos
                 type="date"
                 value={formData.valid_from}
                 onChange={(e) => setFormData((p) => ({ ...p, valid_from: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
             <div>
@@ -148,7 +148,7 @@ export const CouponFormModal: React.FC<CouponFormModalProps> = ({ isOpen, onClos
                 type="date"
                 value={formData.valid_until}
                 onChange={(e) => setFormData((p) => ({ ...p, valid_until: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
           </div>
@@ -165,7 +165,7 @@ export const CouponFormModal: React.FC<CouponFormModalProps> = ({ isOpen, onClos
                   max_redemptions: e.target.value ? parseInt(e.target.value) : null,
                 }))
               }
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="Unlimited"
             />
           </div>
@@ -177,7 +177,7 @@ export const CouponFormModal: React.FC<CouponFormModalProps> = ({ isOpen, onClos
               type="text"
               value={formData.paypal_coupon_id}
               onChange={(e) => setFormData((p) => ({ ...p, paypal_coupon_id: e.target.value }))}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="Optional"
             />
           </div>

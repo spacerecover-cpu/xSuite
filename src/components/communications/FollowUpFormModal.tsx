@@ -145,13 +145,13 @@ export const FollowUpFormModal: React.FC<FollowUpFormModalProps> = ({
               type="datetime-local"
               value={dueAt}
               onChange={(e) => setDueAt(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
         </div>
 
         <div>
-          <span className="block text-sm font-medium text-slate-700 mb-1.5">When it's due</span>
+          <span className="block text-sm font-medium text-slate-700 mb-1">When it's due</span>
           <div className="flex gap-2">
             <button
               type="button"
@@ -231,7 +231,7 @@ export const FollowUpFormModal: React.FC<FollowUpFormModalProps> = ({
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={7}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 placeholder="Pick a template above — placeholders are filled with this case's data now, and this exact text is sent when due."
               />
             </div>

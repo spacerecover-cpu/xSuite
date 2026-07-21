@@ -13,7 +13,7 @@ import { inventoryKeys } from '../../lib/queryKeys';
 import { useToast } from '../../hooks/useToast';
 
 const inputClass =
-  'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary bg-white';
+  'h-9 w-full px-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary bg-white';
 
 /** The subset of a case device the convert flow reads for display + selection.
  *  The RPC re-reads the authoritative case_devices row server-side, so only the
@@ -325,7 +325,7 @@ export const ConvertToInventoryModal: React.FC<ConvertToInventoryModalProps> = (
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Anything worth recording on the inventory item."
-            className={inputClass}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary bg-white"
           />
         </div>
 

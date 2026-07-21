@@ -459,7 +459,7 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
     >
       {/* Fixed header: title, thin divider underneath */}
       <div className="shrink-0 flex items-center justify-between px-6 h-12 border-b border-border">
-        <h2 id={titleId} className="text-lg font-bold tracking-tight text-slate-900">
+        <h2 id={titleId} className="text-lg font-semibold text-slate-900">
           {isEditMode
             ? t('devices.action.editTitle', { defaultValue: 'Edit Device' })
             : t('devices.action.addTitle', { defaultValue: 'Add Device' })}

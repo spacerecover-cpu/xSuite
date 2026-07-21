@@ -73,7 +73,7 @@ export const VATReturnDetailModal: React.FC<VATReturnDetailModalProps> = ({ vatR
         </div>
 
         <div>
-          <h3 className="mb-2 text-sm font-semibold">Supporting subledger rows (tax_period dimension)</h3>
+          <h3 className="mb-2 text-sm font-semibold text-slate-900">Supporting subledger rows (tax_period dimension)</h3>
           <div className="max-h-72 overflow-y-auto rounded-lg border border-border">
             <table className="w-full text-sm">
               <thead className="bg-surface-muted text-left">

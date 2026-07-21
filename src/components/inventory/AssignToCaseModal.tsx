@@ -148,7 +148,7 @@ export function AssignToCaseModal({
 
           {/* Case Selection */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-2">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Select Case <span className="text-danger">*</span>
             </label>
             <SearchableSelect
@@ -184,7 +184,7 @@ export function AssignToCaseModal({
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
-                className="w-full mt-2 px-2 py-2 border border-slate-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full mt-2 px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder="Assignment notes..."
                 disabled={loading || (!!availability && !availability.available)}
               />

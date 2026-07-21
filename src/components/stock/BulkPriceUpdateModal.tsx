@@ -70,12 +70,12 @@ export const BulkPriceUpdateModal: React.FC<Props> = ({ selectedItems, onClose }
       <div className="space-y-5">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label htmlFor={priceFieldId} className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+            <label htmlFor={priceFieldId} className="block text-sm font-medium text-slate-700 mb-1">
               Price Field
             </label>
             <select
               id={priceFieldId}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+              className="w-full h-9 px-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
               value={priceField}
               onChange={(e) => setPriceField(e.target.value as typeof priceField)}
             >
@@ -85,12 +85,12 @@ export const BulkPriceUpdateModal: React.FC<Props> = ({ selectedItems, onClose }
             </select>
           </div>
           <div>
-            <label htmlFor={directionFieldId} className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+            <label htmlFor={directionFieldId} className="block text-sm font-medium text-slate-700 mb-1">
               Direction
             </label>
             <select
               id={directionFieldId}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+              className="w-full h-9 px-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
               value={direction}
               onChange={(e) => setDirection(e.target.value as typeof direction)}
             >
@@ -102,7 +102,7 @@ export const BulkPriceUpdateModal: React.FC<Props> = ({ selectedItems, onClose }
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Update Type
             </label>
             <div className="flex rounded-lg border border-slate-300 overflow-hidden">
@@ -123,7 +123,7 @@ export const BulkPriceUpdateModal: React.FC<Props> = ({ selectedItems, onClose }
             </div>
           </div>
           <div>
-            <label htmlFor={amountFieldId} className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+            <label htmlFor={amountFieldId} className="block text-sm font-medium text-slate-700 mb-1">
               {updateType === 'percentage' ? 'Percentage (%)' : 'Amount'}
             </label>
             <input
@@ -133,14 +133,14 @@ export const BulkPriceUpdateModal: React.FC<Props> = ({ selectedItems, onClose }
               step={updateType === 'percentage' ? 0.1 : 0.001}
               value={value}
               onChange={(e) => setValue(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full h-9 px-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder={updateType === 'percentage' ? 'e.g. 10' : 'e.g. 5.000'}
             />
           </div>
         </div>
 
         <div>
-          <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Preview</p>
+          <p className="text-sm font-semibold text-slate-900 mb-2">Preview</p>
           <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
             {selectedItems.slice(0, 8).map((item) => {
               const preview = getPreviewPrice(item);
@@ -166,7 +166,7 @@ export const BulkPriceUpdateModal: React.FC<Props> = ({ selectedItems, onClose }
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+        <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
           <Button
             variant="primary"

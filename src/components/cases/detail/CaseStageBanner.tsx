@@ -269,7 +269,7 @@ export function CaseStageBanner({
                       ? 'e.g. Customer declined quote'
                       : 'Why are we reopening?'
                   }
-                  className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
             ) : null}

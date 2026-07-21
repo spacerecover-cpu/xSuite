@@ -163,14 +163,14 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
           </div>
 
           <div>
-            <label htmlFor={loanTypeFieldId} className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={loanTypeFieldId} className="block text-sm font-medium text-slate-700 mb-1">
               Loan Type <span className="text-danger">*</span>
             </label>
             <select
               id={loanTypeFieldId}
               value={formData.loan_type}
               onChange={(e) => handleChange('loan_type', e.target.value)}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               required
             >
               <option value="salary_advance">Salary Advance</option>
@@ -180,7 +180,7 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
           </div>
 
           <div>
-            <label htmlFor={principalFieldId} className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={principalFieldId} className="block text-sm font-medium text-slate-700 mb-1">
               Principal Amount <span className="text-danger">*</span>
             </label>
             <Input
@@ -196,7 +196,7 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
           </div>
 
           <div>
-            <label htmlFor={interestFieldId} className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={interestFieldId} className="block text-sm font-medium text-slate-700 mb-1">
               Interest Rate (%)
             </label>
             <Input
@@ -212,7 +212,7 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
           </div>
 
           <div>
-            <label htmlFor={installmentsFieldId} className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={installmentsFieldId} className="block text-sm font-medium text-slate-700 mb-1">
               Number of Installments <span className="text-danger">*</span>
             </label>
             <Input
@@ -227,7 +227,7 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
           </div>
 
           <div>
-            <label htmlFor={startDateFieldId} className="block text-sm font-medium text-slate-700 mb-2">
+            <label htmlFor={startDateFieldId} className="block text-sm font-medium text-slate-700 mb-1">
               Start Date <span className="text-danger">*</span>
             </label>
             <Input
@@ -240,13 +240,13 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
           </div>
 
           <div className="md:col-span-2">
-            <label htmlFor={notesFieldId} className="block text-sm font-medium text-slate-700 mb-2">Notes</label>
+            <label htmlFor={notesFieldId} className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
             <textarea
               id={notesFieldId}
               value={formData.notes}
               onChange={(e) => handleChange('notes', e.target.value)}
               rows={3}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               placeholder="Additional notes or comments..."
             />
           </div>
