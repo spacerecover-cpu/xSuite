@@ -207,7 +207,7 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
         </div>
       }
     >
-      <form id="accountForm" onSubmit={handleSubmit} className="space-y-6">
+      <form id="accountForm" onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <div className="bg-danger-muted border border-danger/30 rounded-lg p-3 flex items-start gap-2">
             <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />

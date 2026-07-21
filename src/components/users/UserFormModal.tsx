@@ -125,7 +125,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
       closeOnBackdrop={false}
       initialFocusRef={firstFieldRef}
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <div className="p-3 bg-danger-muted border border-danger/30 text-danger rounded-lg text-sm">
             {error}

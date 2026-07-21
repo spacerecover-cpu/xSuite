@@ -91,7 +91,7 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Transfer Funds" subtitle="Move funds from one account to another." icon={ArrowLeftRight} size="large" showClose>
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <div className="bg-danger-muted border border-danger/30 rounded-lg p-3 flex items-start gap-2">
             <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />

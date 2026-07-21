@@ -231,7 +231,7 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
       closeOnBackdrop={false}
       initialFocusRef={labelFieldRef}
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <div className="bg-danger-muted border border-danger/30 rounded-lg p-4 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />

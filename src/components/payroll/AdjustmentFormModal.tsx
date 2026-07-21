@@ -90,7 +90,7 @@ export function AdjustmentFormModal({ onClose }: Props) {
       icon={SlidersHorizontal}
       showClose
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <SearchableSelect
             label="Employee"

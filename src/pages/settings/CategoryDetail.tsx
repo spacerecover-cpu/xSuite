@@ -746,7 +746,7 @@ export const CategoryDetail: React.FC = () => {
         onClose={handleCloseModal}
         title={editingItem ? `Edit ${TABLE_LABELS[activeTable]}` : `Add New ${TABLE_LABELS[activeTable]}`}
       >
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             label="Name"
             value={formValue}

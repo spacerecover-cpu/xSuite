@@ -92,7 +92,7 @@ export function SalaryComponentFormModal({ component, onClose }: Props) {
       closeOnBackdrop={false}
       initialFocusRef={nameFieldRef}
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label htmlFor={nameFieldId} className="block text-sm font-medium text-slate-700 mb-1">

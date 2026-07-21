@@ -59,7 +59,7 @@ export const ConvertProformaToTaxModal: React.FC<ConvertProformaToTaxModalProps>
       showClose
       closeOnBackdrop={false}
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div className="bg-info-muted border border-info/30 rounded-lg p-4">
           <div className="flex items-start gap-3">
             <FileText className="w-5 h-5 text-info flex-shrink-0 mt-0.5" />

@@ -320,7 +320,7 @@ export default function InventorySettingsPage() {
         showClose
       >
         {editModal && (
-          <form onSubmit={handleSequenceSave} className="space-y-6">
+          <form onSubmit={handleSequenceSave} className="space-y-4">
             <div>
               <label htmlFor="seq-prefix" className="block text-sm font-medium text-slate-700 mb-1">
                 Prefix

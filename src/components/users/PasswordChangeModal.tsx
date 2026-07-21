@@ -82,7 +82,7 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
       closeOnEscape={false}
       initialFocusRef={firstFieldRef}
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div className="flex items-start gap-3 p-4 bg-warning-muted border border-warning/30 rounded-lg">
           <AlertCircle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
           <div className="flex-1">
