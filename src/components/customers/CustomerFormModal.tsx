@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { createCustomer } from '../../lib/customerService';
 import { createCompany } from '../../lib/companyService';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
+import { Input, FLOATING_LABEL_CLS } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
 import { Modal } from '../ui/Modal';
 import { PhoneInput } from '../ui/PhoneInput';
@@ -20,6 +20,8 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  Plus,
+  X,
 } from 'lucide-react';
 
 interface CustomerFormModalProps {
@@ -69,6 +71,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   const { profile } = useAuth();
   const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false);
   const [detailsCollapsed, setDetailsCollapsed] = useState(true);
+  const [showAltPhone, setShowAltPhone] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const customerNameRef = useRef<HTMLInputElement>(null);
@@ -264,6 +267,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     setErrors({});
     setTouched({});
     setDetailsCollapsed(true);
+    setShowAltPhone(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -318,7 +322,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         {/* Reference layout (2026-07-20): flat paired rows sized to fit the
             viewport with no scrolling; structured address + tax live behind
             the collapsed disclosure so the at-rest form matches the mock. */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <Input
             ref={customerNameRef}
             label="Name"
@@ -330,7 +334,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
             required
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="Email"
               floatingLabel
@@ -340,28 +344,62 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
               onBlur={() => handleBlur('email')}
               error={touched.email ? errors.email : undefined}
             />
-            <PhoneInput
-              label="Mobile Number"
-              floatingLabel
-              value={formData.mobile_number}
-              onChange={(val) => handleFieldChange('mobile_number', val)}
-              countries={countries}
-              selectedCountryId={formData.country_id}
-              placeholder="e.g. 9123 4567"
-            />
+            {/* Mobile + a compact affordance to reveal the alternative phone. */}
+            <div className="flex items-start gap-2">
+              <div className="flex-1">
+                <PhoneInput
+                  label="Mobile Number"
+                  floatingLabel
+                  value={formData.mobile_number}
+                  onChange={(val) => handleFieldChange('mobile_number', val)}
+                  countries={countries}
+                  selectedCountryId={formData.country_id}
+                  placeholder="e.g. 9123 4567"
+                />
+              </div>
+              {!showAltPhone && (
+                <button
+                  type="button"
+                  onClick={() => setShowAltPhone(true)}
+                  title="Add alternative phone number"
+                  aria-label="Add alternative phone number"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-300 text-primary transition-colors hover:border-primary hover:bg-primary/5"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </div>
 
-          <PhoneInput
-            label="Phone Number (Alternative)"
-            floatingLabel
-            value={formData.phone_number}
-            onChange={(val) => handleFieldChange('phone_number', val)}
-            countries={countries}
-            selectedCountryId={formData.country_id}
-            placeholder="e.g. 9123 4567"
-          />
+          {showAltPhone && (
+            <div className="flex items-start gap-2">
+              <div className="flex-1">
+                <PhoneInput
+                  label="Phone Number (Alternative)"
+                  floatingLabel
+                  value={formData.phone_number}
+                  onChange={(val) => handleFieldChange('phone_number', val)}
+                  countries={countries}
+                  selectedCountryId={formData.country_id}
+                  placeholder="e.g. 9123 4567"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAltPhone(false);
+                  handleFieldChange('phone_number', '');
+                }}
+                title="Remove alternative phone number"
+                aria-label="Remove alternative phone number"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-300 text-slate-400 transition-colors hover:border-danger/40 hover:bg-danger-muted hover:text-danger"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <SearchableSelect
               label="Customer Group"
               floatingLabel
@@ -392,7 +430,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <SearchableSelect
               label="Country"
               floatingLabel
@@ -436,17 +474,14 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
               Additional address & tax details (optional)
             </button>
             {!detailsCollapsed && (
-              <div className="mt-3 space-y-4">
+              <div className="mt-4 space-y-5">
                 <AddressFields
                   value={addressValue}
                   onChange={(next) => setFormData((f) => ({ ...f, ...next }))}
                   countryId={formData.country_id || null}
+                  floatingLabel
                 />
-                <div>
-                  <label htmlFor="customer-tax-number" className="mb-1 block text-sm font-medium">
-                    {(countries.find((c) => c.id === formData.country_id) as { tax_number_label?: string | null } | undefined)
-                      ?.tax_number_label ?? 'Tax Registration Number'}
-                  </label>
+                <div className="relative">
                   <input
                     id="customer-tax-number"
                     className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
@@ -454,6 +489,10 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                     onChange={(e) => handleFieldChange('tax_number', e.target.value)}
                     onBlur={() => handleBlur('tax_number')}
                   />
+                  <label htmlFor="customer-tax-number" className={FLOATING_LABEL_CLS}>
+                    {(countries.find((c) => c.id === formData.country_id) as { tax_number_label?: string | null } | undefined)
+                      ?.tax_number_label ?? 'Tax Registration Number'}
+                  </label>
                   {errors.tax_number && <p className="mt-1 text-xs text-danger">{errors.tax_number}</p>}
                 </div>
               </div>
