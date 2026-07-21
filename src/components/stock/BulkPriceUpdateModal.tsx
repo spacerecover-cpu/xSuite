@@ -1,6 +1,6 @@
 import React, { useId, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { TrendingUp } from 'lucide-react';
+import { Tag, TrendingUp } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { useToast } from '../../hooks/useToast';
@@ -66,7 +66,7 @@ export const BulkPriceUpdateModal: React.FC<Props> = ({ selectedItems, onClose }
   };
 
   return (
-    <Modal isOpen onClose={onClose} title={`Bulk Price Update — ${selectedItems.length} items`} size="md">
+    <Modal isOpen onClose={onClose} title={`Bulk Price Update — ${selectedItems.length} items`} subtitle="Update prices for the selected items in bulk." icon={Tag} size="md" showClose>
       <div className="space-y-5">
         <div className="grid grid-cols-2 gap-4">
           <div>

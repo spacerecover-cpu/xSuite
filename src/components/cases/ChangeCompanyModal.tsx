@@ -72,7 +72,10 @@ export const ChangeCompanyModal: React.FC<ChangeCompanyModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Change Company"
+      subtitle="Reassign this case to a different company."
+      icon={Building2}
       size="md"
+      showClose
     >
       <div className="space-y-6">
         {/* Current Company Info */}

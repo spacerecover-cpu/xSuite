@@ -86,7 +86,7 @@ export const ExportWizard: React.FC<Props> = ({ domain, onClose }) => {
   const steps: WizardStep[] = ['scope', 'generate', 'download'];
 
   return (
-    <Modal isOpen onClose={onClose} title={`Export ${DOMAIN_LABELS[domain]}`} size="xl" closeOnBackdrop={false}>
+    <Modal isOpen onClose={onClose} title={`Export ${DOMAIN_LABELS[domain]}`} subtitle="Choose the entities and date range to export." icon={Download} size="xl" showClose closeOnBackdrop={false}>
       <div className="space-y-6">
         {/* Breadcrumb */}
         <nav aria-label="Export steps" className="flex items-center gap-1 text-sm">

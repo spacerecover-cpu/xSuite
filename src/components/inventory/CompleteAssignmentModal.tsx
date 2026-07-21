@@ -60,7 +60,10 @@ export function CompleteAssignmentModal({
       isOpen={isOpen}
       onClose={handleClose}
       title="Mark as Working & Free for Reuse"
+      subtitle="Mark this donor as working and free it for reuse."
+      icon={CheckCircle2}
       size="md"
+      showClose
       initialFocusRef={usageNotesRef}
     >
       <div className="space-y-2">

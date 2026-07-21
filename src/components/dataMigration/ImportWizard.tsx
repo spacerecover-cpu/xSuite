@@ -166,7 +166,7 @@ export const ImportWizard: React.FC<Props> = ({ domain, onClose }) => {
   const steps: WizardStep[] = ['upload', 'validate', 'import', 'summary'];
 
   return (
-    <Modal isOpen onClose={onClose} title={`Import ${DOMAIN_LABELS[domain]}`} size="xl" closeOnBackdrop={false}>
+    <Modal isOpen onClose={onClose} title={`Import ${DOMAIN_LABELS[domain]}`} subtitle="Upload a completed workbook to import records." icon={Upload} size="xl" showClose closeOnBackdrop={false}>
       <div className="space-y-6">
         {/* Step breadcrumb */}
         <nav aria-label="Import steps" className="flex items-center gap-1 text-sm">

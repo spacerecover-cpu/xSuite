@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Info,
   Keyboard,
+  Layers,
   X
 } from 'lucide-react';
 
@@ -322,7 +323,7 @@ export const ServerBulkDrivesModal: React.FC<ServerBulkDrivesModalProps> = ({
 
   return (
     <>
-      <Modal isOpen={isOpen} onClose={handleClose} title="Server Bulk Drive Entry" maxWidth="7xl">
+      <Modal isOpen={isOpen} onClose={handleClose} title="Server Bulk Drive Entry" subtitle="Enter the details for each drive in this server." icon={Layers} maxWidth="7xl" showClose>
         <div className="flex flex-col h-[80vh]">
           {showKeyboardShortcuts && (
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4 text-sm">

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useId } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import { AlertCircle, Mail, Copy, Check, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Mail, Copy, Check, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { generateSecurePassword, copyToClipboard } from '../../lib/passwordUtils';
 
 interface PasswordResetModalProps {
@@ -64,7 +64,16 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Reset User Password" size="md" closeOnBackdrop={false}>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Reset User Password"
+      subtitle="Share the temporary password securely with this user."
+      icon={KeyRound}
+      size="md"
+      showClose
+      closeOnBackdrop={false}
+    >
       <div className="space-y-4">
         <div className="flex items-start gap-3 p-4 bg-warning-muted border border-warning/30 rounded-lg">
           <AlertCircle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />

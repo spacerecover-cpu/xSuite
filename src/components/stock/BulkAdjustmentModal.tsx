@@ -56,7 +56,7 @@ export const BulkAdjustmentModal: React.FC<Props> = ({ selectedItems, onClose })
   const changedCount = lines.filter((l) => l.newQty !== l.currentQty).length;
 
   return (
-    <Modal isOpen onClose={onClose} title={`Bulk Quantity Adjustment — ${selectedItems.length} items`} size="md">
+    <Modal isOpen onClose={onClose} title={`Bulk Quantity Adjustment — ${selectedItems.length} items`} subtitle="Adjust quantities for the selected items and record why." icon={SlidersHorizontal} size="md" showClose>
       <div className="space-y-5">
         <div>
           <label htmlFor={reasonFieldId} className="block text-sm font-medium text-slate-700 mb-1">

@@ -3,7 +3,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { useCustomerPickerRows } from '../../lib/pickerSearch';
-import { User, Mail, Phone, Hash } from 'lucide-react';
+import { User, UserCog, Mail, Phone, Hash } from 'lucide-react';
 
 interface ChangeClientModalProps {
   isOpen: boolean;
@@ -52,7 +52,10 @@ export const ChangeClientModal: React.FC<ChangeClientModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Change Client"
+      subtitle="Reassign this case to a different client."
+      icon={UserCog}
       size="md"
+      showClose
     >
       <div className="space-y-6">
         {/* Current Client Info */}

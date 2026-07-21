@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { SearchableSelect } from '../ui/SearchableSelect';
-import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertCircle, Briefcase, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   getCasesForAssignment,
   assignInventoryToCase,
@@ -118,7 +118,10 @@ export function AssignToCaseModal({
       isOpen={isOpen}
       onClose={onClose}
       title={inventoryItemName}
+      subtitle="Assign this item to a case."
+      icon={Briefcase}
       maxWidth="3xl"
+      showClose
     >
       <div className="grid grid-cols-2 gap-6">
         {/* Left Column - Assignment Interface */}

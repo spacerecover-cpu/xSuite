@@ -151,7 +151,7 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
   ).length;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Receive Stock from Purchase Order" size="xl" closeOnBackdrop={false}>
+    <Modal isOpen={isOpen} onClose={onClose} title="Receive Stock from Purchase Order" subtitle="Receive stock against this purchase order." icon={PackageCheck} size="xl" showClose closeOnBackdrop={false}>
       <div className="space-y-4">
         <p className="text-sm text-slate-600">
           Match each line item to a stock item and confirm quantities received. Items without a linked stock item will be skipped.

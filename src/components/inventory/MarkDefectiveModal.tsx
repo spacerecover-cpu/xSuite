@@ -80,7 +80,10 @@ export function MarkDefectiveModal({
       isOpen={isOpen}
       onClose={handleClose}
       title="Mark as Defective"
+      subtitle="Mark this item defective and record why."
+      icon={AlertTriangle}
       size="md"
+      showClose
       initialFocusRef={defectReasonRef}
     >
       <div className="space-y-2">
