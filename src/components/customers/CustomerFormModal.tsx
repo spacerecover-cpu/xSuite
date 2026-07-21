@@ -447,7 +447,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                     onChange={(e) => handleFieldChange('tax_number', e.target.value)}
                     onBlur={() => handleBlur('tax_number')}
                   />
-                  {errors.tax_number && <p className="mt-1 text-sm text-danger">{errors.tax_number}</p>}
+                  {errors.tax_number && <p className="mt-1 text-xs text-danger">{errors.tax_number}</p>}
                 </div>
               </div>
             )}

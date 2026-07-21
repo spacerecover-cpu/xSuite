@@ -32,6 +32,16 @@ interface ModalProps {
   closeOnEscape?: boolean;
 }
 
+// Modal typography standard (2026-07-21, benchmarked against SAP Fiori /
+// Fluent 2 / SLDS / Atlassian / Ant — see PR #437):
+//   Title            text-lg  (18) · font-semibold · text-slate-900
+//   Subtitle         text-sm  (14) · regular       · text-slate-500
+//   Section heading  text-sm  (14) · font-semibold · text-slate-900
+//   Field label      text-sm  (14) · font-medium   · text-slate-700
+//   Input/button     text-sm  (14) · regular/medium
+//   Helper           text-xs  (12) · regular       · text-slate-500
+//   Error            text-xs  (12) · regular       · text-danger
+//
 // Standard width tiers (keep new modals consistent — pick by content, and use the
 // horizontal space before resorting to vertical scrolling):
 //   xs/sm  – confirmations and single-field quick-adds
@@ -103,7 +113,7 @@ export function Modal({
             )}
             <div>
               <h2 id={titleId} className="text-lg font-semibold text-slate-900">{title}</h2>
-              {subtitle && <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>}
+              {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
             </div>
             {headerBadges && <div className="flex items-center gap-2 ms-2">{headerBadges}</div>}
           </div>
