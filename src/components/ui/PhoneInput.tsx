@@ -278,8 +278,8 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
             placeholder={placeholder}
             disabled={disabled}
             className={`flex-1 px-3 text-sm focus:outline-none bg-white min-w-0 ${
-              disabled ? 'bg-slate-100 cursor-not-allowed' : ''
-            }`}
+              floatingLabel ? 'placeholder:text-xs' : ''
+            } ${disabled ? 'bg-slate-100 cursor-not-allowed' : ''}`}
           />
         </div>
 

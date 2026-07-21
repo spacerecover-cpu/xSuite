@@ -38,7 +38,7 @@ export function AddressFields({ value, onChange, countryId, disabled, floatingLa
   }, [countryId]);
 
   const set = (patch: Partial<AddressValue>) => onChange({ ...value, ...patch });
-  const inputCls = 'h-9 w-full rounded-md border border-border bg-surface px-3 text-sm focus:ring-2 focus:ring-ring';
+  const inputCls = `h-9 w-full rounded-md border border-border bg-surface px-3 text-sm focus:ring-2 focus:ring-ring${floatingLabel ? ' placeholder:text-xs' : ''}`;
   const labelCls = floatingLabel ? FLOATING_LABEL_CLS : 'mb-1 block text-sm font-medium';
 
   return (

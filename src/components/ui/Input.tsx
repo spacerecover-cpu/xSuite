@@ -59,6 +59,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
               inputSizeClasses[size],
               error ? 'border-danger' : 'border-slate-300',
               leftIcon ? 'ps-9' : '',
+              floatingLabel && 'placeholder:text-xs',
               className
             )}
           />

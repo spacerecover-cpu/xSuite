@@ -46,6 +46,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
             'w-full border rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             textareaSizeClasses[size],
             error ? 'border-danger' : 'border-slate-300',
+            floatingLabel && 'placeholder:text-xs',
             className
           )}
         />
