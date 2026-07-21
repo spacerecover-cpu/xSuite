@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Wallet } from 'lucide-react';
+import { Wallet, X } from 'lucide-react';
 import { Dialog } from '../../ui/Dialog';
 import { Button } from '../../ui/Button';
 import { formatCurrencyWithConfig } from '../../../lib/format';
@@ -84,21 +84,31 @@ export const ApplyAdvanceModal: React.FC<ApplyAdvanceModalProps> = ({
   return (
     <Dialog open={open} onClose={onClose} labelledBy={TITLE_ID} className="max-w-md">
       <form onSubmit={handleSubmit} className="p-5">
-        <div className="flex items-start gap-3 mb-4">
-          <div className="w-9 h-9 rounded-full bg-success/15 flex items-center justify-center shrink-0">
-            <Wallet className="w-4.5 h-4.5 text-success" />
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-full bg-success/15 flex items-center justify-center shrink-0">
+              <Wallet className="w-4.5 h-4.5 text-success" />
+            </div>
+            <div className="min-w-0">
+              <h2 id={TITLE_ID} className="text-lg font-semibold text-slate-900">
+                Apply advance {advance.payment_number ?? ''}
+              </h2>
+              <p className="text-sm text-slate-500 mt-0.5">
+                Unapplied balance{' '}
+                <span className="font-semibold text-slate-700 tabular-nums">
+                  {formatCurrencyWithConfig(advance.unappliedBalance, currencyConfig)}
+                </span>
+              </p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <h2 id={TITLE_ID} className="text-lg font-semibold text-slate-900">
-              Apply advance {advance.payment_number ?? ''}
-            </h2>
-            <p className="text-sm text-slate-500 mt-0.5">
-              Unapplied balance{' '}
-              <span className="font-semibold text-slate-700 tabular-nums">
-                {formatCurrencyWithConfig(advance.unappliedBalance, currencyConfig)}
-              </span>
-            </p>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 shrink-0"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {invoices.length === 0 ? (

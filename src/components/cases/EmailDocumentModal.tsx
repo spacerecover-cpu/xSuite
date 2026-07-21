@@ -161,8 +161,10 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
       isOpen={isOpen}
       onClose={handleClose}
       title="Send Document via Email"
+      subtitle="Email this document to the recipient."
       icon={Mail}
       size="lg"
+      showClose
       closeOnBackdrop={false}
       initialFocusRef={firstFieldRef}
       footer={
