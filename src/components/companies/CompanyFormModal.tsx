@@ -40,6 +40,11 @@ interface CompanyFormModalProps {
   onSuccess?: (company: Record<string, unknown>) => void;
   /** Provide to open in edit mode for an existing company. */
   company?: CompanyEditData;
+  /** Hide the structured "Additional address details" block (address line
+   *  1/2 + postal). When false the form keeps a single Address field — the
+   *  profile Edit uses this to stay minimal, as it was before. The existing
+   *  structured values are still preserved (prefilled and written back). */
+  showAddressDetails?: boolean;
 }
 
 interface Industry {
@@ -72,6 +77,7 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
   onClose,
   onSuccess,
   company,
+  showAddressDetails = true,
 }) => {
   const isEdit = Boolean(company);
   const queryClient = useQueryClient();
@@ -469,17 +475,19 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
           placeholder="Enter full address"
         />
 
-        <div>
-          <p className="mb-4 text-xs font-medium text-slate-500">
-            Additional address details (optional)
-          </p>
-          <AddressFields
-            value={addressValue}
-            onChange={(next) => setFormData((f) => ({ ...f, ...next }))}
-            countryId={formData.country_id || null}
-            floatingLabel
-          />
-        </div>
+        {showAddressDetails && (
+          <div>
+            <p className="mb-4 text-xs font-medium text-slate-500">
+              Additional address details (optional)
+            </p>
+            <AddressFields
+              value={addressValue}
+              onChange={(next) => setFormData((f) => ({ ...f, ...next }))}
+              countryId={formData.country_id || null}
+              floatingLabel
+            />
+          </div>
+        )}
 
         <Textarea
           id="company-internal-notes"

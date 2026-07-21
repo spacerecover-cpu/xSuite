@@ -737,6 +737,7 @@ export const CompanyProfilePage: React.FC = () => {
       <CompanyFormModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
+        showAddressDetails={false}
         company={{
           id: company.id,
           company_name: company.name || company.company_name || '',
