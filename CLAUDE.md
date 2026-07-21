@@ -449,6 +449,28 @@ All TanStack Query keys are centralized in `src/lib/queryKeys.ts`.
 ### Permissions
 Use `PermissionsContext` for all feature-gating. Never hardcode role strings in components — use the permission system.
 
+### Modals & Forms (canonical: `CustomerFormModal`)
+The **finalized popup-modal design** is the Add/Edit Customer form
+(`src/components/customers/CustomerFormModal.tsx`) — owner-approved 2026-07-21 (PR #437) as the
+reference to **replicate for every entity add/edit modal**. Full contract: `DESIGN.md → Overlays →
+Form modal`. In short:
+
+- **One component serves both Add and Edit** (pass the record prop to switch to edit) — Add and Edit
+  must be a 1:1 match. Never hand-roll a second edit form for a record that already has an add modal.
+- **Floating notch labels** on every field via the opt-in `floatingLabel` prop
+  (`Input`/`Textarea`/`SearchableSelect`/`PhoneInput`/`AddressFields`); label a11y stays intact via
+  `useFieldA11y`. `FLOATING_LABEL_CLS` (exported from `ui/Input`) is the single source for the notch style.
+- **Compact chrome:** `titleSize="sm"`, round `bg-primary/10` icon badge, `maxWidth="xl"` (party/entity
+  width), opt-in `showClose`, `closeOnBackdrop={false}`, `initialFocusRef` on the first field, optional
+  `headerAction` micro-badge (e.g. a non-consuming next-number preview).
+- **Layout:** `space-y-6` rows, related fields paired into `md:grid-cols-2 gap-4`; `text-xs`
+  placeholders; progressive disclosure (a `+` affordance) for secondary fields; compact `size="sm"`
+  footer (Cancel = `secondary`). This is the Standard/Wide tier — the 4-column uppercase-divider grid
+  stays for 30+ field tabbed Workspace forms (`DeviceFormModal`).
+
+Do **not** invent per-modal form styling — reuse the shared primitives and this pattern so every
+add/edit surface reads identically.
+
 ---
 
 ## Customers vs customers_enhanced

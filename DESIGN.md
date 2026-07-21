@@ -74,13 +74,13 @@ Fonts load via Google Fonts in `index.html` (CSP allows `fonts.googleapis.com` /
 | Page title — detail pages | `DetailPageHeader` h1: `text-2xl font-bold text-slate-900` |
 | Page title — portal / platform-admin shells | `PageHeader` (`text-lg font-semibold`) for list-level; `DetailPageHeader` for detail-level; `text-3xl` retired |
 | Section / card heading | `text-lg font-semibold text-slate-900`; sub-section `text-base font-semibold`; `font-bold` is not a heading weight at these sizes |
-| Modal title | `text-lg font-semibold text-slate-900` (`Modal`/`ConfirmDialog`) — all surfaces incl. portal |
+| Modal title | `text-lg font-semibold text-slate-900` (`Modal`/`ConfirmDialog`) — all surfaces incl. portal; **form/entity modals opt into `titleSize="sm"` → `text-base` (16px)** per the Form-modal reference (Overlays) |
 | Table header (th) | `text-xs font-semibold uppercase tracking-wider text-slate-600` |
 | Table body cell | `text-sm text-slate-700`; identity/emphasis cells `text-sm font-semibold text-slate-900` (or `text-primary` for linked numbers) — size always explicit |
 | Money / quantity | `text-sm font-semibold text-slate-900 tabular-nums`; `font-bold` reserved for totals rows; `tabular-nums` on every numeric column/figure |
 | Button | `font-medium`; sm `text-sm`, **md (default) `text-sm`**, lg `text-base` — 14px is the platform button size |
 | Badge / chip | `ui/Badge` only (`font-semibold`; sm `text-xs`, md `text-sm`); no hand-rolled 9–11px chips |
-| Form label | `text-sm font-medium text-slate-700` (the settings `font-semibold` variant is retired) |
+| Form label | `text-sm font-medium text-slate-700` (the settings `font-semibold` variant is retired). **Floating-label variant (form/entity modals): `FLOATING_LABEL_CLS` = `text-xs` (12px) `font-medium text-slate-500`, a notch on the field's top border** — opt-in `floatingLabel`, a11y-associated via `useFieldA11y` (a persistent label, not a placeholder-only field); see Overlays → Form modal |
 | Hint / helper | `text-xs text-slate-500` |
 | Error | `text-xs text-danger` + `AlertCircle` icon + `role="alert"` (the `FormField` spec — universal) |
 | Uppercase micro-label / form section header | `text-xs font-semibold uppercase tracking-wider` (+ `text-primary` for form section dividers, `text-slate-500` elsewhere) |
@@ -264,10 +264,12 @@ The platform-standard overlay is a **three-region modal**: a pinned header, a si
 
 - **Primitives:** `ui/Modal.tsx` wraps `ui/Dialog.tsx` and is the canonical surface for header-pinned forms — it passes `flex flex-col overflow-hidden` to the panel and renders children in a `p-4 overflow-y-auto flex-1` body, so the header stays pinned (`Modal.tsx:71`/`:104`). `ui/Dialog.tsx` is the low-level container: React portal to `document.body`, `useFocusTrap` (focus trap + restore), and a **ref-counted** body scroll-lock so stacked dialogs don't unlock early (`Dialog.tsx:20-64`). **The pinned behavior is not a property of `Dialog` itself** — `Dialog`'s own panel is a single whole-panel scroller (`max-h-[90vh] overflow-y-auto`, `Dialog.tsx:101`). The three-region layout comes from the *consumer* layering `flex flex-col overflow-hidden` on the panel and splitting children into intrinsic-height header/footer + a `flex-1 overflow-y-auto` body. **Do not render plain children straight into `Dialog`** — that whole-panel scroll lets the header and actions scroll away (retired for forms). **`Modal` now ships a pinned `footer` slot** (2026-07-02: `shrink-0 border-t px-4 py-3`), so ordinary forms get the three-region layout from `Modal` alone; only Workspace-tier surfaces with custom chrome (tab bars, split panes) still compose `Dialog` directly — as `shared/CommandPalette.tsx` and `cases/DeviceFormModal.tsx` do. Mirror them.
 - **Anatomy:**
-  1. **Pinned header** — title + optional icon/badges. **No top-right X**: the close-icon pattern was
-     removed platform-wide 2026-07-02; dismissal is footer buttons + ESC + backdrop (each opt-out via
-     `closeOnEscape`/`closeOnBackdrop`). **Every modal MUST therefore carry at least one explicit
-     footer close/cancel action** (View modals: a single "Close").
+  1. **Pinned header** — title + optional icon/badges. Dismissal is footer buttons + ESC + backdrop
+     (each opt-out via `closeOnEscape`/`closeOnBackdrop`), so **every modal MUST carry at least one
+     explicit footer close/cancel action** (View modals: a single "Close"). The top-right X was removed
+     platform-wide 2026-07-02, then **re-added as an opt-in `showClose` for form/entity modals
+     2026-07-20** (the party-form standard — the reference `CustomerFormModal` sets it); it *supplements*
+     the footer action, never replaces it. Plain content/confirm modals stay X-less.
   2. **Optional pinned sub-header** — the tab bar and/or a fixed control row (e.g. the Device Role select + "Mark as Primary" checkbox in `DeviceFormModal`). Stays put with the header.
   3. **Scrolling body** — the *only* scroll region (`flex-1 overflow-y-auto`).
   4. **Pinned footer** — destructive action left (e.g. Delete), Cancel + primary action right, separated by a `border-t`. Pinned via flex `shrink-0`, **not** CSS `sticky`/`position`. **`Modal` now provides this as the `footer` slot** (2026-07-02): a pinned `shrink-0 border-t px-4 py-3` region; consumers render their own button row inside (`flex items-center justify-end gap-3`; `justify-between` when a destructive action sits left). Footers must never live inside the scrolling body on forms that can scroll.
@@ -288,6 +290,56 @@ The platform-standard overlay is a **three-region modal**: a pinned header, a si
 - **Responsive:** below the `sm` breakpoint a modal should become **full-screen** (or a bottom-sheet filling most of the viewport), **not** a fixed-width centered card — reuse `layout/MobileNavDrawer.tsx`'s slide + scroll-lock + focus-trap mechanics. The desktop multi-column grid collapses to one column. *(Today `Dialog`/`Modal` stay fixed-width from 320px→1920px; this is a forward target — the weakest mobile surface in an otherwise mobile-aware app.)*
 - **Backdrop:** one token-driven scrim — **`bg-slate-900/40`** is the standard and the shipped `Dialog` default (`Dialog.tsx:90`, inherited by ~90 modals). `backdrop-blur-sm` is allowed on Workspace-tier and full-screen media overlays only (today: `CommandPalette`, `PhotoViewerModal`). The deliberate dark media overrides — `EmailDocumentModal` `bg-black/70`, `PhotoViewerModal` `bg-black/90` — stay as-is.
 - **Required behaviors** (all provided by `Dialog` — do not reimplement): focus trap + focus restore on close, ref-counted body scroll-lock, ESC + backdrop close (each opt-out via `closeOnEscape` / `closeOnBackdrop`, both default-on).
+
+### Form modal — canonical reference: `customers/CustomerFormModal.tsx`
+The **finalized design for every entity add/edit modal** — the floating-label form. Owner-approved
+2026-07-21 (PR #437) as the reference to **replicate across all form/entity popups** (customer,
+company, supplier, and the rest). It is the Standard/Wide-tier pattern; the Workspace-tier
+tabbed layout below is for 30+ field records only.
+
+> **Status — leads the code.** The pattern is fully shipped in `CustomerFormModal` (the party-form
+> reference); rolling it out to the remaining entity add/edit modals is the tracked forward work. The
+> non-floating 14px-label baseline (Modal.tsx comment) stays valid for confirm/view/simple modals that
+> haven't adopted it.
+
+- **One component, both modes.** A single modal serves **Add and Edit** — pass the record (e.g.
+  `customer`) to switch to edit; absent = create. Add and Edit must be a **1:1 visual match**. Do not
+  hand-roll a second edit form for a record that already has an add modal (the list/detail pages both
+  render the same component). Company-relationship and profile-photo editing live in their own UIs, so
+  edit mode hides those fields rather than duplicating them.
+- **Chrome:** `titleSize="sm"` (16px title) · round `bg-primary/10` icon badge · **`maxWidth="xl"`
+  (576px)** — the party/entity-form width, two-column rows · opt-in **`showClose`** (top-right X, the
+  party-form standard) · **`closeOnBackdrop={false}`** (a backdrop click must not discard in-progress
+  input) · **`initialFocusRef`** on the first field. Optional **`headerAction` micro-badge** for a
+  non-consuming preview — e.g. the next-number pill (`border border-info/30 bg-info-muted` rounded
+  pill; label `text-xxs font-medium uppercase text-slate-500`, value `font-mono text-xs
+  font-semibold text-info`), shown in create mode only.
+- **Floating labels everywhere.** Every field uses the opt-in **`floatingLabel`** variant — the label
+  is a notch on the field's top border (`FLOATING_LABEL_CLS`, `text-xs` 12px, `text-slate-500`,
+  `bg-surface` so it sits *over* the border), not a stacked label above. Supported on `Input`,
+  `Textarea`, `SearchableSelect`, `PhoneInput`, and `AddressFields`. The label association is preserved
+  through `useFieldA11y` (so it is a real persistent label — never a placeholder-only field — and stays
+  query-able by `getByLabelText`).
+- **Quiet placeholders & sentinels.** Placeholders render at `text-xs` (12px, `placeholder:text-xs`)
+  so they read a step below the 14px typed value; a `SearchableSelect`'s **`shrinkDefaultValue`** shows
+  its unset sentinel ("No <Entity>" / "Not specified", per the Forms sentinel convention) at `text-xxs`
+  so an empty value reads quietly; the dropdown's options/search/empty/add-new text also drops to
+  `text-xs` under `floatingLabel`. Selects **`usePortal`** so their listbox clears the panel (`z-popover`).
+- **Layout:** `space-y-6` row rhythm; related fields pair into `grid grid-cols-1 md:grid-cols-2 gap-4`
+  rows; a single full-width **Address** line sits above an **"Additional address details (optional)"**
+  sub-block (`AddressFields`) captioned `text-xs font-medium text-slate-500`. **No uppercase
+  section-header dividers** at this tier — those belong to the 4-column Workspace grid (Forms & Field
+  Layout). Clear-× affordances stay banned inside controls (Forms & Field Layout).
+- **Progressive disclosure.** Secondary/rare fields hide behind a **`+`** affordance (a plain
+  `text-primary` icon-button anchored above the field it extends) and reveal in the next row with an
+  **`X`** to collapse-and-clear — e.g. Alternative Email + Alternative Mobile. Keeps the default form
+  short (Forms & Feedback: progressive disclosure over overwhelm-upfront).
+- **Footer:** compact — Cancel `variant="secondary" size="sm"` + `text-xs`, primary action
+  `size="sm"` + `text-xs` with a `Loader2` spinner while pending, separated by a `border-t`. A short
+  party form renders this at the end of the `space-y-6` body; **when a form modal can scroll, move the
+  footer into the pinned `Modal` `footer` slot** per the three-region standard above.
+- **Inline sub-create.** An "Add New <X>" flow (e.g. Add New Company) opens as a `size="sm"` child
+  `Modal` from the select's `onAddNew`; on success it selects the new row and closes.
 
 ### Tabbed form modal — reference: `cases/DeviceFormModal.tsx`
 Large, multi-section records use a **tabbed Workspace modal**: a pinned tab bar splits the record into ≤ 4 tabs; each tab's fields render in the responsive grid below (see **Forms & Field Layout**). Reference: the Edit Device modal (tabs: Device Details, Diagnostic, Components, History / Activity).
@@ -349,6 +401,13 @@ This is a ladder, not a license to shadow everything — shadow signals *elevati
 
 ## Forms & Field Layout
 Documents the field-grouping the redesign introduces, plus the existing `FormField` conventions DESIGN.md never captured.
+
+> **Two form tiers, two layouts.** Standard/Wide **entity add/edit modals** use the **floating-label
+> form** (single component for Add + Edit, notch labels, 2-column paired rows, progressive disclosure) —
+> the canonical reference is `CustomerFormModal`, specified under **Overlays → Form modal**. The
+> **4-column grid + uppercase section-header dividers** below is the **Workspace-tier** layout for
+> 30+ field, tabbed records. Pick the tier by field count; do not mix a floating-label party form into
+> the Workspace grid or vice-versa.
 
 > **Status — partly leads the code.** The `FormField` + `ui/` field primitives below exist and are the standard for labels/errors/a11y. The **4-column Workspace grid** and **uppercase section-header dividers** are **net-new prescriptions** — no form uses them yet (the closest shipped grid is `DeviceDetailsForm`'s `sm:grid-cols-2 lg:grid-cols-4`; tab bodies vary at `lg:grid-cols-3`). Apply them to new and edited Workspace forms; existing forms are tracked, not assumed.
 
@@ -414,6 +473,7 @@ Captured 2026-06-01 from a code audit; drifts #1–#3 resolved 2026-06-02. **A 2
 ## Decisions Log
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-07-21 | **Form-modal standard codified — the floating-label form (`CustomerFormModal`) is the canonical entity add/edit popup, to be replicated across all form modals.** Added **Overlays → Form modal**: one component for Add + Edit (1:1 match), floating notch labels (`FLOATING_LABEL_CLS`, `text-xs`/12px, opt-in `floatingLabel` on `Input`/`Textarea`/`SearchableSelect`/`PhoneInput`/`AddressFields`, a11y via `useFieldA11y`), compact chrome (`titleSize="sm"` 16px title, round `bg-primary/10` icon badge, `maxWidth="xl"` 576px, opt-in `showClose` X, `closeOnBackdrop={false}`, `initialFocusRef`, optional `headerAction` number-preview pill), `text-xs` placeholders + `shrinkDefaultValue` sentinels, `space-y-6` + `md:grid-cols-2 gap-4` paired rows, `+`/`X` progressive disclosure, compact `size="sm"` footer (Cancel = `secondary`). Updated the Type-roles **Modal title** (form modals → `titleSize="sm"`) and **Form label** (floating-label variant) rows; reconciled the **No top-right X** anatomy note with the 2026-07-20 opt-in `showClose` re-introduction; cross-linked **Forms & Field Layout** (floating-label = Standard/Wide tier, the 4-col grid = Workspace tier). Marked **leads the code** — shipped in `CustomerFormModal`, roll-out to the remaining entity modals tracked. | Owner directive: the finalized Add/Edit Customer popup is the house form-modal design — replicate everywhere so every add/edit surface reads identically. Codifying it as a named reference (rather than per-modal reinvention) makes the roll-out mechanical and keeps Add/Edit 1:1. The pattern reuses existing primitives (opt-in `floatingLabel`, `Modal` `titleSize`/`showClose`/`headerAction`), so no new tokens — the color/typography/z-index contracts are unaffected. Emerged from PR #437's modal work (`Modal.tsx` typography-benchmark + width-tier comments, `showClose` re-add). |
 | 2026-07-05 | **Midnight Aurora (4th theme, premium dark) + var-backed neutral ramp.** Added `data-theme="midnight"` (navy surfaces `#0A111F`/`#111B32`, electric-blue `primary #2E6BE8`, aurora-violet `secondary #6D4AE3`, dark-violet `accent` surface) and remapped the `white`/`slate` utilities per-utility onto CSS vars (`--nb-*`/`--nt-*`/`--ne-*`) so ~7,000 neutral call-sites re-skin with zero churn — light themes bind to the exact Tailwind values (pixel-identical). New constant `ink-dark` token for ink-on-saturated-fills (GradientStatCard light tiles migrated); status + `cat-7`/`cat-8` re-anchored for dark with hue/meaning preserved (all pairs WCAG-validated, matrix in the plan doc); chart chrome re-skins via scoped CSS (data hues fixed); `@media print` forces light bindings; scrollbars/ring-offset/`color-scheme` themed; bare-`border` DEFAULT rebound from gray-200 (latent drift) to the slate-200 edge token. `main.tsx` anti-flash whitelist now derives from `THEMES` (hardcoded 3-theme list = wrong-theme flash regression, fixed). DB: `tenants.theme` CHECK gains `'midnight'` (applied 2026-07-05, version `20260705175334`). | Owner asked for the new login page's premium navy/blue/violet identity as a flagship app-wide theme plus a theme-system hardening pass. The login design language was already owner-approved for auth (2026-07-04); routing the violet through theme *tokens* keeps the purple/indigo/violet class ban fully enforced. Per-utility var remap chosen over a ~400-file class rewrite: zero call-site churn, pixel-stable light themes, and future themes (incl. dark) become pure CSS additions. |
 | 2026-06-01 | Initial DESIGN.md created by codifying the live system (not proposing a new one) | xSuite has a locked theme/token system; goal is consistency, so the doc documents and enforces what exists. Source: `src/index.css`, `tailwind.config.js`, `src/lib/chartTheme.ts`, `src/lib/pdf/styles.ts`, `index.html`. |
 | 2026-06-01 | Logged 3 known deviations rather than silently "documenting them away" | A consistency contract must reflect reality; drift is tracked for fixing, not normalized. |
