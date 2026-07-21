@@ -74,16 +74,16 @@ describe('DeviceFormModal — tabbed shell', () => {
     });
   });
 
-  it('matches the design: titled sections, footer-only dismissal, and no role/password/primary/delete controls', async () => {
+  it('matches the design: titled sections, standard dismissal, and no role/password/primary/delete controls', async () => {
     renderModal();
 
     // Details tab renders the two titled sections from the design.
     expect(await screen.findByText('Basic Information')).toBeInTheDocument();
     expect(screen.getByText('Technical Information')).toBeInTheDocument();
 
-    // The top-right X pattern is removed platform-wide (DESIGN.md → Overlays);
-    // dismissal is the pinned footer Cancel + ESC/backdrop.
-    expect(screen.queryByRole('button', { name: /^Close$/i })).toBeNull();
+    // 2026-07-21 modal standard (PR #437): header carries the top-right X
+    // alongside the pinned footer Cancel + ESC.
+    expect(screen.getByRole('button', { name: /^Close$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Cancel/i })).toBeInTheDocument();
 
     // Structural controls are intentionally absent from the UI. Their values are
