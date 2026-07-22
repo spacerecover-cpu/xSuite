@@ -10,7 +10,6 @@ import { supabase } from '../../lib/supabaseClient';
 import { getExpenseCategories, Expense } from '../../lib/expensesService';
 import {
   Receipt,
-  Calendar,
   Save,
   Upload,
   Loader2,
@@ -179,22 +178,15 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
     >
       <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-5">
         <div className="grid grid-cols-2 gap-x-4 gap-y-5">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Expense Date
-            </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <Input
-                ref={firstFieldRef}
-                type="date"
-                value={expenseDate}
-                onChange={(e) => setExpenseDate(e.target.value)}
-                className="pl-10"
-                required
-              />
-            </div>
-          </div>
+          <Input
+            ref={firstFieldRef}
+            label="Expense Date"
+            floatingLabel
+            type="date"
+            value={expenseDate}
+            onChange={(e) => setExpenseDate(e.target.value)}
+            required
+          />
 
           <div>
             <Input
