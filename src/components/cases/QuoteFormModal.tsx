@@ -607,7 +607,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                       placeholder="Describe the service or item"
                       value={item.description}
                       onChange={(e) => updateLineItem(index, 'description', e.target.value)}
-                      className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-success focus:border-success"
+                      className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                       required
                     />
                   </div>
@@ -622,7 +622,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                         updated[index] = { ...updated[index], unit_code: code, unit_label: unit?.label ?? null };
                         setLineItems(updated);
                       }}
-                      className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-success focus:border-success"
+                      className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                     >
                       <option value="">—</option>
                       {unitCodes.map((u) => (
@@ -637,7 +637,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                       aria-label="Item code"
                       value={item.item_code ?? ''}
                       onChange={(e) => updateLineItem(index, 'item_code', e.target.value || null)}
-                      className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-success focus:border-success"
+                      className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                     />
                   </div>
                   <div className="col-span-2">
@@ -650,7 +650,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                       }
                       min="0"
                       step="0.01"
-                      className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-success focus:border-success"
+                      className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                       required
                     />
                   </div>
@@ -664,7 +664,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                       }
                       min="0"
                       step="0.01"
-                      className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-success focus:border-success"
+                      className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                       required
                     />
                   </div>
@@ -879,7 +879,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                     setQuoteData({ ...quoteData, terms_and_conditions: e.target.value })
                   }
                   rows={4}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-success focus:border-success"
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   placeholder="Quote validity and payment terms (e.g., Quote valid for 30 days, 50% deposit required)"
                 />
               </div>
