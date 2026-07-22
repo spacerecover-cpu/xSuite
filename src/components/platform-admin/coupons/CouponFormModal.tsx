@@ -2,7 +2,9 @@ import React, { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
-import { Ticket } from 'lucide-react';
+import { Input } from '../../ui/Input';
+import { SearchableSelect } from '../../ui/SearchableSelect';
+import { Ticket, Loader2 } from 'lucide-react';
 import { createCoupon, updateCoupon } from '../../../lib/billingService';
 import { platformAdminKeys } from '../../../lib/queryKeys';
 import { useToast } from '../../../hooks/useToast';
@@ -68,6 +70,7 @@ export const CouponFormModal: React.FC<CouponFormModalProps> = ({ isOpen, onClos
       title={isEditing ? 'Edit Coupon' : 'Create Coupon'}
       subtitle={isEditing ? "Update this coupon's details." : 'Enter the coupon details to create it.'}
       icon={Ticket}
+      titleSize="sm"
       size="md"
       showClose
       closeOnBackdrop={false}
@@ -78,113 +81,92 @@ export const CouponFormModal: React.FC<CouponFormModalProps> = ({ isOpen, onClos
             e.preventDefault();
             mutation.mutate();
           }}
-          className="space-y-4"
+          className="space-y-5"
         >
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="coupon-code" className="block text-sm font-medium text-slate-700 mb-1">Coupon Code *</label>
-              <input
-                id="coupon-code"
-                ref={codeInputRef}
-                type="text"
-                value={formData.code}
-                onChange={(e) => setFormData((p) => ({ ...p, code: e.target.value.toUpperCase() }))}
-                className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="SAVE20"
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="coupon-name" className="block text-sm font-medium text-slate-700 mb-1">Name</label>
-              <input
-                id="coupon-name"
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="20% off first year"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="coupon-discount-type" className="block text-sm font-medium text-slate-700 mb-1">Discount Type *</label>
-              <select
-                id="coupon-discount-type"
-                value={formData.discount_type}
-                onChange={(e) => setFormData((p) => ({ ...p, discount_type: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="percentage">Percentage (%)</option>
-                <option value="fixed">Fixed Amount ($)</option>
-              </select>
-            </div>
-            <div>
-              <label htmlFor="coupon-discount-value" className="block text-sm font-medium text-slate-700 mb-1">Discount Value *</label>
-              <input
-                id="coupon-discount-value"
-                type="number"
-                step="0.01"
-                value={formData.discount_value}
-                onChange={(e) => setFormData((p) => ({ ...p, discount_value: parseFloat(e.target.value) || 0 }))}
-                className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="coupon-valid-from" className="block text-sm font-medium text-slate-700 mb-1">Valid From</label>
-              <input
-                id="coupon-valid-from"
-                type="date"
-                value={formData.valid_from}
-                onChange={(e) => setFormData((p) => ({ ...p, valid_from: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-            <div>
-              <label htmlFor="coupon-valid-until" className="block text-sm font-medium text-slate-700 mb-1">Valid Until</label>
-              <input
-                id="coupon-valid-until"
-                type="date"
-                value={formData.valid_until}
-                onChange={(e) => setFormData((p) => ({ ...p, valid_until: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="coupon-max-redemptions" className="block text-sm font-medium text-slate-700 mb-1">Max Redemptions</label>
-            <input
-              id="coupon-max-redemptions"
-              type="number"
-              value={formData.max_redemptions ?? ''}
-              onChange={(e) =>
-                setFormData((p) => ({
-                  ...p,
-                  max_redemptions: e.target.value ? parseInt(e.target.value) : null,
-                }))
-              }
-              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="Unlimited"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="coupon-paypal-id" className="block text-sm font-medium text-slate-700 mb-1">PayPal Coupon ID</label>
-            <input
-              id="coupon-paypal-id"
+          <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+            <Input
+              ref={codeInputRef}
+              label="Coupon Code"
+              floatingLabel
               type="text"
-              value={formData.paypal_coupon_id}
-              onChange={(e) => setFormData((p) => ({ ...p, paypal_coupon_id: e.target.value }))}
-              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="Optional"
+              value={formData.code}
+              onChange={(e) => setFormData((p) => ({ ...p, code: e.target.value.toUpperCase() }))}
+              className="font-mono"
+              placeholder="SAVE20"
+              required
+            />
+            <Input
+              label="Name"
+              floatingLabel
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
+              placeholder="20% off first year"
             />
           </div>
+
+          <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+            <SearchableSelect
+              label="Discount Type"
+              floatingLabel
+              usePortal
+              value={formData.discount_type}
+              onChange={(value) => setFormData((p) => ({ ...p, discount_type: value }))}
+              options={[
+                { id: 'percentage', name: 'Percentage (%)' },
+                { id: 'fixed', name: 'Fixed Amount ($)' },
+              ]}
+            />
+            <Input
+              label="Discount Value"
+              floatingLabel
+              type="number"
+              step="0.01"
+              value={formData.discount_value}
+              onChange={(e) => setFormData((p) => ({ ...p, discount_value: parseFloat(e.target.value) || 0 }))}
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+            <Input
+              label="Valid From"
+              floatingLabel
+              type="date"
+              value={formData.valid_from}
+              onChange={(e) => setFormData((p) => ({ ...p, valid_from: e.target.value }))}
+            />
+            <Input
+              label="Valid Until"
+              floatingLabel
+              type="date"
+              value={formData.valid_until}
+              onChange={(e) => setFormData((p) => ({ ...p, valid_until: e.target.value }))}
+            />
+          </div>
+
+          <Input
+            label="Max Redemptions"
+            floatingLabel
+            type="number"
+            value={formData.max_redemptions ?? ''}
+            onChange={(e) =>
+              setFormData((p) => ({
+                ...p,
+                max_redemptions: e.target.value ? parseInt(e.target.value) : null,
+              }))
+            }
+            placeholder="Unlimited"
+          />
+
+          <Input
+            label="PayPal Coupon ID"
+            floatingLabel
+            type="text"
+            value={formData.paypal_coupon_id}
+            onChange={(e) => setFormData((p) => ({ ...p, paypal_coupon_id: e.target.value }))}
+            placeholder="Optional"
+          />
 
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -196,12 +178,21 @@ export const CouponFormModal: React.FC<CouponFormModalProps> = ({ isOpen, onClos
             <span className="text-sm text-slate-700">Active</span>
           </label>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-            <Button type="button" variant="secondary" onClick={onClose}>
+          <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-200">
+            <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Saving...' : isEditing ? 'Update Coupon' : 'Create Coupon'}
+            <Button type="submit" size="sm" className="text-xs" disabled={mutation.isPending}>
+              {mutation.isPending ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  Saving...
+                </>
+              ) : isEditing ? (
+                'Update Coupon'
+              ) : (
+                'Create Coupon'
+              )}
             </Button>
           </div>
         </form>

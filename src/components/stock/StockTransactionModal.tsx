@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { PackagePlus, PackageMinus } from 'lucide-react';
+import { PackagePlus, PackageMinus, Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
 import {
   recordStockReceipt,
   recordStockUsage,
@@ -127,6 +128,9 @@ export function StockTransactionModal({
       title={titleText}
       icon={TitleIcon}
       size="sm"
+      titleSize="sm"
+      showClose
+      closeOnBackdrop={false}
     >
       {item && (
         <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
@@ -147,9 +151,10 @@ export function StockTransactionModal({
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <Input
           label="Quantity"
+          floatingLabel
           type="number"
           min={1}
           step={1}
@@ -164,6 +169,7 @@ export function StockTransactionModal({
           <>
             <Input
               label="Cost Per Unit"
+              floatingLabel
               type="number"
               min={0}
               step="0.001"
@@ -179,51 +185,44 @@ export function StockTransactionModal({
               }
             />
 
-            <div>
-              <label htmlFor="stock-txn-serial-numbers" className="block text-sm font-medium text-slate-700 mb-1">
-                Serial Numbers
-                <span className="text-slate-400 font-normal ml-1">(comma-separated, optional)</span>
-              </label>
-              <textarea
-                id="stock-txn-serial-numbers"
-                rows={3}
-                value={form.serialNumbers}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, serialNumbers: e.target.value }))
-                }
-                placeholder="SN001, SN002, SN003"
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-              />
-            </div>
+            <Textarea
+              label="Serial Numbers"
+              floatingLabel
+              hint="Comma-separated, optional"
+              rows={3}
+              className="resize-none"
+              value={form.serialNumbers}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, serialNumbers: e.target.value }))
+              }
+              placeholder="SN001, SN002, SN003"
+            />
           </>
         )}
 
-        <div>
-          <label htmlFor="stock-txn-notes" className="block text-sm font-medium text-slate-700 mb-1">
-            Notes
-            <span className="text-slate-400 font-normal ml-1">(optional)</span>
-          </label>
-          <textarea
-            id="stock-txn-notes"
-            rows={3}
-            value={form.notes}
-            onChange={(e) =>
-              setForm((p) => ({ ...p, notes: e.target.value }))
-            }
-            placeholder={
-              mode === 'receipt'
-                ? 'Purchase order, supplier info, etc.'
-                : 'Reason for usage, job details, etc.'
-            }
-            className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-          />
-        </div>
+        <Textarea
+          label="Notes"
+          floatingLabel
+          hint="Optional"
+          rows={3}
+          className="resize-none"
+          value={form.notes}
+          onChange={(e) =>
+            setForm((p) => ({ ...p, notes: e.target.value }))
+          }
+          placeholder={
+            mode === 'receipt'
+              ? 'Purchase order, supplier info, etc.'
+              : 'Reason for usage, job details, etc.'
+          }
+        />
 
         <div className="flex justify-end gap-2 pt-2">
           <Button
             type="button"
             variant="secondary"
             size="sm"
+            className="text-xs"
             onClick={onClose}
             disabled={submitting}
           >
@@ -233,13 +232,19 @@ export function StockTransactionModal({
             type="submit"
             variant="primary"
             size="sm"
+            className="text-xs"
             disabled={submitting || !item}
           >
-            {submitting
-              ? 'Saving...'
-              : mode === 'receipt'
-              ? 'Confirm Receipt'
-              : 'Confirm Usage'}
+            {submitting ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Saving...
+              </>
+            ) : mode === 'receipt' ? (
+              'Confirm Receipt'
+            ) : (
+              'Confirm Usage'
+            )}
           </Button>
         </div>
       </form>

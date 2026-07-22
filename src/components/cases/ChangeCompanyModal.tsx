@@ -3,7 +3,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { useCompanyPickerRows } from '../../lib/pickerSearch';
-import { Building2, Mail, Phone, Hash, Globe } from 'lucide-react';
+import { Building2, Mail, Phone, Hash, Globe, Loader2 } from 'lucide-react';
 
 interface ChangeCompanyModalProps {
   isOpen: boolean;
@@ -74,8 +74,10 @@ export const ChangeCompanyModal: React.FC<ChangeCompanyModalProps> = ({
       title="Change Company"
       subtitle="Reassign this case to a different company."
       icon={Building2}
+      titleSize="sm"
       size="md"
       showClose
+      closeOnBackdrop={false}
     >
       <div className="space-y-6">
         {/* Current Company Info */}
@@ -127,11 +129,11 @@ export const ChangeCompanyModal: React.FC<ChangeCompanyModalProps> = ({
 
         {/* New Company Selection */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Select New Company
-          </label>
           <SearchableSelect
-            label=""
+            label="Select New Company"
+            floatingLabel
+            shrinkDefaultValue
+            usePortal
             options={companyOptions}
             value={selectedCompanyId}
             onChange={(value) => setSelectedCompanyId(value)}
@@ -157,20 +159,31 @@ export const ChangeCompanyModal: React.FC<ChangeCompanyModalProps> = ({
         )}
 
         {/* Action Buttons */}
-        <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+        <div className="flex gap-2.5 justify-end pt-4 border-t border-slate-200">
           <Button
             variant="secondary"
+            size="sm"
+            className="text-xs"
             onClick={onClose}
             disabled={isLoading}
           >
             Cancel
           </Button>
           <Button
+            size="sm"
+            className="text-xs"
             onClick={handleConfirm}
             disabled={!hasChanged || isLoading}
             style={{ backgroundColor: 'rgb(var(--color-success))' }}
           >
-            {isLoading ? 'Changing Company...' : 'Change Company'}
+            {isLoading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Changing Company...
+              </>
+            ) : (
+              'Change Company'
+            )}
           </Button>
         </div>
       </div>

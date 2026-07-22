@@ -1,7 +1,8 @@
-import { useId, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import { CheckCircle2, RefreshCw } from 'lucide-react';
+import { Textarea } from '../ui/Textarea';
+import { CheckCircle2, RefreshCw, Loader2 } from 'lucide-react';
 import {
   markAssignmentAsWorking,
   type AssignmentWithDetails,
@@ -25,7 +26,6 @@ export function CompleteAssignmentModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const usageNotesRef = useRef<HTMLTextAreaElement>(null);
-  const usageNotesId = useId();
 
   const handleReset = () => {
     setUsageNotes('');
@@ -62,11 +62,13 @@ export function CompleteAssignmentModal({
       title="Mark as Working & Free for Reuse"
       subtitle="Mark this donor as working and free it for reuse."
       icon={CheckCircle2}
+      titleSize="sm"
       size="md"
       showClose
+      closeOnBackdrop={false}
       initialFocusRef={usageNotesRef}
     >
-      <div className="space-y-2">
+      <div className="space-y-5">
         <div className="bg-success-muted border border-success/30 rounded-lg p-2">
           <div className="flex items-start">
             <CheckCircle2 className="w-4 h-4 text-success mt-0.5 mr-2 flex-shrink-0" />
@@ -112,24 +114,18 @@ export function CompleteAssignmentModal({
           </div>
         </div>
 
-        <div>
-          <label htmlFor={usageNotesId} className="block text-sm font-medium text-slate-700 mb-1">
-            Performance Notes (Optional)
-          </label>
-          <textarea
-            id={usageNotesId}
-            ref={usageNotesRef}
-            value={usageNotes}
-            onChange={(e) => setUsageNotes(e.target.value)}
-            rows={2}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-            placeholder="How did this donor perform? Any observations or recommendations for future use..."
-            disabled={loading}
-          />
-          <p className="text-xs text-slate-500 mt-0.5">
-            Document the donor's performance, compatibility notes, or any observations that may be useful for future assignments.
-          </p>
-        </div>
+        <Textarea
+          ref={usageNotesRef}
+          label="Performance Notes (Optional)"
+          floatingLabel
+          value={usageNotes}
+          onChange={(e) => setUsageNotes(e.target.value)}
+          rows={2}
+          className="resize-none"
+          placeholder="How did this donor perform? Any observations or recommendations for future use..."
+          disabled={loading}
+          hint="Document the donor's performance, compatibility notes, or any observations that may be useful for future assignments."
+        />
 
         {error && (
           <div className="bg-danger-muted border border-danger/30 rounded-lg p-2">
@@ -154,18 +150,21 @@ export function CompleteAssignmentModal({
           <Button
             onClick={handleClose}
             variant="secondary"
+            size="sm"
+            className="text-xs"
             disabled={loading}
           >
             Cancel
           </Button>
           <Button
             onClick={handleComplete}
+            size="sm"
             disabled={loading}
-            className="bg-success hover:bg-success/90 text-success-foreground"
+            className="bg-success hover:bg-success/90 text-success-foreground text-xs"
           >
             {loading ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                 Processing...
               </>
             ) : (

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { SearchableSelect } from '../ui/SearchableSelect';
-import { AlertCircle, Briefcase, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Textarea } from '../ui/Textarea';
+import { AlertCircle, Briefcase, CheckCircle2, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import {
   getCasesForAssignment,
   assignInventoryToCase,
@@ -120,12 +121,14 @@ export function AssignToCaseModal({
       title={inventoryItemName}
       subtitle="Assign this item to a case."
       icon={Briefcase}
+      titleSize="sm"
       maxWidth="3xl"
       showClose
+      closeOnBackdrop={false}
     >
       <div className="grid grid-cols-2 gap-6">
         {/* Left Column - Assignment Interface */}
-        <div className="space-y-4">
+        <div className="space-y-5">
           {/* Availability Status */}
           <div className="flex items-center space-x-2">
             {availability && !availability.available ? (
@@ -151,11 +154,12 @@ export function AssignToCaseModal({
 
           {/* Case Selection */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Select Case <span className="text-danger">*</span>
-            </label>
             <SearchableSelect
-              label=""
+              label="Select Case"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
+              required
               options={caseOptions}
               value={selectedCaseId}
               onChange={setSelectedCaseId}
@@ -183,14 +187,18 @@ export function AssignToCaseModal({
             </button>
 
             {showNotes && (
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-                className="w-full mt-2 px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="Assignment notes..."
-                disabled={loading || (!!availability && !availability.available)}
-              />
+              <div className="mt-2">
+                <Textarea
+                  label="Notes"
+                  floatingLabel
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={3}
+                  className="resize-none"
+                  placeholder="Assignment notes..."
+                  disabled={loading || (!!availability && !availability.available)}
+                />
+              </div>
             )}
           </div>
 
@@ -208,7 +216,7 @@ export function AssignToCaseModal({
               variant="secondary"
               size="sm"
               disabled={loading}
-              className="flex-1"
+              className="flex-1 text-xs"
             >
               Cancel
             </Button>
@@ -221,11 +229,11 @@ export function AssignToCaseModal({
                 loadingCases ||
                 (availability !== null && !availability.available)
               }
-              className="flex-1"
+              className="flex-1 text-xs"
             >
               {loading ? (
                 <>
-                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                   Assigning...
                 </>
               ) : (

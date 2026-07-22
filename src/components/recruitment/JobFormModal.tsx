@@ -1,10 +1,12 @@
 import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Briefcase } from 'lucide-react';
+import { Briefcase, Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import { recruitmentKeys } from '../../lib/queryKeys';
 import {
   createJob,
@@ -57,7 +59,7 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
   const toast = useToast();
   const isEditing = !!job;
 
-  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<JobFormData>({
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<JobFormData>({
     defaultValues: {
       title: '',
       department_id: '',
@@ -74,6 +76,9 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
   });
 
   const selectedDepartmentId = watch('department_id');
+  const positionId = watch('position_id');
+  const employmentType = watch('employment_type');
+  const status = watch('status');
 
   useEffect(() => {
     if (job) {
@@ -165,124 +170,104 @@ export const JobFormModal: React.FC<Props> = ({ isOpen, onClose, job }) => {
       title={isEditing ? 'Edit Job' : 'Post New Job'}
       subtitle={isEditing ? "Update this job's details." : 'Enter the job details to post it.'}
       icon={Briefcase}
+      titleSize="sm"
       size="lg"
       showClose
       closeOnBackdrop={false}
     >
-      <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Job Title <span className="text-danger">*</span>
-          </label>
-          <Input
-            {...register('title', { required: 'Title is required' })}
-            placeholder="e.g. Data Recovery Engineer"
+      <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-5">
+        <Input
+          label="Job Title"
+          floatingLabel
+          required
+          error={errors.title?.message}
+          placeholder="e.g. Data Recovery Engineer"
+          {...register('title', { required: 'Title is required' })}
+        />
+
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+          <SearchableSelect
+            label="Department"
+            floatingLabel
+            shrinkDefaultValue
+            usePortal
+            value={selectedDepartmentId}
+            onChange={(value) => setValue('department_id', value)}
+            options={[{ id: '', name: 'No Department' }, ...departments.map(d => ({ id: d.id, name: d.name }))]}
+            placeholder="No Department"
           />
-          {errors.title && <p className="text-danger text-xs mt-1">{errors.title.message}</p>}
-        </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="job-department" className="block text-sm font-medium text-slate-700 mb-1">Department</label>
-            <select
-              id="job-department"
-              {...register('department_id')}
-              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="">Select department...</option>
-              {departments.map(d => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="job-position" className="block text-sm font-medium text-slate-700 mb-1">Position</label>
-            <select
-              id="job-position"
-              {...register('position_id')}
-              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="">Select position...</option>
-              {positions.map(p => (
-                <option key={p.id} value={p.id}>{p.title}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="job-employment-type" className="block text-sm font-medium text-slate-700 mb-1">Employment Type</label>
-            <select
-              id="job-employment-type"
-              {...register('employment_type')}
-              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              {EMPLOYMENT_TYPES.map(t => (
-                <option key={t} value={t}>{employmentTypeLabels[t]}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="job-status" className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-            <select
-              id="job-status"
-              {...register('status')}
-              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              {JOB_STATUSES.map(s => (
-                <option key={s} value={s}>{statusLabels[s]}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Location</label>
-            <Input {...register('location')} placeholder="e.g. Dubai, UAE" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Openings</label>
-            <Input {...register('openings')} type="number" min="1" placeholder="1" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Salary Min</label>
-            <Input {...register('salary_range_min')} type="number" placeholder="e.g. 5000" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Salary Max</label>
-            <Input {...register('salary_range_max')} type="number" placeholder="e.g. 10000" />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Closing Date</label>
-          <Input {...register('closes_at')} type="date" />
-        </div>
-
-        <div>
-          <label htmlFor="job-description" className="block text-sm font-medium text-slate-700 mb-1">Job Description</label>
-          <textarea
-            id="job-description"
-            {...register('description')}
-            rows={4}
-            placeholder="Describe responsibilities, requirements, and qualifications..."
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+          <SearchableSelect
+            label="Position"
+            floatingLabel
+            shrinkDefaultValue
+            usePortal
+            value={positionId}
+            onChange={(value) => setValue('position_id', value)}
+            options={[{ id: '', name: 'No Position' }, ...positions.map(p => ({ id: p.id, name: p.title }))]}
+            placeholder="No Position"
           />
         </div>
+
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+          <SearchableSelect
+            label="Employment Type"
+            floatingLabel
+            usePortal
+            value={employmentType}
+            onChange={(value) => setValue('employment_type', value)}
+            options={EMPLOYMENT_TYPES.map(t => ({ id: t, name: employmentTypeLabels[t] }))}
+          />
+
+          <SearchableSelect
+            label="Status"
+            floatingLabel
+            usePortal
+            value={status}
+            onChange={(value) => setValue('status', value)}
+            options={JOB_STATUSES.map(s => ({ id: s, name: statusLabels[s] }))}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+          <Input label="Location" floatingLabel placeholder="e.g. Dubai, UAE" {...register('location')} />
+          <Input label="Openings" floatingLabel type="number" min="1" placeholder="1" {...register('openings')} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+          <Input label="Salary Min" floatingLabel type="number" placeholder="e.g. 5000" {...register('salary_range_min')} />
+          <Input label="Salary Max" floatingLabel type="number" placeholder="e.g. 10000" {...register('salary_range_max')} />
+        </div>
+
+        <div>
+          <label htmlFor="job-closes-at" className="block text-sm font-medium text-slate-700 mb-1">Closing Date</label>
+          <Input id="job-closes-at" {...register('closes_at')} type="date" />
+        </div>
+
+        <Textarea
+          label="Job Description"
+          floatingLabel
+          rows={4}
+          className="resize-none"
+          placeholder="Describe responsibilities, requirements, and qualifications..."
+          {...register('description')}
+        />
 
         <div className="flex justify-end gap-3 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={mutation.isPending}>
-            {mutation.isPending ? 'Saving...' : isEditing ? 'Update Job' : 'Post Job'}
+          <Button type="submit" size="sm" className="text-xs" disabled={mutation.isPending}>
+            {mutation.isPending ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Saving...
+              </>
+            ) : isEditing ? (
+              'Update Job'
+            ) : (
+              'Post Job'
+            )}
           </Button>
         </div>
       </form>

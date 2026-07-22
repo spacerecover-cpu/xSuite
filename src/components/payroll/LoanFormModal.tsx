@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useId } from 'react';
-import { TrendingUp, HandCoins } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { TrendingUp, HandCoins, Loader2 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { payrollService } from '../../lib/payrollService';
@@ -7,6 +7,7 @@ import { payrollKeys } from '../../lib/queryKeys';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useToast } from '../../hooks/useToast';
@@ -23,12 +24,6 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
   const { formatCurrency } = useCurrency();
   const toast = useToast();
   const queryClient = useQueryClient();
-  const loanTypeFieldId = useId();
-  const principalFieldId = useId();
-  const interestFieldId = useId();
-  const installmentsFieldId = useId();
-  const startDateFieldId = useId();
-  const notesFieldId = useId();
 
   const [formData, setFormData] = useState({
     employee_id: '',
@@ -151,14 +146,18 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
       title="Create New Loan"
       subtitle="Enter the loan details to set it up."
       icon={HandCoins}
+      titleSize="sm"
       showClose
       closeOnBackdrop={false}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-5">
           <div className="md:col-span-2">
             <SearchableSelect
               label="Employee"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
               required
               options={employees.map((emp) => ({
                 id: emp.id,
@@ -170,91 +169,73 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
             />
           </div>
 
-          <div>
-            <label htmlFor={loanTypeFieldId} className="block text-sm font-medium text-slate-700 mb-1">
-              Loan Type <span className="text-danger">*</span>
-            </label>
-            <select
-              id={loanTypeFieldId}
-              value={formData.loan_type}
-              onChange={(e) => handleChange('loan_type', e.target.value)}
-              className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              required
-            >
-              <option value="salary_advance">Salary Advance</option>
-              <option value="personal_loan">Personal Loan</option>
-              <option value="emergency_loan">Emergency Loan</option>
-            </select>
-          </div>
+          <SearchableSelect
+            label="Loan Type"
+            floatingLabel
+            shrinkDefaultValue
+            usePortal
+            required
+            options={[
+              { id: 'salary_advance', name: 'Salary Advance' },
+              { id: 'personal_loan', name: 'Personal Loan' },
+              { id: 'emergency_loan', name: 'Emergency Loan' },
+            ]}
+            value={formData.loan_type}
+            onChange={(value) => handleChange('loan_type', value)}
+          />
 
-          <div>
-            <label htmlFor={principalFieldId} className="block text-sm font-medium text-slate-700 mb-1">
-              Principal Amount <span className="text-danger">*</span>
-            </label>
-            <Input
-              id={principalFieldId}
-              type="number"
-              step="0.001"
-              min="0"
-              value={formData.principal_amount}
-              onChange={(e) => handleChange('principal_amount', e.target.value)}
-              placeholder="0.000"
-              required
-            />
-          </div>
+          <Input
+            label="Principal Amount"
+            floatingLabel
+            type="number"
+            step="0.001"
+            min="0"
+            value={formData.principal_amount}
+            onChange={(e) => handleChange('principal_amount', e.target.value)}
+            placeholder="0.000"
+            required
+          />
 
-          <div>
-            <label htmlFor={interestFieldId} className="block text-sm font-medium text-slate-700 mb-1">
-              Interest Rate (%)
-            </label>
-            <Input
-              id={interestFieldId}
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              value={formData.interest_rate}
-              onChange={(e) => handleChange('interest_rate', e.target.value)}
-              placeholder="0.00"
-            />
-          </div>
+          <Input
+            label="Interest Rate (%)"
+            floatingLabel
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            value={formData.interest_rate}
+            onChange={(e) => handleChange('interest_rate', e.target.value)}
+            placeholder="0.00"
+          />
 
-          <div>
-            <label htmlFor={installmentsFieldId} className="block text-sm font-medium text-slate-700 mb-1">
-              Number of Installments <span className="text-danger">*</span>
-            </label>
-            <Input
-              id={installmentsFieldId}
-              type="number"
-              min="1"
-              value={formData.installments_count}
-              onChange={(e) => handleChange('installments_count', e.target.value)}
-              placeholder="12"
-              required
-            />
-          </div>
+          <Input
+            label="Number of Installments"
+            floatingLabel
+            type="number"
+            min="1"
+            value={formData.installments_count}
+            onChange={(e) => handleChange('installments_count', e.target.value)}
+            placeholder="12"
+            required
+          />
 
-          <div>
-            <label htmlFor={startDateFieldId} className="block text-sm font-medium text-slate-700 mb-1">
-              Start Date <span className="text-danger">*</span>
-            </label>
-            <Input
-              id={startDateFieldId}
-              type="date"
-              value={formData.start_date}
-              onChange={(e) => handleChange('start_date', e.target.value)}
-              required
-            />
-          </div>
+          <Input
+            label="Start Date"
+            floatingLabel
+            type="date"
+            value={formData.start_date}
+            onChange={(e) => handleChange('start_date', e.target.value)}
+            required
+          />
 
           <div className="md:col-span-2">
-            <label htmlFor={notesFieldId} className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
-            <textarea
-              id={notesFieldId}
+            <Textarea
+              label="Notes"
+              floatingLabel
               value={formData.notes}
               onChange={(e) => handleChange('notes', e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="resize-none"
               placeholder="Additional notes or comments..."
             />
           </div>
@@ -297,12 +278,19 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
           </div>
         )}
 
-        <div className="flex justify-end space-x-3 pt-6 border-t">
-          <Button type="button" variant="secondary" onClick={onClose}>
+        <div className="flex justify-end gap-2.5 pt-6 border-t">
+          <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={createLoanMutation.isPending}>
-            {createLoanMutation.isPending ? 'Creating...' : 'Create Loan'}
+          <Button type="submit" size="sm" className="text-xs" disabled={createLoanMutation.isPending}>
+            {createLoanMutation.isPending ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              'Create Loan'
+            )}
           </Button>
         </div>
       </form>

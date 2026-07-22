@@ -3,17 +3,15 @@ import { useQuery } from '@tanstack/react-query';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import { supabase } from '../../lib/supabaseClient';
 import { getTransactionCategories, Transaction } from '../../lib/transactionsService';
 import {
-  DollarSign,
-  Calendar,
-  Tag,
-  FileText,
   TrendingUp,
   TrendingDown,
-  Save,
   ArrowLeftRight,
+  Loader2,
 } from 'lucide-react';
 import { logger } from '../../lib/logger';
 import { useToast } from '../../hooks/useToast';
@@ -112,8 +110,8 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="New Transaction" subtitle="Enter the transaction details to record it." icon={ArrowLeftRight} size="md" showClose closeOnBackdrop={false} initialFocusRef={firstFieldRef}>
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal isOpen={isOpen} onClose={handleClose} title="New Transaction" subtitle="Enter the transaction details to record it." icon={ArrowLeftRight} titleSize="sm" size="md" showClose closeOnBackdrop={false} initialFocusRef={firstFieldRef}>
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
           <button
             type="button"
@@ -141,154 +139,110 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Date
-            </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <Input
-                ref={firstFieldRef}
-                type="date"
-                value={transactionDate}
-                onChange={(e) => setTransactionDate(e.target.value)}
-                className="pl-10"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Amount
-            </label>
-            <div className="relative">
-              <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={amount}
-                onChange={(e) => {
-                  setAmount(parseFloat(e.target.value) || 0);
-                  setAmountError(null);
-                }}
-                className="pl-10"
-                required
-              />
-            </div>
-            {amountError && (
-              <p className="mt-1 text-xs text-danger">{amountError}</p>
-            )}
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="transaction-description" className="block text-sm font-medium text-slate-700 mb-1">
-            Description
-          </label>
-          <div className="relative">
-            <FileText className="absolute left-3 top-3 text-slate-400 w-4 h-4" />
-            <textarea
-              id="transaction-description"
-              value={description}
-              onChange={(e) => {
-                setDescription(e.target.value);
-                setDescriptionError(null);
-              }}
-              rows={2}
-              className="w-full pl-10 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-              placeholder="Transaction description..."
-              required
-            />
-          </div>
-          {descriptionError && (
-            <p className="mt-1 text-xs text-danger">{descriptionError}</p>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="transaction-category" className="block text-sm font-medium text-slate-700 mb-1">
-              Category
-            </label>
-            <div className="relative">
-              <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
-              <select
-                id="transaction-category"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full h-9 pl-10 pr-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-              >
-                <option value="">Select Category</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="transaction-bank-account" className="block text-sm font-medium text-slate-700 mb-1">
-              Bank Account
-            </label>
-            <select
-              id="transaction-bank-account"
-              value={bankAccountId}
-              onChange={(e) => setBankAccountId(e.target.value)}
-              className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-            >
-              <option value="">Select Account</option>
-              {bankAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.account_name} ({account.account_type})
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Reference Number
-          </label>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
           <Input
-            type="text"
-            value={referenceNumber}
-            onChange={(e) => setReferenceNumber(e.target.value)}
-            placeholder="e.g., Check #, Receipt #"
+            ref={firstFieldRef}
+            label="Date"
+            floatingLabel
+            type="date"
+            value={transactionDate}
+            onChange={(e) => setTransactionDate(e.target.value)}
+            required
+          />
+
+          <Input
+            label="Amount"
+            floatingLabel
+            type="number"
+            step="0.01"
+            min="0"
+            value={amount}
+            onChange={(e) => {
+              setAmount(parseFloat(e.target.value) || 0);
+              setAmountError(null);
+            }}
+            required
+            error={amountError || undefined}
           />
         </div>
 
-        <div>
-          <label htmlFor="transaction-notes" className="block text-sm font-medium text-slate-700 mb-1">
-            Notes (Optional)
-          </label>
-          <textarea
-            id="transaction-notes"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={2}
-            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-            placeholder="Additional notes..."
+        <Textarea
+          label="Description"
+          floatingLabel
+          value={description}
+          onChange={(e) => {
+            setDescription(e.target.value);
+            setDescriptionError(null);
+          }}
+          rows={2}
+          className="resize-none"
+          placeholder="Transaction description..."
+          required
+          error={descriptionError || undefined}
+        />
+
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+          <SearchableSelect
+            label="Category"
+            floatingLabel
+            shrinkDefaultValue
+            usePortal
+            value={categoryId}
+            onChange={(value) => setCategoryId(value)}
+            options={[{ id: '', name: 'Not specified' }, ...categories.map((cat) => ({ id: cat.id, name: cat.name }))]}
+            placeholder="Not specified"
+          />
+
+          <SearchableSelect
+            label="Bank Account"
+            floatingLabel
+            shrinkDefaultValue
+            usePortal
+            value={bankAccountId}
+            onChange={(value) => setBankAccountId(value)}
+            options={[{ id: '', name: 'No Bank Account' }, ...bankAccounts.map((account) => ({ id: account.id, name: `${account.account_name} (${account.account_type})` }))]}
+            placeholder="No Bank Account"
           />
         </div>
+
+        <Input
+          label="Reference Number"
+          floatingLabel
+          type="text"
+          value={referenceNumber}
+          onChange={(e) => setReferenceNumber(e.target.value)}
+          placeholder="e.g., Check #, Receipt #"
+        />
+
+        <Textarea
+          label="Notes (Optional)"
+          floatingLabel
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          className="resize-none"
+          placeholder="Additional notes..."
+        />
 
         <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-          <Button type="button" variant="secondary" onClick={handleClose}>
+          <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={handleClose}>
             Cancel
           </Button>
           <Button
             type="submit"
+            size="sm"
             disabled={isSubmitting || amount <= 0}
-            className="flex items-center gap-2"
+            className="text-xs"
             style={{ backgroundColor: type === 'income' ? '#10b981' : '#ef4444' }}
           >
-            <Save className="w-4 h-4" />
-            {isSubmitting ? 'Saving...' : 'Save Transaction'}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              'Save Transaction'
+            )}
           </Button>
         </div>
       </form>

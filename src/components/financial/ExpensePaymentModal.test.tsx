@@ -48,6 +48,8 @@ describe('ExpensePaymentModal (EXP-017 — match-currency v1)', () => {
     ]);
     renderModal('EUR');
 
+    // Account is the modal's only SearchableSelect: open it, then options render (portaled).
+    await userEvent.click(screen.getByRole('combobox'));
     expect(await screen.findByRole('option', { name: /EUR Ops/ })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: /USD Ops/ })).toBeNull();
   });
@@ -59,9 +61,9 @@ describe('ExpensePaymentModal (EXP-017 — match-currency v1)', () => {
     const submit = await screen.findByRole('button', { name: /record payment/i });
     expect(submit).toBeDisabled();
 
-    // wait for the async-loaded option before selecting it
-    await screen.findByRole('option', { name: /EUR Ops/ });
-    await userEvent.selectOptions(screen.getByLabelText(/pay from account/i), 'eur');
+    // Open the SearchableSelect and click the async-loaded EUR account option.
+    await userEvent.click(screen.getByRole('combobox'));
+    await userEvent.click(await screen.findByRole('option', { name: /EUR Ops/ }));
     expect(submit).toBeEnabled();
 
     await userEvent.click(submit);

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { User, UserPlus, Mail, Phone, Briefcase } from 'lucide-react';
+import { UserPlus, Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
 import { supabase, resolveTenantId } from '../../lib/supabaseClient';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
@@ -126,87 +127,65 @@ export default function ContactFormModal({ isOpen, onClose, onSuccess, supplierI
       title={contact ? 'Edit Contact' : 'Add New Contact'}
       subtitle={contact ? "Update this contact's details." : "Enter the contact's details to add them."}
       icon={UserPlus}
+      titleSize="sm"
       showClose
       closeOnBackdrop={false}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            <User className="inline w-4 h-4 mr-1" />
-            Full Name *
-          </label>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <Input
+          label="Full Name"
+          floatingLabel
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          required
+          placeholder="John Doe"
+        />
+
+        <Input
+          label="Position / Title"
+          floatingLabel
+          value={formData.title}
+          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+          placeholder="Sales Manager"
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-5">
           <Input
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            label="Email"
+            floatingLabel
+            type="email"
+            value={formData.email}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             required
-            placeholder="John Doe"
+            placeholder="john@example.com"
           />
-        </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            <Briefcase className="inline w-4 h-4 mr-1" />
-            Position / Title
-          </label>
           <Input
-            value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            placeholder="Sales Manager"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              <Mail className="inline w-4 h-4 mr-1" />
-              Email *
-            </label>
-            <Input
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              required
-              placeholder="john@example.com"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              <Phone className="inline w-4 h-4 mr-1" />
-              Phone
-            </label>
-            <Input
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              placeholder="+1234567890"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Mobile
-          </label>
-          <Input
-            value={formData.mobile}
-            onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+            label="Phone"
+            floatingLabel
+            value={formData.phone}
+            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
             placeholder="+1234567890"
           />
         </div>
 
-        <div>
-          <label htmlFor="supplier-contact-notes" className="block text-sm font-medium text-slate-700 mb-1">
-            Notes
-          </label>
-          <textarea
-            id="supplier-contact-notes"
-            value={formData.notes}
-            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
-            rows={3}
-            placeholder="Additional notes about this contact..."
-          />
-        </div>
+        <Input
+          label="Mobile"
+          floatingLabel
+          value={formData.mobile}
+          onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+          placeholder="+1234567890"
+        />
+
+        <Textarea
+          label="Notes"
+          floatingLabel
+          value={formData.notes}
+          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+          rows={3}
+          className="resize-none"
+          placeholder="Additional notes about this contact..."
+        />
 
         <div>
           <label className="flex items-center gap-2">
@@ -220,12 +199,21 @@ export default function ContactFormModal({ isOpen, onClose, onSuccess, supplierI
           </label>
         </div>
 
-        <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
+        <div className="flex justify-end gap-2.5 pt-4 border-t">
+          <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button type="submit" disabled={loading}>
-            {loading ? 'Saving...' : contact ? 'Update Contact' : 'Add Contact'}
+          <Button type="submit" size="sm" className="text-xs" disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Saving...
+              </>
+            ) : contact ? (
+              'Update Contact'
+            ) : (
+              'Add Contact'
+            )}
           </Button>
         </div>
       </form>

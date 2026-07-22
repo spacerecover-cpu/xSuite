@@ -87,8 +87,8 @@ describe('DeviceCheckoutModal', () => {
     // must be sent back, not the hardcoded default 'full'.
     renderModal({ currentRecoveryOutcome: 'partial' });
 
-    // The dropdown reflects the recorded value.
-    expect((screen.getByRole('combobox', { name: /Recovery Outcome/i }) as HTMLSelectElement).value).toBe('partial');
+    // The SearchableSelect reflects the recorded value via its trigger text.
+    expect(screen.getByText(/Partial Recovery/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: /Print Checkout Form/i }));

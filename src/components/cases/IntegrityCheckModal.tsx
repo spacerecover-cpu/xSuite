@@ -1,9 +1,10 @@
-import React, { useId, useState } from 'react';
+import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Fingerprint, Shield, CheckCircle2, XCircle, AlertTriangle, Package } from 'lucide-react';
+import { Fingerprint, Shield, CheckCircle2, XCircle, AlertTriangle, Package, Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import {
   performIntegrityCheck,
@@ -28,13 +29,6 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
 }) => {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
-
-  const checkReasonId = useId();
-  const expectedHashId = useId();
-  const actualHashId = useId();
-  const sealNumberId = useId();
-  const physicalConditionId = useId();
-  const findingsId = useId();
 
   const [selectedDevice, setSelectedDevice] = useState<string>('');
   const [checkType, setCheckType] = useState('');
@@ -178,8 +172,8 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Perform Integrity Check" icon={Shield} maxWidth="3xl" closeOnBackdrop={false}>
-      <div className="space-y-4">
+    <Modal isOpen={isOpen} onClose={onClose} title="Perform Integrity Check" icon={Shield} titleSize="sm" maxWidth="3xl" showClose closeOnBackdrop={false}>
+      <div className="space-y-5">
         {performCheckMutation.error && (
           <div className="bg-danger-muted border border-danger/30 rounded-lg p-3 flex items-start gap-2">
             <XCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
@@ -206,42 +200,41 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Check Type <span className="text-danger">*</span>
-            </label>
-            <SearchableSelect
-              options={checkTypes}
-              value={checkType}
-              onChange={setCheckType}
-              placeholder="Select check type..."
-            />
-          </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+          <SearchableSelect
+            label="Check Type"
+            required
+            floatingLabel
+            shrinkDefaultValue
+            usePortal
+            options={checkTypes}
+            value={checkType}
+            onChange={setCheckType}
+            placeholder="Select check type..."
+          />
           {devices.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Device (Optional)</label>
-              <SearchableSelect
-                options={devices.map((d) => ({ id: d.id, name: d.name }))}
-                value={selectedDevice}
-                onChange={setSelectedDevice}
-                placeholder="Select device..."
-              />
-            </div>
+            <SearchableSelect
+              label="Device (Optional)"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
+              options={devices.map((d) => ({ id: d.id, name: d.name }))}
+              value={selectedDevice}
+              onChange={setSelectedDevice}
+              placeholder="Select device..."
+            />
           )}
         </div>
 
-        <div>
-          <label htmlFor={checkReasonId} className="block text-sm font-medium text-slate-700 mb-1">Check Reason</label>
-          <textarea
-            id={checkReasonId}
-            value={checkReason}
-            onChange={(e) => setCheckReason(e.target.value)}
-            rows={2}
-            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-            placeholder="Describe the reason for this integrity check..."
-          />
-        </div>
+        <Textarea
+          label="Check Reason"
+          floatingLabel
+          value={checkReason}
+          onChange={(e) => setCheckReason(e.target.value)}
+          rows={2}
+          className="resize-none"
+          placeholder="Describe the reason for this integrity check..."
+        />
 
         <div className="border-t border-slate-200 pt-4">
           <h3 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
@@ -249,44 +242,41 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
             Hash Verification
           </h3>
 
-          <div className="grid grid-cols-3 gap-4 mb-3">
-            <div className="col-span-3">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Hash Algorithm</label>
-              <SearchableSelect
-                options={[
-                  { id: 'SHA-256', name: 'SHA-256' },
-                  { id: 'SHA-512', name: 'SHA-512' },
-                  { id: 'MD5', name: 'MD5' },
-                ]}
-                value={hashAlgorithm}
-                onChange={setHashAlgorithm}
-              />
-            </div>
+          <div className="mb-5">
+            <SearchableSelect
+              label="Hash Algorithm"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
+              options={[
+                { id: 'SHA-256', name: 'SHA-256' },
+                { id: 'SHA-512', name: 'SHA-512' },
+                { id: 'MD5', name: 'MD5' },
+              ]}
+              value={hashAlgorithm}
+              onChange={setHashAlgorithm}
+            />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor={expectedHashId} className="block text-sm font-medium text-slate-700 mb-1">Expected Hash</label>
-              <Input
-                id={expectedHashId}
-                type="text"
-                value={expectedHash}
-                onChange={(e) => setExpectedHash(e.target.value)}
-                placeholder="Enter expected hash value"
-                className="font-mono text-xs"
-              />
-            </div>
-            <div>
-              <label htmlFor={actualHashId} className="block text-sm font-medium text-slate-700 mb-1">Actual Hash</label>
-              <Input
-                id={actualHashId}
-                type="text"
-                value={actualHash}
-                onChange={(e) => setActualHash(e.target.value)}
-                placeholder="Enter actual hash value"
-                className="font-mono text-xs"
-              />
-            </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+            <Input
+              label="Expected Hash"
+              floatingLabel
+              type="text"
+              value={expectedHash}
+              onChange={(e) => setExpectedHash(e.target.value)}
+              placeholder="Enter expected hash value"
+              className="font-mono text-xs"
+            />
+            <Input
+              label="Actual Hash"
+              floatingLabel
+              type="text"
+              value={actualHash}
+              onChange={(e) => setActualHash(e.target.value)}
+              placeholder="Enter actual hash value"
+              className="font-mono text-xs"
+            />
           </div>
 
           {hashMatch !== undefined && (
@@ -309,17 +299,15 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
         <div className="border-t border-slate-200 pt-4">
           <h3 className="text-sm font-semibold text-slate-900 mb-3">Physical Inspection</h3>
 
-          <div className="grid grid-cols-2 gap-4 mb-3">
-            <div>
-              <label htmlFor={sealNumberId} className="block text-sm font-medium text-slate-700 mb-1">Seal Number</label>
-              <Input
-                id={sealNumberId}
-                type="text"
-                value={sealNumber}
-                onChange={(e) => setSealNumber(e.target.value)}
-                placeholder="Enter seal number"
-              />
-            </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-5 mb-5">
+            <Input
+              label="Seal Number"
+              floatingLabel
+              type="text"
+              value={sealNumber}
+              onChange={(e) => setSealNumber(e.target.value)}
+              placeholder="Enter seal number"
+            />
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Seal Condition</label>
               <div className="flex gap-2">
@@ -347,17 +335,15 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
             </div>
           </div>
 
-          <div>
-            <label htmlFor={physicalConditionId} className="block text-sm font-medium text-slate-700 mb-1">Physical Condition</label>
-            <textarea
-              id={physicalConditionId}
-              value={physicalCondition}
-              onChange={(e) => setPhysicalCondition(e.target.value)}
-              rows={2}
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              placeholder="Document the physical condition of the evidence..."
-            />
-          </div>
+          <Textarea
+            label="Physical Condition"
+            floatingLabel
+            value={physicalCondition}
+            onChange={(e) => setPhysicalCondition(e.target.value)}
+            rows={2}
+            className="resize-none"
+            placeholder="Document the physical condition of the evidence..."
+          />
         </div>
 
         <div className="border-t border-slate-200 pt-4">
@@ -397,17 +383,15 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
           )}
         </div>
 
-        <div>
-          <label htmlFor={findingsId} className="block text-sm font-medium text-slate-700 mb-1">Findings</label>
-          <textarea
-            id={findingsId}
-            value={findings}
-            onChange={(e) => setFindings(e.target.value)}
-            rows={3}
-            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-            placeholder="Document your findings from this integrity check..."
-          />
-        </div>
+        <Textarea
+          label="Findings"
+          floatingLabel
+          value={findings}
+          onChange={(e) => setFindings(e.target.value)}
+          rows={3}
+          className="resize-none"
+          placeholder="Document your findings from this integrity check..."
+        />
 
         <div className="border-t border-slate-200 pt-4">
           <div className="flex items-center justify-between">
@@ -416,14 +400,14 @@ export const IntegrityCheckModal: React.FC<IntegrityCheckModalProps> = ({
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-          <Button onClick={onClose} variant="secondary" disabled={performCheckMutation.isPending}>
+        <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-200">
+          <Button onClick={onClose} variant="secondary" size="sm" className="text-xs" disabled={performCheckMutation.isPending}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={performCheckMutation.isPending}>
+          <Button onClick={handleSubmit} size="sm" className="text-xs" disabled={performCheckMutation.isPending}>
             {performCheckMutation.isPending ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                 Recording...
               </>
             ) : (

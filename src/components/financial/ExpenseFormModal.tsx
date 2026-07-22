@@ -3,20 +3,17 @@ import { useQuery } from '@tanstack/react-query';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import { UsageLimitGuard } from '../shared/UsageLimitGuard';
 import { supabase } from '../../lib/supabaseClient';
 import { getExpenseCategories, Expense } from '../../lib/expensesService';
 import {
-  DollarSign,
   Receipt,
   Calendar,
-  Tag,
-  FileText,
-  Briefcase,
-  Percent,
-  Hash,
   Save,
   Upload,
+  Loader2,
 } from 'lucide-react';
 import { logger } from '../../lib/logger';
 import { useToast } from '../../hooks/useToast';
@@ -174,13 +171,14 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
       title={initialData?.id ? 'Edit Expense' : 'New Expense'}
       subtitle={initialData?.id ? "Update this expense's details." : 'Enter the expense details to record it.'}
       icon={Receipt}
+      titleSize="sm"
       size="lg"
       showClose
       closeOnBackdrop={false}
       initialFocusRef={firstFieldRef}
     >
-      <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+      <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-5">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
               Expense Date
@@ -199,173 +197,125 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Amount
-            </label>
-            <div className="relative">
-              <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={amount}
-                onChange={(e) => {
-                  setAmount(parseFloat(e.target.value) || 0);
-                  setAmountError(null);
-                }}
-                className="pl-10"
-                required
-              />
-            </div>
+            <Input
+              label="Amount"
+              floatingLabel
+              type="number"
+              step="0.01"
+              min="0"
+              value={amount}
+              onChange={(e) => {
+                setAmount(parseFloat(e.target.value) || 0);
+                setAmountError(null);
+              }}
+              required
+            />
             {amountError && (
               <p className="mt-1 text-xs text-danger">{amountError}</p>
             )}
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="expense-currency" className="block text-sm font-medium text-slate-700 mb-1">
-              Currency
-            </label>
-            <div className="relative">
-              <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
-              <select
-                id="expense-currency"
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="w-full h-9 pl-10 pr-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-              >
-                {currency && !currencyCodes.some((c) => c.code === currency) && (
-                  <option value={currency}>{currency}</option>
-                )}
-                {currencyCodes.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.code}{c.name ? ` — ${c.name}` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+          <SearchableSelect
+            label="Currency"
+            floatingLabel
+            shrinkDefaultValue
+            usePortal
+            value={currency}
+            onChange={(value) => setCurrency(value)}
+            options={[
+              { id: '', name: 'Not specified' },
+              ...(currency && !currencyCodes.some((c) => c.code === currency)
+                ? [{ id: currency, name: currency }]
+                : []),
+              ...currencyCodes.map((c) => ({
+                id: c.code,
+                name: `${c.code}${c.name ? ` — ${c.name}` : ''}`,
+              })),
+            ]}
+            placeholder="Not specified"
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Tax Amount
-            </label>
-            <div className="relative">
-              <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={taxAmount}
-                onChange={(e) => setTaxAmount(parseFloat(e.target.value) || 0)}
-                className="pl-10"
-                placeholder="0.00"
-              />
-            </div>
-          </div>
+          <Input
+            label="Tax Amount"
+            floatingLabel
+            type="number"
+            step="0.01"
+            min="0"
+            value={taxAmount}
+            onChange={(e) => setTaxAmount(parseFloat(e.target.value) || 0)}
+            placeholder="0.00"
+          />
         </div>
 
         <div>
-          <label htmlFor="expense-description" className="block text-sm font-medium text-slate-700 mb-1">
-            Description
-          </label>
-          <div className="relative">
-            <FileText className="absolute left-3 top-3 text-slate-400 w-4 h-4" />
-            <textarea
-              id="expense-description"
-              value={description}
-              onChange={(e) => {
-                setDescription(e.target.value);
-                setDescriptionError(null);
-              }}
-              rows={2}
-              className="w-full pl-10 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-              placeholder="What was this expense for?"
-              required
-            />
-          </div>
+          <Textarea
+            label="Description"
+            floatingLabel
+            value={description}
+            onChange={(e) => {
+              setDescription(e.target.value);
+              setDescriptionError(null);
+            }}
+            rows={2}
+            className="resize-none"
+            placeholder="What was this expense for?"
+            required
+          />
           {descriptionError && (
             <p className="mt-1 text-xs text-danger">{descriptionError}</p>
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Vendor / Supplier
-            </label>
-            <Input
-              type="text"
-              value={vendorName}
-              onChange={(e) => setVendorName(e.target.value)}
-              placeholder="e.g., Office Supplies Inc."
-            />
-          </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+          <Input
+            label="Vendor / Supplier"
+            floatingLabel
+            type="text"
+            value={vendorName}
+            onChange={(e) => setVendorName(e.target.value)}
+            placeholder="e.g., Office Supplies Inc."
+          />
 
-          <div>
-            <label htmlFor="expense-category" className="block text-sm font-medium text-slate-700 mb-1">
-              Category
-            </label>
-            <div className="relative">
-              <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
-              <select
-                id="expense-category"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full h-9 pl-10 pr-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-              >
-                <option value="">Select Category</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+          <SearchableSelect
+            label="Category"
+            floatingLabel
+            shrinkDefaultValue
+            usePortal
+            value={categoryId}
+            onChange={(value) => setCategoryId(value)}
+            options={[
+              { id: '', name: 'Not specified' },
+              ...categories.map((cat) => ({ id: cat.id, name: cat.name })),
+            ]}
+            placeholder="Not specified"
+          />
         </div>
 
-        <div>
-          <label htmlFor="expense-case" className="block text-sm font-medium text-slate-700 mb-1">
-            Link to Case (Optional)
-          </label>
-          <div className="relative">
-            <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
-            <select
-              id="expense-case"
-              value={caseId}
-              onChange={(e) => setCaseId(e.target.value)}
-              className="w-full h-9 pl-10 pr-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-            >
-              <option value="">No Case</option>
-              {cases.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.case_no} - {c.title}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        <SearchableSelect
+          label="Link to Case (Optional)"
+          floatingLabel
+          shrinkDefaultValue
+          usePortal
+          value={caseId}
+          onChange={(value) => setCaseId(value)}
+          options={[
+            { id: '', name: 'No Case' },
+            ...cases.map((c) => ({ id: c.id, name: `${c.case_no} - ${c.title}` })),
+          ]}
+          placeholder="No Case"
+        />
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="expense-reference" className="block text-sm font-medium text-slate-700 mb-1">
-              Reference (Optional)
-            </label>
-            <div className="relative">
-              <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <Input
-                id="expense-reference"
-                type="text"
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-                className="pl-10"
-                placeholder="Receipt / invoice no."
-              />
-            </div>
-          </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+          <Input
+            label="Reference (Optional)"
+            floatingLabel
+            type="text"
+            value={reference}
+            onChange={(e) => setReference(e.target.value)}
+            placeholder="Receipt / invoice no."
+          />
 
           <div className="flex items-end">
             <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2 cursor-pointer">
@@ -380,22 +330,18 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
           </div>
         </div>
 
-        <div>
-          <label htmlFor="expense-notes" className="block text-sm font-medium text-slate-700 mb-1">
-            Notes (Optional)
-          </label>
-          <textarea
-            id="expense-notes"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={2}
-            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-            placeholder="Additional notes..."
-          />
-        </div>
+        <Textarea
+          label="Notes (Optional)"
+          floatingLabel
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          className="resize-none"
+          placeholder="Additional notes..."
+        />
 
         <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-          <Button type="button" variant="secondary" onClick={handleClose}>
+          <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={handleClose}>
             Cancel
           </Button>
           {/* Only gate the create path. When editing an existing expense
@@ -406,19 +352,21 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
               <Button
                 type="submit"
                 variant="primary"
+                size="sm"
                 disabled={isSubmitting || amount <= 0}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 text-xs"
               >
-                <Save className="w-4 h-4" />
+                {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-4 h-4" />}
                 Save as Draft
               </Button>
               <Button
                 type="button"
+                size="sm"
                 onClick={(e) => handleSubmit(e, true)}
                 disabled={isSubmitting || amount <= 0}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 text-xs"
               >
-                <Upload className="w-4 h-4" />
+                {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-4 h-4" />}
                 {isSubmitting ? 'Saving...' : 'Submit for Approval'}
               </Button>
             </>
@@ -428,19 +376,21 @@ export const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
                 <Button
                   type="submit"
                   variant="primary"
+                  size="sm"
                   disabled={isSubmitting || amount <= 0}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 text-xs"
                 >
-                  <Save className="w-4 h-4" />
+                  {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-4 h-4" />}
                   Save as Draft
                 </Button>
                 <Button
                   type="button"
+                  size="sm"
                   onClick={(e) => handleSubmit(e, true)}
                   disabled={isSubmitting || amount <= 0}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 text-xs"
                 >
-                  <Upload className="w-4 h-4" />
+                  {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-4 h-4" />}
                   {isSubmitting ? 'Saving...' : 'Submit for Approval'}
                 </Button>
               </div>

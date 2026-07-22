@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { HardDriveDownload, HardDrive, FolderOpen, Server, Database } from 'lucide-react';
+import { HardDriveDownload, Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import { supabase } from '../../lib/supabaseClient';
 
 interface DeviceOption {
@@ -225,7 +226,9 @@ export const CreateCloneDriveModal: React.FC<CreateCloneDriveModalProps> = ({
       onClose={onClose}
       title={caseNo ? `Create Clone Drive — Case #${caseNo}` : 'Create Clone Drive'}
       icon={HardDriveDownload}
+      titleSize="sm"
       maxWidth="3xl"
+      showClose
       closeOnBackdrop={false}
     >
       <form
@@ -233,7 +236,7 @@ export const CreateCloneDriveModal: React.FC<CreateCloneDriveModalProps> = ({
           e.preventDefault();
           handleSubmit();
         }}
-        className="space-y-4"
+        className="space-y-5"
       >
         <div className="bg-info-muted border border-info/30 rounded-lg p-3">
           <p className="text-xs text-info">
@@ -242,30 +245,24 @@ export const CreateCloneDriveModal: React.FC<CreateCloneDriveModalProps> = ({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-5">
           <div>
-            <label htmlFor="clone-source-device" className="block text-sm font-medium text-slate-700 mb-1">
-              Source Device <span className="text-danger">*</span>
-            </label>
-            <select
-              id="clone-source-device"
+            <SearchableSelect
+              label="Source Device"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
+              required
               value={values.deviceId}
-              onChange={(e) => update('deviceId', e.target.value)}
+              onChange={(v) => update('deviceId', v)}
+              options={[
+                { id: '', name: 'No Device' },
+                ...devices.map((d) => ({ id: d.id, name: deviceLabel(d) })),
+              ]}
+              placeholder="No Device"
               disabled={isLoading || devices.length === 0}
-              className={`h-9 w-full px-3 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${
-                errors.deviceId ? 'border-danger' : 'border-slate-300'
-              }`}
-            >
-              <option value="">— Select device —</option>
-              {devices.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {deviceLabel(d)}
-                </option>
-              ))}
-            </select>
-            {errors.deviceId && (
-              <p className="mt-1 text-xs text-danger">{errors.deviceId}</p>
-            )}
+              error={errors.deviceId}
+            />
             {devices.length === 0 && (
               <p className="mt-1 text-xs text-warning">
                 No devices on this case yet. Add a device first.
@@ -276,19 +273,20 @@ export const CreateCloneDriveModal: React.FC<CreateCloneDriveModalProps> = ({
           <div>
             <Input
               label="Drive Label"
+              floatingLabel
               value={values.driveLabel}
               onChange={(e) => update('driveLabel', e.target.value)}
               placeholder="e.g. Clone_001"
               disabled={isLoading}
               required
               error={errors.driveLabel}
-              leftIcon={<HardDrive className="w-4 h-4" />}
             />
           </div>
 
           <div>
             <Input
               label="Capacity"
+              floatingLabel
               value={values.capacity}
               onChange={(e) => update('capacity', e.target.value)}
               placeholder="e.g. 2TB"
@@ -301,6 +299,7 @@ export const CreateCloneDriveModal: React.FC<CreateCloneDriveModalProps> = ({
           <div>
             <Input
               label="Expected Size (GB)"
+              floatingLabel
               type="number"
               min="0"
               step="0.1"
@@ -312,98 +311,81 @@ export const CreateCloneDriveModal: React.FC<CreateCloneDriveModalProps> = ({
               placeholder="Optional"
               disabled={isLoading}
               error={errors.expectedSizeGb}
-              leftIcon={<Database className="w-4 h-4" />}
             />
           </div>
 
           <div>
             <Input
               label="Storage Server"
+              floatingLabel
               value={values.storageServer}
               onChange={(e) => update('storageServer', e.target.value)}
               placeholder="e.g. nas01"
               disabled={isLoading}
-              leftIcon={<Server className="w-4 h-4" />}
             />
           </div>
 
           <div>
             <Input
               label="Storage Path"
+              floatingLabel
               value={values.storagePath}
               onChange={(e) => update('storagePath', e.target.value)}
               placeholder="/clones/case-xyz/image.dd"
               disabled={isLoading}
-              leftIcon={<FolderOpen className="w-4 h-4" />}
             />
           </div>
 
           <div>
-            <label htmlFor="clone-storage-type" className="block text-sm font-medium text-slate-700 mb-1">
-              Storage Type
-            </label>
-            <select
-              id="clone-storage-type"
+            <SearchableSelect
+              label="Storage Type"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
               value={values.storageType}
-              onChange={(e) =>
-                update('storageType', e.target.value as CreateCloneDriveFormValues['storageType'])
-              }
+              onChange={(v) => update('storageType', v as CreateCloneDriveFormValues['storageType'])}
+              options={STORAGE_TYPES.map((t) => ({ id: t.value, name: t.label }))}
+              placeholder="Not specified"
               disabled={isLoading}
-              className="h-9 w-full px-3 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              {STORAGE_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           <div>
-            <label htmlFor="clone-image-format" className="block text-sm font-medium text-slate-700 mb-1">
-              Image Format
-            </label>
-            <select
-              id="clone-image-format"
+            <SearchableSelect
+              label="Image Format"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
               value={values.imageFormat}
-              onChange={(e) =>
-                update('imageFormat', e.target.value as CreateCloneDriveFormValues['imageFormat'])
-              }
+              onChange={(v) => update('imageFormat', v as CreateCloneDriveFormValues['imageFormat'])}
+              options={IMAGE_FORMATS.map((f) => ({ id: f.value, name: f.label }))}
+              placeholder="Not specified"
               disabled={isLoading}
-              className="h-9 w-full px-3 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              {IMAGE_FORMATS.map((f) => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           <div className="md:col-span-2">
-            <label htmlFor="clone-resource-drive" className="block text-sm font-medium text-slate-700 mb-1">
-              Resource Clone Drive (optional)
-            </label>
-            <select
-              id="clone-resource-drive"
+            <SearchableSelect
+              label="Resource Clone Drive (optional)"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
               value={values.resourceCloneDriveId ?? ''}
-              onChange={(e) =>
-                update('resourceCloneDriveId', e.target.value === '' ? null : e.target.value)
-              }
+              onChange={(v) => update('resourceCloneDriveId', v === '' ? null : v)}
+              options={[
+                { id: '', name: 'No Resource Drive' },
+                ...resourceDrives.map((d) => ({
+                  id: d.id,
+                  name: `${d.label}${d.serial_number ? ` · SN ${d.serial_number}` : ''}${
+                    d.capacity_gb > 0
+                      ? ` · ${d.available_gb.toFixed(0)}/${d.capacity_gb.toFixed(0)} GB free`
+                      : ''
+                  }`,
+                })),
+              ]}
+              placeholder="No Resource Drive"
               disabled={isLoading}
-              className="h-9 w-full px-3 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="">— None —</option>
-              {resourceDrives.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.label}
-                  {d.serial_number ? ` · SN ${d.serial_number}` : ''}
-                  {d.capacity_gb > 0
-                    ? ` · ${d.available_gb.toFixed(0)}/${d.capacity_gb.toFixed(0)} GB free`
-                    : ''}
-                </option>
-              ))}
-            </select>
+            />
             {selectedResource && (
               <p className="mt-1 text-xs text-slate-500">
                 {selectedResource.capacity_gb > 0
@@ -425,17 +407,24 @@ export const CreateCloneDriveModal: React.FC<CreateCloneDriveModalProps> = ({
 
         <input type="hidden" value={caseId} readOnly />
 
-        <div className="flex justify-end gap-2 pt-4 border-t border-slate-200">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>
+        <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-200">
+          <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onClose} disabled={isLoading}>
             Cancel
           </Button>
           <Button
             type="submit"
+            size="sm"
+            className="text-xs"
             disabled={isLoading || devices.length === 0}
-            className="flex items-center gap-2"
           >
-            <HardDriveDownload className="w-4 h-4" />
-            {isLoading ? 'Creating...' : 'Create Clone Drive'}
+            {isLoading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              'Create Clone Drive'
+            )}
           </Button>
         </div>
       </form>

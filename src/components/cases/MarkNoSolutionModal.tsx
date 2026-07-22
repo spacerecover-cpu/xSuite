@@ -3,15 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CircleHelp, Info, Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
+import { Textarea } from '../ui/Textarea';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import { supabase } from '../../lib/supabaseClient';
 import { caseQualityService } from '../../lib/caseQualityService';
 import { transitionCaseStatus } from '../../lib/caseStateMachineService';
 import { describeGateError } from '../../lib/caseReleaseGate';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
-
-const inputClass =
-  'h-9 w-full px-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary bg-white';
 
 /** Default review horizon for a parked no-solution case. */
 const DEFAULT_FOLLOWUP_MONTHS = 6;
@@ -123,7 +122,16 @@ export const MarkNoSolutionModal: React.FC<MarkNoSolutionModalProps> = ({
   });
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Mark No Solution — Future Follow-up" icon={CircleHelp} size="md">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Mark No Solution — Future Follow-up"
+      icon={CircleHelp}
+      size="md"
+      titleSize="sm"
+      showClose
+      closeOnBackdrop={false}
+    >
       <div className="mb-4 flex gap-2 rounded border-l-4 border-info bg-info-muted p-3">
         <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-info" />
         <p className="text-sm text-info">
@@ -134,40 +142,33 @@ export const MarkNoSolutionModal: React.FC<MarkNoSolutionModalProps> = ({
         </p>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-5">
         <div>
-          <label htmlFor="ns-reason" className="mb-1 block text-sm font-medium text-slate-700">
-            Reason <span className="text-danger">*</span>
-          </label>
-          <select
-            id="ns-reason"
+          <SearchableSelect
+            label="Reason"
+            floatingLabel
+            shrinkDefaultValue
+            usePortal
+            required
             value={reasonId}
-            onChange={(e) => setReasonId(e.target.value)}
-            className={inputClass}
-          >
-            <option value="">Select a reason…</option>
-            {reasons.map((r) => (
-              <option key={r.id} value={r.id}>{r.name}</option>
-            ))}
-          </select>
+            onChange={(value) => setReasonId(value)}
+            options={[{ id: '', name: 'Not specified' }, ...reasons.map((r) => ({ id: r.id, name: r.name }))]}
+            placeholder="Not specified"
+          />
           {reasonId && reasons.find((r) => r.id === reasonId)?.description && (
             <p className="mt-1 text-xs text-slate-500">{reasons.find((r) => r.id === reasonId)?.description}</p>
           )}
         </div>
 
-        <div>
-          <label htmlFor="ns-notes" className="mb-1 block text-sm font-medium text-slate-700">
-            Notes
-          </label>
-          <textarea
-            id="ns-notes"
-            rows={3}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="e.g. Controller SM2258 not yet supported; revisit when tooling lands."
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary bg-white"
-          />
-        </div>
+        <Textarea
+          label="Notes"
+          floatingLabel
+          rows={3}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="e.g. Controller SM2258 not yet supported; revisit when tooling lands."
+          className="resize-none"
+        />
 
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
           <label className="flex items-start gap-2.5 cursor-pointer">
@@ -201,17 +202,22 @@ export const MarkNoSolutionModal: React.FC<MarkNoSolutionModalProps> = ({
         </div>
       </div>
 
-      <div className="mt-6 flex justify-end gap-3">
-        <Button variant="secondary" onClick={onClose} disabled={mutation.isPending}>
+      <div className="mt-6 flex justify-end gap-2.5 border-t border-border pt-4">
+        <Button variant="secondary" size="sm" className="text-xs" onClick={onClose} disabled={mutation.isPending}>
           Cancel
         </Button>
         <Button
           variant="warning"
+          size="sm"
+          className="text-xs"
           onClick={() => mutation.mutate()}
           disabled={mutation.isPending || !reasonId}
-          className="flex items-center gap-2"
         >
-          {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CircleHelp className="h-4 w-4" />}
+          {mutation.isPending ? (
+            <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+          ) : (
+            <CircleHelp className="w-3.5 h-3.5 mr-1.5" />
+          )}
           {mutation.isPending ? 'Parking…' : 'Mark No Solution'}
         </Button>
       </div>

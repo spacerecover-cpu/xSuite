@@ -1,10 +1,12 @@
-import React, { useEffect, useId, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import React, { useEffect, useState } from 'react';
+import { useForm, Controller } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, GripVertical, ListChecks } from 'lucide-react';
+import { Plus, Trash2, GripVertical, ListChecks, Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import { employeeOnboardingKeys, recruitmentKeys } from '../../lib/queryKeys';
 import { resolveTenantId } from '../../lib/supabaseClient';
 import {
@@ -45,13 +47,10 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
   const queryClient = useQueryClient();
   const toast = useToast();
   const isEditing = !!checklist;
-  const nameFieldId = useId();
-  const descriptionFieldId = useId();
-  const positionFieldId = useId();
 
   const [items, setItems] = useState<ChecklistItemDraft[]>([]);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<ChecklistFormData>();
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<ChecklistFormData>();
 
   useEffect(() => {
     if (checklist) {
@@ -178,49 +177,48 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
       title={isEditing ? 'Edit Checklist' : 'New Onboarding Checklist'}
       subtitle={isEditing ? "Update this checklist's details." : 'Enter the checklist details and add its items.'}
       icon={ListChecks}
+      titleSize="sm"
       size="lg"
       showClose
       closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-5">
-        <div>
-          <label htmlFor={nameFieldId} className="block text-sm font-medium text-slate-700 mb-1">
-            Checklist Name <span className="text-danger">*</span>
-          </label>
-          <Input
-            id={nameFieldId}
-            {...register('name', { required: 'Name is required' })}
-            placeholder="e.g. Engineering Onboarding"
-          />
-          {errors.name && <p className="text-danger text-xs mt-1">{errors.name.message}</p>}
-        </div>
+        <Input
+          label="Checklist Name"
+          floatingLabel
+          required
+          {...register('name', { required: 'Name is required' })}
+          error={errors.name?.message}
+          placeholder="e.g. Engineering Onboarding"
+        />
 
-        <div>
-          <label htmlFor={descriptionFieldId} className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-          <textarea
-            id={descriptionFieldId}
-            {...register('description')}
-            rows={2}
-            placeholder="What this checklist covers..."
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-          />
-        </div>
+        <Textarea
+          label="Description"
+          floatingLabel
+          {...register('description')}
+          rows={2}
+          placeholder="What this checklist covers..."
+          className="resize-none"
+        />
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor={positionFieldId} className="block text-sm font-medium text-slate-700 mb-1">For Position</label>
-            <select
-              id={positionFieldId}
-              {...register('for_position_id')}
-              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="">Any position</option>
-              {positions.map(p => (
-                <option key={p.id} value={p.id}>{p.title}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-3 pt-6">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+          <Controller
+            name="for_position_id"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                label="For Position"
+                floatingLabel
+                shrinkDefaultValue
+                usePortal
+                value={field.value}
+                onChange={field.onChange}
+                options={[{ id: '', name: 'Any position' }, ...positions.map(p => ({ id: p.id, name: p.title }))]}
+                placeholder="Any position"
+              />
+            )}
+          />
+          <div className="flex flex-col gap-3 pt-2">
             <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
               <input
                 type="checkbox"
@@ -299,9 +297,14 @@ export const ChecklistFormModal: React.FC<Props> = ({ isOpen, onClose, checklist
         </div>
 
         <div className="flex justify-end gap-3 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={mutation.isPending}>
-            {mutation.isPending ? 'Saving...' : isEditing ? 'Update' : 'Create Checklist'}
+          <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onClose}>Cancel</Button>
+          <Button type="submit" size="sm" className="text-xs" disabled={mutation.isPending}>
+            {mutation.isPending ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Saving...
+              </>
+            ) : isEditing ? 'Update' : 'Create Checklist'}
           </Button>
         </div>
       </form>

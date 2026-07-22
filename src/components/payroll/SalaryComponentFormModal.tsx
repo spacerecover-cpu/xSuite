@@ -1,11 +1,12 @@
-import { useId, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Wallet } from 'lucide-react';
+import { Loader2, Wallet } from 'lucide-react';
 import { payrollService } from '../../lib/payrollService';
 import { payrollKeys } from '../../lib/queryKeys';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import { useToast } from '../../hooks/useToast';
 import type { Database } from '../../types/database.types';
 
@@ -22,10 +23,6 @@ export function SalaryComponentFormModal({ component, onClose }: Props) {
   const queryClient = useQueryClient();
   const isEditing = !!component;
   const nameFieldRef = useRef<HTMLInputElement>(null);
-  const nameFieldId = useId();
-  const typeFieldId = useId();
-  const calculationFieldId = useId();
-  const percentageFieldId = useId();
 
   const [formData, setFormData] = useState({
     name: component?.name || '',
@@ -88,71 +85,61 @@ export function SalaryComponentFormModal({ component, onClose }: Props) {
       title={isEditing ? 'Edit Salary Component' : 'Add Salary Component'}
       subtitle={isEditing ? "Update this salary component's details." : 'Enter the salary component details to add it.'}
       icon={Wallet}
+      titleSize="sm"
       showClose
       closeOnBackdrop={false}
       initialFocusRef={nameFieldRef}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor={nameFieldId} className="block text-sm font-medium text-slate-700 mb-1">
-              Name <span className="text-danger">*</span>
-            </label>
-            <Input
-              ref={nameFieldRef}
-              id={nameFieldId}
-              value={formData.name}
-              onChange={(e) => handleChange('name', e.target.value)}
-              placeholder="e.g., Basic Salary"
-            />
-          </div>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-5">
+          <Input
+            ref={nameFieldRef}
+            label="Name"
+            floatingLabel
+            required
+            value={formData.name}
+            onChange={(e) => handleChange('name', e.target.value)}
+            placeholder="e.g., Basic Salary"
+          />
 
-          <div>
-            <label htmlFor={typeFieldId} className="block text-sm font-medium text-slate-700 mb-1">
-              Component Type <span className="text-danger">*</span>
-            </label>
-            <select
-              id={typeFieldId}
-              value={formData.type}
-              onChange={(e) => handleChange('type', e.target.value)}
-              className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="earning">Earning</option>
-              <option value="allowance">Allowance</option>
-              <option value="bonus">Bonus</option>
-              <option value="deduction">Deduction</option>
-            </select>
-          </div>
+          <SearchableSelect
+            label="Component Type"
+            floatingLabel
+            usePortal
+            required
+            value={formData.type}
+            onChange={(value) => handleChange('type', value)}
+            options={[
+              { id: 'earning', name: 'Earning' },
+              { id: 'allowance', name: 'Allowance' },
+              { id: 'bonus', name: 'Bonus' },
+              { id: 'deduction', name: 'Deduction' },
+            ]}
+          />
 
-          <div>
-            <label htmlFor={calculationFieldId} className="block text-sm font-medium text-slate-700 mb-1">
-              Calculation Type <span className="text-danger">*</span>
-            </label>
-            <select
-              id={calculationFieldId}
-              value={formData.calculation_type}
-              onChange={(e) => handleChange('calculation_type', e.target.value)}
-              className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="fixed">Fixed Amount</option>
-              <option value="percentage">Percentage</option>
-            </select>
-          </div>
+          <SearchableSelect
+            label="Calculation Type"
+            floatingLabel
+            usePortal
+            required
+            value={formData.calculation_type}
+            onChange={(value) => handleChange('calculation_type', value)}
+            options={[
+              { id: 'fixed', name: 'Fixed Amount' },
+              { id: 'percentage', name: 'Percentage' },
+            ]}
+          />
 
           {formData.calculation_type === 'percentage' && (
-            <div>
-              <label htmlFor={percentageFieldId} className="block text-sm font-medium text-slate-700 mb-1">
-                Percentage (%)
-              </label>
-              <Input
-                id={percentageFieldId}
-                type="number"
-                step="0.01"
-                value={formData.percentage}
-                onChange={(e) => handleChange('percentage', e.target.value)}
-                placeholder="0"
-              />
-            </div>
+            <Input
+              label="Percentage (%)"
+              floatingLabel
+              type="number"
+              step="0.01"
+              value={formData.percentage}
+              onChange={(e) => handleChange('percentage', e.target.value)}
+              placeholder="0"
+            />
           )}
         </div>
 
@@ -184,12 +171,21 @@ export function SalaryComponentFormModal({ component, onClose }: Props) {
           </label>
         </div>
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-          <Button type="button" variant="secondary" onClick={onClose}>
+        <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-200">
+          <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={saveMutation.isPending}>
-            {saveMutation.isPending ? 'Saving...' : isEditing ? 'Update' : 'Create'}
+          <Button type="submit" size="sm" className="text-xs" disabled={saveMutation.isPending}>
+            {saveMutation.isPending ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Saving...
+              </>
+            ) : isEditing ? (
+              'Update'
+            ) : (
+              'Create'
+            )}
           </Button>
         </div>
       </form>

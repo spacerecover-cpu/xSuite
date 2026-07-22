@@ -3,9 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Select } from '../ui/Select';
+import { Textarea } from '../ui/Textarea';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import { RichTextEditor, type RichTextEditorHandle } from '../ui/RichTextEditor';
-import { DollarSign, Eye, EyeOff, AlertTriangle, ListPlus } from 'lucide-react';
+import { Eye, EyeOff, AlertTriangle, ListPlus, Loader2 } from 'lucide-react';
 import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
 import { logger } from '../../lib/logger';
 import { useToast } from '../../hooks/useToast';
@@ -82,7 +83,6 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
   const [showPreview, setShowPreview] = useState(false);
   const firstFieldRef = useRef<HTMLInputElement>(null);
   const richEditorRef = useRef<RichTextEditorHandle>(null);
-  const descriptionId = useId();
   const defaultPriceId = useId();
   const templateContentId = useId();
   const currencyConfig = useCurrencyConfig();
@@ -195,17 +195,19 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
       }
       subtitle={initialData ? "Update this template's details." : 'Enter the template details to create it.'}
       icon={ListPlus}
+      titleSize="sm"
       size="large"
       showClose
       closeOnBackdrop={false}
       initialFocusRef={firstFieldRef}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-5">
           <div className="md:col-span-2">
             <Input
               ref={firstFieldRef}
-              label="Service Name *"
+              label="Service Name"
+              floatingLabel
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
@@ -214,15 +216,13 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
           </div>
 
           <div className="md:col-span-2">
-            <label htmlFor={descriptionId} className="block text-sm font-medium text-slate-700 mb-1">
-              Description
-            </label>
-            <textarea
-              id={descriptionId}
+            <Textarea
+              label="Description"
+              floatingLabel
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               rows={2}
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="resize-none"
               placeholder="Brief description of the service..."
             />
           </div>
@@ -264,6 +264,7 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
 
               <Input
                 label="Unit of Measure"
+                floatingLabel
                 value={formData.unit_of_measure}
                 onChange={(e) => setFormData({ ...formData, unit_of_measure: e.target.value })}
                 placeholder="service, hour, month, etc."
@@ -271,6 +272,7 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
 
               <Input
                 label="Category"
+                floatingLabel
                 value={formData.item_category}
                 onChange={(e) => setFormData({ ...formData, item_category: e.target.value })}
                 placeholder="e.g., Diagnostic Services, Standard Recovery"
@@ -283,17 +285,22 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
               <div className="md:col-span-2">
                 <Input
                   label="Subject Line"
+                  floatingLabel
                   value={formData.subject_line}
                   onChange={(e) => setFormData({ ...formData, subject_line: e.target.value })}
                   placeholder="e.g., Quote {{quote.number}} for case {{case.number}}"
                 />
               </div>
               <div className="md:col-span-2">
-                <Select
+                <SearchableSelect
                   label="Applies To Document"
+                  floatingLabel
+                  shrinkDefaultValue
+                  usePortal
                   value={formData.document_type}
-                  onChange={(e) => setFormData({ ...formData, document_type: e.target.value })}
-                  options={DOCUMENT_TYPE_OPTIONS}
+                  onChange={(value) => setFormData({ ...formData, document_type: value })}
+                  options={DOCUMENT_TYPE_OPTIONS.map((opt) => ({ id: opt.value, name: opt.label }))}
+                  placeholder="All documents (generic)"
                   hint="Pin this template to one document type to make it the suggested default when emailing that document."
                 />
               </div>
@@ -394,21 +401,20 @@ export const LineItemTemplateFormModal: React.FC<LineItemTemplateFormModalProps>
           </div>
         </div>
 
-        <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
+        <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-200">
+          <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" size="sm" className="text-xs" disabled={isSubmitting}>
             {isSubmitting ? (
               <>
-                <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                 Saving...
               </>
+            ) : initialData ? (
+              'Update Template'
             ) : (
-              <>
-                <DollarSign className="w-4 h-4 mr-2" />
-                {initialData ? 'Update Template' : 'Create Template'}
-              </>
+              'Create Template'
             )}
           </Button>
         </div>

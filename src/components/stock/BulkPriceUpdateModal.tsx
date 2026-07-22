@@ -1,8 +1,10 @@
-import React, { useId, useState } from 'react';
+import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Tag, TrendingUp } from 'lucide-react';
+import { Tag, TrendingUp, Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import { useToast } from '../../hooks/useToast';
 import { bulkUpdatePrices, type StockItemWithCategory } from '../../lib/stockService';
 import { stockKeys } from '../../lib/queryKeys';
@@ -17,10 +19,6 @@ export const BulkPriceUpdateModal: React.FC<Props> = ({ selectedItems, onClose }
   const queryClient = useQueryClient();
   const toast = useToast();
   const { formatCurrency } = useCurrency();
-
-  const priceFieldId = useId();
-  const directionFieldId = useId();
-  const amountFieldId = useId();
 
   const [updateType, setUpdateType] = useState<'percentage' | 'fixed'>('percentage');
   const [priceField, setPriceField] = useState<'selling' | 'cost' | 'both'>('selling');
@@ -66,41 +64,37 @@ export const BulkPriceUpdateModal: React.FC<Props> = ({ selectedItems, onClose }
   };
 
   return (
-    <Modal isOpen onClose={onClose} title={`Bulk Price Update — ${selectedItems.length} items`} subtitle="Update prices for the selected items in bulk." icon={Tag} size="md" showClose>
+    <Modal isOpen onClose={onClose} title={`Bulk Price Update — ${selectedItems.length} items`} subtitle="Update prices for the selected items in bulk." icon={Tag} size="md" titleSize="sm" showClose closeOnBackdrop={false}>
       <div className="space-y-5">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor={priceFieldId} className="block text-sm font-medium text-slate-700 mb-1">
-              Price Field
-            </label>
-            <select
-              id={priceFieldId}
-              className="w-full h-9 px-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
-              value={priceField}
-              onChange={(e) => setPriceField(e.target.value as typeof priceField)}
-            >
-              <option value="selling">Selling Price</option>
-              <option value="cost">Cost Price</option>
-              <option value="both">Both</option>
-            </select>
-          </div>
-          <div>
-            <label htmlFor={directionFieldId} className="block text-sm font-medium text-slate-700 mb-1">
-              Direction
-            </label>
-            <select
-              id={directionFieldId}
-              className="w-full h-9 px-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
-              value={direction}
-              onChange={(e) => setDirection(e.target.value as typeof direction)}
-            >
-              <option value="increase">Increase</option>
-              <option value="decrease">Decrease</option>
-            </select>
-          </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+          <SearchableSelect
+            label="Price Field"
+            floatingLabel
+            shrinkDefaultValue
+            usePortal
+            value={priceField}
+            onChange={(v) => setPriceField(v as typeof priceField)}
+            options={[
+              { id: 'selling', name: 'Selling Price' },
+              { id: 'cost', name: 'Cost Price' },
+              { id: 'both', name: 'Both' },
+            ]}
+          />
+          <SearchableSelect
+            label="Direction"
+            floatingLabel
+            shrinkDefaultValue
+            usePortal
+            value={direction}
+            onChange={(v) => setDirection(v as typeof direction)}
+            options={[
+              { id: 'increase', name: 'Increase' },
+              { id: 'decrease', name: 'Decrease' },
+            ]}
+          />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
               Update Type
@@ -122,21 +116,16 @@ export const BulkPriceUpdateModal: React.FC<Props> = ({ selectedItems, onClose }
               ))}
             </div>
           </div>
-          <div>
-            <label htmlFor={amountFieldId} className="block text-sm font-medium text-slate-700 mb-1">
-              {updateType === 'percentage' ? 'Percentage (%)' : 'Amount'}
-            </label>
-            <input
-              id={amountFieldId}
-              type="number"
-              min={0}
-              step={updateType === 'percentage' ? 0.1 : 0.001}
-              value={value}
-              onChange={(e) => setValue(Number(e.target.value))}
-              className="w-full h-9 px-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder={updateType === 'percentage' ? 'e.g. 10' : 'e.g. 5.000'}
-            />
-          </div>
+          <Input
+            label={updateType === 'percentage' ? 'Percentage (%)' : 'Amount'}
+            floatingLabel
+            type="number"
+            min={0}
+            step={updateType === 'percentage' ? 0.1 : 0.001}
+            value={value}
+            onChange={(e) => setValue(Number(e.target.value))}
+            placeholder={updateType === 'percentage' ? 'e.g. 10' : 'e.g. 5.000'}
+          />
         </div>
 
         <div>
@@ -166,16 +155,26 @@ export const BulkPriceUpdateModal: React.FC<Props> = ({ selectedItems, onClose }
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-100">
+          <Button variant="secondary" size="sm" className="text-xs" onClick={onClose}>Cancel</Button>
           <Button
             variant="primary"
+            size="sm"
+            className="text-xs"
             onClick={() => mutation.mutate()}
             disabled={mutation.isPending || value === 0}
-            className="gap-2"
           >
-            <TrendingUp className="w-4 h-4" />
-            {mutation.isPending ? 'Updating...' : `Update ${selectedItems.length} Items`}
+            {mutation.isPending ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              <>
+                <TrendingUp className="w-3.5 h-3.5 mr-1.5" />
+                Update {selectedItems.length} Items
+              </>
+            )}
           </Button>
         </div>
       </div>

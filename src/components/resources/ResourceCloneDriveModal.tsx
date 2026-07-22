@@ -1,11 +1,12 @@
-import React, { useId, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
 import { SearchableSelect } from '../ui/SearchableSelect';
-import { HardDrive, AlertCircle } from 'lucide-react';
+import { HardDrive, AlertCircle, Loader2 } from 'lucide-react';
 import type { Database } from '../../types/database.types';
 
 type ResourceCloneDriveRow = Database['public']['Tables']['resource_clone_drives']['Row'];
@@ -60,8 +61,6 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const labelFieldRef = useRef<HTMLInputElement>(null);
-  const statusFieldId = useId();
-  const notesFieldId = useId();
 
   const editingId: string | null = typeof editingDrive?.id === 'string' ? editingDrive.id : null;
   const cloneIdLabel: string = toFormString(editingDrive?.clone_id ?? editingDrive?.label);
@@ -227,11 +226,13 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
       onClose={handleClose}
       title={editingId ? `Edit Clone Drive ${cloneIdLabel}` : 'Add Clone Drive to Resources'}
       icon={HardDrive}
+      titleSize="sm"
       maxWidth="4xl"
+      showClose
       closeOnBackdrop={false}
       initialFocusRef={labelFieldRef}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {error && (
           <div className="bg-danger-muted border border-danger/30 rounded-lg p-4 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
@@ -254,7 +255,7 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
         )}
 
         <div className="grid grid-cols-2 gap-6">
-          <div className="space-y-4">
+          <div className="space-y-5">
             <h3 className="text-sm font-semibold text-slate-900 border-b pb-2">
               Drive Specifications
             </h3>
@@ -262,6 +263,7 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
             <Input
               ref={labelFieldRef}
               label="Clone ID / Label"
+              floatingLabel
               value={formData.label}
               onChange={(e) => setFormData({ ...formData, label: e.target.value })}
               placeholder="e.g., CLONE-001"
@@ -270,6 +272,7 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
 
             <Input
               label="Serial Number"
+              floatingLabel
               value={formData.serial_number}
               onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
               placeholder="e.g., WD-WCAV12345678"
@@ -277,6 +280,9 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
 
             <SearchableSelect
               label="Brand"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
               options={[
                 { id: '', name: 'Not specified' },
                 ...brands.map((brand) => ({
@@ -291,6 +297,9 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
 
             <SearchableSelect
               label="Capacity"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
               options={[
                 { id: '', name: 'Not specified' },
                 ...capacities.map((cap) => ({
@@ -305,6 +314,9 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
 
             <SearchableSelect
               label="Interface"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
               options={[
                 { id: '', name: 'Not specified' },
                 ...interfaces.map((iface) => ({
@@ -318,32 +330,34 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
             />
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-5">
             <h3 className="text-sm font-semibold text-slate-900 border-b pb-2">
               Status & Location
             </h3>
 
-            <div>
-              <label htmlFor={statusFieldId} className="block text-sm font-medium text-slate-700 mb-1">
-                Status
-              </label>
-              <select
-                id={statusFieldId}
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="available">Available</option>
-                <option value="in_use">In Use</option>
-                <option value="maintenance">Maintenance</option>
-                <option value="retired">Retired</option>
-                <option value="lost">Lost</option>
-                <option value="damaged">Damaged</option>
-              </select>
-            </div>
+            <SearchableSelect
+              label="Status"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
+              value={formData.status}
+              onChange={(value) => setFormData({ ...formData, status: value })}
+              options={[
+                { id: 'available', name: 'Available' },
+                { id: 'in_use', name: 'In Use' },
+                { id: 'maintenance', name: 'Maintenance' },
+                { id: 'retired', name: 'Retired' },
+                { id: 'lost', name: 'Lost' },
+                { id: 'damaged', name: 'Damaged' },
+              ]}
+              placeholder="Select status"
+            />
 
             <SearchableSelect
               label="Condition"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
               options={[
                 { id: '', name: 'Not specified' },
                 ...conditions.map((condition) => ({
@@ -358,6 +372,9 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
 
             <SearchableSelect
               label="Storage Location"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
               options={[
                 { id: '', name: 'Not specified' },
                 ...locations.map((loc) => ({
@@ -372,26 +389,31 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
           </div>
         </div>
 
-        <div>
-          <label htmlFor={notesFieldId} className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
-          <textarea
-            id={notesFieldId}
-            value={formData.notes}
-            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            rows={3}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            placeholder="Additional information about this drive..."
-          />
-        </div>
+        <Textarea
+          label="Notes"
+          floatingLabel
+          value={formData.notes}
+          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+          rows={3}
+          className="resize-none"
+          placeholder="Additional information about this drive..."
+        />
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-          <Button type="button" variant="secondary" onClick={handleClose}>
+        <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-200">
+          <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={handleClose}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" disabled={saveMutation.isPending}>
-            {saveMutation.isPending
-              ? editingId ? 'Updating...' : 'Adding...'
-              : editingId ? 'Update Drive' : 'Add Drive'}
+          <Button type="submit" variant="primary" size="sm" className="text-xs" disabled={saveMutation.isPending}>
+            {saveMutation.isPending ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                {editingId ? 'Updating...' : 'Adding...'}
+              </>
+            ) : editingId ? (
+              'Update Drive'
+            ) : (
+              'Add Drive'
+            )}
           </Button>
         </div>
       </form>

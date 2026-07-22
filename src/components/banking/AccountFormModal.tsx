@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useId } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import { supabase } from '../../lib/supabaseClient';
 import { BankAccount } from '../../lib/bankingService';
 import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
-import { Building, Wallet, Smartphone, AlertCircle, Landmark } from 'lucide-react';
+import { Building, Wallet, Smartphone, AlertCircle, Landmark, Loader2 } from 'lucide-react';
 import { logger } from '../../lib/logger';
 
 interface AccountFormModalProps {
@@ -25,8 +26,6 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string>('');
   const currencyConfig = useCurrencyConfig();
-  const employeeSelectId = useId();
-  const currencySelectId = useId();
 
   const [formData, setFormData] = useState({
     account_name: '',
@@ -193,21 +192,31 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
       title={initialData ? 'Edit Account' : 'Add New Account'}
       subtitle={initialData ? "Update this account's details." : 'Enter the account details to add it.'}
       icon={Landmark}
+      titleSize="sm"
       size="large"
       showClose
       closeOnBackdrop={false}
       footer={
-        <div className="flex items-center justify-end gap-3">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
+        <div className="flex items-center justify-end gap-2.5">
+          <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" form="accountForm" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : initialData ? 'Update Account' : 'Create Account'}
+          <Button type="submit" form="accountForm" size="sm" className="text-xs" disabled={isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Saving...
+              </>
+            ) : initialData ? (
+              'Update Account'
+            ) : (
+              'Create Account'
+            )}
           </Button>
         </div>
       }
     >
-      <form id="accountForm" onSubmit={handleSubmit} className="space-y-4">
+      <form id="accountForm" onSubmit={handleSubmit} className="space-y-5">
         {error && (
           <div className="bg-danger-muted border border-danger/30 rounded-lg p-3 flex items-start gap-2">
             <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
@@ -244,9 +253,10 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 gap-x-4 gap-y-5">
           <Input
             label="Account Name"
+            floatingLabel
             value={formData.account_name}
             onChange={(e) => setFormData({ ...formData, account_name: e.target.value })}
             required
@@ -256,6 +266,7 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
           {formData.account_type === 'bank' && (
             <Input
               label="Account Number"
+              floatingLabel
               value={formData.account_number}
               onChange={(e) => setFormData({ ...formData, account_number: e.target.value })}
               placeholder="Auto-generated if empty"
@@ -281,9 +292,10 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
 
         {formData.account_type === 'bank' && (
           <>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-5">
               <Input
                 label="Bank Name"
+                floatingLabel
                 value={formData.bank_name}
                 onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
                 required
@@ -292,15 +304,17 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
 
               <Input
                 label="Branch Code"
+                floatingLabel
                 value={formData.branch_code}
                 onChange={(e) => setFormData({ ...formData, branch_code: e.target.value })}
                 placeholder="Optional"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-5">
               <Input
                 label="SWIFT/BIC Code"
+                floatingLabel
                 value={formData.swift_code}
                 onChange={(e) => setFormData({ ...formData, swift_code: e.target.value })}
                 placeholder="Optional"
@@ -308,6 +322,7 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
 
               <Input
                 label="IBAN"
+                floatingLabel
                 value={formData.iban}
                 onChange={(e) => setFormData({ ...formData, iban: e.target.value })}
                 placeholder="Optional"
@@ -318,27 +333,22 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
 
         {formData.account_type === 'mobile' && (
           <>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor={employeeSelectId} className="block text-sm font-medium text-slate-700 mb-1">Assigned Employee</label>
-                <select
-                  id={employeeSelectId}
-                  value={formData.employee_id}
-                  onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
-                  className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                  required
-                >
-                  <option value="">Select Employee</option>
-                  {employees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.full_name ?? '(Unnamed)'}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+              <SearchableSelect
+                label="Assigned Employee"
+                floatingLabel
+                shrinkDefaultValue
+                usePortal
+                required
+                value={formData.employee_id}
+                onChange={(value) => setFormData({ ...formData, employee_id: value })}
+                options={[{ id: '', name: 'Select Employee' }, ...employees.map((emp) => ({ id: emp.id, name: emp.full_name ?? '(Unnamed)' }))]}
+                placeholder="Select Employee"
+              />
 
               <Input
                 label="Mobile Number"
+                floatingLabel
                 value={formData.mobile_number}
                 onChange={(e) => setFormData({ ...formData, mobile_number: e.target.value })}
                 placeholder="e.g., +1234567890"
@@ -348,6 +358,7 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
 
             <Input
               label="Mobile Provider"
+              floatingLabel
               value={formData.mobile_provider}
               onChange={(e) => setFormData({ ...formData, mobile_provider: e.target.value })}
               placeholder="e.g., M-Pesa, MTN Mobile Money"
@@ -358,6 +369,7 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
         {formData.account_type === 'cash' && (
           <Input
             label="Location"
+            floatingLabel
             value={formData.location}
             onChange={(e) => setFormData({ ...formData, location: e.target.value })}
             placeholder="e.g., Main Office, Branch 1"
@@ -365,22 +377,21 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
           />
         )}
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
           <div>
-            <label htmlFor={currencySelectId} className="block text-sm font-medium text-slate-700 mb-1">Currency</label>
-            <select
-              id={currencySelectId}
+            <SearchableSelect
+              label="Currency"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
               value={formData.currency_id}
-              onChange={(e) => setFormData({ ...formData, currency_id: e.target.value })}
-              className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-            >
-              <option value="">{defaultCurrency ? `${defaultCurrency.code} (Default)` : 'Select Currency'}</option>
-              {currencies.map((curr) => (
-                <option key={curr.id} value={curr.id}>
-                  {curr.code} - {curr.name} ({curr.symbol})
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setFormData({ ...formData, currency_id: value })}
+              options={[
+                { id: '', name: defaultCurrency ? `${defaultCurrency.code} (Default)` : 'Select Currency' },
+                ...currencies.map((curr) => ({ id: curr.id, name: `${curr.code} - ${curr.name} (${curr.symbol})` })),
+              ]}
+              placeholder={defaultCurrency ? `${defaultCurrency.code} (Default)` : 'Select Currency'}
+            />
             {formData.currency_id && (
               <p className="mt-1 text-xs text-slate-500">
                 {(() => {
@@ -395,6 +406,7 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
           {!initialData && (
             <Input
               label="Opening Balance"
+              floatingLabel
               type="number"
               step="0.01"
               value={formData.opening_balance}

@@ -1,8 +1,9 @@
-import { useId, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { AlertTriangle, XCircle } from 'lucide-react';
+import { Textarea } from '../ui/Textarea';
+import { AlertTriangle, XCircle, Loader2 } from 'lucide-react';
 import {
   markAssignmentAsDefective,
   type AssignmentWithDetails,
@@ -27,8 +28,6 @@ export function MarkDefectiveModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const defectReasonRef = useRef<HTMLInputElement>(null);
-  const defectReasonId = useId();
-  const usageNotesId = useId();
 
   const handleReset = () => {
     setDefectReason('');
@@ -82,11 +81,13 @@ export function MarkDefectiveModal({
       title="Mark as Defective"
       subtitle="Mark this item defective and record why."
       icon={AlertTriangle}
+      titleSize="sm"
       size="md"
       showClose
+      closeOnBackdrop={false}
       initialFocusRef={defectReasonRef}
     >
-      <div className="space-y-2">
+      <div className="space-y-5">
         <div className="bg-danger-muted border border-danger/30 rounded-lg p-2">
           <div className="flex items-start">
             <AlertTriangle className="w-4 h-4 text-danger mt-0.5 mr-2 flex-shrink-0" />
@@ -133,18 +134,16 @@ export function MarkDefectiveModal({
         </div>
 
         <div>
-          <label htmlFor={defectReasonId} className="block text-sm font-medium text-slate-700 mb-1">
-            Defect Reason <span className="text-danger">*</span>
-          </label>
           <Input
-            id={defectReasonId}
             ref={defectReasonRef}
+            label="Defect Reason"
+            floatingLabel
+            required
             type="text"
             value={defectReason}
             onChange={(e) => setDefectReason(e.target.value)}
             placeholder="E.g., Heads failed during recovery"
             disabled={loading}
-            className="text-sm"
           />
           <p className="text-xs text-slate-500 mt-0.5">
             Describe what went wrong with this donor part.
@@ -171,15 +170,13 @@ export function MarkDefectiveModal({
         </div>
 
         <div>
-          <label htmlFor={usageNotesId} className="block text-sm font-medium text-slate-700 mb-1">
-            Additional Notes (Optional)
-          </label>
-          <textarea
-            id={usageNotesId}
+          <Textarea
+            label="Additional Notes (Optional)"
+            floatingLabel
             value={usageNotes}
             onChange={(e) => setUsageNotes(e.target.value)}
             rows={2}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+            className="resize-none"
             placeholder="Provide additional details about the failure, diagnostic results, or any other relevant information..."
             disabled={loading}
           />
@@ -216,6 +213,8 @@ export function MarkDefectiveModal({
           <Button
             onClick={handleClose}
             variant="secondary"
+            size="sm"
+            className="text-xs"
             disabled={loading}
           >
             Cancel
@@ -223,11 +222,12 @@ export function MarkDefectiveModal({
           <Button
             onClick={handleMarkDefective}
             disabled={loading || !defectReason.trim()}
-            className="bg-danger hover:bg-danger/90 text-danger-foreground"
+            size="sm"
+            className="bg-danger hover:bg-danger/90 text-danger-foreground text-xs"
           >
             {loading ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                 Marking as Defective...
               </>
             ) : (

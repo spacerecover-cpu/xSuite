@@ -67,7 +67,9 @@ describe('ApplyAdvanceModal', () => {
 
   it('recomputes the max when a different invoice is selected', async () => {
     const onApply = renderModal();
-    fireEvent.change(screen.getByLabelText(/invoice/i), { target: { value: 'inv-2' } });
+    // Invoice is the modal's only SearchableSelect: open it and pick the INV-2 option.
+    fireEvent.click(screen.getByRole('combobox'));
+    fireEvent.click(await screen.findByRole('option', { name: /INV-2/ }));
     // New max is min(5000, 8000) = 5000.
     expect((screen.getByLabelText(/amount/i) as HTMLInputElement).value).toBe('5000');
     fireEvent.click(screen.getByRole('button', { name: /^apply$/i }));
