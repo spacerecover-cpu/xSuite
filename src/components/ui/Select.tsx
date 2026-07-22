@@ -2,6 +2,7 @@ import React from 'react';
 import { AlertCircle, ChevronDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useFieldA11y } from '../../hooks/useFieldA11y';
+import { FLOATING_LABEL_CLS } from './Input';
 
 const selectSizeClasses = { sm: 'px-3 py-1.5 text-sm', md: 'px-3 py-2' } as const;
 
@@ -20,10 +21,12 @@ interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>
   /** Placeholder rendered as a disabled, empty-value leading option. */
   placeholder?: string;
   size?: 'sm' | 'md';
+  /** Opt-in: render the label as a notch on the select's top border. */
+  floatingLabel?: boolean;
 }
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, error, hint, options, placeholder, className = '', size = 'md', children, ...props }, ref) => {
+  ({ label, error, hint, options, placeholder, className = '', size = 'md', floatingLabel = false, children, ...props }, ref) => {
     const { labelProps, controlProps, errorProps, hintProps } = useFieldA11y({
       id: props.id,
       hasError: !!error,
@@ -33,7 +36,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
 
     return (
       <div className="w-full">
-        {label && (
+        {label && !floatingLabel && (
           <label {...labelProps} className="block text-sm font-medium text-slate-700 mb-1">
             {label}
             {props.required && (
@@ -50,7 +53,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             {...props}
             className={cn(
               'w-full appearance-none pe-9 border rounded-md bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-              selectSizeClasses[size],
+              floatingLabel ? 'h-9 px-3 text-sm' : selectSizeClasses[size],
               error ? 'border-danger' : 'border-slate-300',
               className
             )}
@@ -71,6 +74,12 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             aria-hidden="true"
             className="absolute inset-y-0 end-0 me-3 my-auto h-4 w-4 text-slate-400 pointer-events-none"
           />
+          {label && floatingLabel && (
+            <label {...labelProps} className={FLOATING_LABEL_CLS}>
+              {label}
+              {props.required && <span aria-hidden="true" className="text-danger ms-0.5">*</span>}
+            </label>
+          )}
         </div>
         {error && (
           <p {...errorProps} className="mt-1 text-xs text-danger flex items-center gap-1"><AlertCircle aria-hidden="true" className="w-3 h-3 shrink-0" />

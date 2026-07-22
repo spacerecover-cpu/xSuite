@@ -317,7 +317,7 @@ tabbed layout below is for 30+ field records only.
 - **Floating labels everywhere.** Every field uses the opt-in **`floatingLabel`** variant — the label
   is a notch on the field's top border (`FLOATING_LABEL_CLS`, `text-xs` 12px, `text-slate-500`,
   `bg-surface` so it sits *over* the border), not a stacked label above. Supported on `Input`,
-  `Textarea`, `SearchableSelect`, `PhoneInput`, and `AddressFields`. The label association is preserved
+  `Textarea`, `SearchableSelect`, `Select` (native), `PhoneInput`, and `AddressFields`. The label association is preserved
   through `useFieldA11y` (so it is a real persistent label — never a placeholder-only field — and stays
   query-able by `getByLabelText`).
 - **Quiet placeholders & sentinels.** Placeholders render at `text-xs` (12px, `placeholder:text-xs`)

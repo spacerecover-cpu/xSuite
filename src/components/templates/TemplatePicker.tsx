@@ -38,6 +38,8 @@ interface TemplatePickerProps {
   /** Apply the tenant default automatically when the picker mounts. */
   autoApplyDefault?: boolean;
   label?: string;
+  /** Render the label as a floating notch (matches the floating-label form modals). */
+  floatingLabel?: boolean;
   disabled?: boolean;
 }
 
@@ -55,6 +57,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
   channel = 'plain',
   autoApplyDefault = false,
   label = 'Template',
+  floatingLabel = false,
   disabled,
 }) => {
   const { profile } = useAuth();
@@ -133,6 +136,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
         <div className="flex-1">
           <Select
             label={label}
+            floatingLabel={floatingLabel}
             value={selectedId}
             onChange={(e) => {
               const id = e.target.value;

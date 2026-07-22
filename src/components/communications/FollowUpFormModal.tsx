@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { CalendarClock, Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
@@ -49,7 +49,6 @@ export const FollowUpFormModal: React.FC<FollowUpFormModalProps> = ({
 }) => {
   const toast = useToast();
   const queryClient = useQueryClient();
-  const dateId = useId();
 
   const [type, setType] = useState<FollowUpType>(defaultType ?? 'general');
   const [dueAt, setDueAt] = useState('');
@@ -141,18 +140,13 @@ export const FollowUpFormModal: React.FC<FollowUpFormModalProps> = ({
               name: label,
             }))}
           />
-          <div>
-            <label htmlFor={dateId} className="block text-sm font-medium text-slate-700 mb-1">
-              Due
-            </label>
-            <input
-              id={dateId}
-              type="datetime-local"
-              value={dueAt}
-              onChange={(e) => setDueAt(e.target.value)}
-              className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-            />
-          </div>
+          <Input
+            label="Due"
+            floatingLabel
+            type="datetime-local"
+            value={dueAt}
+            onChange={(e) => setDueAt(e.target.value)}
+          />
         </div>
 
         <div>

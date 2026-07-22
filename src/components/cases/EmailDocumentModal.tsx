@@ -246,6 +246,7 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
             channel="plain"
             autoApplyDefault
             label="Email template"
+            floatingLabel
             disabled={isSending}
             onApply={({ subject: appliedSubject, body: appliedBody }) => {
               if (appliedSubject) setSubject(appliedSubject);
