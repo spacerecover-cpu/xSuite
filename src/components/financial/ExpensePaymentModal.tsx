@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Wallet, Banknote } from 'lucide-react';
+import { SearchableSelect } from '../ui/SearchableSelect';
+import { Wallet, Loader2 } from 'lucide-react';
 import { bankingService } from '../../lib/bankingService';
 import { useCurrencyConfig, useDateTimeConfig } from '../../contexts/TenantConfigContext';
 import { tenantToday } from '../../lib/tenantToday';
@@ -79,8 +80,8 @@ export const ExpensePaymentModal: React.FC<ExpensePaymentModalProps> = ({
   if (!expense) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Record Expense Payment" icon={Wallet} size="sm">
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal isOpen={isOpen} onClose={onClose} title="Record Expense Payment" icon={Wallet} titleSize="sm" size="sm" showClose closeOnBackdrop={false}>
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div className="rounded-lg border border-border bg-surface-muted p-3">
           <div className="flex items-center justify-between">
             <span className="text-sm text-slate-500">
@@ -94,27 +95,21 @@ export const ExpensePaymentModal: React.FC<ExpensePaymentModalProps> = ({
         </div>
 
         <div>
-          <label htmlFor="exp-pay-account" className="mb-1 block text-sm font-medium text-slate-700">
-            Pay from account <span className="text-danger">*</span>
-          </label>
-          <div className="relative">
-            <Banknote className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <select
-              id="exp-pay-account"
-              value={bankAccountId}
-              onChange={(e) => setBankAccountId(e.target.value)}
-              required
-              disabled={isLoading || eligibleAccounts.length === 0}
-              className="w-full rounded-lg border border-border bg-surface py-2 ps-9 pe-3 text-sm text-slate-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60"
-            >
-              <option value="">{isLoading ? 'Loading accounts…' : 'Select an account'}</option>
-              {eligibleAccounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.account_name} — {fmt(a.current_balance ?? 0)}
-                </option>
-              ))}
-            </select>
-          </div>
+          <SearchableSelect
+            label="Pay from account"
+            floatingLabel
+            shrinkDefaultValue
+            usePortal
+            required
+            value={bankAccountId}
+            onChange={(v) => setBankAccountId(v)}
+            disabled={isLoading || eligibleAccounts.length === 0}
+            options={[
+              { id: '', name: isLoading ? 'Loading accounts…' : 'No account' },
+              ...eligibleAccounts.map((a) => ({ id: a.id, name: `${a.account_name} — ${fmt(a.current_balance ?? 0)}` })),
+            ]}
+            placeholder="No account"
+          />
           {!isLoading && eligibleAccounts.length === 0 && (
             <p className="mt-1 text-xs text-warning-foreground">
               No active {expenseCurrency} account exists. Add a matching-currency bank account to pay this expense.
@@ -135,25 +130,28 @@ export const ExpensePaymentModal: React.FC<ExpensePaymentModalProps> = ({
           />
         </div>
 
-        <div>
-          <label htmlFor="exp-pay-ref" className="mb-1 block text-sm font-medium text-slate-700">
-            Reference <span className="text-slate-400">(optional)</span>
-          </label>
-          <Input
-            id="exp-pay-ref"
-            type="text"
-            value={reference}
-            onChange={(e) => setReference(e.target.value)}
-            placeholder="Cheque no., transfer ref…"
-          />
-        </div>
+        <Input
+          label="Reference"
+          floatingLabel
+          type="text"
+          value={reference}
+          onChange={(e) => setReference(e.target.value)}
+          placeholder="Cheque no., transfer ref…"
+        />
 
         <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
+          <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" disabled={!bankAccountId || isSubmitting}>
-            {isSubmitting ? 'Recording…' : 'Record Payment'}
+          <Button type="submit" size="sm" className="text-xs" disabled={!bankAccountId || isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Recording…
+              </>
+            ) : (
+              'Record Payment'
+            )}
           </Button>
         </div>
       </form>

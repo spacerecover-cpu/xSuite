@@ -1,8 +1,9 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Package, User, Phone, CreditCard, Printer, FileText } from 'lucide-react';
+import { SearchableSelect } from '../ui/SearchableSelect';
+import { Package, User, Printer, FileText, PackageCheck, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { logger } from '../../lib/logger';
 import {
@@ -99,11 +100,6 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
   const [labSuppliedIds, setLabSuppliedIds] = useState<string[]>([]);
   const [checkoutDone, setCheckoutDone] = useState(false);
   const firstFieldRef = useRef<HTMLInputElement>(null);
-  const collectorNameId = useId();
-  const collectorMobileId = useId();
-  const collectorIdId = useId();
-  const recoveryOutcomeId = useId();
-  const relationshipId = useId();
 
   useEffect(() => {
     if (!challanEnabled || !isOpen || selectedDevices.length === 0) {
@@ -271,7 +267,7 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Device Checkout" closeOnBackdrop={false} initialFocusRef={firstFieldRef}>
+    <Modal isOpen={isOpen} onClose={handleClose} title="Device Checkout" subtitle="Check this device out and record its return." icon={PackageCheck} titleSize="sm" showClose closeOnBackdrop={false} initialFocusRef={firstFieldRef}>
       <form
         className="space-y-6"
         onSubmit={(e) => {
@@ -336,81 +332,61 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
             <User className="w-5 h-5" />
             <span>Collector Information</span>
           </div>
-          <div className="space-y-4">
-            <div>
-              <label htmlFor={relationshipId} className="block text-sm font-medium text-slate-700 mb-1">
-                Who is collecting?
-              </label>
-              <select
-                id={relationshipId}
-                value={relationship}
-                onChange={(e) => handleRelationshipChange(e.target.value as CollectorRelationship)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-success focus:border-success"
-              >
-                <option value="self">The customer (in person)</option>
-                <option value="authorized_agent">Authorized agent (on behalf of the customer)</option>
-                <option value="company_rep">Company representative</option>
-                <option value="courier">Courier</option>
-              </select>
-            </div>
-            <div>
-              <label htmlFor={collectorNameId} className="block text-sm font-medium text-slate-700 mb-1">
-                <User className="w-4 h-4 inline mr-1" />
-                Collector Name *
-              </label>
-              <Input
-                id={collectorNameId}
-                ref={firstFieldRef}
-                value={collectorName}
-                onChange={(e) => setCollectorName(e.target.value)}
-                placeholder="Enter collector name"
-                className="w-full"
-              />
-            </div>
-            <div>
-              <label htmlFor={collectorMobileId} className="block text-sm font-medium text-slate-700 mb-1">
-                <Phone className="w-4 h-4 inline mr-1" />
-                Mobile Number *
-              </label>
-              <Input
-                id={collectorMobileId}
-                value={collectorMobile}
-                onChange={(e) => setCollectorMobile(e.target.value)}
-                placeholder="Enter mobile number"
-                className="w-full"
-              />
-            </div>
-            <div>
-              <label htmlFor={collectorIdId} className="block text-sm font-medium text-slate-700 mb-1">
-                <CreditCard className="w-4 h-4 inline mr-1" />
-                National ID / Passport {relationship === 'self' ? '(Optional)' : '*'}
-              </label>
-              <Input
-                id={collectorIdId}
-                value={collectorId}
-                onChange={(e) => setCollectorId(e.target.value)}
-                placeholder={relationship === 'self' ? 'Enter ID number (optional)' : 'Required when collecting on behalf of the customer'}
-                className="w-full"
-              />
-            </div>
+          <div className="space-y-5">
+            <SearchableSelect
+              label="Who is collecting?"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
+              value={relationship}
+              onChange={(v) => handleRelationshipChange(v as CollectorRelationship)}
+              options={[
+                { id: 'self', name: 'The customer (in person)' },
+                { id: 'authorized_agent', name: 'Authorized agent (on behalf of the customer)' },
+                { id: 'company_rep', name: 'Company representative' },
+                { id: 'courier', name: 'Courier' },
+              ]}
+            />
+            <Input
+              ref={firstFieldRef}
+              label="Collector Name *"
+              floatingLabel
+              value={collectorName}
+              onChange={(e) => setCollectorName(e.target.value)}
+              placeholder="Enter collector name"
+            />
+            <Input
+              label="Mobile Number *"
+              floatingLabel
+              value={collectorMobile}
+              onChange={(e) => setCollectorMobile(e.target.value)}
+              placeholder="Enter mobile number"
+            />
+            <Input
+              label={`National ID / Passport ${relationship === 'self' ? '(Optional)' : '*'}`}
+              floatingLabel
+              value={collectorId}
+              onChange={(e) => setCollectorId(e.target.value)}
+              placeholder={relationship === 'self' ? 'Enter ID number (optional)' : 'Required when collecting on behalf of the customer'}
+            />
           </div>
         </div>
 
         <div className="bg-accent/10 border border-accent/30 rounded-lg p-4">
-          <label htmlFor={recoveryOutcomeId} className="block text-sm font-medium text-accent-foreground mb-2">
-            Recovery Outcome
-          </label>
-          <select
-            id={recoveryOutcomeId}
+          <SearchableSelect
+            label="Recovery Outcome"
+            floatingLabel
+            shrinkDefaultValue
+            usePortal
             value={recoveryOutcome}
-            onChange={(e) => setRecoveryOutcome(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
-          >
-            <option value="full">Full Recovery - All data recovered successfully</option>
-            <option value="partial">Partial Recovery - Some data recovered</option>
-            <option value="unrecoverable">Unrecoverable - Data could not be recovered</option>
-            <option value="declined">Declined - Customer declined service</option>
-          </select>
+            onChange={(v) => setRecoveryOutcome(v)}
+            options={[
+              { id: 'full', name: 'Full Recovery - All data recovered successfully' },
+              { id: 'partial', name: 'Partial Recovery - Some data recovered' },
+              { id: 'unrecoverable', name: 'Unrecoverable - Data could not be recovered' },
+              { id: 'declined', name: 'Declined - Customer declined service' },
+            ]}
+          />
         </div>
 
         {challanEnabled && selectedDevices.length > 0 && (
@@ -469,10 +445,12 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
           </div>
         )}
 
-        <div className="flex justify-end gap-3 pt-4 border-t">
+        <div className="flex items-center justify-end gap-2.5 pt-4 border-t">
           <Button
             type="button"
             variant="secondary"
+            size="sm"
+            className="text-xs"
             onClick={handleClose}
             disabled={isSubmitting}
           >
@@ -481,18 +459,20 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
           <Button
             type="submit"
             variant="accent"
+            size="sm"
+            className="text-xs"
             disabled={isSubmitting}
           >
             {isSubmitting ? (
-              <span className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-accent-foreground border-t-transparent rounded-full animate-spin"></div>
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                 Processing...
-              </span>
+              </>
             ) : (
-              <span className="flex items-center gap-2">
-                <Printer className="w-4 h-4" />
+              <>
+                <Printer className="w-3.5 h-3.5 mr-1.5" />
                 {checkoutDone ? 'Retry Delivery Challan' : 'Print Checkout Form'}
-              </span>
+              </>
             )}
           </Button>
         </div>

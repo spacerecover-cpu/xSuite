@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, X } from 'lucide-react';
+import { Upload, FileText, X, Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import { supabase, resolveTenantId } from '../../lib/supabaseClient';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
@@ -108,40 +109,37 @@ export default function DocumentUploadModal({ isOpen, onClose, onSuccess, suppli
   ];
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Upload Document">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="supplier-doc-type" className="block text-sm font-medium text-slate-700 mb-1">
-            Document Type *
-          </label>
-          <select
-            id="supplier-doc-type"
-            value={formData.document_type}
-            onChange={(e) => setFormData({ ...formData, document_type: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-            required
-          >
-            {documentTypes.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
-        </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Upload Document"
+      subtitle="Select a file and enter the document details."
+      icon={Upload}
+      titleSize="sm"
+      showClose
+      closeOnBackdrop={false}
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <SearchableSelect
+          label="Document Type"
+          floatingLabel
+          usePortal
+          required
+          value={formData.document_type}
+          onChange={(value) => setFormData({ ...formData, document_type: value })}
+          options={documentTypes.map((type) => ({ id: type.value, name: type.label }))}
+        />
+
+        <Input
+          label="Description"
+          floatingLabel
+          value={formData.description}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          placeholder="Brief description of the document"
+        />
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
-            Description
-          </label>
-          <Input
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            placeholder="Brief description of the document"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
             Select File * (Max 10MB)
           </label>
 
@@ -183,12 +181,19 @@ export default function DocumentUploadModal({ isOpen, onClose, onSuccess, suppli
           )}
         </div>
 
-        <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
+        <div className="flex justify-end gap-2.5 pt-4 border-t border-border">
+          <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button type="submit" disabled={loading || !selectedFile}>
-            {loading ? 'Uploading...' : 'Upload Document'}
+          <Button type="submit" size="sm" className="text-xs" disabled={loading || !selectedFile}>
+            {loading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              'Upload Document'
+            )}
           </Button>
         </div>
       </form>

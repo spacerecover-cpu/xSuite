@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Receipt, Calendar, FileText } from 'lucide-react';
+import { Textarea } from '../ui/Textarea';
+import { Receipt, FileText, FileCheck, Loader2 } from 'lucide-react';
 
 interface ConvertProformaToTaxModalProps {
   isOpen: boolean;
@@ -53,10 +54,14 @@ export const ConvertProformaToTaxModal: React.FC<ConvertProformaToTaxModalProps>
       isOpen={isOpen}
       onClose={onClose}
       title="Convert Proforma to Tax Invoice"
+      subtitle="Convert this proforma to a tax invoice."
+      icon={FileCheck}
+      titleSize="sm"
       size="lg"
+      showClose
       closeOnBackdrop={false}
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div className="bg-info-muted border border-info/30 rounded-lg p-4">
           <div className="flex items-start gap-3">
             <FileText className="w-5 h-5 text-info flex-shrink-0 mt-0.5" />
@@ -80,34 +85,26 @@ export const ConvertProformaToTaxModal: React.FC<ConvertProformaToTaxModalProps>
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <Input
-              label="Due Date *"
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              required
-              leftIcon={<Calendar className="w-4 h-4" />}
-            />
-            <p className="text-xs text-slate-500 mt-1">
-              Payment due date for the tax invoice
-            </p>
-          </div>
+        <div className="space-y-5">
+          <Input
+            label="Due Date"
+            floatingLabel
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            required
+            hint="Payment due date for the tax invoice"
+          />
 
-          <div>
-            <label htmlFor="convert-proforma-notes" className="block text-sm font-medium text-slate-700 mb-2">
-              Additional Notes (Optional)
-            </label>
-            <textarea
-              id="convert-proforma-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-              placeholder="Add any additional notes or special instructions for this invoice..."
-            />
-          </div>
+          <Textarea
+            label="Additional Notes (Optional)"
+            floatingLabel
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            className="resize-none"
+            placeholder="Add any additional notes or special instructions for this invoice..."
+          />
         </div>
 
         <div className="bg-warning-muted border border-warning/30 rounded-lg p-3">
@@ -121,10 +118,12 @@ export const ConvertProformaToTaxModal: React.FC<ConvertProformaToTaxModalProps>
           </ul>
         </div>
 
-        <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+        <div className="flex gap-2.5 justify-end pt-4 border-t border-slate-200">
           <Button
             type="button"
             variant="secondary"
+            size="sm"
+            className="text-xs"
             onClick={onClose}
             disabled={isConverting}
           >
@@ -132,18 +131,19 @@ export const ConvertProformaToTaxModal: React.FC<ConvertProformaToTaxModalProps>
           </Button>
           <Button
             type="submit"
+            size="sm"
             style={{ backgroundColor: 'rgb(var(--color-success))' }}
             disabled={isConverting}
-            className="shadow-md hover:shadow-lg transition-shadow"
+            className="text-xs shadow-md hover:shadow-lg transition-shadow"
           >
             {isConverting ? (
               <>
-                <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                 Converting...
               </>
             ) : (
               <>
-                <Receipt className="w-4 h-4 mr-2" />
+                <Receipt className="w-3.5 h-3.5 mr-1.5" />
                 Convert to Tax Invoice
               </>
             )}

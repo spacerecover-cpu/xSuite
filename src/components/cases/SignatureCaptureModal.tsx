@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { PenLine, X } from 'lucide-react';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 
@@ -146,9 +147,28 @@ export function SignatureCaptureModal({ open, onClose, title, onCapture, allowed
 
   return (
     <Dialog open={open} onClose={onClose} label={title} className="max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden">
-      <div className="p-6 space-y-5 overflow-y-auto flex-1">
-        <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+      {/* Fixed header — standard modal chrome (badge + title/subtitle + X) */}
+      <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-border">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+            <PenLine className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+            <p className="mt-0.5 text-sm text-slate-500">Capture a signature to confirm.</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
 
+      <div className="px-5 py-4 space-y-5 overflow-y-auto flex-1">
         {/* Segmented control */}
         <div className="flex rounded-md border border-border overflow-hidden" role="group" aria-label="Signature method">
           {methods.map((m) => (
@@ -183,7 +203,7 @@ export function SignatureCaptureModal({ open, onClose, title, onCapture, allowed
               value={signerName}
               onChange={(e) => setSignerName(e.target.value)}
               placeholder="Full name of signer"
-              className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-ring"
+              className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
         )}
@@ -201,7 +221,7 @@ export function SignatureCaptureModal({ open, onClose, title, onCapture, allowed
               value={typedValue}
               onChange={(e) => setTypedValue(e.target.value)}
               placeholder="Full name"
-              className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-ring"
+              className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
         )}
@@ -267,7 +287,7 @@ export function SignatureCaptureModal({ open, onClose, title, onCapture, allowed
 
       </div>
       {/* Actions — pinned footer */}
-      <div className="shrink-0 flex items-center justify-end gap-3 border-t border-border px-6 py-3">
+      <div className="shrink-0 flex items-center justify-end gap-3 border-t border-border px-5 py-3">
         <Button type="button" variant="secondary" onClick={onClose}>
           Cancel
         </Button>

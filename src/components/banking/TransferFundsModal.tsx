@@ -1,12 +1,14 @@
-import React, { useState, useId } from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import { bankingService } from '../../lib/bankingService';
 import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
 import { formatCurrencyWithConfig } from '../../lib/format';
-import { AlertCircle, ArrowRight } from 'lucide-react';
+import { AlertCircle, ArrowRight, ArrowLeftRight, Loader2 } from 'lucide-react';
 
 interface TransferFundsModalProps {
   isOpen: boolean;
@@ -24,9 +26,6 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string>('');
   const [warning, setWarning] = useState<string>('');
-  const fromAccountId = useId();
-  const toAccountId = useId();
-  const descriptionId = useId();
 
   const [formData, setFormData] = useState({
     transfer_date: new Date().toISOString().split('T')[0],
@@ -90,8 +89,8 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Transfer Funds" size="large">
-      <form onSubmit={handleSubmit} className="space-y-6">
+    <Modal isOpen={isOpen} onClose={onClose} title="Transfer Funds" subtitle="Move funds from one account to another." icon={ArrowLeftRight} size="large" titleSize="sm" showClose closeOnBackdrop={false}>
+      <form onSubmit={handleSubmit} className="space-y-5">
         {error && (
           <div className="bg-danger-muted border border-danger/30 rounded-lg p-3 flex items-start gap-2">
             <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
@@ -108,31 +107,33 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
 
         <Input
           label="Transfer Date"
+          floatingLabel
           type="date"
           value={formData.transfer_date}
           onChange={(e) => setFormData({ ...formData, transfer_date: e.target.value })}
           required
         />
 
-        <div className="grid grid-cols-[1fr,auto,1fr] gap-4 items-end">
+        <div className="grid grid-cols-[1fr,auto,1fr] gap-x-4 gap-y-5 items-end">
           <div>
-            <label htmlFor={fromAccountId} className="block text-sm font-medium text-slate-700 mb-1.5">From Account</label>
-            <select
-              id={fromAccountId}
+            <SearchableSelect
+              label="From Account"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
               value={formData.from_account_id}
-              onChange={(e) => setFormData({ ...formData, from_account_id: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-              required
-            >
-              <option value="">Select Source</option>
-              {accounts.map((acc) => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.account_name} - Balance: {formatCurrencyValue(acc.current_balance)}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setFormData({ ...formData, from_account_id: value })}
+              options={[
+                { id: '', name: 'Select Source' },
+                ...accounts.map((acc) => ({
+                  id: acc.id,
+                  name: `${acc.account_name} - Balance: ${formatCurrencyValue(acc.current_balance)}`,
+                })),
+              ]}
+              placeholder="Select Source"
+            />
             {fromAccount && (
-              <p className="mt-1 text-xs text-slate-600">
+              <p className="mt-1 text-xs text-slate-500">
                 Type: <span className="font-medium capitalize">{fromAccount.account_type}</span>
               </p>
             )}
@@ -143,25 +144,26 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
           </div>
 
           <div>
-            <label htmlFor={toAccountId} className="block text-sm font-medium text-slate-700 mb-1.5">To Account</label>
-            <select
-              id={toAccountId}
+            <SearchableSelect
+              label="To Account"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
               value={formData.to_account_id}
-              onChange={(e) => setFormData({ ...formData, to_account_id: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-              required
-            >
-              <option value="">Select Destination</option>
-              {accounts
-                .filter(a => a.id !== formData.from_account_id)
-                .map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.account_name} - Balance: {formatCurrencyValue(acc.current_balance)}
-                  </option>
-                ))}
-            </select>
+              onChange={(value) => setFormData({ ...formData, to_account_id: value })}
+              options={[
+                { id: '', name: 'Select Destination' },
+                ...accounts
+                  .filter((a) => a.id !== formData.from_account_id)
+                  .map((acc) => ({
+                    id: acc.id,
+                    name: `${acc.account_name} - Balance: ${formatCurrencyValue(acc.current_balance)}`,
+                  })),
+              ]}
+              placeholder="Select Destination"
+            />
             {toAccount && (
-              <p className="mt-1 text-xs text-slate-600">
+              <p className="mt-1 text-xs text-slate-500">
                 Type: <span className="font-medium capitalize">{toAccount.account_type}</span>
               </p>
             )}
@@ -170,6 +172,7 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
 
         <Input
           label="Amount"
+          floatingLabel
           type="number"
           step="0.01"
           value={formData.amount}
@@ -179,29 +182,35 @@ export const TransferFundsModal: React.FC<TransferFundsModalProps> = ({
 
         <Input
           label="Reference Number"
+          floatingLabel
           value={formData.reference}
           onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
           placeholder="Optional reference"
         />
 
-        <div>
-          <label htmlFor={descriptionId} className="block text-sm font-medium text-slate-700 mb-1.5">Description</label>
-          <textarea
-            id={descriptionId}
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            rows={3}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-            placeholder="Reason for transfer..."
-          />
-        </div>
+        <Textarea
+          label="Description"
+          floatingLabel
+          value={formData.description}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          rows={3}
+          className="resize-none"
+          placeholder="Reason for transfer..."
+        />
 
         <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
+          <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting || !!warning}>
-            {isSubmitting ? 'Processing...' : 'Transfer Funds'}
+          <Button type="submit" size="sm" className="text-xs" disabled={isSubmitting || !!warning}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              'Transfer Funds'
+            )}
           </Button>
         </div>
       </form>

@@ -24,6 +24,38 @@ function stripGeneratedColumns(payload: Record<string, unknown>): Record<string,
   return payload;
 }
 
+/**
+ * Non-consuming preview of the next company number. Mirrors the DB
+ * `get_next_number('companies')` legacy branch (all sequences have a NULL
+ * format_template): `prefix || '-' || LPAD(current_value + 1, padding)`, with
+ * an annual-reset short-circuit. Read-only — the real number is allocated at
+ * insert time by `get_next_company_number()`.
+ */
+export async function getNextCompanyNumberPreview(): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('number_sequences')
+    .select('prefix, padding, current_value, reset_annually, last_reset_year')
+    .eq('scope', 'companies')
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    logger.error('Failed to preview next company number:', error);
+    return null;
+  }
+  const prefix = data?.prefix ?? 'COMP';
+  const padding = data?.padding ?? 4;
+  const currentYear = new Date().getFullYear();
+  let nextVal: number;
+  if (!data) {
+    nextVal = 1;
+  } else if (data.reset_annually && (data.last_reset_year == null || data.last_reset_year < currentYear)) {
+    nextVal = 1;
+  } else {
+    nextVal = (data.current_value ?? 0) + 1;
+  }
+  return `${prefix}-${String(nextVal).padStart(padding, '0')}`;
+}
+
 export interface CreateCompanyInput {
   name?: string | null;
   company_name?: string | null;

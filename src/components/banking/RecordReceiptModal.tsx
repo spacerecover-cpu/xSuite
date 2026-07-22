@@ -392,7 +392,10 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={singleInvoiceMode ? 'Record Payment for Invoice' : 'Record Payment'}
+      subtitle="Record a payment received and allocate it to invoices."
+      icon={Receipt}
       size="2xl"
+      showClose
       closeOnBackdrop={false}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -446,14 +449,14 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
                 required
               />
               <div>
-                <label htmlFor={accountSelectId} className="block text-sm font-medium text-slate-700 mb-1.5">
+                <label htmlFor={accountSelectId} className="block text-sm font-medium text-slate-700 mb-1">
                   Deposit to account <span className="text-danger">*</span>
                 </label>
                 <select
                   id={accountSelectId}
                   value={formData.account_id}
                   onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   required
                 >
                   <option value="">Select account</option>
@@ -465,14 +468,14 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
                 </select>
               </div>
               <div>
-                <label htmlFor={paymentMethodSelectId} className="block text-sm font-medium text-slate-700 mb-1.5">
+                <label htmlFor={paymentMethodSelectId} className="block text-sm font-medium text-slate-700 mb-1">
                   Payment method
                 </label>
                 <select
                   id={paymentMethodSelectId}
                   value={formData.payment_method_id}
                   onChange={(e) => setFormData({ ...formData, payment_method_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 >
                   <option value="">Select method</option>
                   {paymentMethods.map((method: { id: string; name: string }) => (
@@ -510,13 +513,13 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
                     placeholder="Payment description"
                   />
                   <div>
-                    <label htmlFor={notesId} className="block text-sm font-medium text-slate-700 mb-1.5">Notes</label>
+                    <label htmlFor={notesId} className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
                     <textarea
                       id={notesId}
                       value={formData.notes}
                       onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                       rows={2}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                       placeholder="Additional notes..."
                     />
                   </div>

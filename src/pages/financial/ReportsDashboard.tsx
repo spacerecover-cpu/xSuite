@@ -663,7 +663,7 @@ export const ReportsDashboard: React.FC = () => {
                   </div>
                   {profitLossData.expenses.byCategory.length > 0 && (
                     <div>
-                      <h4 className="text-sm font-semibold text-slate-700 mb-3">Expenses by Category</h4>
+                      <h4 className="text-sm font-semibold text-slate-900 mb-3">Expenses by Category</h4>
                       <div className="space-y-2">
                         {profitLossData.expenses.byCategory.map((cat, i) => (
                           <div key={i} className="flex justify-between items-center py-2 border-b border-slate-100">
@@ -711,7 +711,7 @@ export const ReportsDashboard: React.FC = () => {
               {selectedReport === 'cash-flow' && cashFlowData && (
                 <div className="space-y-6">
                   <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                    <h4 className="text-sm font-semibold text-slate-700 mb-4">Operating Activities</h4>
+                    <h4 className="text-sm font-semibold text-slate-900 mb-4">Operating Activities</h4>
                     <div className="space-y-3">
                       <div className="flex justify-between">
                         <span className="text-sm text-slate-600">Cash Receipts</span>
@@ -765,7 +765,7 @@ export const ReportsDashboard: React.FC = () => {
                   </div>
                   {invoiceSummaryData.byStatus.length > 0 && (
                     <div>
-                      <h4 className="text-sm font-semibold text-slate-700 mb-3">By Status</h4>
+                      <h4 className="text-sm font-semibold text-slate-900 mb-3">By Status</h4>
                       <div className="space-y-2">
                         {invoiceSummaryData.byStatus.map((status, i) => (
                           <div key={i} className="flex justify-between items-center py-2 border-b border-slate-100">

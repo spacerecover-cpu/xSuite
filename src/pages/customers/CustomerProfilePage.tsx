@@ -6,14 +6,10 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
 import { Modal } from '../../components/ui/Modal';
-import { Input } from '../../components/ui/Input';
-import { PhoneInput } from '../../components/ui/PhoneInput';
-import { SearchableSelect } from '../../components/ui/SearchableSelect';
 import { CustomerAvatar } from '../../components/ui/CustomerAvatar';
 import { ImageUpload } from '../../components/ui/ImageUpload';
-import { PhotoViewerModal } from '../../components/ui/PhotoViewerModal';
 import {
-  User, Mail, Phone, MapPin, Building2,
+  User, Mail, Phone, MapPin, Building2, Camera,
   Calendar, FileText, DollarSign, MessageSquare, MessageCircle, Eye, Link as LinkIcon,
   Copy, RefreshCw, Ban, Check, AlertTriangle, ShoppingBag, Activity
 } from 'lucide-react';
@@ -24,6 +20,7 @@ import { uploadCustomerProfilePhoto, deleteCustomerProfilePhoto } from '../../li
 import { generatePortalLoginUrl, generateCustomerPortalCredentialsText } from '../../lib/portalUrlService';
 import { generateSecurePassword } from '../../lib/passwordUtils';
 import { ManageCompaniesModal } from '../../components/customers/ManageCompaniesModal';
+import { CustomerFormModal, type CustomerEditData } from '../../components/customers/CustomerFormModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { CustomerPurchasesTab } from '../../components/customers/CustomerPurchasesTab';
 import { CustomerCasesTab } from '../../components/customers/CustomerCasesTab';
@@ -100,21 +97,8 @@ export const CustomerProfilePage: React.FC = () => {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
-  const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
+  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
   const [portalLoginUrl, setPortalLoginUrl] = useState<string>('');
-  const [editFormData, setEditFormData] = useState({
-    customer_name: '',
-    email: '',
-    mobile_number: '',
-    phone: '',
-    customer_group_id: '',
-    country_id: '',
-    city_id: '',
-    address: '',
-    portal_enabled: false,
-    notes: '',
-    profile_photo_url: '',
-  });
   const [showComposeEmail, setShowComposeEmail] = useState(false);
   const [composeMessageChannel, setComposeMessageChannel] = useState<'whatsapp' | 'sms' | null>(null);
   const [showManageCompanies, setShowManageCompanies] = useState(false);
@@ -180,51 +164,6 @@ export const CustomerProfilePage: React.FC = () => {
     enabled: !!id,
   });
 
-  const { data: customerGroups = [] } = useQuery({
-    queryKey: ['customer_groups'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('customer_groups')
-        .select('*')
-        .order('name');
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: countries = [] } = useQuery({
-    queryKey: ['countries'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('geo_countries')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: cities = [] } = useQuery({
-    queryKey: ['cities'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('geo_cities')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const filteredCities = cities.filter(
-    (city: { id: string; country_id: string; name: string }) => !editFormData.country_id || city.country_id === editFormData.country_id
-  );
-
   React.useEffect(() => {
     const loadPortalUrl = async () => {
       const url = await generatePortalLoginUrl();
@@ -233,76 +172,43 @@ export const CustomerProfilePage: React.FC = () => {
     loadPortalUrl();
   }, []);
 
-  const updateMutation = useMutation({
-    mutationFn: async (updatedData: typeof editFormData) => {
-      if (!id) throw new Error('Missing customer ID');
-
-      let photoUrl = updatedData.profile_photo_url;
-
-      if (photoFile) {
-        setUploadingPhoto(true);
+  // Photo upload is its own action now (triggered from the avatar), separate
+  // from editing the customer's fields (handled by the shared CustomerFormModal).
+  const savePhotoMutation = useMutation({
+    mutationFn: async () => {
+      if (!id || !photoFile) throw new Error('No photo selected');
+      setUploadingPhoto(true);
+      try {
         const uploadResult = await uploadCustomerProfilePhoto(photoFile, id);
-
-        if (uploadResult.success && uploadResult.publicUrl) {
-          photoUrl = uploadResult.publicUrl;
-
-          if (customer?.profile_photo_url) {
-            const oldPath = customer.profile_photo_url.split('/').slice(-2).join('/');
-            await deleteCustomerProfilePhoto(oldPath);
-          }
+        if (!uploadResult.success || !uploadResult.publicUrl) {
+          throw new Error(uploadResult.error || 'Failed to upload photo');
         }
+        if (customer?.profile_photo_url) {
+          const oldPath = customer.profile_photo_url.split('/').slice(-2).join('/');
+          await deleteCustomerProfilePhoto(oldPath);
+        }
+        const { error } = await supabase
+          .from('customers_enhanced')
+          .update({ profile_photo_url: uploadResult.publicUrl })
+          .eq('id', id);
+        if (error) throw error;
+      } finally {
         setUploadingPhoto(false);
       }
-
-      const { data, error } = await supabase
-        .from('customers_enhanced')
-        .update({
-          customer_name: updatedData.customer_name,
-          email: updatedData.email || null,
-          mobile_number: updatedData.mobile_number || null,
-          phone: updatedData.phone || null,
-          customer_group_id: updatedData.customer_group_id || null,
-          country_id: updatedData.country_id || null,
-          city_id: updatedData.city_id || null,
-          address: updatedData.address || null,
-          portal_enabled: updatedData.portal_enabled,
-          notes: updatedData.notes || null,
-          profile_photo_url: photoUrl || null,
-        })
-        .eq('id', id)
-        .select()
-        .maybeSingle();
-
-      if (error) throw error;
-      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customer', id] });
       queryClient.invalidateQueries({ queryKey: ['customers_enhanced'] });
-      setIsEditModalOpen(false);
+      setIsPhotoModalOpen(false);
       setPhotoFile(null);
       setPhotoPreviewUrl(null);
     },
   });
 
-  const handleOpenEditModal = () => {
-    if (!customer) return;
-
-    setEditFormData({
-      customer_name: customer.customer_name,
-      email: customer.email || '',
-      mobile_number: customer.mobile_number || '',
-      phone: customer.phone || '',
-      customer_group_id: customer.customer_group_id || '',
-      country_id: customer.country_id || '',
-      city_id: customer.city_id || '',
-      address: customer.address || '',
-      portal_enabled: customer.portal_enabled ?? false,
-      notes: customer.notes || '',
-      profile_photo_url: customer.profile_photo_url || '',
-    });
-    setPhotoPreviewUrl(customer.profile_photo_url);
-    setIsEditModalOpen(true);
+  const openPhotoModal = () => {
+    setPhotoFile(null);
+    setPhotoPreviewUrl(customer?.profile_photo_url ?? null);
+    setIsPhotoModalOpen(true);
   };
 
   const generatePasswordMutation = useMutation({
@@ -375,11 +281,6 @@ export const CustomerProfilePage: React.FC = () => {
     disablePortalAccessMutation.mutate();
   };
 
-  const handleSubmitEdit = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateMutation.mutate(editFormData);
-  };
-
   if (isLoading) {
     return <DetailPageSkeleton />;
   }
@@ -436,7 +337,7 @@ export const CustomerProfilePage: React.FC = () => {
           </>
         ),
         actions: (
-          <Button variant="secondary" size="sm" onClick={handleOpenEditModal}>
+          <Button variant="secondary" size="sm" onClick={() => setIsEditModalOpen(true)}>
             Edit Profile
           </Button>
         ),
@@ -568,147 +469,77 @@ export const CustomerProfilePage: React.FC = () => {
             </div>
           </Modal>
 
-          <Modal
+          {/* Edit uses the SAME shared modal as Add (1:1) — company links and
+              the photo are handled by their own UIs (Manage Companies / the
+              avatar photo modal below). */}
+          <CustomerFormModal
             isOpen={isEditModalOpen}
             onClose={() => setIsEditModalOpen(false)}
-            title="Edit Customer"
+            customer={{
+              id: customer.id,
+              customer_name: customer.customer_name,
+              email: customer.email,
+              mobile_number: customer.mobile_number,
+              phone: customer.phone,
+              customer_group_id: customer.customer_group_id,
+              country_id: customer.country_id,
+              city_id: customer.city_id,
+              address: customer.address,
+              address_line1: (customer as { address_line1?: string | null }).address_line1 ?? null,
+              address_line2: (customer as { address_line2?: string | null }).address_line2 ?? null,
+              subdivision_id: (customer as { subdivision_id?: string | null }).subdivision_id ?? null,
+              postal_code: (customer as { postal_code?: string | null }).postal_code ?? null,
+              portal_enabled: customer.portal_enabled,
+              notes: customer.notes,
+              metadata: (customer as { metadata?: Record<string, unknown> | null }).metadata ?? null,
+            } satisfies CustomerEditData}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ['customer', id] });
+            }}
+          />
+
+          {/* Avatar-triggered photo upload — replaces the old in-form uploader. */}
+          <Modal
+            isOpen={isPhotoModalOpen}
+            onClose={() => setIsPhotoModalOpen(false)}
+            title="Profile Photo"
+            subtitle="Upload or update this customer's photo."
+            icon={Camera}
+            titleSize="sm"
+            size="sm"
+            showClose
           >
-            <form onSubmit={handleSubmitEdit} className="space-y-4">
-              <div className="max-w-sm">
-                <ImageUpload
-                  label="Profile Photo"
-                  description="Upload a profile photo for this customer"
-                  value={photoPreviewUrl || undefined}
-                  onChange={(file, previewUrl) => {
-                    setPhotoFile(file);
-                    setPhotoPreviewUrl(previewUrl);
-                  }}
-                  maxSizeMB={5}
-                  bucketName="company-assets"
-                  className="compact-upload"
-                  enableCrop={true}
-                  cropAspectRatio={1}
-                  cropShape="round"
-                />
-              </div>
-
-              <Input
-                label="Customer Name"
-                value={editFormData.customer_name}
-                onChange={(e) => setEditFormData({ ...editFormData, customer_name: e.target.value })}
-                required
+            <div className="space-y-4">
+              <ImageUpload
+                label="Profile Photo"
+                description="Upload a profile photo for this customer"
+                value={photoPreviewUrl || undefined}
+                onChange={(file, previewUrl) => {
+                  setPhotoFile(file);
+                  setPhotoPreviewUrl(previewUrl);
+                }}
+                maxSizeMB={5}
+                bucketName="company-assets"
+                className="compact-upload"
+                enableCrop={true}
+                cropAspectRatio={1}
+                cropShape="round"
               />
-
-              <div className="grid grid-cols-2 gap-3">
-                <Input
-                  label="Email"
-                  type="email"
-                  value={editFormData.email}
-                  onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
-                />
-                <PhoneInput
-                  label="Mobile Number"
-                  value={editFormData.mobile_number}
-                  onChange={(val) => setEditFormData({ ...editFormData, mobile_number: val })}
-                  countries={countries as Array<{ id: string; name: string; code: string; phone_code: string | null }>}
-                  selectedCountryId={editFormData.country_id}
-                />
-              </div>
-
-              <PhoneInput
-                label="Phone Number (Alternative)"
-                value={editFormData.phone}
-                onChange={(val) => setEditFormData({ ...editFormData, phone: val })}
-                countries={countries as Array<{ id: string; name: string; code: string; phone_code: string | null }>}
-                selectedCountryId={editFormData.country_id}
-              />
-
-              <SearchableSelect
-                label="Customer Group"
-                value={editFormData.customer_group_id}
-                onChange={(value) => setEditFormData({ ...editFormData, customer_group_id: value })}
-                options={[{ id: '', name: 'No group' }, ...customerGroups.map((g: { id: string; name: string }) => ({ id: g.id, name: g.name }))]}
-                placeholder="Select Group"
-              />
-
-              <div className="grid grid-cols-2 gap-3">
-                <SearchableSelect
-                  label="Country"
-                  value={editFormData.country_id}
-                  onChange={(value) => {
-                    setEditFormData({ ...editFormData, country_id: value, city_id: '' });
-                  }}
-                  options={[{ id: '', name: 'Not specified' }, ...countries.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))]}
-                  placeholder="Select Country"
-                />
-                <SearchableSelect
-                  label="City"
-                  value={editFormData.city_id}
-                  onChange={(value) => setEditFormData({ ...editFormData, city_id: value })}
-                  options={[{ id: '', name: 'Not specified' }, ...filteredCities.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))]}
-                  placeholder="Select City"
-                  disabled={!editFormData.country_id}
-                />
-              </div>
-
-              <Input
-                label="Address"
-                value={editFormData.address}
-                onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
-              />
-
-              <div>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={editFormData.portal_enabled}
-                    onChange={(e) =>
-                      setEditFormData({ ...editFormData, portal_enabled: e.target.checked })
-                    }
-                    className="w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
-                  />
-                  <span className="text-sm font-medium text-slate-700">
-                    Enable Client Portal Access
-                  </span>
-                </label>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Internal Notes
-                </label>
-                <textarea
-                  value={editFormData.notes}
-                  onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
-                  rows={2}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
-                  placeholder="Add any internal notes..."
-                />
-              </div>
-
-              <div className="flex gap-3 justify-end pt-3 border-t">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => setIsEditModalOpen(false)}
-                >
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-200">
+                <Button type="button" variant="secondary" size="sm" onClick={() => setIsPhotoModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={updateMutation.isPending || uploadingPhoto}>
-                  {uploadingPhoto ? 'Uploading Photo...' : updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => savePhotoMutation.mutate()}
+                  disabled={!photoFile || uploadingPhoto}
+                >
+                  {uploadingPhoto ? 'Uploading…' : 'Save Photo'}
                 </Button>
               </div>
-            </form>
+            </div>
           </Modal>
-
-          {customer.profile_photo_url && (
-            <PhotoViewerModal
-              isOpen={isPhotoViewerOpen}
-              onClose={() => setIsPhotoViewerOpen(false)}
-              imageUrl={customer.profile_photo_url}
-              altText={`${customer.customer_name} profile photo`}
-            />
-          )}
 
           {showComposeEmail && id && (
             <EmailDocumentModal
@@ -749,8 +580,8 @@ export const CustomerProfilePage: React.FC = () => {
                 lastName=""
                 photoUrl={customer.profile_photo_url}
                 size="xl"
-                clickable={!!customer.profile_photo_url}
-                onClick={() => customer.profile_photo_url && setIsPhotoViewerOpen(true)}
+                clickable
+                onClick={openPhotoModal}
               />
               <div className="flex-1">
                 {customer.customer_groups && (

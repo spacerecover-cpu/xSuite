@@ -8,7 +8,7 @@ import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { Tabs, type TabDef } from '../ui/Tabs';
-import { HardDrive, Stethoscope, Cpu, History, Save } from 'lucide-react';
+import { HardDrive, Stethoscope, Cpu, History, Save, X } from 'lucide-react';
 import { diagnosticsService } from '../../lib/diagnosticsService';
 import { setPrimaryDevice } from '../../lib/deviceService';
 import { logger } from '../../lib/logger';
@@ -455,25 +455,45 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
       onClose={onClose}
       labelledBy={titleId}
       closeOnBackdrop={false}
-      className="w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col rounded-2xl bg-surface border border-border shadow-[0_12px_40px_rgba(15,23,42,0.12)]"
+      className="w-full max-w-6xl overflow-hidden flex flex-col"
     >
-      {/* Fixed header: title, thin divider underneath */}
-      <div className="shrink-0 flex items-center justify-between px-6 h-12 border-b border-border">
-        <h2 id={titleId} className="text-lg font-bold tracking-tight text-slate-900">
-          {isEditMode
-            ? t('devices.action.editTitle', { defaultValue: 'Edit Device' })
-            : t('devices.action.addTitle', { defaultValue: 'Add Device' })}
-        </h2>
+      {/* Fixed header — mirrors the shared Modal chrome (badge + title/subtitle + X) */}
+      <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-border">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+            <HardDrive className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h2 id={titleId} className="text-lg font-semibold text-slate-900">
+              {isEditMode
+                ? t('devices.action.editTitle', { defaultValue: 'Edit Device' })
+                : t('devices.action.addTitle', { defaultValue: 'Add Device' })}
+            </h2>
+            <p className="mt-0.5 text-sm text-slate-500">
+              {isEditMode
+                ? t('devices.action.editSubtitle', { defaultValue: "Update this device's details." })
+                : t('devices.action.addSubtitle', { defaultValue: 'Enter the device details for this case.' })}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t('ui.close', { defaultValue: 'Close' })}
+          className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+        >
+          <X className="h-5 w-5" />
+        </button>
       </div>
 
       {/* Fixed tab navigation (colored pills) */}
-      <div className="shrink-0 px-6 pt-3 pb-2">
+      <div className="shrink-0 px-5 pt-3 pb-2">
         <Tabs tabs={tabDefs} activeId={activeTab} variant="pills" onChange={(id) => setActiveTab(id as DeviceTabId)} />
       </div>
 
       {/* Scrolling body — light backdrop with a white form card */}
       <div
-        className="flex-1 overflow-y-auto bg-surface-muted px-4 pb-4 pt-1"
+        className="flex-1 overflow-y-auto bg-surface-muted px-5 pb-4 pt-1"
         id={`panel-${activeTab}`}
         role="tabpanel"
         aria-labelledby={`tab-${activeTab}`}
@@ -511,7 +531,6 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
                 <div className="space-y-3">
                   <SearchableSelect
                     label={t('devices.field.donorFromInventory', { defaultValue: 'Select Donor from Inventory' })}
-                    size="sm"
                     value={selectedDonorInventoryId}
                     onChange={setSelectedDonorInventoryId}
                     options={donorInventory.map(d => ({
@@ -542,12 +561,12 @@ export const DeviceFormModal: React.FC<DeviceFormModalProps> = ({
       </div>
 
       {/* Sticky footer */}
-      <div className="shrink-0 flex items-center justify-end gap-3 px-6 h-14 border-t border-border bg-surface">
-        <Button variant="secondary" size="md" onClick={onClose} disabled={isSubmitting} className="h-10 rounded-[10px] px-5">
+      <div className="shrink-0 flex items-center justify-end gap-3 px-5 py-3 border-t border-border bg-surface">
+        <Button variant="secondary" size="md" onClick={onClose} disabled={isSubmitting}>
           {t('common.cancel', { defaultValue: 'Cancel' })}
         </Button>
-        <Button size="md" onClick={handleSubmit} disabled={!isFormValid || isSubmitting} className="h-10 rounded-[10px] px-5 shadow-sm">
-          <Save className="w-[18px] h-[18px] me-2" />
+        <Button size="md" onClick={handleSubmit} disabled={!isFormValid || isSubmitting}>
+          <Save className="w-4 h-4 me-2" />
           {isSubmitting
             ? t('common.saving', { defaultValue: 'Saving...' })
             : isEditMode

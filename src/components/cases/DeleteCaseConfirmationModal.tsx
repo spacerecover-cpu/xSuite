@@ -40,6 +40,7 @@ export const DeleteCaseConfirmationModal: React.FC<DeleteCaseConfirmationModalPr
       isOpen={isOpen}
       onClose={handleClose}
       title="Delete Case Permanently"
+      icon={Trash2}
       size="sm"
     >
       <div className="space-y-4">
@@ -88,7 +89,7 @@ export const DeleteCaseConfirmationModal: React.FC<DeleteCaseConfirmationModalPr
           />
         </div>
 
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="flex justify-end gap-3 pt-2">
           <Button
             variant="secondary"
             onClick={handleClose}

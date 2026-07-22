@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
-import { Modal } from '../../components/ui/Modal';
-import { Input } from '../../components/ui/Input';
-import { SearchableSelect } from '../../components/ui/SearchableSelect';
+import { CompanyFormModal } from '../../components/companies/CompanyFormModal';
 import {
   ChevronLeft, Building2, Mail, Phone, MapPin, Globe, Users,
   Calendar, FileText, DollarSign, MessageSquare, Eye, Briefcase
@@ -16,7 +14,6 @@ import { formatDate } from '../../lib/format';
 import { useCurrency } from '../../hooks/useCurrency';
 import { baseAmount } from '../../lib/financialMath';
 import { logger } from '../../lib/logger';
-import { updateCompany } from '../../lib/companyService';
 import { CustomerCasesTab } from '../../components/customers/CustomerCasesTab';
 import { CustomerFinancialTab } from '../../components/customers/CustomerFinancialTab';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -35,6 +32,10 @@ interface Company {
   country_id: string | null;
   city_id: string | null;
   address: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  subdivision_id: string | null;
+  postal_code: string | null;
   notes: string | null;
   is_active: boolean | null;
   created_at: string;
@@ -75,22 +76,9 @@ interface Communication {
 export const CompanyProfilePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
   const [activeTab, setActiveTab] = useState<'overview' | 'contacts' | 'cases' | 'financial' | 'communications'>('overview');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editFormData, setEditFormData] = useState({
-    company_name: '',
-    tax_number: '',
-    industry_id: '',
-    email: '',
-    phone: '',
-    website: '',
-    country_id: '',
-    city_id: '',
-    address: '',
-    notes: '',
-  });
 
   const { data: company, isLoading } = useQuery({
     queryKey: ['company', id],
@@ -283,97 +271,6 @@ export const CompanyProfilePage: React.FC = () => {
     retry: false,
   });
 
-  const { data: industries = [] } = useQuery({
-    queryKey: ['industries'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('master_industries')
-        .select('*')
-        .order('name');
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: countries = [] } = useQuery({
-    queryKey: ['countries'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('geo_countries')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: cities = [] } = useQuery({
-    queryKey: ['cities'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('geo_cities')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const filteredCities = cities.filter(
-    (city: { id: string; country_id: string; name: string }) => !editFormData.country_id || city.country_id === editFormData.country_id
-  );
-
-  const updateMutation = useMutation({
-    mutationFn: async (updatedData: typeof editFormData) => {
-      if (!id) throw new Error('Company id is required');
-      return updateCompany(id, {
-        name: updatedData.company_name,
-        tax_number: updatedData.tax_number || null,
-        industry_id: updatedData.industry_id || null,
-        email: updatedData.email || null,
-        phone: updatedData.phone || null,
-        website: updatedData.website || null,
-        country_id: updatedData.country_id || null,
-        city_id: updatedData.city_id || null,
-        address: updatedData.address || null,
-        notes: updatedData.notes || null,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['company', id] });
-      queryClient.invalidateQueries({ queryKey: ['companies'] });
-      setIsEditModalOpen(false);
-    },
-  });
-
-  const handleOpenEditModal = () => {
-    if (!company) return;
-
-    setEditFormData({
-      company_name: company.name || company.company_name || '',
-      tax_number: company.tax_number || '',
-      industry_id: company.industry_id || '',
-      email: company.email || '',
-      phone: company.phone || '',
-      website: company.website || '',
-      country_id: company.country_id || '',
-      city_id: company.city_id || '',
-      address: company.address || '',
-      notes: company.notes || '',
-    });
-    setIsEditModalOpen(true);
-  };
-
-  const handleSubmitEdit = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateMutation.mutate(editFormData);
-  };
-
   if (isLoading) {
     return (
       <div className="p-8 max-w-[1600px] mx-auto">
@@ -533,7 +430,7 @@ export const CompanyProfilePage: React.FC = () => {
             )}
           </div>
 
-          <Button variant="secondary" size="sm" onClick={handleOpenEditModal}>
+          <Button variant="secondary" size="sm" onClick={() => setIsEditModalOpen(true)}>
             Edit Profile
           </Button>
         </div>
@@ -837,108 +734,28 @@ export const CompanyProfilePage: React.FC = () => {
         </div>
       </div>
 
-      <Modal
+      <CompanyFormModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
-        title="Edit Company"
-      >
-        <form onSubmit={handleSubmitEdit} className="space-y-4">
-          <Input
-            label="Company Name"
-            value={editFormData.company_name}
-            onChange={(e) => setEditFormData({ ...editFormData, company_name: e.target.value })}
-            required
-          />
-
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="VAT/Tax Number"
-              value={editFormData.tax_number}
-              onChange={(e) => setEditFormData({ ...editFormData, tax_number: e.target.value })}
-            />
-            <SearchableSelect
-              label="Industry"
-              value={editFormData.industry_id}
-              onChange={(value) => setEditFormData({ ...editFormData, industry_id: value })}
-              options={[{ id: '', name: 'Not specified' }, ...industries.map((i: { id: string; name: string }) => ({ id: i.id, name: i.name }))]}
-              placeholder="Select Industry"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Email"
-              type="email"
-              value={editFormData.email}
-              onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
-            />
-            <Input
-              label="Phone Number"
-              value={editFormData.phone}
-              onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
-            />
-          </div>
-
-          <Input
-            label="Website"
-            value={editFormData.website}
-            onChange={(e) => setEditFormData({ ...editFormData, website: e.target.value })}
-            placeholder="https://example.com"
-          />
-
-          <div className="grid grid-cols-2 gap-3">
-            <SearchableSelect
-              label="Country"
-              value={editFormData.country_id}
-              onChange={(value) => {
-                setEditFormData({ ...editFormData, country_id: value, city_id: '' });
-              }}
-              options={[{ id: '', name: 'Not specified' }, ...countries.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))]}
-              placeholder="Select Country"
-            />
-            <SearchableSelect
-              label="City"
-              value={editFormData.city_id}
-              onChange={(value) => setEditFormData({ ...editFormData, city_id: value })}
-              options={[{ id: '', name: 'Not specified' }, ...filteredCities.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))]}
-              placeholder="Select City"
-              disabled={!editFormData.country_id}
-            />
-          </div>
-
-          <Input
-            label="Address"
-            value={editFormData.address}
-            onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
-          />
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
-              Internal Notes
-            </label>
-            <textarea
-              value={editFormData.notes}
-              onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
-              rows={2}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
-              placeholder="Add any internal notes..."
-            />
-          </div>
-
-          <div className="flex gap-3 justify-end pt-3 border-t">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setIsEditModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
+        showAddressDetails={false}
+        company={{
+          id: company.id,
+          company_name: company.name || company.company_name || '',
+          tax_number: company.tax_number,
+          industry_id: company.industry_id,
+          email: company.email,
+          phone: company.phone,
+          website: company.website,
+          country_id: company.country_id,
+          city_id: company.city_id,
+          address: company.address,
+          address_line1: company.address_line1,
+          address_line2: company.address_line2,
+          subdivision_id: company.subdivision_id,
+          postal_code: company.postal_code,
+          notes: company.notes,
+        }}
+      />
     </div>
   );
 };

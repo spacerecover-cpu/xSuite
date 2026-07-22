@@ -3,6 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Package, Info, Loader2, ExternalLink, AlertTriangle } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import { supabase } from '../../lib/supabaseClient';
 import { getInventoryConditionTypes } from '../../lib/inventoryService';
 import {
@@ -11,9 +14,6 @@ import {
 } from '../../lib/caseInventoryConversionService';
 import { inventoryKeys } from '../../lib/queryKeys';
 import { useToast } from '../../hooks/useToast';
-
-const inputClass =
-  'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary bg-white';
 
 /** The subset of a case device the convert flow reads for display + selection.
  *  The RPC re-reads the authoritative case_devices row server-side, so only the
@@ -163,7 +163,16 @@ export const ConvertToInventoryModal: React.FC<ConvertToInventoryModalProps> = (
     (!!alreadyConverted && !allowDuplicate);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Convert Device to Inventory" icon={Package} size="md">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Convert Device to Inventory"
+      icon={Package}
+      size="md"
+      titleSize="sm"
+      showClose
+      closeOnBackdrop={false}
+    >
       <div className="mb-4 flex gap-2 rounded border-l-4 border-info bg-info-muted p-3">
         <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-info" />
         <p className="text-sm text-info">
@@ -174,29 +183,26 @@ export const ConvertToInventoryModal: React.FC<ConvertToInventoryModalProps> = (
         </p>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-5">
         <div>
-          <label htmlFor="cti-device" className="mb-1 block text-sm font-medium text-slate-700">
-            Device <span className="text-danger">*</span>
-          </label>
-          <select
-            id="cti-device"
+          <SearchableSelect
+            label="Device"
+            floatingLabel
+            usePortal
+            required
             value={selectedDeviceId}
-            onChange={(e) => setSelectedDeviceId(e.target.value)}
-            className={inputClass}
-          >
-            {devices.map((d) => {
+            onChange={(value) => setSelectedDeviceId(value)}
+            placeholder="Select a device"
+            options={devices.map((d) => {
               const conv = convertedByDevice.get(d.id);
-              return (
-                <option key={d.id} value={d.id}>
-                  {d.is_primary ? '★ ' : ''}
-                  {deviceLabel(d)}
-                  {d.serial_number ? ` (S/N ${d.serial_number})` : ''}
-                  {conv ? ` — already ${conv.item_number ?? 'converted'}` : ''}
-                </option>
-              );
+              return {
+                id: d.id,
+                name: `${d.is_primary ? '★ ' : ''}${deviceLabel(d)}${
+                  d.serial_number ? ` (S/N ${d.serial_number})` : ''
+                }${conv ? ` — already ${conv.item_number ?? 'converted'}` : ''}`,
+              };
             })}
-          </select>
+          />
           {selectedDevice && (
             <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
               {selectedDevice.device_role?.name && <span>Role: {selectedDevice.device_role.name}</span>}
@@ -247,40 +253,28 @@ export const ConvertToInventoryModal: React.FC<ConvertToInventoryModalProps> = (
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="cti-condition" className="mb-1 block text-sm font-medium text-slate-700">
-              Physical condition
-            </label>
-            <select
-              id="cti-condition"
-              value={conditionId}
-              onChange={(e) => setConditionId(e.target.value)}
-              className={inputClass}
-            >
-              <option value="">Set later…</option>
-              {conditions.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
+        <div className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">
+          <SearchableSelect
+            label="Physical condition"
+            floatingLabel
+            shrinkDefaultValue
+            usePortal
+            value={conditionId}
+            onChange={(value) => setConditionId(value)}
+            options={[{ id: '', name: 'Set later…' }, ...conditions.map((c) => ({ id: c.id, name: c.name }))]}
+            placeholder="Set later…"
+          />
 
-          <div>
-            <label htmlFor="cti-location" className="mb-1 block text-sm font-medium text-slate-700">
-              Storage location
-            </label>
-            <select
-              id="cti-location"
-              value={locationId}
-              onChange={(e) => setLocationId(e.target.value)}
-              className={inputClass}
-            >
-              <option value="">Set later…</option>
-              {locations.map((l) => (
-                <option key={l.id} value={l.id}>{l.name}</option>
-              ))}
-            </select>
-          </div>
+          <SearchableSelect
+            label="Storage location"
+            floatingLabel
+            shrinkDefaultValue
+            usePortal
+            value={locationId}
+            onChange={(value) => setLocationId(value)}
+            options={[{ id: '', name: 'Set later…' }, ...locations.map((l) => ({ id: l.id, name: l.name }))]}
+            placeholder="Set later…"
+          />
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -300,34 +294,24 @@ export const ConvertToInventoryModal: React.FC<ConvertToInventoryModalProps> = (
           </label>
         </div>
 
-        <div>
-          <label htmlFor="cti-legal" className="mb-1 block text-sm font-medium text-slate-700">
-            Abandonment basis
-          </label>
-          <input
-            id="cti-legal"
-            type="text"
-            value={legalBasis}
-            onChange={(e) => setLegalBasis(e.target.value)}
-            placeholder="e.g. Unclaimed after 90 days; signed abandonment consent on file"
-            className={inputClass}
-          />
-          <p className="mt-1 text-xs text-slate-500">Recorded in the chain-of-custody entry.</p>
-        </div>
+        <Input
+          label="Abandonment basis"
+          floatingLabel
+          value={legalBasis}
+          onChange={(e) => setLegalBasis(e.target.value)}
+          placeholder="e.g. Unclaimed after 90 days; signed abandonment consent on file"
+          hint="Recorded in the chain-of-custody entry."
+        />
 
-        <div>
-          <label htmlFor="cti-notes" className="mb-1 block text-sm font-medium text-slate-700">
-            Notes
-          </label>
-          <textarea
-            id="cti-notes"
-            rows={2}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Anything worth recording on the inventory item."
-            className={inputClass}
-          />
-        </div>
+        <Textarea
+          label="Notes"
+          floatingLabel
+          rows={2}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Anything worth recording on the inventory item."
+          className="resize-none"
+        />
 
         <p className="text-xs text-slate-500">
           Original customer: <span className="font-medium text-slate-700">{customerName}</span>{' '}
@@ -335,20 +319,20 @@ export const ConvertToInventoryModal: React.FC<ConvertToInventoryModalProps> = (
         </p>
       </div>
 
-      <div className="mt-6 flex justify-end gap-3">
-        <Button variant="secondary" onClick={onClose} disabled={mutation.isPending}>
+      <div className="mt-6 flex justify-end gap-2.5">
+        <Button variant="secondary" size="sm" className="text-xs" onClick={onClose} disabled={mutation.isPending}>
           Cancel
         </Button>
         <Button
           onClick={() => mutation.mutate()}
           disabled={convertDisabled}
-          className="flex items-center gap-2"
-          style={{ backgroundColor: 'rgb(var(--color-primary))' }}
+          size="sm"
+          className="text-xs"
         >
           {mutation.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
           ) : (
-            <ExternalLink className="h-4 w-4" />
+            <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
           )}
           {mutation.isPending ? 'Converting…' : 'Convert to Inventory'}
         </Button>

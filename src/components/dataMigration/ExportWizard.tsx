@@ -86,7 +86,7 @@ export const ExportWizard: React.FC<Props> = ({ domain, onClose }) => {
   const steps: WizardStep[] = ['scope', 'generate', 'download'];
 
   return (
-    <Modal isOpen onClose={onClose} title={`Export ${DOMAIN_LABELS[domain]}`} size="xl" closeOnBackdrop={false}>
+    <Modal isOpen onClose={onClose} title={`Export ${DOMAIN_LABELS[domain]}`} subtitle="Choose the entities and date range to export." icon={Download} size="xl" showClose closeOnBackdrop={false}>
       <div className="space-y-6">
         {/* Breadcrumb */}
         <nav aria-label="Export steps" className="flex items-center gap-1 text-sm">
@@ -104,7 +104,7 @@ export const ExportWizard: React.FC<Props> = ({ domain, onClose }) => {
         {step === 'scope' && (
           <div className="space-y-4">
             <div>
-              <p className="text-sm font-medium text-slate-700 mb-2">Select entities to export</p>
+              <p className="text-sm font-medium text-slate-700 mb-1">Select entities to export</p>
               <div className="rounded-lg border border-slate-200 divide-y divide-slate-100">
                 {(domainEntities as EntityType[]).map((entity) => (
                   <label
@@ -125,24 +125,24 @@ export const ExportWizard: React.FC<Props> = ({ domain, onClose }) => {
             </div>
 
             <div>
-              <p className="text-sm font-medium text-slate-700 mb-2">Optional date range (by record created date)</p>
+              <p className="text-sm font-medium text-slate-700 mb-1">Optional date range (by record created date)</p>
               <div className="flex items-center gap-3">
                 <div className="flex-1">
-                  <label className="block text-xs text-slate-500 mb-1">From</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">From</label>
                   <input
                     type="date"
                     value={dateFrom}
                     onChange={(e) => setDateFrom(e.target.value)}
-                    className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full text-sm border border-slate-300 rounded-lg h-9 px-3 focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="block text-xs text-slate-500 mb-1">To</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">To</label>
                   <input
                     type="date"
                     value={dateTo}
                     onChange={(e) => setDateTo(e.target.value)}
-                    className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full text-sm border border-slate-300 rounded-lg h-9 px-3 focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
               </div>

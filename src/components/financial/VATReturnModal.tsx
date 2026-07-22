@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { composeReturnForDate, fileReturn, type ComposedReturnPreview } from '../../lib/tax/taxReturnService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCurrency } from '../../hooks/useCurrency';
-import { Calendar, ChevronLeft, ChevronRight, Save, Send } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, FileText, Save, Send } from 'lucide-react';
 import { logger } from '../../lib/logger';
 
 interface VATReturnModalProps {
@@ -83,7 +83,7 @@ export const VATReturnModal: React.FC<VATReturnModalProps> = ({ isOpen, onClose,
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="File Tax Return" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title="File Tax Return" subtitle="Review and file the tax return for this period." icon={FileText} size="lg" showClose>
       <div className="space-y-6">
         <div className="flex items-center justify-between rounded-lg border border-border bg-surface-muted px-4 py-3">
           <Button

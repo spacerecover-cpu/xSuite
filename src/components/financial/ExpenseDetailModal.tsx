@@ -59,8 +59,10 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Expense Details"
+      subtitle="Review this expense and its details."
       size="lg"
       icon={Receipt}
+      showClose
       footer={
         <div className="flex items-center justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>Close</Button>

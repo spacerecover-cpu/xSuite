@@ -1,8 +1,9 @@
-import React, { useEffect, useId, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { MessageCircle, MessageSquare, Copy, ExternalLink, Check } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
 import { TemplatePicker } from '../templates/TemplatePicker';
 import { openWhatsAppChat, isValidWhatsAppNumber } from '../../lib/whatsappUtils';
 import {
@@ -45,7 +46,6 @@ export const SendMessageModal: React.FC<SendMessageModalProps> = ({
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState(false);
   const [logging, setLogging] = useState(false);
-  const messageId = useId();
 
   const isWhatsApp = channel === 'whatsapp';
   const channelLabel = isWhatsApp ? 'WhatsApp' : 'SMS';
@@ -122,12 +122,15 @@ export const SendMessageModal: React.FC<SendMessageModalProps> = ({
       onClose={onClose}
       title={`Send ${channelLabel} Message`}
       icon={ChannelIcon}
+      titleSize="sm"
       size="lg"
+      showClose
       closeOnBackdrop={false}
     >
-      <div className="space-y-4">
+      <div className="space-y-5">
         <Input
           label={isWhatsApp ? 'WhatsApp Number' : 'Phone Number'}
+          floatingLabel
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           placeholder="+968 9876 5432"
@@ -141,39 +144,34 @@ export const SendMessageModal: React.FC<SendMessageModalProps> = ({
           onApply={({ body }) => setMessage(body)}
         />
 
-        <div>
-          <label htmlFor={messageId} className="block text-sm font-medium text-slate-700 mb-1">
-            Message
-          </label>
-          <textarea
-            id={messageId}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            rows={7}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-            placeholder={`Write or pick a template — the message is sent from your ${isWhatsApp ? 'WhatsApp' : 'phone'}, and logged here.`}
-          />
-          <p className="mt-1 text-xs text-slate-400">
-            xSuite logs this communication on the {caseId ? 'case' : 'customer'}; the message
-            itself is sent from your device.
-          </p>
-        </div>
+        <Textarea
+          label="Message"
+          floatingLabel
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          rows={7}
+          className="resize-none"
+          placeholder={`Write or pick a template — the message is sent from your ${isWhatsApp ? 'WhatsApp' : 'phone'}, and logged here.`}
+          hint={`xSuite logs this communication on the ${caseId ? 'case' : 'customer'}; the message itself is sent from your device.`}
+        />
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-          <Button variant="secondary" onClick={onClose} disabled={logging}>
+        <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-200">
+          <Button variant="secondary" size="sm" className="text-xs" onClick={onClose} disabled={logging}>
             Close
           </Button>
           <Button
             variant="secondary"
+            size="sm"
+            className="text-xs"
             onClick={handleCopy}
             disabled={!message.trim() || logging}
           >
-            {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
+            {copied ? <Check className="w-3.5 h-3.5 mr-1.5" /> : <Copy className="w-3.5 h-3.5 mr-1.5" />}
             {copied ? 'Copied' : 'Copy Message'}
           </Button>
           {isWhatsApp && (
-            <Button onClick={handleOpenWhatsApp} disabled={!message.trim() || logging}>
-              <ExternalLink className="w-4 h-4 mr-2" />
+            <Button size="sm" className="text-xs" onClick={handleOpenWhatsApp} disabled={!message.trim() || logging}>
+              <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
               Open WhatsApp
             </Button>
           )}

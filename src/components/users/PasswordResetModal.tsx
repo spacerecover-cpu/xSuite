@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useId } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import { AlertCircle, Mail, Copy, Check, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Mail, Copy, Check, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { generateSecurePassword, copyToClipboard } from '../../lib/passwordUtils';
 
 interface PasswordResetModalProps {
@@ -64,7 +64,16 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Reset User Password" size="md" closeOnBackdrop={false}>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Reset User Password"
+      subtitle="Share the temporary password securely with this user."
+      icon={KeyRound}
+      size="md"
+      showClose
+      closeOnBackdrop={false}
+    >
       <div className="space-y-4">
         <div className="flex items-start gap-3 p-4 bg-warning-muted border border-warning/30 rounded-lg">
           <AlertCircle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
@@ -97,7 +106,7 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
         </div>
 
         <div>
-          <label htmlFor={temporaryPasswordId} className="block text-sm font-medium text-slate-700 mb-2">
+          <label htmlFor={temporaryPasswordId} className="block text-sm font-medium text-slate-700 mb-1">
             Temporary Password
           </label>
           <div className="relative">
@@ -106,7 +115,7 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
               type={showPassword ? 'text' : 'password'}
               value={temporaryPassword}
               readOnly
-              className="w-full px-3 py-2 pr-20 border border-slate-300 rounded-lg bg-slate-50 font-mono text-sm"
+              className="w-full h-9 px-3 pr-20 border border-slate-300 rounded-lg bg-slate-50 font-mono text-sm"
             />
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
               <button

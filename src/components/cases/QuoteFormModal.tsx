@@ -438,7 +438,10 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={initialData ? 'Edit Quote' : 'Create New Quote'}
+      subtitle={initialData ? "Update this quote's line items and terms." : 'Build the quote line items and terms.'}
+      icon={FileText}
       size="xl"
+      showClose
       initialFocusRef={titleInputRef}
       headerBadges={headerBadges}
       closeOnBackdrop={false}
@@ -469,7 +472,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
         </div>
       }
     >
-      <form id="quoteForm" onSubmit={handleSubmit} className="space-y-3">
+      <form id="quoteForm" onSubmit={handleSubmit} className="space-y-4">
 
         {!caseId && (
           <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
@@ -484,7 +487,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
               <select
                 value={selectedCaseId}
                 onChange={(e) => setSelectedCaseId(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-success focus:border-success"
+                className="h-9 w-full px-3 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-success focus:border-success"
                 required
               >
                 <option value="">Select a case...</option>
@@ -531,7 +534,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
               <select
                 value={quoteData.status}
                 onChange={(e) => setQuoteData({ ...quoteData, status: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-success focus:border-success"
+                className="h-9 w-full px-3 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-success focus:border-success"
               >
                 <option value="draft">Draft</option>
                 <option value="sent">Sent</option>
@@ -556,7 +559,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                 <select
                   value={quoteData.currency || baseCurrency}
                   onChange={(e) => setQuoteData((d) => ({ ...d, currency: e.target.value }))}
-                  className="w-full rounded border border-border bg-surface px-3 py-2 text-sm"
+                  className="h-9 w-full rounded border border-border bg-surface px-3 text-sm"
                 >
                   {currencies.map((c) => (
                     <option key={c.code} value={c.code}>{c.code}{c.isBase ? ' (base)' : ''}</option>
@@ -712,7 +715,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                     }
                     min="0"
                     step="0.01"
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary border-slate-300"
+                    className="h-9 w-full px-3 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-primary border-slate-300"
                   />
                 </div>
                 <div>
@@ -808,13 +811,13 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   Bank Account
                 </label>
                 <select
                   value={quoteData.bank_account_id || ''}
                   onChange={(e) => setQuoteData({ ...quoteData, bank_account_id: e.target.value || null })}
-                  className="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-success focus:border-success"
+                  className="h-9 w-full px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-success focus:border-success"
                   disabled={bankAccountsLoading}
                 >
                   <option value="">None selected</option>
@@ -830,8 +833,8 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-medium text-slate-700">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-slate-700">
                     Quote Terms
                   </label>
                   <button
@@ -878,7 +881,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                     setQuoteData({ ...quoteData, terms_and_conditions: e.target.value })
                   }
                   rows={4}
-                  className="w-full px-2.5 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-success focus:border-success"
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-success focus:border-success"
                   placeholder="Quote validity and payment terms (e.g., Quote valid for 30 days, 50% deposit required)"
                 />
               </div>
@@ -894,11 +897,11 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
         label="Catalog"
         className="max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
       >
-            <div className="flex items-center gap-2 p-4 border-b border-slate-200">
+            <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-200">
               <Search className="w-5 h-5 text-primary" />
               <h3 className="text-lg font-semibold text-slate-900">Quick Add from Catalog</h3>
             </div>
-            <div className="p-4">
+            <div className="px-5 py-4">
               <Input
                 placeholder="Search services, descriptions, or categories..."
                 value={searchQuery}
@@ -906,7 +909,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                 leftIcon={<Search className="w-4 h-4" />}
               />
             </div>
-            <div className="flex-1 overflow-y-auto px-4 pb-4">
+            <div className="flex-1 overflow-y-auto px-5 pb-4">
               <div className="space-y-2">
                 {catalogLoading ? (
                   <div className="text-center py-8 text-sm text-slate-500">Loading templates...</div>
@@ -948,7 +951,7 @@ export const QuoteFormModal: React.FC<QuoteFormModalProps> = ({
                 )}
               </div>
             </div>
-            <div className="shrink-0 flex items-center justify-end gap-3 border-t border-slate-200 px-4 py-3">
+            <div className="shrink-0 flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-3">
               <Button type="button" variant="secondary" onClick={() => setShowCatalog(false)}>
                 Done
               </Button>

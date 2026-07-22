@@ -1,18 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
-import type { Database } from '../../types/database.types';
-import { createCustomer, getCustomerStats } from '../../lib/customerService';
-import { createCompany } from '../../lib/companyService';
+import { getCustomerStats } from '../../lib/customerService';
 import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/ui/Badge';
-import { PhoneInput } from '../../components/ui/PhoneInput';
-import { SearchableSelect } from '../../components/ui/SearchableSelect';
 import { CustomerAvatar } from '../../components/ui/CustomerAvatar';
+import { CustomerFormModal } from '../../components/customers/CustomerFormModal';
 import { Plus, Search, Filter, Mail, Phone, Building2, MapPin, Users, UserCheck, Clock, Archive, Download, ShieldCheck } from 'lucide-react';
 import { KpiRow } from '../../components/templates/KpiRow';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
@@ -62,27 +57,6 @@ interface CustomerGroup {
   name: string;
 }
 
-interface Company {
-  id: string;
-  company_number: string;
-  company_name: string;
-}
-
-interface Country {
-  id: string;
-  name: string;
-  code: string;
-  phone_code: string | null;
-  is_active: boolean;
-}
-
-interface City {
-  id: string;
-  name: string;
-  country_id: string;
-  is_active: boolean;
-}
-
 export const CustomersListPage: React.FC = () => {
   const navigate = useNavigate();
   const toast = useToast();
@@ -94,8 +68,6 @@ export const CustomersListPage: React.FC = () => {
   const canBulkArchive = profile?.role === 'owner' || profile?.role === 'admin';
   const [isArchiving, setIsArchiving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterGroup, setFilterGroup] = useState<string>('all');
@@ -129,37 +101,6 @@ export const CustomersListPage: React.FC = () => {
       setSearchParams(next, { replace: true });
     }
   }, [searchParams, setSearchParams]);
-
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    mobile_number: '',
-    phone_number: '',
-    customer_group_id: '',
-    country_id: '',
-    city_id: '',
-    address: '',
-    portal_enabled: true,
-    notes: '',
-    company_id: '',
-  });
-
-  const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false);
-  const [editFormData, setEditFormData] = useState({
-    customer_name: '',
-    email: '',
-    mobile_number: '',
-    phone_number: '',
-    customer_group_id: '',
-    country_id: '',
-    city_id: '',
-    address_line1: '',
-    portal_enabled: false,
-    notes: '',
-  });
-  const [newCompanyData, setNewCompanyData] = useState({
-    company_name: '',
-  });
 
   const { data: customersPage, isLoading } = useQuery({
     queryKey: ['customers_enhanced', debouncedSearch, filterGroup, filterPortal, page, pageSize],
@@ -219,182 +160,6 @@ export const CustomersListPage: React.FC = () => {
       return data as CustomerGroup[];
     },
   });
-
-  const { data: companies = [] } = useQuery({
-    queryKey: ['companies'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('id, company_number, company_name')
-        .order('company_name');
-
-      if (error) throw error;
-      return data as Company[];
-    },
-  });
-
-  const { data: countries = [] } = useQuery({
-    queryKey: ['countries'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('geo_countries')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      return data as Country[];
-    },
-  });
-
-  const { data: cities = [] } = useQuery({
-    queryKey: ['cities'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('geo_cities')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      return data as City[];
-    },
-  });
-
-  const { data: companySettings } = useQuery({
-    queryKey: ['company_settings', 'location'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('company_settings')
-        .select('location')
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data as { location: { default_country_id?: string } | null } | null;
-    },
-  });
-
-  const filteredCities = cities.filter(
-    (city) => !formData.country_id || city.country_id === formData.country_id
-  );
-
-  const createMutation = useMutation({
-    mutationFn: async (customer: typeof formData) =>
-      createCustomer({
-        customer_name: customer.name,
-        email: customer.email || null,
-        mobile_number: customer.mobile_number || null,
-        phone: customer.phone_number || null,
-        customer_group_id: customer.customer_group_id || null,
-        country_id: customer.country_id || null,
-        city_id: customer.city_id || null,
-        address: customer.address || null,
-        portal_enabled: customer.portal_enabled,
-        notes: customer.notes || null,
-        created_by: profile?.id,
-        company_id: customer.company_id || null,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers_enhanced'] });
-      queryClient.invalidateQueries({ queryKey: ['customer_stats'] });
-      setIsModalOpen(false);
-      resetForm();
-    },
-  });
-
-  const updateCustomerMutation = useMutation({
-    mutationFn: async (data: typeof editFormData) => {
-      if (!editingCustomer) throw new Error('No customer selected');
-
-      const updatePayload = {
-        customer_name: data.customer_name,
-        email: data.email || null,
-        mobile_number: data.mobile_number || null,
-        phone: data.phone_number || null,
-        customer_group_id: data.customer_group_id || null,
-        country_id: data.country_id || null,
-        city_id: data.city_id || null,
-        address: data.address_line1 || null,
-        portal_enabled: data.portal_enabled,
-        notes: data.notes || null,
-      } as Database['public']['Tables']['customers_enhanced']['Update'];
-
-      const { data: updatedCustomer, error } = await supabase
-        .from('customers_enhanced')
-        .update(updatePayload)
-        .eq('id', editingCustomer.id)
-        .select()
-        .maybeSingle();
-
-      if (error) throw error;
-      return updatedCustomer;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers_enhanced'] });
-      queryClient.invalidateQueries({ queryKey: ['customer_stats'] });
-      setIsEditModalOpen(false);
-      setEditingCustomer(null);
-    },
-  });
-
-  const createCompanyMutation = useMutation({
-    mutationFn: async (companyData: typeof newCompanyData) =>
-      createCompany({
-        name: companyData.company_name,
-        company_name: companyData.company_name,
-        created_by: profile?.id,
-      }),
-    onSuccess: async (newCompany) => {
-      await queryClient.invalidateQueries({ queryKey: ['companies'] });
-      await queryClient.refetchQueries({ queryKey: ['companies'] });
-      setFormData({ ...formData, company_id: newCompany.id });
-      setIsAddCompanyModalOpen(false);
-      setNewCompanyData({ company_name: '' });
-    },
-  });
-
-  const resetForm = () => {
-    const defaultCountryId = companySettings?.location?.default_country_id || '';
-    setFormData({
-      name: '',
-      email: '',
-      mobile_number: '',
-      phone_number: '',
-      customer_group_id: '',
-      country_id: defaultCountryId,
-      city_id: '',
-      address: '',
-      portal_enabled: true,
-      notes: '',
-      company_id: '',
-    });
-  };
-
-  const handleOpenModal = () => {
-    const defaultCountryId = companySettings?.location?.default_country_id || '';
-    setFormData((prev) => ({ ...prev, country_id: defaultCountryId }));
-    setIsModalOpen(true);
-  };
-
-  const handleAddNewCompany = () => {
-    setIsAddCompanyModalOpen(true);
-  };
-
-  const handleCreateCompany = (e: React.FormEvent) => {
-    e.preventDefault();
-    createCompanyMutation.mutate(newCompanyData);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    createMutation.mutate(formData);
-  };
-
-  const handleSubmitEdit = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateCustomerMutation.mutate(editFormData);
-  };
 
   const visibleIds = customers.map((c) => c.id);
 
@@ -795,7 +560,7 @@ export const CustomersListPage: React.FC = () => {
     <ListPageTemplate
       title="Customers"
       headerActions={
-        <Button onClick={handleOpenModal}>
+        <Button onClick={() => setIsModalOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
           Add Customer
         </Button>
@@ -832,304 +597,14 @@ export const CustomersListPage: React.FC = () => {
         </BulkActionsBar>
       }
     >
-      <Modal
+      {/* Shared, standardized create modal — same component used by the
+          Create Case wizard, so the list page and wizard stay identical
+          (structured address, Add-Company sub-modal, consistent width). */}
+      <CustomerFormModal
         isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          resetForm();
-        }}
-        title="Add New Customer"
-      >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            required
-          />
-
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            />
-            <PhoneInput
-              label="Mobile Number"
-              value={formData.mobile_number}
-              onChange={(val) => setFormData({ ...formData, mobile_number: val })}
-              countries={countries}
-              selectedCountryId={formData.country_id}
-            />
-          </div>
-
-          <PhoneInput
-            label="Phone Number (Alternative)"
-            value={formData.phone_number}
-            onChange={(val) => setFormData({ ...formData, phone_number: val })}
-            countries={countries}
-            selectedCountryId={formData.country_id}
-          />
-
-          <div className="grid grid-cols-2 gap-3">
-            <SearchableSelect
-              label="Customer Group"
-              value={formData.customer_group_id}
-              onChange={(value) => setFormData({ ...formData, customer_group_id: value })}
-              options={[{ id: '', name: 'No group' }, ...customerGroups.map((g) => ({ id: g.id, name: g.name }))]}
-              placeholder="Select Group"
-            />
-
-            <SearchableSelect
-              label="Company (Optional)"
-              value={formData.company_id}
-              onChange={(value) => setFormData({ ...formData, company_id: value })}
-              options={[
-                { id: '', name: 'No Company' },
-                ...companies.map((c) => ({ id: c.id, name: `${c.company_name} (${c.company_number})` })),
-              ]}
-              placeholder="No Company"
-              onAddNew={handleAddNewCompany}
-              addNewLabel="Add New Company"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <SearchableSelect
-              label="Country"
-              value={formData.country_id}
-              onChange={(value) => {
-                setFormData({ ...formData, country_id: value, city_id: '' });
-              }}
-              options={[{ id: '', name: 'Not specified' }, ...countries.map((c) => ({ id: c.id, name: c.name }))]}
-              placeholder="Select Country"
-            />
-            <SearchableSelect
-              label="City"
-              value={formData.city_id}
-              onChange={(value) => setFormData({ ...formData, city_id: value })}
-              options={[{ id: '', name: 'Not specified' }, ...filteredCities.map((c) => ({ id: c.id, name: c.name }))]}
-              placeholder="Select City"
-              disabled={!formData.country_id}
-            />
-          </div>
-
-          <Input
-            label="Address"
-            value={formData.address}
-            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-          />
-
-          <div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.portal_enabled}
-                onChange={(e) =>
-                  setFormData({ ...formData, portal_enabled: e.target.checked })
-                }
-                className="w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
-              />
-              <span className="text-sm font-medium text-slate-700">
-                Enable Client Portal Access
-              </span>
-            </label>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
-              Internal Notes
-            </label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              rows={2}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
-              placeholder="Add any internal notes..."
-            />
-          </div>
-
-          <div className="flex gap-3 justify-end pt-3 border-t">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                setIsModalOpen(false);
-                resetForm();
-              }}
-            >
-              Cancel
-            </Button>
-            <Button type="submit">
-              Create Customer
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal
-        isOpen={isAddCompanyModalOpen}
-        onClose={() => {
-          setIsAddCompanyModalOpen(false);
-          setNewCompanyData({ company_name: '' });
-        }}
-        title="Add New Company"
-      >
-        <form onSubmit={handleCreateCompany} className="space-y-4">
-          <Input
-            label="Company Name"
-            value={newCompanyData.company_name}
-            onChange={(e) => setNewCompanyData({ ...newCompanyData, company_name: e.target.value })}
-            required
-          />
-
-          {createCompanyMutation.isError && (
-            <div className="bg-danger-muted border border-danger/30 rounded-lg p-3 text-sm text-danger">
-              {createCompanyMutation.error instanceof Error
-                ? createCompanyMutation.error.message
-                : 'Failed to create company. Please try again.'}
-            </div>
-          )}
-
-          <div className="flex gap-3 justify-end pt-3 border-t">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                setIsAddCompanyModalOpen(false);
-                setNewCompanyData({ company_name: '' });
-              }}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={createCompanyMutation.isPending}>
-              {createCompanyMutation.isPending ? 'Creating...' : 'Create Company'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal
-        isOpen={isEditModalOpen}
-        onClose={() => {
-          setIsEditModalOpen(false);
-          setEditingCustomer(null);
-        }}
-        title="Edit Customer"
-      >
-        <form onSubmit={handleSubmitEdit} className="space-y-4">
-          <Input
-            label="Customer Name"
-            value={editFormData.customer_name}
-            onChange={(e) => setEditFormData({ ...editFormData, customer_name: e.target.value })}
-            required
-          />
-
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Email"
-              type="email"
-              value={editFormData.email}
-              onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
-            />
-            <PhoneInput
-              label="Mobile Number"
-              value={editFormData.mobile_number}
-              onChange={(val) => setEditFormData({ ...editFormData, mobile_number: val })}
-              countries={countries}
-              selectedCountryId={editFormData.country_id}
-            />
-          </div>
-
-          <PhoneInput
-            label="Phone Number (Alternative)"
-            value={editFormData.phone_number}
-            onChange={(val) => setEditFormData({ ...editFormData, phone_number: val })}
-            countries={countries}
-            selectedCountryId={editFormData.country_id}
-          />
-
-          <SearchableSelect
-            label="Customer Group"
-            value={editFormData.customer_group_id}
-            onChange={(value) => setEditFormData({ ...editFormData, customer_group_id: value })}
-            options={[{ id: '', name: 'No group' }, ...customerGroups.map((g) => ({ id: g.id, name: g.name }))]}
-            placeholder="Select Group"
-          />
-
-          <div className="grid grid-cols-2 gap-3">
-            <SearchableSelect
-              label="Country"
-              value={editFormData.country_id}
-              onChange={(value) => {
-                setEditFormData({ ...editFormData, country_id: value, city_id: '' });
-              }}
-              options={[{ id: '', name: 'Not specified' }, ...countries.map((c) => ({ id: c.id, name: c.name }))]}
-              placeholder="Select Country"
-            />
-            <SearchableSelect
-              label="City"
-              value={editFormData.city_id}
-              onChange={(value) => setEditFormData({ ...editFormData, city_id: value })}
-              options={[{ id: '', name: 'Not specified' }, ...filteredCities.map((c) => ({ id: c.id, name: c.name }))]}
-              placeholder="Select City"
-              disabled={!editFormData.country_id}
-            />
-          </div>
-
-          <Input
-            label="Address"
-            value={editFormData.address_line1}
-            onChange={(e) => setEditFormData({ ...editFormData, address_line1: e.target.value })}
-          />
-
-          <div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={editFormData.portal_enabled}
-                onChange={(e) =>
-                  setEditFormData({ ...editFormData, portal_enabled: e.target.checked })
-                }
-                className="w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
-              />
-              <span className="text-sm font-medium text-slate-700">
-                Enable Client Portal Access
-              </span>
-            </label>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
-              Internal Notes
-            </label>
-            <textarea
-              value={editFormData.notes}
-              onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
-              rows={2}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
-              placeholder="Add any internal notes..."
-            />
-          </div>
-
-          <div className="flex gap-3 justify-end pt-3 border-t">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                setIsEditModalOpen(false);
-                setEditingCustomer(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={updateCustomerMutation.isPending}>
-              {updateCustomerMutation.isPending ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['customer_stats'] })}
+      />
     </ListPageTemplate>
   );
 };

@@ -475,7 +475,7 @@ export const PortalQuotes: React.FC = () => {
           <p className="text-slate-700">
             {t('portal.quotes.approveModal.body')}
           </p>
-          <div className="flex gap-3 justify-end pt-3 border-t">
+          <div className="flex gap-3 justify-end pt-4 border-t">
             <Button
               variant="secondary"
               onClick={() => {
@@ -509,18 +509,18 @@ export const PortalQuotes: React.FC = () => {
             {t('portal.quotes.rejectModal.body')}
           </p>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               {t('portal.quotes.rejectModal.reasonLabel')}
             </label>
             <textarea
               value={response}
               onChange={(e) => setResponse(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               placeholder={t('portal.quotes.rejectModal.reasonPlaceholder')}
             />
           </div>
-          <div className="flex gap-3 justify-end pt-3 border-t">
+          <div className="flex gap-3 justify-end pt-4 border-t">
             <Button
               variant="secondary"
               onClick={() => {

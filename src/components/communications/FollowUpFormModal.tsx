@@ -4,7 +4,8 @@ import { CalendarClock, Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Select } from '../ui/Select';
+import { Textarea } from '../ui/Textarea';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import { TemplatePicker } from '../templates/TemplatePicker';
 import {
   createFollowUp,
@@ -49,7 +50,6 @@ export const FollowUpFormModal: React.FC<FollowUpFormModalProps> = ({
   const toast = useToast();
   const queryClient = useQueryClient();
   const dateId = useId();
-  const messageId = useId();
 
   const [type, setType] = useState<FollowUpType>(defaultType ?? 'general');
   const [dueAt, setDueAt] = useState('');
@@ -123,17 +123,22 @@ export const FollowUpFormModal: React.FC<FollowUpFormModalProps> = ({
       title="Schedule Follow-up"
       icon={CalendarClock}
       size="lg"
+      titleSize="sm"
+      showClose
       closeOnBackdrop={false}
     >
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select
+      <div className="space-y-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-5">
+          <SearchableSelect
             label="Type"
+            floatingLabel
+            shrinkDefaultValue
+            usePortal
             value={type}
-            onChange={(e) => setType(e.target.value as FollowUpType)}
+            onChange={(value) => setType(value as FollowUpType)}
             options={Object.entries(FOLLOW_UP_TYPE_LABELS).map(([value, label]) => ({
-              value,
-              label,
+              id: value,
+              name: label,
             }))}
           />
           <div>
@@ -145,13 +150,13 @@ export const FollowUpFormModal: React.FC<FollowUpFormModalProps> = ({
               type="datetime-local"
               value={dueAt}
               onChange={(e) => setDueAt(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full h-9 px-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
         </div>
 
         <div>
-          <span className="block text-sm font-medium text-slate-700 mb-1.5">When it's due</span>
+          <span className="block text-sm font-medium text-slate-700 mb-1">When it's due</span>
           <div className="flex gap-2">
             <button
               type="button"
@@ -187,6 +192,7 @@ export const FollowUpFormModal: React.FC<FollowUpFormModalProps> = ({
         {channel === 'internal' && (
           <Input
             label="Notes"
+            floatingLabel
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="What needs to happen? (shown in the reminder)"
@@ -197,6 +203,7 @@ export const FollowUpFormModal: React.FC<FollowUpFormModalProps> = ({
           <>
             <Input
               label="Send To"
+              floatingLabel
               type="email"
               value={sendTo}
               onChange={(e) => setSendTo(e.target.value)}
@@ -215,37 +222,31 @@ export const FollowUpFormModal: React.FC<FollowUpFormModalProps> = ({
             />
             <Input
               label="Subject"
+              floatingLabel
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="Email subject"
             />
-            <div>
-              <label
-                htmlFor={messageId}
-                className="block text-sm font-medium text-slate-700 mb-1"
-              >
-                Message (sent exactly as written)
-              </label>
-              <textarea
-                id={messageId}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                rows={7}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                placeholder="Pick a template above — placeholders are filled with this case's data now, and this exact text is sent when due."
-              />
-            </div>
+            <Textarea
+              label="Message (sent exactly as written)"
+              floatingLabel
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={7}
+              className="resize-none"
+              placeholder="Pick a template above — placeholders are filled with this case's data now, and this exact text is sent when due."
+            />
           </>
         )}
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-          <Button variant="secondary" onClick={onClose} disabled={saving}>
+        <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-200">
+          <Button variant="secondary" size="sm" className="text-xs" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button size="sm" className="text-xs" onClick={handleSave} disabled={saving}>
             {saving ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                 Scheduling…
               </>
             ) : (

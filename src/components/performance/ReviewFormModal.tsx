@@ -1,10 +1,12 @@
 import React, { useEffect, useId } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Star } from 'lucide-react';
+import { Star, ClipboardCheck, Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import { performanceKeys } from '../../lib/queryKeys';
 import {
   createReview,
@@ -120,19 +122,12 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
   const toast = useToast();
   const { user } = useAuth();
   const isEditing = !!review;
-  const employeeFieldId = useId();
   const periodStartFieldId = useId();
   const periodEndFieldId = useId();
-  const strengthsFieldId = useId();
-  const improvementsFieldId = useId();
-  const goalsAchievedFieldId = useId();
-  const goalsNextFieldId = useId();
-  const commentsFieldId = useId();
-  const statusFieldId = useId();
 
   const [rating, setRating] = React.useState(0);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<ReviewFormData>();
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<ReviewFormData>();
 
   useEffect(() => {
     if (review) {
@@ -203,34 +198,39 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
       isOpen={isOpen}
       onClose={onClose}
       title={isEditing ? 'Edit Performance Review' : 'New Performance Review'}
+      subtitle={isEditing ? "Update this performance review's details." : 'Enter the performance review details to get started.'}
+      icon={ClipboardCheck}
+      titleSize="sm"
       size="lg"
+      showClose
       closeOnBackdrop={false}
     >
-      <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-4">
-        <div>
-          <label htmlFor={employeeFieldId} className="block text-sm font-medium text-slate-700 mb-1">
-            Employee <span className="text-danger">*</span>
-          </label>
-          <select
-            id={employeeFieldId}
-            {...register('employee_id', { required: 'Select an employee' })}
-            disabled={isEditing}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-slate-50"
-          >
-            <option value="">Select employee...</option>
-            {employees.map((e: { id: string; first_name: string; last_name: string; employee_number?: string | null }) => (
-              <option key={e.id} value={e.id}>
-                {e.first_name} {e.last_name}
-                {e.employee_number ? ` (${e.employee_number})` : ''}
-              </option>
-            ))}
-          </select>
-          {errors.employee_id && (
-            <p className="text-danger text-xs mt-1">{errors.employee_id.message}</p>
+      <form onSubmit={handleSubmit(data => mutation.mutate(data))} className="space-y-5">
+        <Controller
+          name="employee_id"
+          control={control}
+          rules={{ required: 'Select an employee' }}
+          render={({ field }) => (
+            <SearchableSelect
+              label="Employee"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
+              required
+              disabled={isEditing}
+              value={field.value}
+              onChange={field.onChange}
+              options={employees.map((e: { id: string; first_name: string; last_name: string; employee_number?: string | null }) => ({
+                id: e.id,
+                name: `${e.first_name} ${e.last_name}${e.employee_number ? ` (${e.employee_number})` : ''}`,
+              }))}
+              placeholder="Select an employee"
+              error={errors.employee_id?.message}
+            />
           )}
-        </div>
+        />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
           <div>
             <label htmlFor={periodStartFieldId} className="block text-sm font-medium text-slate-700 mb-1">
               Period Start <span className="text-danger">*</span>
@@ -260,83 +260,90 @@ export const ReviewFormModal: React.FC<Props> = ({ isOpen, onClose, review }) =>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Overall Rating</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Overall Rating</label>
           <StarPicker value={rating} onChange={setRating} />
         </div>
 
-        <div>
-          <label htmlFor={strengthsFieldId} className="block text-sm font-medium text-slate-700 mb-1">Strengths</label>
-          <textarea
-            id={strengthsFieldId}
-            {...register('strengths')}
+        <Textarea
+          label="Strengths"
+          floatingLabel
+          {...register('strengths')}
+          rows={3}
+          className="resize-none"
+          placeholder="Key strengths demonstrated during the review period..."
+        />
+
+        <Textarea
+          label="Areas for Improvement"
+          floatingLabel
+          {...register('areas_for_improvement')}
+          rows={3}
+          className="resize-none"
+          placeholder="Areas that need development or improvement..."
+        />
+
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+          <Textarea
+            label="Goals Achieved"
+            floatingLabel
+            {...register('goals_achieved')}
             rows={3}
-            placeholder="Key strengths demonstrated during the review period..."
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+            className="resize-none"
+            placeholder="Goals accomplished this period..."
           />
-        </div>
-
-        <div>
-          <label htmlFor={improvementsFieldId} className="block text-sm font-medium text-slate-700 mb-1">Areas for Improvement</label>
-          <textarea
-            id={improvementsFieldId}
-            {...register('areas_for_improvement')}
+          <Textarea
+            label="Goals Next Period"
+            floatingLabel
+            {...register('goals_next_period')}
             rows={3}
-            placeholder="Areas that need development or improvement..."
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+            className="resize-none"
+            placeholder="Objectives for the next review period..."
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor={goalsAchievedFieldId} className="block text-sm font-medium text-slate-700 mb-1">Goals Achieved</label>
-            <textarea
-              id={goalsAchievedFieldId}
-              {...register('goals_achieved')}
-              rows={3}
-              placeholder="Goals accomplished this period..."
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+        <Textarea
+          label="Additional Comments"
+          floatingLabel
+          {...register('comments')}
+          rows={2}
+          className="resize-none"
+          placeholder="Any additional comments or notes..."
+        />
+
+        <Controller
+          name="status"
+          control={control}
+          render={({ field }) => (
+            <SearchableSelect
+              label="Status"
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
+              value={field.value}
+              onChange={field.onChange}
+              options={[
+                { id: 'draft', name: 'Draft' },
+                { id: 'submitted', name: 'Submitted' },
+                { id: 'completed', name: 'Completed' },
+              ]}
+              placeholder="Draft"
             />
-          </div>
-          <div>
-            <label htmlFor={goalsNextFieldId} className="block text-sm font-medium text-slate-700 mb-1">Goals Next Period</label>
-            <textarea
-              id={goalsNextFieldId}
-              {...register('goals_next_period')}
-              rows={3}
-              placeholder="Objectives for the next review period..."
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-            />
-          </div>
-        </div>
+          )}
+        />
 
-        <div>
-          <label htmlFor={commentsFieldId} className="block text-sm font-medium text-slate-700 mb-1">Additional Comments</label>
-          <textarea
-            id={commentsFieldId}
-            {...register('comments')}
-            rows={2}
-            placeholder="Any additional comments or notes..."
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-          />
-        </div>
-
-        <div>
-          <label htmlFor={statusFieldId} className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-          <select
-            id={statusFieldId}
-            {...register('status')}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="draft">Draft</option>
-            <option value="submitted">Submitted</option>
-            <option value="completed">Completed</option>
-          </select>
-        </div>
-
-        <div className="flex justify-end gap-3 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={mutation.isPending}>
-            {mutation.isPending ? 'Saving...' : isEditing ? 'Update Review' : 'Save Review'}
+        <div className="flex justify-end gap-2.5 pt-2">
+          <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onClose}>Cancel</Button>
+          <Button type="submit" size="sm" className="text-xs" disabled={mutation.isPending}>
+            {mutation.isPending ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Saving...
+              </>
+            ) : isEditing ? (
+              'Update Review'
+            ) : (
+              'Save Review'
+            )}
           </Button>
         </div>
       </form>

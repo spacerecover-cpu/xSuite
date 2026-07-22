@@ -2,6 +2,8 @@ import React, { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
+import { Input } from '../../ui/Input';
+import { ListPlus, Loader2 } from 'lucide-react';
 import { createPlanFeature, updatePlanFeature } from '../../../lib/billingService';
 import { platformAdminKeys } from '../../../lib/queryKeys';
 import { useToast } from '../../../hooks/useToast';
@@ -92,7 +94,11 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={isEditing ? 'Edit Feature' : 'Add Feature'}
+      subtitle={isEditing ? "Update this feature's details." : 'Enter the feature details to add it.'}
+      icon={ListPlus}
       size="md"
+      titleSize="sm"
+      showClose
       closeOnBackdrop={false}
       initialFocusRef={firstFieldRef}
     >
@@ -101,7 +107,7 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
           e.preventDefault();
           mutation.mutate();
         }}
-        className="space-y-4"
+        className="space-y-5"
       >
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Feature Key *</label>
@@ -111,7 +117,7 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
                   type="text"
                   value={formData.feature_key}
                   onChange={(e) => setFormData((p) => ({ ...p, feature_key: e.target.value }))}
-                  className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="flex-1 border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="custom_feature_key"
                   required
                 />
@@ -125,7 +131,7 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
                   ref={firstFieldRef}
                   value={formData.feature_key}
                   onChange={(e) => setFormData((p) => ({ ...p, feature_key: e.target.value }))}
-                  className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="flex-1 border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   required
                 >
                   <option value="">Select a feature key...</option>
@@ -140,73 +146,57 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="feature-display-name" className="block text-sm font-medium text-slate-700 mb-1">Display Name *</label>
-              <input
-                id="feature-display-name"
-                type="text"
-                value={formData.feature_name}
-                onChange={(e) => setFormData((p) => ({ ...p, feature_name: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="feature-arabic-name" className="block text-sm font-medium text-slate-700 mb-1">Arabic Name</label>
-              <input
-                id="feature-arabic-name"
-                type="text"
-                dir="rtl"
-                value={formData.feature_name_ar}
-                onChange={(e) => setFormData((p) => ({ ...p, feature_name_ar: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="feature-limit-type" className="block text-sm font-medium text-slate-700 mb-1">Limit Type</label>
-              <input
-                id="feature-limit-type"
-                type="text"
-                value={formData.limit_type}
-                onChange={(e) => setFormData((p) => ({ ...p, limit_type: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="e.g. users, cases, storage"
-              />
-            </div>
-            <div>
-              <label htmlFor="feature-limit-value" className="block text-sm font-medium text-slate-700 mb-1">Limit Value</label>
-              <input
-                id="feature-limit-value"
-                type="number"
-                value={formData.limit_value ?? ''}
-                onChange={(e) =>
-                  setFormData((p) => ({
-                    ...p,
-                    limit_value: e.target.value ? parseInt(e.target.value) : null,
-                  }))
-                }
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Unlimited"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="feature-display-order" className="block text-sm font-medium text-slate-700 mb-1">Display Order</label>
-            <input
-              id="feature-display-order"
-              type="number"
-              value={formData.display_order ?? 0}
-              onChange={(e) =>
-                setFormData((p) => ({ ...p, display_order: parseInt(e.target.value) || 0 }))
-              }
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+            <Input
+              label="Display Name"
+              floatingLabel
+              value={formData.feature_name}
+              onChange={(e) => setFormData((p) => ({ ...p, feature_name: e.target.value }))}
+              required
+              placeholder="e.g. Advanced Reports"
+            />
+            <Input
+              label="Arabic Name"
+              floatingLabel
+              dir="rtl"
+              value={formData.feature_name_ar}
+              onChange={(e) => setFormData((p) => ({ ...p, feature_name_ar: e.target.value }))}
+              placeholder="الاسم بالعربية"
             />
           </div>
+
+          <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+            <Input
+              label="Limit Type"
+              floatingLabel
+              value={formData.limit_type}
+              onChange={(e) => setFormData((p) => ({ ...p, limit_type: e.target.value }))}
+              placeholder="e.g. users, cases, storage"
+            />
+            <Input
+              label="Limit Value"
+              floatingLabel
+              type="number"
+              value={formData.limit_value ?? ''}
+              onChange={(e) =>
+                setFormData((p) => ({
+                  ...p,
+                  limit_value: e.target.value ? parseInt(e.target.value) : null,
+                }))
+              }
+              placeholder="Unlimited"
+            />
+          </div>
+
+          <Input
+            label="Display Order"
+            floatingLabel
+            type="number"
+            value={formData.display_order ?? 0}
+            onChange={(e) =>
+              setFormData((p) => ({ ...p, display_order: parseInt(e.target.value) || 0 }))
+            }
+          />
 
           <div className="flex gap-4">
             <label className="flex items-center gap-2 cursor-pointer">
@@ -229,12 +219,21 @@ export const PlanFeatureFormModal: React.FC<PlanFeatureFormModalProps> = ({
             </label>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-            <Button type="button" variant="secondary" onClick={onClose}>
+          <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-200">
+            <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Saving...' : isEditing ? 'Update Feature' : 'Add Feature'}
+            <Button type="submit" size="sm" className="text-xs" disabled={mutation.isPending}>
+              {mutation.isPending ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  Saving...
+                </>
+              ) : isEditing ? (
+                'Update Feature'
+              ) : (
+                'Add Feature'
+              )}
             </Button>
           </div>
         </form>

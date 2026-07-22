@@ -697,41 +697,41 @@ export const CaseDetail: React.FC = () => {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-slate-600">Clone ID</label>
+                    <label className="text-sm font-medium text-slate-700">Clone ID</label>
                     <p className="text-sm text-slate-900 font-semibold">Clone #{caseData.case_no}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-slate-600">Status</label>
+                    <label className="text-sm font-medium text-slate-700">Status</label>
                     <p className="text-sm text-slate-900 capitalize">{modals.viewCloneModal.status}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-slate-600">Storage Path</label>
+                    <label className="text-sm font-medium text-slate-700">Storage Path</label>
                     <p className="text-sm text-slate-900 font-mono break-all">{modals.viewCloneModal.storage_path}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-slate-600">Storage Server</label>
+                    <label className="text-sm font-medium text-slate-700">Storage Server</label>
                     <p className="text-sm text-slate-900">{modals.viewCloneModal.storage_server || 'N/A'}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-slate-600">Image Format</label>
+                    <label className="text-sm font-medium text-slate-700">Image Format</label>
                     <p className="text-sm text-slate-900 uppercase">{modals.viewCloneModal.image_format || 'DD'}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-slate-600">Image Size</label>
+                    <label className="text-sm font-medium text-slate-700">Image Size</label>
                     <p className="text-sm text-slate-900">{modals.viewCloneModal.image_size_gb ? `${modals.viewCloneModal.image_size_gb} GB` : 'N/A'}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-slate-600">Clone Date</label>
+                    <label className="text-sm font-medium text-slate-700">Clone Date</label>
                     <p className="text-sm text-slate-900">{formatDate(modals.viewCloneModal.clone_date)}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-slate-600">Cloned By</label>
+                    <label className="text-sm font-medium text-slate-700">Cloned By</label>
                     <p className="text-sm text-slate-900">{modals.viewCloneModal.cloned_by_name || 'Unknown'}</p>
                   </div>
                   {modals.viewCloneModal.extracted_date && (
                     <>
                       <div>
-                        <label className="text-sm font-medium text-slate-600">Extracted Date</label>
+                        <label className="text-sm font-medium text-slate-700">Extracted Date</label>
                         <p className="text-sm text-slate-900">{formatDate(modals.viewCloneModal.extracted_date)}</p>
                       </div>
                     </>
@@ -739,7 +739,7 @@ export const CaseDetail: React.FC = () => {
                 </div>
                 {modals.viewCloneModal.notes && (
                   <div>
-                    <label className="text-sm font-medium text-slate-600">Notes</label>
+                    <label className="text-sm font-medium text-slate-700">Notes</label>
                     <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded">{modals.viewCloneModal.notes}</p>
                   </div>
                 )}
@@ -1510,7 +1510,7 @@ export const CaseDetail: React.FC = () => {
             className="max-w-sm w-full"
           >
             <div className="p-6">
-              <h2 className="text-base font-semibold text-slate-900 mb-4">New Document</h2>
+              <h2 className="text-lg font-semibold text-slate-900 mb-4">New Document</h2>
               <div className="space-y-2">
                 {(Object.keys(REPORT_TYPES) as ReportType[]).map((key) => {
                   const cfg = REPORT_TYPES[key];

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Mail, Phone, Video } from 'lucide-react';
+import { MessageSquare, Mail, Phone, Video, Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
 import { supabase, resolveTenantId } from '../../lib/supabaseClient';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
@@ -105,10 +106,19 @@ export default function CommunicationFormModal({ isOpen, onClose, onSuccess, sup
   ];
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={communication ? 'Edit Communication' : 'Log Communication'} closeOnBackdrop={false}>
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={communication ? 'Edit Communication' : 'Log Communication'}
+      subtitle={communication ? "Update this communication's details." : 'Enter the communication details to log it.'}
+      icon={MessageSquare}
+      titleSize="sm"
+      showClose
+      closeOnBackdrop={false}
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             Communication Type *
           </label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -135,39 +145,41 @@ export default function CommunicationFormModal({ isOpen, onClose, onSuccess, sup
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Subject / Topic *
-          </label>
-          <Input
-            value={formData.subject}
-            onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-            required
-            placeholder="Brief description of the communication"
-          />
-        </div>
+        <Input
+          label="Subject / Topic"
+          floatingLabel
+          value={formData.subject}
+          onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+          required
+          placeholder="Brief description of the communication"
+        />
 
-        <div>
-          <label htmlFor="supplier-comm-notes" className="block text-sm font-medium text-slate-700 mb-1">
-            Notes / Details *
-          </label>
-          <textarea
-            id="supplier-comm-notes"
-            value={formData.notes}
-            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-            rows={4}
-            required
-            placeholder="Detailed notes about the communication..."
-          />
-        </div>
+        <Textarea
+          label="Notes / Details"
+          floatingLabel
+          value={formData.notes}
+          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+          rows={4}
+          required
+          className="resize-none"
+          placeholder="Detailed notes about the communication..."
+        />
 
-        <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
+        <div className="flex justify-end gap-2.5 pt-4 border-t">
+          <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button type="submit" disabled={loading}>
-            {loading ? 'Saving...' : communication ? 'Update Communication' : 'Log Communication'}
+          <Button type="submit" size="sm" className="text-xs" disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Saving...
+              </>
+            ) : communication ? (
+              'Update Communication'
+            ) : (
+              'Log Communication'
+            )}
           </Button>
         </div>
       </form>

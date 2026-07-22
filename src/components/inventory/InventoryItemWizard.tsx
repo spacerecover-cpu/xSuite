@@ -107,7 +107,9 @@ const EMPTY_FORM: InventoryForm = {
   location_id: '',
 };
 
-const SECTION_HEAD = 'text-xs font-bold uppercase tracking-wider text-primary mb-3';
+// No bottom margin — the heading sits inside a flex row with its icon, and
+// the section wrapper's space-y-3 provides the gap below.
+const SECTION_HEAD = 'text-sm font-semibold text-slate-900';
 
 // Identity fields shown in inventory (device_type_id is rendered specially above).
 // Module-level: BASIC_FIELDS is a static constant, so this never needs recomputing per render.
@@ -511,8 +513,10 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
       isOpen={isOpen}
       onClose={handleClose}
       title={isEdit ? 'Edit Inventory Item' : 'Add Inventory Item'}
+      subtitle={isEdit ? "Update this inventory item's details." : 'Enter the device details to add it to inventory.'}
       icon={Package}
       maxWidth="7xl"
+      showClose
       closeOnBackdrop={false}
       headerAction={
         itemNumber ? (
@@ -561,7 +565,6 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                     required
                     error={errors.device_type_id}
                     placeholder="Select device type"
-                    size="sm"
                     usePortal
                   />
                 </div>
@@ -575,7 +578,6 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                     required
                     error={errors.category_id}
                     placeholder="Select category"
-                    size="sm"
                     usePortal
                   />
                 </div>
@@ -606,7 +608,6 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                     onChange={e => setField('legacy_case_ref', e.target.value)}
                     placeholder="e.g. old ERP case ref"
                     maxLength={100}
-                    size="sm"
                   />
                 </div>
               </div>
@@ -721,7 +722,6 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                     onChange={v => setField('status_id', v)}
                     options={statusTypes}
                     placeholder="Select status"
-                    size="sm"
                     usePortal
                   />
                 </div>
@@ -735,7 +735,6 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                     onChange={e => setField('quantity', parseInt(e.target.value) || 0)}
                     required
                     error={errors.quantity}
-                    size="sm"
                   />
                 </div>
 
@@ -746,7 +745,6 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                     value={String(form.min_quantity)}
                     min="0"
                     onChange={e => setField('min_quantity', parseInt(e.target.value) || 0)}
-                    size="sm"
                   />
                 </div>
 
@@ -758,7 +756,6 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                     step="0.01"
                     min="0"
                     onChange={e => setField('purchase_price', e.target.value)}
-                    size="sm"
                   />
                 </div>
 
@@ -768,7 +765,6 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                     label="Purchase Date"
                     value={form.purchase_date as string}
                     onChange={e => setField('purchase_date', e.target.value)}
-                    size="sm"
                   />
                 </div>
 
@@ -779,7 +775,6 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                     onChange={v => setField('supplier_id', v)}
                     options={[{ id: '', name: 'Not specified' }, ...suppliers]}
                     placeholder="Select supplier"
-                    size="sm"
                     usePortal
                   />
                 </div>
@@ -798,12 +793,12 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Notes</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
                   <textarea
                     value={form.notes as string}
                     onChange={e => setField('notes', e.target.value)}
                     rows={2}
-                    className="w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-none"
+                    className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-none"
                     placeholder="Optional notes…"
                   />
                 </div>
@@ -819,7 +814,7 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
             )}
 
             {/* ── Actions ───────────────────────────────────────── */}
-            <div className="flex justify-end gap-3 pt-2 border-t border-border">
+            <div className="flex justify-end gap-3 pt-4 border-t border-border">
               <Button type="button" variant="secondary" onClick={handleClose} disabled={submitting}>
                 Cancel
               </Button>

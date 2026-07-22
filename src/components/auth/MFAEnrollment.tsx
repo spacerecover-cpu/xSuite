@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShieldCheck, Copy, Check, Loader2, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Copy, Check, Loader2, AlertCircle, X } from 'lucide-react';
 import { mfaService, MFAEnrollResponse } from '../../lib/mfaService';
 import { useAuth } from '../../contexts/AuthContext';
 import { Dialog } from '../ui/Dialog';
@@ -84,14 +84,27 @@ export const MFAEnrollment: React.FC<MFAEnrollmentProps> = ({ isOpen, onClose, o
       closeOnBackdrop={false}
       initialFocusRef={inputRef}
     >
-        <div className="flex items-center justify-between p-4 border-b border-slate-200">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold text-slate-900">Set Up Two-Factor Authentication</h2>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+              <ShieldCheck className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Set Up Two-Factor Authentication</h2>
+              <p className="mt-0.5 text-sm text-slate-500">Add an authenticator app for an extra layer of security.</p>
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        <div className="p-6">
+        <div className="px-5 py-4">
           {error && (
             <div className="mb-4 p-3 bg-danger-muted border border-danger/30 text-danger rounded flex items-center gap-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />

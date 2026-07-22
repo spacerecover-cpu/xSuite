@@ -275,7 +275,10 @@ export default function InventoryDetailModal({
         isOpen={isOpen}
         onClose={onClose}
         title={getItemDisplayName()}
+        subtitle="Review this item's details and history."
+        icon={Package}
         maxWidth="4xl"
+        showClose
         headerAction={
           <div className="flex items-center gap-2">
             <Button
@@ -438,7 +441,7 @@ export default function InventoryDetailModal({
                         value={assignmentNotes}
                         onChange={(e) => setAssignmentNotes(e.target.value)}
                         rows={2}
-                        className="w-full mt-2 px-2 py-1 border border-slate-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                        className="w-full mt-2 px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                         placeholder="Assignment notes..."
                         disabled={assignmentLoading}
                       />

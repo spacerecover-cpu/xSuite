@@ -7,7 +7,7 @@ import { Input } from '../../components/ui/Input';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/ui/Badge';
-import { ChevronLeft, Search, Edit2, Check, X } from 'lucide-react';
+import { ChevronLeft, Search, Edit2, Check, X, Hash } from 'lucide-react';
 import { SettingsPageHeader } from '../../components/layout/SettingsPageHeader';
 import { useToast } from '../../hooks/useToast';
 import { logger } from '../../lib/logger';
@@ -547,6 +547,9 @@ export const SystemNumbers: React.FC = () => {
         onClose={handleCloseModal}
         size="lg"
         title={`Edit ${editingSequence ? (SCOPE_REGISTRY.find(t => t.key === editingSequence.scope)?.label ?? editingSequence.scope) : ''}`}
+        subtitle="Update this sequence's numbering format."
+        icon={Hash}
+        showClose
       >
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -631,7 +634,7 @@ export const SystemNumbers: React.FC = () => {
                   id="reset_basis"
                   value={formData.reset_basis}
                   onChange={(e) => setFormData({ ...formData, reset_basis: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="w-full h-9 px-3 text-sm border border-slate-300 rounded-md bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   {RESET_BASIS_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>

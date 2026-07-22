@@ -3,11 +3,13 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { AlertCircle, ChevronDown, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { FLOATING_LABEL_CLS } from './Input';
 import { useFieldA11y } from '../../hooks/useFieldA11y';
 import { useAnchoredPosition } from '../../hooks/useAnchoredPosition';
 import { useListboxKeyboard } from '../../hooks/useListboxKeyboard';
 
-const triggerSizeClasses = { sm: 'px-3 py-1.5 text-sm', md: 'px-3 py-2' } as const;
+// md matches the 36px standard field height set in ui/Input.tsx.
+const triggerSizeClasses = { sm: 'px-3 py-1.5 text-sm', md: 'h-9 px-3 text-sm' } as const;
 
 interface Option {
   id: string;
@@ -36,6 +38,11 @@ interface SearchableSelectProps {
   name?: string;
   className?: string;
   size?: 'sm' | 'md';
+  /** Opt-in: render the label as a notch on the trigger's top border. */
+  floatingLabel?: boolean;
+  /** Opt-in: render the trigger text at the smallest size while the default
+   *  (empty) value is selected — i.e. placeholder/"No X" options read quietly. */
+  shrinkDefaultValue?: boolean;
   /** Reports the live filter term (and '' on close) so consumers can fetch
    *  options server-side — required beyond PostgREST's 1000-row cap. */
   onSearchTermChange?: (term: string) => void;
@@ -61,6 +68,8 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
       name,
       className,
       size = 'md',
+      floatingLabel = false,
+      shrinkDefaultValue = false,
       onSearchTermChange,
     },
     ref
@@ -189,7 +198,7 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
               aria-expanded
               aria-controls={listboxId}
               aria-activedescendant={activeOptionId}
-              className="w-full ps-8 pe-3 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              className={`w-full ps-8 pe-3 py-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${floatingLabel ? 'text-xs placeholder:text-xs' : 'text-sm'}`}
               placeholder={t('ui.select.searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => {
@@ -219,7 +228,7 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
             <div
               role="status"
               aria-live="polite"
-              className="px-3 py-6 text-center text-slate-500 text-sm"
+              className={`px-3 py-6 text-center text-slate-500 ${floatingLabel ? 'text-xs' : 'text-sm'}`}
             >
               {resolvedEmptyMessage}
             </div>
@@ -231,7 +240,7 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
                 id={`${listboxId}-opt-${option.id}`}
                 aria-selected={option.id === value}
                 aria-disabled={option.disabled || undefined}
-                className={`px-3 py-2 cursor-pointer transition-colors ${
+                className={`px-3 py-2 cursor-pointer transition-colors ${floatingLabel ? 'text-xs' : ''} ${
                   option.disabled
                     ? 'text-slate-400 cursor-not-allowed'
                     : activeIndex === index
@@ -254,7 +263,7 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
             <button
               type="button"
               onClick={handleAddNew}
-              className="w-full px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5 rounded-md transition-colors text-start"
+              className={`w-full px-3 py-2 font-medium text-primary hover:bg-primary/5 rounded-md transition-colors text-start ${floatingLabel ? 'text-xs' : 'text-sm'}`}
             >
               + {resolvedAddNewLabel}
             </button>
@@ -275,7 +284,7 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
 
     return (
       <div className={`relative ${className ?? ''}`} ref={containerRef}>
-        {label && (
+        {label && !floatingLabel && (
           <label {...labelProps} className="block text-sm font-medium text-slate-700 mb-1">
             {label}
             {required && (
@@ -315,17 +324,28 @@ export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelec
           onKeyDown={onKeyDown}
           tabIndex={disabled ? -1 : 0}
         >
-          <div className="flex items-center justify-between">
-            <span className={selectedOption ? 'text-slate-900' : 'text-slate-400'}>
+          <div className="flex h-full items-center justify-between gap-2">
+            <span className={cn(
+              'truncate',
+              selectedOption ? 'text-slate-900' : 'text-slate-400',
+              shrinkDefaultValue && !value && 'text-xxs',
+            )}>
               {selectedOption ? selectedOption.name : resolvedPlaceholder}
             </span>
             <ChevronDown
-              className={`w-4 h-4 text-slate-400 transition-transform ${
+              className={`w-4 h-4 shrink-0 text-slate-400 transition-transform ${
                 isOpen ? 'rotate-180' : ''
               }`}
             />
           </div>
         </div>
+
+        {label && floatingLabel && (
+          <label {...labelProps} className={FLOATING_LABEL_CLS}>
+            {label}
+            {required && <span aria-hidden="true" className="text-danger ms-0.5">*</span>}
+          </label>
+        )}
 
         {error ? (
           <p {...errorProps} className="mt-1 text-xs text-danger flex items-center gap-1"><AlertCircle aria-hidden="true" className="w-3 h-3 shrink-0" />

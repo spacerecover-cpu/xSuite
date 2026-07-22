@@ -7,7 +7,75 @@ import { TERMINAL_TYPES } from './caseLifecycle';
 
 type CustomerRow = Database['public']['Tables']['customers_enhanced']['Row'];
 type CustomerInsert = Database['public']['Tables']['customers_enhanced']['Insert'];
+type CustomerUpdate = Database['public']['Tables']['customers_enhanced']['Update'];
 type RelationshipInsert = Database['public']['Tables']['customer_company_relationships']['Insert'];
+
+export interface UpdateCustomerInput {
+  customer_name: string;
+  email?: string | null;
+  mobile_number?: string | null;
+  phone?: string | null;
+  customer_group_id?: string | null;
+  country_id?: string | null;
+  city_id?: string | null;
+  address?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  subdivision_id?: string | null;
+  postal_code?: string | null;
+  portal_enabled?: boolean;
+  notes?: string | null;
+  /** Full metadata object to write (caller merges to preserve other keys). */
+  metadata?: Record<string, unknown> | null;
+}
+
+/**
+ * Update a customer's own fields. Company relationships and the profile photo
+ * are deliberately NOT touched here — they are managed by their dedicated UIs
+ * (Associated Companies / avatar upload), matching the create/edit split.
+ */
+export async function updateCustomer(id: string, input: UpdateCustomerInput): Promise<CustomerRow | null> {
+  const { data, error } = await supabase
+    .from('customers_enhanced')
+    .update({ ...input } as CustomerUpdate)
+    .eq('id', id)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Non-consuming preview of the next customer number. Mirrors the DB
+ * `get_next_number('customers')` legacy branch (all sequences have a NULL
+ * format_template): `prefix || '-' || LPAD(current_value + 1, padding)`, with
+ * an annual-reset short-circuit. Read-only — the real number is allocated at
+ * insert time by `get_next_customer_number()`.
+ */
+export async function getNextCustomerNumberPreview(): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('number_sequences')
+    .select('prefix, padding, current_value, reset_annually, last_reset_year')
+    .eq('scope', 'customers')
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    logger.error('Failed to preview next customer number:', error);
+    return null;
+  }
+  const prefix = data?.prefix ?? 'CUST';
+  const padding = data?.padding ?? 4;
+  const currentYear = new Date().getFullYear();
+  let nextVal: number;
+  if (!data) {
+    nextVal = 1;
+  } else if (data.reset_annually && (data.last_reset_year == null || data.last_reset_year < currentYear)) {
+    nextVal = 1;
+  } else {
+    nextVal = (data.current_value ?? 0) + 1;
+  }
+  return `${prefix}-${String(nextVal).padStart(padding, '0')}`;
+}
 
 export interface CreateCustomerInput {
   customer_name: string;
@@ -26,6 +94,8 @@ export interface CreateCustomerInput {
   portal_enabled?: boolean;
   notes?: string | null;
   created_by?: string | null;
+  /** Free-form JSON bag (e.g. { secondary_email }); merged, never blind-set. */
+  metadata?: Record<string, unknown> | null;
   /** When set, links the new customer to this company (non-primary). */
   company_id?: string | null;
 }

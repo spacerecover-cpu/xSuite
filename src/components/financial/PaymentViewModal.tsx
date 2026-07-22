@@ -95,7 +95,10 @@ export const PaymentViewModal: React.FC<PaymentViewModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Payment Details"
+      subtitle="Review this payment and its allocations."
+      icon={Receipt}
       size="lg"
+      showClose
     >
       <div className="space-y-6">
         <div className="bg-gradient-to-r from-success-muted to-success-muted rounded-xl p-6 border border-success/30">
@@ -140,7 +143,7 @@ export const PaymentViewModal: React.FC<PaymentViewModalProps> = ({
           <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
             <div className="flex items-center gap-2 mb-3">
               <User className="w-5 h-5 text-primary" />
-              <h4 className="font-semibold text-slate-900">Customer Information</h4>
+              <h4 className="text-sm font-semibold text-slate-900">Customer Information</h4>
             </div>
             <div className="space-y-2">
               <div>
@@ -157,7 +160,7 @@ export const PaymentViewModal: React.FC<PaymentViewModalProps> = ({
           <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
             <div className="flex items-center gap-2 mb-3">
               <Briefcase className="w-5 h-5 text-accent-foreground" />
-              <h4 className="font-semibold text-slate-900">Case Information</h4>
+              <h4 className="text-sm font-semibold text-slate-900">Case Information</h4>
             </div>
             <div>
               <p className="text-xs text-slate-500">Case</p>
@@ -169,7 +172,7 @@ export const PaymentViewModal: React.FC<PaymentViewModalProps> = ({
         <div className="bg-white rounded-lg border border-slate-200 p-4">
           <div className="flex items-center gap-2 mb-4">
             <CreditCard className="w-5 h-5 text-success" />
-            <h4 className="font-semibold text-slate-900">Payment Details</h4>
+            <h4 className="text-sm font-semibold text-slate-900">Payment Details</h4>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -209,7 +212,7 @@ export const PaymentViewModal: React.FC<PaymentViewModalProps> = ({
             <div className="bg-slate-50 px-4 py-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-primary" />
-                <h4 className="font-semibold text-slate-900">Invoice Allocations</h4>
+                <h4 className="text-sm font-semibold text-slate-900">Invoice Allocations</h4>
               </div>
             </div>
             <div className="overflow-x-auto">

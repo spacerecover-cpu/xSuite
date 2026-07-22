@@ -45,7 +45,7 @@ export function TaxTraceDrawer({ trace, backfilled, open, onClose }: TaxTraceDra
       className="ms-auto flex h-full max-h-full w-full max-w-md flex-col overflow-hidden rounded-none"
     >
       <div className="flex shrink-0 items-center justify-between border-b border-border p-4">
-        <h2 id={titleId} className="text-base font-semibold text-slate-900">
+        <h2 id={titleId} className="text-lg font-semibold text-slate-900">
           {t('financial.taxTrace.title')}
         </h2>
       </div>

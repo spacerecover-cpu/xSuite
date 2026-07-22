@@ -1,10 +1,12 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Loader2, SlidersHorizontal } from 'lucide-react';
 import { payrollService } from '../../lib/payrollService';
 import { payrollKeys } from '../../lib/queryKeys';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { useToast } from '../../hooks/useToast';
 import { supabase } from '../../lib/supabaseClient';
@@ -16,9 +18,6 @@ interface Props {
 export function AdjustmentFormModal({ onClose }: Props) {
   const toast = useToast();
   const queryClient = useQueryClient();
-  const typeFieldId = useId();
-  const amountFieldId = useId();
-  const descriptionFieldId = useId();
 
   const [formData, setFormData] = useState({
     employee_id: '',
@@ -81,73 +80,83 @@ export function AdjustmentFormModal({ onClose }: Props) {
   }));
 
   return (
-    <Modal isOpen onClose={onClose} title="Add Payroll Adjustment">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Add Payroll Adjustment"
+      subtitle="Enter the payroll adjustment details to record it."
+      icon={SlidersHorizontal}
+      titleSize="sm"
+      showClose
+      closeOnBackdrop={false}
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <SearchableSelect
+          label="Employee"
+          floatingLabel
+          shrinkDefaultValue
+          usePortal
+          required
+          options={employeeOptions}
+          value={formData.employee_id}
+          onChange={(value) => handleChange('employee_id', value)}
+          placeholder="Select employee..."
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-5">
           <SearchableSelect
-            label="Employee"
+            label="Type"
+            floatingLabel
+            shrinkDefaultValue
+            usePortal
             required
-            options={employeeOptions}
-            value={formData.employee_id}
-            onChange={(value) => handleChange('employee_id', value)}
-            placeholder="Select employee..."
+            value={formData.type}
+            onChange={(value) => handleChange('type', value)}
+            options={[
+              { id: 'bonus', name: 'Bonus' },
+              { id: 'advance', name: 'Salary Advance' },
+              { id: 'reimbursement', name: 'Reimbursement' },
+              { id: 'deduction', name: 'Deduction' },
+              { id: 'other', name: 'Other' },
+            ]}
+          />
+
+          <Input
+            label="Amount (OMR)"
+            floatingLabel
+            required
+            type="number"
+            step="0.001"
+            value={formData.amount}
+            onChange={(e) => handleChange('amount', e.target.value)}
+            placeholder="0.000"
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor={typeFieldId} className="block text-sm font-medium text-slate-700 mb-2">
-              Type <span className="text-danger">*</span>
-            </label>
-            <select
-              id={typeFieldId}
-              value={formData.type}
-              onChange={(e) => handleChange('type', e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="bonus">Bonus</option>
-              <option value="advance">Salary Advance</option>
-              <option value="reimbursement">Reimbursement</option>
-              <option value="deduction">Deduction</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
+        <Textarea
+          label="Description"
+          floatingLabel
+          required
+          value={formData.description}
+          onChange={(e) => handleChange('description', e.target.value)}
+          placeholder="Enter reason for adjustment..."
+          className="resize-none"
+          rows={3}
+        />
 
-          <div>
-            <label htmlFor={amountFieldId} className="block text-sm font-medium text-slate-700 mb-2">
-              Amount (OMR) <span className="text-danger">*</span>
-            </label>
-            <Input
-              id={amountFieldId}
-              type="number"
-              step="0.001"
-              value={formData.amount}
-              onChange={(e) => handleChange('amount', e.target.value)}
-              placeholder="0.000"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor={descriptionFieldId} className="block text-sm font-medium text-slate-700 mb-2">
-            Description <span className="text-danger">*</span>
-          </label>
-          <textarea
-            id={descriptionFieldId}
-            value={formData.description}
-            onChange={(e) => handleChange('description', e.target.value)}
-            placeholder="Enter reason for adjustment..."
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-            rows={3}
-          />
-        </div>
-
-        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-          <Button type="button" variant="secondary" onClick={onClose}>
+        <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-200">
+          <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={saveMutation.isPending}>
-            {saveMutation.isPending ? 'Creating...' : 'Create Adjustment'}
+          <Button type="submit" size="sm" className="text-xs" disabled={saveMutation.isPending}>
+            {saveMutation.isPending ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              'Create Adjustment'
+            )}
           </Button>
         </div>
       </form>

@@ -244,7 +244,7 @@ export const TemplateGalleryModal: React.FC<TemplateGalleryModalProps> = ({
           </div>
 
           {/* Footer actions */}
-          <div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-3">
+          <div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-4">
             <Button variant="ghost" size="sm" onClick={onBlank}>
               Skip — start blank
             </Button>

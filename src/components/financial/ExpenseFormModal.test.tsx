@@ -59,10 +59,9 @@ describe('ExpenseFormModal edit prefill (EXP-003a / EXP-003b)', () => {
         initialData={{ id: 'e1', category_id: 'c1', amount: 10, description: 'x', status: 'pending' }}
       />,
     );
-    // Wait for the async category options to load before asserting the bound value.
-    await screen.findByRole('option', { name: 'Consumables' });
-    const select = screen.getByLabelText('Category') as HTMLSelectElement;
-    expect(select.value).toBe('c1');
+    // Category is now a SearchableSelect combobox: the saved category renders as
+    // its trigger text once the async options resolve.
+    expect(await screen.findByText('Consumables')).toBeInTheDocument();
   });
 
   it('no longer renders the phantom Payment Method field', () => {

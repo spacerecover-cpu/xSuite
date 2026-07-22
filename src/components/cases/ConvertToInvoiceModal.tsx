@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Receipt, Calendar, FileText, DollarSign } from 'lucide-react';
+import { Textarea } from '../ui/Textarea';
+import { Receipt, Calendar, FileText, DollarSign, Loader2 } from 'lucide-react';
 import { useDateTimeConfig } from '../../contexts/TenantConfigContext';
 import { tenantToday, addDaysIso } from '../../lib/tenantToday';
 
@@ -60,10 +61,14 @@ export const ConvertToInvoiceModal: React.FC<ConvertToInvoiceModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Convert Quote to Invoice"
+      subtitle="Convert this quote into an invoice."
+      icon={FileText}
+      titleSize="sm"
       size="lg"
+      showClose
       closeOnBackdrop={false}
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div className="bg-info-muted border border-info/30 rounded-lg p-4">
           <div className="flex items-start gap-3">
             <FileText className="w-5 h-5 text-info flex-shrink-0 mt-0.5" />
@@ -89,9 +94,9 @@ export const ConvertToInvoiceModal: React.FC<ConvertToInvoiceModalProps> = ({
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-3">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Invoice Type *
             </label>
             <div className="grid grid-cols-2 gap-3">
@@ -148,15 +153,13 @@ export const ConvertToInvoiceModal: React.FC<ConvertToInvoiceModalProps> = ({
           </div>
 
           <div>
-            <label htmlFor="convert-invoice-notes" className="block text-sm font-medium text-slate-700 mb-2">
-              Additional Notes (Optional)
-            </label>
-            <textarea
-              id="convert-invoice-notes"
+            <Textarea
+              label="Additional Notes (Optional)"
+              floatingLabel
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="resize-none"
               placeholder="Add any additional notes or special instructions for this invoice..."
             />
           </div>
@@ -173,10 +176,12 @@ export const ConvertToInvoiceModal: React.FC<ConvertToInvoiceModalProps> = ({
           </ul>
         </div>
 
-        <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+        <div className="flex gap-2.5 justify-end pt-4 border-t border-slate-200">
           <Button
             type="button"
             variant="secondary"
+            size="sm"
+            className="text-xs"
             onClick={onClose}
             disabled={isConverting}
           >
@@ -184,18 +189,19 @@ export const ConvertToInvoiceModal: React.FC<ConvertToInvoiceModalProps> = ({
           </Button>
           <Button
             type="submit"
+            size="sm"
             style={{ backgroundColor: invoiceType === 'proforma' ? 'rgb(var(--color-primary))' : 'rgb(var(--color-success))' }}
             disabled={isConverting}
-            className="shadow-md hover:shadow-lg transition-shadow"
+            className="text-xs shadow-md hover:shadow-lg transition-shadow"
           >
             {isConverting ? (
               <>
-                <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                 Converting...
               </>
             ) : (
               <>
-                <Receipt className="w-4 h-4 mr-2" />
+                <Receipt className="w-3.5 h-3.5 mr-1.5" />
                 Convert to {invoiceType === 'proforma' ? 'Proforma' : 'Tax'} Invoice
               </>
             )}

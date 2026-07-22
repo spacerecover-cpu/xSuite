@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useId, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Modal } from '../ui/Modal';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
 import { ChipInput } from '../ui/ChipInput';
 import {
   Mail,
@@ -63,9 +64,6 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
   const [success, setSuccess] = useState(false);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const firstFieldRef = useRef<HTMLInputElement>(null);
-  const toId = useId();
-  const subjectId = useId();
-  const bodyId = useId();
 
   useEffect(() => {
     if (isOpen) {
@@ -161,25 +159,28 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
       isOpen={isOpen}
       onClose={handleClose}
       title="Send Document via Email"
+      subtitle="Email this document to the recipient."
       icon={Mail}
       size="lg"
+      titleSize="sm"
+      showClose
       closeOnBackdrop={false}
       initialFocusRef={firstFieldRef}
       footer={
         success ? undefined : (
-          <div className="flex items-center justify-end gap-3">
-            <Button variant="secondary" onClick={handleClose} disabled={isSending}>
+          <div className="flex items-center justify-end gap-2.5">
+            <Button variant="secondary" size="sm" className="text-xs" onClick={handleClose} disabled={isSending}>
               Cancel
             </Button>
-            <Button variant="primary" onClick={handleSend} disabled={isSending || !to.trim()}>
+            <Button variant="primary" size="sm" className="text-xs" onClick={handleSend} disabled={isSending || !to.trim()}>
               {isSending ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                   Sending...
                 </>
               ) : (
                 <>
-                  <Send className="w-4 h-4 mr-2" />
+                  <Send className="w-3.5 h-3.5 mr-1.5" />
                   Send Email
                 </>
               )}
@@ -195,7 +196,7 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
           <p className="text-slate-500">The document has been sent to {to}</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {blob && filename && (
             <div className="bg-slate-50 rounded-lg p-4">
               <div className="flex items-start gap-3">
@@ -226,20 +227,17 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
             </div>
           )}
 
-          <div>
-            <label htmlFor={toId} className="block text-sm font-medium text-slate-700 mb-1">
-              Recipient Email <span className="text-danger">*</span>
-            </label>
-            <Input
-              id={toId}
-              ref={firstFieldRef}
-              type="email"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              placeholder="customer@example.com"
-              disabled={isSending}
-            />
-          </div>
+          <Input
+            ref={firstFieldRef}
+            label="Recipient Email"
+            floatingLabel
+            required
+            type="email"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            placeholder="customer@example.com"
+            disabled={isSending}
+          />
 
           <TemplatePicker
             typeCode="email"
@@ -328,34 +326,26 @@ export const EmailDocumentModal: React.FC<EmailDocumentModalProps> = ({
             </div>
           )}
 
-          <div>
-            <label htmlFor={subjectId} className="block text-sm font-medium text-slate-700 mb-1">
-              Subject
-            </label>
-            <Input
-              id={subjectId}
-              type="text"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="Email subject"
-              disabled={isSending}
-            />
-          </div>
+          <Input
+            label="Subject"
+            floatingLabel
+            type="text"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            placeholder="Email subject"
+            disabled={isSending}
+          />
 
-          <div>
-            <label htmlFor={bodyId} className="block text-sm font-medium text-slate-700 mb-1">
-              Message
-            </label>
-            <textarea
-              id={bodyId}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={8}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary resize-none"
-              placeholder="Email message..."
-              disabled={isSending}
-            />
-          </div>
+          <Textarea
+            label="Message"
+            floatingLabel
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={8}
+            className="resize-none"
+            placeholder="Email message..."
+            disabled={isSending}
+          />
 
           {error && (
             <div className="flex items-center gap-2 p-3 bg-danger-muted border border-danger/30 rounded-lg text-danger">

@@ -12,14 +12,11 @@ const { createCompanySpy, createCustomerSpy } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../lib/companyService', () => ({ createCompany: createCompanySpy }));
-vi.mock('../../lib/customerService', () => ({ createCustomer: createCustomerSpy }));
+vi.mock('../../lib/customerService', () => ({
+  createCustomer: createCustomerSpy,
+  getNextCustomerNumberPreview: vi.fn(async () => 'CUST-0001'),
+}));
 
-const { validatePureSpy } = vi.hoisted(() => ({
-  validatePureSpy: vi.fn((): { ok: boolean; error: string | null } => ({ ok: true, error: null })),
-}));
-vi.mock('../../lib/regimes/partyTaxValidation', () => ({
-  validatePartyTaxNumberPure: validatePureSpy,
-}));
 vi.mock('../../lib/geoSubdivisionService', () => ({
   listSubdivisions: vi.fn(async () => []),
 }));
@@ -79,8 +76,8 @@ describe('CustomerFormModal — inline Add New Company', () => {
 
     expect(screen.getByText('Add New Customer')).toBeInTheDocument();
 
-    // The Company select shows the unique "No company" placeholder.
-    await user.click(screen.getByText('No company'));
+    // The Company select shows the unique "No Company" placeholder.
+    await user.click(screen.getByText('No Company'));
 
     // The dropdown (and its "+ Add New Company" footer) must be portaled out of
     // the modal's overflow-clipped panel — i.e. NOT nested inside a dialog
@@ -98,7 +95,7 @@ describe('CustomerFormModal — inline Add New Company', () => {
     const user = userEvent.setup();
     renderModal();
 
-    await user.click(screen.getByText('No company'));
+    await user.click(screen.getByText('No Company'));
     await user.click(await screen.findByRole('button', { name: /add new company/i }));
 
     const nameInput = await screen.findByPlaceholderText('Enter company name');
@@ -115,12 +112,18 @@ describe('CustomerFormModal — inline Add New Company', () => {
     );
   });
 
+  it('shows the next customer number preview in the header', async () => {
+    renderModal();
+    expect(await screen.findByText('CUST-0001')).toBeInTheDocument();
+  });
+
   it('persists structured address fields alongside the legacy address blob', async () => {
     const user = userEvent.setup();
     createCustomerSpy.mockResolvedValue({ id: 'cust-1' });
     renderModal();
 
-    await user.type(screen.getByLabelText(/customer name/i), 'Jane Doe');
+    await user.type(screen.getByLabelText(/^name/i), 'Jane Doe');
+    // The structured address block is always visible below the main fields.
     await user.type(screen.getByLabelText('Address line 1'), 'Bldg 12');
     await user.type(screen.getByLabelText('Postal Code'), '133');
     await user.click(screen.getByRole('button', { name: /create customer/i }));
@@ -138,37 +141,3 @@ describe('CustomerFormModal — inline Add New Company', () => {
   });
 });
 
-describe('CustomerFormModal — tax registration number (GSTIN) capture', () => {
-  beforeEach(() => {
-    validatePureSpy.mockReset();
-    validatePureSpy.mockReturnValue({ ok: true, error: null });
-    createCustomerSpy.mockReset();
-    createCustomerSpy.mockResolvedValue({ id: 'cust-1' });
-  });
-
-  it('blocks submit and shows the validator error for an invalid tax number', async () => {
-    const user = userEvent.setup();
-    validatePureSpy.mockReturnValue({
-      ok: false, error: 'GSTIN check character is invalid — please re-check the number.',
-    });
-    renderModal();
-    await user.type(screen.getByLabelText(/customer name/i), 'Jane Doe');
-    await user.type(screen.getByLabelText(/tax registration number/i), '29ABCDE1234F1Z5');
-    await user.click(screen.getByRole('button', { name: /create customer/i }));
-    expect(await screen.findByText(/check character is invalid/i)).toBeInTheDocument();
-    expect(createCustomerSpy).not.toHaveBeenCalled();
-  });
-
-  it('includes tax_number in the createCustomer payload when valid', async () => {
-    const user = userEvent.setup();
-    renderModal();
-    await user.type(screen.getByLabelText(/customer name/i), 'Jane Doe');
-    await user.type(screen.getByLabelText(/tax registration number/i), '29AAACX0000X1ZW');
-    await user.click(screen.getByRole('button', { name: /create customer/i }));
-    await waitFor(() =>
-      expect(createCustomerSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ tax_number: '29AAACX0000X1ZW' }),
-      ),
-    );
-  });
-});

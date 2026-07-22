@@ -1,8 +1,8 @@
-import React, { useState, useRef, useId } from 'react';
+import React, { useState, useRef } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, KeyRound, Loader2 } from 'lucide-react';
 import { userManagementService } from '../../lib/userManagementService';
 import { validatePassword } from '../auth/shared/passwordPolicy';
 import { PasswordStrengthMeter } from '../auth/shared/PasswordStrengthMeter';
@@ -17,9 +17,6 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
   userName,
 }) => {
   const firstFieldRef = useRef<HTMLInputElement>(null);
-  const currentPasswordId = useId();
-  const newPasswordId = useId();
-  const confirmPasswordId = useId();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -75,12 +72,15 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
       isOpen={isOpen}
       onClose={() => {}}
       title="Change Your Password"
+      subtitle="Set a new password for this account."
+      icon={KeyRound}
+      titleSize="sm"
       size="md"
       closeOnBackdrop={false}
       closeOnEscape={false}
       initialFocusRef={firstFieldRef}
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div className="flex items-start gap-3 p-4 bg-warning-muted border border-warning/30 rounded-lg">
           <AlertCircle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
           <div className="flex-1">
@@ -101,44 +101,32 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
           </div>
         )}
 
-        <div>
-          <label htmlFor={currentPasswordId} className="block text-sm font-medium text-slate-700 mb-2">
-            <div className="flex items-center gap-2">
-              <Lock className="w-4 h-4" />
-              Current Password
-            </div>
-          </label>
-          <div className="relative">
-            <Input
-              ref={firstFieldRef}
-              id={currentPasswordId}
-              type={showCurrentPassword ? 'text' : 'password'}
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder="Enter your current password"
-              required
-              className="pr-10"
-            />
-            <button
-              type="button"
-              onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-            >
-              {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
+        <div className="relative">
+          <Input
+            ref={firstFieldRef}
+            label="Current Password"
+            floatingLabel
+            type={showCurrentPassword ? 'text' : 'password'}
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            placeholder="Enter your current password"
+            required
+            className="pr-10"
+          />
+          <button
+            type="button"
+            onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+          >
+            {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
         </div>
 
         <div>
-          <label htmlFor={newPasswordId} className="block text-sm font-medium text-slate-700 mb-2">
-            <div className="flex items-center gap-2">
-              <Lock className="w-4 h-4" />
-              New Password
-            </div>
-          </label>
           <div className="relative">
             <Input
-              id={newPasswordId}
+              label="New Password"
+              floatingLabel
               type={showNewPassword ? 'text' : 'password'}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
@@ -158,15 +146,10 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
         </div>
 
         <div>
-          <label htmlFor={confirmPasswordId} className="block text-sm font-medium text-slate-700 mb-2">
-            <div className="flex items-center gap-2">
-              <Lock className="w-4 h-4" />
-              Confirm New Password
-            </div>
-          </label>
           <div className="relative">
             <Input
-              id={confirmPasswordId}
+              label="Confirm New Password"
+              floatingLabel
               type={showConfirmPassword ? 'text' : 'password'}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
@@ -188,8 +171,15 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
         </div>
 
         <div className="flex justify-end pt-4 border-t border-slate-200">
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? 'Changing Password...' : 'Change Password'}
+          <Button type="submit" disabled={loading} size="sm" className="w-full text-xs">
+            {loading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Changing Password...
+              </>
+            ) : (
+              'Change Password'
+            )}
           </Button>
         </div>
       </form>

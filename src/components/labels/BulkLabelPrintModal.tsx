@@ -129,7 +129,7 @@ export function BulkLabelPrintModal<T extends BulkTarget>({
   };
 
   return (
-    <Modal isOpen onClose={running ? () => {} : onClose} title={`Print ${entity} labels`} size="md">
+    <Modal isOpen onClose={running ? () => {} : onClose} title={`Print ${entity} labels`} subtitle="Print or download labels in bulk." icon={Printer} size="md" showClose>
       <div className="space-y-5">
         {/* Scope */}
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-2">

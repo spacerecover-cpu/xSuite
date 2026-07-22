@@ -315,11 +315,14 @@ export default function InventorySettingsPage() {
         isOpen={editModal !== null}
         onClose={() => setEditModal(null)}
         title={editModal ? `Edit Sequence — ${editModal.deviceType.name}` : ''}
+        subtitle={editModal ? "Update this device type's numbering sequence." : ''}
+        icon={Hash}
+        showClose
       >
         {editModal && (
-          <form onSubmit={handleSequenceSave} className="space-y-6">
+          <form onSubmit={handleSequenceSave} className="space-y-4">
             <div>
-              <label htmlFor="seq-prefix" className="block text-sm font-semibold text-slate-700 mb-2">
+              <label htmlFor="seq-prefix" className="block text-sm font-medium text-slate-700 mb-1">
                 Prefix
               </label>
               <Input
@@ -336,7 +339,7 @@ export default function InventorySettingsPage() {
             </div>
 
             <div>
-              <label htmlFor="seq-padding" className="block text-sm font-semibold text-slate-700 mb-2">
+              <label htmlFor="seq-padding" className="block text-sm font-medium text-slate-700 mb-1">
                 Number Padding
               </label>
               <Input
@@ -357,7 +360,7 @@ export default function InventorySettingsPage() {
             </div>
 
             <div>
-              <label htmlFor="seq-next" className="block text-sm font-semibold text-slate-700 mb-2">
+              <label htmlFor="seq-next" className="block text-sm font-medium text-slate-700 mb-1">
                 Next Number
               </label>
               <Input

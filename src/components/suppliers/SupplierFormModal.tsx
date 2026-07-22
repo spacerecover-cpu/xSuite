@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useRef, useId } from 'react';
-import { Building2, Mail, Phone, MapPin, FileText, User, Truck, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { User, Truck, CheckCircle, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import { AddressFields, type AddressValue } from '../ui/AddressFields';
 import { supabase, resolveTenantId } from '../../lib/supabaseClient';
 import { useToast } from '../../hooks/useToast';
@@ -48,8 +50,6 @@ interface SupplierFormModalProps {
 export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier }: SupplierFormModalProps) {
   const toast = useToast();
   const firstFieldRef = useRef<HTMLInputElement>(null);
-  const categorySelectId = useId();
-  const paymentTermsSelectId = useId();
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Array<{ id: string; name: string; is_active?: boolean }>>([]);
   const [paymentTerms, setPaymentTerms] = useState<Array<{ id: string; name: string; days: number | null; is_active?: boolean }>>([]);
@@ -226,29 +226,40 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
       isOpen={isOpen}
       onClose={onClose}
       title={supplier ? 'Edit Supplier' : 'Add New Supplier'}
+      subtitle={supplier ? "Update this supplier's details." : 'Enter the supplier details to add them.'}
+      icon={Truck}
+      titleSize="sm"
       maxWidth="4xl"
+      showClose
       closeOnBackdrop={false}
       initialFocusRef={firstFieldRef}
       footer={
-        <div className="flex items-center justify-end gap-3">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
+        <div className="flex items-center justify-end gap-2.5">
+          <Button type="button" variant="secondary" size="sm" className="text-xs" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button type="submit" form="supplierForm" disabled={loading}>
-            {loading ? 'Saving...' : supplier ? 'Update Supplier' : 'Create Supplier'}
+          <Button type="submit" form="supplierForm" size="sm" className="text-xs" disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Saving...
+              </>
+            ) : supplier ? (
+              'Update Supplier'
+            ) : (
+              'Create Supplier'
+            )}
           </Button>
         </div>
       }
     >
-      <form id="supplierForm" onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <form id="supplierForm" onSubmit={handleSubmit} className="space-y-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-5">
           <div className="md:col-span-2 lg:col-span-3">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              <Building2 className="inline w-4 h-4 mr-1" />
-              Company Name *
-            </label>
             <Input
               ref={firstFieldRef}
+              label="Company Name"
+              floatingLabel
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
@@ -256,96 +267,69 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Supplier Number *
-            </label>
-            <Input
-              value={formData.supplier_number}
-              onChange={(e) => setFormData({ ...formData, supplier_number: e.target.value })}
-              required
-              placeholder="SUP00001"
-              disabled={!!supplier}
-            />
-          </div>
+          <Input
+            label="Supplier Number"
+            floatingLabel
+            value={formData.supplier_number}
+            onChange={(e) => setFormData({ ...formData, supplier_number: e.target.value })}
+            required
+            placeholder="SUP00001"
+            disabled={!!supplier}
+          />
 
-          <div>
-            <label htmlFor={categorySelectId} className="block text-sm font-medium text-slate-700 mb-1">
-              Category
-            </label>
-            <select
-              id={categorySelectId}
-              value={formData.category_id}
-              onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-            >
-              <option value="">Select Category</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <SearchableSelect
+            label="Category"
+            floatingLabel
+            shrinkDefaultValue
+            value={formData.category_id}
+            onChange={(value) => setFormData({ ...formData, category_id: value })}
+            options={[{ id: '', name: 'Not specified' }, ...categories.map((cat) => ({ id: cat.id, name: cat.name }))]}
+            placeholder="Not specified"
+            usePortal
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              <Mail className="inline w-4 h-4 mr-1" />
-              Email *
-            </label>
-            <Input
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              required
-              placeholder="supplier@example.com"
-            />
-          </div>
+          <Input
+            label="Email"
+            floatingLabel
+            type="email"
+            value={formData.email}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            required
+            placeholder="supplier@example.com"
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              <Phone className="inline w-4 h-4 mr-1" />
-              Phone
-            </label>
-            <Input
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              placeholder="+1234567890"
-            />
-          </div>
+          <Input
+            label="Phone"
+            floatingLabel
+            value={formData.phone}
+            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            placeholder="+1234567890"
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Tax ID / VAT Number
-            </label>
-            <Input
-              value={formData.tax_id}
-              onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
-              placeholder="Tax identification number"
-            />
-          </div>
+          <Input
+            label="Tax ID / VAT Number"
+            floatingLabel
+            value={formData.tax_id}
+            onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
+            placeholder="Tax identification number"
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Website
-            </label>
-            <Input
-              type="url"
-              value={formData.website}
-              onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-              placeholder="https://example.com"
-            />
-          </div>
+          <Input
+            label="Website"
+            floatingLabel
+            type="url"
+            value={formData.website}
+            onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+            placeholder="https://example.com"
+          />
 
           <div className="md:col-span-2 lg:col-span-3">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              <MapPin className="inline w-4 h-4 mr-1" />
-              Address
-            </label>
+            <p className="mb-2 text-xs font-medium text-slate-500">Address</p>
             <AddressFields
               value={addressValue}
               onChange={(next) => setFormData((f) => ({ ...f, ...next }))}
               countryId={null}
+              floatingLabel
             />
           </div>
 
@@ -359,156 +343,122 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
               Additional address notes
             </button>
             {!addressNotesCollapsed && (
-              <Input
-                value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Street address (legacy free-text; folded into the composed address on save)"
-              />
+              <div className="mt-2">
+                <Input
+                  label="Address notes"
+                  floatingLabel
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  placeholder="Legacy free-text; folded into the composed address on save"
+                />
+              </div>
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              City
-            </label>
-            <Input
-              value={formData.city}
-              onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-              placeholder="City"
-            />
-          </div>
+          <Input
+            label="City"
+            floatingLabel
+            value={formData.city}
+            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+            placeholder="City"
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              State / Province
-            </label>
-            <Input
-              value={formData.state}
-              onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-              placeholder="State"
-            />
-          </div>
+          <Input
+            label="State / Province"
+            floatingLabel
+            value={formData.state}
+            onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+            placeholder="State"
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              ZIP / Postal Code
-            </label>
-            <Input
-              value={formData.zip_code}
-              onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
-              placeholder="12345"
-            />
-          </div>
+          <Input
+            label="ZIP / Postal Code"
+            floatingLabel
+            value={formData.zip_code}
+            onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
+            placeholder="12345"
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Country
-            </label>
-            <Input
-              value={formData.country}
-              onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-              placeholder="Country"
-            />
-          </div>
+          <Input
+            label="Country"
+            floatingLabel
+            value={formData.country}
+            onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+            placeholder="Country"
+          />
 
-          <div>
-            <label htmlFor={paymentTermsSelectId} className="block text-sm font-medium text-slate-700 mb-1">
-              Payment Terms
-            </label>
-            <select
-              id={paymentTermsSelectId}
-              value={formData.payment_terms_id}
-              onChange={(e) => setFormData({ ...formData, payment_terms_id: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-            >
-              <option value="">Select Payment Terms</option>
-              {paymentTerms.map((term) => (
-                <option key={term.id} value={term.id}>
-                  {term.name} ({term.days} days)
-                </option>
-              ))}
-            </select>
-          </div>
+          <SearchableSelect
+            label="Payment Terms"
+            floatingLabel
+            shrinkDefaultValue
+            value={formData.payment_terms_id}
+            onChange={(value) => setFormData({ ...formData, payment_terms_id: value })}
+            options={[{ id: '', name: 'Not specified' }, ...paymentTerms.map((term) => ({ id: term.id, name: `${term.name} (${term.days} days)` }))]}
+            placeholder="Not specified"
+            usePortal
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              <Truck className="inline w-4 h-4 mr-1" />
-              Preferred Shipping Method
-            </label>
-            <Input
-              value={formData.preferred_shipping_method}
-              onChange={(e) => setFormData({ ...formData, preferred_shipping_method: e.target.value })}
-              placeholder="FedEx, UPS, DHL, etc."
-            />
-          </div>
+          <Input
+            label="Preferred Shipping Method"
+            floatingLabel
+            value={formData.preferred_shipping_method}
+            onChange={(e) => setFormData({ ...formData, preferred_shipping_method: e.target.value })}
+            placeholder="FedEx, UPS, DHL, etc."
+          />
 
           <div className="md:col-span-2 lg:col-span-3">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              <FileText className="inline w-4 h-4 mr-1" />
-              Description
-            </label>
-            <textarea
+            <Textarea
+              label="Description"
+              floatingLabel
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               rows={3}
+              className="resize-none"
               placeholder="Brief description of the supplier and products/services..."
             />
           </div>
 
-          <div className="md:col-span-2 lg:col-span-3 border-t pt-4">
-            <h3 className="text-sm font-semibold text-slate-900 mb-3">
-              <User className="inline w-4 h-4 mr-1" />
+          <div className="md:col-span-2 lg:col-span-3 border-t border-border pt-4">
+            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-1.5">
+              <User className="w-4 h-4 text-slate-400" />
               Primary Contact Information
             </h3>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Contact Name
-            </label>
-            <Input
-              value={formData.primary_contact_name}
-              onChange={(e) => setFormData({ ...formData, primary_contact_name: e.target.value })}
-              placeholder="Full name"
-            />
-          </div>
+          <Input
+            label="Contact Name"
+            floatingLabel
+            value={formData.primary_contact_name}
+            onChange={(e) => setFormData({ ...formData, primary_contact_name: e.target.value })}
+            placeholder="Full name"
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Contact Position
-            </label>
-            <Input
-              value={formData.primary_contact_position}
-              onChange={(e) => setFormData({ ...formData, primary_contact_position: e.target.value })}
-              placeholder="Sales Manager, Account Executive, etc."
-            />
-          </div>
+          <Input
+            label="Contact Position"
+            floatingLabel
+            value={formData.primary_contact_position}
+            onChange={(e) => setFormData({ ...formData, primary_contact_position: e.target.value })}
+            placeholder="Sales Manager, Account Executive, etc."
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Contact Email
-            </label>
-            <Input
-              type="email"
-              value={formData.primary_contact_email}
-              onChange={(e) => setFormData({ ...formData, primary_contact_email: e.target.value })}
-              placeholder="contact@example.com"
-            />
-          </div>
+          <Input
+            label="Contact Email"
+            floatingLabel
+            type="email"
+            value={formData.primary_contact_email}
+            onChange={(e) => setFormData({ ...formData, primary_contact_email: e.target.value })}
+            placeholder="contact@example.com"
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Contact Phone
-            </label>
-            <Input
-              value={formData.primary_contact_phone}
-              onChange={(e) => setFormData({ ...formData, primary_contact_phone: e.target.value })}
-              placeholder="+1234567890"
-            />
-          </div>
+          <Input
+            label="Contact Phone"
+            floatingLabel
+            value={formData.primary_contact_phone}
+            onChange={(e) => setFormData({ ...formData, primary_contact_phone: e.target.value })}
+            placeholder="+1234567890"
+          />
 
-          <div className="md:col-span-2 lg:col-span-3 border-t pt-4">
+          <div className="md:col-span-2 lg:col-span-3 border-t border-border pt-4">
             <div className="flex gap-6">
               <label className="flex items-center gap-2">
                 <input
@@ -527,8 +477,8 @@ export default function SupplierFormModal({ isOpen, onClose, onSuccess, supplier
                   onChange={(e) => setFormData({ ...formData, is_approved: e.target.checked })}
                   className="w-4 h-4 text-success border-slate-300 rounded focus:ring-success"
                 />
-                <span className="text-sm font-medium text-slate-700">
-                  <CheckCircle className="inline w-4 h-4 mr-1 text-success" />
+                <span className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+                  <CheckCircle className="w-4 h-4 text-success" />
                   Approved Supplier
                 </span>
               </label>

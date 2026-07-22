@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { AlertCircle, ChevronDown, Search } from 'lucide-react';
+import { FLOATING_LABEL_CLS } from './Input';
 import { useFieldA11y } from '../../hooks/useFieldA11y';
 import { useAnchoredPosition } from '../../hooks/useAnchoredPosition';
 import { useListboxKeyboard } from '../../hooks/useListboxKeyboard';
@@ -26,6 +27,8 @@ interface PhoneInputProps {
   id?: string;
   hint?: string;
   name?: string;
+  /** Opt-in: render the label as a notch on the field's top border. */
+  floatingLabel?: boolean;
 }
 
 function findPhoneCodeForCountry(countries: PhoneCountry[], countryId: string): string {
@@ -72,6 +75,7 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
       id,
       hint,
       name,
+      floatingLabel = false,
     },
     ref
   ) => {
@@ -215,8 +219,8 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
       : null;
 
     return (
-      <div className="w-full" ref={containerRef}>
-        {label && (
+      <div className="relative w-full" ref={containerRef}>
+        {label && !floatingLabel && (
           <label {...labelProps} className="block text-sm font-medium text-slate-700 mb-1">
             {label}
             {required && (
@@ -226,8 +230,10 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
             )}
           </label>
         )}
+        {/* h-9 wrapper = the 36px standard field height (ui/Input.tsx md);
+            the button/input children stretch to fill it. */}
         <div
-          className={`flex border rounded-md overflow-hidden transition-all ${
+          className={`flex h-9 border rounded-md overflow-hidden transition-all ${
             error
               ? 'border-danger'
               : isDropdownOpen
@@ -244,7 +250,7 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
             aria-controls={listboxId}
             disabled={disabled}
             onClick={() => setIsDropdownOpen((prev) => !prev)}
-            className={`flex items-center gap-1 px-2.5 py-2 bg-slate-50 border-e border-slate-300 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors shrink-0 ${
+            className={`flex items-center gap-1 px-2.5 bg-slate-50 border-e border-slate-300 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors shrink-0 ${
               disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
             }`}
           >
@@ -271,11 +277,18 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
             onChange={handleLocalNumberChange}
             placeholder={placeholder}
             disabled={disabled}
-            className={`flex-1 px-3 py-2 text-sm focus:outline-none bg-white min-w-0 ${
-              disabled ? 'bg-slate-100 cursor-not-allowed' : ''
-            }`}
+            className={`flex-1 px-3 text-sm focus:outline-none bg-white min-w-0 ${
+              floatingLabel ? 'placeholder:text-xs' : ''
+            } ${disabled ? 'bg-slate-100 cursor-not-allowed' : ''}`}
           />
         </div>
+
+        {label && floatingLabel && (
+          <label {...labelProps} className={FLOATING_LABEL_CLS}>
+            {label}
+            {required && <span aria-hidden="true" className="text-danger ms-0.5">*</span>}
+          </label>
+        )}
 
         {error ? (
           <p {...errorProps} className="mt-1 text-xs text-danger flex items-center gap-1"><AlertCircle aria-hidden="true" className="w-3 h-3 shrink-0" />

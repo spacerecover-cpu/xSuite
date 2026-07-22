@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRightLeft, Package, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ArrowRightLeft, Package, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { supabase } from '../../lib/supabaseClient';
 import {
@@ -170,10 +171,12 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
       onClose={onClose}
       title={getTitle()}
       icon={ArrowRightLeft}
+      titleSize="sm"
       size="2xl"
+      showClose
       closeOnBackdrop={false}
     >
-      <div className="space-y-4">
+      <div className="space-y-5">
         {error && (
           <div className="bg-danger-muted border border-danger/30 rounded-lg p-3 flex items-start gap-2">
             <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
@@ -200,87 +203,73 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Transfer To <span className="text-danger">*</span>
-              </label>
-              <SearchableSelect
-                options={profiles.map((p) => ({
-                  id: p.id,
-                  name: `${p.full_name} (${p.role})`,
-                }))}
-                value={selectedRecipient}
-                onChange={(value) => {
-                  setSelectedRecipient(value);
-                  const profile = profiles.find((p) => p.id === value);
-                  if (profile) setRecipientName(profile.full_name);
-                }}
-                placeholder="Select recipient..."
+            <SearchableSelect
+              label="Transfer To"
+              required
+              floatingLabel
+              shrinkDefaultValue
+              usePortal
+              options={profiles.map((p) => ({
+                id: p.id,
+                name: `${p.full_name} (${p.role})`,
+              }))}
+              value={selectedRecipient}
+              onChange={(value) => {
+                setSelectedRecipient(value);
+                const profile = profiles.find((p) => p.id === value);
+                if (profile) setRecipientName(profile.full_name);
+              }}
+              placeholder="Select recipient..."
+            />
+
+            <Textarea
+              label="Transfer Reason"
+              required
+              floatingLabel
+              value={transferReason}
+              onChange={(e) => setTransferReason(e.target.value)}
+              rows={3}
+              className="resize-none"
+              placeholder="Describe the reason for this custody transfer..."
+            />
+
+            <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+              <Input
+                label="Transfer Method"
+                floatingLabel
+                type="text"
+                value={transferMethod}
+                onChange={(e) => setTransferMethod(e.target.value)}
+                placeholder="e.g., Hand delivery, Courier"
+              />
+              <Input
+                label="Transfer Location"
+                floatingLabel
+                type="text"
+                value={transferLocation}
+                onChange={(e) => setTransferLocation(e.target.value)}
+                placeholder="e.g., Lab 2, Main Office"
               />
             </div>
 
-            <div>
-              <label htmlFor="custody-transfer-reason" className="block text-sm font-medium text-slate-700 mb-2">
-                Transfer Reason <span className="text-danger">*</span>
-              </label>
-              <textarea
-                id="custody-transfer-reason"
-                value={transferReason}
-                onChange={(e) => setTransferReason(e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                placeholder="Describe the reason for this custody transfer..."
+            <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+              <Textarea
+                label="Condition Before Transfer"
+                floatingLabel
+                value={conditionBefore}
+                onChange={(e) => setConditionBefore(e.target.value)}
+                rows={2}
+                className="resize-none"
+                placeholder="Document current condition..."
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Transfer Method
-                </label>
-                <Input
-                  type="text"
-                  value={transferMethod}
-                  onChange={(e) => setTransferMethod(e.target.value)}
-                  placeholder="e.g., Hand delivery, Courier"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Transfer Location
-                </label>
-                <Input
-                  type="text"
-                  value={transferLocation}
-                  onChange={(e) => setTransferLocation(e.target.value)}
-                  placeholder="e.g., Lab 2, Main Office"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="custody-condition-before" className="block text-sm font-medium text-slate-700 mb-2">
-                  Condition Before Transfer
-                </label>
-                <textarea
-                  id="custody-condition-before"
-                  value={conditionBefore}
-                  onChange={(e) => setConditionBefore(e.target.value)}
-                  rows={2}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="Document current condition..."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Seal Number</label>
-                <Input
-                  type="text"
-                  value={sealNumber}
-                  onChange={(e) => setSealNumber(e.target.value)}
-                  placeholder="Enter seal number if applicable"
-                />
-              </div>
+              <Input
+                label="Seal Number"
+                floatingLabel
+                type="text"
+                value={sealNumber}
+                onChange={(e) => setSealNumber(e.target.value)}
+                placeholder="Enter seal number if applicable"
+              />
             </div>
           </>
         )}
@@ -311,11 +300,12 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">
                 Seal Condition <span className="text-danger">*</span>
               </label>
               <div className="flex gap-4">
                 <button
+                  type="button"
                   onClick={() => setSealIntact(true)}
                   className={`flex-1 p-3 border-2 rounded-lg transition-colors ${
                     sealIntact === true
@@ -331,6 +321,7 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
                   <span className="text-sm font-medium">Seal Intact</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => setSealIntact(false)}
                   className={`flex-1 p-3 border-2 rounded-lg transition-colors ${
                     sealIntact === false
@@ -348,32 +339,25 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
               </div>
             </div>
 
-            <div>
-              <label htmlFor="custody-condition-after" className="block text-sm font-medium text-slate-700 mb-2">
-                Condition After Transfer
-              </label>
-              <textarea
-                id="custody-condition-after"
-                value={conditionAfter}
-                onChange={(e) => setConditionAfter(e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                placeholder="Document condition upon receipt..."
-              />
-            </div>
+            <Textarea
+              label="Condition After Transfer"
+              floatingLabel
+              value={conditionAfter}
+              onChange={(e) => setConditionAfter(e.target.value)}
+              rows={3}
+              className="resize-none"
+              placeholder="Document condition upon receipt..."
+            />
 
             {sealIntact === false && (
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  New Seal Number
-                </label>
-                <Input
-                  type="text"
-                  value={newSealNumber}
-                  onChange={(e) => setNewSealNumber(e.target.value)}
-                  placeholder="Enter new seal number"
-                />
-              </div>
+              <Input
+                label="New Seal Number"
+                floatingLabel
+                type="text"
+                value={newSealNumber}
+                onChange={(e) => setNewSealNumber(e.target.value)}
+                placeholder="Enter new seal number"
+              />
             )}
           </>
         )}
@@ -391,40 +375,38 @@ export const CustodyTransferModal: React.FC<CustodyTransferModalProps> = ({
               </p>
             </div>
 
-            <div>
-              <label htmlFor="custody-rejection-reason" className="block text-sm font-medium text-slate-700 mb-2">
-                Rejection Reason <span className="text-danger">*</span>
-              </label>
-              <textarea
-                id="custody-rejection-reason"
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                rows={4}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-danger focus:border-transparent"
-                placeholder="Provide a detailed reason for rejecting this transfer..."
-              />
-            </div>
+            <Textarea
+              label="Rejection Reason"
+              required
+              floatingLabel
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              rows={4}
+              className="resize-none"
+              placeholder="Provide a detailed reason for rejecting this transfer..."
+            />
           </>
         )}
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-          <Button onClick={onClose} variant="secondary" disabled={isLoading}>
+        <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-200">
+          <Button onClick={onClose} variant="secondary" size="sm" className="text-xs" disabled={isLoading}>
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={isLoading}
-            className={
+            size="sm"
+            className={`text-xs ${
               mode === 'reject'
                 ? 'bg-danger hover:bg-danger/90'
                 : mode === 'accept'
                 ? 'bg-success hover:bg-success/90'
                 : ''
-            }
+            }`}
           >
             {isLoading ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                 Processing...
               </>
             ) : mode === 'initiate' ? (

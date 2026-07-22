@@ -216,7 +216,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOp
                       {...c}
                       value={form.parent_id}
                       onChange={(e) => setForm({ ...form, parent_id: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                      className="w-full h-9 px-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
                     >
                       <option value="">None (top-level)</option>
                       {parentOptions.map((cat) => (

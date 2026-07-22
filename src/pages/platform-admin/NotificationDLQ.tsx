@@ -585,7 +585,7 @@ const NotificationDLQ: React.FC = () => {
               )}
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+            <div className="flex justify-end gap-2 pt-4 border-t border-slate-200">
               <Button
                 variant="ghost"
                 onClick={() => setDetailEvent(null)}

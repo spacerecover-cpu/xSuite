@@ -112,7 +112,7 @@ export const CopyStyleModal: React.FC<CopyStyleModalProps> = ({
           })}
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+        <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>

@@ -7,7 +7,9 @@ import { useFieldA11y } from '../../hooks/useFieldA11y';
 import { useAnchoredPosition } from '../../hooks/useAnchoredPosition';
 import { useListboxKeyboard } from '../../hooks/useListboxKeyboard';
 
-const multiSelectSizeClasses = { sm: 'px-3 py-1.5 text-sm', md: 'px-3 py-2' } as const;
+// md matches the 36px standard field height (ui/Input.tsx); min-h instead of
+// a fixed h-9 because the trigger grows when selected chips wrap.
+const multiSelectSizeClasses = { sm: 'px-3 py-1.5 text-sm', md: 'min-h-9 px-3 py-1.5 text-sm' } as const;
 
 interface Option {
   id: string;
@@ -287,7 +289,7 @@ export const MultiSelectDropdown = React.forwardRef<HTMLDivElement, MultiSelectD
             onKeyDown(e);
           }}
           className={cn(
-            'w-full min-h-[42px] border rounded-lg bg-surface transition-all',
+            'w-full border rounded-lg bg-surface transition-all',
             multiSelectSizeClasses[size],
             disabled
               ? 'bg-slate-100 border-slate-300 cursor-not-allowed'

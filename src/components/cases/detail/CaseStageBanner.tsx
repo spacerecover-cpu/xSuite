@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronRight, AlertCircle, Loader2, XCircle } from 'lucide-react';
+import { ChevronRight, AlertCircle, Loader2, XCircle, ArrowRight } from 'lucide-react';
 import {
   getAllowedTransitions,
   transitionCaseStatus,
@@ -235,6 +235,9 @@ export function CaseStageBanner({
           isOpen={pickerOpen}
           onClose={() => setPickerOpen(false)}
           title={`Move to ${pendingTarget.to_status.name}`}
+          subtitle="Confirm this status change and record any required details."
+          icon={ArrowRight}
+          showClose
         >
           <div className="space-y-4">
             {pendingTarget.requires.length > 0 ? (
@@ -269,7 +272,7 @@ export function CaseStageBanner({
                       ? 'e.g. Customer declined quote'
                       : 'Why are we reopening?'
                   }
-                  className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
             ) : null}

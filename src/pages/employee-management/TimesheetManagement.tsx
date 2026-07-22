@@ -140,7 +140,7 @@ function TimesheetEntryModal({ entry, employees, onClose, onSave, currentEmploye
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Employee <span className="text-danger">*</span></label>
             <select
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               value={form.employee_id}
               onChange={e => setForm(f => ({ ...f, employee_id: e.target.value }))}
             >
@@ -159,7 +159,7 @@ function TimesheetEntryModal({ entry, employees, onClose, onSave, currentEmploye
             <label className="block text-sm font-medium text-slate-700 mb-1">Work Date <span className="text-danger">*</span></label>
             <input
               type="date"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               value={form.work_date}
               onChange={e => setForm(f => ({ ...f, work_date: e.target.value }))}
             />
@@ -171,7 +171,7 @@ function TimesheetEntryModal({ entry, employees, onClose, onSave, currentEmploye
               step="0.5"
               min="0.5"
               max="24"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               value={form.hours}
               onChange={e => setForm(f => ({ ...f, hours: e.target.value }))}
             />
@@ -182,7 +182,7 @@ function TimesheetEntryModal({ entry, employees, onClose, onSave, currentEmploye
           <label className="block text-sm font-medium text-slate-700 mb-1">Project Name</label>
           <input
             type="text"
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-slate-300 rounded-lg h-9 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             placeholder="e.g. Client Server Recovery"
             value={form.project_name}
             onChange={e => setForm(f => ({ ...f, project_name: e.target.value }))}

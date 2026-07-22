@@ -414,7 +414,7 @@ export const StockAdjustmentsPage: React.FC = () => {
                 Reason <span className="text-danger">*</span>
               </label>
               <select
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-sm bg-white"
+                className="w-full h-9 px-3 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-sm bg-white"
                 value={form.reason}
                 onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
               >
@@ -440,7 +440,7 @@ export const StockAdjustmentsPage: React.FC = () => {
 
           <div className="border-t border-slate-200 pt-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-slate-800">
+              <h3 className="text-sm font-semibold text-slate-900">
                 Items ({adjustmentItems.length})
               </h3>
             </div>
@@ -449,7 +449,7 @@ export const StockAdjustmentsPage: React.FC = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                className="w-full h-9 pl-9 pr-3 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-sm"
                 placeholder="Search stock items by name, SKU or brand..."
                 value={itemSearch}
                 onChange={(e) => setItemSearch(e.target.value)}
@@ -580,7 +580,7 @@ export const StockAdjustmentsPage: React.FC = () => {
             )}
           </div>
 
-          <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
             <Button variant="secondary" onClick={closeModal} disabled={saving}>
               Cancel
             </Button>

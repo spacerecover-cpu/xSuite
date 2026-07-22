@@ -3,7 +3,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { useCustomerPickerRows } from '../../lib/pickerSearch';
-import { User, Mail, Phone, Hash } from 'lucide-react';
+import { User, UserCog, Mail, Phone, Hash, Loader2 } from 'lucide-react';
 
 interface ChangeClientModalProps {
   isOpen: boolean;
@@ -52,7 +52,12 @@ export const ChangeClientModal: React.FC<ChangeClientModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Change Client"
+      subtitle="Reassign this case to a different client."
+      icon={UserCog}
+      titleSize="sm"
       size="md"
+      showClose
+      closeOnBackdrop={false}
     >
       <div className="space-y-6">
         {/* Current Client Info */}
@@ -89,11 +94,11 @@ export const ChangeClientModal: React.FC<ChangeClientModalProps> = ({
 
         {/* New Client Selection */}
         <div>
-          <label className="block text-sm font-semibold text-slate-900 mb-2">
-            Select New Client
-          </label>
           <SearchableSelect
-            label=""
+            label="Select New Client"
+            floatingLabel
+            shrinkDefaultValue
+            usePortal
             options={customerOptions}
             value={selectedCustomerId}
             onChange={(value) => setSelectedCustomerId(value)}
@@ -119,19 +124,30 @@ export const ChangeClientModal: React.FC<ChangeClientModalProps> = ({
         )}
 
         {/* Action Buttons */}
-        <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+        <div className="flex gap-2.5 justify-end pt-4 border-t border-slate-200">
           <Button
             variant="secondary"
+            size="sm"
+            className="text-xs"
             onClick={onClose}
             disabled={isLoading}
           >
             Cancel
           </Button>
           <Button
+            size="sm"
+            className="text-xs"
             onClick={handleConfirm}
             disabled={!selectedCustomerId || selectedCustomerId === currentCustomer?.id || isLoading}
           >
-            {isLoading ? 'Changing Client...' : 'Change Client'}
+            {isLoading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Changing...
+              </>
+            ) : (
+              'Change Client'
+            )}
           </Button>
         </div>
       </div>

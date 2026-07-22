@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Package, Calendar, DollarSign, FileText } from 'lucide-react';
+import { Plus, Trash2, Package, Calendar, DollarSign, FileText, ClipboardList } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -344,7 +344,10 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
       isOpen={isOpen}
       onClose={onClose}
       title={purchaseOrder ? 'Edit Purchase Order' : 'Create Purchase Order'}
+      subtitle={purchaseOrder ? "Update this purchase order's details." : 'Enter the purchase order details to create it.'}
+      icon={ClipboardList}
       maxWidth="5xl"
+      showClose
       closeOnBackdrop={false}
       footer={
         <div className="flex items-center justify-end gap-3">
@@ -357,7 +360,7 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
         </div>
       }
     >
-      <form id="purchaseOrderForm" onSubmit={handleSubmit} className="space-y-6">
+      <form id="purchaseOrderForm" onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -381,7 +384,7 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
               id="po-supplier"
               value={formData.supplier_id}
               onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full h-9 px-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
               required
               disabled={!!supplierId}
             >
@@ -427,7 +430,7 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
               id="po-status"
               value={formData.status_id}
               onChange={(e) => setFormData({ ...formData, status_id: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full h-9 px-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
               required
             >
               <option value="">Select Status</option>
@@ -458,7 +461,7 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
               id="po-shipping-address"
               value={formData.shipping_address}
               onChange={(e) => setFormData({ ...formData, shipping_address: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
               rows={2}
               placeholder="Complete shipping address..."
             />
@@ -467,7 +470,7 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
 
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold text-slate-900">
+            <h3 className="text-sm font-semibold text-slate-900">
               <DollarSign className="inline w-5 h-5 mr-1" />
               Line Items
             </h3>
@@ -560,7 +563,7 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
               id="po-notes"
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
               rows={3}
               placeholder="Notes for the supplier..."
             />
@@ -574,7 +577,7 @@ export default function PurchaseOrderFormModal({ isOpen, onClose, onSuccess, pur
               id="po-internal-notes"
               value={formData.internal_notes}
               onChange={(e) => setFormData({ ...formData, internal_notes: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
               rows={3}
               placeholder="Internal notes (not visible to supplier)..."
             />
