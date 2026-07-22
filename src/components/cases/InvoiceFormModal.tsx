@@ -551,10 +551,14 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
         <FileBarChart className="w-3.5 h-3.5 text-primary" />
         <span className="text-xs font-semibold text-primary">{invoiceNumber}</span>
       </div>
-      <div className="flex items-center gap-1.5 bg-info-muted border border-info/30 px-2.5 py-1 rounded-lg">
-        <Briefcase className="w-3.5 h-3.5 text-info" />
-        <span className="text-xs font-semibold text-info">#{caseNumber}</span>
-      </div>
+      {/* When the header Case selector is shown (no bound case), this badge is
+          redundant — only show it for an invoice already tied to a case. */}
+      {caseId && (
+        <div className="flex items-center gap-1.5 bg-info-muted border border-info/30 px-2.5 py-1 rounded-lg">
+          <Briefcase className="w-3.5 h-3.5 text-info" />
+          <span className="text-xs font-semibold text-info">#{caseNumber}</span>
+        </div>
+      )}
     </>
   );
 
