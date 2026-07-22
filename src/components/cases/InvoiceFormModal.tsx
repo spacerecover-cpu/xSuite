@@ -4,7 +4,7 @@ import { Plus, Trash2, Search, FileText, Download, DollarSign, FileBarChart, Bri
 import { Modal } from '../ui/Modal';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
+import { Input, FLOATING_LABEL_CLS } from '../ui/Input';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { supabase } from '../../lib/supabaseClient';
 import { useCurrency } from '../../hooks/useCurrency';
@@ -558,6 +558,27 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
     </>
   );
 
+  // When the invoice isn't already bound to a case, the Case picker lives in
+  // the modal header (not a separate body card) as the primary top-level control.
+  const caseSelector = !caseId ? (
+    <div className="w-56 sm:w-64">
+      <SearchableSelect
+        label="Case"
+        floatingLabel
+        shrinkDefaultValue
+        usePortal
+        required
+        value={selectedCaseId}
+        onChange={(value) => handleCaseSelection(value)}
+        options={[
+          { id: '', name: 'Select a case...' },
+          ...cases.map((caseItem) => ({ id: caseItem.id, name: `${caseItem.case_no} - ${caseItem.title}` })),
+        ]}
+        placeholder="Select a case..."
+      />
+    </div>
+  ) : undefined;
+
   return (
     <Modal
       isOpen={isOpen}
@@ -568,6 +589,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
       size="xl"
       showClose
       headerBadges={headerBadges}
+      headerAction={caseSelector}
       closeOnBackdrop={false}
       footer={
         <div className="flex items-center justify-end gap-3">
@@ -604,31 +626,6 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
           </div>
         )}
 
-        {!caseId && (
-          <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="bg-slate-100 p-1.5 rounded-lg">
-                <Briefcase className="w-4 h-4 text-slate-600" />
-              </div>
-              <h3 className="text-sm font-semibold text-slate-900">Select Case</h3>
-            </div>
-            <SearchableSelect
-              label="Case"
-              floatingLabel
-              shrinkDefaultValue
-              usePortal
-              required
-              value={selectedCaseId}
-              onChange={(value) => handleCaseSelection(value)}
-              options={[
-                { id: '', name: 'Select a case...' },
-                ...cases.map((caseItem) => ({ id: caseItem.id, name: `${caseItem.case_no} - ${caseItem.title}` })),
-              ]}
-              placeholder="Select a case..."
-            />
-          </div>
-        )}
-
         <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
           <div className="flex flex-col gap-2 mb-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
@@ -660,32 +657,34 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
           <div className="space-y-2.5">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
               <div className="md:col-span-1">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Invoice Type</label>
-                <div className="flex border border-slate-300 rounded-md overflow-hidden h-[34px]">
-                  <button
-                    type="button"
-                    disabled={isRestricted}
-                    onClick={() => setInvoiceData({ ...invoiceData, invoice_type: 'tax_invoice' })}
-                    className={`flex-1 px-2 py-1 text-xs transition-all ${
-                      invoiceData.invoice_type === 'tax_invoice'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    Regular
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isRestricted}
-                    onClick={() => setInvoiceData({ ...invoiceData, invoice_type: 'proforma' })}
-                    className={`flex-1 px-2 py-1 text-xs border-l border-slate-300 transition-all ${
-                      invoiceData.invoice_type === 'proforma'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    Proforma
-                  </button>
+                <div className="relative">
+                  <div className="flex border border-slate-300 rounded-md overflow-hidden h-9">
+                    <button
+                      type="button"
+                      disabled={isRestricted}
+                      onClick={() => setInvoiceData({ ...invoiceData, invoice_type: 'tax_invoice' })}
+                      className={`flex-1 px-2 text-xs transition-all ${
+                        invoiceData.invoice_type === 'tax_invoice'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      Regular
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isRestricted}
+                      onClick={() => setInvoiceData({ ...invoiceData, invoice_type: 'proforma' })}
+                      className={`flex-1 px-2 text-xs border-l border-slate-300 transition-all ${
+                        invoiceData.invoice_type === 'proforma'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      Proforma
+                    </button>
+                  </div>
+                  <label className={FLOATING_LABEL_CLS}>Invoice Type</label>
                 </div>
               </div>
 
@@ -927,34 +926,34 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Discount Type
-                  </label>
-                  <div className="flex border border-slate-300 rounded-md overflow-hidden h-[34px]">
-                    <button
-                      type="button"
-                      onClick={() => setInvoiceData({ ...invoiceData, discount_type: 'fixed' })}
-                      className={`flex-1 px-2 py-1 transition-all flex items-center justify-center ${
-                        invoiceData.discount_type === 'fixed'
-                          ? 'bg-primary text-primary-foreground shadow-sm'
-                          : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
-                      }`}
-                      title="Fixed Amount"
-                    >
-                      <DollarSign className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setInvoiceData({ ...invoiceData, discount_type: 'percentage' })}
-                      className={`flex-1 px-2 py-1 border-l border-slate-300 transition-all flex items-center justify-center ${
-                        invoiceData.discount_type === 'percentage'
-                          ? 'bg-primary text-primary-foreground shadow-sm'
-                          : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
-                      }`}
-                      title="Percentage"
-                    >
-                      <Percent className="w-4 h-4" />
-                    </button>
+                  <div className="relative">
+                    <div className="flex border border-slate-300 rounded-md overflow-hidden h-9">
+                      <button
+                        type="button"
+                        onClick={() => setInvoiceData({ ...invoiceData, discount_type: 'fixed' })}
+                        className={`flex-1 px-2 transition-all flex items-center justify-center ${
+                          invoiceData.discount_type === 'fixed'
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                        }`}
+                        title="Fixed Amount"
+                      >
+                        <DollarSign className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setInvoiceData({ ...invoiceData, discount_type: 'percentage' })}
+                        className={`flex-1 px-2 border-l border-slate-300 transition-all flex items-center justify-center ${
+                          invoiceData.discount_type === 'percentage'
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                        }`}
+                        title="Percentage"
+                      >
+                        <Percent className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <label className={FLOATING_LABEL_CLS}>Discount Type</label>
                   </div>
                 </div>
               </div>
