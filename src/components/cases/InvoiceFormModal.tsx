@@ -588,7 +588,6 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={initialData ? 'Edit Invoice' : 'Create New Invoice'}
-      subtitle={initialData ? "Update this invoice's line items and terms." : 'Build the invoice line items and terms.'}
       icon={FileText}
       size="xl"
       showClose
@@ -621,7 +620,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
         </div>
       }
     >
-      <form id="invoiceForm" onSubmit={handleSubmit} className="space-y-4">
+      <form id="invoiceForm" onSubmit={handleSubmit} className="space-y-5">
 
         {isRestricted && (
           <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning-muted px-3 py-2 text-sm text-warning">
@@ -658,8 +657,8 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
               </div>
             )}
           </div>
-          <div className="space-y-2.5">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-5">
               <div className="md:col-span-1">
                 <div className="relative">
                   <div className="flex border border-slate-300 rounded-md overflow-hidden h-9">
@@ -722,7 +721,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-x-4 gap-y-5">
               <div className="md:col-span-2">
                 <Input
                   label="Invoice Title"
@@ -901,8 +900,8 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
               </div>
               <h3 className="text-sm font-semibold text-slate-900">Financial Calculation</h3>
             </div>
-            <div className="space-y-3">
-              <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-5">
+              <div className="grid grid-cols-3 gap-x-4 gap-y-5">
                 <div>
                   <Input
                     label="Tax Rate (%)"
@@ -1020,7 +1019,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
               </div>
               <h3 className="text-sm font-semibold text-slate-900">Additional Information</h3>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-5">
               <div>
                 <SearchableSelect
                   label="Bank Account"
