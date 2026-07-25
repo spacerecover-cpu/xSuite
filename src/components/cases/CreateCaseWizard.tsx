@@ -574,7 +574,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
       label="Create case"
       closeOnBackdrop={false}
       closeOnEscape={false}
-      className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-[1600px] max-h-[90vh] overflow-hidden flex flex-col"
+      className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-[1440px] max-h-[92vh] overflow-hidden flex flex-col"
     >
         {/* Header mirrors the shared Modal chrome (badge + title/subtitle + X). */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
@@ -598,22 +598,22 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-5 gap-y-4">
             <div className="flex flex-col">
               <div
-                className="rounded-xl p-5 mb-4 bg-info-muted"
+                className="rounded-xl p-4 mb-4 bg-info-muted"
                 style={{
                   borderLeft: '4px solid rgb(var(--color-info))',
                 }}
               >
-                <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center gap-3 mb-3">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-info/10">
                     <Users className="w-4 h-4 text-info" />
                   </div>
                   <h3 className="text-sm font-semibold text-slate-900">Client & Service</h3>
                 </div>
 
-                <div className="bg-surface rounded-lg border border-slate-200 p-4 space-y-4">
+                <div className="bg-surface rounded-lg border border-slate-200 p-4 space-y-3">
                     <div>
                       <SearchableSelect
                         label="Client"
@@ -728,12 +728,12 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
 
             <div className="flex flex-col">
               <div
-                className="rounded-xl p-5 mb-4 bg-success-muted"
+                className="rounded-xl p-4 mb-4 bg-success-muted"
                 style={{
                   borderLeft: '4px solid rgb(var(--color-success))',
                 }}
               >
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-success/10">
                       <HardDrive className="w-4 h-4 text-success" />
@@ -832,8 +832,8 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                         )}
                       </div>
 
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-4">
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-3">
                           <SearchableSelect
                             label="Device Role"
                             floatingLabel
@@ -870,7 +870,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                           />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-4">
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-3">
                           <SearchableSelect
                             label="Brand"
                             floatingLabel
@@ -901,7 +901,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-4">
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-3">
                           <Input
                             label="Model"
                             floatingLabel
@@ -926,7 +926,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                           />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-4">
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-3">
                           <SearchableSelect
                             label="Condition"
                             floatingLabel
@@ -967,12 +967,12 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
 
             <div className="flex flex-col">
               <div
-                className="rounded-xl p-5 mb-4 bg-warning-muted"
+                className="rounded-xl p-4 mb-4 bg-warning-muted"
                 style={{
                   borderLeft: '4px solid rgb(var(--color-warning))',
                 }}
               >
-                <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center gap-3 mb-3">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-warning/10">
                     <AlertCircle className="w-4 h-4 text-warning" />
                   </div>
@@ -981,7 +981,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                   </h3>
                 </div>
 
-                <div className="bg-surface rounded-lg border border-slate-200 p-4 space-y-4">
+                <div className="bg-surface rounded-lg border border-slate-200 p-4 space-y-3">
                   <SearchableSelect
                     label={isServerDevice ? "Server/Array Problem" : "Device Problem"}
                     floatingLabel
