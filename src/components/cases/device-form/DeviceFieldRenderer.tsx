@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { SearchableSelect } from '../../ui/SearchableSelect';
 import { MultiSelectDropdown } from '../../ui/MultiSelectDropdown';
-import { Input } from '../../ui/Input';
+import { Input, NO_AUTOFILL } from '../../ui/Input';
 import { Textarea } from '../../ui/Textarea';
 import type { DeviceFieldDef } from '../../../lib/devices/deviceFieldConfig';
 import type { CatalogOption } from '../../../lib/devices/deviceCatalogQueries';
@@ -53,12 +53,12 @@ export function DeviceFieldRenderer({ def, value, onChange, options, error }: Pr
     case 'number':
       return (
         <Input type="number" label={label} value={str} required={def.required} error={error}
-          onChange={(e) => onChange(def.key, e.target.value)} />
+          {...NO_AUTOFILL} onChange={(e) => onChange(def.key, e.target.value)} />
       );
     case 'date':
       return (
         <Input type="date" label={label} value={str} required={def.required} error={error}
-          onChange={(e) => onChange(def.key, e.target.value)} />
+          {...NO_AUTOFILL} onChange={(e) => onChange(def.key, e.target.value)} />
       );
     case 'json':
       // Opaque object fields (e.g. component_meta) are managed by bespoke forms;
@@ -68,7 +68,7 @@ export function DeviceFieldRenderer({ def, value, onChange, options, error }: Pr
     default:
       return (
         <Input type="text" label={label} value={str} required={def.required} error={error}
-          onChange={(e) => onChange(def.key, e.target.value)} />
+          {...NO_AUTOFILL} onChange={(e) => onChange(def.key, e.target.value)} />
       );
   }
 }

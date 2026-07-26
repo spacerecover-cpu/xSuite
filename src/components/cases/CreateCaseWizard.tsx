@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../ui/Button';
 import { Dialog } from '../ui/Dialog';
-import { Input } from '../ui/Input';
+import { Input, NO_AUTOFILL } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown';
@@ -37,22 +37,6 @@ import { CASE_COMMAND_STATS_KEY } from '../../hooks/useCaseCommandStats';
 import type { Database } from '../../types/database.types';
 
 type CasesInsert = Database['public']['Tables']['cases']['Insert'];
-
-// Intake staff must never get their own saved login credentials injected into a
-// device record. Chrome ignores autoComplete="off" on password-type inputs and
-// treats the surrounding area as a login form (autofilling the saved email into a
-// nearby text field like Model), so sensitive inputs also carry the opt-out
-// data-attributes that 1Password / LastPass / Bitwarden / Dashlane honour. The
-// password field additionally uses autoComplete="new-password" — the one value
-// Chrome respects to suppress saved-credential autofill. data-* keys aren't in the
-// React input type, so the object is attached at runtime via this cast.
-const NO_AUTOFILL = {
-  autoComplete: 'off',
-  'data-1p-ignore': true,
-  'data-lpignore': 'true',
-  'data-bwignore': true,
-  'data-form-type': 'other',
-} as Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'>;
 
 interface Device {
   id: string;

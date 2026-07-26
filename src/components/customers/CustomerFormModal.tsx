@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { createCustomer, updateCustomer, getNextCustomerNumberPreview } from '../../lib/customerService';
 import { createCompany } from '../../lib/companyService';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
+import { Input, NO_AUTOFILL } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
 import { Modal } from '../ui/Modal';
 import { PhoneInput } from '../ui/PhoneInput';
@@ -423,6 +423,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
             ref={customerNameRef}
             label="Name"
             floatingLabel
+            {...NO_AUTOFILL}
             value={formData.customer_name}
             onChange={(e) => handleFieldChange('customer_name', e.target.value)}
             onBlur={() => handleBlur('customer_name')}
@@ -434,6 +435,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
             <Input
               label="Email"
               floatingLabel
+              {...NO_AUTOFILL}
               type="email"
               value={formData.email}
               onChange={(e) => handleFieldChange('email', e.target.value)}
@@ -471,6 +473,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 <Input
                   label="Alternative Email"
                   floatingLabel
+                  {...NO_AUTOFILL}
                   type="email"
                   value={formData.secondary_email}
                   onChange={(e) => handleFieldChange('secondary_email', e.target.value)}
@@ -568,6 +571,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
           <Input
             label="Address"
             floatingLabel
+            {...NO_AUTOFILL}
             value={formData.address}
             onChange={(e) => handleFieldChange('address', e.target.value)}
             placeholder="Enter full address"
