@@ -99,10 +99,12 @@ interface NumberFieldProps {
   max?: number;
   step?: number;
   suffix?: string;
+  /** Greys the field out when the setting does not apply to the current mode. */
+  disabled?: boolean;
 }
 
-export const NumberField: React.FC<NumberFieldProps> = ({ label, value, onChange, min, max, step, suffix }) => (
-  <div>
+export const NumberField: React.FC<NumberFieldProps> = ({ label, value, onChange, min, max, step, suffix, disabled }) => (
+  <div className={disabled ? 'opacity-50' : undefined}>
     <label className="mb-1 block text-sm font-medium text-slate-700">
       {label}
       {suffix ? <span className="ml-1 font-normal text-slate-400">({suffix})</span> : null}
@@ -113,6 +115,7 @@ export const NumberField: React.FC<NumberFieldProps> = ({ label, value, onChange
       min={min}
       max={max}
       step={step}
+      disabled={disabled}
       aria-label={label}
       onChange={(e) => onChange(Number(e.target.value) || 0)}
     />

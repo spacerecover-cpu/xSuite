@@ -23,7 +23,7 @@ import type { DocumentTemplateConfig, TemplateDocumentType } from '../templateCo
 import type { CompanySettingsData, TranslationContext } from '../types';
 import { renderTemplate } from './renderTemplate';
 import { applyTenantLanguage } from './applyTenantLanguage';
-import { isTypstEngineEnabled } from './featureFlag';
+import { selectRenderEngine } from './featureFlag';
 import { createPdfWithFonts, initializePDFFonts } from '../fonts';
 import { ctxFromLanguageConfig, withTimeout } from '../translationContext';
 import { resolveSecondary } from '../templateConfig';
@@ -153,7 +153,9 @@ export async function previewTemplate(
   // languages already render cleanly through pdfmake, so they stay on it. Lazily
   // imported so the WASM never enters the default bundle. Phase-1: text/tables
   // (logo/QR images TBD).
-  if (isTypstEngineEnabled() && secondary === 'ar') {
+  // Renderer choice is the SHARED decision (see engine/featureFlag) so the
+  // preview can never render through a different engine than the download.
+  if (selectRenderEngine(secondary) === 'typst') {
     const [{ assembleTypst }, { renderTypstPdf }, { logoAsset, qrAsset }] = await Promise.all([
       import('../typst/assemble'),
       import('../typst/typstEngine'),

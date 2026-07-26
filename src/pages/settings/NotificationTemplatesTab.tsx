@@ -10,7 +10,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Skeleton } from '../../components/ui/Skeleton';
-import { renderTemplate } from '../../lib/templateEngine';
+import { renderTemplate, validateTemplate } from '../../lib/templateEngine';
 import {
   listMergedEmailTemplates,
   upsertOverride,
@@ -198,6 +198,7 @@ const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({
   onSaved,
 }) => {
   const toast = useToast();
+  const confirm = useConfirm();
   const base = item.override ?? item.system;
   const [subject, setSubject] = useState(base?.subject_template ?? '');
   const [body, setBody] = useState(base?.body_template ?? '');
@@ -208,6 +209,15 @@ const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({
 
   const variables = NOTIFICATION_EVENT_VARIABLES[item.eventType] ?? [];
   const sampleCtx = useMemo(() => sampleContextFor(item.eventType), [item.eventType]);
+
+  // A placeholder this event doesn't publish renders as EMPTY STRING in the sent
+  // email — silently, with no trace. A typo ({{case_numbr}}) or a since-renamed
+  // key therefore ships a blank where a case number or amount should be. Surface
+  // it while editing, and make the user acknowledge it on save.
+  const unknownVariables = useMemo(() => {
+    if (variables.length === 0) return [];
+    return validateTemplate(`${subject} ${body} ${link}`, variables).unknown;
+  }, [variables, subject, body, link]);
 
   const insertVariable = (key: string) => {
     const token = `{{${key}}}`;
@@ -234,6 +244,21 @@ const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({
     if (!body.trim()) {
       toast.error('The email body cannot be empty');
       return;
+    }
+    // Unknown placeholders send blanks to customers — confirm rather than block,
+    // so a deliberately forward-looking template is still savable.
+    if (unknownVariables.length > 0) {
+      const proceed = await confirm({
+        title: 'Unknown variables will send blank',
+        message: `${unknownVariables.map((v) => `{{${v}}}`).join(', ')} ${
+          unknownVariables.length === 1 ? 'is' : 'are'
+        } not published by this event, so ${
+          unknownVariables.length === 1 ? 'it' : 'they'
+        } will render as empty text in every email sent from this template. Save anyway?`,
+        confirmLabel: 'Save anyway',
+        tone: 'danger',
+      });
+      if (!proceed) return;
     }
     setSaving(true);
     try {
@@ -293,6 +318,20 @@ const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({
             placeholder="Email body — click a variable below to insert it."
           />
         </div>
+
+        {unknownVariables.length > 0 && (
+          <div
+            role="status"
+            className="rounded-lg border border-warning/30 bg-warning-muted px-3 py-2 text-xs text-warning"
+          >
+            <span className="font-semibold">
+              Unknown variable{unknownVariables.length > 1 ? 's' : ''} (will send blank):
+            </span>{' '}
+            <span className="font-mono">
+              {unknownVariables.map((v) => `{{${v}}}`).join(', ')}
+            </span>
+          </div>
+        )}
 
         {variables.length > 0 && (
           <div>

@@ -59,6 +59,25 @@ const TYPOGRAPHY_STYLE_KEYS: TypographyStyleKey[] = [
   'termsText',
 ];
 
+/**
+ * A pdfmake node for the watermark IMAGE, or null when no usable image exists.
+ *
+ * pdfmake's `watermark` property is TEXT-ONLY, so an image watermark cannot go
+ * through it — it is drawn as a page `background` instead (see the call site).
+ * The image is the tenant's resolved logo: `watermark.image` means "use the
+ * uploaded brand image as the watermark", and the logo is the branding asset the
+ * tenant has already provided (stamp/signature carry their own meaning).
+ */
+function watermarkImageNode(
+  logo: import('../brandingImage').BrandingImage | string | null | undefined,
+): { image: string } | { svg: string } | null {
+  if (!logo) return null;
+  if (typeof logo === 'string') return logo ? { image: logo } : null;
+  if (logo.kind === 'raster') return { image: logo.dataUrl };
+  if (logo.kind === 'svg') return { svg: logo.markup };
+  return null; // kind === 'none'
+}
+
 /** Substitute `{page}` / `{pages}` tokens in a page-number format string. */
 function formatPageNumber(format: string, page: number, pages: number): string {
   return format.replace(/\{page\}/g, String(page)).replace(/\{pages\}/g, String(pages));
@@ -329,8 +348,30 @@ export function renderTemplate(
   // `branding.watermark` path keeps its exact prior shape (no `angle`) for parity;
   // only the new `watermark` group adds the configurable angle.
   const wm = resolveWatermarkSettings(config);
+
+  // 8a. IMAGE watermark (opt-in `watermark.image`). pdfmake's `watermark` key
+  // only renders text, so the image is painted as a page `background` — sized
+  // against the REAL page box from the callback (never a hardcoded A4 width) and
+  // horizontally centred. When the image variant is chosen but no usable image
+  // resolved, we fall through to the text watermark rather than silently
+  // dropping the watermark entirely (the bug this replaces).
+  // NOTE: `angle` is intentionally not applied here — pdfmake cannot rotate an
+  // image node, so rotation stays a text-watermark capability.
+  const wmImageNode = wm?.image ? watermarkImageNode(logo) : null;
+  const background = wmImageNode
+    ? (_currentPage: number, currentPageSize: { width: number; height: number }) => ({
+        ...wmImageNode,
+        width: Math.round(currentPageSize.width * 0.6),
+        opacity: wm?.opacity,
+        alignment: 'center' as const,
+        margin: [0, Math.round(currentPageSize.height * 0.32), 0, 0] as [number, number, number, number],
+      })
+    : undefined;
+
+  // 8b. TEXT watermark — suppressed when an image watermark was drawn, since the
+  // config reads "render an uploaded watermark image INSTEAD of text".
   const watermark: Watermark | undefined =
-    wm && wm.text
+    !background && wm && wm.text
       ? {
           text: wm.text,
           font: baseFont,
@@ -352,6 +393,7 @@ export function renderTemplate(
     styles,
     content,
     ...(footer ? { footer } : {}),
+    ...(background ? { background } : {}),
     ...(watermark ? { watermark } : {}),
   };
 }

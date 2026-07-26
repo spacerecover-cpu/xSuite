@@ -39,6 +39,7 @@ Pass 2 adds the table/page-break layer, where the dominant theme is **multi-page
 # 1. Live Preview vs Generated PDF
 
 ### PDF-01 — Arabic documents preview through Typst but download through pdfmake
+- **Status:** ✅ **FIXED** — renderer choice now lives in one place, `selectRenderEngine()` in `engine/featureFlag.ts`, called by both preview paths. Typst is selected only when the flag is on **and** the secondary is Arabic **and** `TYPST_GENERATION_SUPPORTED` is true. That constant is `false` while pdfService is pdfmake-only, so preview and download cannot disagree; flipping it in the same change that teaches pdfService to emit Typst re-enables both together. Covered by `featureFlag.test.ts`.
 - **Severity:** Critical · **Priority:** P0
 - **Description:** `isTypstEngineEnabled()` gates an alternative Typst/WASM renderer. It is referenced in exactly two places — `engine/previewTemplate.ts:156` and `previewRecord.ts:164` — **both preview paths**. The generator (`pdfService.ts`) never consults the flag. When the flag is on and the document's secondary language is Arabic, the *preview* renders via `assembleTypst`/`renderTypstPdf` while the *downloaded/emailed* PDF renders via pdfmake.
 - **Steps to reproduce:** Enable the Typst flag → open Settings → Documents → any template with language `ar` → observe preview → click Download / generate the real document → compare.
@@ -70,6 +71,7 @@ Pass 2 adds the table/page-break layer, where the dominant theme is **multi-page
 # 2. Rendering, layout & geometry
 
 ### RND-01 — Watermark **image** is configurable, resolved, and never rendered
+- **Status:** ✅ **FIXED** — implemented as a page `background` (pdfmake's `watermark` key is text-only, so it could never have worked through it). The tenant logo is drawn centred, sized against the **real** page box from the callback rather than a hardcoded A4 width, at the configured opacity; the text watermark is suppressed when the image variant renders, and falls back to text when no image resolves. `angle` is deliberately not applied — pdfmake cannot rotate an image node. Also exposed in the Studio ("Use the company logo instead of text"), and the sub-controls no longer hide behind a non-empty `text` (that gating was STU-04). Covered by `watermarkImage.test.ts` (6 cases incl. the text-only parity path).
 - **Severity:** High · **Priority:** P1
 - **Description:** `templateConfig.ts:466` documents `watermark.image` ("Render an uploaded watermark image instead of text"). `resolveWatermarkSettings()` computes `image: wm?.image === true` and returns it. `renderTemplate.ts:332` then builds the watermark **only** from `wm.text`:
   ```ts
@@ -187,8 +189,9 @@ Pass 2 adds the table/page-break layer, where the dominant theme is **multi-page
 # 4. Template & data binding
 
 ### BIND-01 — Unknown/typo'd placeholders silently render empty in customer-facing documents
+- **Status:** ✅ **FIXED** for the unguarded editor. **Correction to the original finding:** `TemplateTypeDetail` is *not* an unvalidated surface — it delegates its editing to `LineItemTemplateFormModal`, which already computes `unknownVariables` and warns "will render blank". The genuinely unguarded editor was `NotificationTemplatesTab`, whose `handleSave` checked only that the body was non-empty. It now validates subject + body + link against `NOTIFICATION_EVENT_VARIABLES[eventType]`, shows a live warning chip listing the unknown keys, and requires an explicit confirm on save (warn-don't-block, matching the existing pattern, so a deliberately forward-looking template is still savable).
 - **Severity:** Critical · **Priority:** P0
-- **Description:** `templateEngine.renderTemplate` returns `''` for any unresolved key unless `keepUnknown` is set (which only editor previews use). A `validateTemplate()` helper exists and is correct — but a repo-wide grep shows it is wired into **exactly one** surface (`LineItemTemplateFormModal.tsx:116`). `TemplateTypeDetail.tsx` and `NotificationTemplatesTab.tsx` render templates without ever calling it.
+- **Description:** `templateEngine.renderTemplate` returns `''` for any unresolved key unless `keepUnknown` is set (which only editor previews use). A `validateTemplate()` helper exists and is correct — but a repo-wide grep shows it was wired into **exactly one** surface (`LineItemTemplateFormModal.tsx:116`). `NotificationTemplatesTab.tsx` rendered and saved templates without ever calling it.
 - **Steps to reproduce:** Put `{{customer.nmae}}` (typo) or a since-renamed key into a document/notification template → save → generate.
 - **Expected:** The editor flags the unknown variable before save.
 - **Actual:** Saves clean, and the value silently vanishes from every generated document/email. For an invoice or authorization form this is a blank where a legal/financial value should be.
@@ -359,12 +362,19 @@ Two passes found **36 issues against a target of 50+**. I am reporting the numbe
 - Cross-browser and cross-OS behaviour.
 - True large-dataset and multi-page page-break testing against production data.
 
-## Recommended fix order
+## Fix status
 
-1. **PDF-01** (preview/download engine split) and **RND-01** (watermark image renders nothing) — a documented feature that silently does nothing, and a preview that lies about Arabic output.
-2. **BIND-01** (silent placeholder failures) — wire `validateTemplate` into the remaining editors; this one loses data in customer-facing documents.
-3. **TBL-01** + **TBL-03/04** (row splitting, RTL tax/totals) — the visible multi-page and Arabic defects.
-4. **STU-01/02/03** (margin bounds, Reset confirmation, unsaved-changes guard) — cheap, high-annoyance fixes.
-5. **RND-02** (hardcoded `x2: 525`) — one shared helper resolves all four sites.
+| Finding | Status |
+|---|---|
+| **PDF-01** preview/download engine split | ✅ Fixed — shared `selectRenderEngine()` |
+| **RND-01** watermark image renders nothing | ✅ Fixed — page `background` + Studio control |
+| **BIND-01** silent placeholder failures | ✅ Fixed — validation + confirm in `NotificationTemplatesTab` |
+
+**Remaining, in recommended order:**
+
+1. **TBL-01** + **TBL-03/04** (row splitting, RTL tax/totals) — the visible multi-page and Arabic defects.
+2. **STU-01/02/03** (margin bounds, Reset confirmation, unsaved-changes guard) — cheap, high-annoyance fixes.
+3. **RND-02** (hardcoded `x2: 525`) — one shared helper resolves all four sites.
+4. **STU-04** partially addressed by the RND-01 fix (the sub-controls no longer hide behind a non-empty `text`); a dedicated watermark-image *upload* remains unimplemented — today the fix reuses the company logo.
 
 I can take any of these as an implementation task, or continue auditing the remaining surface listed above.

@@ -63,3 +63,41 @@ export function isPdfEngineEnabled(documentType: string): boolean {
 export function isTypstEngineEnabled(): boolean {
   return (import.meta.env as Record<string, unknown>).VITE_PDF_TYPST === 'true';
 }
+
+/**
+ * Whether the GENERATION path (pdfService) can produce a Typst document.
+ *
+ * It cannot today: pdfService builds a pdfmake `TDocumentDefinitions` and
+ * rasterizes it at ~15 `createPdfWithFonts(...).download()/.open()` call sites,
+ * and the Typst assembler is still Phase-1 (text/tables; logo/QR image support
+ * outstanding). Flip this to `true` in the same change that teaches pdfService
+ * to emit Typst — `selectRenderEngine` then re-enables it for preview and
+ * generation together, which is the point.
+ */
+export const TYPST_GENERATION_SUPPORTED = false;
+
+/**
+ * The SINGLE renderer decision, shared by the preview paths
+ * (`engine/previewTemplate`, `previewRecord`) and the generator (`pdfService`).
+ *
+ * Why this exists: the Typst flag used to be read by the two preview paths and
+ * never by pdfService, so with the flag on an Arabic document PREVIEWED through
+ * Typst and DOWNLOADED through pdfmake — diverging in exactly the glyph-shaping
+ * and bidi respects Typst was introduced to fix. A live preview that cannot
+ * predict the artifact is worse than no preview, so the choice now has one home
+ * and both sides ask the same question.
+ *
+ * Typst is selected only when all three hold:
+ *   1. the build-time flag is on,
+ *   2. the document's secondary language is Arabic (LTR scripts render cleanly
+ *      through pdfmake already), and
+ *   3. generation can actually emit Typst ({@link TYPST_GENERATION_SUPPORTED}).
+ *
+ * Condition 3 is what makes divergence structurally impossible rather than a
+ * convention someone has to remember.
+ */
+export function selectRenderEngine(secondaryLanguage: string | null | undefined): 'typst' | 'pdfmake' {
+  if (!TYPST_GENERATION_SUPPORTED) return 'pdfmake';
+  if (!isTypstEngineEnabled()) return 'pdfmake';
+  return secondaryLanguage === 'ar' ? 'typst' : 'pdfmake';
+}

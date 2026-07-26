@@ -18,7 +18,7 @@ import { toEngineData as toQuoteEngineData } from './engine/adapters/quoteAdapte
 import { toEngineData as toPaymentReceiptEngineData } from './engine/adapters/paymentReceiptAdapter';
 import { renderTemplate } from './engine/renderTemplate';
 import { applyTenantLanguage } from './engine/applyTenantLanguage';
-import { isTypstEngineEnabled } from './engine/featureFlag';
+import { selectRenderEngine } from './engine/featureFlag';
 import { createPdfWithFonts, initializePDFFonts } from './fonts';
 import { ctxFromLanguageConfig, withTimeout } from './translationContext';
 import { resolveSecondary } from './templateConfig';
@@ -158,10 +158,11 @@ export async function previewDocumentForRecord(
       /* non-fatal: render proceeds with the base font */
     }
   }
-  // Arabic documents render through Typst (correct shaping + bidi); the LTR
-  // languages keep the proven pdfmake path. Lazily imported so the WASM never
-  // enters the default bundle. Phase-1: text/tables (logo/QR images TBD).
-  if (isTypstEngineEnabled() && secondary === 'ar') {
+  // Renderer choice is the SHARED decision (see engine/featureFlag) so this
+  // record preview can never render through a different engine than the
+  // download it is meant to predict. Lazily imported so the WASM never enters
+  // the default bundle. Phase-1: text/tables (logo/QR images TBD).
+  if (selectRenderEngine(secondary) === 'typst') {
     const [{ assembleTypst }, { renderTypstPdf }, { logoAsset, qrAsset, stampAsset, signatureAsset }] = await Promise.all([
       import('./typst/assemble'),
       import('./typst/typstEngine'),

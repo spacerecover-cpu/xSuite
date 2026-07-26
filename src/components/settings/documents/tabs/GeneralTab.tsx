@@ -326,7 +326,16 @@ export const GeneralTab: React.FC<{ api: StudioApi }> = ({ api }) => {
           onChange={(e) => api.setWatermark({ text: e.target.value || undefined })}
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
-        {resolved.watermark?.text && (
+        <ToggleRow
+          label="Use the company logo instead of text"
+          description="Draws your logo as a centered background wash. Rotation applies to text watermarks only."
+          checked={resolved.watermark?.image === true}
+          onChange={(v) => api.setWatermark({ image: v || undefined })}
+        />
+        {/* Shown whenever a watermark is configured EITHER way — the sub-controls
+            used to be gated on `text` alone, which left the image variant with no
+            opacity control (and hid every setting until text was typed). */}
+        {(resolved.watermark?.text || resolved.watermark?.image) && (
           <div className="grid grid-cols-3 gap-2">
             <NumberField
               label="Angle"
@@ -334,6 +343,8 @@ export const GeneralTab: React.FC<{ api: StudioApi }> = ({ api }) => {
               value={resolved.watermark?.angle ?? -45}
               min={-90}
               max={90}
+              step={5}
+              disabled={resolved.watermark?.image === true}
               onChange={(v) => api.setWatermark({ angle: v })}
             />
             <NumberField
@@ -350,6 +361,7 @@ export const GeneralTab: React.FC<{ api: StudioApi }> = ({ api }) => {
               value={resolved.watermark?.fontSize ?? 60}
               min={12}
               max={160}
+              disabled={resolved.watermark?.image === true}
               onChange={(v) => api.setWatermark({ fontSize: v })}
             />
           </div>
