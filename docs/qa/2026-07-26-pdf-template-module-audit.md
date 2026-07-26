@@ -233,6 +233,7 @@ Pass 2 adds the table/page-break layer, where the dominant theme is **multi-page
 # 5. Section renderers & adapters — tables, page breaks, RTL, overflow *(pass 2)*
 
 ### TBL-01 — No data table protects its rows from splitting across pages
+- **Status:** ✅ **FIXED** — `dontBreakRows: true` added to all eight data tables (`lineItemTable`, `devices`, `custodyLog`, `payComponentTable`, `paymentHistory`, `taxSummary`, `digitalSignatures`, `hashVerification`). Pure layout tables (info boxes, totals, header) are deliberately left alone — a break there is harmless and forcing rows to stay whole can push a whole block to the next page for no benefit.
 - **Severity:** High · **Priority:** P1
 - **Description:** A repo-wide grep for `dontBreakRows` across `engine/sections/**` and `engine/adapters/**` returns **zero hits**. All eight data tables (`lineItemTable`, `devices`, `custodyLog`, `payComponentTable`, `paymentHistory`, `taxSummary`, `digitalSignatures`, `hashVerification`) set `headerRows: 1` but never `dontBreakRows: true`.
 - **Steps to reproduce:** Generate any document whose table reaches a page boundary with a tall row — an invoice line with a multi-line description, a custody entry with a long note, a device row with a long fault description.
@@ -248,6 +249,7 @@ Pass 2 adds the table/page-break layer, where the dominant theme is **multi-page
 - **Suggested fix:** Add an opt-in `pageBreakBefore` to the section config and map it to pdfmake's `pageBreak: 'before'`; consider `unbreakable: true` for signature/approval blocks.
 
 ### TBL-03 — Tax summary table is RTL-blind
+- **Status:** ✅ **FIXED** — the section now resolves `engineLayoutDirection` and passes every row through an `orient()` helper that reverses the column order and swaps each cell's left/right alignment. `orient()` is the identity for LTR, so English output is byte-for-byte unchanged. Header row, data rows and the totals row all mirror. Covered by `sections/rtlTablesParity.test.ts`.
 - **Severity:** High · **Priority:** P1
 - **Description:** `sections/taxSummary.ts` hardcodes `alignment: 'left'` on the rate column and `'right'` on taxable/tax, for **both** header (lines 36–38) and body (lines 43–45). It never calls `engineLayoutDirection` and never mirrors. By contrast `lineItemTable`, `devices`, `custodyLog`, `digitalSignatures` and `hashVerification` mirror via `mirrorColumns`, and `paymentHistory` / `payComponentTable` mirror via their own inline direction check.
 - **Steps to reproduce:** Set a template's language to Arabic (RTL) and generate an invoice with a tax breakdown.
@@ -257,7 +259,10 @@ Pass 2 adds the table/page-break layer, where the dominant theme is **multi-page
 - **Suggested fix:** Apply the same `engineLayoutDirection` + mirror treatment used by `paymentHistory`.
 
 ### TBL-04 — Totals block is RTL-blind
-- **Severity:** High · **Priority:** P1
+- **Status:** ✅ **FIXED, but narrower than this finding originally claimed.** Implementing it surfaced that part of the "defect" was a deliberate prior decision:
+  - **Fixed** — the block indent (`margin: [280, 8, 0, 8]`) pushed the totals to the *right* edge of the page in every direction; under RTL it now becomes `[0, 8, 280, 8]` so the block sits on the left edge, mirrored. The label/value cells swap column slots (widths flip `['*','auto']` → `['auto','*']`) so the pair reads label-then-value right-to-left, and the 8pt cell padding moves to the other side.
+  - **Deliberately NOT changed** — in-cell text alignment stays `right` in both directions. `rtl.test.ts` already pins this ("totals labels are right-aligned under RTL") with an explanatory comment, and the reasoning holds: these cells are currency figures, and right/decimal alignment is the numeric convention regardless of script direction. The original finding treated the hardcoded `'right'` as evidence of RTL-blindness; it was actually an intentional call. What was genuinely broken was the geometry around it.
+- **Severity:** High → **Medium** (revised: the block indent, not the text alignment) · **Priority:** P1
 - **Description:** `sections/totals.ts` hardcodes `alignment: 'right'` and `margin: [0, v, 8, v]` on both the label and value cells for every totals line. It imports `bilingualLabelRuns` from `../rtl` — so it handles Arabic *text shaping* — but never checks layout direction, so the block is never mirrored and the 8pt padding stays on the right edge.
 - **Expected:** Under RTL the label/value pair mirrors and the padding follows.
 - **Actual:** Subtotal / discount / VAT / Grand Total — the most prominent block on an invoice — keeps LTR geometry in an otherwise RTL document.
@@ -369,12 +374,19 @@ Two passes found **36 issues against a target of 50+**. I am reporting the numbe
 | **PDF-01** preview/download engine split | ✅ Fixed — shared `selectRenderEngine()` |
 | **RND-01** watermark image renders nothing | ✅ Fixed — page `background` + Studio control |
 | **BIND-01** silent placeholder failures | ✅ Fixed — validation + confirm in `NotificationTemplatesTab` |
+| **TBL-01** rows split across pages | ✅ Fixed — `dontBreakRows` on all 8 data tables |
+| **TBL-03** tax summary RTL-blind | ✅ Fixed — column + alignment mirroring |
+| **TBL-04** totals RTL-blind | ✅ Fixed (geometry); in-cell alignment intentionally unchanged |
 
 **Remaining, in recommended order:**
 
-1. **TBL-01** + **TBL-03/04** (row splitting, RTL tax/totals) — the visible multi-page and Arabic defects.
-2. **STU-01/02/03** (margin bounds, Reset confirmation, unsaved-changes guard) — cheap, high-annoyance fixes.
-3. **RND-02** (hardcoded `x2: 525`) — one shared helper resolves all four sites.
+1. **STU-01/02/03** (margin bounds, Reset confirmation, unsaved-changes guard) — cheap, high-annoyance fixes.
+2. **RND-02** (hardcoded `x2: 525`) — one shared helper resolves all four sites.
+3. **TBL-05/06/07** (S/N column side under RTL, empty line-item table, column-width overflow).
 4. **STU-04** partially addressed by the RND-01 fix (the sub-controls no longer hide behind a non-empty `text`); a dedicated watermark-image *upload* remains unimplemented — today the fix reuses the company logo.
+
+### Note on verification limits for the table fixes
+
+`dontBreakRows` and the RTL mirroring are asserted at the **document-definition** level (the structure handed to pdfmake), which is what these tests can reach. The *visual* result — that a tall row now moves whole to the next page, and that a mirrored Arabic totals block looks right — still needs a real multi-page render to confirm. The compliance-matrix snapshots for the OM/SA RTL invoices were reviewed before updating: the only changes are the added `dontBreakRows` flags and the totals cells swapping slots with identical values, i.e. a pure reordering with no data change.
 
 I can take any of these as an implementation task, or continue auditing the remaining surface listed above.

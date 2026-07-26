@@ -198,7 +198,7 @@ export const renderCustodyLog: SectionRenderer = (
 
   stack.push(heading);
   stack.push({
-    table: { headerRows: 1, widths, body },
+    table: { headerRows: 1, dontBreakRows: true, widths, body },
     layout: {
       hLineWidth: (i: number) => (i <= 1 ? 1 : 0.5),
       vLineWidth: () => 0.5,

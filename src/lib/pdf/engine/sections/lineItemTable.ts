@@ -123,7 +123,7 @@ export const renderLineItems: SectionRenderer = (
   return {
     stack: [
       heading,
-      { table: { headerRows: 1, widths, body }, layout, margin: [0, 0, 0, 8] },
+      { table: { headerRows: 1, dontBreakRows: true, widths, body }, layout, margin: [0, 0, 0, 8] },
     ],
   };
 };
