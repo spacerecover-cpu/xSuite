@@ -402,10 +402,17 @@ export const CaseDetail: React.FC = () => {
         breadcrumbs: [{ label: 'Cases', to: '/cases' }, { label: `Case #${caseData.case_no}` }],
         badges: (
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="custom" color={getStatusColor(caseData.status)} size="lg">
+            <Badge variant="custom" color={getStatusColor(caseData.status)} size="md">
               {getStatusDisplayName(caseData.status)}
             </Badge>
-            <OutcomeBadge outcome={caseData.recovery_outcome} size="md" />
+            {/* Outcome is meaningless on the no-recovery terminals — the status
+                already says "No Solution"/"Cancelled", and a positive outcome
+                there is contradictory (a case can't be both "No Solution" and
+                "Full recovery"). Reconciling the stored recovery_outcome on those
+                transitions is the root fix; this guards the display until then. */}
+            {!['no_solution', 'cancelled'].includes(currentPhase ?? '') && (
+              <OutcomeBadge outcome={caseData.recovery_outcome} size="md" />
+            )}
             {caseData.parent_case_id && (
               <button
                 type="button"
