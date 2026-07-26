@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../ui/Button';
 import { Dialog } from '../ui/Dialog';
 import { Input } from '../ui/Input';
+import { Textarea } from '../ui/Textarea';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown';
 import { CustomerFormModal } from '../customers/CustomerFormModal';
@@ -573,7 +574,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
       label="Create case"
       closeOnBackdrop={false}
       closeOnEscape={false}
-      className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-[1600px] max-h-[90vh] overflow-hidden flex flex-col"
+      className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-[1440px] max-h-[92vh] overflow-hidden flex flex-col"
     >
         {/* Header mirrors the shared Modal chrome (badge + title/subtitle + X). */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
@@ -597,23 +598,28 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-5 gap-y-4">
             <div className="flex flex-col">
               <div
-                className="rounded-xl p-5 mb-4 bg-info-muted"
+                className="rounded-xl p-4 mb-4 bg-info-muted"
                 style={{
                   borderLeft: '4px solid rgb(var(--color-info))',
                 }}
               >
-                <div className="flex items-center gap-3 mb-4">
-                  <Users className="w-5 h-5 text-info" />
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-info/10">
+                    <Users className="w-4 h-4 text-info" />
+                  </div>
                   <h3 className="text-sm font-semibold text-slate-900">Client & Service</h3>
                 </div>
 
-                <div className="space-y-3">
+                <div className="bg-surface rounded-lg border border-slate-200 p-4 space-y-3">
                     <div>
                       <SearchableSelect
                         label="Client"
+                        floatingLabel
+                        shrinkDefaultValue
+                        usePortal
                         value={formData.customer_id}
                         onChange={(value) =>
                           setFormData({ ...formData, customer_id: value, contact_id: '' })
@@ -640,6 +646,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
 
                     <Input
                       label="Client Reference"
+                      floatingLabel
                       placeholder="Client's PO or reference number (optional)"
                       value={formData.client_reference}
                       onChange={(e) =>
@@ -648,6 +655,9 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                     />
                     <SearchableSelect
                       label="Service Type"
+                      floatingLabel
+                      shrinkDefaultValue
+                      usePortal
                       value={formData.service_type_id}
                       onChange={(value) =>
                         setFormData({ ...formData, service_type_id: value })
@@ -660,6 +670,9 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                     <div className="grid grid-cols-2 gap-3">
                       <SearchableSelect
                         label="Priority"
+                        floatingLabel
+                        shrinkDefaultValue
+                        usePortal
                         value={formData.priority}
                         onChange={(value) => setFormData({ ...formData, priority: value })}
                         options={casePriorities.map(p => ({ id: p.name.toLowerCase(), name: p.name }))}
@@ -668,6 +681,9 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
 
                       <SearchableSelect
                         label="Location"
+                        floatingLabel
+                        shrinkDefaultValue
+                        usePortal
                         value={formData.service_location_id}
                         onChange={(value) =>
                           setFormData({ ...formData, service_location_id: value })
@@ -677,7 +693,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                       />
                     </div>
 
-                    <div className="space-y-2 pt-2">
+                    <div className="space-y-2 pt-1">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="checkbox"
@@ -712,14 +728,16 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
 
             <div className="flex flex-col">
               <div
-                className="rounded-xl p-5 mb-4 bg-success-muted"
+                className="rounded-xl p-4 mb-4 bg-success-muted"
                 style={{
                   borderLeft: '4px solid rgb(var(--color-success))',
                 }}
               >
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <HardDrive className="w-5 h-5 text-success" />
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-success/10">
+                      <HardDrive className="w-4 h-4 text-success" />
+                    </div>
                     <h3 className="text-sm font-semibold text-slate-900">
                       Device Information ({devices.length}{bulkServerDrives.length > 0 ? ` + ${bulkServerDrives.length} bulk` : ''})
                     </h3>
@@ -791,7 +809,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                   {devices.map((device, index) => (
                     <div
                       key={device.id}
-                      className="bg-white rounded-lg p-3 border border-slate-200"
+                      className="bg-surface rounded-lg p-3 border border-slate-200"
                     >
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
@@ -814,10 +832,13 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                         )}
                       </div>
 
-                      <div className="space-y-2">
-                        <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-3">
                           <SearchableSelect
                             label="Device Role"
+                            floatingLabel
+                            shrinkDefaultValue
+                            usePortal
                             value={device.device_role_id?.toString() || ''}
                             onChange={(value) => {
                               const numericValue = value ? parseInt(value) : null;
@@ -836,6 +857,9 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
 
                           <SearchableSelect
                             label="Device Type"
+                            floatingLabel
+                            shrinkDefaultValue
+                            usePortal
                             value={device.device_type_id}
                             onChange={(value) =>
                               updateDevice(device.id, 'device_type_id', value)
@@ -846,9 +870,12 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                           />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-3">
                           <SearchableSelect
                             label="Brand"
+                            floatingLabel
+                            shrinkDefaultValue
+                            usePortal
                             value={device.brand_id}
                             onChange={(value) => updateDevice(device.id, 'brand_id', value)}
                             options={[{ id: '', name: 'Not specified' }, ...brands.map(b => ({ id: b.id, name: b.name }))]}
@@ -858,6 +885,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                           <div>
                             <Input
                               label="Serial Number"
+                              floatingLabel
                               value={device.serial_no}
                               onChange={(e) =>
                                 updateDevice(device.id, 'serial_no', e.target.value)
@@ -873,9 +901,10 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-3">
                           <Input
                             label="Model"
+                            floatingLabel
                             value={device.model}
                             onChange={(e) =>
                               updateDevice(device.id, 'model', e.target.value)
@@ -885,6 +914,8 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
 
                           <SearchableSelect
                             label="Capacity"
+                            floatingLabel
+                            shrinkDefaultValue
                             value={device.capacity_id}
                             onChange={(value) =>
                               updateDevice(device.id, 'capacity_id', value)
@@ -895,9 +926,11 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                           />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-3">
                           <SearchableSelect
                             label="Condition"
+                            floatingLabel
+                            shrinkDefaultValue
                             value={device.condition_id}
                             onChange={(value) =>
                               updateDevice(device.id, 'condition_id', value)
@@ -915,6 +948,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
 
                           <MultiSelectDropdown
                             label="Accessories"
+                            floatingLabel
                             value={device.accessories}
                             onChange={(value) =>
                               updateDevice(device.id, 'accessories', value)
@@ -933,21 +967,26 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
 
             <div className="flex flex-col">
               <div
-                className="rounded-xl p-5 mb-4 bg-warning-muted"
+                className="rounded-xl p-4 mb-4 bg-warning-muted"
                 style={{
                   borderLeft: '4px solid rgb(var(--color-warning))',
                 }}
               >
-                <div className="flex items-center gap-3 mb-4">
-                  <AlertCircle className="w-5 h-5 text-warning" />
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-warning/10">
+                    <AlertCircle className="w-4 h-4 text-warning" />
+                  </div>
                   <h3 className="text-sm font-semibold text-slate-900">
                     Problem & Requirements
                   </h3>
                 </div>
 
-                <div className="space-y-3">
+                <div className="bg-surface rounded-lg border border-slate-200 p-4 space-y-3">
                   <SearchableSelect
                     label={isServerDevice ? "Server/Array Problem" : "Device Problem"}
+                    floatingLabel
+                    shrinkDefaultValue
+                    usePortal
                     value={devices[0].device_problem_id}
                     onChange={(value) =>
                       updateDevice(devices[0].id, 'device_problem_id', value)
@@ -957,54 +996,50 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                     required
                   />
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Recovery Requirements
-                    </label>
-                    <textarea
-                      value={devices[0].recovery_requirements}
-                      onChange={(e) =>
-                        updateDevice(devices[0].id, 'recovery_requirements', e.target.value)
-                      }
-                      rows={2}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-warning focus:border-warning text-sm"
-                      placeholder="Describe what files or data the customer needs recovered (e.g., Family photos, Financial reports, Database files)"
-                    />
-                  </div>
+                  <Textarea
+                    label="Recovery Requirements"
+                    floatingLabel
+                    value={devices[0].recovery_requirements}
+                    onChange={(e) =>
+                      updateDevice(devices[0].id, 'recovery_requirements', e.target.value)
+                    }
+                    rows={2}
+                    className="resize-none"
+                    placeholder="Describe what files or data the customer needs recovered (e.g., Family photos, Financial reports, Database files)"
+                  />
 
                   <div className="relative">
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Device Password
-                    </label>
-                    <div className="relative">
-                      <form className="contents" onSubmit={(e) => e.preventDefault()}>
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          value={devices[0].device_password}
-                          onChange={(e) =>
-                            updateDevice(devices[0].id, 'device_password', e.target.value)
-                          }
-                          className="h-9 w-full px-3 pr-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-warning focus:border-warning text-sm"
-                          placeholder="Password needed to access encrypted data (if applicable)"
-                          autoComplete="off"
-                        />
-                      </form>
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                      >
-                        {showPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
+                    <Input
+                      label="Device Password"
+                      floatingLabel
+                      type={showPassword ? 'text' : 'password'}
+                      value={devices[0].device_password}
+                      onChange={(e) =>
+                        updateDevice(devices[0].id, 'device_password', e.target.value)
+                      }
+                      className="pe-10"
+                      placeholder="Password needed to access encrypted data (if applicable)"
+                      autoComplete="off"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
                   </div>
 
                   <SearchableSelect
                     label="Encryption"
+                    floatingLabel
+                    shrinkDefaultValue
+                    usePortal
                     value={devices[0].encryption_type_id}
                     onChange={(value) =>
                       updateDevice(devices[0].id, 'encryption_type_id', value)
@@ -1014,7 +1049,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                   />
 
                   {isFormValid ? (
-                    <div className="mt-4 p-3 bg-success-muted rounded-lg border border-success/30">
+                    <div className="p-3 bg-success-muted rounded-lg border border-success/30">
                       <div className="flex items-center gap-2 text-success">
                         <CheckCircle className="w-5 h-5" />
                         <span className="text-sm font-semibold">Ready to Create Case</span>
@@ -1024,7 +1059,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                       </p>
                     </div>
                   ) : (
-                    <div className="mt-4 p-3 bg-warning-muted rounded-lg border border-warning/30">
+                    <div className="p-3 bg-warning-muted rounded-lg border border-warning/30">
                       <div className="flex items-center gap-2 text-warning">
                         <AlertCircle className="w-5 h-5" />
                         <span className="text-sm font-semibold">Required Information Missing</span>

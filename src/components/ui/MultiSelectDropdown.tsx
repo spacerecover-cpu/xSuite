@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { AlertCircle, Check, ChevronDown, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { FLOATING_LABEL_CLS } from './Input';
 import { useFieldA11y } from '../../hooks/useFieldA11y';
 import { useAnchoredPosition } from '../../hooks/useAnchoredPosition';
 import { useListboxKeyboard } from '../../hooks/useListboxKeyboard';
@@ -30,6 +31,8 @@ interface MultiSelectDropdownProps {
   name?: string;
   disabled?: boolean;
   size?: 'sm' | 'md';
+  /** Opt-in: render the label as a notch on the trigger's top border. */
+  floatingLabel?: boolean;
 }
 
 export const MultiSelectDropdown = React.forwardRef<HTMLDivElement, MultiSelectDropdownProps>(
@@ -48,6 +51,7 @@ export const MultiSelectDropdown = React.forwardRef<HTMLDivElement, MultiSelectD
       name,
       disabled = false,
       size = 'md',
+      floatingLabel = false,
     },
     ref
   ) => {
@@ -249,7 +253,7 @@ export const MultiSelectDropdown = React.forwardRef<HTMLDivElement, MultiSelectD
 
     return (
       <div className="relative" ref={containerRef}>
-        {label !== '' && (
+        {label !== '' && !floatingLabel && (
           <label {...labelProps} className="block text-sm font-medium text-slate-700 mb-1">
             {label}
             {required && (
@@ -329,6 +333,13 @@ export const MultiSelectDropdown = React.forwardRef<HTMLDivElement, MultiSelectD
             </div>
           )}
         </div>
+
+        {label !== '' && floatingLabel && (
+          <label {...labelProps} className={FLOATING_LABEL_CLS}>
+            {label}
+            {required && <span aria-hidden="true" className="text-danger ms-0.5">*</span>}
+          </label>
+        )}
 
         {error ? (
           <p {...errorProps} className="mt-1 text-xs text-danger flex items-center gap-1"><AlertCircle aria-hidden="true" className="w-3 h-3 shrink-0" />
