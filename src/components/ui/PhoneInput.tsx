@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { AlertCircle, ChevronDown, Search } from 'lucide-react';
-import { FLOATING_LABEL_CLS } from './Input';
+import { FLOATING_LABEL_CLS, NO_AUTOFILL } from './Input';
 import { useFieldA11y } from '../../hooks/useFieldA11y';
 import { useAnchoredPosition } from '../../hooks/useAnchoredPosition';
 import { useListboxKeyboard } from '../../hooks/useListboxKeyboard';
@@ -271,6 +271,7 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
             type="tel"
             ref={ref}
             {...controlProps}
+            {...NO_AUTOFILL}
             {...(label ? {} : placeholder ? { 'aria-label': placeholder } : {})}
             name={name}
             value={localNumber}

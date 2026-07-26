@@ -23,6 +23,24 @@ interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, '
 export const FLOATING_LABEL_CLS =
   'pointer-events-none absolute -top-2 start-2.5 z-10 bg-surface px-1 text-xs font-medium text-slate-500';
 
+/**
+ * Attributes that ask the browser AND the major password managers
+ * (1Password / LastPass / Bitwarden / Dashlane) to leave a field alone. Spread
+ * onto any input that records third-party data — device serials, customer
+ * contact details, secrets — so staff never get their own saved login or
+ * contact profile injected into a business record. Chrome ignores
+ * autoComplete="off" on password-type inputs, so those fields additionally set
+ * autoComplete="new-password". The data-* keys aren't in the React input type,
+ * so the object is attached at runtime via this cast.
+ */
+export const NO_AUTOFILL = {
+  autoComplete: 'off',
+  'data-1p-ignore': true,
+  'data-lpignore': 'true',
+  'data-bwignore': true,
+  'data-form-type': 'other',
+} as Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'>;
+
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, hint, leftIcon, floatingLabel = false, className = '', size = 'md', ...props }, ref) => {
     const { labelProps, controlProps, errorProps, hintProps } = useFieldA11y({

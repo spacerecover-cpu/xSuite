@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { listSubdivisions, type Subdivision } from '../../lib/geoSubdivisionService';
 import { useLocaleConfig } from '../../contexts/TenantConfigContext';
-import { FLOATING_LABEL_CLS } from './Input';
+import { FLOATING_LABEL_CLS, NO_AUTOFILL } from './Input';
 
 export interface AddressValue {
   address_line1: string;
@@ -50,7 +50,7 @@ export function AddressFields({ value, onChange, countryId, disabled, floatingLa
         <label htmlFor="addr-line1" className={labelCls}>
           {t('ui.addressLine1', 'Address line 1')}
         </label>
-        <input id="addr-line1" className={inputCls} disabled={disabled}
+        <input id="addr-line1" className={inputCls} disabled={disabled} {...NO_AUTOFILL}
           placeholder={t('ui.addressLine1Placeholder', 'Street address, P.O. box, etc.')}
           value={value.address_line1} onChange={(e) => set({ address_line1: e.target.value })} />
       </div>
@@ -58,7 +58,7 @@ export function AddressFields({ value, onChange, countryId, disabled, floatingLa
         <label htmlFor="addr-line2" className={labelCls}>
           {t('ui.addressLine2', 'Address line 2')}
         </label>
-        <input id="addr-line2" className={inputCls} disabled={disabled}
+        <input id="addr-line2" className={inputCls} disabled={disabled} {...NO_AUTOFILL}
           placeholder={t('ui.addressLine2Placeholder', 'Apartment, suite, unit, floor, etc.')}
           value={value.address_line2} onChange={(e) => set({ address_line2: e.target.value })} />
       </div>
@@ -77,7 +77,7 @@ export function AddressFields({ value, onChange, countryId, disabled, floatingLa
       )}
       <div className="relative">
         <label htmlFor="addr-postal" className={labelCls}>{locale.postalCodeLabel}</label>
-        <input id="addr-postal" className={inputCls} disabled={disabled}
+        <input id="addr-postal" className={inputCls} disabled={disabled} {...NO_AUTOFILL}
           value={value.postal_code} onChange={(e) => set({ postal_code: e.target.value })} />
       </div>
     </div>
