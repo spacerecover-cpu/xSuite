@@ -574,7 +574,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
       label="Create case"
       closeOnBackdrop={false}
       closeOnEscape={false}
-      className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-[1440px] max-h-[92vh] overflow-hidden flex flex-col"
+      className="bg-white rounded-2xl shadow-2xl w-[90vw] max-w-[1180px] max-h-[90vh] overflow-hidden flex flex-col"
     >
         {/* Header mirrors the shared Modal chrome (badge + title/subtitle + X). */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
@@ -598,7 +598,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-5 gap-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 items-start gap-x-5 gap-y-4">
             <div className="flex flex-col">
               <div
                 className="rounded-xl p-4 mb-4 bg-info-muted"
