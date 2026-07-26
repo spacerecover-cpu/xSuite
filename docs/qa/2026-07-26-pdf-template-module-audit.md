@@ -1,8 +1,11 @@
-# PDF Template Module — QA Audit (Pass 1)
+# PDF Template Module — QA Audit (Passes 1–2)
 
 **Date:** 2026-07-26
 **Scope:** `src/lib/pdf/**` (engine, sections, adapters), `src/components/settings/documents/**` (Template Studio + tabs), `src/lib/templateEngine.ts`, `src/lib/pdf/engine/previewTemplate.ts`, `src/lib/pdf/previewRecord.ts`
-**Method:** static / code-level audit against the running implementation. See **Coverage & gaps** for what this pass did *not* cover.
+**Method:** static / code-level audit against the running implementation. See **Coverage & gaps** for what these passes did *not* cover.
+
+- **Pass 1** — engine core, Studio, substitution layer (PDF-01…BIND-06).
+- **Pass 2** — section renderers + adapters: tables, page breaks, RTL, overflow (TBL-01…TBL-11).
 
 ---
 
@@ -16,7 +19,9 @@ Preview/PDF mismatches are therefore *not* systemic. They are a small number of 
 
 The defects that matter most are: a **feature-flagged engine split** that makes Arabic previews render through a different engine than downloads (PDF-01), a **documented watermark-image option that renders nothing** (RND-01), **page-size-dependent geometry hardcoded to A4 portrait** (RND-02), **no input validation on page margins** (STU-01), and **silent placeholder failures in customer-facing documents** (BIND-01).
 
-**Findings this pass: 25** (4 Critical/High parity · 8 rendering · 7 Studio UX · 6 data-binding). Target was 50+; see **Coverage & gaps** for exactly what remains and why.
+Pass 2 adds the table/page-break layer, where the dominant theme is **multi-page and RTL behaviour**: no data table in the module protects its rows from splitting across a page boundary (TBL-01), and two of the most prominent blocks on an Arabic invoice — the **tax summary** and the **totals** — never mirror for RTL while every sibling table does (TBL-03, TBL-04).
+
+**Findings: 36 total** — 25 in pass 1 (4 parity · 8 rendering · 7 Studio UX · 6 data-binding) and 11 in pass 2 (tables, page breaks, RTL, overflow). Target was 50+; see **Coverage & gaps** for exactly what remains and why.
 
 ---
 
@@ -222,6 +227,93 @@ The defects that matter most are: a **feature-flagged engine split** that makes 
 
 ---
 
+# 5. Section renderers & adapters — tables, page breaks, RTL, overflow *(pass 2)*
+
+### TBL-01 — No data table protects its rows from splitting across pages
+- **Severity:** High · **Priority:** P1
+- **Description:** A repo-wide grep for `dontBreakRows` across `engine/sections/**` and `engine/adapters/**` returns **zero hits**. All eight data tables (`lineItemTable`, `devices`, `custodyLog`, `payComponentTable`, `paymentHistory`, `taxSummary`, `digitalSignatures`, `hashVerification`) set `headerRows: 1` but never `dontBreakRows: true`.
+- **Steps to reproduce:** Generate any document whose table reaches a page boundary with a tall row — an invoice line with a multi-line description, a custody entry with a long note, a device row with a long fault description.
+- **Expected:** The row moves intact to the next page.
+- **Actual:** pdfmake's default is to split a row across the page break, so a single logical row is severed — the first lines print at the bottom of page 1 and the remainder at the top of page 2, with the cell borders drawn as two partial boxes.
+- **Impact:** Affects every multi-page document; most visible on invoices and chain-of-custody logs, where a severed row undermines the document's evidentiary readability.
+- **Suggested fix:** Add `dontBreakRows: true` to the eight data tables. Keep it off for pure layout tables (info boxes, totals) where a break is harmless.
+
+### TBL-02 — No section can request a page break
+- **Severity:** Medium (improvement) · **Priority:** P2
+- **Description:** `pageBreak` appears **nowhere** in the sections or adapters. Page flow is entirely pdfmake's default.
+- **Impact:** A tenant cannot say "start Terms & Conditions on a new page" or "keep the signature block off a page of its own" — common requirements for contracts, authorization forms and reports. Signature blocks in particular can be orphaned at the top of a trailing page.
+- **Suggested fix:** Add an opt-in `pageBreakBefore` to the section config and map it to pdfmake's `pageBreak: 'before'`; consider `unbreakable: true` for signature/approval blocks.
+
+### TBL-03 — Tax summary table is RTL-blind
+- **Severity:** High · **Priority:** P1
+- **Description:** `sections/taxSummary.ts` hardcodes `alignment: 'left'` on the rate column and `'right'` on taxable/tax, for **both** header (lines 36–38) and body (lines 43–45). It never calls `engineLayoutDirection` and never mirrors. By contrast `lineItemTable`, `devices`, `custodyLog`, `digitalSignatures` and `hashVerification` mirror via `mirrorColumns`, and `paymentHistory` / `payComponentTable` mirror via their own inline direction check.
+- **Steps to reproduce:** Set a template's language to Arabic (RTL) and generate an invoice with a tax breakdown.
+- **Expected:** The tax table mirrors like every other table.
+- **Actual:** It stays in LTR column order and alignment while the surrounding document is RTL — the one table on the page reading the wrong way.
+- **Impact:** This is the statutory VAT/GST breakdown on Arabic-market invoices, so the defect lands on a compliance-relevant block.
+- **Suggested fix:** Apply the same `engineLayoutDirection` + mirror treatment used by `paymentHistory`.
+
+### TBL-04 — Totals block is RTL-blind
+- **Severity:** High · **Priority:** P1
+- **Description:** `sections/totals.ts` hardcodes `alignment: 'right'` and `margin: [0, v, 8, v]` on both the label and value cells for every totals line. It imports `bilingualLabelRuns` from `../rtl` — so it handles Arabic *text shaping* — but never checks layout direction, so the block is never mirrored and the 8pt padding stays on the right edge.
+- **Expected:** Under RTL the label/value pair mirrors and the padding follows.
+- **Actual:** Subtotal / discount / VAT / Grand Total — the most prominent block on an invoice — keeps LTR geometry in an otherwise RTL document.
+- **Suggested fix:** Mirror the column pair and swap the padding side when `engineLayoutDirection(language) === 'rtl'`.
+
+### TBL-05 — Row-number (S/N) column lands on the wrong side under RTL
+- **Severity:** Medium · **Priority:** P2
+- **Description:** `lineItemTable.ts:96-102` implements the opt-in S/N column with `headerRow.unshift(...)`, `body[r].unshift(...)` and `widths.unshift(24)`. These always prepend to the *array head*, i.e. the visual left. But the columns were already mirrored for RTL at line 41 (`mirrorColumns`).
+- **Steps to reproduce:** Enable row numbering on an Arabic (RTL) template.
+- **Expected:** The serial column sits on the right, first in reading order.
+- **Actual:** It is pushed to the far left — last in RTL reading order, so rows appear to start with the description and end with the number.
+- **Suggested fix:** `push` instead of `unshift` when direction is RTL (or mirror after the S/N column is added).
+
+### TBL-06 — Empty line-item list renders a heading and an empty table
+- **Severity:** Medium · **Priority:** P2
+- **Description:** `renderLineItems` guards `!li` (line 34) and `columns.length === 0` (line 42), but never `li.rows.length === 0`. The body is seeded with the header row and the loop simply adds nothing.
+- **Steps to reproduce:** Generate a document whose line-item collection is empty (a zero-item quote, or a case with no billable services).
+- **Expected:** The section is omitted, or shows an explicit "No items" line.
+- **Actual:** A "Line Items" heading followed by a header-only table with no rows — reads as a rendering failure.
+- **Suggested fix:** Return `null` (or an explicit empty-state row) when there are no rows.
+
+### TBL-07 — Explicit column widths are never normalized against the printable width
+- **Severity:** Medium · **Priority:** P2
+- **Description:** `widths` is built as `col.width !== undefined ? col.width : '*'` (line 92). Column widths are tenant-configurable, and nothing checks that the fixed widths sum to less than the content width — nor that at least one star column remains to absorb the remainder.
+- **Steps to reproduce:** Configure explicit point widths on every visible line-item column totalling more than the printable width (easy at narrow margins, or after switching to a custom/label paper size).
+- **Expected:** Widths are normalized, or the config is rejected with a clear message.
+- **Actual:** pdfmake overflows the table past the right margin and clips; with the S/N column enabled an extra fixed 24pt is added on top, making overflow easier to hit.
+- **Suggested fix:** Normalize fixed widths to the available content width (scale down proportionally) and warn in the Studio.
+
+### TBL-08 — Row rendering is unbounded, with no cap or pagination safeguard
+- **Severity:** Medium · **Priority:** P2
+- **Description:** Every table maps its full collection with no cap. `previewTemplate` enforces a 15s `PREVIEW_TIMEOUT_MS`.
+- **Steps to reproduce:** Preview a chain-of-custody document for a long-running case (hundreds of custody events), or a case with a large device array (e.g. a 24-drive RAID plus per-device rows).
+- **Expected:** Large datasets render, or degrade with a clear message.
+- **Actual:** Render time grows with row count until the preview trips the 15s timeout and reports the generic "Could not render the preview" (see STU-05) — indistinguishable from a config error. Generation has no equivalent timeout, so the browser tab can instead hang while rasterizing.
+- **Suggested fix:** Measure worst-case row counts; add a soft cap with a "showing first N of M" continuation line, and surface a distinct timeout message.
+
+### TBL-09 — Long unbroken tokens overflow their column
+- **Severity:** Medium · **Priority:** P2
+- **Description:** Cells are emitted as plain `{ text }` (`lineItemTable.ts:81-85`) with no wrap strategy. pdfmake wraps on whitespace only.
+- **Steps to reproduce:** Put a long serial number, hash, or URL with no spaces into a narrow column (device serials and the hash-verification table are the natural cases).
+- **Expected:** The token wraps or is ellipsized within the column.
+- **Actual:** It overflows the column boundary and overlaps the neighbouring cell/border.
+- **Suggested fix:** Insert soft break opportunities (zero-width spaces) for long tokens in the adapter, or ellipsize with the full value retained elsewhere.
+
+### TBL-10 — `'N/A'` fallback is hardcoded English in bilingual documents
+- **Severity:** Medium · **Priority:** P2
+- **Description:** Adapters fall back to the literal `'N/A'` for missing parties/fields — e.g. `advanceVoucherAdapter.ts:46`, `checkoutAdapter.ts:229/238/240`, `creditNoteAdapter.ts:100`. The engine has a translation context (`ctx.t`) used elsewhere for exactly this purpose.
+- **Expected:** The placeholder is localized (or a neutral `—`).
+- **Actual:** An Arabic document shows a Latin `N/A` mid-sentence in an otherwise Arabic field block.
+- **Suggested fix:** Route the fallback through `ctx.t`, or standardize on the script-neutral `—`.
+
+### TBL-11 — Dead duplicate helper in the line-item renderer
+- **Severity:** Low · **Priority:** P3
+- **Description:** `headerAlignment(col)` (`lineItemTable.ts:25-27`) returns `col.align ?? 'left'` — the exact expression inlined at line 82 for body cells. Two spellings of one rule invite divergence.
+- **Suggested fix:** Use the helper in both places, or drop it.
+
+---
+
 ## Verified as **not** defective
 
 Recorded so a future pass does not re-investigate:
@@ -235,20 +327,31 @@ Recorded so a future pass does not re-investigate:
 - **pdfmake async-error handling** — `previewTemplate` wires the error callback *and* a 15s timeout, so a rasterization failure rejects rather than hanging the spinner.
 - **Page-margin CSS→pdfmake reorder** — the `[top,right,bottom,left]` → `[left,top,right,bottom]` remap is correct.
 
+*Added in pass 2:*
+
+- **Adapter null-safety** — the adapters are well defended, not sloppy: ~47 explicit fallbacks and 6–7 length guards each in `invoiceAdapter`/`quoteAdapter`. The only defect found is the *wording* of the fallback (TBL-10), not a missing guard.
+- **`chainOfCustodyAdapter` date range** — `sortedByDate[0]` looked like an unchecked index but is inside `if (entries.length > 0)`. Safe.
+- **`paymentHistory` / `payComponentTable` RTL** — these do not use `mirrorColumns`, but both implement the equivalent reverse + `mirrorAlign` inline. Correct; only `taxSummary` and `totals` are genuinely RTL-blind.
+- **Header logo overflow** — `buildLogoNode` consistently passes `maxHeight` (and clamps width via `Math.min` in the compact variants), so an oversized logo is constrained rather than blowing out the header.
+- **`terms.stripLeadingTitleLine`** — the `slice`/whitespace-strip logic is correct and does not truncate body text.
+- **Header-row aliasing in `lineItemTable`** — `body[0]` and `headerRow` are the same reference, so the S/N `unshift` mutates both. This is intentional and correct (the bug is the *side* it inserts on — TBL-05, not the aliasing).
+
 ---
 
 ## Coverage & gaps — please read
 
-This pass found **25 issues against a target of 50+**. I am reporting the number I actually verified rather than padding the list, because a QA report whose findings are speculative is worse than a short one.
+Two passes found **36 issues against a target of 50+**. I am reporting the number I actually verified rather than padding the list, because a QA report whose findings are speculative is worse than a short one. Pass 2 yielded fewer new findings than I predicted for an honest reason: **the adapters turned out to be genuinely well written** (see the pass-2 additions to "Verified as not defective"), so the defects concentrated in the table/page-break/RTL layer rather than in data handling.
 
-**Covered:** `renderTemplate`, `previewTemplate`, `branding`/watermark resolution, `footer`/`header`/`reportFooter` section geometry, `TemplateStudio` + `GeneralTab`, `templateEngine`, and the preview/generation call graph.
+**Covered:** `renderTemplate`, `previewTemplate`, `branding`/watermark resolution, `footer`/`header`/`reportFooter` geometry, `TemplateStudio` + `GeneralTab`, `templateEngine`, the preview/generation call graph, the page-break and RTL posture of all eight data tables, `lineItemTable` / `totals` / `taxSummary` in depth, and an adapter-wide sweep for null-safety, numeric guards and date formatting.
 
-**Not yet covered (the remaining ~40 section renderers and adapters — where I would expect the bulk of the outstanding findings):**
-- ~35 section renderers under `engine/sections/` (`lineItemTable`, `totals`, `taxSummary`, `devices`, `custodyLog`, `signature`, `payComponentTable`, labels …) — table/page-break/overflow behaviour lives here.
-- 14 adapters under `engine/adapters/` — null/empty/long-value handling per document type.
-- `HeaderFooterTab`, `TransactionTab`, `TableTab`, `TotalTab`, `OtherDetailsTab` (~1,100 lines of controls).
+**Still not covered:**
+- ~25 remaining section renderers read only via targeted pattern sweeps, not line by line — `reportSections`, `reportSummary`, `reportHeader`, `infoBoxes`, `caseInfo`, `devices`, `custodyLog`, `signature`, `bank`, `openCard`, `taxBar`, `netPay`, `deductions`, `earnings`, the label renderers.
+- Per-adapter deep reads (14 files) — the sweep covered null-safety/format patterns, not each adapter's document-specific mapping logic.
+- `HeaderFooterTab`, `TransactionTab`, `TableTab`, `TotalTab`, `OtherDetailsTab` (~1,100 lines of controls) — pass 1 only covered `GeneralTab`.
 - `profileResolver`, `registry`, `rtl`, `palette`, `fonts`/`fontLoader`, `brandingImage`, `qrImage`, `contentHash`.
 - `documentTemplatesService` / `templateContextService` CRUD, RLS and tenant-scoping.
+
+**Cannot be done in this environment (needs a human or a live session):** unchanged from pass 1 — screenshots/recordings, visual preview-vs-PDF diffing, cross-viewer (Acrobat / Preview / Chrome / pdf.js), cross-browser/OS, and true large-dataset page-break testing. TBL-01 through TBL-09 in particular are *predicted from the code*; each needs a real multi-page render to confirm severity.
 
 **Cannot be done in this environment (needs a human or a live session):**
 - Screenshots / screen recordings.
@@ -256,4 +359,12 @@ This pass found **25 issues against a target of 50+**. I am reporting the number
 - Cross-browser and cross-OS behaviour.
 - True large-dataset and multi-page page-break testing against production data.
 
-I can continue with a second pass over the section renderers and adapters — that is where I would expect to roughly double this count. Say the word and I will keep going.
+## Recommended fix order
+
+1. **PDF-01** (preview/download engine split) and **RND-01** (watermark image renders nothing) — a documented feature that silently does nothing, and a preview that lies about Arabic output.
+2. **BIND-01** (silent placeholder failures) — wire `validateTemplate` into the remaining editors; this one loses data in customer-facing documents.
+3. **TBL-01** + **TBL-03/04** (row splitting, RTL tax/totals) — the visible multi-page and Arabic defects.
+4. **STU-01/02/03** (margin bounds, Reset confirmation, unsaved-changes guard) — cheap, high-annoyance fixes.
+5. **RND-02** (hardcoded `x2: 525`) — one shared helper resolves all four sites.
+
+I can take any of these as an implementation task, or continue auditing the remaining surface listed above.
