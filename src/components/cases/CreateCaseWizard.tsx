@@ -648,7 +648,6 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                       label="Client Reference"
                       floatingLabel
                       {...NO_AUTOFILL}
-                      placeholder="Client's PO or reference number (optional)"
                       value={formData.client_reference}
                       onChange={(e) =>
                         setFormData({ ...formData, client_reference: e.target.value })
@@ -892,7 +891,6 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                               onChange={(e) =>
                                 updateDevice(device.id, 'serial_no', e.target.value)
                               }
-                              placeholder={isServerDevice && index === 0 ? "Server S/N (optional if only loose drives)" : "Serial number (e.g., WXY123456789)"}
                               required={index === 0 && !isServerDevice}
                             />
                             {index === 0 && isServerDevice && (
@@ -912,7 +910,6 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                             onChange={(e) =>
                               updateDevice(device.id, 'model', e.target.value)
                             }
-                            placeholder="Model..."
                           />
 
                           <SearchableSelect
@@ -957,7 +954,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                               updateDevice(device.id, 'accessories', value)
                             }
                             options={accessories.map(a => ({ id: a.id, name: a.name }))}
-                            placeholder="Select accessories (optional)..."
+                            placeholder=""
                             usePortal={true}
                           />
                         </div>
@@ -1008,7 +1005,6 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                     }
                     rows={2}
                     className="resize-none"
-                    placeholder="Describe what files or data the customer needs recovered (e.g., Family photos, Financial reports, Database files)"
                   />
 
                   <div className="relative">
@@ -1024,7 +1020,6 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                         updateDevice(devices[0].id, 'device_password', e.target.value)
                       }
                       className="pe-10"
-                      placeholder="Password needed to access encrypted data (if applicable)"
                     />
                     <button
                       type="button"
