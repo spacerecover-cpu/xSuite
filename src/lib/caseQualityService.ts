@@ -62,6 +62,34 @@ export function aggregateRecoveryOutcome(results: ReadonlyArray<string | null>):
 }
 
 /**
+ * Reconcile a stored case outcome against the phase the case now sits in.
+ *
+ * A case parked at "No Solution — Future Follow-up" can never be a FULL
+ * recovery: no-solution means the device is recoverable in principle but no
+ * method exists today, so by definition some scope is still unrecovered. When
+ * attempts had already rolled the case up to 'full', parking it left the
+ * contradiction "No Solution — Future Follow-up" + "Full recovery" on screen —
+ * and no_solution is a no-recovery surface for Rule 51 refund eligibility
+ * (see advanceTerminals.canOfferRefundVoucher), so the claim is not merely
+ * cosmetic. Demote to 'partial': some data WAS recovered, which must not be
+ * lost. Every other outcome passes through, and a case with no recorded
+ * outcome stays null — never fabricate evidence.
+ *
+ * This mirrors the DB trigger trg_reconcile_no_solution_outcome, which is the
+ * authoritative write path (it covers transition_case_status, the manual
+ * set_case_status override and log_case_checkout alike). Applying it on read
+ * too keeps the badge truthful on rows written before that trigger existed.
+ */
+export function reconcileOutcomeForPhase(
+  outcome: string | null | undefined,
+  phaseType: string | null | undefined,
+): string | null {
+  if (!outcome) return null;
+  if (phaseType === 'no_solution' && outcome === 'full') return 'partial';
+  return outcome;
+}
+
+/**
  * Capture services backing the C3 release gate. The gate in
  * transition_case_status requires a recorded recovery attempt and a passed QA
  * checklist before a case can reach Completed / Delivered; these are the only
