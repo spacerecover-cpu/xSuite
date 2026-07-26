@@ -26,6 +26,7 @@ import { SendMessageModal } from '../../components/communications/SendMessageMod
 import { DeviceCheckoutModal } from '../../components/cases/DeviceCheckoutModal';
 import { DuplicateCaseConfirmationModal } from '../../components/cases/DuplicateCaseConfirmationModal';
 import { OutcomeBadge } from '../../components/cases/OutcomeBadge';
+import { reconcileOutcomeForPhase } from '../../lib/caseQualityService';
 import { MarkNoSolutionModal } from '../../components/cases/MarkNoSolutionModal';
 import { LabelPrintDialog } from '../../components/labels/LabelPrintDialog';
 import type { LabelEntityConfig } from '../../lib/labelPrefsService';
@@ -405,14 +406,13 @@ export const CaseDetail: React.FC = () => {
             <Badge variant="custom" color={getStatusColor(caseData.status)} size="md">
               {getStatusDisplayName(caseData.status)}
             </Badge>
-            {/* Outcome is meaningless on the no-recovery terminals — the status
-                already says "No Solution"/"Cancelled", and a positive outcome
-                there is contradictory (a case can't be both "No Solution" and
-                "Full recovery"). Reconciling the stored recovery_outcome on those
-                transitions is the root fix; this guards the display until then. */}
-            {!['no_solution', 'cancelled'].includes(currentPhase ?? '') && (
-              <OutcomeBadge outcome={caseData.recovery_outcome} size="md" />
-            )}
+            {/* A no-solution case can never be a FULL recovery — reconcile to
+                'partial' so the badge matches what the DB trigger stores (and
+                stays truthful on rows written before that trigger existed). */}
+            <OutcomeBadge
+              outcome={reconcileOutcomeForPhase(caseData.recovery_outcome, currentPhase)}
+              size="md"
+            />
             {caseData.parent_case_id && (
               <button
                 type="button"
