@@ -5,7 +5,7 @@ import { describe, it, expect, vi } from 'vitest';
 // exercise the pure aggregateRecoveryOutcome helper.
 vi.mock('./supabaseClient', () => ({ supabase: {} }));
 
-import { aggregateRecoveryOutcome } from './caseQualityService';
+import { aggregateRecoveryOutcome, reconcileOutcomeForPhase } from './caseQualityService';
 
 // Regression lock for the last-write-wins outcome corruption (bug: a later
 // failed/no_data attempt flipped the whole case to 'unrecoverable', exposing a
@@ -45,5 +45,36 @@ describe('aggregateRecoveryOutcome', () => {
   it('ignores null/unknown result values when aggregating', () => {
     expect(aggregateRecoveryOutcome(['success', null])).toBe('full');
     expect(aggregateRecoveryOutcome([null, 'no_data'])).toBe('unrecoverable');
+  });
+});
+
+// Regression lock for the "No Solution — Future Follow-up + Full recovery"
+// contradiction: recovery_outcome is rolled up from attempts and nothing
+// reconciled it when the case was later parked as no-solution, so a case could
+// claim it recovered everything while sitting on a no-recovery terminal that
+// qualifies for a Rule 51 refund. Mirrors the DB trigger
+// trg_reconcile_no_solution_outcome — keep both in step.
+describe('reconcileOutcomeForPhase', () => {
+  it('demotes "full" to "partial" in the no_solution phase', () => {
+    // Some data WAS recovered; the remaining scope has no method today.
+    expect(reconcileOutcomeForPhase('full', 'no_solution')).toBe('partial');
+  });
+
+  it('leaves every other stored outcome untouched in no_solution', () => {
+    expect(reconcileOutcomeForPhase('partial', 'no_solution')).toBe('partial');
+    expect(reconcileOutcomeForPhase('unrecoverable', 'no_solution')).toBe('unrecoverable');
+    expect(reconcileOutcomeForPhase('declined', 'no_solution')).toBe('declined');
+  });
+
+  it('never fabricates an outcome where none was recorded', () => {
+    expect(reconcileOutcomeForPhase(null, 'no_solution')).toBeNull();
+    expect(reconcileOutcomeForPhase(undefined, 'no_solution')).toBeNull();
+  });
+
+  it('passes outcomes through unchanged on every other phase', () => {
+    expect(reconcileOutcomeForPhase('full', 'delivered')).toBe('full');
+    expect(reconcileOutcomeForPhase('full', 'recovery')).toBe('full');
+    expect(reconcileOutcomeForPhase('full', 'closed')).toBe('full');
+    expect(reconcileOutcomeForPhase('full', null)).toBe('full');
   });
 });

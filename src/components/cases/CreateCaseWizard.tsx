@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../ui/Button';
 import { Dialog } from '../ui/Dialog';
-import { Input } from '../ui/Input';
+import { Input, NO_AUTOFILL } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown';
@@ -574,7 +574,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
       label="Create case"
       closeOnBackdrop={false}
       closeOnEscape={false}
-      className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-[1440px] max-h-[92vh] overflow-hidden flex flex-col"
+      className="bg-white rounded-2xl shadow-2xl w-[90vw] max-w-[1180px] max-h-[90vh] overflow-hidden flex flex-col"
     >
         {/* Header mirrors the shared Modal chrome (badge + title/subtitle + X). */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
@@ -598,7 +598,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-5 gap-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 items-start gap-x-5 gap-y-4">
             <div className="flex flex-col">
               <div
                 className="rounded-xl p-4 mb-4 bg-info-muted"
@@ -647,7 +647,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                     <Input
                       label="Client Reference"
                       floatingLabel
-                      placeholder="Client's PO or reference number (optional)"
+                      {...NO_AUTOFILL}
                       value={formData.client_reference}
                       onChange={(e) =>
                         setFormData({ ...formData, client_reference: e.target.value })
@@ -886,11 +886,11 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                             <Input
                               label="Serial Number"
                               floatingLabel
+                              {...NO_AUTOFILL}
                               value={device.serial_no}
                               onChange={(e) =>
                                 updateDevice(device.id, 'serial_no', e.target.value)
                               }
-                              placeholder={isServerDevice && index === 0 ? "Server S/N (optional if only loose drives)" : "Serial number (e.g., WXY123456789)"}
                               required={index === 0 && !isServerDevice}
                             />
                             {index === 0 && isServerDevice && (
@@ -905,11 +905,11 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                           <Input
                             label="Model"
                             floatingLabel
+                            {...NO_AUTOFILL}
                             value={device.model}
                             onChange={(e) =>
                               updateDevice(device.id, 'model', e.target.value)
                             }
-                            placeholder="Model..."
                           />
 
                           <SearchableSelect
@@ -954,7 +954,7 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                               updateDevice(device.id, 'accessories', value)
                             }
                             options={accessories.map(a => ({ id: a.id, name: a.name }))}
-                            placeholder="Select accessories (optional)..."
+                            placeholder=""
                             usePortal={true}
                           />
                         </div>
@@ -1005,21 +1005,21 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
                     }
                     rows={2}
                     className="resize-none"
-                    placeholder="Describe what files or data the customer needs recovered (e.g., Family photos, Financial reports, Database files)"
                   />
 
                   <div className="relative">
                     <Input
                       label="Device Password"
                       floatingLabel
+                      {...NO_AUTOFILL}
+                      autoComplete="new-password"
+                      name="device-secret"
                       type={showPassword ? 'text' : 'password'}
                       value={devices[0].device_password}
                       onChange={(e) =>
                         updateDevice(devices[0].id, 'device_password', e.target.value)
                       }
                       className="pe-10"
-                      placeholder="Password needed to access encrypted data (if applicable)"
-                      autoComplete="off"
                     />
                     <button
                       type="button"

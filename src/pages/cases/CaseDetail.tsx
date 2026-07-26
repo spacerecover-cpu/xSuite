@@ -26,6 +26,7 @@ import { SendMessageModal } from '../../components/communications/SendMessageMod
 import { DeviceCheckoutModal } from '../../components/cases/DeviceCheckoutModal';
 import { DuplicateCaseConfirmationModal } from '../../components/cases/DuplicateCaseConfirmationModal';
 import { OutcomeBadge } from '../../components/cases/OutcomeBadge';
+import { reconcileOutcomeForPhase } from '../../lib/caseQualityService';
 import { MarkNoSolutionModal } from '../../components/cases/MarkNoSolutionModal';
 import { LabelPrintDialog } from '../../components/labels/LabelPrintDialog';
 import type { LabelEntityConfig } from '../../lib/labelPrefsService';
@@ -402,10 +403,16 @@ export const CaseDetail: React.FC = () => {
         breadcrumbs: [{ label: 'Cases', to: '/cases' }, { label: `Case #${caseData.case_no}` }],
         badges: (
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="custom" color={getStatusColor(caseData.status)} size="lg">
+            <Badge variant="custom" color={getStatusColor(caseData.status)} size="md">
               {getStatusDisplayName(caseData.status)}
             </Badge>
-            <OutcomeBadge outcome={caseData.recovery_outcome} size="md" />
+            {/* A no-solution case can never be a FULL recovery — reconcile to
+                'partial' so the badge matches what the DB trigger stores (and
+                stays truthful on rows written before that trigger existed). */}
+            <OutcomeBadge
+              outcome={reconcileOutcomeForPhase(caseData.recovery_outcome, currentPhase)}
+              size="md"
+            />
             {caseData.parent_case_id && (
               <button
                 type="button"
