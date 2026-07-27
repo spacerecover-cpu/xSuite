@@ -45,7 +45,8 @@ const EVENT_LABELS = new Map(WHATSAPP_EVENT_CATALOG.map((e) => [e.key, e.label])
 
 function eventLabel(row: LogRow): string {
   if (row.event_key) return EVENT_LABELS.get(row.event_key) ?? row.event_key;
-  return row.message_kind === 'session' ? 'Session reply' : 'Manual send';
+  // stored kinds are 'session_text' / 'session_media' (never bare 'session')
+  return String(row.message_kind ?? '').startsWith('session') ? 'Session reply' : 'Manual send';
 }
 
 function costChip(row: LogRow): string | null {
@@ -175,7 +176,7 @@ export const WhatsAppMessageLog: React.FC = () => {
           </td>
           <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600 tabular-nums">{row.to_phone_e164 ?? '—'}</td>
           <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600">
-            {row.template_name ?? (row.message_kind === 'session' ? 'free-form' : '—')}
+            {row.template_name ?? (String(row.message_kind ?? '').startsWith('session') ? 'free-form' : '—')}
             {row.template_language && <span className="text-xs text-slate-400"> · {row.template_language}</span>}
           </td>
           <td className="px-4 py-3 whitespace-nowrap">

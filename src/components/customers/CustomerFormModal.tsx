@@ -27,6 +27,7 @@ import { UsageLimitGuard } from '../shared/UsageLimitGuard';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { AddressFields, type AddressValue } from '../ui/AddressFields';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTenantFeature } from '../../contexts/TenantConfigContext';
 import {
   User,
   UserPlus,
@@ -116,6 +117,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [consentDraft, setConsentDraft] = useState<ConsentDraft>({ utility: false, marketing: false });
+  const whatsappEnabled = useTenantFeature('automation.whatsapp');
   const customerNameRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
@@ -585,11 +587,13 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                     placeholder="e.g. 9123 4567"
                   />
                 </div>
-                <WhatsAppConsentBlock
-                  customerId={customer?.id}
-                  value={consentDraft}
-                  onChange={setConsentDraft}
-                />
+                {whatsappEnabled && (
+                  <WhatsAppConsentBlock
+                    customerId={customer?.id}
+                    value={consentDraft}
+                    onChange={setConsentDraft}
+                  />
+                )}
               </div>
               <button
                 type="button"

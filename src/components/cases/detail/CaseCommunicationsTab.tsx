@@ -57,6 +57,7 @@ export const CaseCommunicationsTab: React.FC<CaseCommunicationsTabProps> = ({
   const [milestoneMode, setMilestoneMode] = useState(false);
   const [showFollowUp, setShowFollowUp] = useState(false);
   const followUpsEnabled = useTenantFeature('automation.case_follow_ups');
+  const whatsappEnabled = useTenantFeature('automation.whatsapp');
 
   const { data: communications = [], isLoading } = useQuery({
     queryKey: communicationKeys.byCase(caseId),
@@ -66,8 +67,9 @@ export const CaseCommunicationsTab: React.FC<CaseCommunicationsTabProps> = ({
   const { data: waIntegration } = useQuery({
     queryKey: whatsappKeys.integration(),
     queryFn: getIntegration,
+    enabled: whatsappEnabled,
   });
-  const waConnected = waIntegration?.connection_status === 'connected';
+  const waConnected = whatsappEnabled && waIntegration?.connection_status === 'connected';
 
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: communicationKeys.byCase(caseId) });

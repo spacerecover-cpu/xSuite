@@ -24,6 +24,7 @@ import { CustomerFormModal, type CustomerEditData } from '../../components/custo
 import { recordConsent, getConsentState, summarizeConsent } from '../../lib/whatsappService';
 import { whatsappKeys } from '../../lib/queryKeys';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTenantFeature } from '../../contexts/TenantConfigContext';
 import { CustomerPurchasesTab } from '../../components/customers/CustomerPurchasesTab';
 import { CustomerCasesTab } from '../../components/customers/CustomerCasesTab';
 import { CustomerFinancialTab } from '../../components/customers/CustomerFinancialTab';
@@ -168,10 +169,11 @@ export const CustomerProfilePage: React.FC = () => {
   });
 
   const tenantId = profile?.tenant_id ?? null;
+  const whatsappEnabled = useTenantFeature('automation.whatsapp');
   const { data: consentRows } = useQuery({
     queryKey: whatsappKeys.consents(id ?? 'none'),
     queryFn: () => getConsentState(tenantId!, id!),
-    enabled: Boolean(id && tenantId),
+    enabled: Boolean(id && tenantId && whatsappEnabled),
   });
   const consentSummary = consentRows
     ? summarizeConsent(consentRows)
@@ -190,7 +192,7 @@ export const CustomerProfilePage: React.FC = () => {
       if (error) throw error;
       return data ?? [];
     },
-    enabled: !!id,
+    enabled: Boolean(id && whatsappEnabled),
   });
 
   const optOutMutation = useMutation({
@@ -878,6 +880,7 @@ export const CustomerProfilePage: React.FC = () => {
           )}
         </Card>
 
+        {whatsappEnabled && (
         <Card className="p-4 h-fit">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-2">
@@ -961,6 +964,7 @@ export const CustomerProfilePage: React.FC = () => {
             )}
           </div>
         </Card>
+        )}
         </div>
       </div>
 

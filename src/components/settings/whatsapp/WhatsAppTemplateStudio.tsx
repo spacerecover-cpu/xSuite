@@ -73,7 +73,12 @@ export function WhatsAppTemplateStudio({ isOpen, onClose, template }: Props) {
   const editLocked = isVersionEdit && lastSyncedMs !== null && Date.now() - lastSyncedMs < 24 * 60 * 60 * 1000;
 
   const parsed = useMemo(() => {
-    const comps = ((template?.components ?? []) as TemplateComponent[]);
+    // components is the generated Json type — narrow rather than blind-cast, since
+    // this parses template JSON that round-tripped through Meta
+    const raw = template?.components;
+    const comps: TemplateComponent[] = Array.isArray(raw)
+      ? (raw.filter((c) => !!c && typeof c === 'object' && !Array.isArray(c) && 'type' in c) as unknown as TemplateComponent[])
+      : [];
     const header = comps.find((c) => c.type === 'HEADER');
     const varMap = (template?.variable_map ?? {}) as Record<string, string>;
     const buttons: ButtonDraft[] = (comps.find((c) => c.type === 'BUTTONS')?.buttons ?? []).map((b, i) => {
@@ -82,7 +87,8 @@ export function WhatsAppTemplateStudio({ isOpen, onClose, template }: Props) {
         return {
           type: 'URL' as const, text: b.text,
           baseUrl: dynamic ? (b.url ?? '').slice(0, -'{{1}}'.length) : (b.url ?? ''),
-          contextKey: varMap[`button_url_${i + 1}`] ?? '', phone: '',
+          // 0-based to match the send worker's forEach index (waCore.buildTemplateParams)
+          contextKey: varMap[`button_url_${i}`] ?? '', phone: '',
         };
       }
       if (b.type === 'PHONE_NUMBER') {
@@ -218,7 +224,7 @@ export function WhatsAppTemplateStudio({ isOpen, onClose, template }: Props) {
       if (key) map[p] = key;
     }
     buttons.forEach((b, i) => {
-      if (b.type === 'URL' && b.contextKey) map[`button_url_${i + 1}`] = b.contextKey;
+      if (b.type === 'URL' && b.contextKey) map[`button_url_${i}`] = b.contextKey;
     });
     return map;
   }, [bodyText, headerText, headerMode, varMap, buttons]);
