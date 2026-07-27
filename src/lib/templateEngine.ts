@@ -17,15 +17,21 @@
 //  1. FILTERS (BIND-03) are additive NEW syntax: {{invoice.total | currency}}.
 //     The edge regex is /\{\{(\w+)\}\}/ — it cannot match a pipe or a dot, so a
 //     filtered placeholder would be left LITERAL in a dispatched email.
-//     **Do not use filtered placeholders in notification_templates** until
-//     notification-dispatch-email understands them. Document templates
-//     (document_templates / invoice_terms), which only ever render through this
-//     module, are free to use them.
+//     Filtered placeholders in notification_templates are now BLOCKED, not just
+//     discouraged: validateTemplate reports them as `filtered` and the
+//     notification editor refuses the save (FUP-03). Relying on a comment was
+//     not enough — extractVariables reports the bare key, so a filtered
+//     placeholder validated as a perfectly known variable and shipped literally.
+//     Document templates (document_templates / invoice_terms), which only ever
+//     render through this module, are free to use them.
 //     Unfiltered {{key}} is untouched by this feature: same regex capture, same
 //     resolution, same output, byte for byte.
 //
 //  2. BOOLEANS (BIND-02) render as Yes/No here, where the edge function's
-//     String(value) would emit `true`/`false`. Justification: `true`/`false` are
+//     String(value) would emit `true`/`false`. The notification editor previews
+//     with EDGE_FUNCTION_BOOLEANS so its preview shows the dispatcher's output
+//     rather than a friendlier string the customer never receives.
+//     Justification: `true`/`false` are
 //     untranslated developer tokens in a customer-facing document, and coercing
 //     them to '' would put a blank where "No" belongs — indistinguishable from a
 //     missing field, which is exactly the failure mode BIND-01 was about. On a
@@ -87,6 +93,12 @@ export const DEFAULT_BOOLEAN_LABELS: { true: string; false: string } = {
 // optional filter. Degenerate (`{{a | }}`) and chained (`{{a | b | c}}`) forms
 // intentionally match NOTHING and stay literal, so unsupported syntax is
 // visible to the template author instead of silently half-working.
+// NOT SAFE ON THE NOTIFICATION PATH: the edge function substitutes with
+// /\{\{(\w+)\}\}/g, which cannot match a pipe, so a filtered placeholder is
+// mailed to the customer VERBATIM. That is enforced, not merely documented —
+// `validateTemplate` reports `filtered`, and NotificationTemplatesTab blocks
+// the save on it (FUP-03). Teach the edge function the same regex, boolean
+// labels and formatter contract before relaxing that.
 const PLACEHOLDER_RE = /\{\{\s*([\w.]+)\s*(?:\|\s*(\w+)\s*)?\}\}/g;
 
 function resolvePath(ctx: TemplateContext, path: string): TemplateContextValue {
@@ -159,12 +171,62 @@ export function extractVariables(template: string): string[] {
   return keys;
 }
 
+/**
+ * Boolean labels matching what the notification edge function actually emits.
+ *
+ * `supabase/functions/notification-dispatch-email/index.ts` substitutes with a
+ * plain `String(value)`, so a boolean arrives in the customer's inbox as
+ * `true`/`false` — not the friendly {@link DEFAULT_BOOLEAN_LABELS} the document
+ * surfaces use. Pass this when PREVIEWING a notification template so the preview
+ * shows what will be sent rather than a nicer string the dispatcher never
+ * produces.
+ */
+export const EDGE_FUNCTION_BOOLEANS = { true: 'true', false: 'false' } as const;
+
+/**
+ * The keys of any placeholders that carry a FILTER, e.g. `{{total | currency}}`
+ * → `['total']`. Deduped, in first-appearance order.
+ *
+ * Needed because {@link extractVariables} deliberately reports group 1 (the
+ * key) only, so a filtered placeholder is indistinguishable from a plain one to
+ * every existing caller. That is correct for document surfaces — which DO
+ * understand filters — but dangerous for the notification path, whose dispatcher
+ * cannot (see {@link EDGE_FUNCTION_BOOLEANS} and the note on `PLACEHOLDER_RE`):
+ * a filtered placeholder there is mailed to the customer verbatim.
+ */
+export function extractFilteredPlaceholders(template: string): string[] {
+  if (!template) return [];
+  const seen = new Set<string>();
+  const keys: string[] = [];
+  for (const match of template.matchAll(PLACEHOLDER_RE)) {
+    if (match[2] === undefined) continue; // no filter on this placeholder
+    const key = match[1];
+    if (!seen.has(key)) {
+      seen.add(key);
+      keys.push(key);
+    }
+  }
+  return keys;
+}
+
+/**
+ * Validate a template against the variables its surface publishes.
+ *
+ * `unknown` — keys that will render EMPTY (the missing-key contract).
+ * `filtered` — keys using filter syntax. Harmless on document surfaces; on the
+ * notification path it means the placeholder ships LITERALLY, so that surface
+ * must treat a non-empty `filtered` as an error rather than a warning.
+ * The field is additive — existing callers reading only `unknown` are unaffected.
+ */
 export function validateTemplate(
   template: string,
   knownKeys: string[]
-): { unknown: string[] } {
+): { unknown: string[]; filtered: string[] } {
   const known = new Set(knownKeys);
-  return { unknown: extractVariables(template).filter((key) => !known.has(key)) };
+  return {
+    unknown: extractVariables(template).filter((key) => !known.has(key)),
+    filtered: extractFilteredPlaceholders(template),
+  };
 }
 
 // Sample values mirroring the master_template_variables catalog descriptions —

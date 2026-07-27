@@ -10,7 +10,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Skeleton } from '../../components/ui/Skeleton';
-import { renderTemplate, validateTemplate } from '../../lib/templateEngine';
+import { renderTemplate, validateTemplate, EDGE_FUNCTION_BOOLEANS } from '../../lib/templateEngine';
 import {
   listMergedEmailTemplates,
   upsertOverride,
@@ -21,6 +21,14 @@ import {
 } from '../../lib/notificationTemplateService';
 
 const MERGED_KEY = ['notification-templates', 'merged', 'email'] as const;
+
+/**
+ * Render options that make this preview match the DISPATCHER, not the document
+ * surfaces. The edge function substitutes with a plain `String(value)`, so a
+ * boolean is mailed as `true`/`false` — previewing it as the friendlier
+ * "Yes"/"No" would show the author a string the customer never receives.
+ */
+const PREVIEW_OPTS = { booleans: EDGE_FUNCTION_BOOLEANS } as const;
 
 const EVENT_LABELS: Record<string, string> = {
   'case.phase_changed': 'Case status changed',
@@ -214,9 +222,15 @@ const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({
   // email — silently, with no trace. A typo ({{case_numbr}}) or a since-renamed
   // key therefore ships a blank where a case number or amount should be. Surface
   // it while editing, and make the user acknowledge it on save.
-  const unknownVariables = useMemo(() => {
-    if (variables.length === 0) return [];
-    return validateTemplate(`${subject} ${body} ${link}`, variables).unknown;
+  const { unknownVariables, filteredVariables } = useMemo(() => {
+    const result = validateTemplate(`${subject} ${body} ${link}`, variables);
+    return {
+      // Only meaningful when the event publishes a variable list.
+      unknownVariables: variables.length === 0 ? [] : result.unknown,
+      // Filter syntax is checked ALWAYS — it is invalid here regardless of
+      // whether we know the event's variables.
+      filteredVariables: result.filtered,
+    };
   }, [variables, subject, body, link]);
 
   const insertVariable = (key: string) => {
@@ -243,6 +257,18 @@ const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({
     }
     if (!body.trim()) {
       toast.error('The email body cannot be empty');
+      return;
+    }
+    // Filter syntax cannot be rendered by the dispatcher, so it would be MAILED
+    // LITERALLY to the customer. Unlike an unknown key (which sends a blank and
+    // might be deliberate), there is no scenario where this is what the author
+    // wanted — block the save outright rather than confirm it.
+    if (filteredVariables.length > 0) {
+      toast.error(
+        `Remove the | filter from ${filteredVariables
+          .map((v) => `{{${v}}}`)
+          .join(', ')} — notification emails send filtered placeholders as literal text.`,
+      );
       return;
     }
     // Unknown placeholders send blanks to customers — confirm rather than block,
@@ -319,6 +345,25 @@ const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({
           />
         </div>
 
+        {filteredVariables.length > 0 && (
+          <div
+            role="alert"
+            className="rounded-lg border border-danger/30 bg-danger-muted px-3 py-2 text-xs text-danger"
+          >
+            <span className="font-semibold">
+              Filter syntax is not supported in notification emails:
+            </span>{' '}
+            <span className="font-mono">
+              {filteredVariables.map((v) => `{{${v} | …}}`).join(', ')}
+            </span>
+            <span className="mt-1 block font-normal">
+              The email dispatcher sends these as literal text. Use the plain
+              <span className="font-mono"> {'{{key}}'} </span>
+              form — the value arrives already formatted.
+            </span>
+          </div>
+        )}
+
         {unknownVariables.length > 0 && (
           <div
             role="status"
@@ -367,10 +412,10 @@ const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({
               Preview with sample data
             </p>
             <p className="text-sm font-medium text-slate-900 mb-1">
-              {renderTemplate(subject, sampleCtx) || '(no subject)'}
+              {renderTemplate(subject, sampleCtx, PREVIEW_OPTS) || '(no subject)'}
             </p>
             <p className="text-sm text-slate-700 whitespace-pre-wrap">
-              {renderTemplate(body, sampleCtx)}
+              {renderTemplate(body, sampleCtx, PREVIEW_OPTS)}
             </p>
           </div>
         )}

@@ -6,6 +6,8 @@ import {
   SAMPLE_CONTEXT,
   STRESS_CONTEXT,
   type TemplateContext,
+  extractFilteredPlaceholders,
+  EDGE_FUNCTION_BOOLEANS,
 } from './templateEngine';
 
 // The one substitution engine for every template surface:
@@ -111,12 +113,14 @@ describe('validateTemplate', () => {
     const known = ['customer.name', 'case.number'];
     expect(validateTemplate('{{customer.name}} {{case.numbr}}', known)).toEqual({
       unknown: ['case.numbr'],
+      filtered: [],
     });
   });
 
   it('passes a fully-known template', () => {
     expect(validateTemplate('{{customer.name}}', ['customer.name'])).toEqual({
       unknown: [],
+      filtered: [],
     });
   });
 });
@@ -279,15 +283,20 @@ describe('renderTemplate — filtered placeholders (BIND-03)', () => {
     expect(renderTemplate('a | b', fctx, { formatters })).toBe('a | b');
   });
 
-  it('extractVariables reports the bare key so validateTemplate still works', () => {
+  it('extractVariables reports the bare key, and validateTemplate ALSO flags the filter', () => {
     expect(extractVariables('{{invoice.total | currency}} {{invoice.total}}')).toEqual([
       'invoice.total',
     ]);
+    // The key resolves fine — which is precisely why `unknown` alone was not a
+    // sufficient signal (FUP-03): the notification dispatcher cannot render the
+    // filter, so `filtered` has to carry that separately.
     expect(validateTemplate('{{invoice.total | currency}}', ['invoice.total'])).toEqual({
       unknown: [],
+      filtered: ['invoice.total'],
     });
     expect(validateTemplate('{{invoice.totl | currency}}', ['invoice.total'])).toEqual({
       unknown: ['invoice.totl'],
+      filtered: ['invoice.totl'],
     });
   });
 });
@@ -491,5 +500,77 @@ describe('STRESS_CONTEXT (BIND-04)', () => {
     expect(renderTemplate('{{company.name}}', STRESS_CONTEXT)).not.toBe('');
     expect(renderTemplate('[{{customer.phone}}]', STRESS_CONTEXT)).toBe('[]');
     expect(renderTemplate('{{case.problem}}', STRESS_CONTEXT).length).toBeGreaterThan(120);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FUP-03 — filter syntax must not reach the notification delivery path.
+//
+// The filter regex keeps the KEY as group 1, so `{{total | currency}}` used to
+// report as the perfectly-known variable `total`: validateTemplate returned no
+// unknowns, the BIND-01 confirm gate stayed silent, and the template saved
+// clean. But supabase/functions/notification-dispatch-email/index.ts substitutes
+// with /\{\{(\w+)\}\}/g, which cannot match a pipe — so the customer's email
+// contained the literal text "{{total | currency}}" where an amount belonged,
+// and the in-app preview (which DOES understand filters) showed the value, so
+// the author had no way to notice.
+// ---------------------------------------------------------------------------
+
+describe('extractFilteredPlaceholders (FUP-03)', () => {
+  it('reports placeholders that carry a filter', () => {
+    expect(extractFilteredPlaceholders('Total: {{total | currency}}')).toEqual(['total']);
+  });
+
+  it('is empty for plain placeholders — the edge-function-safe subset', () => {
+    expect(extractFilteredPlaceholders('Hi {{customer_name}}, case {{case_number}}')).toEqual([]);
+    expect(extractFilteredPlaceholders('')).toEqual([]);
+  });
+
+  it('dedupes and preserves order', () => {
+    expect(
+      extractFilteredPlaceholders('{{a | currency}} {{b | date}} {{a | currency}}'),
+    ).toEqual(['a', 'b']);
+  });
+
+  it('ignores degenerate/chained forms, which stay literal anyway', () => {
+    // These do not match PLACEHOLDER_RE at all, so they are neither rendered
+    // nor reportable as filtered — they are visible literals by design.
+    expect(extractFilteredPlaceholders('{{a | }}')).toEqual([]);
+    expect(extractFilteredPlaceholders('{{a | b | c}}')).toEqual([]);
+  });
+});
+
+describe('validateTemplate reports filters alongside unknowns (FUP-03)', () => {
+  const known = ['total', 'case_number'];
+
+  it('flags a filtered placeholder even though its key is known', () => {
+    const result = validateTemplate('{{total | currency}}', known);
+    // The key IS known — this is exactly why the old signature said "all clear".
+    expect(result.unknown).toEqual([]);
+    expect(result.filtered).toEqual(['total']);
+  });
+
+  it('still reports unknown keys, and the two lists are independent', () => {
+    const result = validateTemplate('{{nope}} {{total | currency}}', known);
+    expect(result.unknown).toEqual(['nope']);
+    expect(result.filtered).toEqual(['total']);
+  });
+
+  it('is empty on both counts for a clean edge-function-safe template', () => {
+    const result = validateTemplate('Case {{case_number}} total {{total}}', known);
+    expect(result.unknown).toEqual([]);
+    expect(result.filtered).toEqual([]);
+  });
+});
+
+describe('EDGE_FUNCTION_BOOLEANS keeps the notification preview honest (FUP-03)', () => {
+  it('renders booleans the way the edge function will, not the way documents do', () => {
+    const ctx = { is_paid: true, is_overdue: false };
+    // Document surfaces get the friendly labels…
+    expect(renderTemplate('{{is_paid}}', ctx)).toBe('Yes');
+    // …but the dispatcher does String(value), so the notification PREVIEW must
+    // show what will actually be sent.
+    expect(renderTemplate('{{is_paid}}', ctx, { booleans: EDGE_FUNCTION_BOOLEANS })).toBe('true');
+    expect(renderTemplate('{{is_overdue}}', ctx, { booleans: EDGE_FUNCTION_BOOLEANS })).toBe('false');
   });
 });
