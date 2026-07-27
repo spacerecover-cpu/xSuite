@@ -9,6 +9,7 @@ import { SearchableSelect } from '../../ui/SearchableSelect';
 import { WhatsAppBubblePreview } from './WhatsAppBubblePreview';
 import { whatsappKeys, templateKeys } from '../../../lib/queryKeys';
 import { saveDraftTemplate, whatsappAdmin, type WhatsAppTemplate } from '../../../lib/whatsappService';
+import { templateVarLimitError } from '../../../lib/whatsapp/templateRules';
 import { getVariableRegistry } from '../../../lib/templateContextService';
 import { getOrCreateCompanySettings } from '../../../lib/companySettingsService';
 import { useTenantConfig, useCurrencyConfig } from '../../../contexts/TenantConfigContext';
@@ -243,6 +244,14 @@ export function WhatsAppTemplateStudio({ isOpen, onClose, template }: Props) {
       if (!effectiveVarMap[p]) return `Variable {{${p}}} is not bound to a data field — insert it with a chip.`;
     }
     if (headerMode === 'text' && !headerText.trim()) return 'Header text is required (or set the header to None).';
+    // Meta's fixed per-component parameter limits. Without these the submission
+    // only fails at Graph, as a 422 after the whole template is authored.
+    if (headerMode === 'text') {
+      const headerErr = templateVarLimitError('header', headerText);
+      if (headerErr) return headerErr;
+    }
+    const footerErr = templateVarLimitError('footer', footerText);
+    if (footerErr) return footerErr;
     if (headerMode === 'logo' && !logoUrl) {
       return 'Upload a company logo (Settings → General Settings → Branding) before using an image header.';
     }
@@ -483,8 +492,12 @@ export function WhatsAppTemplateStudio({ isOpen, onClose, template }: Props) {
                     </p>
               )}
             </div>
+            {/* Placeholder deliberately shows FIXED text: Meta allows no
+                variables here, and the old "{{company_name}} — Data Recovery"
+                example taught the exact pattern Graph rejects on submit. */}
             <Input floatingLabel label="Footer (optional)" value={footerText} maxLength={60}
-              placeholder="e.g. {{company_name}} — Data Recovery"
+              placeholder="e.g. Space Data Recovery — fixed text, no variables"
+              error={templateVarLimitError('footer', footerText) ?? undefined}
               onChange={(e) => setFooterText(e.target.value)} />
           </div>
 
