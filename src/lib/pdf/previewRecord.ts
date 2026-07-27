@@ -81,6 +81,17 @@ export function supportsRecordPreview(docType: TemplateDocumentType): boolean {
 export interface PreviewRecordOption {
   id: string;
   label: string;
+  /**
+   * For `report` records: the record's OWN `report_type`.
+   *
+   * Production derives the section config from this
+   * (`reportPDFService`: `reportConfigForSubtype(data.report.report_type)`), so
+   * a preview that instead used the Studio's free-standing subtype picker would
+   * render a forensic record through the evaluation shell and disagree with the
+   * download (FUP-02). Surfacing it here lets the Studio resolve the same base
+   * production will.
+   */
+  reportType?: string;
 }
 
 /** Doc types whose record is a CASE (the id passed to the fetcher is a case id). */
@@ -178,12 +189,20 @@ export async function listPreviewRecords(docType: TemplateDocumentType): Promise
   if (docType === 'report') {
     const { data } = await supabase
       .from('document_instances')
-      .select('id, document_number, title')
+      .select('id, document_number, title, report_subtype')
       .eq('doc_type', 'report')
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(RECORD_LIMIT);
-    return (data ?? []).map((r) => ({ id: r.id, label: r.document_number || r.title || r.id }));
+    return (data ?? []).map((r) => ({
+      id: r.id,
+      label: r.document_number || r.title || r.id,
+      // Drives the Studio's subtype resolution so the preview matches the
+      // download for THIS record, not whatever the picker happens to show.
+      // The `?? 'evaluation'` default mirrors documentInstanceData.ts exactly,
+      // so a record with no stored subtype resolves the same base in both paths.
+      reportType: r.report_subtype ?? 'evaluation',
+    }));
   }
   if (docType === 'payslip') {
     const { data } = await supabase

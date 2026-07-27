@@ -64,6 +64,7 @@ import {
   previewDownloadFilename,
   type PreviewFailure,
 } from './previewStudioHelpers';
+import type { PreviewRecordOption } from '../../../lib/pdf/previewRecord';
 import { GeneralTab } from './tabs/GeneralTab';
 import { HeaderFooterTab } from './tabs/HeaderFooterTab';
 import { TransactionTab } from './tabs/TransactionTab';
@@ -192,12 +193,28 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   const [activeTab, setActiveTab] = useState<TabId>('general');
   // Preview data source: 'sample' synthetic data, or a real record id.
   const [dataSource, setDataSource] = useState<string>('sample');
-  const [records, setRecords] = useState<{ id: string; label: string }[]>([]);
+  const [records, setRecords] = useState<PreviewRecordOption[]>([]);
   // A subtype-scoped template previews as its own report type. The legacy
   // shared base serves all 8, so it keeps a preview picker that renders each
   // one the exact way generation resolves it (subtype base + this override).
   const [previewSubtype, setPreviewSubtype] = useState<string>(reportSubtype ?? 'evaluation');
   const showSubtypePicker = docType === 'report' && !reportSubtype;
+
+  /**
+   * The report subtype the preview actually renders through.
+   *
+   * When a real record is selected it is the RECORD's own `report_type`, never
+   * the picker — production resolves the section config from the record
+   * (`reportPDFService`: `reportConfigForSubtype(data.report.report_type)`), so
+   * taking the picker instead would render a forensic record through the
+   * evaluation shell and disagree with the download (FUP-02). The picker still
+   * drives SAMPLE previews, where there is no record to ask.
+   */
+  const selectedRecord = dataSource === 'sample' ? undefined : records.find((r) => r.id === dataSource);
+  const effectiveSubtype = selectedRecord?.reportType ?? previewSubtype;
+  /** True when the record overruled the picker — surfaced so it is not silent. */
+  const subtypeFollowsRecord =
+    docType === 'report' && !!selectedRecord?.reportType && selectedRecord.reportType !== previewSubtype;
   // "Print view": drop the stand-in logo box so the preview predicts the printed
   // layout exactly. Only meaningful while a placeholder is actually in play.
   const [printView, setPrintView] = useState(false);
@@ -205,8 +222,8 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   const heading = titleLabel ?? DOC_TYPE_LABELS[docType];
 
   const builtIn = useMemo(
-    () => (docType === 'report' ? reportConfigForSubtype(previewSubtype) : BUILT_IN_TEMPLATE_CONFIGS[docType]),
-    [docType, previewSubtype],
+    () => (docType === 'report' ? reportConfigForSubtype(effectiveSubtype) : BUILT_IN_TEMPLATE_CONFIGS[docType]),
+    [docType, effectiveSubtype],
   );
 
   const resolved = useMemo(
@@ -264,7 +281,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
             companySettings ?? undefined,
             languageExplicit,
             {
-              ...(docType === 'report' ? { reportSubtype: previewSubtype } : {}),
+              ...(docType === 'report' ? { reportSubtype: effectiveSubtype } : {}),
               logoPlaceholder,
             },
           ));
@@ -297,7 +314,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [resolved, languageExplicit, dataSource, docType, previewSubtype, tenantLogo, tenantStamp, tenantSignature, companySettings, printView]);
+  }, [resolved, languageExplicit, dataSource, docType, effectiveSubtype, tenantLogo, tenantStamp, tenantSignature, companySettings, printView]);
 
   useEffect(() => () => {
     if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
@@ -718,9 +735,18 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
                 {showSubtypePicker && (
                   <select
                     aria-label="Preview report type"
-                    value={previewSubtype}
+                    value={effectiveSubtype}
                     onChange={(e) => setPreviewSubtype(e.target.value)}
-                    className="max-w-[190px] rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    /* Disabled while a real record drives it: the record's own
+                       report_type is what production renders, so letting the
+                       picker fight it would only recreate the divergence. */
+                    disabled={!!selectedRecord?.reportType}
+                    title={
+                      selectedRecord?.reportType
+                        ? 'Set by the selected record — this is the type the generated PDF uses.'
+                        : undefined
+                    }
+                    className="max-w-[190px] rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                   >
                     {Object.values(REPORT_TYPES).map((o) => (
                       <option key={o.key} value={o.key}>
@@ -728,6 +754,14 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
                       </option>
                     ))}
                   </select>
+                )}
+                {subtypeFollowsRecord && (
+                  <span
+                    role="status"
+                    className="rounded bg-info-muted px-1.5 py-0.5 text-xxs font-medium text-info"
+                  >
+                    Type from record
+                  </span>
                 )}
                 {logoIsPlaceholder && (
                   <button
