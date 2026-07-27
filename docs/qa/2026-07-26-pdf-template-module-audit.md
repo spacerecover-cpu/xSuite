@@ -134,15 +134,13 @@ Pass 2 adds the table/page-break layer, where the dominant theme is **multi-page
 
 # 3. Template Studio — UI/UX, CRUD & validation
 
-### STU-01 — Page margin inputs have no min/max bounds
-- **Severity:** High · **Priority:** P1
-- **Description:** In `GeneralTab.tsx` the four margin `NumberField`s pass only `label` and `value` — no `min`/`max`/`step`. The same file *does* bound other controls (`Fine-tune scale` `min={0.6}`, watermark `Opacity` `min={0.05}`), so this is an inconsistency, not a house style.
-- **Steps to reproduce:** Enter `-50`, or `900`, in any margin field.
-- **Expected:** Rejected or clamped to a printable range.
-- **Actual:** Negative margins push content off-page; margins exceeding the sheet produce zero/negative content width — a blank or broken PDF, reported only as the generic preview error.
-- **Suggested fix:** `min={0}` plus a max derived from the selected paper size, and validate again in `renderTemplate` as a backstop.
+### STU-01 — Page margin inputs have no upper bound *(finding partly incorrect as first written)*
+- **Status:** ✅ **FIXED**, and the finding is **corrected**. The original text claimed the margin fields passed "no `min`/`max`" and that negative margins were accepted. That was wrong: `min={0}` was already present on `origin/main` — my grep window (`-A 3` after each `NumberField`) cut the line off, and I did not verify before writing it up. **Negative margins were never possible.**
+  The real gap was the missing **upper** bound, and that part was genuine: a margin pair wider than the sheet collapses the content box. Fixed on both sides — `max={maxMarginFor(side)}` in `GeneralTab`, derived from the current sheet **and orientation** so the cap follows a Letter/landscape/custom switch; plus a `clampPageMargins()` backstop in `renderTemplate`, because margins also arrive from stored configs, the gallery and hand-edited JSON, not only from this UI. The clamp scales an oversized pair proportionally (so the layout keeps its balance rather than one side absorbing the whole correction), coerces negative/non-finite values to 0, and reserves a 1-inch content floor. Covered by `pageMarginClamp.test.ts` (7 cases incl. landscape rotation and a custom label box).
+- **Severity:** High → **Medium** (revised: oversized margins only, not negative) · **Priority:** P1
 
 ### STU-02 — "Reset" destroys all customization with no confirmation
+- **Status:** ✅ **FIXED** — `handleReset` now goes through the shared `useConfirm` hook with a `tone: 'danger'` dialog naming what is lost ("layout, colours, typography, labels… cannot be undone") before wiping the override.
 - **Severity:** High · **Priority:** P1
 - **Description:** `handleReset` (`TemplateStudio.tsx:541`) calls `setOverride({})` immediately, then shows an *informational* toast after the fact. There is no confirm step and no undo.
 - **Steps to reproduce:** Customize a template extensively → click Reset.
@@ -151,6 +149,7 @@ Pass 2 adds the table/page-break layer, where the dominant theme is **multi-page
 - **Suggested fix:** Route through the existing `useConfirm` hook with a `tone: 'danger'` dialog.
 
 ### STU-03 — No unsaved-changes guard when leaving the Studio
+- **Status:** ✅ **FIXED** — the Studio now tracks a `savedOverride` baseline and derives `isDirty` from it. Back routes through `handleBack`, which confirms before discarding; a `beforeunload` listener (armed only while dirty) covers tab close / reload / external navigation, which React cannot intercept. The baseline advances on save, so "unsaved" means *since the last deploy*, not since mount.
 - **Severity:** High · **Priority:** P1
 - **Description:** The Back control (`TemplateStudio.tsx:551`) calls `onBack()` directly. `override` lives in component state and Save is explicit (`onSave(override)`), so anything unsaved is lost. There is no dirty check and no `beforeunload` handler.
 - **Steps to reproduce:** Edit any setting → click Back (or close the tab).
@@ -377,12 +376,15 @@ Two passes found **36 issues against a target of 50+**. I am reporting the numbe
 | **TBL-01** rows split across pages | ✅ Fixed — `dontBreakRows` on all 8 data tables |
 | **TBL-03** tax summary RTL-blind | ✅ Fixed — column + alignment mirroring |
 | **TBL-04** totals RTL-blind | ✅ Fixed (geometry); in-cell alignment intentionally unchanged |
+| **STU-01** margin bounds | ✅ Fixed — UI `max` + `clampPageMargins` backstop (finding corrected) |
+| **STU-02** Reset has no confirmation | ✅ Fixed — `useConfirm` danger dialog |
+| **STU-03** no unsaved-changes guard | ✅ Fixed — dirty tracking + confirm on back + `beforeunload` |
 
 **Remaining, in recommended order:**
 
-1. **STU-01/02/03** (margin bounds, Reset confirmation, unsaved-changes guard) — cheap, high-annoyance fixes.
-2. **RND-02** (hardcoded `x2: 525`) — one shared helper resolves all four sites.
-3. **TBL-05/06/07** (S/N column side under RTL, empty line-item table, column-width overflow).
+1. **RND-02** (hardcoded `x2: 525`) — one shared helper resolves all four sites.
+2. **TBL-05/06/07** (S/N column side under RTL, empty line-item table, column-width overflow).
+3. **RND-07** (custom page dimensions unvalidated) — partly mitigated: `clampPageMargins` now guards the *margins* against a custom box, but a zero/negative `dimensions` pair still reaches pdfmake.
 4. **STU-04** partially addressed by the RND-01 fix (the sub-controls no longer hide behind a non-empty `text`); a dedicated watermark-image *upload* remains unimplemented — today the fix reuses the company logo.
 
 ### Note on verification limits for the table fixes

@@ -69,6 +69,17 @@ export const GeneralTab: React.FC<{ api: StudioApi }> = ({ api }) => {
   const fitting = resolved.pageFitting;
   const presentation = resolved.presentation;
   const seed = colors?.accent && colors.accent.startsWith('#') ? colors.accent : PDF_COLORS.primary;
+
+  // Upper bound per margin side, derived from the CURRENT sheet + orientation so
+  // the cap follows a Letter/landscape/custom switch. Half the axis minus a 36pt
+  // share of the 1-inch content floor keeps the opposite side usable too.
+  const maxMarginFor = (side: 'top' | 'right' | 'bottom' | 'left'): number => {
+    const custom = resolved.paper.size === 'custom' ? resolved.paper.dimensions : undefined;
+    const [sheetW, sheetH] = custom ?? (resolved.paper.size === 'Letter' ? [612, 792] : [595, 842]);
+    const [w, h] = resolved.paper.orientation === 'landscape' ? [sheetH, sheetW] : [sheetW, sheetH];
+    const axis = side === 'left' || side === 'right' ? w : h;
+    return Math.max(0, Math.floor(axis / 2) - 36);
+  };
   const secondary = resolveSecondary(resolved.language);
   const docTitle = resolved.labels?.documentTitle;
 
@@ -115,6 +126,11 @@ export const GeneralTab: React.FC<{ api: StudioApi }> = ({ api }) => {
             ]}
           />
         </div>
+        {/* `min={0}` already blocked negative margins; the missing bound was the
+            upper one — a margin wider than the sheet collapses the content box
+            and yields a blank page. Cap each side at "sheet minus one inch of
+            content", split across the pair. renderTemplate clamps too, for
+            configs that arrive from the gallery/stored JSON rather than here. */}
         <div className="grid grid-cols-4 gap-2">
           {(['top', 'right', 'bottom', 'left'] as const).map((side, i) => (
             <NumberField
@@ -122,6 +138,7 @@ export const GeneralTab: React.FC<{ api: StudioApi }> = ({ api }) => {
               label={side[0].toUpperCase() + side.slice(1)}
               value={resolved.paper.margins[i]}
               min={0}
+              max={maxMarginFor(side)}
               onChange={(v) => {
                 const next = [...resolved.paper.margins] as PaperConfig['margins'];
                 next[i] = v;

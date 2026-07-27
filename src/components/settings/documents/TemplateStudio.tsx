@@ -16,6 +16,7 @@ import {
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
 import { useToast } from '../../../hooks/useToast';
+import { useConfirm } from '../../../hooks/useConfirm';
 import { logger } from '../../../lib/logger';
 import {
   BUILT_IN_TEMPLATE_CONFIGS,
@@ -177,7 +178,11 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   onOpenGallery,
 }) => {
   const toast = useToast();
+  const confirm = useConfirm();
   const [override, setOverride] = useState<TemplateConfigOverride>(initialOverride);
+  // Saved baseline for the dirty check — advanced on every successful save so
+  // "unsaved changes" means changes since the last deploy, not since mount.
+  const [savedOverride, setSavedOverride] = useState<TemplateConfigOverride>(initialOverride);
   const [activeTab, setActiveTab] = useState<TabId>('general');
   // Preview data source: 'sample' synthetic data, or a real record id.
   const [dataSource, setDataSource] = useState<string>('sample');
@@ -538,9 +543,64 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
     };
   }, [docType, resolved, override]);
 
-  const handleReset = () => {
+  // Structural compare of the edited override against the last saved one. The
+  // override is a small plain-JSON config, so stringify is an adequate and cheap
+  // deep-equal here; key order is stable because every mutator spreads the
+  // previous object rather than rebuilding it.
+  const isDirty = useMemo(
+    () => JSON.stringify(override) !== JSON.stringify(savedOverride),
+    [override, savedOverride],
+  );
+
+  // Native guard for tab close / reload / external navigation, which React
+  // cannot intercept. Only armed while dirty so it never nags otherwise.
+  useEffect(() => {
+    if (!isDirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Required by some browsers to trigger the native prompt.
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [isDirty]);
+
+  // Reset wipes every customization in one click and there is no undo, so it
+  // takes the same confirmation any other destructive action in the app does.
+  const handleReset = async () => {
+    const confirmed = await confirm({
+      title: 'Reset this template?',
+      message:
+        'Every customization on this template — layout, colours, typography, labels — goes back to the built-in default. This cannot be undone.',
+      confirmLabel: 'Reset to default',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     setOverride({});
     toast.info('Reverted to the default layout. Save to apply.');
+  };
+
+  // Leaving with unsaved edits silently discarded them — the override lives in
+  // component state and only Save persists it.
+  const handleBack = async () => {
+    if (isDirty) {
+      const leave = await confirm({
+        title: 'Leave without saving?',
+        message: 'Your changes to this template have not been deployed yet. Leaving discards them.',
+        confirmLabel: 'Discard changes',
+        tone: 'danger',
+      });
+      if (!leave) return;
+    }
+    onBack();
+  };
+
+  const handleSave = () => {
+    // Optimistic: the parent owns persistence, and a failed save keeps the
+    // Studio mounted with the edits intact — the baseline advancing only means
+    // the guard stops warning about work the user has explicitly submitted.
+    setSavedOverride(override);
+    onSave(override);
   };
 
   return (
@@ -548,7 +608,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       {/* Top bar */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="rounded-lg p-2 transition-colors hover:bg-slate-100" aria-label="Back to documents">
+          <button onClick={handleBack} className="rounded-lg p-2 transition-colors hover:bg-slate-100" aria-label="Back to documents">
             <ArrowLeft className="h-5 w-5 text-slate-600" />
           </button>
           <div>
@@ -567,7 +627,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
             <RotateCcw className="mr-2 h-4 w-4" />
             Reset
           </Button>
-          <Button size="sm" onClick={() => onSave(override)} isLoading={isSaving} loadingLabel="Saving">
+          <Button size="sm" onClick={handleSave} isLoading={isSaving} loadingLabel="Saving">
             <Save className="mr-2 h-4 w-4" />
             Save &amp; deploy
           </Button>
