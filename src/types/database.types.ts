@@ -20658,6 +20658,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      seed_whatsapp_starter_templates: {
+        Args: { p_tenant_id: string }
+        Returns: number
+      }
       set_case_status: {
         Args: { p_case_id: string; p_notes?: string; p_to_status_id: string }
         Returns: Json
@@ -20896,6 +20900,21 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      whatsapp_analytics_summary: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          avg_response_seconds: number
+          billable: number
+          day: string
+          delivered: number
+          failed: number
+          queued: number
+          read: number
+          replies: number
+          sent: number
+          skipped: number
+        }[]
+      }
       whatsapp_apply_send_window: {
         Args: {
           p_business_hours: Json
@@ -20911,6 +20930,14 @@ export type Database = {
           occurred_at: string
           opted_in: boolean
           scope: string
+        }[]
+      }
+      whatsapp_failure_breakdown: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          error_code: number
+          occurrences: number
+          sample_error: string
         }[]
       }
       whatsapp_match_customer_by_phone: {
