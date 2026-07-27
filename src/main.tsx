@@ -10,6 +10,11 @@ import { isChunkLoadError } from './lib/chunkError';
 import './index.css';
 import './lib/i18n';
 
+// Tells public/boot-guard.js the entry module graph resolved, so a later
+// resource error (a lazy chunk after a deploy) is left to lazyWithRetry /
+// ErrorBoundary instead of triggering a boot-time reload.
+(window as Window & { __xsuiteBooted?: boolean }).__xsuiteBooted = true;
+
 // Make React's DOM commits tolerant of browser page-translation (Google Translate
 // et al.) re-parenting nodes, which otherwise crashes the app with a removeChild
 // NotFoundError. Installed before any DOM work. See domTranslationGuard.ts.

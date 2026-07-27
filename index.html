@@ -9,6 +9,13 @@
          app has its own EN/AR i18n; domTranslationGuard.ts is the runtime safety net. -->
     <meta name="google" content="notranslate" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://api-m.paypal.com https://api-m.sandbox.paypal.com https://fonts.gstatic.com; frame-src 'self' blob:; object-src 'self' blob:; base-uri 'self'; form-action 'self';" />
+    <!-- Classic (non-module) script, deliberately FIRST: it recovers a
+         stale-deploy failure in the entry module graph, which main.tsx's error
+         handlers and ErrorBoundary structurally cannot see because they never
+         execute. Must precede Vite's injected module script and modulepreload
+         links so its capture-phase listener is registered before their fetches
+         can fail. See public/boot-guard.js. -->
+    <script src="/boot-guard.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Chakra Petch is the sanctioned AUTH-ONLY display face (font-display-auth);
