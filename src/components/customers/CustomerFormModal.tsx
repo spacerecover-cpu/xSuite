@@ -1,8 +1,23 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
-import { createCustomer, updateCustomer, getNextCustomerNumberPreview } from '../../lib/customerService';
+import {
+  createCustomer,
+  updateCustomer,
+  getNextCustomerNumberPreview,
+  type CreateCustomerInput,
+  type UpdateCustomerInput,
+} from '../../lib/customerService';
 import { createCompany } from '../../lib/companyService';
+import { recordConsent, getConsentState, summarizeConsent } from '../../lib/whatsappService';
+import { whatsappKeys } from '../../lib/queryKeys';
+import {
+  WhatsAppConsentBlock,
+  useCompanyName,
+  utilityConsentLabel,
+  marketingConsentLabel,
+  type ConsentDraft,
+} from './WhatsAppConsentBlock';
 import { Button } from '../ui/Button';
 import { Input, NO_AUTOFILL } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
@@ -30,6 +45,7 @@ export interface CustomerEditData {
   email: string | null;
   mobile_number: string | null;
   phone: string | null;
+  whatsapp_number?: string | null;
   customer_group_id: string | null;
   country_id: string | null;
   city_id: string | null;
@@ -49,6 +65,8 @@ interface CustomerFormModalProps {
   onSuccess?: (customer: Record<string, unknown>) => void;
   /** Provide to open in edit mode for an existing customer. */
   customer?: CustomerEditData;
+  /** Origin recorded on WhatsApp consent rows — the intake wizard passes 'intake_form'. */
+  consentSource?: 'staff' | 'intake_form';
 }
 
 interface CustomerGroup {
@@ -87,14 +105,17 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   onClose,
   onSuccess,
   customer,
+  consentSource = 'staff',
 }) => {
   const isEdit = Boolean(customer);
   const queryClient = useQueryClient();
   const { profile } = useAuth();
+  const companyName = useCompanyName();
   const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false);
   const [showAltPhone, setShowAltPhone] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [consentDraft, setConsentDraft] = useState<ConsentDraft>({ utility: false, marketing: false });
   const customerNameRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
@@ -103,6 +124,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     secondary_email: '',
     mobile_number: '',
     phone_number: '',
+    whatsapp_number: '',
     customer_group_id: '',
     country_id: '',
     city_id: '',
@@ -192,6 +214,48 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     staleTime: 0,
   });
 
+  // Existing consent state (edit mode) — save only writes NEWLY-checked scopes.
+  const tenantId = profile?.tenant_id ?? null;
+  const { data: existingConsent } = useQuery({
+    queryKey: whatsappKeys.consents(customer?.id ?? 'new'),
+    queryFn: () => getConsentState(tenantId!, customer!.id),
+    enabled: Boolean(isOpen && customer?.id && tenantId),
+  });
+
+  const writeNewConsents = async (saved: {
+    id: string;
+    whatsapp_number?: string | null;
+    mobile_number?: string | null;
+  }) => {
+    if (!tenantId) return;
+    const already = existingConsent
+      ? summarizeConsent(existingConsent)
+      : { utility: false, marketing: false };
+    const phone = saved.whatsapp_number ?? saved.mobile_number ?? null;
+    if (consentDraft.utility && !already.utility) {
+      await recordConsent({
+        tenant_id: tenantId,
+        customer_id: saved.id,
+        scope: 'utility',
+        action: 'opt_in',
+        source: consentSource,
+        consent_text: utilityConsentLabel(companyName),
+        phone_e164: phone,
+      });
+    }
+    if (consentDraft.marketing && !already.marketing) {
+      await recordConsent({
+        tenant_id: tenantId,
+        customer_id: saved.id,
+        scope: 'marketing',
+        action: 'opt_in',
+        source: consentSource,
+        consent_text: marketingConsentLabel(companyName),
+        phone_e164: phone,
+      });
+    }
+  };
+
   // Edit mode: prefill the form from the customer whenever the modal opens.
   React.useEffect(() => {
     if (!isOpen || !customer) return;
@@ -201,6 +265,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       secondary_email: (customer.metadata as { secondary_email?: string } | null)?.secondary_email ?? '',
       mobile_number: customer.mobile_number ?? '',
       phone_number: customer.phone ?? '',
+      whatsapp_number: customer.whatsapp_number ?? '',
       customer_group_id: customer.customer_group_id ?? '',
       country_id: customer.country_id ?? '',
       city_id: customer.city_id ?? '',
@@ -215,8 +280,10 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     });
     setShowAltPhone(
       Boolean(customer.phone) ||
+      Boolean(customer.whatsapp_number) ||
       Boolean((customer.metadata as { secondary_email?: string } | null)?.secondary_email),
     );
+    setConsentDraft({ utility: false, marketing: false });
   }, [isOpen, customer]);
 
   const filteredCities = cities.filter(
@@ -250,12 +317,15 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   const createMutation = useMutation({
     mutationFn: async (customer: typeof formData) => {
       // The structured address fields (WP-1 Task 3) are declared on
-      // `CreateCustomerInput`; createCustomer spreads them into the insert.
-      const payload = {
+      // `CreateCustomerInput`; createCustomer spreads them into the insert
+      // (whatsapp_number rides the same spread — the column exists on
+      // customers_enhanced, the service passes unknown fields through).
+      const payload: CreateCustomerInput & { whatsapp_number: string | null } = {
         customer_name: customer.customer_name,
         email: customer.email || null,
         mobile_number: customer.mobile_number || null,
         phone: customer.phone_number || null,
+        whatsapp_number: customer.whatsapp_number || null,
         customer_group_id: customer.customer_group_id || null,
         country_id: customer.country_id || null,
         city_id: customer.city_id || null,
@@ -270,12 +340,17 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         created_by: profile?.id,
         company_id: customer.company_id || null,
       };
-      return createCustomer(payload);
+      const newCustomer = await createCustomer(payload);
+      if (newCustomer) await writeNewConsents(newCustomer);
+      return newCustomer;
     },
     onSuccess: (newCustomer) => {
       queryClient.invalidateQueries({ queryKey: ['customers_enhanced'] });
       queryClient.invalidateQueries({ queryKey: ['customer_number_preview'] });
       queryClient.invalidateQueries({ queryKey: ['customers_for_cases'] });
+      if (newCustomer) {
+        queryClient.invalidateQueries({ queryKey: whatsappKeys.consents(newCustomer.id) });
+      }
       resetForm();
       if (onSuccess && newCustomer) onSuccess(newCustomer as unknown as Record<string, unknown>);
       onClose();
@@ -285,11 +360,12 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   const updateMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       if (!customer) throw new Error('No customer to update');
-      return updateCustomer(customer.id, {
+      const payload: UpdateCustomerInput & { whatsapp_number: string | null } = {
         customer_name: data.customer_name,
         email: data.email || null,
         mobile_number: data.mobile_number || null,
         phone: data.phone_number || null,
+        whatsapp_number: data.whatsapp_number || null,
         customer_group_id: data.customer_group_id || null,
         country_id: data.country_id || null,
         city_id: data.city_id || null,
@@ -305,12 +381,18 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
           ...((customer?.metadata as Record<string, unknown> | null) ?? {}),
           secondary_email: data.secondary_email || null,
         },
-      });
+      };
+      const updated = await updateCustomer(customer.id, payload);
+      if (updated) await writeNewConsents(updated);
+      return updated;
     },
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ['customers_enhanced'] });
       queryClient.invalidateQueries({ queryKey: ['customers_for_cases'] });
-      if (customer) queryClient.invalidateQueries({ queryKey: ['customer', customer.id] });
+      if (customer) {
+        queryClient.invalidateQueries({ queryKey: ['customer', customer.id] });
+        queryClient.invalidateQueries({ queryKey: whatsappKeys.consents(customer.id) });
+      }
       if (onSuccess && updated) onSuccess(updated as unknown as Record<string, unknown>);
       onClose();
     },
@@ -338,6 +420,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       secondary_email: '',
       mobile_number: '',
       phone_number: '',
+      whatsapp_number: '',
       customer_group_id: '',
       country_id: defaultCountryId,
       city_id: '',
@@ -353,6 +436,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     setErrors({});
     setTouched({});
     setShowAltPhone(false);
+    setConsentDraft({ utility: false, marketing: false });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -448,8 +532,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowAltPhone(true)}
-                  title="Add alternative phone number"
-                  aria-label="Add alternative phone number"
+                  title="Add alternative contact & WhatsApp"
+                  aria-label="Add alternative contact & WhatsApp"
                   className="absolute -top-5 right-0 text-primary transition-colors hover:text-primary/80"
                 >
                   <Plus className="h-4 w-4" />
@@ -469,32 +553,57 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
 
           {showAltPhone && (
             <div className="flex items-start gap-2">
-              <div className="grid flex-1 grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Alternative Email"
-                  floatingLabel
-                  {...NO_AUTOFILL}
-                  type="email"
-                  value={formData.secondary_email}
-                  onChange={(e) => handleFieldChange('secondary_email', e.target.value)}
-                  placeholder="e.g. info@example.com"
-                />
-                <PhoneInput
-                  label="Alternative Mobile Number"
-                  floatingLabel
-                  value={formData.phone_number}
-                  onChange={(val) => handleFieldChange('phone_number', val)}
-                  countries={countries}
-                  selectedCountryId={formData.country_id}
-                  placeholder="e.g. 9123 4567"
+              <div className="flex-1 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input
+                    label="Alternative Email"
+                    floatingLabel
+                    {...NO_AUTOFILL}
+                    type="email"
+                    value={formData.secondary_email}
+                    onChange={(e) => handleFieldChange('secondary_email', e.target.value)}
+                    placeholder="e.g. info@example.com"
+                  />
+                  <PhoneInput
+                    label="Alternative Mobile Number"
+                    floatingLabel
+                    value={formData.phone_number}
+                    onChange={(val) => handleFieldChange('phone_number', val)}
+                    countries={countries}
+                    selectedCountryId={formData.country_id}
+                    placeholder="e.g. 9123 4567"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <PhoneInput
+                    label="WhatsApp Number"
+                    floatingLabel
+                    value={formData.whatsapp_number}
+                    onChange={(val) => handleFieldChange('whatsapp_number', val)}
+                    countries={countries}
+                    selectedCountryId={formData.country_id}
+                    placeholder="e.g. 9123 4567"
+                  />
+                </div>
+                <WhatsAppConsentBlock
+                  customerId={customer?.id}
+                  value={consentDraft}
+                  onChange={setConsentDraft}
                 />
               </div>
               <button
                 type="button"
                 onClick={() => {
                   setShowAltPhone(false);
-                  handleFieldChange('phone_number', '');
-                  handleFieldChange('secondary_email', '');
+                  // Single functional update — chained handleFieldChange calls
+                  // each spread the stale formData closure and undo one another.
+                  setFormData((prev) => ({
+                    ...prev,
+                    phone_number: '',
+                    secondary_email: '',
+                    whatsapp_number: '',
+                  }));
+                  setConsentDraft({ utility: false, marketing: false });
                 }}
                 title="Remove alternative contact"
                 aria-label="Remove alternative contact"
