@@ -20,6 +20,7 @@ import {
   Workflow,
   Receipt,
   Tags,
+  MessageCircle,
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 
@@ -322,6 +323,16 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     actionLabel: 'Manage Subscriptions',
     description: 'Choose which events notify you and on which channels',
   },
+  {
+    id: 'communications',
+    title: 'Communications',
+    icon: MessageCircle,
+    backgroundColor: '#0E7490',
+    borderColor: '#155E75',
+    tables: [],
+    actionLabel: 'Configure',
+    description: 'WhatsApp connection, automated customer notifications, and message templates',
+  },
 ];
 
 export interface SettingsGroup {
@@ -342,7 +353,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   // Accents are 600/700-level so the same hue is legible as icon, tint, and the
   // action-label text (AA on white); the soft tint comes from the 12% alpha, not
   // a lighter hue.
-  { id: 'workspace', label: 'Workspace', accent: '#475569', categoryIds: ['appearance', 'preferences', 'table-columns', 'features', 'general-settings', 'notifications'] },
+  { id: 'workspace', label: 'Workspace', accent: '#475569', categoryIds: ['appearance', 'preferences', 'table-columns', 'features', 'general-settings', 'notifications', 'communications'] },
   { id: 'operations', label: 'Operations', accent: '#1d4ed8', categoryIds: ['device-media', 'inventory-settings', 'case-service', 'case-lifecycle', 'procurement'] },
   { id: 'finance', label: 'Client & Finance', accent: '#0f766e', categoryIds: ['client-financial', 'localization', 'tax-registration'] },
   { id: 'documents', label: 'Documents & Reports', accent: '#be185d', categoryIds: ['templates', 'documents', 'labels'] },

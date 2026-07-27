@@ -122,6 +122,8 @@ export const SettingsDashboard: React.FC = () => {
       navigate('/settings/import-export');
     } else if (categoryId === 'notifications') {
       navigate('/settings/notifications');
+    } else if (categoryId === 'communications') {
+      navigate('/settings/communications');
     } else if (categoryId === 'inventory-settings') {
       navigate('/settings/inventory');
     } else {
