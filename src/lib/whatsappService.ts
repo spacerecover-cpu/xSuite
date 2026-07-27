@@ -26,17 +26,82 @@ export function diffRulesToSeed(
   }));
 }
 
+export interface GoLiveGate { key: string; ok: boolean; label: string; fix: string }
+
+/**
+ * Pure: every gate standing between "credentials stored" and "a customer
+ * actually receives a message". `whatsapp_tenant_active()` ANDs is_enabled with
+ * connection_status, and the dispatch trigger additionally reads the tenant's
+ * `automation.whatsapp` flag — so a connected integration with the send switch
+ * off is silently inert. Keep all four here; that silence is the failure mode.
+ */
+export function whatsappGoLiveGates(input: {
+  connectionStatus?: string | null;
+  isEnabled?: boolean | null;
+  webhookStatus?: string | null;
+  featureEnabled: boolean;
+}): GoLiveGate[] {
+  const connected = input.connectionStatus === 'connected';
+  return [
+    { key: 'credentials', ok: connected,
+      label: 'Credentials verified with Meta',
+      fix: 'Enter the five values below and press Connect.' },
+    { key: 'sending', ok: connected && input.isEnabled === true,
+      label: 'Sending armed',
+      fix: 'Turn on the sending switch above — automations stay queued until then.' },
+    { key: 'webhook', ok: input.webhookStatus === 'verified' || input.webhookStatus === 'receiving',
+      label: 'Webhook verified by Meta',
+      fix: 'Paste the callback URL + verify token into Meta → WhatsApp → Configuration, then subscribe to the six fields listed there.' },
+    { key: 'feature', ok: input.featureEnabled,
+      label: 'WhatsApp Automation feature on',
+      fix: 'Settings → Features & Modules → WhatsApp Automation.' },
+  ];
+}
+
 /** Pure: consent-state rows → { utility, marketing } booleans. */
 export function summarizeConsent(rows: ConsentStateRow[]): { utility: boolean; marketing: boolean } {
   const get = (scope: string) => rows.find((r) => r.scope === scope)?.opted_in ?? false;
   return { utility: get('utility'), marketing: get('marketing') };
 }
 
-export async function getIntegration(): Promise<WhatsAppIntegration | null> {
+/**
+ * Every readable column EXCEPT access_token_secret_id / app_secret_secret_id.
+ * Those two are REVOKEd from `authenticated` (the Vault handles are service-role
+ * only), and Postgres denies `SELECT *` outright when any expanded column lacks a
+ * grant — so this list must stay explicit. Adding a column to the table means
+ * adding it here too.
+ */
+const INTEGRATION_COLUMNS = [
+  'id', 'tenant_id', 'public_id', 'integration_mode', 'app_id', 'waba_id',
+  'phone_number_id', 'display_phone_number', 'verified_name', 'graph_api_version',
+  'webhook_verify_token', 'is_enabled', 'connection_status', 'webhook_status',
+  'quality_rating', 'messaging_limit_tier', 'name_status', 'token_valid',
+  'token_expires_at', 'send_paused_until', 'last_health_check_at', 'last_webhook_at',
+  'health_errors', 'created_by', 'updated_by', 'created_at', 'updated_at', 'deleted_at',
+].join(', ');
+
+export type WhatsAppIntegrationView = Omit<
+  WhatsAppIntegration, 'access_token_secret_id' | 'app_secret_secret_id'
+>;
+
+export async function getIntegration(): Promise<WhatsAppIntegrationView | null> {
   const { data, error } = await supabase.from('whatsapp_integrations')
-    .select('*').is('deleted_at', null).maybeSingle();
+    .select(INTEGRATION_COLUMNS).is('deleted_at', null).maybeSingle();
   if (error) throw error;
-  return data;
+  return (data as WhatsAppIntegrationView | null) ?? null;
+}
+
+/**
+ * Master send switch. `whatsapp_tenant_active()` requires `is_enabled AND
+ * connection_status = 'connected'`, so storing credentials alone never sends
+ * anything — an admin has to arm it here. `is_enabled` is one of only three
+ * columns `authenticated` may UPDATE on this table, so the patch must name it
+ * alone (a wider patch is rejected by the column grants).
+ */
+export async function setIntegrationEnabled(id: string, enabled: boolean): Promise<void> {
+  const { error } = await supabase.from('whatsapp_integrations')
+    .update({ is_enabled: enabled }).eq('id', id);
+  if (error) throw error;
 }
 
 export async function listRules(): Promise<WhatsAppRule[]> {

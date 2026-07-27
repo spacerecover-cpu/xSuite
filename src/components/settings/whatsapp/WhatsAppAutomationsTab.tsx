@@ -47,15 +47,19 @@ export function WhatsAppAutomationsTab() {
   const setPatch = (rule: WhatsAppRule, patch: Partial<WhatsAppRule>) =>
     setDraft((d) => ({ ...d, [rule.id]: { ...(d[rule.id] ?? {}), ...patch } }));
   const dirty = Object.keys(draft).length > 0;
-  const blocked = !integration || integration.connection_status !== 'connected' || !whatsappEnabled;
+  const notConnected = !integration || integration.connection_status !== 'connected';
+  const sendingPaused = !notConnected && !integration!.is_enabled;
+  const blocked = notConnected || sendingPaused || !whatsappEnabled;
 
   return (
     <div className="max-w-4xl space-y-6 pb-24">
       {blocked && (
         <div className="rounded-xl border border-warning/40 bg-warning-muted p-4 text-sm text-warning">
-          {!integration || integration.connection_status !== 'connected'
+          {notConnected
             ? 'Connect WhatsApp first (Connection tab). Automations stay off until the connection is healthy.'
-            : 'The "WhatsApp Automation" feature toggle is off (Settings → Features & Modules).'}
+            : sendingPaused
+              ? 'Sending is paused for this tenant — switch it on in the Connection tab. Rules can be configured, but nothing will leave until then.'
+              : 'The "WhatsApp Automation" feature toggle is off (Settings → Features & Modules).'}
         </div>
       )}
       {stages.map((stage) => (
