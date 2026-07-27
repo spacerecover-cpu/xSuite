@@ -139,10 +139,12 @@ describe('PARITY — unconfigured English A4-portrait invoice', () => {
     expect(def.pageOrientation).toBe('portrait');
     expect(def.pageMargins).toEqual([40, 40, 40, 40]);
 
-    // Page footer: the legacy 35pt side inset and 525pt divider rule.
+    // Page footer: FLUSH with the text column — the inset equals the page
+    // margin (40) and the divider spans exactly that block (515). This replaced
+    // the legacy 35pt/525 pair when FOOTER_OUTDENT was set to 0 by decision.
     const node = footerNode(def);
-    expect(node.margin).toEqual([35, 10, 35, 25]);
-    expect(ruleWidths(node)).toEqual([525]);
+    expect(node.margin).toEqual([40, 10, 40, 25]);
+    expect(ruleWidths(node)).toEqual([515]);
 
     // No opt-in feature leaks into the default document.
     expect(def.watermark).toBeUndefined();
@@ -152,11 +154,11 @@ describe('PARITY — unconfigured English A4-portrait invoice', () => {
     expect((def.content as Content[]).length).toBeGreaterThan(0);
   });
 
-  it('keeps the QR footer variant on its legacy inset too', () => {
+  it('keeps the QR footer variant flush too', () => {
     const def = render(BUILT_IN_TEMPLATE_CONFIGS.invoice, 'QR');
     const node = footerNode(def);
-    expect(node.margin).toEqual([35, 0, 35, 25]);
-    expect(ruleWidths(node)).toEqual([525]);
+    expect(node.margin).toEqual([40, 0, 40, 25]);
+    expect(ruleWidths(node)).toEqual([515]);
   });
 });
 
@@ -173,18 +175,18 @@ describe('RND-03 — page-footer inset follows paper margins', () => {
 
   it('insets a narrow-margin template with its own margins', () => {
     const def = render(invoiceWith({ paper: { margins: [20, 20, 20, 20] } }));
-    expect(insets(def)).toEqual([15, 15]);
+    expect(insets(def)).toEqual([20, 20]);
   });
 
   it('insets a wide-margin template with its own margins', () => {
     const def = render(invoiceWith({ paper: { margins: [60, 60, 60, 60] } }));
-    expect(insets(def)).toEqual([55, 55]);
+    expect(insets(def)).toEqual([60, 60]);
   });
 
   it('tracks asymmetric left/right margins independently', () => {
     // CSS order [top, right, bottom, left].
     const def = render(invoiceWith({ paper: { margins: [40, 24, 40, 72] } }));
-    expect(insets(def)).toEqual([67, 19]);
+    expect(insets(def)).toEqual([72, 24]);
   });
 
   it('never lets the divider width desync from the emitted inset', () => {
@@ -207,8 +209,8 @@ describe('RND-03 — page-footer inset follows paper margins', () => {
     expect(SHEET_POINTS.A4[0] - l - r).toBeGreaterThan(0);
   });
 
-  it('footerSideInsets reproduces the legacy 35pt pair on the default margins', () => {
-    expect(footerSideInsets(BUILT_IN_TEMPLATE_CONFIGS.invoice.paper)).toEqual([35, 35]);
+  it('footerSideInsets is flush with the page margins', () => {
+    expect(footerSideInsets(BUILT_IN_TEMPLATE_CONFIGS.invoice.paper)).toEqual([40, 40]);
   });
 
   it('applies to the report page footer as well', () => {
@@ -229,8 +231,8 @@ describe('RND-03 — page-footer inset follows paper margins', () => {
     );
     const node = footerNode(def);
     const m = node.margin as [number, number, number, number];
-    expect([m[0], m[2]]).toEqual([15, 15]);
-    expect(ruleWidths(node)).toEqual([Math.round(SHEET_POINTS.A4[0] - 30)]);
+    expect([m[0], m[2]]).toEqual([20, 20]);
+    expect(ruleWidths(node)).toEqual([Math.round(SHEET_POINTS.A4[0] - 40)]);
   });
 });
 
@@ -339,10 +341,10 @@ describe('RND-08 — the predefined sheet set', () => {
 
   it('derives divider widths from the new sheet instead of silently using A4', () => {
     const def = render(invoiceWith({ paper: { size: 'A3' } }));
-    expect(ruleWidths(footerNode(def))).toEqual([Math.round(841.89 - 70)]);
+    expect(ruleWidths(footerNode(def))).toEqual([Math.round(841.89 - 80)]);
     // A5 is NARROWER than A4 — the A4 fallback would have overflowed the sheet.
     const a5 = render(invoiceWith({ paper: { size: 'A5' } }));
-    expect(ruleWidths(footerNode(a5))).toEqual([Math.round(419.53 - 70)]);
+    expect(ruleWidths(footerNode(a5))).toEqual([Math.round(419.53 - 80)]);
   });
 });
 

@@ -50,30 +50,31 @@ export const PREDEFINED_SHEET: Record<
 export const MIN_CONTENT_POINTS = 72;
 
 /**
- * The inset the page-footer blocks applied on each side before RND-03
- * (`margin: [35, …, 35, …]` in `sections/footer.ts` / `reportFooter.ts`).
- * Retained as the calibration point for {@link FOOTER_OUTDENT}, not as a
- * hardcoded geometry constant.
+ * The flat inset the page-footer blocks applied on each side before RND-03
+ * (`margin: [35, …, 35, …]` in `sections/footer.ts` / `reportFooter.ts`), while
+ * the engine's page margins defaulted to 40 — a 5pt outdent no config could
+ * influence. Kept only as the historical reference the docs and tests cite; it
+ * is no longer part of any geometry calculation.
  */
 export const FOOTER_SIDE_INSET = 35;
 
-/** The engine's built-in A4 side margin, which the 35pt inset was paired with. */
-const LEGACY_PAGE_SIDE_MARGIN = 40;
-
 /**
- * How far OUTSIDE the body text column the page-footer block sits, in points.
+ * How far OUTSIDE the body text column the page-footer block sits: ZERO. The
+ * footer is flush with the text column, on every sheet and at every margin.
  *
- * The page footer used to inset a flat 35pt while the engine's page margins
- * default to 40 — a 5pt outdent that no config could influence, so a 20pt or
- * 60pt template got a footer visibly detached from its text column (RND-03), and
- * the case-label sheet (16pt margins) was out by 19pt.
+ * The first RND-03 fix made the inset track the configured margins but kept the
+ * historic 5pt outdent, so the default template stayed byte-identical. That
+ * preserved parity at the cost of keeping a misalignment nobody had chosen —
+ * the 5pt gap was an artifact of a hardcoded 35 sitting next to a defaulted 40,
+ * not a design. Flush is the correct layout, so the outdent is now 0 by
+ * explicit decision.
  *
- * The inset now TRACKS the configured margins while preserving that 5pt
- * relationship, rather than re-aligning flush. That keeps the default template
- * byte-identical (40 − 5 = 35, divider 525) instead of silently nudging the
- * footer of every document already in the field by 5pt.
+ * DELIBERATE OUTPUT CHANGE: the footer of every existing document moves 5pt
+ * outward to meet its text column, and the default A4 divider narrows 525 → 515
+ * to match. This is the intended result, not drift — the divider spans exactly
+ * the block it is drawn in, which is what {@link footerContentWidth} guarantees.
  */
-export const FOOTER_OUTDENT = LEGACY_PAGE_SIDE_MARGIN - FOOTER_SIDE_INSET;
+export const FOOTER_OUTDENT = 0;
 
 type PaperLike = Pick<DocumentTemplateConfig['paper'], 'size' | 'orientation' | 'margins' | 'dimensions'>;
 

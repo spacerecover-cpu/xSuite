@@ -60,14 +60,18 @@ describe('derived widths', () => {
     expect(contentWidth(paper({ orientation: 'landscape', margins: [30, 35, 30, 35] }))).toBe(772);
   });
 
-  it('footerContentWidth uses the footer inset derived from the page margins', () => {
-    // The footer block sits FOOTER_OUTDENT (5pt) outside the text column, so the
-    // built-in 40pt margins reproduce the legacy 35pt inset — 595.28 - 70 = 525.
-    // (RND-03 made the inset track the margins; it used to be a flat 35pt that
-    // ignored them entirely.)
-    expect(footerContentWidth(paper({ margins: [30, 40, 30, 40] }))).toBe(525);
-    expect(footerContentWidth(paper({ size: 'Letter' }))).toBe(542);
-    expect(footerContentWidth(paper({ margins: [30, 120, 30, 120] }))).toBe(365);
+  it('footerContentWidth is flush with the body text column', () => {
+    // FOOTER_OUTDENT is 0, so the footer block insets exactly the page margins
+    // and its divider spans the same width as body content. The default A4
+    // template is therefore 595.28 - 80 = 515, NOT the historic 525 — a
+    // deliberate 5pt output change (see FOOTER_OUTDENT).
+    expect(footerContentWidth(paper({ margins: [30, 40, 30, 40] }))).toBe(515);
+    expect(footerContentWidth(paper({ size: 'Letter' }))).toBe(532);
+    expect(footerContentWidth(paper({ margins: [30, 120, 30, 120] }))).toBe(355);
+    // Flush means it now agrees with contentWidth for the same paper.
+    expect(footerContentWidth(paper({ margins: [30, 40, 30, 40] }))).toBe(
+      contentWidth(paper({ margins: [30, 40, 30, 40] })),
+    );
   });
 });
 
