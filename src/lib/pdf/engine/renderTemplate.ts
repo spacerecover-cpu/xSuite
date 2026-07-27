@@ -248,7 +248,16 @@ export function renderTemplate(
       if (partiesComboEmitted) continue; // the second of the pair — already rendered
       const combined = renderPartiesMeta(engine, data);
       partiesComboEmitted = true;
-      if (combined) emit(combined, breakBefore);
+      // The pair renders as ONE block at the position of whichever member sorts
+      // first, so read the flag from BOTH: a break set on the second member
+      // would otherwise be silently dropped, and the Studio checkbox on that
+      // section would appear to do nothing (FUP-04).
+      const pairBreak =
+        breakBefore ||
+        ordered.some(
+          (s) => (s.key === 'parties' || s.key === detailsKey) && s.pageBreakBefore === true,
+        );
+      if (combined) emit(combined, pairBreak);
       continue;
     }
 

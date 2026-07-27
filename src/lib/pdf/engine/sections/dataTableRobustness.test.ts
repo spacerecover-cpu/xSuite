@@ -457,9 +457,53 @@ describe('TBL-09 — soft break opportunities for long unbroken tokens', () => {
     expect((table.body[1][0] as { text?: string }).text).toContain(ZERO_WIDTH_SPACE);
   });
 
-  it('does NOT apply the wrap on an Arabic document (Tajawal has no U+200B glyph)', () => {
+  it('wraps on an Arabic document too, pinning the ASCII run to a U+200B-capable font (FUP-05)', () => {
+    // Tajawal has no U+200B, so the break used to be skipped entirely and those
+    // documents kept the overflow. The wrapped run is pure ASCII by
+    // construction, so it can render in Roboto without touching a single Arabic
+    // glyph — the rest of the cell keeps the document font.
     const node = renderLineItems(engineFor('ar'), liData([{ description: 'Z'.repeat(80) }]));
-    expect(JSON.stringify(node)).not.toContain(ZERO_WIDTH_SPACE);
+    // RTL mirrors the column order, so locate the cell by content, not index.
+    const row = tableOf(node).body[1] as Array<{ text?: unknown }>;
+    const cell = row.find((c) => Array.isArray(c.text)) as { text?: unknown } | undefined;
+    expect(cell, 'expected one cell to be split into runs').toBeDefined();
+    const runs = cell!.text as Array<string | { text: string; font: string }>;
+    expect(Array.isArray(runs)).toBe(true);
+    const pinned = runs.filter(
+      (r): r is { text: string; font: string } => typeof r === 'object' && r !== null,
+    );
+    expect(pinned.length).toBeGreaterThan(0);
+    // Every run carrying a U+200B must declare a font that actually has one.
+    for (const run of pinned) {
+      expect(run.text).toContain(ZERO_WIDTH_SPACE);
+      expect(run.font).toBe('Roboto');
+    }
+    // …and no Arabic character was swept into a pinned run.
+    expect(pinned.some((r) => /[\u0600-\u06FF]/.test(r.text))).toBe(false);
+  });
+
+  it('still returns a PLAIN STRING when nothing needed wrapping (no node churn)', () => {
+    const short = renderLineItems(engineFor('ar'), liData([{ description: 'Short desc' }]));
+    const row = tableOf(short).body[1] as Array<{ text?: unknown }>;
+    expect(row.every((c) => typeof c.text === 'string')).toBe(true);
+  });
+
+  it('leaves a copy-exact column untouched on an Arabic document as well', () => {
+    const node = renderCustodyLog(
+      custodyEngine('ar'),
+      custodyData([{ entry: '1', description: 'X'.repeat(80), hash: 'f'.repeat(64) }]),
+    );
+    // Located by content because RTL mirrors the columns.
+    const row = tableOf(node).body[1] as Array<{ text?: unknown }>;
+    expect(row.some((c) => c.text === 'f'.repeat(64))).toBe(true);
+    // No pinned run may contain the hash — copy-exactness beats fit.
+    for (const cell of row) {
+      if (!Array.isArray(cell.text)) continue;
+      for (const run of cell.text as Array<string | { text: string }>) {
+        const t = typeof run === 'string' ? run : run.text;
+        expect(t.replace(/\u200b/g, '')).not.toBe('f'.repeat(64));
+      }
+    }
   });
 
   it('never wraps a custody hash or signature cell (copy-exactness beats fit)', () => {

@@ -114,6 +114,8 @@ export interface StudioApi {
       bankWidth?: 'auto' | 'half' | 'full';
       bankAlign?: 'left' | 'center' | 'right';
       headerBackground?: string;
+      /** TBL-02: start this section on a fresh page. */
+      pageBreakBefore?: boolean;
     },
   ) => void;
   /** Patch a line-item column. `labelSecondary` writes to `label.i18n[secondary]`

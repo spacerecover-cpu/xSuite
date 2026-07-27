@@ -286,14 +286,63 @@ export function softWrapLongTokens(text: string): string {
 export const COPY_EXACT_COLUMN_KEYS = new Set(['serial', 'itemCode', 'hash', 'signature']);
 
 /**
- * The per-cell soft-wrap function for this document: identity when the font
- * cannot carry a U+200B ({@link softWrapEnabled}) or when the column is
- * copy-exact ({@link COPY_EXACT_COLUMN_KEYS}).
+ * The font a soft-wrapped ASCII run is pinned to when the DOCUMENT font cannot
+ * carry U+200B. Roboto is verified to have a real zero-advance glyph and is
+ * always registered (it is the engine's base family).
  */
-export function cellSoftWrapper(engine: EngineContext): (columnKey: string, value: string) => string {
-  const enabled = softWrapEnabled(engine);
-  return (columnKey, value) =>
-    enabled && !COPY_EXACT_COLUMN_KEYS.has(columnKey) ? softWrapLongTokens(value) : value;
+const ZWSP_FALLBACK_FONT = 'Roboto';
+
+/** A pdfmake inline value: a plain string, or runs that may pin their own font. */
+export type SoftWrappedText = string | Array<string | { text: string; font: string }>;
+
+/**
+ * Split a wrapped string into pdfmake runs, pinning the segments that actually
+ * received a U+200B to {@link ZWSP_FALLBACK_FONT} (FUP-05).
+ *
+ * Tajawal — the family every non-English document resolves to — has no U+200B,
+ * so soft wrapping used to be switched OFF wholesale for Arabic/bilingual
+ * documents: exactly the documents whose columns are narrowest, left with the
+ * original overflow. Because {@link wrapToken} only ever touches **pure-ASCII**
+ * tokens, those segments can be rendered in a Latin face without affecting a
+ * single Arabic glyph — the surrounding text keeps the document font, and only
+ * the serial/hash/URL run switches. Arabic shaping and cursive joining are
+ * untouched because no Arabic character is ever inside a pinned run.
+ */
+function pinWrappedRuns(original: string, wrapped: string): SoftWrappedText {
+  if (wrapped === original) return original;
+  const runs: Array<string | { text: string; font: string }> = [];
+  // Split on the inserted breaks' neighbourhoods: any whitespace-delimited
+  // segment that gained a ZWSP becomes its own pinned run.
+  for (const segment of wrapped.split(/(\s+)/)) {
+    if (segment === '') continue;
+    if (segment.includes(ZERO_WIDTH_SPACE)) {
+      runs.push({ text: segment, font: ZWSP_FALLBACK_FONT });
+    } else {
+      runs.push(segment);
+    }
+  }
+  return runs;
+}
+
+/**
+ * The per-cell soft-wrap function for this document.
+ *
+ * Identity for a {@link COPY_EXACT_COLUMN_KEYS} column (the value must paste
+ * back byte-identical). Otherwise the token gets its break opportunities — as a
+ * plain string when the document font carries U+200B, or as font-pinned runs
+ * when it does not ({@link pinWrappedRuns}), so Arabic documents wrap too
+ * instead of silently keeping the overflow.
+ */
+export function cellSoftWrapper(
+  engine: EngineContext,
+): (columnKey: string, value: string) => SoftWrappedText {
+  const nativeZwsp = softWrapEnabled(engine);
+  return (columnKey, value) => {
+    if (COPY_EXACT_COLUMN_KEYS.has(columnKey)) return value;
+    const wrapped = softWrapLongTokens(value);
+    if (wrapped === value) return value; // nothing to wrap — no node churn
+    return nativeZwsp ? wrapped : pinWrappedRuns(value, wrapped);
+  };
 }
 
 /** Column alignment — one rule, used for BOTH the header and the body cells. */
