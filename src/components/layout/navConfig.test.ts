@@ -69,7 +69,7 @@ describe('navConfig — structure', () => {
   it('section keys are unique and match the persisted preference strings, in order', () => {
     const keys = NAV_SECTIONS.map((s) => s.key);
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys).toEqual(['core', 'financial', 'business', 'resources', 'hr', 'payroll', 'employee', 'system']);
+    expect(keys).toEqual(['core', 'financial', 'business', 'communications', 'resources', 'hr', 'payroll', 'employee', 'system']);
   });
 
   it('every item has a route, icon and label', () => {
