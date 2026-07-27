@@ -28,30 +28,69 @@ export function diffRulesToSeed(
 
 export interface GoLiveGate { key: string; ok: boolean; label: string; fix: string }
 
+export interface HealthError { code?: number; description: string; solution?: string }
+
+/**
+ * Pure: normalise Meta's WABA `health_status` payload into displayable errors.
+ * Two shapes reach the UI for the same data — `whatsapp_integrations.health_errors`
+ * stores the flattened `errors`, while test_connection returns the raw `entities`
+ * each wrapping its own — so accept both. This is the single most actionable
+ * diagnostic Meta gives us (141006 payment method, business verification,
+ * display-name rejection); it was being fetched, stored and then dropped.
+ */
+export function parseHealthErrors(raw: unknown): HealthError[] {
+  if (!Array.isArray(raw)) return [];
+  const flat = raw.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return [];
+    const e = entry as Record<string, unknown>;
+    return Array.isArray(e.errors) ? e.errors : [e];
+  });
+  return flat.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return [];
+    const e = entry as Record<string, unknown>;
+    const description = typeof e.error_description === 'string' ? e.error_description : '';
+    if (!description) return [];
+    return [{
+      code: typeof e.error_code === 'number' ? e.error_code : undefined,
+      description,
+      solution: typeof e.possible_solution === 'string' ? e.possible_solution : undefined,
+    }];
+  });
+}
+
 /**
  * Pure: every gate standing between "credentials stored" and "a customer
  * actually receives a message". `whatsapp_tenant_active()` ANDs is_enabled with
  * connection_status, and the dispatch trigger additionally reads the tenant's
  * `automation.whatsapp` flag — so a connected integration with the send switch
- * off is silently inert. Keep all four here; that silence is the failure mode.
+ * off is silently inert. That silence is the failure mode.
+ *
+ * Credentials and account health are deliberately SEPARATE gates. test_connection
+ * collapses both into connection_status ('error' when Meta reports
+ * can_send_message=BLOCKED), so keying the credentials gate on it told an admin
+ * whose only problem was a lapsed payment method to re-enter their App ID and
+ * token — advice that cannot possibly work.
  */
 export function whatsappGoLiveGates(input: {
   connectionStatus?: string | null;
+  tokenValid?: boolean | null;
   isEnabled?: boolean | null;
   webhookStatus?: string | null;
   featureEnabled: boolean;
 }): GoLiveGate[] {
-  const connected = input.connectionStatus === 'connected';
   return [
-    { key: 'credentials', ok: connected,
+    { key: 'credentials', ok: input.tokenValid === true && input.connectionStatus !== 'token_invalid',
       label: 'Credentials verified with Meta',
       fix: 'Enter the five values below and press Connect.' },
-    { key: 'sending', ok: connected && input.isEnabled === true,
+    { key: 'account', ok: input.connectionStatus === 'connected',
+      label: 'Meta account cleared to send',
+      fix: 'Meta is blocking sends on this account — see the account health errors above for its exact reason (billing, business verification or display name).' },
+    { key: 'sending', ok: input.isEnabled === true,
       label: 'Sending armed',
       fix: 'Turn on the sending switch above — automations stay queued until then.' },
     { key: 'webhook', ok: input.webhookStatus === 'verified' || input.webhookStatus === 'receiving',
       label: 'Webhook verified by Meta',
-      fix: 'Paste the callback URL + verify token into Meta → WhatsApp → Configuration, then subscribe to the six fields listed there.' },
+      fix: 'Paste the callback URL + verify token into Meta → WhatsApp → Configuration, then subscribe the app to the WABA and tick the six fields listed there.' },
     { key: 'feature', ok: input.featureEnabled,
       label: 'WhatsApp Automation feature on',
       fix: 'Settings → Features & Modules → WhatsApp Automation.' },
