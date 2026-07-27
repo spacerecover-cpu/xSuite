@@ -65,6 +65,8 @@ export const NOTIFICATION_EVENT_VARIABLES: Record<string, string[]> = {
   ],
   'inventory.low_stock': ['alert_type', 'message', 'alert_id', 'item_id'],
   'inventory.out_of_stock': ['alert_type', 'message', 'alert_id', 'item_id'],
+  'whatsapp.reply_received': ['customer_id', 'case_id', 'preview'],
+  'whatsapp.message_failed': ['case_id', 'event_key', 'error_code', 'detail'],
 };
 
 /** Sample values for editor previews, keyed by payload key. */
@@ -97,6 +99,10 @@ export const SAMPLE_EVENT_PAYLOAD: Record<string, string> = {
   status: 'completed',
   alert_type: 'low_stock',
   message: 'Donor drives (2.5" 1TB) below minimum level',
+  preview: 'Thanks — when can I collect my drive?',
+  event_key: 'case.phase_changed:ready',
+  error_code: '131047',
+  detail: '24h service window closed',
   follow_up_type: 'quote_chase',
   follow_up_id: '00000000-0000-0000-0000-000000000000',
   case_id: '00000000-0000-0000-0000-000000000000',
