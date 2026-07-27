@@ -4,8 +4,9 @@ import { Button } from '../../../ui/Button';
 import { Select } from '../../../ui/Select';
 import { Input } from '../../../ui/Input';
 import { ColorField, FieldGroup, NumberField, SegmentedControl, ToggleRow } from '../controls';
-import { PDF_COLORS } from '../../../../lib/pdf/styles';
+import { PDF_COLORS, PDF_STYLES } from '../../../../lib/pdf/styles';
 import { generatePalette } from '../../../../lib/pdf/engine/palette';
+import { resolvePageBox } from '../../../../lib/pdf/engine/pageGeometry';
 import { resolveSecondary, secondaryText } from '../../../../lib/pdf/templateConfig';
 import type {
   DensityPreset,
@@ -69,6 +70,17 @@ export const GeneralTab: React.FC<{ api: StudioApi }> = ({ api }) => {
   const fitting = resolved.pageFitting;
   const presentation = resolved.presentation;
   const seed = colors?.accent && colors.accent.startsWith('#') ? colors.accent : PDF_COLORS.primary;
+
+  // Upper bound per margin side, derived from the CURRENT sheet + orientation so
+  // the cap follows an A3/A5/Legal/Letter/landscape/custom switch. Half the axis
+  // minus a 36pt share of the 1-inch content floor keeps the opposite side
+  // usable too. `resolvePageBox` is the same resolver the renderer uses, so the
+  // cap can never drift from the sheet actually laid out.
+  const maxMarginFor = (side: 'top' | 'right' | 'bottom' | 'left'): number => {
+    const box = resolvePageBox(resolved.paper);
+    const axis = side === 'left' || side === 'right' ? box.width : box.height;
+    return Math.max(0, Math.floor(axis / 2) - 36);
+  };
   const secondary = resolveSecondary(resolved.language);
   const docTitle = resolved.labels?.documentTitle;
 
@@ -102,7 +114,10 @@ export const GeneralTab: React.FC<{ api: StudioApi }> = ({ api }) => {
             onChange={(e) => api.setPaper({ size: e.target.value as PaperConfig['size'] })}
             options={[
               { value: 'A4', label: 'A4' },
+              { value: 'A3', label: 'A3' },
+              { value: 'A5', label: 'A5' },
               { value: 'Letter', label: 'Letter' },
+              { value: 'Legal', label: 'Legal' },
             ]}
           />
           <Select
@@ -115,6 +130,11 @@ export const GeneralTab: React.FC<{ api: StudioApi }> = ({ api }) => {
             ]}
           />
         </div>
+        {/* `min={0}` already blocked negative margins; the missing bound was the
+            upper one — a margin wider than the sheet collapses the content box
+            and yields a blank page. Cap each side at "sheet minus one inch of
+            content", split across the pair. renderTemplate clamps too, for
+            configs that arrive from the gallery/stored JSON rather than here. */}
         <div className="grid grid-cols-4 gap-2">
           {(['top', 'right', 'bottom', 'left'] as const).map((side, i) => (
             <NumberField
@@ -122,6 +142,7 @@ export const GeneralTab: React.FC<{ api: StudioApi }> = ({ api }) => {
               label={side[0].toUpperCase() + side.slice(1)}
               value={resolved.paper.margins[i]}
               min={0}
+              max={maxMarginFor(side)}
               onChange={(v) => {
                 const next = [...resolved.paper.margins] as PaperConfig['margins'];
                 next[i] = v;
@@ -326,32 +347,58 @@ export const GeneralTab: React.FC<{ api: StudioApi }> = ({ api }) => {
           onChange={(e) => api.setWatermark({ text: e.target.value || undefined })}
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
-        {resolved.watermark?.text && (
-          <div className="grid grid-cols-3 gap-2">
-            <NumberField
-              label="Angle"
-              suffix="°"
-              value={resolved.watermark?.angle ?? -45}
-              min={-90}
-              max={90}
-              onChange={(v) => api.setWatermark({ angle: v })}
-            />
-            <NumberField
-              label="Opacity"
-              value={resolved.watermark?.opacity ?? 0.3}
-              min={0.05}
-              max={1}
-              step={0.05}
-              onChange={(v) => api.setWatermark({ opacity: v })}
-            />
-            <NumberField
-              label="Font size"
-              suffix="pt"
-              value={resolved.watermark?.fontSize ?? 60}
-              min={12}
-              max={160}
-              onChange={(v) => api.setWatermark({ fontSize: v })}
-            />
+        <ToggleRow
+          label="Use the company logo instead of text"
+          description="Draws your logo as a centered background wash. Rotation applies to text watermarks only."
+          checked={resolved.watermark?.image === true}
+          onChange={(v) => api.setWatermark({ image: v || undefined })}
+        />
+        {/* Shown whenever a watermark is configured EITHER way — the sub-controls
+            used to be gated on `text` alone, which left the image variant with no
+            opacity control (and hid every setting until text was typed). */}
+        {(resolved.watermark?.text || resolved.watermark?.image) && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              <NumberField
+                label="Angle"
+                suffix="°"
+                value={resolved.watermark?.angle ?? -45}
+                min={-90}
+                max={90}
+                step={5}
+                disabled={resolved.watermark?.image === true}
+                onChange={(v) => api.setWatermark({ angle: v })}
+              />
+              <NumberField
+                label="Opacity"
+                value={resolved.watermark?.opacity ?? 0.3}
+                min={0.05}
+                max={1}
+                step={0.05}
+                onChange={(v) => api.setWatermark({ opacity: v })}
+              />
+              <NumberField
+                label="Font size"
+                suffix="pt"
+                value={resolved.watermark?.fontSize ?? 60}
+                min={12}
+                max={160}
+                disabled={resolved.watermark?.image === true}
+                onChange={(v) => api.setWatermark({ fontSize: v })}
+              />
+            </div>
+            {/* Colour was the one text-watermark parameter with no control while
+                angle / opacity / size were all exposed. Blank = the neutral wash.
+                Omitted in image mode, where it has nothing to colour. */}
+            {resolved.watermark?.image !== true && (
+              <ColorField
+                label="Watermark colour"
+                value={resolved.watermark?.color}
+                neutral={PDF_STYLES.watermark.color as string}
+                onChange={(hex) => api.setWatermark({ color: hex })}
+                againstLabel="on white"
+              />
+            )}
           </div>
         )}
       </FieldGroup>

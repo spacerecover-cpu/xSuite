@@ -122,7 +122,7 @@ export function buildPayComponentTable(
     stack: [
       heading,
       {
-        table: { headerRows: 1, widths, body },
+        table: { headerRows: 1, dontBreakRows: true, widths, body },
         layout: light
           ? {
               hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>

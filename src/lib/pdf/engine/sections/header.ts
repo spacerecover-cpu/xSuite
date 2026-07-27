@@ -21,6 +21,7 @@ import type { EngineContext, EngineDocData, SectionRenderer } from '../types';
 import { isBilingualMode, en, ar, resolveLabel } from '../labels';
 import { reverseArabicText } from '../../fonts';
 import { resolveColors, resolveHeader, resolveOrganization, resolvePresentation } from '../branding';
+import { contentWidth } from '../pageGeometry';
 import type { ResolvedHeader } from '../branding';
 import { buildLogoNode, classifyLogo } from '../../brandingImage';
 
@@ -186,7 +187,7 @@ export const renderHeader: SectionRenderer = (
     // Brand divider rule — neutral by default, accent when opted in (resolveColors
     // applies the colors.accent → branding.accent → neutral precedence).
     out.push({
-      canvas: [{ type: 'line', x1: 0, y1: 0, x2: 525, y2: 0, lineWidth: 0.5, lineColor: colors.accent }],
+      canvas: [{ type: 'line', x1: 0, y1: 0, x2: contentWidth(config.paper), y2: 0, lineWidth: 0.5, lineColor: colors.accent }],
       margin: [0, 0, 0, 12],
     });
     out.push(titleBlock);

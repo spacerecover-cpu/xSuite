@@ -22,8 +22,9 @@
 import type { DocumentTemplateConfig, TemplateDocumentType } from '../templateConfig';
 import type { CompanySettingsData, TranslationContext } from '../types';
 import { renderTemplate } from './renderTemplate';
+import { PREVIEW_MAX_TABLE_ROWS } from './sections/lineItemTable';
 import { applyTenantLanguage } from './applyTenantLanguage';
-import { isTypstEngineEnabled } from './featureFlag';
+import { selectRenderEngine } from './featureFlag';
 import { createPdfWithFonts, initializePDFFonts } from '../fonts';
 import { ctxFromLanguageConfig, withTimeout } from '../translationContext';
 import { resolveSecondary } from '../templateConfig';
@@ -66,16 +67,47 @@ export interface PreviewResult {
 }
 
 /**
- * Decide which logo a sample preview should draw: the real resolved logo when
- * present, else a labeled placeholder box (so the layout still shows where the
- * logo goes), plus any warning to surface in the Studio.
+ * Warning that names the ONE way the preview knowingly diverges from the
+ * generated PDF: the placeholder logo box occupies header space that the real
+ * document does not reserve, so the letterhead reflows without it. The warning
+ * chip that already exists ("No logo uploaded…") reports the *cause*; this one
+ * reports the *consequence*, which is what the tenant actually needs to know.
+ */
+export const PLACEHOLDER_LOGO_LAYOUT_WARNING =
+  'Placeholder box is preview-only — the printed header reflows without it. Switch to Print view to see the real layout.';
+
+/** Options for {@link resolvePreviewLogo}. */
+export interface PreviewLogoOptions {
+  /**
+   * `false` renders exactly what generation draws when no logo resolves — i.e.
+   * no logo node at all, so the header reflows the way the real PDF will
+   * ("Print view"). Anything else (including the default `undefined`) keeps the
+   * labeled placeholder box, which is the historical behaviour.
+   */
+  placeholder?: boolean;
+}
+
+/**
+ * Decide which logo a preview should draw: the real resolved logo when present,
+ * else a labeled placeholder box (so the layout still shows where the logo
+ * goes), plus any warnings to surface in the Studio.
+ *
+ * The placeholder is a deliberate, *disclosed* divergence — see
+ * {@link PLACEHOLDER_LOGO_LAYOUT_WARNING}. Pass `{ placeholder: false }` to opt
+ * out and predict the printed output exactly.
  */
 export function resolvePreviewLogo(
   resolved: BrandingImage | null | undefined,
+  opts: PreviewLogoOptions = {},
 ): { logo: BrandingImage; warnings: string[] } {
   if (resolved && resolved.kind !== 'none') return { logo: resolved, warnings: [] };
-  const warning = brandingImageWarning(resolved ?? { kind: 'none', reason: 'empty' });
-  return { logo: placeholderLogoSvg('LOGO'), warnings: warning ? [warning] : [] };
+  const missing: BrandingImage = resolved ?? { kind: 'none', reason: 'empty' };
+  const warning = brandingImageWarning(missing);
+  const warnings = warning ? [warning] : [];
+  // Print view: hand the engine the unresolved logo so `buildLogoNode` returns
+  // null and the header lays out exactly as the generated document will.
+  if (opts.placeholder === false) return { logo: missing, warnings };
+  return { logo: placeholderLogoSvg('LOGO'), warnings: [...warnings, PLACEHOLDER_LOGO_LAYOUT_WARNING] };
 }
 
 /**
@@ -91,6 +123,8 @@ export function resolvePreviewLogo(
  *                surfaced in the returned result.
  * @param stampImage     Optional resolved tenant stamp drawn in the signature area.
  * @param signatureImage Optional resolved tenant signature drawn in the signature area.
+ * @param opts.logoPlaceholder `false` suppresses the stand-in logo box so the
+ *        preview predicts the printed layout exactly (see {@link resolvePreviewLogo}).
  * @returns A {@link PreviewResult} — `url` is a `blob:` URL the caller MUST
  *          `URL.revokeObjectURL` when done; `warnings` is non-blocking copy.
  */
@@ -103,7 +137,7 @@ export async function previewTemplate(
   signatureImage?: BrandingImage | null,
   companySettings?: CompanySettingsData,
   languageExplicit = false,
-  opts?: { reportSubtype?: string },
+  opts?: { reportSubtype?: string; logoPlaceholder?: boolean },
 ): Promise<PreviewResult> {
   // When the tenant's company settings are supplied, render the way the generator
   // does: the tenant's real company replaces the sample company, and the config
@@ -145,7 +179,7 @@ export async function previewTemplate(
   // auto-generated from the document's verification payload as a PNG image —
   // pdfmake's native `qr` does not paint in the browser build, so an image is the
   // reliable path (the same one tenant-uploaded QR images use).
-  const { logo: previewLogo, warnings } = resolvePreviewLogo(logo);
+  const { logo: previewLogo, warnings } = resolvePreviewLogo(logo, { placeholder: opts?.logoPlaceholder });
   const qrImage = await resolveQrImage(null, engineData.zatcaPayload ?? engineData.qrPayload);
 
   // Experimental Typst renderer (flag-gated, default off): correct Arabic via
@@ -153,7 +187,9 @@ export async function previewTemplate(
   // languages already render cleanly through pdfmake, so they stay on it. Lazily
   // imported so the WASM never enters the default bundle. Phase-1: text/tables
   // (logo/QR images TBD).
-  if (isTypstEngineEnabled() && secondary === 'ar') {
+  // Renderer choice is the SHARED decision (see engine/featureFlag) so the
+  // preview can never render through a different engine than the download.
+  if (selectRenderEngine(secondary) === 'typst') {
     const [{ assembleTypst }, { renderTypstPdf }, { logoAsset, qrAsset }] = await Promise.all([
       import('../typst/assemble'),
       import('../typst/typstEngine'),
@@ -166,6 +202,10 @@ export async function previewTemplate(
     return { url: URL.createObjectURL(blob), warnings };
   }
 
+  // The row cap is passed HERE and only here (plus `previewDocumentForRecord`):
+  // it exists to keep a pathological collection from blowing PREVIEW_TIMEOUT_MS,
+  // and must never reach generation, where a truncated table would be a wrong
+  // document rather than a slow preview (QA TBL-08).
   const docDefinition = renderTemplate(
     effectiveConfig,
     engineData,
@@ -174,6 +214,7 @@ export async function previewTemplate(
     qrImage,
     stampImage ?? null,
     signatureImage ?? null,
+    { maxTableRows: PREVIEW_MAX_TABLE_ROWS },
   );
 
   // Wire pdfmake's error callback so a rasterization failure REJECTS (rather

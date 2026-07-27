@@ -18,7 +18,7 @@
  */
 
 import type { Content, DynamicContent, PageOrientation, PageSize, StyleDictionary, TDocumentDefinitions, Watermark } from 'pdfmake/interfaces';
-import { getStylesWithFont, PDF_COLORS, PDF_STYLES } from '../styles';
+import { getStylesWithFont, PDF_COLORS } from '../styles';
 import type { DocumentTemplateConfig, TypographyStyleKey } from '../templateConfig';
 import type { TranslationContext } from '../types';
 import type { EngineContext, EngineDocData } from './types';
@@ -35,6 +35,7 @@ import {
   resolveWatermarkSettings,
 } from './branding';
 import { contrastRatio, readableTextOn } from './palette';
+import { clampPageMargins, PREDEFINED_SHEET, resolvePageBox } from './pageGeometry';
 
 /** Spacing/size multiplier per density preset (comfortable = identity/legacy). */
 const DENSITY_SCALE: Record<'comfortable' | 'compact' | 'dense', number> = {
@@ -59,6 +60,36 @@ const TYPOGRAPHY_STYLE_KEYS: TypographyStyleKey[] = [
   'termsText',
 ];
 
+/**
+ * A pdfmake node for the watermark IMAGE, or null when no usable image exists.
+ *
+ * pdfmake's `watermark` property is TEXT-ONLY, so an image watermark cannot go
+ * through it — it is drawn as a page `background` instead (see the call site).
+ * The image is the tenant's resolved logo: `watermark.image` means "use the
+ * uploaded brand image as the watermark", and the logo is the branding asset the
+ * tenant has already provided (stamp/signature carry their own meaning).
+ */
+function watermarkImageNode(
+  logo: import('../brandingImage').BrandingImage | string | null | undefined,
+): { image: string } | { svg: string } | null {
+  if (!logo) return null;
+  if (typeof logo === 'string') return logo ? { image: logo } : null;
+  if (logo.kind === 'raster') return { image: logo.dataUrl };
+  if (logo.kind === 'svg') return { svg: logo.markup };
+  return null; // kind === 'none'
+}
+
+/**
+ * Re-emit a section's first block asking pdfmake to start it on a fresh page
+ * (opt-in `section.pageBreakBefore`, TBL-02). A bare string block has to be
+ * promoted to a text node first, since only object nodes can carry the flag.
+ */
+function withPageBreakBefore(block: Content): Content {
+  if (typeof block === 'string') return { text: block, pageBreak: 'before' };
+  if (Array.isArray(block)) return { stack: block, pageBreak: 'before' };
+  return { ...(block as object), pageBreak: 'before' } as Content;
+}
+
 /** Substitute `{page}` / `{pages}` tokens in a page-number format string. */
 function formatPageNumber(format: string, page: number, pages: number): string {
   return format.replace(/\{page\}/g, String(page)).replace(/\{pages\}/g, String(pages));
@@ -80,6 +111,18 @@ function scaleFontSizes(node: unknown, factor: number): void {
   for (const v of Object.values(o)) scaleFontSizes(v, factor);
 }
 
+/** Non-content render options. Omitted entirely by the generation callers. */
+export interface RenderTemplateOptions {
+  /**
+   * PREVIEW-ONLY soft cap on data-table rows (QA TBL-08) — see
+   * {@link EngineContext.maxTableRows}. Only `previewTemplate` /
+   * `previewDocumentForRecord` pass it; leaving it unset (the generation path)
+   * renders every row, which is what keeps an invoice's printed lines consistent
+   * with its totals and a chain-of-custody report forensically complete.
+   */
+  maxTableRows?: number;
+}
+
 export function renderTemplate(
   config: DocumentTemplateConfig,
   data: EngineDocData,
@@ -88,8 +131,17 @@ export function renderTemplate(
   qrCodeBase64?: string | null,
   stampImage?: import('../brandingImage').BrandingImage | string | null,
   signatureImage?: import('../brandingImage').BrandingImage | string | null,
+  options?: RenderTemplateOptions,
 ): TDocumentDefinitions {
-  const engine: EngineContext = { config, ctx, logo, qrCodeBase64, stampImage, signatureImage };
+  const engine: EngineContext = {
+    config,
+    ctx,
+    logo,
+    qrCodeBase64,
+    stampImage,
+    signatureImage,
+    maxTableRows: options?.maxTableRows,
+  };
 
   // 1. Page geometry from config.paper. A `'custom'` size (physical labels)
   // becomes a literal `{ width, height }` page box from `paper.dimensions`; the
@@ -101,19 +153,29 @@ export function renderTemplate(
     const dims = config.paper.dimensions;
     pageSize = dims ? { width: dims[0], height: dims[1] } : 'A4';
   } else {
-    pageSize = config.paper.size === 'Letter' ? 'LETTER' : 'A4';
+    // One shared config→pdfmake sheet map (A3/A4/A5/Legal/Letter). Previously
+    // anything that was not 'Letter' collapsed to A4, which is why A3/A5/Legal
+    // could not be offered at all (RND-08).
+    pageSize = PREDEFINED_SHEET[config.paper.size] ?? 'A4';
   }
   const pageOrientation: PageOrientation = config.paper.orientation;
   // config.paper.margins is CSS order [top, right, bottom, left]; pdfmake's
   // pageMargins is [left, top, right, bottom]. Reorder so each Studio input maps
   // to its own side (without this, Top→Left, Right→Top, … rotate).
   const cssMargins = config.paper.margins;
-  let pageMargins: [number, number, number, number] = [
-    cssMargins[3], // left
-    cssMargins[0], // top
-    cssMargins[1], // right
-    cssMargins[2], // bottom
-  ];
+  // Resolve the page box in points so the margins can be clamped against it.
+  const { width: pageW, height: pageH } = resolvePageBox(config.paper);
+
+  let pageMargins: [number, number, number, number] = clampPageMargins(
+    [
+      cssMargins[3], // left
+      cssMargins[0], // top
+      cssMargins[1], // right
+      cssMargins[2], // bottom
+    ],
+    pageW,
+    pageH,
+  );
 
   // 2. Visible sections, ascending order, dispatched via the registry.
   const ordered = [...config.sections]
@@ -166,14 +228,36 @@ export function renderTemplate(
   let partiesComboEmitted = false;
 
   const content: Content[] = [];
+  /**
+   * Append a section's output, honouring its opt-in `pageBreakBefore` (TBL-02).
+   * The flag is dropped when nothing has been emitted yet — a `pageBreak` on the
+   * very first block makes pdfmake open the document with a blank page.
+   */
+  const emit = (out: Content | Content[], breakBefore: boolean): void => {
+    const blocks = Array.isArray(out) ? [...out] : [out];
+    if (blocks.length === 0) return;
+    if (breakBefore && content.length > 0) blocks[0] = withPageBreakBefore(blocks[0]);
+    for (const block of blocks) content.push(block);
+  };
+
   for (let i = 0; i < bodyEnd; i++) {
     const section = ordered[i];
+    const breakBefore = section.pageBreakBefore === true;
 
     if (combineParties && (section.key === 'parties' || section.key === detailsKey)) {
       if (partiesComboEmitted) continue; // the second of the pair — already rendered
       const combined = renderPartiesMeta(engine, data);
       partiesComboEmitted = true;
-      if (combined) content.push(combined);
+      // The pair renders as ONE block at the position of whichever member sorts
+      // first, so read the flag from BOTH: a break set on the second member
+      // would otherwise be silently dropped, and the Studio checkbox on that
+      // section would appear to do nothing (FUP-04).
+      const pairBreak =
+        breakBefore ||
+        ordered.some(
+          (s) => (s.key === 'parties' || s.key === detailsKey) && s.pageBreakBefore === true,
+        );
+      if (combined) emit(combined, pairBreak);
       continue;
     }
 
@@ -181,12 +265,15 @@ export function renderTemplate(
     if (!renderer) continue; // skip unknown / not-yet-implemented keys safely
     const out = renderer(engine, data);
     if (out == null) continue;
-    if (Array.isArray(out)) {
-      for (const block of out) content.push(block);
-    } else {
-      content.push(out);
-    }
+    emit(out, breakBefore);
   }
+
+  // A configuration whose only visible sections are the page-footer keys leaves
+  // `bodyEnd` at 0, so nothing is emitted and pdfmake is handed `content: []`
+  // (BIND-05). Backfill an empty text node: the page footer/watermark still
+  // render, and pdfmake gets a well-formed body. Unreachable for any document
+  // that emits at least one block, so it cannot affect existing output.
+  if (content.length === 0) content.push({ text: '' });
 
   // 4. RTL + typography document defaults. Any Arabic-containing document (RTL
   // Arabic-lead OR English-lead bilingual) uses the Arabic-capable family so
@@ -263,11 +350,16 @@ export function renderTemplate(
     densityFontScale = scale;
     if (scale !== 1) {
       // Scale the already-reordered pdfmake [left, top, right, bottom] tuple.
+      // A margin the tenant asked for must never round away to nothing: a
+      // fractional margin below ~0.71pt (reachable from a stored/hand-edited
+      // config, not from the Studio's integer inputs) would otherwise land on 0
+      // and print flush to the page edge (BIND-06). Zero stays zero.
+      const scaleMargin = (m: number): number => (m === 0 ? 0 : Math.max(1, Math.round(m * scale)));
       pageMargins = [
-        Math.round(pageMargins[0] * scale),
-        Math.round(pageMargins[1] * scale),
-        Math.round(pageMargins[2] * scale),
-        Math.round(pageMargins[3] * scale),
+        scaleMargin(pageMargins[0]),
+        scaleMargin(pageMargins[1]),
+        scaleMargin(pageMargins[2]),
+        scaleMargin(pageMargins[3]),
       ];
       for (const key of Object.keys(styles)) {
         const style = styles[key] as { fontSize?: number };
@@ -289,6 +381,18 @@ export function renderTemplate(
       ? buildPageFooter(engine, data)
       : null;
   const pageNumbers = resolvePageNumbers(config);
+  // RND-04: route the page number through the resolved palette like every other
+  // text element, but ONLY when a colors group is configured — with no group the
+  // legacy neutral (`textMuted`) is kept verbatim, so the default is unchanged.
+  const pageNumberColor = config.colors ? colors.label : PDF_COLORS.textMuted;
+  // RND-05: the gutters used to be a hardcoded symmetric `[40, 4, 40, 0]` that
+  // ignored the paper margins and inherited LTR geometry under RTL. Derive them
+  // from the resolved (clamped, density-scaled) page margins and mirror for RTL.
+  // The built-in 40pt margins reproduce the old tuple exactly.
+  const numberMargin: [number, number, number, number] =
+    direction === 'rtl'
+      ? [pageMargins[2], 4, pageMargins[0], 0]
+      : [pageMargins[0], 4, pageMargins[2], 0];
   let footer: DynamicContent | undefined;
   if (pageNumbers.enabled) {
     footer = (currentPage, pageCount, currentPageSize) => {
@@ -297,8 +401,8 @@ export function renderTemplate(
         text: formatPageNumber(pageNumbers.format, currentPage, pageCount),
         alignment: pageNumbers.position,
         fontSize: 8,
-        color: PDF_COLORS.textMuted,
-        margin: [40, 4, 40, 0],
+        color: pageNumberColor,
+        margin: numberMargin,
       };
       return base
         ? { stack: [base, numberLine] }
@@ -329,12 +433,36 @@ export function renderTemplate(
   // `branding.watermark` path keeps its exact prior shape (no `angle`) for parity;
   // only the new `watermark` group adds the configurable angle.
   const wm = resolveWatermarkSettings(config);
+
+  // 8a. IMAGE watermark (opt-in `watermark.image`). pdfmake's `watermark` key
+  // only renders text, so the image is painted as a page `background` — sized
+  // against the REAL page box from the callback (never a hardcoded A4 width) and
+  // horizontally centred. When the image variant is chosen but no usable image
+  // resolved, we fall through to the text watermark rather than silently
+  // dropping the watermark entirely (the bug this replaces).
+  // NOTE: `angle` is intentionally not applied here — pdfmake cannot rotate an
+  // image node, so rotation stays a text-watermark capability.
+  const wmImageNode = wm?.image ? watermarkImageNode(logo) : null;
+  const background = wmImageNode
+    ? (_currentPage: number, currentPageSize: { width: number; height: number }) => ({
+        ...wmImageNode,
+        width: Math.round(currentPageSize.width * 0.6),
+        opacity: wm?.opacity,
+        alignment: 'center' as const,
+        margin: [0, Math.round(currentPageSize.height * 0.32), 0, 0] as [number, number, number, number],
+      })
+    : undefined;
+
+  // 8b. TEXT watermark — suppressed when an image watermark was drawn, since the
+  // config reads "render an uploaded watermark image INSTEAD of text".
   const watermark: Watermark | undefined =
-    wm && wm.text
+    !background && wm && wm.text
       ? {
           text: wm.text,
           font: baseFont,
-          color: PDF_STYLES.watermark.color as string,
+          // Opt-in `watermark.color`; absent/malformed → the neutral wash the
+          // legacy `PDF_STYLES.watermark` used (RND-06).
+          color: wm.color,
           opacity: wm.opacity,
           bold: true,
           fontSize: wm.fontSize,
@@ -352,6 +480,7 @@ export function renderTemplate(
     styles,
     content,
     ...(footer ? { footer } : {}),
+    ...(background ? { background } : {}),
     ...(watermark ? { watermark } : {}),
   };
 }

@@ -13,7 +13,7 @@
 
 import type { Content, TableCell } from 'pdfmake/interfaces';
 import { PDF_COLORS } from '../../styles';
-import { bilingualLabelRuns } from '../rtl';
+import { bilingualLabelRuns, engineLayoutDirection } from '../rtl';
 import { fieldLabelLanguage } from '../labels';
 import type { EngineContext, EngineDocData, SectionRenderer } from '../types';
 
@@ -37,6 +37,18 @@ export const renderTotals: SectionRenderer = (
   const labelLang = fieldLabelLanguage(language, engine.config.translationPolicy, 'totals');
   const baseFont = engine.ctx.fontFamily;
   const totalIdx = totals.findIndex((l) => l.emphasis);
+  // Under RTL the block mirrors: label/value swap column slots (so the pair reads
+  // label-then-value right-to-left), the cell padding moves to the other side,
+  // and the 280pt indent that pushes the block to the right edge moves to the
+  // right so the block sits on the left edge. LTR keeps every value (parity).
+  //
+  // Cell alignment deliberately stays RIGHT in both directions: these cells are
+  // currency figures, and right/decimal alignment is the numeric convention
+  // regardless of script direction. `rtl.test.ts` pins this ("totals labels are
+  // right-aligned under RTL") — mirroring the column slots is what makes the
+  // block read correctly, not flipping the text alignment inside the cells.
+  const rtl = engineLayoutDirection(language) === 'rtl';
+  const cellAlign = 'right' as const;
 
   const body: TableCell[][] = totals.map((line) => {
     const isTotal = !!line.emphasis;
@@ -49,10 +61,12 @@ export const renderTotals: SectionRenderer = (
     // run so the number keeps LTR ordering.
     const labelRuns = bilingualLabelRuns(line.label, labelLang, baseFont);
     const vmargin = isTotal ? 5 : 2.5;
-    return [
-      { text: labelRuns, fontSize: isTotal ? 10.5 : 9, bold: isTotal, color: labelColor, alignment: 'right', margin: [0, vmargin, 8, vmargin] },
-      { text: line.value, fontSize: isTotal ? 12 : 9, bold: isTotal, color: valueColor, alignment: 'right', margin: [0, vmargin, 8, vmargin] },
-    ];
+    const pad: [number, number, number, number] = rtl
+      ? [8, vmargin, 0, vmargin]
+      : [0, vmargin, 8, vmargin];
+    const labelCell = { text: labelRuns, fontSize: isTotal ? 10.5 : 9, bold: isTotal, color: labelColor, alignment: cellAlign, margin: pad };
+    const valueCell = { text: line.value, fontSize: isTotal ? 12 : 9, bold: isTotal, color: valueColor, alignment: cellAlign, margin: pad };
+    return rtl ? [valueCell, labelCell] : [labelCell, valueCell];
   });
 
   const fillColor = (rowIndex: number): string | null => {
@@ -65,7 +79,7 @@ export const renderTotals: SectionRenderer = (
   };
 
   return {
-    table: { widths: ['*', 'auto'], body },
+    table: { widths: rtl ? ['auto', '*'] : ['*', 'auto'], body },
     layout: {
       fillColor,
       // 'bordered' draws hairlines around every cell; otherwise just a single
@@ -75,6 +89,6 @@ export const renderTotals: SectionRenderer = (
       hLineColor: () => PDF_COLORS.border,
       vLineColor: () => PDF_COLORS.border,
     },
-    margin: [280, 8, 0, 8],
+    margin: rtl ? [0, 8, 280, 8] : [280, 8, 0, 8],
   };
 };

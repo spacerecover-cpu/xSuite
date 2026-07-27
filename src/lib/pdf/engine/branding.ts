@@ -236,16 +236,19 @@ export interface ResolvedWatermark {
   angle: number;
   opacity: number;
   fontSize: number;
+  /** Text-watermark colour; the neutral wash unless a template opts in. */
+  color: string;
 }
 
 const WATERMARK_DEFAULT_OPACITY = (PDF_STYLES.watermark as { opacity?: number }).opacity ?? 0.3;
 const WATERMARK_DEFAULT_SIZE = (PDF_STYLES.watermark as { fontSize?: number }).fontSize ?? 60;
+const WATERMARK_DEFAULT_COLOR = (PDF_STYLES.watermark as { color?: string }).color ?? '#e2e8f0';
 
 /**
  * Resolve the watermark settings, or `null` when there is none. Reads
  * `watermark.text` first, then the legacy `branding.watermark` (back-compat). An
- * image watermark needs no text. Angle/opacity/fontSize default to the shared
- * neutral params.
+ * image watermark needs no text. Angle/opacity/fontSize/color default to the
+ * shared neutral params, so an unconfigured watermark is byte-identical.
  */
 export function resolveWatermarkSettings(config: {
   watermark?: WatermarkConfig;
@@ -263,6 +266,7 @@ export function resolveWatermarkSettings(config: {
     angle: typeof wm?.angle === 'number' ? wm.angle : -45,
     opacity: typeof wm?.opacity === 'number' ? wm.opacity : WATERMARK_DEFAULT_OPACITY,
     fontSize: typeof wm?.fontSize === 'number' ? wm.fontSize : WATERMARK_DEFAULT_SIZE,
+    color: normalizeHex(wm?.color) ?? WATERMARK_DEFAULT_COLOR,
   };
 }
 

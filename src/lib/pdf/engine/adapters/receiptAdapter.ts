@@ -26,6 +26,7 @@
 import type { CaseData, DeviceData, ReceiptData } from '../../types';
 import type { DocumentTemplateConfig } from '../../templateConfig';
 import { formatDate, formatCapacity, safeString } from '../../utils';
+import { missingValue } from './missingValue';
 import type {
   CaseInfoBlock,
   DevicesBlock,
@@ -90,14 +91,17 @@ function deviceRow(device: DeviceData): Record<string, string> {
  * "Customer Information" box in the legacy builders (name / company / phone /
  * email / reference) with the same customer→contact fallbacks.
  */
-function customerParty(caseData: CaseData): PartyBlock {
-  const customerName = caseData.customer?.customer_name || caseData.contact_name || 'N/A';
+function customerParty(caseData: CaseData, config: DocumentTemplateConfig): PartyBlock {
+  // TBL-10: party VALUES bypass the bilingual label join, so the fallback has to
+  // be script-neutral on a non-English document. English-only keeps 'N/A'.
+  const na = missingValue(config.language);
+  const customerName = caseData.customer?.customer_name || caseData.contact_name || na;
   const phone =
     caseData.customer?.mobile_number ||
     caseData.customer?.phone_number ||
     caseData.contact_phone ||
-    'N/A';
-  const email = caseData.customer?.email || caseData.contact_email || 'N/A';
+    na;
+  const email = caseData.customer?.email || caseData.contact_email || na;
 
   return {
     title: { en: 'Customer Information', ar: 'معلومات العميل' },
@@ -199,7 +203,7 @@ export function toEngineData(
   const caseInfo: CaseInfoBlock = caseInfoBlock(caseData, devices, bannerActive);
 
   // ---- Customer party ------------------------------------------------------
-  const to: PartyBlock = customerParty(caseData);
+  const to: PartyBlock = customerParty(caseData, config);
 
   // ---- Device intake table -------------------------------------------------
   const devicesBlock: DevicesBlock = {

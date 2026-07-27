@@ -257,6 +257,10 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
         <ul className="space-y-2">
           {ordered.map((section, index) => {
             const label = api.resolved.labels[section.key];
+            // A page break on the document's FIRST rendered section would open
+            // with a blank page, so renderTemplate drops it there — don't offer
+            // a control that provably does nothing.
+            const isFirstVisible = ordered.findIndex((s) => s.visible) === index;
             return (
               <li key={section.key} className="rounded-lg border border-slate-200 bg-white p-3">
                 <div className="flex items-center gap-2">
@@ -357,6 +361,31 @@ export const OtherDetailsTab: React.FC<{ api: StudioApi }> = ({ api }) => {
                       />
                     )}
                   </div>
+                )}
+                {/* TBL-02's flag had no control, so it was reachable only from a
+                    hand-edited stored config — the same "config with no UI"
+                    shape RND-01 was raised for (FUP-04). Hidden on the first
+                    visible section, where a leading page break would open the
+                    document with a blank page (renderTemplate drops it there). */}
+                {section.visible && !isFirstVisible && (
+                  <label className="mt-3 flex cursor-pointer items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={section.pageBreakBefore === true}
+                      onChange={(e) =>
+                        api.patchSection(section.key, { pageBreakBefore: e.target.checked })
+                      }
+                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-slate-800">
+                        Start on a new page
+                      </span>
+                      <span className="block text-xs text-slate-500">
+                        Pushes {displayLabel(section.key)} to the top of a fresh page.
+                      </span>
+                    </span>
+                  </label>
                 )}
                 {section.visible && HEADER_SECTIONS.has(section.key) && (
                   <div className="mt-3">

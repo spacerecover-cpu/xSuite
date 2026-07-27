@@ -833,6 +833,14 @@ export interface EngineContext {
   qrCodeBase64?: string | null;
   stampImage?: import('../brandingImage').BrandingImage | string | null;
   signatureImage?: import('../brandingImage').BrandingImage | string | null;
+  /**
+   * PREVIEW-ONLY soft cap on data-table rows (QA TBL-08). Set exclusively by
+   * `previewTemplate` / `previewDocumentForRecord`, which enforce a 15s render
+   * timeout; the generation callers (`pdfService`, `reportPDFService`,
+   * `send-document-email`) leave it undefined so a delivered document is NEVER
+   * truncated. Absent → uncapped. The custody-log renderer ignores it outright.
+   */
+  maxTableRows?: number;
 }
 
 /**

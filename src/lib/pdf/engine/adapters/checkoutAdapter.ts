@@ -21,6 +21,7 @@ import type { CaseData, DeviceData, ReceiptData } from '../../types';
 import type { DocumentTemplateConfig } from '../../templateConfig';
 import { formatDate, formatCapacity, safeString } from '../../utils';
 import { docRefBannerActive } from './receiptAdapter';
+import { missingValue } from './missingValue';
 import type {
   CaseInfoBlock,
   CollectorBlock,
@@ -224,9 +225,12 @@ export function toEngineData(
   );
 
   // ---- Customer party ------------------------------------------------------
+  // TBL-10: party VALUES bypass the bilingual label join, so the fallback has to
+  // be script-neutral on a non-English document. English-only keeps 'N/A'.
+  const na = missingValue(config.language);
   const to: PartyBlock = {
     title: { en: 'Customer Information', ar: 'معلومات العميل' },
-    name: caseData.customer?.customer_name || caseData.contact_name || 'N/A',
+    name: caseData.customer?.customer_name || caseData.contact_name || na,
     rows: [
       { label: { en: 'Company:', ar: 'الشركة:' }, value: safeString(caseData.company?.company_name) },
       {
@@ -235,9 +239,9 @@ export function toEngineData(
           caseData.customer?.mobile_number ||
           caseData.customer?.phone_number ||
           caseData.contact_phone ||
-          'N/A',
+          na,
       },
-      { label: { en: 'Email:', ar: 'البريد:' }, value: caseData.customer?.email || caseData.contact_email || 'N/A' },
+      { label: { en: 'Email:', ar: 'البريد:' }, value: caseData.customer?.email || caseData.contact_email || na },
     ],
   };
 

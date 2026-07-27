@@ -19,15 +19,19 @@ import type { Content, DynamicContent } from 'pdfmake/interfaces';
 import { PDF_COLORS } from '../../styles';
 import type { EngineContext, EngineDocData, ReportFooterBlock, SectionRenderer } from '../types';
 import { resolveLabel } from '../labels';
+import { contentWidth, footerBlockMargin, footerContentWidth } from '../pageGeometry';
 
 /** Build the stacked footer lines (divider + confidentiality + copyright + report id). */
 function footerLines(
   block: ReportFooterBlock,
   language: EngineContext['config']['language'],
+  /** Width of the rule — the caller knows whether these lines are drawn inline
+   *  (page content width) or inside the inset page-footer block. */
+  ruleWidth: number,
 ): Content[] {
   const lines: Content[] = [
     {
-      canvas: [{ type: 'line', x1: 0, y1: 0, x2: 525, y2: 0, lineWidth: 0.5, lineColor: PDF_COLORS.primary }],
+      canvas: [{ type: 'line', x1: 0, y1: 0, x2: ruleWidth, y2: 0, lineWidth: 0.5, lineColor: PDF_COLORS.primary }],
       margin: [0, 0, 0, 6],
     },
     {
@@ -65,7 +69,7 @@ export const renderReportFooter: SectionRenderer = (
 ): Content | null => {
   const block = data.reportFooter;
   if (!block) return null;
-  return { stack: footerLines(block, engine.config.language), margin: [0, 12, 0, 0] };
+  return { stack: footerLines(block, engine.config.language, contentWidth(engine.config.paper)), margin: [0, 12, 0, 0] };
 };
 
 /**
@@ -78,6 +82,9 @@ export function buildReportPageFooter(
 ): DynamicContent | null {
   const block = data.reportFooter;
   if (!block) return null;
-  const lines = footerLines(block, engine.config.language);
-  return (): Content => ({ stack: lines, margin: [35, 6, 35, 22] });
+  const lines = footerLines(block, engine.config.language, footerContentWidth(engine.config.paper));
+  // Side inset derived from the configured paper margins (RND-03); the default
+  // margins still resolve to the legacy 35pt.
+  const margin = footerBlockMargin(engine.config.paper, 6, 22);
+  return (): Content => ({ stack: lines, margin });
 }

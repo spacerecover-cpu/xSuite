@@ -115,6 +115,7 @@ export const renderPaymentHistory: SectionRenderer = (
       {
         table: {
           headerRows: 1,
+          dontBreakRows: true,
           widths,
           body,
         },

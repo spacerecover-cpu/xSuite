@@ -24,6 +24,7 @@ import type { DocumentTemplateConfig, ColumnConfig, TotalsLineKey } from '../../
 import type { CreditNoteDocumentData } from '../../types';
 import { formatEngineMoney, safeString } from '../../utils';
 import { fmtDateWithConfig } from '../../configDate';
+import { missingValue } from './missingValue';
 import type { EngineDocData, LabelText, PartyBlock, ResolvedColumn } from '../types';
 import { resolveStatutoryDocumentMeta } from '../../../regimes/in_gst/statutoryMeta';
 
@@ -97,7 +98,8 @@ export function toCreditNoteEngineData(
   const documentTitle: LabelText = config.labels?.documentTitle ?? { en: 'CREDIT NOTE', ar: 'إشعار دائن' };
 
   // ---- Recipient (customer / company) party --------------------------------
-  const customerName = creditNoteData.customer_name ?? creditNoteData.company_name ?? 'N/A';
+  const customerName =
+    creditNoteData.customer_name ?? creditNoteData.company_name ?? missingValue(config.language);
   const toRows: PartyBlock['rows'] = [];
   if (creditNoteData.customer_name && creditNoteData.company_name) {
     toRows.push({ label: { en: 'Company:', ar: 'الشركة:' }, value: creditNoteData.company_name });

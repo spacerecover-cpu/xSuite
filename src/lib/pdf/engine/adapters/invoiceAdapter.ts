@@ -19,6 +19,7 @@ import { resolveEInvoicingTransport } from '../../../regimes/registry';
 import { resolveStatutoryDocumentMeta } from '../../../regimes/in_gst/statutoryMeta';
 import { isEInvoiceApplicable } from '../../../einvoiceReadiness';
 import type { ResolvedCountryFacts } from '../countryConfig';
+import { missingValue } from './missingValue';
 import type {
   BankBlock,
   EngineDocData,
@@ -97,7 +98,9 @@ export function toEngineData(
 
   // ---- Recipient (customer / company) party --------------------------------
   const customerName =
-    invoiceData.customer?.customer_name || invoiceData.cases?.contact_name || 'N/A';
+    invoiceData.customer?.customer_name ||
+    invoiceData.cases?.contact_name ||
+    missingValue(config.language);
   const companyNameDisplay =
     invoiceData.customer_associated_company?.company_name || invoiceData.company?.company_name;
   const customerEmail =

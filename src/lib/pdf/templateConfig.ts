@@ -234,7 +234,15 @@ export function resolveSecondary(language: LanguageConfig): LanguageCode | null 
  * set `'custom'`) are completely unaffected.
  */
 export interface PaperConfig {
-  size: 'A4' | 'Letter' | 'custom';
+  /**
+   * A pdfmake predefined sheet, or `'custom'` with explicit `dimensions`.
+   * A3/A5/Legal are supported natively by pdfmake; the union used to stop at
+   * A4/Letter, which forced Legal contracts and A5 receipts through the
+   * `'custom'` escape hatch (RND-08). Point dimensions live in
+   * `engine/pageGeometry.ts` — add a sheet to BOTH or the margin clamp and the
+   * divider widths silently fall back to A4.
+   */
+  size: 'A3' | 'A4' | 'A5' | 'Legal' | 'Letter' | 'custom';
   orientation: 'portrait' | 'landscape';
   margins: [number, number, number, number];
   /** Literal page box `[width, height]` in points; used only when `size === 'custom'`. */
@@ -305,6 +313,14 @@ export interface SectionConfig {
   /** Per-section header band / table-header fill (hex). Overrides the global
    *  `colors.headerBackground` for THIS section only; absent → global, then neutral. */
   headerBackground?: string;
+  /**
+   * Start this section on a fresh page (pdfmake `pageBreak: 'before'`). OPT-IN —
+   * absent/false leaves page flow entirely to pdfmake, exactly as today. Set on
+   * the first rendered section it is ignored, since a leading break would emit a
+   * blank first page. For "Terms & Conditions start on their own page" and the
+   * like (TBL-02).
+   */
+  pageBreakBefore?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -471,6 +487,12 @@ export interface WatermarkConfig {
   opacity?: number;
   /** Text watermark font size. Default 60. */
   fontSize?: number;
+  /**
+   * Text watermark colour (hex). Default = the neutral `PDF_STYLES.watermark`
+   * wash. Angle/opacity/size were configurable while colour was not (RND-06);
+   * a malformed value degrades back to the neutral.
+   */
+  color?: string;
 }
 
 export interface SignatureImageOptions {
@@ -817,6 +839,7 @@ export interface SectionConfigOverride {
   tone?: SectionTone;
   condition?: string;
   headerBackground?: string;
+  pageBreakBefore?: boolean;
 }
 
 /** Partial column override; `key` identifies the target column. */
@@ -1306,6 +1329,7 @@ function mergeSections(
         ...(ov.tone !== undefined ? { tone: ov.tone } : {}),
         ...(ov.condition !== undefined ? { condition: ov.condition } : {}),
         ...(ov.headerBackground !== undefined ? { headerBackground: ov.headerBackground } : {}),
+        ...(ov.pageBreakBefore !== undefined ? { pageBreakBefore: ov.pageBreakBefore } : {}),
       });
     } else {
       // New section introduced by an override layer.
@@ -1321,6 +1345,7 @@ function mergeSections(
         ...(ov.tone !== undefined ? { tone: ov.tone } : {}),
         ...(ov.condition !== undefined ? { condition: ov.condition } : {}),
         ...(ov.headerBackground !== undefined ? { headerBackground: ov.headerBackground } : {}),
+        ...(ov.pageBreakBefore !== undefined ? { pageBreakBefore: ov.pageBreakBefore } : {}),
       });
     }
   }

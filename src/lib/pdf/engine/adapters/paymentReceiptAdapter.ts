@@ -20,6 +20,7 @@
 import type { PaymentReceiptDocumentData } from '../../types';
 import type { DocumentTemplateConfig } from '../../templateConfig';
 import { formatDate, formatEngineMoney } from '../../utils';
+import { missingValue } from './missingValue';
 import type {
   BankBlock,
   EngineDocData,
@@ -50,7 +51,7 @@ export function toEngineData(
   const documentTitle: LabelText = { en: 'PAYMENT RECEIPT', ar: 'إيصال الدفع' };
 
   // ---- Recipient (customer / company) party --------------------------------
-  const customerName = paymentData.customer?.customer_name || 'N/A';
+  const customerName = paymentData.customer?.customer_name || missingValue(config.language);
   const companyNameDisplay = paymentData.company?.company_name;
   const customerEmail = paymentData.customer?.email;
   const customerPhone = paymentData.customer?.mobile_number || paymentData.customer?.phone_number;

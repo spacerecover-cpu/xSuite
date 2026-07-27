@@ -27,6 +27,7 @@ import type { DocumentTemplateConfig, ColumnConfig, TotalsLineKey } from '../../
 import { safeString, formatEngineMoney, formatPartyAddressLines } from '../../utils';
 import { fmtDateWithConfig } from '../../configDate';
 import { amountInWordsAr, amountInWordsEn } from '../amountInWords';
+import { missingValue } from './missingValue';
 import type {
   BankBlock,
   EngineDocData,
@@ -96,7 +97,9 @@ export function toEngineData(
 
   // ---- Recipient (customer / company) party --------------------------------
   const customerName =
-    quoteData.customer?.customer_name || quoteData.cases?.contact_name || 'N/A';
+    quoteData.customer?.customer_name ||
+    quoteData.cases?.contact_name ||
+    missingValue(config.language);
   const companyNameDisplay =
     quoteData.customer_associated_company?.company_name || quoteData.company?.company_name;
   const customerEmail =

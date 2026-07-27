@@ -10,6 +10,7 @@
 import type { Content, TableCell } from 'pdfmake/interfaces';
 import { PDF_COLORS } from '../../styles';
 import { resolveLabel } from '../labels';
+import { engineLayoutDirection, mirrorAlign, type HAlign } from '../rtl';
 import type { EngineContext, EngineDocData, SectionRenderer } from '../types';
 
 const HEX_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
@@ -32,30 +33,43 @@ export const renderTaxSummary: SectionRenderer = (
   const highlightTotal = cfg.highlightTotalRow !== false;
   const totalBg = hex(cfg.totalRowBackground) ?? PDF_COLORS.background;
 
-  const headerRow: TableCell[] = [
+  // Under RTL, reverse the column order and swap each cell's left/right
+  // alignment so the statutory breakdown reads right-to-left like every other
+  // table in the document. `orient` is the identity for LTR, so English output
+  // is byte-for-byte unchanged.
+  const rtl = engineLayoutDirection(language) === 'rtl';
+  const orient = (cells: TableCell[]): TableCell[] =>
+    rtl
+      ? [...cells].reverse().map((cell) => {
+          const c = cell as { alignment?: HAlign };
+          return { ...(cell as object), alignment: mirrorAlign(c.alignment) } as TableCell;
+        })
+      : cells;
+
+  const headerRow: TableCell[] = orient([
     { text: resolveLabel(ts.columns.rate, language), bold: true, fontSize: 8, color: headerText, alignment: 'left', margin: [4, 4, 4, 4] },
     { text: resolveLabel(ts.columns.taxable, language), bold: true, fontSize: 8, color: headerText, alignment: 'right', margin: [4, 4, 4, 4] },
     { text: resolveLabel(ts.columns.tax, language), bold: true, fontSize: 8, color: headerText, alignment: 'right', margin: [4, 4, 4, 4] },
-  ];
+  ]);
   const body: TableCell[][] = [headerRow];
   for (const r of ts.rows) {
-    body.push([
+    body.push(orient([
       { text: r.rate, fontSize: 8, color: bodyText, alignment: 'left', margin: [4, 3, 4, 3] },
       { text: r.taxable, fontSize: 8, color: bodyText, alignment: 'right', margin: [4, 3, 4, 3] },
       { text: r.tax, fontSize: 8, color: bodyText, alignment: 'right', margin: [4, 3, 4, 3] },
-    ]);
+    ]));
   }
-  body.push([
+  body.push(orient([
     { text: resolveLabel(ts.total.label, language), bold: true, fontSize: 8, color: bodyText, alignment: 'left', margin: [4, 4, 4, 4] },
     { text: ts.total.taxable, bold: true, fontSize: 8, color: bodyText, alignment: 'right', margin: [4, 4, 4, 4] },
     { text: ts.total.tax, bold: true, fontSize: 8, color: bodyText, alignment: 'right', margin: [4, 4, 4, 4] },
-  ]);
+  ]));
   const totalRowIdx = body.length - 1;
 
   const stack: Content[] = [
     { text: resolveLabel(ts.title, language), bold: true, fontSize: 9, color: PDF_COLORS.primary, margin: [0, 0, 0, 4] },
     {
-      table: { headerRows: 1, widths: ['*', '*', '*'], body },
+      table: { headerRows: 1, dontBreakRows: true, widths: ['*', '*', '*'], body },
       layout: {
         fillColor: (rowIndex: number) =>
           rowIndex === 0

@@ -6,6 +6,7 @@ import {
   LayoutGrid,
   LayoutPanelTop,
   Loader2,
+  Printer,
   RotateCcw,
   Save,
   Settings2,
@@ -16,6 +17,7 @@ import {
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
 import { useToast } from '../../../hooks/useToast';
+import { useConfirm } from '../../../hooks/useConfirm';
 import { logger } from '../../../lib/logger';
 import {
   BUILT_IN_TEMPLATE_CONFIGS,
@@ -57,6 +59,12 @@ import { fetchCompanySettings } from '../../../lib/pdf/dataFetcher';
 import type { CompanySettingsData } from '../../../lib/pdf/types';
 import { reportConfigForSubtype } from '../../../lib/pdf/engine/adapters/reportAdapter';
 import { REPORT_TYPES } from '../../../lib/reportTypes';
+import {
+  describePreviewFailure,
+  previewDownloadFilename,
+  type PreviewFailure,
+} from './previewStudioHelpers';
+import type { PreviewRecordOption } from '../../../lib/pdf/previewRecord';
 import { GeneralTab } from './tabs/GeneralTab';
 import { HeaderFooterTab } from './tabs/HeaderFooterTab';
 import { TransactionTab } from './tabs/TransactionTab';
@@ -106,6 +114,8 @@ export interface StudioApi {
       bankWidth?: 'auto' | 'half' | 'full';
       bankAlign?: 'left' | 'center' | 'right';
       headerBackground?: string;
+      /** TBL-02: start this section on a fresh page. */
+      pageBreakBefore?: boolean;
     },
   ) => void;
   /** Patch a line-item column. `labelSecondary` writes to `label.i18n[secondary]`
@@ -177,24 +187,45 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   onOpenGallery,
 }) => {
   const toast = useToast();
+  const confirm = useConfirm();
   const [override, setOverride] = useState<TemplateConfigOverride>(initialOverride);
+  // Saved baseline for the dirty check — advanced on every successful save so
+  // "unsaved changes" means changes since the last deploy, not since mount.
+  const [savedOverride, setSavedOverride] = useState<TemplateConfigOverride>(initialOverride);
   const [activeTab, setActiveTab] = useState<TabId>('general');
   // Preview data source: 'sample' synthetic data, or a real record id.
   const [dataSource, setDataSource] = useState<string>('sample');
-  const [records, setRecords] = useState<{ id: string; label: string }[]>([]);
+  const [records, setRecords] = useState<PreviewRecordOption[]>([]);
   // A subtype-scoped template previews as its own report type. The legacy
   // shared base serves all 8, so it keeps a preview picker that renders each
   // one the exact way generation resolves it (subtype base + this override).
   const [previewSubtype, setPreviewSubtype] = useState<string>(reportSubtype ?? 'evaluation');
   const showSubtypePicker = docType === 'report' && !reportSubtype;
-  const recordPreviewSupported =
-    docType === 'invoice' || docType === 'quote' || docType === 'payment_receipt';
+
+  /**
+   * The report subtype the preview actually renders through.
+   *
+   * When a real record is selected it is the RECORD's own `report_type`, never
+   * the picker — production resolves the section config from the record
+   * (`reportPDFService`: `reportConfigForSubtype(data.report.report_type)`), so
+   * taking the picker instead would render a forensic record through the
+   * evaluation shell and disagree with the download (FUP-02). The picker still
+   * drives SAMPLE previews, where there is no record to ask.
+   */
+  const selectedRecord = dataSource === 'sample' ? undefined : records.find((r) => r.id === dataSource);
+  const effectiveSubtype = selectedRecord?.reportType ?? previewSubtype;
+  /** True when the record overruled the picker — surfaced so it is not silent. */
+  const subtypeFollowsRecord =
+    docType === 'report' && !!selectedRecord?.reportType && selectedRecord.reportType !== previewSubtype;
+  // "Print view": drop the stand-in logo box so the preview predicts the printed
+  // layout exactly. Only meaningful while a placeholder is actually in play.
+  const [printView, setPrintView] = useState(false);
 
   const heading = titleLabel ?? DOC_TYPE_LABELS[docType];
 
   const builtIn = useMemo(
-    () => (docType === 'report' ? reportConfigForSubtype(previewSubtype) : BUILT_IN_TEMPLATE_CONFIGS[docType]),
-    [docType, previewSubtype],
+    () => (docType === 'report' ? reportConfigForSubtype(effectiveSubtype) : BUILT_IN_TEMPLATE_CONFIGS[docType]),
+    [docType, effectiveSubtype],
   );
 
   const resolved = useMemo(
@@ -209,7 +240,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   // ---- Live preview (debounced, real pdfmake artifact) --------------------
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(true);
-  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewFailure, setPreviewFailure] = useState<PreviewFailure | null>(null);
   const [tenantLogo, setTenantLogo] = useState<BrandingImage | null>(null);
   const [tenantStamp, setTenantStamp] = useState<BrandingImage | null>(null);
   const [tenantSignature, setTenantSignature] = useState<BrandingImage | null>(null);
@@ -217,16 +248,26 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
   const lastUrlRef = useRef<string | null>(null);
 
+  // A logo stand-in is only ever drawn when the tenant has none — that is the
+  // only case where "Print view" changes anything, so the toggle stays hidden
+  // otherwise rather than offering a no-op.
+  const logoIsPlaceholder = tenantLogo !== null && tenantLogo.kind === 'none';
+
   useEffect(() => {
     let cancelled = false;
     setPreviewLoading(true);
-    setPreviewError(null);
+    setPreviewFailure(null);
     const timer = setTimeout(async () => {
       try {
         const { preloadAllFonts } = await import('../../../lib/pdf/fonts');
         await preloadAllFonts();
         let url: string;
         let warnings: string[] = [];
+        // ONE branding resolution for both data sources: the tenant logo/stamp/
+        // signature resolved once above feed the sample path and the record path
+        // alike, so flipping the picker changes only the DATA. `logoPlaceholder`
+        // travels with them so the stand-in treatment matches too.
+        const logoPlaceholder = !printView;
         if (dataSource === 'sample') {
           const { previewTemplate } = await import('../../../lib/pdf/engine/previewTemplate');
           // Pass the tenant's real company settings so the sample preview shows the
@@ -241,11 +282,19 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
             tenantSignature,
             companySettings ?? undefined,
             languageExplicit,
-            docType === 'report' ? { reportSubtype: previewSubtype } : undefined,
+            {
+              ...(docType === 'report' ? { reportSubtype: effectiveSubtype } : {}),
+              logoPlaceholder,
+            },
           ));
         } else {
           const { previewDocumentForRecord } = await import('../../../lib/pdf/previewRecord');
-          ({ url, warnings } = await previewDocumentForRecord(docType, dataSource, resolved, languageExplicit));
+          ({ url, warnings } = await previewDocumentForRecord(docType, dataSource, resolved, languageExplicit, {
+            logo: tenantLogo,
+            stamp: tenantStamp,
+            signature: tenantSignature,
+            logoPlaceholder,
+          }));
         }
         if (cancelled) {
           URL.revokeObjectURL(url);
@@ -258,7 +307,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       } catch (err) {
         if (cancelled) return;
         logger.error('[TemplateStudio] preview failed:', err);
-        setPreviewError('Could not render the preview. Try adjusting a setting.');
+        setPreviewFailure(describePreviewFailure(err));
       } finally {
         if (!cancelled) setPreviewLoading(false);
       }
@@ -267,15 +316,16 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [resolved, languageExplicit, dataSource, docType, previewSubtype, tenantLogo, tenantStamp, tenantSignature, companySettings]);
+  }, [resolved, languageExplicit, dataSource, docType, effectiveSubtype, tenantLogo, tenantStamp, tenantSignature, companySettings, printView]);
 
   useEffect(() => () => {
     if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
   }, []);
 
-  // Resolve the real tenant logo, stamp, and signature once so the sample
-  // preview can draw them (and so a missing/broken logo surfaces a non-blocking
-  // warning chip).
+  // Resolve the real tenant logo, stamp, and signature ONCE. This is the single
+  // branding-resolution step: both preview data sources consume this state, so
+  // the sample and record previews can never disagree about the letterhead, and
+  // the record path no longer re-fetches the same three images per render.
   useEffect(() => {
     let cancelled = false;
     fetchCompanySettings()
@@ -296,13 +346,14 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
     return () => { cancelled = true; };
   }, []);
 
-  // Load recent records for the data-source picker (financial doc types only).
+  // Load recent records for the data-source picker. `listPreviewRecords` is the
+  // single authority on which doc types have real records — it returns [] for
+  // the ones that do not, and the picker hides itself when the list is empty.
+  // (The old hardcoded invoice/quote/receipt gate is gone: reports, checkout
+  // forms, custody logs, payslips, credit notes and case labels are supported.)
   useEffect(() => {
-    if (!recordPreviewSupported) {
-      setRecords([]);
-      return;
-    }
     let cancelled = false;
+    setDataSource('sample');
     import('../../../lib/pdf/previewRecord')
       .then(({ listPreviewRecords }) => listPreviewRecords(docType))
       .then((r) => {
@@ -314,7 +365,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [docType, recordPreviewSupported]);
+  }, [docType]);
 
   // ---- Mutators -----------------------------------------------------------
   const api: StudioApi = useMemo(() => {
@@ -538,9 +589,64 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
     };
   }, [docType, resolved, override]);
 
-  const handleReset = () => {
+  // Structural compare of the edited override against the last saved one. The
+  // override is a small plain-JSON config, so stringify is an adequate and cheap
+  // deep-equal here; key order is stable because every mutator spreads the
+  // previous object rather than rebuilding it.
+  const isDirty = useMemo(
+    () => JSON.stringify(override) !== JSON.stringify(savedOverride),
+    [override, savedOverride],
+  );
+
+  // Native guard for tab close / reload / external navigation, which React
+  // cannot intercept. Only armed while dirty so it never nags otherwise.
+  useEffect(() => {
+    if (!isDirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Required by some browsers to trigger the native prompt.
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [isDirty]);
+
+  // Reset wipes every customization in one click and there is no undo, so it
+  // takes the same confirmation any other destructive action in the app does.
+  const handleReset = async () => {
+    const confirmed = await confirm({
+      title: 'Reset this template?',
+      message:
+        'Every customization on this template — layout, colours, typography, labels — goes back to the built-in default. This cannot be undone.',
+      confirmLabel: 'Reset to default',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     setOverride({});
     toast.info('Reverted to the default layout. Save to apply.');
+  };
+
+  // Leaving with unsaved edits silently discarded them — the override lives in
+  // component state and only Save persists it.
+  const handleBack = async () => {
+    if (isDirty) {
+      const leave = await confirm({
+        title: 'Leave without saving?',
+        message: 'Your changes to this template have not been deployed yet. Leaving discards them.',
+        confirmLabel: 'Discard changes',
+        tone: 'danger',
+      });
+      if (!leave) return;
+    }
+    onBack();
+  };
+
+  const handleSave = () => {
+    // Optimistic: the parent owns persistence, and a failed save keeps the
+    // Studio mounted with the edits intact — the baseline advancing only means
+    // the guard stops warning about work the user has explicitly submitted.
+    setSavedOverride(override);
+    onSave(override);
   };
 
   return (
@@ -548,7 +654,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       {/* Top bar */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="rounded-lg p-2 transition-colors hover:bg-slate-100" aria-label="Back to documents">
+          <button onClick={handleBack} className="rounded-lg p-2 transition-colors hover:bg-slate-100" aria-label="Back to documents">
             <ArrowLeft className="h-5 w-5 text-slate-600" />
           </button>
           <div>
@@ -567,7 +673,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
             <RotateCcw className="mr-2 h-4 w-4" />
             Reset
           </Button>
-          <Button size="sm" onClick={() => onSave(override)} isLoading={isSaving} loadingLabel="Saving">
+          <Button size="sm" onClick={handleSave} isLoading={isSaving} loadingLabel="Saving">
             <Save className="mr-2 h-4 w-4" />
             Save &amp; deploy
           </Button>
@@ -616,9 +722,10 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
                 {previewUrl && (
                   <a
                     href={previewUrl}
-                    download={`${heading}${
-                      dataSource !== 'sample' ? `-${records.find((r) => r.id === dataSource)?.label ?? ''}` : ''
-                    }.pdf`.replace(/[^\w.\-]+/g, '-')}
+                    download={previewDownloadFilename(
+                      heading,
+                      dataSource !== 'sample' ? records.find((r) => r.id === dataSource)?.label : null,
+                    )}
                     title="Download the rendered PDF"
                     aria-label="Download the rendered PDF"
                     className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -630,9 +737,18 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
                 {showSubtypePicker && (
                   <select
                     aria-label="Preview report type"
-                    value={previewSubtype}
+                    value={effectiveSubtype}
                     onChange={(e) => setPreviewSubtype(e.target.value)}
-                    className="max-w-[190px] rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    /* Disabled while a real record drives it: the record's own
+                       report_type is what production renders, so letting the
+                       picker fight it would only recreate the divergence. */
+                    disabled={!!selectedRecord?.reportType}
+                    title={
+                      selectedRecord?.reportType
+                        ? 'Set by the selected record — this is the type the generated PDF uses.'
+                        : undefined
+                    }
+                    className="max-w-[190px] rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                   >
                     {Object.values(REPORT_TYPES).map((o) => (
                       <option key={o.key} value={o.key}>
@@ -641,7 +757,32 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
                     ))}
                   </select>
                 )}
-                {recordPreviewSupported && records.length > 0 && (
+                {subtypeFollowsRecord && (
+                  <span
+                    role="status"
+                    className="rounded bg-info-muted px-1.5 py-0.5 text-xxs font-medium text-info"
+                  >
+                    Type from record
+                  </span>
+                )}
+                {logoIsPlaceholder && (
+                  <button
+                    type="button"
+                    onClick={() => setPrintView((v) => !v)}
+                    aria-pressed={printView}
+                    title="Hide the placeholder logo box and lay the header out exactly as the printed document will"
+                    className={[
+                      'inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      printView
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+                    ].join(' ')}
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                    Print view
+                  </button>
+                )}
+                {records.length > 0 && (
                   <select
                     aria-label="Preview data source"
                     value={dataSource}
@@ -677,9 +818,19 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
               </div>
             )}
             <div className="relative h-[calc(100vh-12rem)] min-h-[480px] bg-slate-200">
-              {previewError ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
-                  <p className="text-sm text-danger">{previewError}</p>
+              {previewFailure ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+                  <p className="max-w-md text-sm text-danger">{previewFailure.message}</p>
+                  {previewFailure.detail && (
+                    <details className="max-w-md text-left">
+                      <summary className="cursor-pointer text-xs font-medium text-slate-600 hover:text-slate-900">
+                        Technical details
+                      </summary>
+                      <p className="mt-1.5 break-words rounded-md bg-slate-100 px-2 py-1.5 font-mono text-xs text-slate-700">
+                        {previewFailure.detail}
+                      </p>
+                    </details>
+                  )}
                 </div>
               ) : previewUrl ? (
                 // PDF open-parameters strip the native viewer's toolbar + thumbnail
@@ -698,7 +849,8 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
             </div>
           </Card>
           <p className="mt-2 text-xs text-slate-500">
-            Preview uses sample data. PDFs stay neutral unless you opt colors in.
+            {dataSource === 'sample' ? 'Preview uses sample data.' : 'Preview uses a real record.'} PDFs stay neutral
+            unless you opt colors in.
           </p>
         </div>
       </div>

@@ -7,6 +7,10 @@ import { logger } from '../../../lib/logger';
 import { PDF_COLORS } from '../../../lib/pdf/styles';
 import { BUILT_IN_TEMPLATE_CONFIGS, resolveTemplateConfig } from '../../../lib/pdf/templateConfig';
 import type { TemplateConfigOverride, TemplateDocumentType } from '../../../lib/pdf/templateConfig';
+import { getCompanyLogo, getCompanyStamp, getCompanySignature } from '../../../lib/fileStorageService';
+import { resolveBrandingImage, type BrandingImage } from '../../../lib/pdf/brandingImage';
+import { fetchCompanySettings } from '../../../lib/pdf/dataFetcher';
+import type { CompanySettingsData } from '../../../lib/pdf/types';
 import { DOC_TYPE_LABELS } from '../../../pages/settings/documentTypeMeta';
 import {
   PRESET_CATEGORY_LABELS,
@@ -122,6 +126,36 @@ export const TemplateGalleryModal: React.FC<TemplateGalleryModalProps> = ({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const lastUrlRef = useRef<string | null>(null);
+  // The tenant's own identity + branding, so a gallery preview is judged in the
+  // tenant's real language/direction/letterhead — not against a neutral English
+  // LTR sample company that no bilingual or RTL tenant can evaluate a design
+  // from. Resolved once when the modal first opens; a failure degrades to the
+  // previous sample-company behaviour rather than blocking the preview.
+  const [branding, setBranding] = useState<{
+    companySettings: CompanySettingsData | null;
+    logo: BrandingImage | null;
+    stamp: BrandingImage | null;
+    signature: BrandingImage | null;
+  }>({ companySettings: null, logo: null, stamp: null, signature: null });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    const noImage: BrandingImage = { kind: 'none', reason: 'empty' };
+    const safe = (p: Promise<string | null>) =>
+      p.then((url) => resolveBrandingImage(url)).catch(() => noImage);
+    Promise.all([
+      fetchCompanySettings().catch(() => null),
+      safe(getCompanyLogo('primary')),
+      safe(getCompanyStamp()),
+      safe(getCompanySignature()),
+    ]).then(([companySettings, logo, stamp, signature]) => {
+      if (!cancelled) setBranding({ companySettings, logo, stamp, signature });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   const filtered = category === 'all' ? presets : presets.filter((p) => p.category === category);
   const selected = presets.find((p) => p.id === selectedId) ?? null;
@@ -148,7 +182,20 @@ export const TemplateGalleryModal: React.FC<TemplateGalleryModalProps> = ({
       ]);
       await preloadAllFonts();
       const config = resolveTemplateConfig(BUILT_IN_TEMPLATE_CONFIGS[docType], undefined, preset.config);
-      const { url } = await previewTemplate(docType, config);
+      // Thread the tenant's identity + branding through, exactly as the Studio's
+      // sample preview does, so what the gallery shows is what applying the
+      // preset produces. `languageExplicit` mirrors the Studio rule: only a
+      // preset that actually carries a language overrides the tenant default.
+      const { url } = await previewTemplate(
+        docType,
+        config,
+        undefined,
+        branding.logo,
+        branding.stamp,
+        branding.signature,
+        branding.companySettings ?? undefined,
+        preset.config.language !== undefined,
+      );
       if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
       lastUrlRef.current = url;
       setPreviewUrl(url);
