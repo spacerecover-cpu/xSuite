@@ -226,6 +226,7 @@ owner > admin > manager > technician = sales = accounts = hr > viewer
 | `payroll_*` | Tenant | Payroll |
 | `leave_*` | Tenant | Leave management |
 | `kb_*` | Tenant | Knowledge base |
+| `whatsapp_*` | Tenant | WhatsApp communication automation (Meta Cloud API) |
 
 ### Soft Deletes
 All tables use `deleted_at timestamptz DEFAULT NULL`. **Never use hard deletes (`DELETE FROM`)**. Always set `deleted_at = now()`.
@@ -315,6 +316,9 @@ The schema-drift detector (`scripts/check-schema-drift.sh`) regenerates types an
 `chain_of_custody`, `chain_of_custody_access_log`, `chain_of_custody_integrity_checks`, `chain_of_custody_transfers`
 - Uses enums: `custody_action_category`, `custody_status`, `custody_transfer_status`, `integrity_check_result`
 
+### WhatsApp Communications (Tenant-scoped)
+`whatsapp_integrations` (per-tenant Meta Cloud API connection; secrets in Supabase Vault), `whatsapp_templates`, `whatsapp_automation_rules`, `whatsapp_contacts`, `whatsapp_consents` (append-only), `whatsapp_messages` (queue + delivery ledger), `whatsapp_inbound_messages`, `whatsapp_webhook_events` (platform-scoped provider ledger — deliberately not full tenant kit)
+
 ### Customers & Companies (Tenant-scoped)
 `customers_enhanced` (canonical; `customers` is a compatibility view), `customer_groups`, `customer_communications`, `customer_company_relationships`, `companies`, `company_documents`, `company_settings`, `ndas`, `portal_link_history`
 
@@ -380,6 +384,9 @@ Located in `supabase/functions/`:
 | `paypal-create-subscription` | PayPal subscription creation |
 | `paypal-cancel-subscription` | PayPal subscription cancellation |
 | `paypal-webhook` | PayPal webhook handler |
+| `whatsapp-webhook` | Meta WhatsApp Cloud API webhook receiver (verify_jwt=false; HMAC-verified) |
+| `whatsapp-send` | WhatsApp send worker (service-role only; pg_net-invoked) |
+| `whatsapp-admin` | WhatsApp admin actions (credentials, connection test, template sync/submit, send_now) |
 
 - All edge functions use Deno runtime
 - All must handle CORS with headers: `Content-Type, Authorization, X-Client-Info, Apikey`
@@ -679,6 +686,15 @@ const formatted = formatCurrencyWithConfig(amount, currency);
 - **Dark-surface systems**: status bases+muteds and `cat-7`/`cat-8` re-anchored under midnight (hue/meaning preserved; `chartCategorical` untouched); chart chrome re-skinned via scoped `.recharts-*` CSS; themed scrollbars; ring-offset default rebound; `color-scheme: dark`; `@media print` forces light bindings.
 - **Theme-system bug fixes**: `main.tsx` anti-flash whitelist hardcoded 3 themes (new themes flashed Royal) — now derives from `THEMES`; `AppearanceSettings` gains the Midnight card (dark `preview` surfaces + Premium badge, grid `md:2 xl:4`).
 - No `database.types.ts` change (CHECK constraints are not represented in generated types).
+
+### Version 1.6.0 — WhatsApp Customer Communication Automation
+**Date**: 2026-07-27
+**Migrations**: `whatsapp_core_tables` (20260727093836), `whatsapp_dispatch_and_emitters` (20260727094103), `whatsapp_gdpr_and_seeds` (20260727094556), `whatsapp_advisor_hardening` (20260727094753)
+
+- **Tenant-connected Meta WhatsApp Cloud API automation** (spec: `docs/superpowers/specs/2026-07-27-whatsapp-communication-automation-design.md`; plan: `docs/superpowers/plans/2026-07-27-whatsapp-communication-automation.md`). 8 new `whatsapp_*` tables; per-tenant credentials in **Supabase Vault** (first live Vault usage — store/reveal via service_role-only SECURITY DEFINER RPCs; secret-id columns excluded from authenticated column grants).
+- **Event pipeline**: 7 new DB emitters (case created/device received/quote lifecycle incl. DB-side `quotes.sent_at` stamping/invoice issued/recovery outcome/checkout/parts ordered) → `notification_events` via `whatsapp_safe_emit(tenant,…)` (direct insert — the emit RPC requires session tenant context that pg_cron lacks) → `dispatch_notification_event_whatsapp` trigger (consumes base `case.phase_changed` only; default-FALSE read of `feature_flags->>'automation.whatsapp'`; inlined consent check; stable `wa:<event>:<entity>:<day>` dedup with pending-row schedule bump for multi-device intake debounce) → `whatsapp_messages` queue → pg_cron scanners (1-min queue sweep with SKIP-LOCKED innermost locking + per-tenant fairness; 15-min reminders with repeat_max enforcement; daily payload purge) → `whatsapp-send` edge worker (attempt budget consumed only by real Graph calls; error-classified backoff/suppression) → `whatsapp-webhook` receiver (two-phase ledger, tenant-scoped wamid updates, STOP/START consent automation, 24h-window tracking).
+- **22-event automation catalog** (`src/lib/whatsapp/events.ts`), Communications settings module (connection/automations/template studio), consent capture (customer modal + intake wizard + profile), case-thread WhatsApp timeline with delivery ticks, message log + analytics (server-side aggregate RPCs), GDPR anonymize/export cascade with the consent-ledger Art. 17(3)(e) carve-out. Feature default-OFF via registry `automation.whatsapp` (mirrored server-side).
+- `whatsapp_webhook_events` is excluded from `check-tenant-table-requirements` by design (nullable tenant, service-role writer). `database.types.ts` regenerated.
 
 ### Future Migration Guidelines
 
