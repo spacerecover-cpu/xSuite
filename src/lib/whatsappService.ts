@@ -32,11 +32,31 @@ export function summarizeConsent(rows: ConsentStateRow[]): { utility: boolean; m
   return { utility: get('utility'), marketing: get('marketing') };
 }
 
-export async function getIntegration(): Promise<WhatsAppIntegration | null> {
+/**
+ * Every readable column EXCEPT access_token_secret_id / app_secret_secret_id.
+ * Those two are REVOKEd from `authenticated` (the Vault handles are service-role
+ * only), and Postgres denies `SELECT *` outright when any expanded column lacks a
+ * grant — so this list must stay explicit. Adding a column to the table means
+ * adding it here too.
+ */
+const INTEGRATION_COLUMNS = [
+  'id', 'tenant_id', 'public_id', 'integration_mode', 'app_id', 'waba_id',
+  'phone_number_id', 'display_phone_number', 'verified_name', 'graph_api_version',
+  'webhook_verify_token', 'is_enabled', 'connection_status', 'webhook_status',
+  'quality_rating', 'messaging_limit_tier', 'name_status', 'token_valid',
+  'token_expires_at', 'send_paused_until', 'last_health_check_at', 'last_webhook_at',
+  'health_errors', 'created_by', 'updated_by', 'created_at', 'updated_at', 'deleted_at',
+].join(', ');
+
+export type WhatsAppIntegrationView = Omit<
+  WhatsAppIntegration, 'access_token_secret_id' | 'app_secret_secret_id'
+>;
+
+export async function getIntegration(): Promise<WhatsAppIntegrationView | null> {
   const { data, error } = await supabase.from('whatsapp_integrations')
-    .select('*').is('deleted_at', null).maybeSingle();
+    .select(INTEGRATION_COLUMNS).is('deleted_at', null).maybeSingle();
   if (error) throw error;
-  return data;
+  return (data as WhatsAppIntegrationView | null) ?? null;
 }
 
 export async function listRules(): Promise<WhatsAppRule[]> {

@@ -105,26 +105,61 @@ Deno.serve(async (req: Request) => {
       if (![appId, wabaId, phoneNumberId, accessToken, appSecret].every((v) => typeof v === "string" && v.length > 3)) {
         return new Response(JSON.stringify({ error: "All credential fields are required" }), { status: 422, headers: cors });
       }
-      // validate BEFORE storing: token introspection + scope + WABA ownership
+      // validate BEFORE storing: token introspection + scope + WABA ownership.
+      // Surface Meta's OWN wording — "invalid or revoked" alone cannot tell the
+      // admin whether the App Secret, the App ID, or the token is the wrong one.
       const dbg = await fetch(
         `${GRAPH}/debug_token?input_token=${encodeURIComponent(accessToken)}&access_token=${encodeURIComponent(`${appId}|${appSecret}`)}`,
       ).then((r) => r.json()).catch(() => null);
-      const d = dbg?.data;
-      if (!d?.is_valid) {
-        return new Response(JSON.stringify({ error: "Meta rejected the access token (invalid or revoked)" }),
+
+      if (!dbg) {
+        return new Response(JSON.stringify({ error: "Could not reach Meta to validate the credentials. Try again." }),
           { status: 422, headers: cors });
       }
+      // Top-level error = the APP credentials (App ID | App Secret) are wrong,
+      // not the access token. Meta commonly returns code 190 subcode 'Invalid
+      // appsecret' or code 100 here.
+      if (dbg.error) {
+        const m = String(dbg.error.message ?? "unknown error");
+        console.error("whatsapp-admin debug_token app-credential error:", dbg.error);
+        return new Response(JSON.stringify({
+          error: `Meta rejected the App ID / App Secret pair: ${m}. `
+               + `Check that the App Secret belongs to App ID ${appId} `
+               + `(Meta App Dashboard → Settings → Basic → App Secret → Show).`,
+        }), { status: 422, headers: cors });
+      }
+
+      const d = dbg.data;
+      if (!d?.is_valid) {
+        // debug_token reports WHY inside data.error for a well-formed-but-dead token
+        const why = String(d?.error?.message ?? "").trim();
+        const appMismatch = d?.app_id && String(d.app_id) !== String(appId)
+          ? ` The token was issued for app ${d.app_id}, not ${appId} — generate the System User token with THIS app selected.`
+          : "";
+        return new Response(JSON.stringify({
+          error: `Meta rejected the access token${why ? `: ${why}` : " (invalid, expired or revoked)"}.${appMismatch}`
+               + ` Regenerate it in Meta Business Settings → Users → System Users → Generate New Token,`
+               + ` selecting app ${appId} and expiration "Never".`,
+        }), { status: 422, headers: cors });
+      }
+
       const scopes: string[] = d.scopes ?? [];
-      for (const s of ["whatsapp_business_messaging", "whatsapp_business_management"]) {
-        if (!scopes.includes(s)) {
-          return new Response(JSON.stringify({ error: `Token is missing the ${s} permission` }),
-            { status: 422, headers: cors });
-        }
+      const missing = ["whatsapp_business_messaging", "whatsapp_business_management"]
+        .filter((s) => !scopes.includes(s));
+      if (missing.length > 0) {
+        return new Response(JSON.stringify({
+          error: `Token is missing the ${missing.join(" and ")} permission${missing.length > 1 ? "s" : ""}.`
+               + ` Regenerate the System User token with ${missing.length > 1 ? "both boxes" : "that box"} ticked.`
+               + (scopes.length ? ` (Token currently grants: ${scopes.join(", ")}.)` : ""),
+        }), { status: 422, headers: cors });
       }
       const granted = (d.granular_scopes ?? []).flatMap((g: { target_ids?: string[] }) => g.target_ids ?? []);
       if (granted.length > 0 && !granted.includes(wabaId)) {
-        return new Response(JSON.stringify({ error: "Token is not authorized for the given WhatsApp Business Account ID" }),
-          { status: 422, headers: cors });
+        return new Response(JSON.stringify({
+          error: `Token is not authorized for WhatsApp Business Account ${wabaId}.`
+               + ` It is scoped to: ${granted.join(", ")}.`
+               + ` Assign the WABA to the System User in Business Settings → Users → System Users → Assign Assets.`,
+        }), { status: 422, headers: cors });
       }
       // phone belongs to WABA + capture display metadata
       const phone = await fetch(
@@ -132,8 +167,11 @@ Deno.serve(async (req: Request) => {
         { headers: { Authorization: `Bearer ${accessToken}` } },
       ).then((r) => r.json()).catch(() => null);
       if (!phone?.id && !phone?.display_phone_number) {
-        return new Response(JSON.stringify({ error: "Phone Number ID not reachable with this token" }),
-          { status: 422, headers: cors });
+        const m = String(phone?.error?.message ?? "").trim();
+        return new Response(JSON.stringify({
+          error: `Phone Number ID ${phoneNumberId} is not reachable with this token${m ? `: ${m}` : ""}.`
+               + ` Copy it from WhatsApp Manager → API Setup (it is the "Phone number ID", not the phone number).`,
+        }), { status: 422, headers: cors });
       }
       const { data: integId, error: storeErr } = await db.rpc("whatsapp_store_credentials", {
         p_tenant_id: tenantId, p_app_id: appId, p_waba_id: wabaId,
