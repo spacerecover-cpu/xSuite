@@ -23,6 +23,24 @@
 /
   Cache-Control: no-cache
 
+# Do NOT "fix" the two rules above by adding a catch-all `/*  Cache-Control:
+# no-cache`. It looks like it closes a gap for deep links (/cases/…,
+# /settings/…), but:
+#   1. There is no gap. Cloudflare Pages already defaults static asset
+#      responses to `public, max-age=0, must-revalidate`, so the SPA fallback
+#      document served for a deep link is revalidated anyway.
+#   2. Pages does NOT resolve overlapping rules by specificity. A request
+#      matching several rules inherits ALL of their headers, and a header set
+#      twice is JOINED WITH A COMMA — a catch-all would turn every asset into
+#      `Cache-Control: no-cache, public, max-age=31536000, immutable` and
+#      destroy hashed-asset caching sitewide.
+# Removing an inherited header needs the `! Header-Name` syntax in the more
+# specific rule; that is the only supported override.
+#
+# Cache headers cannot help the case where a tab is ALREADY open across a
+# deploy — that document is never refetched. Entry-graph recovery for that
+# lives in public/boot-guard.js; lazy-chunk recovery in src/lib/lazyWithRetry.ts.
+
 # NOTE: production security headers (CSP, HSTS, X-Frame-Options, etc.) belong
 # here too — the headers in vite.config.ts only apply to the dev/preview
 # servers, not the static Cloudflare Pages deploy. Adding them is tracked as a
