@@ -11,7 +11,7 @@
 **Companion design spec:** `docs/superpowers/specs/2026-07-27-whatsapp-communication-automation-design.md` — read it first; it holds the research digest, event catalog, and all architecture rationale.
 
 **Ground rules for every task**
-- Migrations are applied ONLY via `mcp__supabase__apply_migration` (project_id `ssmbegiyjivrcwgcqutu`), then `database.types.ts` regenerated via `mcp__supabase__generate_typescript_types` and saved to `src/types/database.types.ts`, and a row appended to `supabase/migrations.manifest.md`. Never hand-edit generated types. Additive-only (no DROP/hard delete).
+- Migrations are applied ONLY via `mcp__supabase__apply_migration` (project_id `ssmbegiyjivrcwgcqutu`), then `database.types.ts` regenerated via `mcp__supabase__generate_typescript_types` and saved to `src/types/database.types.ts`, and a row appended to `supabase/migrations.manifest.md`. Never hand-edit generated types. Additive-only (no DROP/hard delete). Schema-change PRs use `.github/PULL_REQUEST_TEMPLATE/migration.md`.
 - Every new tenant-scoped table gets the full kit: `tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE`, `ENABLE`+`FORCE ROW LEVEL SECURITY`, RESTRICTIVE isolation policy with `(SELECT ...)`-wrapped helpers (InitPlan rule), `set_tenant_and_audit_fields` trigger, `idx_<table>_tenant_id ... WHERE deleted_at IS NULL`, `deleted_at` soft delete.
 - Edge functions: no `_shared/` (duplicate helpers per function — house style), `Deno.serve`, `jsr:@supabase/functions-js/edge-runtime.d.ts` shim, `npm:@supabase/supabase-js@2`, CORS allowlist (never `*`) + `Vary: Origin`, error envelope `{error}`, secrets via `Deno.env.get`.
 - UI: semantic tokens only (no purple/indigo/violet, no raw hexes), lucide-react icons, `maybeSingle()`, query keys in `src/lib/queryKeys.ts`, permission gating per house patterns.
@@ -181,6 +181,20 @@ CREATE INDEX idx_whatsapp_consents_customer ON whatsapp_consents(tenant_id, cust
   WHERE deleted_at IS NULL;
 REVOKE UPDATE, DELETE ON whatsapp_consents FROM authenticated, anon;
 
+-- Append-only guard (house prevent_audit_mutation pattern), with a sanctioned
+-- transaction-local carve-out used ONLY by the GDPR anonymize cascade (Task 17),
+-- which nulls phone/consent_text but keeps the event skeleton (Art. 17(3)(e)).
+CREATE OR REPLACE FUNCTION guard_whatsapp_consents_mutation() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND current_setting('app.allow_consent_anonymize', true) = 'true' THEN
+    RETURN NEW;
+  END IF;
+  RAISE EXCEPTION 'whatsapp_consents is append-only';
+END $$;
+CREATE TRIGGER trg_guard_whatsapp_consents_mutation BEFORE UPDATE OR DELETE ON whatsapp_consents
+  FOR EACH ROW EXECUTE FUNCTION guard_whatsapp_consents_mutation();
+
 -- ---------- 6. whatsapp_messages (queue + ledger) ----------
 CREATE TABLE whatsapp_messages (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -188,6 +202,7 @@ CREATE TABLE whatsapp_messages (
   status text NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending','processing','sent','delivered','read','failed','cancelled','skipped')),
   message_kind text NOT NULL DEFAULT 'template' CHECK (message_kind IN ('template','session_text','session_media')),
+  priority smallint NOT NULL DEFAULT 5 CHECK (priority BETWEEN 1 AND 9),  -- 1 = staff manual sends, 5 = automation
   event_key text,
   notification_event_id uuid,
   dedup_key text,
@@ -319,12 +334,48 @@ CREATE POLICY whatsapp_automation_rules_admin_write ON whatsapp_automation_rules
   WITH CHECK ((SELECT is_tenant_admin()) OR (SELECT is_platform_admin()));
 CREATE POLICY whatsapp_consents_staff_insert ON whatsapp_consents
   FOR INSERT TO authenticated WITH CHECK ((SELECT is_staff_user()));
-CREATE POLICY whatsapp_messages_staff_write ON whatsapp_messages
-  FOR ALL TO authenticated
+-- whatsapp_messages is the permanent delivery ledger (provable-delivery evidence).
+-- Per-operation policies, house pattern: staff insert (manual sends) + limited update;
+-- DELETE is admin-only (and soft-delete-only per the Do-Not list).
+CREATE POLICY whatsapp_messages_staff_insert ON whatsapp_messages
+  FOR INSERT TO authenticated WITH CHECK ((SELECT is_staff_user()));
+CREATE POLICY whatsapp_messages_staff_update ON whatsapp_messages
+  FOR UPDATE TO authenticated
   USING ((SELECT is_staff_user())) WITH CHECK ((SELECT is_staff_user()));
-CREATE POLICY whatsapp_contacts_staff_write ON whatsapp_contacts
-  FOR ALL TO authenticated
+CREATE POLICY whatsapp_messages_admin_delete ON whatsapp_messages
+  FOR DELETE TO authenticated USING ((SELECT has_role('admin')));
+CREATE POLICY whatsapp_contacts_staff_insert ON whatsapp_contacts
+  FOR INSERT TO authenticated WITH CHECK ((SELECT is_staff_user()));
+CREATE POLICY whatsapp_contacts_staff_update ON whatsapp_contacts
+  FOR UPDATE TO authenticated
   USING ((SELECT is_staff_user())) WITH CHECK ((SELECT is_staff_user()));
+
+-- Delivery evidence is immutable from end-user sessions: staff may only retry a
+-- failed row, cancel a pending row, or soft-delete. Service-role/cron paths
+-- (auth.uid() IS NULL) bypass — they maintain the delivery fields.
+CREATE OR REPLACE FUNCTION guard_whatsapp_message_staff_update() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN RETURN NEW; END IF;
+  IF NOT (
+       (OLD.status = 'failed'  AND NEW.status = 'pending')
+    OR (OLD.status = 'pending' AND NEW.status = 'cancelled')
+    OR (NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL)
+  ) THEN
+    RAISE EXCEPTION 'whatsapp_messages: staff sessions may only retry, cancel, or archive';
+  END IF;
+  IF NEW.wamid IS DISTINCT FROM OLD.wamid
+     OR NEW.sent_at IS DISTINCT FROM OLD.sent_at
+     OR NEW.delivered_at IS DISTINCT FROM OLD.delivered_at
+     OR NEW.read_at IS DISTINCT FROM OLD.read_at
+     OR NEW.pricing_category IS DISTINCT FROM OLD.pricing_category
+     OR NEW.pricing_billable IS DISTINCT FROM OLD.pricing_billable THEN
+    RAISE EXCEPTION 'whatsapp_messages: delivery evidence is immutable';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER trg_guard_whatsapp_message_staff_update BEFORE UPDATE ON whatsapp_messages
+  FOR EACH ROW EXECUTE FUNCTION guard_whatsapp_message_staff_update();
 
 -- webhook events: platform admin read only (service role bypasses RLS for writes)
 ALTER TABLE whatsapp_webhook_events ENABLE ROW LEVEL SECURITY;
@@ -332,18 +383,37 @@ ALTER TABLE whatsapp_webhook_events FORCE ROW LEVEL SECURITY;
 CREATE POLICY whatsapp_webhook_events_platform_read ON whatsapp_webhook_events
   FOR SELECT TO authenticated USING ((SELECT is_platform_admin()));
 
--- Secret-id columns: never readable/writable by app roles
-REVOKE ALL (access_token_secret_id, app_secret_secret_id) ON whatsapp_integrations FROM authenticated, anon;
+-- Secret-id columns: a column-level REVOKE is a NO-OP while a table-level grant
+-- exists (Postgres semantics), so revoke the table grant and re-grant explicit
+-- column lists that exclude the two vault ids. authenticated gets no INSERT/DELETE
+-- at all — integration rows are created/rotated only via the credential RPC.
+REVOKE ALL ON whatsapp_integrations FROM authenticated, anon;
+GRANT SELECT (id, tenant_id, public_id, integration_mode, app_id, waba_id, phone_number_id,
+  display_phone_number, verified_name, graph_api_version, webhook_verify_token, is_enabled,
+  connection_status, webhook_status, quality_rating, messaging_limit_tier, name_status,
+  token_valid, token_expires_at, send_paused_until, last_health_check_at, last_webhook_at,
+  health_errors, created_by, updated_by, created_at, updated_at, deleted_at)
+  ON whatsapp_integrations TO authenticated;
+GRANT UPDATE (is_enabled, updated_at, updated_by) ON whatsapp_integrations TO authenticated;
 
 -- ---------- Consent state helper ----------
+-- SECURITY DEFINER bypasses RLS, so end-user callers MUST be pinned to their own
+-- tenant; service-role callers (no auth.uid()) are unrestricted.
 CREATE OR REPLACE FUNCTION whatsapp_consent_state(p_tenant_id uuid, p_customer_id uuid)
 RETURNS TABLE (scope text, opted_in boolean, occurred_at timestamptz)
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT DISTINCT ON (scope) scope, (action = 'opt_in') AS opted_in, occurred_at
-  FROM whatsapp_consents
-  WHERE tenant_id = p_tenant_id AND customer_id = p_customer_id AND deleted_at IS NULL
-  ORDER BY scope, occurred_at DESC;
-$$;
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF auth.uid() IS NOT NULL
+     AND p_tenant_id IS DISTINCT FROM (SELECT get_current_tenant_id())
+     AND NOT (SELECT is_platform_admin()) THEN
+    RAISE EXCEPTION 'whatsapp_consent_state: tenant mismatch';
+  END IF;
+  RETURN QUERY
+  SELECT DISTINCT ON (c.scope) c.scope, (c.action = 'opt_in') AS opted_in, c.occurred_at
+  FROM whatsapp_consents c
+  WHERE c.tenant_id = p_tenant_id AND c.customer_id = p_customer_id AND c.deleted_at IS NULL
+  ORDER BY c.scope, c.occurred_at DESC;
+END $$;
 REVOKE EXECUTE ON FUNCTION whatsapp_consent_state(uuid, uuid) FROM public, anon;
 GRANT EXECUTE ON FUNCTION whatsapp_consent_state(uuid, uuid) TO authenticated, service_role;
 
@@ -364,17 +434,20 @@ BEGIN
     INSERT INTO whatsapp_integrations (tenant_id) VALUES (p_tenant_id) RETURNING * INTO v_row;
   END IF;
 
+  -- Secret NAMES key on the integration row id, not the tenant id: vault names are
+  -- unique, and a disconnect/reconnect cycle (soft-deleted row → new row) must not
+  -- collide with an orphaned secret from the old row.
   IF v_row.access_token_secret_id IS NOT NULL THEN
     PERFORM vault.update_secret(v_row.access_token_secret_id, p_access_token);
     v_token_id := v_row.access_token_secret_id;
   ELSE
-    v_token_id := vault.create_secret(p_access_token, 'wa_token_' || p_tenant_id::text);
+    v_token_id := vault.create_secret(p_access_token, 'wa_token_' || v_row.id::text);
   END IF;
   IF v_row.app_secret_secret_id IS NOT NULL THEN
     PERFORM vault.update_secret(v_row.app_secret_secret_id, p_app_secret);
     v_secret_id := v_row.app_secret_secret_id;
   ELSE
-    v_secret_id := vault.create_secret(p_app_secret, 'wa_appsecret_' || p_tenant_id::text);
+    v_secret_id := vault.create_secret(p_app_secret, 'wa_appsecret_' || v_row.id::text);
   END IF;
 
   UPDATE whatsapp_integrations SET
@@ -385,8 +458,9 @@ BEGIN
   WHERE id = v_row.id;
 
   BEGIN
+    -- p_new_values is jsonb — pass the object directly (a ::text cast matches no overload)
     PERFORM log_audit_trail('whatsapp_integrations', v_row.id, 'credentials_stored',
-      NULL, jsonb_build_object('phone_number_id', p_phone_number_id, 'waba_id', p_waba_id)::text);
+      NULL, jsonb_build_object('phone_number_id', p_phone_number_id, 'waba_id', p_waba_id));
   EXCEPTION WHEN OTHERS THEN NULL;
   END;
   RETURN v_row.id;
@@ -426,9 +500,14 @@ select polname, polpermissive from pg_policy p join pg_class c on c.oid=p.polrel
  where c.relname='whatsapp_messages';
 select whatsapp_consent_state('00000000-0000-0000-0000-000000000000'::uuid,
                               '00000000-0000-0000-0000-000000000000'::uuid);
+-- Vault smoke: SECURITY DEFINER reveal must actually decrypt (owner-grant check)
+select whatsapp_store_credentials('00000000-0000-0000-0000-000000000000'::uuid,
+  'app','waba','pn','+10000000000','tok-smoke','sec-smoke');
+select access_token is not null as ok from whatsapp_reveal_credentials(
+  '00000000-0000-0000-0000-000000000000'::uuid);
 ```
 
-Expected: 8 tables, all `t`/`t` for RLS; a RESTRICTIVE `whatsapp_messages_tenant_isolation` policy; the consent call returns 0 rows (not an error).
+Expected: 8 tables, all `t`/`t` for RLS; a RESTRICTIVE `whatsapp_messages_tenant_isolation` policy; the consent call returns 0 rows (not an error); the reveal smoke returns `ok = true` (this proves the function owner keeps its `vault.decrypted_secrets` grant on this project — if it fails, stop and fix grants before proceeding). Delete the smoke rows afterwards (`update whatsapp_integrations set deleted_at = now() where tenant_id = '00000000-0000-0000-0000-000000000000';` — note the zero-uuid tenant must exist on a branch DB or use a real staging tenant id).
 
 - [ ] **Step 4: Append to the migration manifest and commit**
 
@@ -444,6 +523,26 @@ git commit -m "feat(whatsapp): core tables, RLS kit, Vault credential RPCs (dorm
 **Files:**
 - Migration (via MCP): name `whatsapp_dispatch_and_emitters`
 
+**Pre-flight introspection (do not skip):** the live DB is the source of truth and two behaviors this migration depends on are not in the repo:
+
+```sql
+select pg_get_functiondef('emit_notification_event(text,text,uuid,jsonb,text)'::regprocedure);
+-- (a) confirm how it handles a duplicate (tenant_id, dedup_key) — the emitters below
+--     defensively catch unique_violation in case it raises instead of swallowing;
+-- (b) confirm how it resolves tenant_id (payload/entity vs auth context) — the cron
+--     scanners below run with NO auth context and rely on entity-derived tenant.
+select pg_get_functiondef('set_tenant_and_audit_fields()'::regprocedure);
+-- confirm the cross-tenant guard exemptions: is_platform_admin() OR jwt role
+-- 'service_role' OR the transaction-local GUC app.bypass_tenant_guard (house
+-- precedent: manifest rows 20260530051557, 20260610043346). The dispatcher below
+-- sets that GUC because pg_cron-driven emissions have no JWT at all.
+select column_name from information_schema.columns
+ where table_name in ('quotes','invoices','inventory_parts_usage')
+ order by table_name, column_name;
+-- quotes/invoices use total_amount (NOT total); verify inventory_parts_usage has
+-- (tenant_id, case_id) before wiring the parts emitter — adjust if the linkage differs.
+```
+
 - [ ] **Step 1: Apply the migration**
 
 ```sql
@@ -451,22 +550,46 @@ git commit -m "feat(whatsapp): core tables, RLS kit, Vault credential RPCs (dorm
 -- WhatsApp dispatch trigger, event emitters, queue scanner, cron
 -- =============================================================
 
--- ---------- quotes.sent_at + DB-side stamp (closes client-side best-effort hole) ----------
+-- ---------- quotes.sent_at (closes the client-side best-effort hole FOR ALL TENANTS) ----------
 ALTER TABLE quotes ADD COLUMN IF NOT EXISTS sent_at timestamptz;
 
--- ---------- case_follow_ups: allow whatsapp channel ----------
-ALTER TABLE case_follow_ups DROP CONSTRAINT IF EXISTS case_follow_ups_channel_check;
-ALTER TABLE case_follow_ups ADD CONSTRAINT case_follow_ups_channel_check
-  CHECK (channel IN ('internal','email','whatsapp'));
+-- Unconditional stamp: independent of WhatsApp so every tenant gets DB-side sent_at.
+CREATE OR REPLACE FUNCTION stamp_quote_sent_at() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NEW.status = 'sent' AND NEW.sent_at IS NULL THEN
+    NEW.sent_at := now();
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER trg_stamp_quote_sent_at BEFORE INSERT OR UPDATE ON quotes
+  FOR EACH ROW EXECUTE FUNCTION stamp_quote_sent_at();
+
+-- NOTE: case_follow_ups.channel is NOT widened. WhatsApp follow-ups ride the existing
+-- channel='internal' rows: process_due_case_follow_ups already emits case.follow_up_due
+-- for them, and the dispatcher below consumes that event. (Widening the CHECK would
+-- leave 'whatsapp' rows matching neither branch of the untouched follow-up scanner.)
+
+-- ---------- Phone-match helper (webhook inbound correlation; stored numbers are unnormalized) ----------
+CREATE OR REPLACE FUNCTION whatsapp_match_customer_by_phone(p_tenant_id uuid, p_last9 text)
+RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT id FROM customers_enhanced
+  WHERE tenant_id = p_tenant_id AND deleted_at IS NULL
+    AND (regexp_replace(COALESCE(whatsapp_number, ''), '\D', '', 'g') LIKE '%' || p_last9
+      OR regexp_replace(COALESCE(mobile_number, ''), '\D', '', 'g') LIKE '%' || p_last9
+      OR regexp_replace(COALESCE(phone, ''), '\D', '', 'g') LIKE '%' || p_last9)
+  LIMIT 1;
+$$;
+REVOKE EXECUTE ON FUNCTION whatsapp_match_customer_by_phone(uuid, text) FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION whatsapp_match_customer_by_phone(uuid, text) TO service_role;
 
 -- ---------- Business-hours window helper ----------
--- Returns p_ts if inside the rule window (tenant timezone), else the next window start.
 CREATE OR REPLACE FUNCTION whatsapp_apply_send_window(
   p_tenant_id uuid, p_send_window text, p_business_hours jsonb, p_ts timestamptz
 ) RETURNS timestamptz
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
 DECLARE
-  v_tz text; v_local timestamptz; v_start time; v_end time; v_days int[]; v_probe timestamptz; i int;
+  v_tz text; v_start time; v_end time; v_days int[]; v_probe timestamptz; i int;
 BEGIN
   IF p_send_window IS DISTINCT FROM 'business_hours' THEN RETURN p_ts; END IF;
   SELECT COALESCE(timezone, 'UTC') INTO v_tz FROM tenants WHERE id = p_tenant_id;
@@ -481,7 +604,6 @@ BEGIN
        AND (v_probe AT TIME ZONE v_tz)::time <  v_end THEN
       RETURN v_probe;
     END IF;
-    -- jump to the next window start (today if before start, else tomorrow)
     IF (v_probe AT TIME ZONE v_tz)::time < v_start
        AND EXTRACT(isodow FROM v_probe AT TIME ZONE v_tz)::int = ANY (v_days) THEN
       v_probe := ((v_probe AT TIME ZONE v_tz)::date::timestamp + v_start) AT TIME ZONE v_tz;
@@ -491,6 +613,7 @@ BEGIN
   END LOOP;
   RETURN p_ts; -- defensive: never loop forever; send anyway
 END $$;
+GRANT EXECUTE ON FUNCTION whatsapp_apply_send_window(uuid, text, jsonb, timestamptz) TO service_role;
 
 -- ---------- The dispatcher: notification_events → whatsapp_messages ----------
 CREATE OR REPLACE FUNCTION dispatch_notification_event_whatsapp()
@@ -502,24 +625,34 @@ DECLARE
   v_event_key text;
   v_customer_id uuid;
   v_phone text;
-  v_consent record;
+  v_consent_ok boolean;
   v_scheduled timestamptz;
+  v_dedup text;
   v_msg_id uuid;
   v_url text; v_key text;
 BEGIN
   -- 0. cheap short-circuits, cheapest first
   IF current_setting('app.importing', true) = 'on' THEN RETURN NEW; END IF;
+  -- Customer-visible transitions emit BOTH case.phase_changed AND
+  -- case.phase_changed.customer for the SAME transition (v1.3.0 RPCs). Handle only
+  -- the base event so one transition can never enqueue two customer messages.
+  IF NEW.event_type = 'case.phase_changed.customer' THEN RETURN NEW; END IF;
 
   SELECT * INTO v_integration FROM whatsapp_integrations
    WHERE tenant_id = NEW.tenant_id AND deleted_at IS NULL
      AND is_enabled AND connection_status = 'connected';
   IF v_integration.id IS NULL THEN RETURN NEW; END IF;
 
-  IF NOT tenant_feature_enabled(NEW.tenant_id, 'automation.whatsapp') THEN RETURN NEW; END IF;
+  -- Master switch is default-OFF. tenant_feature_enabled() fails OPEN on a missing
+  -- key, so read the flag with default-false semantics instead of using it.
+  IF COALESCE((SELECT (feature_flags->>'automation.whatsapp')::boolean
+                 FROM tenants WHERE id = NEW.tenant_id), false) IS NOT TRUE THEN
+    RETURN NEW;
+  END IF;
 
   -- 1. effective event key (phase-changes expand on to_phase)
   v_event_key := NEW.event_type;
-  IF NEW.event_type IN ('case.phase_changed', 'case.phase_changed.customer') THEN
+  IF NEW.event_type = 'case.phase_changed' THEN
     v_event_key := 'case.phase_changed:' || COALESCE(NEW.payload->>'to_phase', '');
   END IF;
 
@@ -544,25 +677,39 @@ BEGIN
     INTO v_phone FROM customers_enhanced WHERE id = v_customer_id AND deleted_at IS NULL;
   IF v_phone IS NULL THEN RETURN NEW; END IF;
 
-  -- 3. consent (required scope from the rule)
-  SELECT * INTO v_consent FROM whatsapp_consent_state(NEW.tenant_id, v_customer_id) s
-   WHERE s.scope = v_rule.required_consent AND s.opted_in;
-  IF v_consent IS NULL THEN RETURN NEW; END IF;
+  -- 3. consent (required scope from the rule). Inlined rather than calling
+  -- whatsapp_consent_state(): that helper enforces a caller-tenant check that can
+  -- misfire under portal-JWT session contexts (e.g. approve_quote fired from the
+  -- customer portal) — the dispatcher must behave identically in every context.
+  SELECT (c.action = 'opt_in') INTO v_consent_ok
+    FROM whatsapp_consents c
+   WHERE c.tenant_id = NEW.tenant_id AND c.customer_id = v_customer_id
+     AND c.scope = v_rule.required_consent AND c.deleted_at IS NULL
+   ORDER BY c.occurred_at DESC LIMIT 1;
+  IF v_consent_ok IS NOT TRUE THEN RETURN NEW; END IF;
 
   -- 4. schedule (delay + business window)
   v_scheduled := whatsapp_apply_send_window(
     NEW.tenant_id, v_rule.send_window, v_rule.business_hours,
     now() + make_interval(mins => v_rule.delay_minutes));
 
-  -- 5. enqueue (dedup on event dedup_key + event_key)
+  -- 5. enqueue. Dedup key is STABLE BUSINESS IDENTITY (never the source event's
+  -- dedup_key, which differs between sibling emissions of one transition).
+  -- ON CONFLICT bumps the schedule of a still-pending row — this is the debounce
+  -- that collapses a multi-device intake into ONE receipt listing all devices.
+  v_dedup := 'wa:' || v_event_key || ':' || COALESCE(NEW.entity_id::text, NEW.id::text)
+             || ':' || to_char(now(), 'YYYY-MM-DD');
+
+  -- pg_cron-driven emissions carry no JWT: sanction this insert for the event's
+  -- tenant via the house GUC (precedent: 20260530051557, 20260610043346).
+  PERFORM set_config('app.bypass_tenant_guard', 'true', true);
   INSERT INTO whatsapp_messages (
     tenant_id, event_key, notification_event_id, dedup_key, template_id,
-    customer_id, to_phone_e164,
+    customer_id, to_phone_e164, priority,
     case_id, quote_id, invoice_id, scheduled_for
   ) VALUES (
-    NEW.tenant_id, v_event_key, NEW.id,
-    COALESCE(NEW.dedup_key, NEW.id::text) || ':wa:' || v_event_key,
-    v_rule.template_id, v_customer_id, v_phone,
+    NEW.tenant_id, v_event_key, NEW.id, v_dedup,
+    v_rule.template_id, v_customer_id, v_phone, 5,
     CASE WHEN NEW.entity_type = 'case'    THEN NEW.entity_id
          ELSE NULLIF(NEW.payload->>'case_id','')::uuid END,
     CASE WHEN NEW.entity_type = 'quote'   THEN NEW.entity_id
@@ -572,8 +719,10 @@ BEGIN
     v_scheduled
   )
   ON CONFLICT (tenant_id, dedup_key) WHERE dedup_key IS NOT NULL AND deleted_at IS NULL
-  DO NOTHING
+  DO UPDATE SET scheduled_for = EXCLUDED.scheduled_for, updated_at = now()
+  WHERE whatsapp_messages.status = 'pending'
   RETURNING id INTO v_msg_id;
+  PERFORM set_config('app.bypass_tenant_guard', '', true);
 
   -- 6. instant poke (best effort; the cron sweep is the guarantee)
   IF v_msg_id IS NOT NULL AND v_scheduled <= now() THEN
@@ -589,6 +738,7 @@ BEGIN
 
   RETURN NEW;
 EXCEPTION WHEN OTHERS THEN
+  PERFORM set_config('app.bypass_tenant_guard', '', true);
   RAISE WARNING 'dispatch_notification_event_whatsapp failed for event %: %', NEW.id, SQLERRM;
   RETURN NEW;  -- NEVER block the business transaction
 END $$;
@@ -598,7 +748,12 @@ CREATE TRIGGER trg_dispatch_notification_event_whatsapp
   FOR EACH ROW EXECUTE FUNCTION dispatch_notification_event_whatsapp();
 
 -- ---------- New event emitters ----------
--- Guard shared by all emitters: skip imports and tenants without a connected integration.
+-- Every emitter: (a) EXCEPTION-wrapped so a WhatsApp defect can never fail a business
+-- write; (b) each PERFORM emit_notification_event additionally catches unique_violation
+-- in case the live emit fn raises on duplicate dedup keys (see pre-flight); (c) gated
+-- on whatsapp_tenant_active() so tenants without a connected integration pay one
+-- indexed EXISTS and emit nothing (the subscription-blind email-trigger defect is not
+-- copied); (d) app.importing-guarded.
 CREATE OR REPLACE FUNCTION whatsapp_tenant_active(p_tenant_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT EXISTS (
@@ -607,12 +762,21 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
       AND is_enabled AND connection_status = 'connected');
 $$;
 
+CREATE OR REPLACE FUNCTION whatsapp_safe_emit(
+  p_event_type text, p_entity_type text, p_entity_id uuid, p_payload jsonb, p_dedup_key text
+) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  PERFORM emit_notification_event(p_event_type, p_entity_type, p_entity_id, p_payload, p_dedup_key);
+EXCEPTION WHEN unique_violation THEN
+  NULL;  -- duplicate dedup key = already emitted; fine
+END $$;
+
 CREATE OR REPLACE FUNCTION emit_case_created_event() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF current_setting('app.importing', true) = 'on' THEN RETURN NEW; END IF;
   IF NOT whatsapp_tenant_active(NEW.tenant_id) THEN RETURN NEW; END IF;
-  PERFORM emit_notification_event('case.created', 'case', NEW.id,
+  PERFORM whatsapp_safe_emit('case.created', 'case', NEW.id,
     jsonb_build_object('case_id', NEW.id, 'case_number', NEW.case_number,
                        'customer_id', NEW.customer_id, 'priority', NEW.priority),
     'case.created:' || NEW.id::text);
@@ -625,18 +789,24 @@ CREATE TRIGGER trg_emit_case_created AFTER INSERT ON cases
 
 CREATE OR REPLACE FUNCTION emit_device_received_event() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_case cases%ROWTYPE;
+DECLARE v_case cases%ROWTYPE; v_tz text;
 BEGIN
   IF current_setting('app.importing', true) = 'on' THEN RETURN NEW; END IF;
   IF NOT whatsapp_tenant_active(NEW.tenant_id) THEN RETURN NEW; END IF;
   SELECT * INTO v_case FROM cases WHERE id = NEW.case_id;
   IF v_case.id IS NULL OR v_case.deleted_at IS NOT NULL THEN RETURN NEW; END IF;
-  PERFORM emit_notification_event('case.device_received', 'case', NEW.case_id,
+  SELECT COALESCE(timezone, 'UTC') INTO v_tz FROM tenants WHERE id = NEW.tenant_id;
+  -- One event per DEVICE (so each arrival re-triggers the dispatcher), but the
+  -- dispatcher's stable per-case-per-day dedup + pending-row schedule bump collapse
+  -- them into ONE receipt whose device.summary is rendered AT SEND TIME with every
+  -- device present. Day bucket is tenant-local, not UTC. Pair this with the
+  -- catalog's 15-minute default delay on case.device_received (the debounce window).
+  PERFORM whatsapp_safe_emit('case.device_received', 'case', NEW.case_id,
     jsonb_build_object('case_id', NEW.case_id, 'case_number', v_case.case_number,
                        'customer_id', v_case.customer_id, 'device_id', NEW.id,
                        'serial_number', NEW.serial_number, 'model', NEW.model),
-    'case.device_received:' || NEW.case_id::text || ':' ||
-      to_char(now(), 'YYYY-MM-DD'));  -- one receipt per case per day (multi-device intake = 1 message)
+    'case.device_received:' || NEW.case_id::text || ':' || NEW.id::text || ':' ||
+      to_char(now() AT TIME ZONE v_tz, 'YYYY-MM-DD'));
   RETURN NEW;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'emit_device_received_event: %', SQLERRM; RETURN NEW;
@@ -644,6 +814,9 @@ END $$;
 CREATE TRIGGER trg_emit_device_received AFTER INSERT ON case_devices
   FOR EACH ROW EXECUTE FUNCTION emit_device_received_event();
 
+-- AFTER trigger (the design's shape): quote rows exist when the dispatcher enqueues,
+-- so the whatsapp_messages.quote_id FK is satisfiable. sent_at stamping lives in the
+-- separate unconditional BEFORE trigger above.
 CREATE OR REPLACE FUNCTION emit_quote_events() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_event text;
@@ -652,30 +825,27 @@ BEGIN
   IF NOT whatsapp_tenant_active(NEW.tenant_id) THEN RETURN NEW; END IF;
 
   IF TG_OP = 'INSERT' THEN
-    v_event := 'quote.created';
+    v_event := CASE WHEN NEW.status = 'sent' THEN 'quote.sent' ELSE 'quote.created' END;
   ELSIF NEW.status IS DISTINCT FROM OLD.status THEN
     v_event := CASE NEW.status
       WHEN 'sent' THEN 'quote.sent'
-      WHEN 'accepted' THEN 'quote.approved'
+      WHEN 'accepted' THEN 'quote.approved'   -- canonical v1.3.0 vocabulary
       WHEN 'rejected' THEN 'quote.rejected'
       ELSE NULL END;
-    IF NEW.status = 'sent' AND NEW.sent_at IS NULL THEN
-      NEW.sent_at := now();  -- BEFORE trigger required for this write; see trigger def
-    END IF;
   END IF;
   IF v_event IS NULL THEN RETURN NEW; END IF;
 
-  PERFORM emit_notification_event(v_event, 'quote', NEW.id,
+  PERFORM whatsapp_safe_emit(v_event, 'quote', NEW.id,
     jsonb_build_object('quote_id', NEW.id, 'quote_number', NEW.quote_number,
                        'case_id', NEW.case_id, 'customer_id', NEW.customer_id,
-                       'total', NEW.total, 'currency', NEW.currency,
+                       'total', NEW.total_amount, 'currency', NEW.currency,
                        'valid_until', NEW.valid_until),
-    v_event || ':' || NEW.id::text || ':' || COALESCE(NEW.status, 'new'));
+    v_event || ':' || NEW.id::text);
   RETURN NEW;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'emit_quote_events: %', SQLERRM; RETURN NEW;
 END $$;
-CREATE TRIGGER trg_emit_quote_events BEFORE INSERT OR UPDATE ON quotes
+CREATE TRIGGER trg_emit_quote_events AFTER INSERT OR UPDATE ON quotes
   FOR EACH ROW EXECUTE FUNCTION emit_quote_events();
 
 CREATE OR REPLACE FUNCTION emit_invoice_issued_event() RETURNS trigger
@@ -685,10 +855,10 @@ BEGIN
   IF NOT whatsapp_tenant_active(NEW.tenant_id) THEN RETURN NEW; END IF;
   IF (TG_OP = 'INSERT' AND NEW.status = 'sent')
      OR (TG_OP = 'UPDATE' AND NEW.status = 'sent' AND OLD.status IS DISTINCT FROM 'sent') THEN
-    PERFORM emit_notification_event('invoice.issued', 'invoice', NEW.id,
+    PERFORM whatsapp_safe_emit('invoice.issued', 'invoice', NEW.id,
       jsonb_build_object('invoice_id', NEW.id, 'invoice_number', NEW.invoice_number,
                          'case_id', NEW.case_id, 'customer_id', NEW.customer_id,
-                         'total', NEW.total, 'balance_due', NEW.balance_due,
+                         'total', NEW.total_amount, 'balance_due', NEW.balance_due,
                          'currency', NEW.currency, 'due_date', NEW.due_date),
       'invoice.issued:' || NEW.id::text);
   END IF;
@@ -703,10 +873,9 @@ CREATE OR REPLACE FUNCTION emit_recovery_outcome_event() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF current_setting('app.importing', true) = 'on' THEN RETURN NEW; END IF;
-  IF NEW.recovery_outcome IS NULL
-     OR NEW.recovery_outcome IS NOT DISTINCT FROM OLD.recovery_outcome THEN RETURN NEW; END IF;
+  IF NEW.recovery_outcome IS NULL THEN RETURN NEW; END IF;
   IF NOT whatsapp_tenant_active(NEW.tenant_id) THEN RETURN NEW; END IF;
-  PERFORM emit_notification_event('case.recovery_outcome', 'case', NEW.id,
+  PERFORM whatsapp_safe_emit('case.recovery_outcome', 'case', NEW.id,
     jsonb_build_object('case_id', NEW.id, 'case_number', NEW.case_number,
                        'customer_id', NEW.customer_id, 'recovery_outcome', NEW.recovery_outcome),
     -- dedup by value: the three competing writers of recovery_outcome collapse to one event per value
@@ -715,8 +884,11 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'emit_recovery_outcome_event: %', SQLERRM; RETURN NEW;
 END $$;
+-- WHEN clause: cases is the hottest table; only outcome changes invoke the function
 CREATE TRIGGER trg_emit_recovery_outcome AFTER UPDATE ON cases
-  FOR EACH ROW EXECUTE FUNCTION emit_recovery_outcome_event();
+  FOR EACH ROW
+  WHEN (OLD.recovery_outcome IS DISTINCT FROM NEW.recovery_outcome)
+  EXECUTE FUNCTION emit_recovery_outcome_event();
 
 CREATE OR REPLACE FUNCTION emit_case_checkout_event() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
@@ -726,7 +898,7 @@ BEGIN
   IF current_setting('app.importing', true) = 'on' THEN RETURN NEW; END IF;
   IF NOT whatsapp_tenant_active(NEW.tenant_id) THEN RETURN NEW; END IF;
   SELECT * INTO v_case FROM cases WHERE id = NEW.case_id;
-  PERFORM emit_notification_event('case.checked_out', 'case', NEW.case_id,
+  PERFORM whatsapp_safe_emit('case.checked_out', 'case', NEW.case_id,
     jsonb_build_object('case_id', NEW.case_id, 'case_number', v_case.case_number,
                        'customer_id', v_case.customer_id, 'details', NEW.details),
     'case.checked_out:' || NEW.id::text);
@@ -737,18 +909,43 @@ END $$;
 CREATE TRIGGER trg_emit_case_checkout AFTER INSERT ON case_job_history
   FOR EACH ROW EXECUTE FUNCTION emit_case_checkout_event();
 
+-- Parts Ordered: donor/part allocation recorded against a case. Column linkage
+-- verified in pre-flight (inventory_parts_usage.tenant_id/case_id) — adjust if the
+-- live shape differs.
+CREATE OR REPLACE FUNCTION emit_parts_ordered_event() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_case cases%ROWTYPE; v_tz text;
+BEGIN
+  IF NEW.case_id IS NULL THEN RETURN NEW; END IF;
+  IF current_setting('app.importing', true) = 'on' THEN RETURN NEW; END IF;
+  IF NOT whatsapp_tenant_active(NEW.tenant_id) THEN RETURN NEW; END IF;
+  SELECT * INTO v_case FROM cases WHERE id = NEW.case_id;
+  IF v_case.id IS NULL THEN RETURN NEW; END IF;
+  SELECT COALESCE(timezone, 'UTC') INTO v_tz FROM tenants WHERE id = NEW.tenant_id;
+  PERFORM whatsapp_safe_emit('case.parts_ordered', 'case', NEW.case_id,
+    jsonb_build_object('case_id', NEW.case_id, 'case_number', v_case.case_number,
+                       'customer_id', v_case.customer_id),
+    'case.parts_ordered:' || NEW.case_id::text || ':' ||
+      to_char(now() AT TIME ZONE v_tz, 'YYYY-MM-DD'));  -- one per case per tenant-local day
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  RAISE WARNING 'emit_parts_ordered_event: %', SQLERRM; RETURN NEW;
+END $$;
+CREATE TRIGGER trg_emit_parts_ordered AFTER INSERT ON inventory_parts_usage
+  FOR EACH ROW EXECUTE FUNCTION emit_parts_ordered_event();
+
 -- ---------- Queue scanner (pg_cron every minute) ----------
 CREATE OR REPLACE FUNCTION process_due_whatsapp_messages()
-RETURNS TABLE (dispatched int, reset_stuck int)
+RETURNS TABLE (dispatched int, reset_stuck int, capped int)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_url text; v_key text; v_row record;
-  v_dispatched int := 0; v_reset int := 0;
+  v_dispatched int := 0; v_reset int := 0; v_capped int := 0;
 BEGIN
   v_url := get_system_setting('edge_function_base_url');
   v_key := get_system_setting('edge_function_service_key');
   IF v_url IS NULL OR v_key IS NULL THEN
-    RETURN QUERY SELECT 0, 0; RETURN;  -- dormant until configured
+    RETURN QUERY SELECT 0, 0, 0; RETURN;  -- dormant until configured
   END IF;
 
   -- recover rows stuck in 'processing' (worker crash) after 5 minutes
@@ -761,20 +958,41 @@ BEGIN
      RETURNING 1)
   SELECT count(*) INTO v_reset FROM stuck;
 
+  -- retry-exhausted rows: fail them VISIBLY (never leave pending zombies) + notify staff
+  FOR v_row IN
+    SELECT id, tenant_id FROM whatsapp_messages
+     WHERE status = 'pending' AND attempt_count >= 5 AND deleted_at IS NULL
+     LIMIT 100
+  LOOP
+    UPDATE whatsapp_messages
+       SET status = 'failed', failed_at = now(),
+           last_error = COALESCE(last_error, '') || ' [retries exhausted]'
+     WHERE id = v_row.id AND status = 'pending';
+    PERFORM whatsapp_safe_emit('whatsapp.message_failed', 'whatsapp_message', v_row.id,
+      jsonb_build_object('reason', 'retries_exhausted'),
+      'whatsapp.message_failed:' || v_row.id::text);
+    v_capped := v_capped + 1;
+  END LOOP;
+
+  -- claim due work. Locking clause lives in the INNERMOST subquery (FOR UPDATE is
+  -- illegal in the same SELECT level as a window function); fairness ranking wraps it.
   FOR v_row IN
     SELECT id FROM (
-      SELECT m.id, m.tenant_id,
-             row_number() OVER (PARTITION BY m.tenant_id ORDER BY m.scheduled_for) AS rn
-        FROM whatsapp_messages m
-       WHERE m.status = 'pending' AND m.deleted_at IS NULL
-         AND m.scheduled_for <= now()
-         AND (m.next_attempt_at IS NULL OR m.next_attempt_at <= now())
-         AND m.attempt_count < 5
-       ORDER BY m.scheduled_for
-       FOR UPDATE OF m SKIP LOCKED
-       LIMIT 200
-    ) c
-    WHERE c.rn <= 10   -- per-tenant fairness cap per tick
+      SELECT c.id, row_number() OVER (PARTITION BY c.tenant_id
+                                      ORDER BY c.priority, c.scheduled_for) AS rn
+      FROM (
+        SELECT m.id, m.tenant_id, m.priority, m.scheduled_for
+          FROM whatsapp_messages m
+         WHERE m.status = 'pending' AND m.deleted_at IS NULL
+           AND m.scheduled_for <= now()
+           AND (m.next_attempt_at IS NULL OR m.next_attempt_at <= now())
+           AND m.attempt_count < 5
+         ORDER BY m.priority, m.scheduled_for
+         LIMIT 200
+         FOR UPDATE SKIP LOCKED
+      ) c
+    ) ranked
+    WHERE ranked.rn <= 10   -- per-tenant fairness cap per tick
     LIMIT 50
   LOOP
     PERFORM net.http_post(
@@ -784,7 +1002,7 @@ BEGIN
     v_dispatched := v_dispatched + 1;
   END LOOP;
 
-  RETURN QUERY SELECT v_dispatched, v_reset;
+  RETURN QUERY SELECT v_dispatched, v_reset, v_capped;
 END $$;
 REVOKE EXECUTE ON FUNCTION process_due_whatsapp_messages() FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION process_due_whatsapp_messages() TO service_role;
@@ -793,31 +1011,45 @@ GRANT EXECUTE ON FUNCTION process_due_whatsapp_messages() TO service_role;
 CREATE OR REPLACE FUNCTION process_whatsapp_scheduled_reminders()
 RETURNS int
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_count int := 0; v_rule record; v_target record;
+DECLARE
+  v_count int := 0; v_rule record; v_target record;
+  v_after int; v_repeat_max int; v_every int;
+  v_prior int; v_last timestamptz;
 BEGIN
-  -- quote.reminder: sent N days ago, still awaiting decision
+  -- quote.reminder: sent N days ago, still awaiting decision, capped + spaced by rule
   FOR v_rule IN
     SELECT r.* FROM whatsapp_automation_rules r
      JOIN whatsapp_integrations i ON i.tenant_id = r.tenant_id
        AND i.deleted_at IS NULL AND i.is_enabled AND i.connection_status = 'connected'
      WHERE r.event_key = 'quote.reminder' AND r.enabled AND r.deleted_at IS NULL
   LOOP
+    v_after      := COALESCE((v_rule.reminder_config->>'after_days')::int, 3);
+    v_repeat_max := COALESCE((v_rule.reminder_config->>'repeat_max')::int, 2);
+    v_every      := COALESCE((v_rule.reminder_config->>'repeat_every_days')::int, 4);
     FOR v_target IN
-      SELECT q.* FROM quotes q
+      SELECT q.id, q.quote_number, q.case_id, q.customer_id, q.total_amount, q.currency
+        FROM quotes q
        WHERE q.tenant_id = v_rule.tenant_id AND q.deleted_at IS NULL
          AND q.status = 'sent' AND q.sent_at IS NOT NULL
-         AND q.sent_at < now() - make_interval(days => COALESCE((v_rule.reminder_config->>'after_days')::int, 3))
+         AND q.sent_at < now() - make_interval(days => v_after)
     LOOP
-      PERFORM emit_notification_event('quote.reminder', 'quote', v_target.id,
+      SELECT count(*), max(created_at) INTO v_prior, v_last
+        FROM whatsapp_messages
+       WHERE tenant_id = v_rule.tenant_id AND event_key = 'quote.reminder'
+         AND quote_id = v_target.id AND status <> 'cancelled' AND deleted_at IS NULL;
+      CONTINUE WHEN v_prior >= v_repeat_max;                                   -- cap reached
+      CONTINUE WHEN v_last IS NOT NULL
+              AND v_last > now() - make_interval(days => v_every);             -- spacing
+      PERFORM whatsapp_safe_emit('quote.reminder', 'quote', v_target.id,
         jsonb_build_object('quote_id', v_target.id, 'quote_number', v_target.quote_number,
                            'case_id', v_target.case_id, 'customer_id', v_target.customer_id,
-                           'total', v_target.total, 'currency', v_target.currency),
+                           'total', v_target.total_amount, 'currency', v_target.currency),
         'quote.reminder:' || v_target.id::text || ':' || to_char(now(), 'YYYY-MM-DD'));
       v_count := v_count + 1;
     END LOOP;
   END LOOP;
 
-  -- case.feedback_request / case.review_request: delivered N days ago
+  -- case.feedback_request / case.review_request: delivered N days ago, once per case ever
   FOR v_rule IN
     SELECT r.* FROM whatsapp_automation_rules r
      JOIN whatsapp_integrations i ON i.tenant_id = r.tenant_id
@@ -825,16 +1057,17 @@ BEGIN
      WHERE r.event_key IN ('case.feedback_request','case.review_request')
        AND r.enabled AND r.deleted_at IS NULL
   LOOP
+    v_after := COALESCE((v_rule.reminder_config->>'after_days')::int, 2);
     FOR v_target IN
-      SELECT c.* FROM cases c
+      SELECT c.id, c.case_number, c.customer_id FROM cases c
        JOIN master_case_statuses s ON s.id = c.status_id
        WHERE c.tenant_id = v_rule.tenant_id AND c.deleted_at IS NULL
          AND s.type IN ('delivered','closed')
          AND c.actual_completion IS NOT NULL
          AND c.actual_completion::date =
-             (now() - make_interval(days => COALESCE((v_rule.reminder_config->>'after_days')::int, 2)))::date
+             (now() - make_interval(days => v_after))::date
     LOOP
-      PERFORM emit_notification_event(v_rule.event_key, 'case', v_target.id,
+      PERFORM whatsapp_safe_emit(v_rule.event_key, 'case', v_target.id,
         jsonb_build_object('case_id', v_target.id, 'case_number', v_target.case_number,
                            'customer_id', v_target.customer_id),
         v_rule.event_key || ':' || v_target.id::text);  -- once per case, ever
@@ -843,23 +1076,26 @@ BEGIN
   END LOOP;
 
   RETURN v_count;
+EXCEPTION WHEN OTHERS THEN
+  RAISE WARNING 'process_whatsapp_scheduled_reminders: %', SQLERRM;
+  RETURN v_count;  -- a bad tenant/rule must not kill the whole 15-min scan
 END $$;
 REVOKE EXECUTE ON FUNCTION process_whatsapp_scheduled_reminders() FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION process_whatsapp_scheduled_reminders() TO service_role;
 
 -- ---------- pg_cron schedules (idempotent: unschedule-then-schedule) ----------
-DO $cron$
+DO $cronblock$
 BEGIN
   PERFORM cron.unschedule('process-whatsapp-messages')
     WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'process-whatsapp-messages');
   PERFORM cron.schedule('process-whatsapp-messages', '* * * * *',
-    $$SELECT process_due_whatsapp_messages();$$);
+    'SELECT process_due_whatsapp_messages();');
 
   PERFORM cron.unschedule('process-whatsapp-reminders')
     WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'process-whatsapp-reminders');
   PERFORM cron.schedule('process-whatsapp-reminders', '*/15 * * * *',
-    $$SELECT process_whatsapp_scheduled_reminders();$$);
-END $cron$;
+    'SELECT process_whatsapp_scheduled_reminders();');
+END $cronblock$;
 
 -- ---------- Raw-webhook-payload retention (90 days) ----------
 CREATE OR REPLACE FUNCTION purge_whatsapp_webhook_payloads()
@@ -874,32 +1110,36 @@ RETURNS int LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
 $$;
 REVOKE EXECUTE ON FUNCTION purge_whatsapp_webhook_payloads() FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION purge_whatsapp_webhook_payloads() TO service_role;
-DO $cron2$
+DO $cronblock2$
 BEGIN
   PERFORM cron.unschedule('purge-whatsapp-webhook-payloads')
     WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'purge-whatsapp-webhook-payloads');
   PERFORM cron.schedule('purge-whatsapp-webhook-payloads', '45 3 * * *',
-    $$SELECT purge_whatsapp_webhook_payloads();$$);
-END $cron2$;
+    'SELECT purge_whatsapp_webhook_payloads();');
+END $cronblock2$;
 ```
-
-**Emitter design notes (why it is safe):** every trigger body is wrapped in `EXCEPTION WHEN OTHERS → RAISE WARNING → RETURN NEW`, so a WhatsApp defect can never fail a case/quote/invoice/payment write. Every emitter first checks `whatsapp_tenant_active()` — tenants without a connected, enabled integration pay a single indexed EXISTS per write and emit nothing (the outbox does not bloat; the subscription-blind email-trigger defect is not copied). `trg_emit_quote_events` is BEFORE so it can stamp `quotes.sent_at` in the same write.
 
 - [ ] **Step 2: Verify**
 
 ```sql
-select tgname from pg_trigger where tgname like 'trg_emit%' or tgname like 'trg_dispatch%' order by 1;
+select tgname from pg_trigger where tgname like 'trg_emit%' or tgname like 'trg_dispatch%'
+   or tgname = 'trg_stamp_quote_sent_at' order by 1;
 select jobname, schedule from cron.job where jobname like '%whatsapp%';
 select whatsapp_apply_send_window(
   (select id from tenants limit 1), 'business_hours',
   '{"start":"08:00","end":"20:00","days":[1,2,3,4,5]}'::jsonb, now());
 ```
 
-Expected: 7 triggers (`trg_dispatch_notification_event_whatsapp`, `trg_emit_case_created`, `trg_emit_device_received`, `trg_emit_quote_events`, `trg_emit_invoice_issued`, `trg_emit_recovery_outcome`, `trg_emit_case_checkout`); 3 cron jobs; the window function returns a timestamptz.
+Expected: 9 triggers (`trg_dispatch_notification_event_whatsapp`, `trg_stamp_quote_sent_at`, `trg_emit_case_created`, `trg_emit_device_received`, `trg_emit_quote_events`, `trg_emit_invoice_issued`, `trg_emit_recovery_outcome`, `trg_emit_case_checkout`, `trg_emit_parts_ordered`); 3 cron jobs; the window function returns a timestamptz.
 
-- [ ] **Step 3: Behavioral smoke test (branch DB or staging tenant)**
+- [ ] **Step 3: Behavioral smoke tests (branch DB or staging tenant)**
 
-With no integration row: insert a test `notification_events` row via `emit_notification_event('case.created', 'case', <case-uuid>, '{}'::jsonb, 'smoke-1')` and confirm `whatsapp_messages` stays empty (dormancy). Then insert a `whatsapp_integrations` row (`is_enabled=true, connection_status='connected'`), an enabled rule for `case.created` pointing at a placeholder template row, an opt-in consent row, and re-emit with a new dedup key — confirm exactly one `whatsapp_messages` row appears with `status='pending'`. Clean up test rows via `deleted_at = now()`.
+1. **Dormancy**: with no integration row, `emit_notification_event('case.created', 'case', <case-uuid>, '{}'::jsonb, 'smoke-1')` → `whatsapp_messages` stays empty.
+2. **Happy path**: insert a `whatsapp_integrations` row (`is_enabled=true, connection_status='connected'`), set `tenants.feature_flags = feature_flags || '{"automation.whatsapp": true}'` (the dispatcher reads this key with default-FALSE semantics — enabling the toggle in Settings is a real precondition), an enabled `case.created` rule with a template, and an opt-in consent row; re-emit with a new dedup key → exactly one `pending` message row.
+3. **Cron-context enqueue (the guard trap)**: from a plain SQL session with NO JWT (`select set_config('request.jwt.claims','',false);` in a fresh connection, or via the pg_cron runner), call `process_whatsapp_scheduled_reminders()` against a tenant with an eligible sent quote → the dispatcher's `whatsapp_messages` insert must succeed (the `app.bypass_tenant_guard` GUC covers the `set_tenant_and_audit_fields` cross-tenant check). If this fails, stop and re-read the guard's live definition.
+4. **Emitter reality check**: flip a test quote to `status='sent'` and confirm BOTH `quotes.sent_at` is stamped AND a `quote.sent` notification event exists — the emitters' WHEN-OTHERS swallow makes column-name bugs invisible without this assertion.
+5. **Double-send guard**: transition a case to a customer-visible status (both `case.phase_changed` + `.customer` events fire) → exactly ONE `whatsapp_messages` row.
+Clean up test rows via `deleted_at = now()`.
 
 - [ ] **Step 4: Manifest + commit**
 
@@ -936,11 +1176,18 @@ describe('WHATSAPP_EVENT_CATALOG', () => {
     for (const required of [
       'case.created', 'case.device_received', 'case.phase_changed:diagnosis',
       'quote.created', 'quote.sent', 'quote.reminder', 'quote.approved', 'quote.rejected',
-      'case.phase_changed:recovery', 'case.recovery_outcome', 'case.phase_changed:ready',
+      'case.phase_changed:recovery', 'case.parts_ordered', 'case.milestone',
+      'case.recovery_outcome', 'case.phase_changed:ready',
       'invoice.issued', 'payment.received.customer', 'case.checked_out',
-      'case.phase_changed:closed', 'case.follow_up_due',
+      'case.phase_changed:closed', 'case.phase_changed:no_solution',
+      'case.phase_changed:cancelled', 'case.follow_up_due',
       'case.feedback_request', 'case.review_request',
     ]) expect(keys).toContain(required);
+  });
+
+  it('debounces multi-device intake with a non-zero default delay', () => {
+    const deviceReceived = WHATSAPP_EVENT_CATALOG.find((e) => e.key === 'case.device_received');
+    expect(deviceReceived?.defaultDelayMinutes).toBeGreaterThanOrEqual(15);
   });
 
   it('marks feedback/review as marketing, everything else utility', () => {
@@ -993,7 +1240,8 @@ export const WHATSAPP_EVENT_CATALOG: WhatsAppEventDef[] = [
   { key: 'case.created', label: 'Case Registered', stage: 'Intake',
     description: 'Confirmation that the case was created', requiredConsent: 'utility', defaultDelayMinutes: 0 },
   { key: 'case.device_received', label: 'Device Check-in Receipt', stage: 'Intake',
-    description: 'Receipt when devices are checked in (one message per intake day)', requiredConsent: 'utility', defaultDelayMinutes: 0 },
+    description: 'Receipt when devices are checked in (one message per intake day; the delay debounces multi-device jobs so a 12-drive RAID sends ONE receipt listing all drives)',
+    requiredConsent: 'utility', defaultDelayMinutes: 15 },
   { key: 'case.phase_changed:diagnosis', label: 'Accepted for Evaluation', stage: 'Diagnosis',
     description: 'Case moved into diagnosis', requiredConsent: 'utility', defaultDelayMinutes: 0 },
   { key: 'quote.created', label: 'Quote Generated', stage: 'Quotation',
@@ -1009,8 +1257,14 @@ export const WHATSAPP_EVENT_CATALOG: WhatsAppEventDef[] = [
     description: 'Acknowledgement after the customer declines', requiredConsent: 'utility', defaultDelayMinutes: 0 },
   { key: 'case.phase_changed:recovery', label: 'Recovery Started', stage: 'Recovery',
     description: 'Recovery work has begun', requiredConsent: 'utility', defaultDelayMinutes: 0 },
-  { key: 'case.recovery_outcome', label: 'Recovery Completed', stage: 'Recovery',
-    description: 'Recovery outcome recorded (full / partial / unrecoverable / declined)',
+  { key: 'case.parts_ordered', label: 'Parts Ordered', stage: 'Recovery',
+    description: 'Donor parts allocated to the case (one message per day at most)',
+    requiredConsent: 'utility', defaultDelayMinutes: 0 },
+  { key: 'case.milestone', label: 'Recovery Progress Update', stage: 'Recovery',
+    description: 'Staff-triggered progress update from the case detail (Send progress update action)',
+    requiredConsent: 'utility', defaultDelayMinutes: 0 },
+  { key: 'case.recovery_outcome', label: 'Recovery Outcome Recorded', stage: 'Recovery',
+    description: 'Recovery outcome recorded — starter copy is outcome-neutral and renders {{recovery_outcome}}; per-outcome template overrides are on the roadmap',
     requiredConsent: 'utility', defaultDelayMinutes: 0 },
   { key: 'case.phase_changed:ready', label: 'Ready for Collection', stage: 'Delivery',
     description: 'Recovered data / device ready for collection', requiredConsent: 'utility', defaultDelayMinutes: 0 },
@@ -1022,6 +1276,12 @@ export const WHATSAPP_EVENT_CATALOG: WhatsAppEventDef[] = [
     description: 'Checkout confirmation with collector details', requiredConsent: 'utility', defaultDelayMinutes: 0 },
   { key: 'case.phase_changed:closed', label: 'Case Closed', stage: 'Closure',
     description: 'The case is closed', requiredConsent: 'utility', defaultDelayMinutes: 0 },
+  { key: 'case.phase_changed:no_solution', label: 'No Solution — Follow-up Plan', stage: 'Closure',
+    description: 'Recovery not currently possible; explains the outcome and the scheduled future review',
+    requiredConsent: 'utility', defaultDelayMinutes: 0 },
+  { key: 'case.phase_changed:cancelled', label: 'Case Cancelled', stage: 'Closure',
+    description: 'Cancellation acknowledged; device-return arrangements',
+    requiredConsent: 'utility', defaultDelayMinutes: 0 },
   { key: 'case.follow_up_due', label: 'Follow-up Reminder', stage: 'Follow-up',
     description: 'Scheduled follow-ups incl. pickup and no-solution reviews', requiredConsent: 'utility', defaultDelayMinutes: 0 },
   { key: 'case.feedback_request', label: 'Feedback Request', stage: 'Follow-up',
@@ -1125,11 +1385,13 @@ describe('classifySendError', () => {
 });
 
 describe('computeBackoff', () => {
-  it('doubles per attempt, capped at 12h', () => {
-    expect(computeBackoff(1)).toBe(60);          // 1 min
+  it('doubles per attempt (1m, 2m, 4m, …), capped at 12h', () => {
+    expect(computeBackoff(1)).toBe(60);
     expect(computeBackoff(2)).toBe(120);
     expect(computeBackoff(3)).toBe(240);
-    expect(computeBackoff(10)).toBe(12 * 3600);  // cap
+    expect(computeBackoff(10)).toBe(30720);      // 60 * 2^9, still under the cap
+    expect(computeBackoff(11)).toBe(12 * 3600);  // cap engages
+    expect(computeBackoff(20)).toBe(12 * 3600);
   });
 });
 
@@ -1137,14 +1399,16 @@ describe('normalizeToE164', () => {
   it.each([
     ['+971 501234567', '+971501234567'],
     ['00971-50-123-4567', '+971501234567'],
-    ['971501234567', '+971501234567'],
-    ['(501) 234-567', null],           // no country prefix, ambiguous → null
+    ['971501234567', '+971501234567'],   // bare international digits, no leading 0
+    ['(501) 234-567', null],             // 9 digits, no country prefix → ambiguous → null
+    ['0501234567', null],                // leading 0 = local format, country unknown → null
   ])('%s → %s', (input, expected) => {
     expect(normalizeToE164(input)).toBe(expected);
   });
   it('rejects garbage', () => {
     expect(normalizeToE164('abc')).toBeNull();
-    expect(normalizeToE164('+12')).toBeNull();   // too short
+    expect(normalizeToE164('+12')).toBeNull();     // too short
+    expect(normalizeToE164('+0501234567')).toBeNull(); // E.164 never starts with 0
   });
 });
 
@@ -1188,7 +1452,46 @@ describe('buildTemplateParams', () => {
   });
   it('missing context values become em-dash (never leak template syntax)', () => {
     const p = buildTemplateParams(components, variableMap, {}, 'named');
-    expect(p[0].parameters.every((x) => x.text === '—')).toBe(true);
+    expect(p[0].parameters.every((x) => (x as { text?: string }).text === '—')).toBe(true);
+  });
+
+  it('emits an image header parameter from the media link', () => {
+    const withHeader = [
+      { type: 'HEADER', format: 'IMAGE' },
+      ...components,
+    ];
+    const p = buildTemplateParams(withHeader, variableMap, context, 'named',
+      { headerImageLink: 'https://cdn.example/logo.png' });
+    expect(p[0]).toEqual({
+      type: 'header',
+      parameters: [{ type: 'image', image: { link: 'https://cdn.example/logo.png' } }],
+    });
+  });
+
+  it('throws for an image header with no media link (worker converts to a loud skip)', () => {
+    expect(() => buildTemplateParams(
+      [{ type: 'HEADER', format: 'IMAGE' }, ...components], variableMap, context, 'named',
+    )).toThrow(/header media/i);
+  });
+
+  it('emits button parameters: dynamic URL suffix from the variable map, quick-reply payloads', () => {
+    const withButtons = [
+      ...components,
+      { type: 'BUTTONS', buttons: [
+        { type: 'URL', text: 'Track case', url: 'https://portal.example/t/{{1}}' },
+        { type: 'QUICK_REPLY', text: 'Unsubscribe' },
+      ] },
+    ];
+    const p = buildTemplateParams(withButtons, { ...variableMap, 'button_url_0': 'case.tracking_ref' },
+      { ...context, 'case.tracking_ref': 'CASE-0042' }, 'named');
+    expect(p).toContainEqual({
+      type: 'button', sub_type: 'url', index: 0,
+      parameters: [{ type: 'text', text: 'CASE-0042' }],
+    });
+    expect(p).toContainEqual({
+      type: 'button', sub_type: 'quick_reply', index: 1,
+      parameters: [{ type: 'payload', payload: 'UNSUBSCRIBE' }],
+    });
   });
 });
 
@@ -1220,6 +1523,15 @@ describe('verifyMetaSignature', () => {
     expect(await verifyMetaSignature(body, `sha256=${'0'.repeat(64)}`, secret)).toBe(false);
     expect(await verifyMetaSignature(body, null, secret)).toBe(false);
     expect(await verifyMetaSignature(body, 'bogus', secret)).toBe(false);
+  });
+});
+
+describe('timingSafeEqual', () => {
+  it('compares without early exit', async () => {
+    const { timingSafeEqual } = await import('./webhookCore');
+    expect(timingSafeEqual('abc', 'abc')).toBe(true);
+    expect(timingSafeEqual('abc', 'abd')).toBe(false);
+    expect(timingSafeEqual('abc', 'ab')).toBe(false);
   });
 });
 
@@ -1282,12 +1594,17 @@ export function computeBackoff(attempt: number): number {
   return Math.min(60 * 2 ** Math.max(0, attempt - 1), 12 * 3600);
 }
 
-/** Best-effort E.164: strips separators, converts leading 00, requires + and 8-15 digits. */
+/**
+ * Best-effort E.164. Strips separators; converts leading 00 to +; promotes BARE
+ * digit strings only when they cannot be a local number (10-15 digits, no leading
+ * 0 — a leading 0 means local format with unknown country → null, never guess).
+ * E.164 country codes never start with 0.
+ */
 export function normalizeToE164(raw: string): string | null {
   let v = (raw ?? '').replace(/[\s\-().]/g, '');
   if (v.startsWith('00')) v = '+' + v.slice(2);
-  if (/^\d{8,15}$/.test(v)) v = '+' + v;            // bare international digits
-  if (!/^\+\d{8,15}$/.test(v)) return null;
+  if (/^[1-9]\d{9,14}$/.test(v)) v = '+' + v;
+  if (!/^\+[1-9]\d{7,14}$/.test(v)) return null;
   return v;
 }
 
@@ -1309,30 +1626,71 @@ export function resolveTemplateLanguage(
 
 const VAR_RE = /\{\{\s*([\w]+)\s*\}\}/g;
 
-interface TemplateComponent { type: string; text?: string; format?: string; }
+interface TemplateButton { type: string; text?: string; url?: string; }
+interface TemplateComponent { type: string; text?: string; format?: string; buttons?: TemplateButton[]; }
+type SendComponent = {
+  type: string; sub_type?: string; index?: number;
+  parameters: Array<Record<string, unknown>>;
+};
 
-/** Build Meta send-time components from the stored template components + variable map + context. */
+/**
+ * Build Meta send-time components from the stored template components + variable
+ * map + context. Covers: TEXT/IMAGE headers (image = tenant-logo branding via
+ * media.headerImageLink), BODY variables, dynamic-URL-suffix buttons (suffix value
+ * from variableMap['button_url_<index>']), and quick-reply payloads (uppercased
+ * button text — which is how STOP/UNSUBSCRIBE taps arrive recognizably inbound).
+ * Throws on an IMAGE header with no media link — the worker converts that to a
+ * loud skip instead of sending a payload Meta would reject.
+ */
 export function buildTemplateParams(
   components: TemplateComponent[],
   variableMap: Record<string, string>,
   context: Record<string, string>,
   parameterFormat: 'named' | 'positional',
-): Array<{ type: string; parameters: Array<Record<string, string>> }> {
-  const out: Array<{ type: string; parameters: Array<Record<string, string>> }> = [];
+  media?: { headerImageLink?: string },
+): SendComponent[] {
+  const out: SendComponent[] = [];
+  const valueOf = (name: string) => context[variableMap[name] ?? name] ?? '—';
   for (const c of components) {
     const type = c.type?.toUpperCase();
-    if ((type !== 'BODY' && type !== 'HEADER') || !c.text) continue;
-    if (type === 'HEADER' && c.format && c.format.toUpperCase() !== 'TEXT') continue;
-    const names = [...c.text.matchAll(VAR_RE)].map((m) => m[1]);
-    if (names.length === 0) continue;
-    const parameters = names.map((name) => {
-      const contextKey = variableMap[name] ?? name;
-      const text = context[contextKey] ?? '—';
-      return parameterFormat === 'named'
-        ? { type: 'text', parameter_name: name, text }
-        : { type: 'text', text };
-    });
-    out.push({ type: type.toLowerCase(), parameters });
+    if (type === 'HEADER') {
+      const format = (c.format ?? 'TEXT').toUpperCase();
+      if (format === 'IMAGE') {
+        if (!media?.headerImageLink) throw new Error('template requires header media but none provided');
+        out.push({ type: 'header', parameters: [{ type: 'image', image: { link: media.headerImageLink } }] });
+        continue;
+      }
+      if (format !== 'TEXT' || !c.text) continue;
+    }
+    if (type === 'BODY' || type === 'HEADER') {
+      if (!c.text) continue;
+      const names = [...c.text.matchAll(VAR_RE)].map((m) => m[1]);
+      if (names.length === 0) continue;
+      const parameters = names.map((name) =>
+        parameterFormat === 'named'
+          ? { type: 'text', parameter_name: name, text: valueOf(name) }
+          : { type: 'text', text: valueOf(name) });
+      out.push({ type: type.toLowerCase(), parameters });
+      continue;
+    }
+    if (type === 'BUTTONS') {
+      (c.buttons ?? []).forEach((btn, index) => {
+        const btnType = btn.type?.toUpperCase();
+        if (btnType === 'URL' && btn.url && VAR_RE.test(btn.url)) {
+          VAR_RE.lastIndex = 0;
+          out.push({
+            type: 'button', sub_type: 'url', index,
+            parameters: [{ type: 'text', text: valueOf(`button_url_${index}`) }],
+          });
+        } else if (btnType === 'QUICK_REPLY') {
+          out.push({
+            type: 'button', sub_type: 'quick_reply', index,
+            parameters: [{ type: 'payload', payload: (btn.text ?? '').toUpperCase() }],
+          });
+        }
+        // PHONE_NUMBER / static-URL buttons need no send-time parameters
+      });
+    }
   }
   return out;
 }
@@ -1363,6 +1721,14 @@ export async function verifyMetaSignature(
   if (actualHex.length !== expectedHex.length) return false;
   let diff = 0;
   for (let i = 0; i < actualHex.length; i++) diff |= actualHex.charCodeAt(i) ^ expectedHex.charCodeAt(i);
+  return diff === 0;
+}
+
+/** Constant-time string equality (verify-token comparison on the GET handshake). */
+export function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
 }
 
@@ -1420,14 +1786,18 @@ git commit -m "feat(whatsapp): pure core modules (error classes, backoff, E.164,
 
 ```ts
 // WhatsApp Cloud API webhook receiver.
-// GET  = Meta verification handshake (hub.challenge echo, per-tenant verify token)
+// GET  = Meta verification handshake (hub.challenge echo, per-tenant verify token,
+//        rate-limited, constant-time compare)
 // POST = signed event delivery (X-Hub-Signature-256 over raw body, tenant app secret)
 // Auth model: verify_jwt=false in config.toml — the handler authenticates Meta itself.
-// Idempotency: two-phase whatsapp_webhook_events ledger (insert-first, processed_at last),
-// mirroring the billing_events protocol in paypal-webhook.
+// Idempotency: two-phase whatsapp_webhook_events ledger (insert-first, processed_at
+// last), mirroring the billing_events protocol; the inbound-message ledger insert
+// happens BEFORE any non-idempotent side effect (consents, comms, notifications).
+// Tenant scoping: EVERY read/update keyed by wamid or template name also filters
+// tenant_id — a validly-signed payload must never become a cross-tenant write channel.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { verifyMetaSignature, matchOptKeyword, extractChanges } from "./webhookCore.ts";
+import { verifyMetaSignature, matchOptKeyword, extractChanges, timingSafeEqual } from "./webhookCore.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -1439,6 +1809,29 @@ const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
 async function sha256Hex(bytes: Uint8Array): Promise<string> {
   const d = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
   return Array.from(d).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function safeTs(unixSeconds: unknown): string {
+  const t = Number(unixSeconds);
+  return Number.isFinite(t) && t > 0 ? new Date(t * 1000).toISOString() : new Date().toISOString();
+}
+
+/**
+ * notification_events insert with explicit tenant + dedup-ignore. The emit RPC's
+ * tenant resolution under a service-role JWT is unproven (see Task 2 pre-flight),
+ * so edge code writes the outbox row directly — service role bypasses RLS and the
+ * jwt role 'service_role' passes the tenant-guard trigger.
+ */
+async function emitEvent(
+  tenantId: string, eventType: string, entityType: string, entityId: string,
+  payload: Record<string, unknown>, dedupKey: string,
+) {
+  const { error } = await db.from("notification_events").upsert({
+    tenant_id: tenantId, event_type: eventType, entity_type: entityType,
+    entity_id: entityId, payload, dedup_key: dedupKey,
+    occurred_at: new Date().toISOString(),
+  }, { onConflict: "tenant_id,dedup_key", ignoreDuplicates: true });
+  if (error) console.error(`emitEvent(${eventType}):`, error);
 }
 
 interface IntegrationRow {
@@ -1453,15 +1846,17 @@ async function loadIntegrationByPublicId(publicId: string): Promise<IntegrationR
   return (data as IntegrationRow | null) ?? null;
 }
 
-/** statuses[] → whatsapp_messages updates (monotonic; idempotent set-to-value). */
+const STATUS_RANK: Record<string, number> = { sent: 1, delivered: 2, read: 3 };
+
+/** statuses[] → whatsapp_messages updates (tenant-scoped; monotonic via conditional UPDATE). */
 async function handleStatuses(tenantId: string, statuses: Array<Record<string, unknown>>) {
   for (const s of statuses) {
     const wamid = s.id as string;
     const status = s.status as string;
-    const ts = new Date(Number(s.timestamp) * 1000).toISOString();
+    if (!wamid || !status) continue;
+    const ts = safeTs(s.timestamp);
     const pricing = (s.pricing ?? {}) as Record<string, unknown>;
     const conversation = (s.conversation ?? {}) as Record<string, unknown>;
-    if (!wamid || !status) continue;
 
     if (status === "sent" || status === "delivered" || status === "read") {
       const patch: Record<string, unknown> = {
@@ -1471,41 +1866,43 @@ async function handleStatuses(tenantId: string, statuses: Array<Record<string, u
         conversation_id: conversation.id ?? null,
       };
       if (status === "sent") patch.sent_at = ts;
-      if (status === "delivered") { patch.delivered_at = ts; }
-      if (status === "read") { patch.read_at = ts; }
-      // status column: only move forward (read implies delivered implies sent)
-      const rank: Record<string, number> = { sent: 1, delivered: 2, read: 3 };
+      if (status === "delivered") patch.delivered_at = ts;
+      if (status === "read") patch.read_at = ts;
       const { data: row } = await db.from("whatsapp_messages")
-        .select("id,status").eq("wamid", wamid).maybeSingle();
+        .select("id,status").eq("tenant_id", tenantId).eq("wamid", wamid).maybeSingle();
       if (!row) continue;
-      if ((rank[status] ?? 0) > (rank[row.status] ?? 0)) patch.status = status;
+      // Meta deliveries are unordered + at-least-once: guard the status column
+      // atomically by conditioning on the value we read (a lost race just means the
+      // other writer already advanced it further — timestamps still land).
+      if ((STATUS_RANK[status] ?? 0) > (STATUS_RANK[row.status] ?? 0)) {
+        const { data: moved } = await db.from("whatsapp_messages")
+          .update({ ...patch, status })
+          .eq("id", row.id).eq("status", row.status).select("id").maybeSingle();
+        if (moved) continue;
+      }
       await db.from("whatsapp_messages").update(patch).eq("id", row.id);
     } else if (status === "failed") {
       const errors = (s.errors ?? []) as Array<Record<string, unknown>>;
       const first = errors[0] ?? {};
+      const { data: msg } = await db.from("whatsapp_messages")
+        .select("id, case_id, event_key").eq("tenant_id", tenantId).eq("wamid", wamid).maybeSingle();
+      if (!msg) continue;
       await db.from("whatsapp_messages").update({
         status: "failed", failed_at: ts,
         last_error_code: Number(first.code) || null,
         last_error: String(
           (first.error_data as Record<string, unknown> | undefined)?.details ?? first.message ?? "delivery failed",
         ),
-      }).eq("wamid", wamid);
-      // surface terminal delivery failures to staff via the existing notification stack
-      const { data: msg } = await db.from("whatsapp_messages")
-        .select("id, tenant_id, case_id, event_key").eq("wamid", wamid).maybeSingle();
-      if (msg) {
-        await db.rpc("emit_notification_event", {
-          p_event_type: "whatsapp.message_failed",
-          p_entity_type: "whatsapp_message", p_entity_id: msg.id,
-          p_payload: { case_id: msg.case_id, event_key: msg.event_key, error_code: first.code ?? null },
-          p_dedup_key: `whatsapp.message_failed:${msg.id}`,
-        });
-      }
+      }).eq("id", msg.id);
+      await emitEvent(tenantId, "whatsapp.message_failed", "whatsapp_message", msg.id,
+        { case_id: msg.case_id, event_key: msg.event_key, error_code: first.code ?? null },
+        `whatsapp.message_failed:${msg.id}`);
     }
   }
 }
 
-/** inbound messages[] → contacts window, STOP/START, ledger rows, staff notification. */
+/** inbound messages[]: ledger-first (wamid dedup gates ALL side effects), then
+ *  contact window, STOP/START consents, comms mirror, staff notification. */
 async function handleInbound(
   integ: IntegrationRow, contacts: Array<Record<string, unknown>>, messages: Array<Record<string, unknown>>,
 ) {
@@ -1517,38 +1914,11 @@ async function handleInbound(
     const wamid = String(m.id ?? "");
     const from = String(m.from ?? "");
     const type = String(m.type ?? "unknown");
-    const ts = new Date(Number(m.timestamp) * 1000).toISOString();
     if (!wamid || !from) continue;
-
+    const ts = safeTs(m.timestamp);
     const phoneE164 = `+${from}`;
-    // 1. upsert contact + open the 24h service window
-    const windowExpires = new Date(Number(m.timestamp) * 1000 + 24 * 3600 * 1000).toISOString();
-    const { data: existing } = await db.from("whatsapp_contacts")
-      .select("id, customer_id").eq("tenant_id", integ.tenant_id)
-      .eq("phone_e164", phoneE164).is("deleted_at", null).maybeSingle();
-    let contactId = existing?.id as string | undefined;
-    let customerId = existing?.customer_id as string | undefined;
-    if (contactId) {
-      await db.from("whatsapp_contacts").update({
-        wa_id: from, last_inbound_at: ts, service_window_expires_at: windowExpires,
-        profile_name: profileByWaId.get(from) ?? null, unreachable: false,
-      }).eq("id", contactId);
-    } else {
-      // correlate to a customer by any stored phone variant (digits-suffix match)
-      const { data: cust } = await db.from("customers_enhanced")
-        .select("id").eq("tenant_id", integ.tenant_id).is("deleted_at", null)
-        .or(`whatsapp_number.ilike.%${from.slice(-9)},mobile_number.ilike.%${from.slice(-9)},phone.ilike.%${from.slice(-9)}`)
-        .limit(1).maybeSingle();
-      customerId = cust?.id;
-      const { data: created } = await db.from("whatsapp_contacts").insert({
-        tenant_id: integ.tenant_id, customer_id: customerId ?? null, wa_id: from,
-        phone_e164: phoneE164, profile_name: profileByWaId.get(from) ?? null,
-        last_inbound_at: ts, service_window_expires_at: windowExpires,
-      }).select("id").single();
-      contactId = created?.id;
-    }
 
-    // 2. body / reply-context extraction
+    // ---- extract body / media / reply context ----
     let body: string | null = null; let buttonPayload: string | null = null;
     let mediaId: string | null = null; let mediaMime: string | null = null;
     if (type === "text") body = String((m.text as Record<string, unknown>)?.body ?? "");
@@ -1568,17 +1938,59 @@ async function handleInbound(
     }
     const context = m.context as Record<string, unknown> | undefined;
     let inReplyTo: string | null = null; let caseId: string | null = null;
+    let customerId: string | null = null;
     if (context?.id) {
       const { data: orig } = await db.from("whatsapp_messages")
-        .select("id, case_id, customer_id").eq("wamid", String(context.id)).maybeSingle();
-      if (orig) { inReplyTo = orig.id; caseId = orig.case_id; customerId = customerId ?? orig.customer_id; }
+        .select("id, case_id, customer_id")
+        .eq("tenant_id", integ.tenant_id).eq("wamid", String(context.id)).maybeSingle();
+      if (orig) { inReplyTo = orig.id; caseId = orig.case_id; customerId = orig.customer_id; }
     }
 
-    // 3. opt keyword handling
-    let handled = "none";
+    // ---- resolve/refresh the contact (idempotent: safe before the dedup gate) ----
+    const windowExpires = new Date(new Date(ts).getTime() + 24 * 3600 * 1000).toISOString();
+    const { data: existing } = await db.from("whatsapp_contacts")
+      .select("id, customer_id").eq("tenant_id", integ.tenant_id)
+      .eq("phone_e164", phoneE164).is("deleted_at", null).maybeSingle();
+    let contactId = existing?.id as string | undefined;
+    customerId = customerId ?? (existing?.customer_id as string | undefined) ?? null;
+    if (contactId) {
+      await db.from("whatsapp_contacts").update({
+        wa_id: from, last_inbound_at: ts, service_window_expires_at: windowExpires,
+        profile_name: profileByWaId.get(from) ?? null, unreachable: false,
+      }).eq("id", contactId);
+    } else {
+      if (!customerId) {
+        // stored numbers are unformatted — digits-normalized match runs DB-side
+        const { data: matched } = await db.rpc("whatsapp_match_customer_by_phone", {
+          p_tenant_id: integ.tenant_id, p_last9: from.slice(-9),
+        });
+        customerId = (matched as string | null) ?? null;
+      }
+      const { data: created } = await db.from("whatsapp_contacts").insert({
+        tenant_id: integ.tenant_id, customer_id: customerId, wa_id: from,
+        phone_e164: phoneE164, profile_name: profileByWaId.get(from) ?? null,
+        last_inbound_at: ts, service_window_expires_at: windowExpires,
+      }).select("id").maybeSingle();
+      contactId = created?.id;
+    }
+
+    // ---- DEDUP GATE: the inbound ledger insert. 23505 = redelivery → nothing below runs twice ----
     const kw = body ? matchOptKeyword(body) : null;
+    const handled = kw ?? "none";
+    const { error: insErr } = await db.from("whatsapp_inbound_messages").insert({
+      tenant_id: integ.tenant_id, wamid, contact_id: contactId ?? null,
+      customer_id: customerId, case_id: caseId,
+      in_reply_to_message_id: inReplyTo, message_type: type, body,
+      media_id: mediaId, media_mime: mediaMime, button_payload: buttonPayload,
+      raw: m, received_at: ts, handled,
+    });
+    if (insErr) {
+      if (insErr.code !== "23505") console.error("inbound ledger insert:", insErr);
+      continue;
+    }
+
+    // ---- non-idempotent side effects (run exactly once per wamid) ----
     if (kw && customerId) {
-      handled = kw;
       await db.from("whatsapp_consents").insert({
         tenant_id: integ.tenant_id, customer_id: customerId,
         scope: "utility", action: kw === "stop" ? "opt_out" : "opt_in",
@@ -1591,24 +2003,15 @@ async function handleInbound(
           source: "inbound_message", phone_e164: phoneE164, consent_text: body,
         });
       }
-      await db.from("whatsapp_contacts").update({ opt_out_all: kw === "stop" }).eq("id", contactId!);
+      if (contactId) {
+        await db.from("whatsapp_contacts").update({ opt_out_all: kw === "stop" }).eq("id", contactId);
+      }
     }
-
-    // 4. inbound ledger (idempotent on wamid) + comms mirror + staff notification
-    const { error: insErr } = await db.from("whatsapp_inbound_messages").insert({
-      tenant_id: integ.tenant_id, wamid, contact_id: contactId ?? null,
-      customer_id: customerId ?? null, case_id: caseId,
-      in_reply_to_message_id: inReplyTo, message_type: type, body,
-      media_id: mediaId, media_mime: mediaMime, button_payload: buttonPayload,
-      raw: m, received_at: ts, handled,
-    });
-    if (insErr && insErr.code === "23505") continue; // duplicate delivery — already handled
-
     if (caseId) {
       await db.rpc("log_case_communication", {
         p_case_id: caseId, p_type: "whatsapp", p_direction: "inbound",
         p_content: body ?? `[${type}]`, p_sent_to: phoneE164,
-      });
+      }).then(() => {}, (e: unknown) => console.error("log_case_communication:", e));
     } else if (customerId) {
       await db.from("customer_communications").insert({
         tenant_id: integ.tenant_id, customer_id: customerId, type: "whatsapp",
@@ -1617,23 +2020,21 @@ async function handleInbound(
       });
     }
     if (handled === "none") {
-      await db.rpc("emit_notification_event", {
-        p_event_type: "whatsapp.reply_received",
-        p_entity_type: caseId ? "case" : "customer",
-        p_entity_id: caseId ?? customerId ?? integ.id,
-        p_payload: { customer_id: customerId ?? null, case_id: caseId, preview: (body ?? "").slice(0, 140) },
-        p_dedup_key: `whatsapp.reply_received:${wamid}`,
-      });
+      await emitEvent(integ.tenant_id, "whatsapp.reply_received",
+        caseId ? "case" : "customer", caseId ?? customerId ?? integ.id,
+        { customer_id: customerId, case_id: caseId, preview: (body ?? "").slice(0, 140) },
+        `whatsapp.reply_received:${wamid}`);
     }
   }
 }
 
-/** template + phone/account health webhooks → registry + integration updates. */
+/** template + phone/account health webhooks → registry + integration updates
+ *  (tenant-scoped; family-head rows only via superseded_by IS NULL). */
 async function handleAdminFields(integ: IntegrationRow, field: string, value: Record<string, unknown>) {
+  const name = String(value.message_template_name ?? "");
+  const language = String(value.message_template_language ?? "");
   if (field === "message_template_status_update") {
     const event = String(value.event ?? "");
-    const name = String(value.message_template_name ?? "");
-    const language = String(value.message_template_language ?? "");
     const map: Record<string, string> = {
       APPROVED: "APPROVED", REJECTED: "REJECTED", PAUSED: "PAUSED", DISABLED: "DISABLED", PENDING: "PENDING",
     };
@@ -1648,17 +2049,17 @@ async function handleAdminFields(integ: IntegrationRow, field: string, value: Re
   } else if (field === "message_template_quality_update") {
     await db.from("whatsapp_templates").update({
       quality_score: String(value.new_quality_score ?? "") || null,
-    }).eq("tenant_id", integ.tenant_id)
-      .eq("name", String(value.message_template_name ?? ""))
-      .eq("language", String(value.message_template_language ?? ""))
-      .is("deleted_at", null);
+    }).eq("tenant_id", integ.tenant_id).eq("name", name).eq("language", language)
+      .is("deleted_at", null).is("superseded_by", null);
   } else if (field === "template_category_update") {
-    await db.from("whatsapp_templates").update({
-      category: String(value.new_category ?? value.correct_category ?? "") || undefined,
-    }).eq("tenant_id", integ.tenant_id)
-      .eq("name", String(value.message_template_name ?? "")).is("deleted_at", null);
+    const next = String(value.new_category ?? value.correct_category ?? "");
+    if (next) {
+      await db.from("whatsapp_templates").update({ category: next })
+        .eq("tenant_id", integ.tenant_id).eq("name", name)
+        .is("deleted_at", null).is("superseded_by", null);
+    }
   } else if (field === "phone_number_quality_update") {
-    // value.event ∈ FLAGGED | UNFLAGGED | (limit upgrades); value.current_limit = tier string
+    // value.event ∈ FLAGGED | UNFLAGGED | limit changes; current_limit = tier string
     const patch: Record<string, unknown> = {
       messaging_limit_tier: String(value.current_limit ?? "") || null,
     };
@@ -1666,8 +2067,12 @@ async function handleAdminFields(integ: IntegrationRow, field: string, value: Re
     if (value.event === "UNFLAGGED") patch.quality_rating = "GREEN";
     await db.from("whatsapp_integrations").update(patch).eq("id", integ.id);
   } else if (field === "account_update") {
+    // append, never overwrite, the health history (bounded to the last 20 entries)
+    const { data: row } = await db.from("whatsapp_integrations")
+      .select("health_errors").eq("id", integ.id).maybeSingle();
+    const prior = Array.isArray(row?.health_errors) ? row!.health_errors : [];
     await db.from("whatsapp_integrations").update({
-      health_errors: [{ at: new Date().toISOString(), field, event: value.event ?? null }],
+      health_errors: [...prior, { at: new Date().toISOString(), field, event: value.event ?? null }].slice(-20),
     }).eq("id", integ.id);
   }
 }
@@ -1678,11 +2083,15 @@ Deno.serve(async (req: Request) => {
 
   // ---- GET: Meta verification handshake ----
   if (req.method === "GET") {
+    const { data: rl } = await db.rpc("check_rate_limit", {
+      p_key: `wa-verify:${publicId || "none"}`, p_max_requests: 5, p_window_seconds: 60,
+    });
+    if (rl !== true) return new Response("Rate limited", { status: 429 });
     const mode = url.searchParams.get("hub.mode");
-    const token = url.searchParams.get("hub.verify_token");
+    const token = url.searchParams.get("hub.verify_token") ?? "";
     const challenge = url.searchParams.get("hub.challenge") ?? "";
     const integ = await loadIntegrationByPublicId(publicId);
-    if (mode === "subscribe" && integ && token === integ.webhook_verify_token) {
+    if (mode === "subscribe" && integ && timingSafeEqual(token, integ.webhook_verify_token)) {
       await db.from("whatsapp_integrations")
         .update({ webhook_status: "verified" }).eq("id", integ.id);
       return new Response(challenge, { status: 200, headers: { "Content-Type": "text/plain" } });
@@ -1722,7 +2131,7 @@ Deno.serve(async (req: Request) => {
       const { data: prior } = await db.from("whatsapp_webhook_events")
         .select("processed_at").eq("provider_event_id", eventId).maybeSingle();
       if (prior?.processed_at) return new Response(JSON.stringify({ received: true }), { status: 200 });
-      // fall through: prior attempt died mid-flight → reprocess (all updates are idempotent)
+      // fall through: prior attempt died mid-flight → reprocess (handlers are dedup-gated)
     } else {
       console.error("whatsapp-webhook ledger insert failed:", ledgerErr);
       return new Response(JSON.stringify({ error: "Internal error" }), { status: 500 });
@@ -1734,7 +2143,7 @@ Deno.serve(async (req: Request) => {
       .update({ last_webhook_at: new Date().toISOString(), webhook_status: "receiving" })
       .eq("id", integ.id);
     for (const c of changes) {
-      // cross-check routing: the event's phone_number_id must match this tenant's number
+      // routing cross-check: the event's phone_number_id must match this tenant's number
       if (c.phoneNumberId && integ.phone_number_id && c.phoneNumberId !== integ.phone_number_id) {
         console.error(`whatsapp-webhook: phone_number_id mismatch for tenant ${integ.tenant_id}`);
         continue;
@@ -1788,9 +2197,12 @@ git commit -m "feat(whatsapp): webhook receiver (handshake, HMAC, two-phase ledg
 ```ts
 // WhatsApp send worker. Invoked by pg_net (dispatcher poke + 1-min scanner) with { message_id }.
 // Auth: exact service-role bearer only (house pattern: notification-dispatch-email).
-// Guarantees: atomic claim pending→processing BEFORE the Graph call; error-classified
-// backoff/suppression on failure; every outcome lands on the whatsapp_messages row and
-// mirrors into log_case_communication / customer_communications.
+// Guarantees: atomic claim pending→processing BEFORE the Graph call; attempts are
+// counted ONLY when a Graph call is actually made (infra holds — integration down,
+// quality pause, token dead, pair pacing — never consume the retry budget);
+// error-classified backoff/suppression on failure; business-hours rules re-apply
+// to retry scheduling; every outcome lands on the whatsapp_messages row and mirrors
+// into log_case_communication / customer_communications.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
@@ -1811,51 +2223,132 @@ async function appSecretProof(appSecret: string, accessToken: string): Promise<s
   return Array.from(mac).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** Build the template context (Deno port of the buildTemplateContext essentials). */
-async function buildContext(msg: Record<string, unknown>, tenantId: string): Promise<Record<string, string>> {
+/** Direct outbox insert with explicit tenant (see whatsapp-webhook emitEvent rationale). */
+async function emitEvent(
+  tenantId: string, eventType: string, entityType: string, entityId: string,
+  payload: Record<string, unknown>, dedupKey: string,
+) {
+  const { error } = await db.from("notification_events").upsert({
+    tenant_id: tenantId, event_type: eventType, entity_type: entityType,
+    entity_id: entityId, payload, dedup_key: dedupKey,
+    occurred_at: new Date().toISOString(),
+  }, { onConflict: "tenant_id,dedup_key", ignoreDuplicates: true });
+  if (error) console.error(`emitEvent(${eventType}):`, error);
+}
+
+interface TenantFormatConfig {
+  currencySymbol: string; currencyCode: string; decimalPlaces: number;
+  localeCode: string; timezone: string; uiLanguage: string | null;
+}
+
+/** Tenant-config-aware formatters (CLAUDE.md: never hardcode symbols/decimals/date formats).
+ *  Reads the denormalized config columns on tenants (synced from geo_countries). */
+async function loadTenantFormat(tenantId: string): Promise<TenantFormatConfig> {
+  const { data: t } = await db.from("tenants")
+    .select("currency_symbol, currency_code, decimal_places, locale_code, timezone, ui_language")
+    .eq("id", tenantId).maybeSingle();
+  return {
+    currencySymbol: t?.currency_symbol ?? t?.currency_code ?? "",
+    currencyCode: t?.currency_code ?? "",
+    decimalPlaces: Number.isFinite(Number(t?.decimal_places)) ? Number(t?.decimal_places) : 2,
+    localeCode: t?.locale_code ?? "en-US",
+    timezone: t?.timezone ?? "UTC",
+    uiLanguage: t?.ui_language ?? null,
+  };
+}
+function fmtMoney(v: unknown, cfg: TenantFormatConfig): string {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  const num = new Intl.NumberFormat(cfg.localeCode, {
+    minimumFractionDigits: cfg.decimalPlaces, maximumFractionDigits: cfg.decimalPlaces,
+  }).format(n);
+  return `${cfg.currencySymbol} ${num}`.trim();
+}
+function fmtDate(v: unknown, cfg: TenantFormatConfig): string {
+  if (!v) return "—";
+  const d = new Date(String(v));
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat(cfg.localeCode, {
+    dateStyle: "medium", timeZone: cfg.timezone,
+  }).format(d);
+}
+
+/**
+ * Template context. Key vocabulary = the house catalog (templateContextService /
+ * master_template_variables) plus the WhatsApp additions registered in Task 17:
+ * device.summary, device.count, quote.valid_until→quote.expiry_date, invoice.balance_due,
+ * case.recovery_outcome, case.engineer, case.tracking_link, case.collection_date,
+ * branch.name, customer.custom.* (from customers_enhanced.metadata).
+ */
+async function buildContext(
+  msg: Record<string, unknown>, tenantId: string, cfg: TenantFormatConfig,
+): Promise<Record<string, string>> {
   const ctx: Record<string, string> = {};
   const { data: settings } = await db.from("company_settings")
-    .select("basic_info, contact_info").eq("tenant_id", tenantId).is("deleted_at", null).maybeSingle();
+    .select("basic_info, contact_info, branding, portal_settings")
+    .eq("tenant_id", tenantId).is("deleted_at", null).maybeSingle();
   const basic = (settings?.basic_info ?? {}) as Record<string, unknown>;
   const contact = (settings?.contact_info ?? {}) as Record<string, unknown>;
+  const portal = (settings?.portal_settings ?? {}) as Record<string, unknown>;
   ctx["company.name"] = String(basic.company_name ?? "");
-  ctx["company.phone"] = String(contact.phone_general ?? "");
+  ctx["company.phone"] = String(contact.phone_primary ?? "");
+  ctx["company.email"] = String(contact.email_general ?? "");
 
   if (msg.customer_id) {
     const { data: cust } = await db.from("customers_enhanced")
-      .select("customer_name, email, preferred_language").eq("id", msg.customer_id).maybeSingle();
+      .select("customer_name, email, preferred_language, metadata").eq("id", msg.customer_id).maybeSingle();
     ctx["customer.name"] = String(cust?.customer_name ?? "");
+    const meta = (cust?.metadata ?? {}) as Record<string, unknown>;
+    for (const [k, v] of Object.entries(meta)) {
+      if (typeof v === "string" || typeof v === "number") ctx[`customer.custom.${k}`] = String(v);
+    }
   }
   if (msg.case_id) {
     const { data: c } = await db.from("cases")
-      .select("case_number, status, recovery_outcome, assigned_to").eq("id", msg.case_id).maybeSingle();
+      .select("case_number, status, recovery_outcome, assigned_to, branch_id").eq("id", msg.case_id).maybeSingle();
     ctx["case.number"] = String(c?.case_number ?? "");
     ctx["case.status"] = String(c?.status ?? "");
     ctx["case.recovery_outcome"] = String(c?.recovery_outcome ?? "");
     if (c?.assigned_to) {
       const { data: eng } = await db.from("profiles").select("full_name").eq("id", c.assigned_to).maybeSingle();
       ctx["case.engineer"] = String(eng?.full_name ?? "");
+      ctx["technician.name"] = ctx["case.engineer"];
     }
+    if (c?.branch_id) {
+      const { data: br } = await db.from("branches").select("name").eq("id", c.branch_id).maybeSingle();
+      ctx["branch.name"] = String(br?.name ?? "");
+    }
+    // portal tracking link: tenant portal base + case number (portalUrlService convention;
+    // verify the portal_settings key against src/lib/portalUrlService.ts at execution)
+    const portalBase = String(portal.portal_url ?? portal.base_url ?? "");
+    ctx["case.tracking_link"] = portalBase && ctx["case.number"]
+      ? `${portalBase.replace(/\/$/, "")}/track/${ctx["case.number"]}` : "";
     const { data: devices } = await db.from("case_devices")
       .select("model").eq("case_id", msg.case_id).is("deleted_at", null);
     ctx["device.summary"] = (devices ?? []).map((d) => d.model).filter(Boolean).slice(0, 3).join(", ")
       + ((devices?.length ?? 0) > 3 ? ` +${devices!.length - 3} more` : "");
     ctx["device.count"] = String(devices?.length ?? 0);
+    // collection date: the earliest scheduled pickup follow-up, if any
+    const { data: pickup } = await db.from("case_follow_ups")
+      .select("follow_up_date").eq("case_id", msg.case_id)
+      .eq("follow_up_type", "pickup_reminder").eq("status", "pending")
+      .is("deleted_at", null).order("follow_up_date").limit(1).maybeSingle();
+    ctx["case.collection_date"] = pickup ? fmtDate(pickup.follow_up_date, cfg) : "";
   }
   if (msg.quote_id) {
     const { data: q } = await db.from("quotes")
-      .select("quote_number, total, currency, valid_until").eq("id", msg.quote_id).maybeSingle();
+      .select("quote_number, total_amount, currency, valid_until").eq("id", msg.quote_id).maybeSingle();
     ctx["quote.number"] = String(q?.quote_number ?? "");
-    ctx["quote.total"] = q ? `${q.currency ?? ""} ${Number(q.total ?? 0).toFixed(2)}`.trim() : "";
-    ctx["quote.valid_until"] = String(q?.valid_until ?? "");
+    ctx["quote.total"] = fmtMoney(q?.total_amount, cfg);
+    ctx["quote.expiry_date"] = fmtDate(q?.valid_until, cfg);
   }
   if (msg.invoice_id) {
     const { data: inv } = await db.from("invoices")
-      .select("invoice_number, total, balance_due, currency, due_date").eq("id", msg.invoice_id).maybeSingle();
+      .select("invoice_number, total_amount, balance_due, currency, due_date").eq("id", msg.invoice_id).maybeSingle();
     ctx["invoice.number"] = String(inv?.invoice_number ?? "");
-    ctx["invoice.total"] = inv ? `${inv.currency ?? ""} ${Number(inv.total ?? 0).toFixed(2)}`.trim() : "";
-    ctx["invoice.balance_due"] = inv ? `${inv.currency ?? ""} ${Number(inv.balance_due ?? 0).toFixed(2)}`.trim() : "";
-    ctx["invoice.due_date"] = String(inv?.due_date ?? "");
+    ctx["invoice.total"] = fmtMoney(inv?.total_amount, cfg);
+    ctx["invoice.balance_due"] = fmtMoney(inv?.balance_due, cfg);
+    ctx["invoice.due_date"] = fmtDate(inv?.due_date, cfg);
   }
   return ctx;
 }
@@ -1868,10 +2361,23 @@ async function failMessage(id: string, code: number | null, error: string, skipR
   }).eq("id", id);
 }
 
-async function releaseForRetry(id: string, attempt: number, code: number, error: string) {
+/** Retry with backoff — counts against the attempt budget (Graph call was made). */
+async function releaseForRetry(
+  id: string, attempt: number, code: number, error: string, windowedAt?: string | null,
+) {
   await db.from("whatsapp_messages").update({
     status: "pending", claimed_at: null,
-    next_attempt_at: new Date(Date.now() + computeBackoff(attempt) * 1000).toISOString(),
+    next_attempt_at: windowedAt ?? new Date(Date.now() + computeBackoff(attempt) * 1000).toISOString(),
+    last_error_code: code, last_error: error,
+  }).eq("id", id);
+}
+
+/** Infra hold — releases WITHOUT consuming the attempt budget (decrements the claim's increment). */
+async function releaseForHold(id: string, currentAttempt: number, code: number, error: string, holdSeconds: number) {
+  await db.from("whatsapp_messages").update({
+    status: "pending", claimed_at: null,
+    attempt_count: Math.max(0, currentAttempt - 1),
+    next_attempt_at: new Date(Date.now() + holdSeconds * 1000).toISOString(),
     last_error_code: code, last_error: error,
   }).eq("id", id);
 }
@@ -1884,7 +2390,9 @@ Deno.serve(async (req: Request) => {
   const { message_id } = await req.json().catch(() => ({}));
   if (!message_id) return new Response(JSON.stringify({ error: "message_id required" }), { status: 400 });
 
-  // ---- atomic claim (pending → processing); loser of the race no-ops ----
+  // ---- atomic claim (pending → processing); loser of the race no-ops.
+  // attempt_count++ rides the claim but is REFUNDED by every infra-hold path —
+  // net effect: only real Graph attempts consume the budget of 5.
   const { data: claimed } = await db.from("whatsapp_messages")
     .update({ status: "processing", claimed_at: new Date().toISOString() })
     .eq("id", message_id).eq("status", "pending")
@@ -1895,15 +2403,16 @@ Deno.serve(async (req: Request) => {
   await db.from("whatsapp_messages").update({ attempt_count: attempt }).eq("id", message_id);
 
   try {
-    // ---- integration + credentials ----
+    // ---- integration + credentials (failures here are HOLDS, not attempts) ----
     const { data: integ } = await db.from("whatsapp_integrations")
       .select("*").eq("tenant_id", claimed.tenant_id).is("deleted_at", null).maybeSingle();
     if (!integ || !integ.is_enabled || integ.connection_status !== "connected") {
-      await releaseForRetry(message_id, attempt, 0, "integration unavailable");
+      await releaseForHold(message_id, attempt, 0, "integration unavailable", 15 * 60);
       return new Response(JSON.stringify({ ok: false, error: "integration unavailable" }), { status: 200 });
     }
     if (integ.send_paused_until && new Date(integ.send_paused_until) > new Date()) {
-      await releaseForRetry(message_id, attempt - 1, 131048, "quality pause active");
+      await releaseForHold(message_id, attempt, 131048, "quality pause active",
+        Math.ceil((new Date(integ.send_paused_until).getTime() - Date.now()) / 1000));
       return new Response(JSON.stringify({ ok: false, error: "quality paused" }), { status: 200 });
     }
     const { data: credRows } = await db.rpc("whatsapp_reveal_credentials", { p_tenant_id: claimed.tenant_id });
@@ -1913,17 +2422,34 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ ok: false, error: "credentials missing" }), { status: 200 });
     }
 
-    // ---- re-check consent + contact state at send time ----
+    // ---- recipient + policy gates ----
     const phone = normalizeToE164(String(claimed.to_phone_e164 ?? ""));
     if (!phone) {
       await failMessage(message_id, null, "no valid phone", "no_phone");
       return new Response(JSON.stringify({ ok: false }), { status: 200 });
     }
     const { data: rule } = await db.from("whatsapp_automation_rules")
-      .select("required_consent").eq("tenant_id", claimed.tenant_id)
+      .select("required_consent, send_window, business_hours").eq("tenant_id", claimed.tenant_id)
       .eq("event_key", claimed.event_key ?? "").is("deleted_at", null).maybeSingle();
     const requiredConsent = rule?.required_consent ?? "utility";
-    if (claimed.customer_id) {
+    const isSessionMessage = String(claimed.message_kind ?? "template").startsWith("session");
+
+    const { data: contact } = await db.from("whatsapp_contacts")
+      .select("*").eq("tenant_id", claimed.tenant_id).eq("phone_e164", phone)
+      .is("deleted_at", null).maybeSingle();
+    // opt-out blocks EVERYTHING, session replies included
+    if (contact?.opt_out_all) {
+      await failMessage(message_id, null, "customer opted out", "opted_out");
+      return new Response(JSON.stringify({ ok: false }), { status: 200 });
+    }
+    if (contact?.unreachable) {
+      await failMessage(message_id, null, "number not on WhatsApp", "unreachable");
+      return new Response(JSON.stringify({ ok: false }), { status: 200 });
+    }
+    // Recorded consent gates AUTOMATED template sends. Staff session replies inside
+    // an open 24h window are permitted Meta service traffic (the inbound message
+    // itself opened the conversation) — the window check replaces the consent check.
+    if (!isSessionMessage && claimed.customer_id) {
       const { data: consent } = await db.rpc("whatsapp_consent_state", {
         p_tenant_id: claimed.tenant_id, p_customer_id: claimed.customer_id,
       });
@@ -1933,67 +2459,73 @@ Deno.serve(async (req: Request) => {
         return new Response(JSON.stringify({ ok: false }), { status: 200 });
       }
     }
-    const { data: contact } = await db.from("whatsapp_contacts")
-      .select("*").eq("tenant_id", claimed.tenant_id).eq("phone_e164", phone)
-      .is("deleted_at", null).maybeSingle();
-    if (contact?.opt_out_all) {
-      await failMessage(message_id, null, "customer opted out", "opted_out");
-      return new Response(JSON.stringify({ ok: false }), { status: 200 });
+    if (isSessionMessage) {
+      const windowOpen = contact?.service_window_expires_at
+        && new Date(contact.service_window_expires_at) > new Date();
+      if (!windowOpen) {
+        await failMessage(message_id, 131047, "24h service window closed", "no_template");
+        return new Response(JSON.stringify({ ok: false }), { status: 200 });
+      }
     }
-    if (contact?.unreachable) {
-      await failMessage(message_id, null, "number not on WhatsApp", "unreachable");
-      return new Response(JSON.stringify({ ok: false }), { status: 200 });
-    }
-    if (requiredConsent === "marketing") {
+    if (requiredConsent === "marketing" && !isSessionMessage) {
       if (phone.startsWith("+1")) {
         await failMessage(message_id, null, "US marketing paused by Meta", "us_marketing_paused");
         return new Response(JSON.stringify({ ok: false }), { status: 200 });
       }
       if (contact?.marketing_suppressed_until && new Date(contact.marketing_suppressed_until) > new Date()) {
-        await releaseForRetry(message_id, attempt, 131049, "marketing frequency suppression");
+        await releaseForHold(message_id, attempt, 131049, "marketing frequency suppression", 4 * 3600);
         return new Response(JSON.stringify({ ok: false }), { status: 200 });
       }
     }
-    // pair pacing: ≥6s between messages to the same recipient
+    // pair pacing: ≥6s between messages to the same recipient (hold, not an attempt)
     if (contact?.last_outbound_at && Date.now() - new Date(contact.last_outbound_at).getTime() < 6000) {
-      await db.from("whatsapp_messages").update({
-        status: "pending", claimed_at: null,
-        next_attempt_at: new Date(Date.now() + 10_000).toISOString(),
-      }).eq("id", message_id);
+      await releaseForHold(message_id, attempt, 131056, "pair pacing", 10);
       return new Response(JSON.stringify({ ok: true, deferred: "pair pacing" }), { status: 200 });
     }
 
     // ---- resolve template + language, render params ----
+    const cfg = await loadTenantFormat(claimed.tenant_id);
     let requestBody: Record<string, unknown>;
     let bodyPreview = claimed.body_preview as string | null;
-    if (claimed.message_kind === "template") {
+    if (!isSessionMessage) {
       const { data: bound } = await db.from("whatsapp_templates")
-        .select("name").eq("id", claimed.template_id).maybeSingle();
+        .select("name").eq("id", claimed.template_id).eq("tenant_id", claimed.tenant_id).maybeSingle();
       const { data: family } = await db.from("whatsapp_templates")
         .select("*").eq("tenant_id", claimed.tenant_id).eq("name", bound?.name ?? "")
         .is("deleted_at", null).is("superseded_by", null);
       const rows = family ?? [];
-      let custLang: string | null = null; let tenantLang: string | null = null;
+      let custLang: string | null = null;
       if (claimed.customer_id) {
         const { data: cust } = await db.from("customers_enhanced")
           .select("preferred_language").eq("id", claimed.customer_id).maybeSingle();
         custLang = cust?.preferred_language ?? null;
       }
-      const { data: tenant } = await db.from("tenants").select("ui_language").eq("id", claimed.tenant_id).maybeSingle();
-      tenantLang = tenant?.ui_language ?? null;
-      const language = resolveTemplateLanguage(rows, custLang, tenantLang);
+      const language = resolveTemplateLanguage(rows, custLang, cfg.uiLanguage);
       const tpl = rows.find((r) => r.language === language)
         ?? rows.find((r) => r.is_fallback && r.status === "APPROVED");
       if (!tpl) {
         await failMessage(message_id, 132001, "no approved template translation", "no_template");
         return new Response(JSON.stringify({ ok: false }), { status: 200 });
       }
-      const context = await buildContext(claimed, claimed.tenant_id);
-      const components = buildTemplateParams(
-        tpl.components as Array<{ type: string; text?: string; format?: string }>,
-        (tpl.variable_map ?? {}) as Record<string, string>,
-        context, tpl.parameter_format as "named" | "positional",
-      );
+      const context = await buildContext(claimed, claimed.tenant_id, cfg);
+      // tenant-logo branding for image-header templates (Task 17 registers branding.logo_url;
+      // verify the branding key against companySettingsService at execution)
+      const { data: brandRow } = await db.from("company_settings")
+        .select("branding").eq("tenant_id", claimed.tenant_id).is("deleted_at", null).maybeSingle();
+      const logoUrl = String((brandRow?.branding as Record<string, unknown> | null)?.logo_url ?? "") || undefined;
+      let components: ReturnType<typeof buildTemplateParams>;
+      try {
+        components = buildTemplateParams(
+          tpl.components as Parameters<typeof buildTemplateParams>[0],
+          (tpl.variable_map ?? {}) as Record<string, string>,
+          context, tpl.parameter_format as "named" | "positional",
+          { headerImageLink: logoUrl },
+        );
+      } catch (e) {
+        // loud skip instead of a payload Meta would reject (e.g. image header, no logo)
+        await failMessage(message_id, null, String(e), "unsupported_header");
+        return new Response(JSON.stringify({ ok: false }), { status: 200 });
+      }
       const bodyComponent = (tpl.components as Array<{ type: string; text?: string }>)
         .find((c) => c.type?.toUpperCase() === "BODY");
       const values: Record<string, string> = {};
@@ -2011,7 +2543,6 @@ Deno.serve(async (req: Request) => {
         rendered_params: components, body_preview: bodyPreview, to_phone_e164: phone,
       }).eq("id", message_id);
     } else {
-      // manual session message (window-open free-form)
       requestBody = {
         messaging_product: "whatsapp", recipient_type: "individual", to: phone,
         type: "text", text: { preview_url: false, body: String(claimed.session_body ?? "") },
@@ -2019,7 +2550,7 @@ Deno.serve(async (req: Request) => {
       bodyPreview = String(claimed.session_body ?? "");
     }
 
-    // ---- Graph API call ----
+    // ---- Graph API call (this is the attempt that counts) ----
     const proof = await appSecretProof(creds.app_secret, creds.access_token);
     const version = creds.graph_api_version || "v25.0";
     const resp = await fetch(
@@ -2036,7 +2567,6 @@ Deno.serve(async (req: Request) => {
       await db.from("whatsapp_messages").update({
         status: "sent", wamid, sent_at: new Date().toISOString(), last_error: null, last_error_code: null,
       }).eq("id", message_id);
-      // contact bookkeeping + comms mirror
       if (contact?.id) {
         await db.from("whatsapp_contacts").update({
           last_outbound_at: new Date().toISOString(), wa_id: result.contacts?.[0]?.wa_id ?? contact.wa_id,
@@ -2067,10 +2597,20 @@ Deno.serve(async (req: Request) => {
     const code = Number(result.error?.code ?? resp.status);
     const detail = String(result.error?.error_data?.details ?? result.error?.message ?? `HTTP ${resp.status}`);
     const cls = classifySendError(code);
+    // business-hours rules re-apply to retries: backoff, then shift into the window
+    const windowedRetryAt = async (): Promise<string | null> => {
+      if (rule?.send_window !== "business_hours") return null;
+      const { data: at } = await db.rpc("whatsapp_apply_send_window", {
+        p_tenant_id: claimed.tenant_id, p_send_window: "business_hours",
+        p_business_hours: rule.business_hours,
+        p_ts: new Date(Date.now() + computeBackoff(attempt) * 1000).toISOString(),
+      });
+      return (at as string | null) ?? null;
+    };
     switch (cls.kind) {
       case "retry":
         if (attempt >= 5) await failMessage(message_id, code, `retries exhausted: ${detail}`);
-        else await releaseForRetry(message_id, attempt, code, detail);
+        else await releaseForRetry(message_id, attempt, code, detail, await windowedRetryAt());
         break;
       case "suppress_marketing":
         if (contact?.id) {
@@ -2095,13 +2635,13 @@ Deno.serve(async (req: Request) => {
           send_paused_until: new Date(Date.now() + 3600 * 1000).toISOString(),
           connection_status: "quality_paused",
         }).eq("id", integ.id);
-        await releaseForRetry(message_id, attempt - 1, code, detail);
+        await releaseForHold(message_id, attempt, code, detail, 3600);
         break;
       case "integration_token_dead":
         await db.from("whatsapp_integrations").update({
           connection_status: "token_invalid", token_valid: false,
         }).eq("id", integ.id);
-        await releaseForRetry(message_id, attempt - 1, code, detail); // queue holds until reconnect
+        await releaseForHold(message_id, attempt, code, detail, 3600); // queue holds until reconnect
         break;
       case "integration_locked":
         await db.from("whatsapp_integrations").update({ connection_status: "error" }).eq("id", integ.id);
@@ -2110,26 +2650,26 @@ Deno.serve(async (req: Request) => {
       default:
         await failMessage(message_id, code, detail);
     }
-    // notify staff on terminal outcomes
     if (["hard_fail", "template_broken", "integration_locked"].includes(cls.kind)
         || (cls.kind === "retry" && attempt >= 5)) {
-      await db.rpc("emit_notification_event", {
-        p_event_type: "whatsapp.message_failed", p_entity_type: "whatsapp_message",
-        p_entity_id: message_id,
-        p_payload: { case_id: claimed.case_id, event_key: claimed.event_key, error_code: code, detail },
-        p_dedup_key: `whatsapp.message_failed:${message_id}`,
-      });
+      await emitEvent(claimed.tenant_id, "whatsapp.message_failed", "whatsapp_message", message_id,
+        { case_id: claimed.case_id, event_key: claimed.event_key, error_code: code, detail },
+        `whatsapp.message_failed:${message_id}`);
     }
     return new Response(JSON.stringify({ ok: false, code, detail }), { status: 200 });
   } catch (e) {
     console.error("whatsapp-send unexpected error:", e);
-    await releaseForRetry(message_id, attempt, 131000, String(e));
+    // unexpected exceptions respect the attempt cap too — never loop forever
+    const { data: row } = await db.from("whatsapp_messages")
+      .select("attempt_count").eq("id", message_id).maybeSingle();
+    if ((row?.attempt_count ?? 0) >= 5) await failMessage(message_id, 131000, String(e));
+    else await releaseForRetry(message_id, row?.attempt_count ?? 1, 131000, String(e));
     return new Response(JSON.stringify({ ok: false, error: "internal" }), { status: 200 });
   }
 });
 ```
 
-Worker notes: HTTP responses are **200 even for handled failures** — DB-side retry state, not HTTP retries, governs redelivery (house convention). The claim happens before the Graph call; an unexpected crash leaves `processing`, which the scanner resets after 5 minutes.
+Worker notes: HTTP responses are **200 even for handled failures** — DB-side retry state, not HTTP retries, governs redelivery (house convention). The claim happens before the Graph call; an unexpected crash leaves `processing`, which the scanner resets after 5 minutes. Attempts are consumed only by real Graph calls (holds refund the claim's increment), so a token outage can never burn the retry budget — pilot step 7 ("re-paste token → held messages drain") depends on this.
 
 - [ ] **Step 2: Commit**
 
@@ -2151,7 +2691,9 @@ git commit -m "feat(whatsapp): send worker (claim, consent/window/pacing gates, 
 // work + anon client with the caller's Authorization to resolve the user; owner/admin role gate;
 // tenant scope gate; check_rate_limit per action.
 // Actions: save_credentials | test_connection | sync_templates | submit_template |
-//          delete_template | send_test
+//          delete_template | send_test | send_now
+// Role gates: owner/admin for everything EXCEPT send_now, which any non-viewer staff
+// role may call (it powers the SendMessageModal poke for manual sends).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -2205,27 +2747,46 @@ Deno.serve(async (req: Request) => {
   if (userErr || !userData?.user) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: cors });
   }
+  const body = await req.json().catch(() => ({}));
+  const action: string = body.action;
+  const STAFF_ROLES = ["owner", "admin", "manager", "technician", "sales", "accounts", "hr"];
   const { data: profile } = await db.from("profiles")
     .select("role, tenant_id").eq("id", userData.user.id).maybeSingle();
   const isPlatformAdmin = profile && ["owner", "admin"].includes(profile.role) && profile.tenant_id === null;
-  if (!profile || (!["owner", "admin"].includes(profile.role))) {
+  const allowedRoles = action === "send_now" ? STAFF_ROLES : ["owner", "admin"];
+  if (!profile || !allowedRoles.includes(profile.role)) {
     return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: cors });
   }
-  const body = await req.json().catch(() => ({}));
   const tenantId: string = body.tenantId;
   if (!tenantId || (!isPlatformAdmin && profile.tenant_id !== tenantId)) {
     return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: cors });
   }
+  // fail CLOSED (house shape: only an explicit true passes)
   const { data: rl } = await db.rpc("check_rate_limit", {
     p_key: `whatsapp-admin:${userData.user.id}`, p_max_requests: 10, p_window_seconds: 60,
   });
-  if (rl === false) {
+  if (rl !== true) {
     return new Response(JSON.stringify({ error: "Rate limit exceeded" }),
       { status: 429, headers: { ...cors, "Retry-After": "60" } });
   }
-
-  const action: string = body.action;
   try {
+    // ---------- send_now: staff poke for a message row they just enqueued ----------
+    // (SendMessageModal inserts the whatsapp_messages row under RLS, then calls this;
+    // the worker requires the service-role bearer, which browsers must never hold.)
+    if (action === "send_now") {
+      const { messageId } = body;
+      const { data: msg } = await db.from("whatsapp_messages")
+        .select("id").eq("id", messageId).eq("tenant_id", tenantId)
+        .eq("status", "pending").is("deleted_at", null).maybeSingle();
+      if (!msg) return new Response(JSON.stringify({ error: "Message not found" }), { status: 404, headers: cors });
+      await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE_KEY}` },
+        body: JSON.stringify({ message_id: msg.id }),
+      });
+      return new Response(JSON.stringify({ success: true }), { status: 200, headers: cors });
+    }
+
     // ---------- save_credentials ----------
     if (action === "save_credentials") {
       const { appId, wabaId, phoneNumberId, accessToken, appSecret } = body;
@@ -2392,7 +2953,10 @@ Deno.serve(async (req: Request) => {
       if (!tpl) return new Response(JSON.stringify({ error: "Template not found" }), { status: 404, headers: cors });
       await fetch(`${GRAPH}/${V}/${creds.waba_id}/message_templates?name=${encodeURIComponent(tpl.name)}&${authQ}`,
         { method: "DELETE", headers });
-      await db.from("whatsapp_templates").update({ deleted_at: new Date().toISOString() }).eq("id", tpl.id);
+      // Meta's DELETE-by-name removes ALL language variants — soft-delete the whole
+      // family locally so send-time resolution can never pick a dead translation (132001)
+      await db.from("whatsapp_templates").update({ deleted_at: new Date().toISOString() })
+        .eq("tenant_id", tenantId).eq("name", tpl.name).is("deleted_at", null);
       return new Response(JSON.stringify({ success: true }), { status: 200, headers: cors });
     }
 
@@ -2407,9 +2971,9 @@ Deno.serve(async (req: Request) => {
       const { data: msg, error } = await db.from("whatsapp_messages").insert({
         tenant_id: tenantId, message_kind: "template", template_id: tpl.id,
         to_phone_e164: to, event_key: "manual.test", initiated_by: userData.user.id,
-        dedup_key: `manual.test:${crypto.randomUUID()}`,
-      }).select("id").single();
-      if (error) throw error;
+        priority: 1, dedup_key: `manual.test:${crypto.randomUUID()}`,
+      }).select("id").maybeSingle();
+      if (error || !msg) throw error ?? new Error("insert returned no row");
       await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-send`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE_KEY}` },
@@ -2438,11 +3002,13 @@ git commit -m "feat(whatsapp): admin edge function (validated credential save, 3
 
 - [ ] **Step 1: Deploy all three** via `mcp__supabase__deploy_edge_function` (project `ssmbegiyjivrcwgcqutu`): `whatsapp-webhook` (files: index.ts, webhookCore.ts), `whatsapp-send` (index.ts, waCore.ts), `whatsapp-admin` (index.ts). No new platform env secrets are needed (per-tenant credentials live in Vault; `SUPABASE_URL`/`SERVICE_ROLE_KEY`/`ANON_KEY` are injected by the platform).
 
-- [ ] **Step 2: Confirm cron plumbing** — `system_settings_internal` rows `edge_function_base_url` + `edge_function_service_key` already exist for the follow-ups pipeline (verify: `select key from system_settings_internal;` returns both). If absent in an environment, the WhatsApp jobs stay dormant by design.
+- [ ] **Step 2: Prove `verify_jwt=false` took effect for the webhook** — `config.toml` only governs CLI deploys, so after an MCP deploy this MUST be verified: `curl -s -o /dev/null -w '%{http_code}' 'https://<project>.supabase.co/functions/v1/whatsapp-webhook?t=x'` with NO Authorization header must return **403** (the handler's own Forbidden), NOT a gateway **401**. If it returns 401, redeploy `whatsapp-webhook` via `supabase functions deploy whatsapp-webhook` (honors config.toml) or flip the function's "Verify JWT" toggle in the dashboard, then re-test. The other two functions keep JWT verification ON.
 
-- [ ] **Step 3: End-to-end smoke (Meta test number)** — using a staging tenant: `save_credentials` with the app's test number credentials → `test_connection` returns token+phone+health green → configure the webhook URL `https://<project>.supabase.co/functions/v1/whatsapp-webhook?t=<public_id>` + the row's `webhook_verify_token` in the Meta app dashboard → dashboard shows Verified and `whatsapp_integrations.webhook_status='verified'` → `sync_templates` pulls `hello_world` → `send_test` to a verified test recipient → row reaches `status='delivered'` via webhook. Record evidence in the PR.
+- [ ] **Step 3: Confirm cron plumbing** — `system_settings_internal` rows `edge_function_base_url` + `edge_function_service_key` already exist for the follow-ups pipeline (verify: `select key from system_settings_internal;` returns both). If absent in an environment, the WhatsApp jobs stay dormant by design.
 
-- [ ] **Step 4: Commit** any config notes:
+- [ ] **Step 4: End-to-end smoke (Meta test number)** — using a staging tenant: `save_credentials` with the app's test number credentials → `test_connection` returns token+phone+health green → configure the webhook URL `https://<project>.supabase.co/functions/v1/whatsapp-webhook?t=<public_id>` + the row's `webhook_verify_token` in the Meta app dashboard → dashboard shows Verified and `whatsapp_integrations.webhook_status='verified'` → `sync_templates` pulls `hello_world` → `send_test` to a verified test recipient → row reaches `status='delivered'` via webhook. Record evidence in the PR.
+
+- [ ] **Step 5: Commit** any config notes:
 
 ```bash
 git add -A && git commit -m "chore(whatsapp): deploy notes + smoke evidence for edge functions"
@@ -2573,8 +3139,9 @@ export async function saveDraftTemplate(
   row: Database['public']['Tables']['whatsapp_templates']['Insert'],
 ): Promise<WhatsAppTemplate> {
   const { data, error } = await supabase.from('whatsapp_templates')
-    .insert(row).select('*').single();
+    .insert(row).select('*').maybeSingle();
   if (error) throw error;
+  if (!data) throw new Error('Template insert returned no row');
   return data;
 }
 
@@ -2612,14 +3179,27 @@ export async function recordConsent(row: Database['public']['Tables']['whatsapp_
   if (error) throw error;
 }
 
-/** All whatsapp-admin edge actions go through here. */
+/**
+ * All whatsapp-admin edge actions go through here. On a non-2xx response
+ * supabase-js raises a generic FunctionsHttpError WITHOUT the body — the real
+ * validation message ("Meta rejected the access token…", scope errors, template
+ * rejections) lives in error.context; surface it or the Connection tab shows
+ * "Edge Function returned a non-2xx status code" for every failure.
+ */
 export async function whatsappAdmin<T = Record<string, unknown>>(
   action: string, payload: Record<string, unknown>,
 ): Promise<T> {
   const { data, error } = await supabase.functions.invoke('whatsapp-admin', {
     body: { action, ...payload },
   });
-  if (error) throw error;
+  if (error) {
+    const ctx = (error as { context?: Response }).context;
+    if (ctx && typeof ctx.json === 'function') {
+      const body = await ctx.json().catch(() => null);
+      if (body?.error) throw new Error(body.error);
+    }
+    throw error;
+  }
   if (data?.error) throw new Error(data.error);
   return data as T;
 }
@@ -2827,9 +3407,10 @@ export function WhatsAppConnectionTab() {
           </button>
         </div>
         {integration && (
-          <dl className="mt-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+          <dl className="mt-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-5">
             <div><dt className="text-xs text-slate-400">Quality</dt><dd className="text-slate-700">{integration.quality_rating ?? '—'}</dd></div>
             <div><dt className="text-xs text-slate-400">Messaging tier</dt><dd className="text-slate-700">{integration.messaging_limit_tier ?? '—'}</dd></div>
+            <div><dt className="text-xs text-slate-400">Display name</dt><dd className="text-slate-700">{integration.name_status ?? 'Not reviewed'}</dd></div>
             <div><dt className="text-xs text-slate-400">API version</dt><dd className="text-slate-700">{integration.graph_api_version}</dd></div>
             <div><dt className="text-xs text-slate-400">Token expiry</dt><dd className="text-slate-700">{integration.token_expires_at ? new Date(integration.token_expires_at).toLocaleDateString() : 'Never'}</dd></div>
           </dl>
@@ -2929,7 +3510,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Clock, MessageSquareText } from 'lucide-react';
 import { whatsappKeys } from '../../../lib/queryKeys';
 import {
-  ensureRules, getIntegration, listRules, listTemplates, updateRule, type WhatsAppRule,
+  diffRulesToSeed, ensureRules, getIntegration, listRules, listTemplates, updateRule,
+  type WhatsAppRule,
 } from '../../../lib/whatsappService';
 import { WHATSAPP_EVENT_CATALOG } from '../../../lib/whatsapp/events';
 import { useTenantConfig, useTenantFeature } from '../../../contexts/TenantConfigContext';
@@ -2945,8 +3527,12 @@ export function WhatsAppAutomationsTab() {
   const { data: templates } = useQuery({ queryKey: whatsappKeys.templates(), queryFn: listTemplates });
 
   useEffect(() => {
-    if (tenantId && rules && rules.length < WHATSAPP_EVENT_CATALOG.length) {
-      ensureRules(tenantId).then(() => qc.invalidateQueries({ queryKey: whatsappKeys.rules() }));
+    // seed by SET DIFFERENCE, not row count (non-catalog rows must not mask missing
+    // catalog rows), and never let a failed seed become an unhandled rejection
+    if (tenantId && rules && diffRulesToSeed(rules, tenantId).length > 0) {
+      ensureRules(tenantId)
+        .then(() => qc.invalidateQueries({ queryKey: whatsappKeys.rules() }))
+        .catch((e) => console.error('WhatsApp rule seeding failed:', e));
     }
   }, [tenantId, rules, qc]);
 
@@ -2987,7 +3573,15 @@ export function WhatsAppAutomationsTab() {
           <ul className="divide-y divide-slate-100">
             {WHATSAPP_EVENT_CATALOG.filter((e) => e.stage === stage).map((event) => {
               const rule = byKey.get(event.key);
-              if (!rule) return null;
+              if (!rule) {
+                // not yet seeded (first visit, insert in flight) — visible but inert
+                return (
+                  <li key={event.key} className="flex items-center gap-3 px-5 py-3 opacity-50">
+                    <div className="h-5 w-9 rounded-full bg-slate-200" />
+                    <div className="text-sm text-slate-500">{event.label} — preparing…</div>
+                  </li>
+                );
+              }
               const value = patchOf(rule);
               return (
                 <li key={event.key} className="flex flex-wrap items-center gap-3 px-5 py-3">
@@ -3099,10 +3693,12 @@ export function WhatsAppBubblePreview({ bodyText, footerText, headerText, sample
 - [ ] **Step 2: Templates tab** — `WhatsAppTemplatesTab.tsx`: table of template families (name, languages as chips, category, status chip, quality dot, linked event) with actions **New template** (opens the studio), **Sync from Meta** (`whatsappAdmin('sync_templates', { tenantId })`), row action **Submit to Meta** for DRAFT rows. Status chip tones: APPROVED `bg-success-muted text-success`, PENDING `bg-warning-muted text-warning`, REJECTED/DISABLED `bg-danger-muted text-danger`, PAUSED `bg-warning-muted text-warning`, DRAFT `bg-slate-100 text-slate-500`. Uses `whatsappKeys.templates()` + `listTemplates`. Implementation is a straightforward table composition of the primitives used in Task 12 (same list/card classes); the one non-obvious rule: group rows by `name` and render one row per family with language chips.
 
 - [ ] **Step 3: Template Studio** — `WhatsAppTemplateStudio.tsx`, a right-side panel/modal (follow the `CustomerFormModal` chrome contract: `titleSize="sm"`, icon badge, `closeOnBackdrop={false}`):
-  - Fields: display name → auto-slugged Meta `name` (lowercase, underscores), language select (from `geo_languages` actives), category select (UTILITY default, with the warning copy: *"Promotional wording in a UTILITY template will be recategorized by Meta as MARKETING and billed accordingly"*), body textarea with insert-variable chips sourced from `master_template_variables` (each insert also records `variable_map[varName] = contextKey`), optional footer, optional header text.
-  - Right side: `WhatsAppBubblePreview` bound to the live body + sample values.
+  - Fields: display name → auto-slugged Meta `name` (lowercase, underscores), language select (from `geo_languages` actives), category select (UTILITY default, with the warning copy: *"Promotional wording in a UTILITY template will be recategorized by Meta as MARKETING and billed accordingly"*), body textarea with insert-variable chips sourced from `master_template_variables` **restricted to the worker-supported key list** (the Task 17 catalog — chips outside it would render as "—" in real messages), optional footer, header: none / text / **tenant logo image** (writes an `IMAGE`-format HEADER component; send-time media comes from `company_settings.branding.logo_url`).
+  - **Buttons editor** (spec §12): up to 3 rows of quick-reply (text; the send-time payload is the uppercased text — STOP words become recognizable inbound opt-outs), dynamic-URL (base URL + `{{1}}` suffix bound to a context key stored as `variable_map['button_url_<index>']`), or phone buttons. MARKETING-category templates get an **Unsubscribe** quick-reply pre-added (removable with a policy warning).
+  - Right side: `WhatsAppBubblePreview` bound to the live body + sample values (+ button pills under the bubble).
   - Save = `saveDraftTemplate` (status DRAFT); Submit = save + `whatsappAdmin('submit_template', { tenantId, templateId })`.
-  - Validation before submit: name matches `/^[a-z0-9_]{1,512}$/`, body ≤ 1024 chars, no adjacent variables (`}}{{` forbidden), every variable present in `variable_map`.
+  - **Edit an APPROVED template** = version n+1: clone the row (`version: n+1`), set the old row's `superseded_by` to the clone, submit the clone via Meta's template-edit endpoint (`POST /{meta_template_id}`); surface Meta's edit limits in the UI (max 10 edits/30 days, 1/24h) and block the action when `last_synced_at` shows an edit in the past 24h.
+  - Validation before submit: name matches `/^[a-z0-9_]{1,512}$/`, body ≤ 1024 chars, no adjacent variables (`}}{{` forbidden), every variable present in `variable_map`, image-header templates require a tenant logo URL to be configured.
 
 - [ ] **Step 4: Verify + commit (Tasks 10–13 together)**
 
@@ -3191,7 +3787,7 @@ export function WhatsAppConsentBlock({ customerId, value, onChange }: Props) {
 
 **Consent-text capture rule:** on save, the caller writes one `whatsapp_consents` row per checked scope with `consent_text` set to the exact label string rendered above (build the string from the same template literal — never re-type it) and `source: 'staff'` (modal) or `'intake_form'` (wizard).
 
-- [ ] **Step 2: CustomerFormModal** — under the existing `mobile_number`/`phone` `PhoneInput` grid row, add a `whatsapp_number` `PhoneInput` (floatingLabel, `selectedCountryId={formData.country_id}`) into the progressive-disclosure section, and render `<WhatsAppConsentBlock>` beneath it holding local `consentDraft` state (`{utility:false, marketing:false}`). In the save handler, after a successful create/update, call `recordConsent` once per newly-checked scope:
+- [ ] **Step 2: CustomerFormModal** — under the existing `mobile_number`/`phone_number` `PhoneInput` grid row, add a `whatsapp_number` `PhoneInput` (floatingLabel, `countries={countries}`, `selectedCountryId={formData.country_id}` — the `countries` prop is REQUIRED on PhoneInput; copy the existing mobile_number field's usage) into the progressive-disclosure section, and render `<WhatsAppConsentBlock>` beneath it holding local `consentDraft` state (`{utility:false, marketing:false}`). In the save handler, after a successful create/update, call `recordConsent` once per newly-checked scope:
 
 ```tsx
 if (consentDraft.utility && !alreadyUtility) {
@@ -3227,8 +3823,9 @@ git commit -m "feat(whatsapp): consent capture (customer modal, intake wizard, p
 - [ ] **Step 1: `WhatsAppThread.tsx`** — merged timeline for a case: `listMessages({ caseId })` + inbound rows (`whatsapp_inbound_messages` by case) sorted by time; outbound bubbles right-aligned (`bg-primary/10`), inbound left (`bg-white border`), tick marks from status (`sent` ✓ `text-slate-400`, `delivered` ✓✓ `text-slate-400`, `read` ✓✓ `text-info`), failed rows with `last_error` + a Retry button (`retryMessage`). Poll with `refetchInterval: 15_000` while the tab is visible.
 
 - [ ] **Step 2: SendMessageModal** — when `getIntegration()` reports `connection_status === 'connected'`:
-  - template mode: enqueue a `whatsapp_messages` row (`message_kind: 'template'`, chosen approved template, `initiated_by` = current user, `case_id`/`customer_id` from context) and poke via `whatsappAdmin('send_test', …)`-style direct insert; keep the wa.me handoff as the fallback button.
-  - free-form mode: only enabled while `whatsapp_contacts.service_window_expires_at > now()` for the recipient (show a countdown chip, e.g. "Window open · 6h 12m left"); enqueue with `message_kind: 'session_text'`, `session_body` = typed text.
+  - template mode: insert a `whatsapp_messages` row under RLS (`message_kind: 'template'`, chosen approved template, `initiated_by` = current user, `priority: 1`, `case_id`/`customer_id` from context, `dedup_key: 'manual:' + crypto.randomUUID()`), then poke it with `whatsappAdmin('send_now', { tenantId, messageId })` (the staff-gated bridge to the service-role worker — the browser never holds the service key, and without the poke a manual send would wait up to a full 60s scanner tick); keep the wa.me handoff as the fallback button.
+  - free-form mode: only enabled while `whatsapp_contacts.service_window_expires_at > now()` for the recipient (show a countdown chip, e.g. "Window open · 6h 12m left"); insert with `message_kind: 'session_text'`, `session_body` = typed text, then the same `send_now` poke.
+  - **Send progress update** (catalog event `case.milestone`): a Case Detail action that opens this modal preloaded with the `case.milestone` rule's template and `event_key: 'case.milestone'` on the inserted row — the staff-triggered "Recovery in Progress" update.
 
 - [ ] **Step 3: Notification preferences** — in `NotificationPreferences.tsx` remove `comingSoon: true` from the WhatsApp channel column; add the two new staff events to `EVENT_GROUPS` ("WhatsApp replies", "WhatsApp delivery failures") and to `NOTIFICATION_EVENT_VARIABLES` in `notificationTemplateService.ts`:
 
@@ -3254,15 +3851,13 @@ git commit -m "feat(whatsapp): case thread with delivery ticks, window-aware man
 
 - [ ] **Step 1: Message log** — filterable virtualized table (status, event, date range, search by case/customer), columns: created, event label (from `WHATSAPP_EVENT_CATALOG`), recipient, template, status chip, error, cost chip (`pricing_category` + `pricing_billable === false ? 'free' : ''`); row click opens a detail drawer (body preview, timeline sent→delivered→read, attempts, `last_error`, raw params); bulk Retry for failed. Data: `listMessages` with server-side filters; reuse `VirtualizedTableBody`.
 
-- [ ] **Step 2: Analytics** — KPI row via `KpiRow` (`Sent`, `Delivery rate`, `Read rate`, `Reply rate`, `Failed`, `Billable messages`), computed from a single aggregate query:
+- [ ] **Step 2: Analytics** — KPI row via `KpiRow` (`Sent`, `Delivery rate`, `Read rate`, `Reply rate`, `Avg response time`, `Failed`, `Billable messages`). **Aggregation is server-side** — a raw row select would be silently truncated at PostgREST's 1,000-row cap and misreport every KPI. Task 17's migration ships `whatsapp_analytics_summary(p_from, p_to)` (SECURITY INVOKER — RLS scopes it to the caller's tenant) returning per-day rows: `day, queued, sent, delivered, read, failed, skipped, billable, replies, avg_response_seconds` (avg response = mean of `whatsapp_inbound_messages.received_at - <nearest prior outbound sent_at>` per conversation-day). The page calls:
 
 ```ts
-const { data } = await supabase.from('whatsapp_messages')
-  .select('status, pricing_billable, pricing_category, event_key, created_at, read_at, delivered_at')
-  .gte('created_at', from).lte('created_at', to).is('deleted_at', null);
+const { data, error } = await supabase.rpc('whatsapp_analytics_summary', { p_from: from, p_to: to });
 ```
 
-plus `whatsapp_inbound_messages` count for reply rate. Charts (Recharts + `chartTheme` hues): stacked area of daily volume by terminal status; horizontal bar of failures by `last_error_code`; table of per-event totals (sent/delivered/read/failed, success %). Date presets computed with `tenantToday(timezone)` (RevenueDashboard pattern). CSV export via `csvExport.ts`.
+Charts (Recharts + `chartTheme` hues): stacked area of daily volume by terminal status; horizontal bar of failures by `last_error_code` (a second small RPC `whatsapp_failure_breakdown(p_from, p_to)`, same migration); table of per-event totals (sent/delivered/read/failed, success %). Date presets computed with `tenantToday(timezone)` (RevenueDashboard pattern). CSV export via `csvExport.ts`.
 
 - [ ] **Step 3: Typecheck + commit**
 
@@ -3290,34 +3885,118 @@ git commit -m "feat(whatsapp): message log + analytics dashboard (KPIs, volume/s
 --     WHERE customer_id = p_customer_id;
 --   UPDATE whatsapp_contacts SET wa_id = NULL, phone_e164 = 'anonymized-' || id::text,
 --     profile_name = NULL, deleted_at = now() WHERE customer_id = p_customer_id;
+--   -- consents are append-only (Task 1 guard trigger); the anonymize cascade is the ONE
+--   -- sanctioned mutation, unlocked transaction-locally:
+--   PERFORM set_config('app.allow_consent_anonymize', 'true', true);
 --   UPDATE whatsapp_consents SET phone_e164 = NULL, consent_text = '[anonymized]'
 --     WHERE customer_id = p_customer_id;  -- ledger skeleton retained (Art. 17(3)(e) carve-out)
+--   PERFORM set_config('app.allow_consent_anonymize', '', true);
 -- Extend export_customer_data analogously (add whatsapp_messages/inbound/consents arrays).
+
+-- ---------- Analytics aggregation (server-side: PostgREST row selects cap at 1,000) ----------
+-- SECURITY INVOKER: RLS scopes every aggregate to the caller's tenant automatically.
+CREATE OR REPLACE FUNCTION whatsapp_analytics_summary(p_from timestamptz, p_to timestamptz)
+RETURNS TABLE (
+  day date, queued bigint, sent bigint, delivered bigint, read bigint,
+  failed bigint, skipped bigint, billable bigint, replies bigint,
+  avg_response_seconds numeric
+)
+LANGUAGE sql STABLE SECURITY INVOKER AS $$
+  WITH msgs AS (
+    SELECT created_at::date AS day,
+           count(*) AS queued,
+           count(*) FILTER (WHERE status IN ('sent','delivered','read')) AS sent,
+           count(*) FILTER (WHERE status IN ('delivered','read')) AS delivered,
+           count(*) FILTER (WHERE status = 'read') AS read,
+           count(*) FILTER (WHERE status = 'failed') AS failed,
+           count(*) FILTER (WHERE status = 'skipped') AS skipped,
+           count(*) FILTER (WHERE pricing_billable IS TRUE) AS billable
+      FROM whatsapp_messages
+     WHERE created_at >= p_from AND created_at < p_to AND deleted_at IS NULL
+     GROUP BY 1),
+  inbound AS (
+    SELECT i.received_at::date AS day, count(*) AS replies,
+           avg(EXTRACT(epoch FROM (i.received_at - m.sent_at))) AS avg_response_seconds
+      FROM whatsapp_inbound_messages i
+      LEFT JOIN whatsapp_messages m ON m.id = i.in_reply_to_message_id
+     WHERE i.received_at >= p_from AND i.received_at < p_to AND i.deleted_at IS NULL
+     GROUP BY 1)
+  SELECT COALESCE(m.day, i.day) AS day,
+         COALESCE(m.queued, 0), COALESCE(m.sent, 0), COALESCE(m.delivered, 0),
+         COALESCE(m.read, 0), COALESCE(m.failed, 0), COALESCE(m.skipped, 0),
+         COALESCE(m.billable, 0), COALESCE(i.replies, 0),
+         round(i.avg_response_seconds)
+    FROM msgs m FULL OUTER JOIN inbound i USING (day)
+   ORDER BY 1;
+$$;
+GRANT EXECUTE ON FUNCTION whatsapp_analytics_summary(timestamptz, timestamptz) TO authenticated;
+
+CREATE OR REPLACE FUNCTION whatsapp_failure_breakdown(p_from timestamptz, p_to timestamptz)
+RETURNS TABLE (error_code int, occurrences bigint, sample_error text)
+LANGUAGE sql STABLE SECURITY INVOKER AS $$
+  SELECT last_error_code, count(*), max(last_error)
+    FROM whatsapp_messages
+   WHERE status = 'failed' AND created_at >= p_from AND created_at < p_to
+     AND deleted_at IS NULL AND last_error_code IS NOT NULL
+   GROUP BY 1 ORDER BY 2 DESC LIMIT 20;
+$$;
+GRANT EXECUTE ON FUNCTION whatsapp_failure_breakdown(timestamptz, timestamptz) TO authenticated;
+
+-- ---------- Register the WhatsApp context keys in the variable catalog ----------
+-- The Template Studio's chips come from master_template_variables; the worker's
+-- buildContext supports the house keys PLUS these additions — chips and context
+-- must agree or inserted variables render as "—" in real messages.
+INSERT INTO master_template_variables (key, label, category, sample_value)
+SELECT v.key, v.label, v.category, v.sample
+FROM (VALUES
+  ('device.summary', 'Device summary (first models + count)', 'device', 'WD My Passport 2TB, Samsung 970 EVO +1 more'),
+  ('device.count', 'Device count', 'device', '3'),
+  ('case.recovery_outcome', 'Recovery outcome', 'case', 'full'),
+  ('case.engineer', 'Assigned engineer', 'case', 'Sara K.'),
+  ('case.tracking_link', 'Portal tracking link', 'case', 'https://portal.example/track/CASE-0042'),
+  ('case.collection_date', 'Scheduled collection date', 'case', '30 Jul 2026'),
+  ('branch.name', 'Branch name', 'company', 'Downtown Lab'),
+  ('invoice.balance_due', 'Invoice balance due', 'invoice', 'AED 1,250.00')
+) AS v(key, label, category, sample)
+WHERE NOT EXISTS (SELECT 1 FROM master_template_variables m WHERE m.key = v.key);
+-- NOTE (execution): introspect master_template_variables' real column names first
+-- (select * from master_template_variables limit 3) and adapt the insert — the shape
+-- above follows the seedData.ts templateVariables convention.
 
 -- Starter template seed function for connected tenants (called from the Templates tab "Add starter pack"):
 CREATE OR REPLACE FUNCTION seed_whatsapp_starter_templates(p_tenant_id uuid)
 RETURNS int LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_count int := 0;
 BEGIN
+  -- Caller check: SECURITY DEFINER bypasses RLS, so pin end-user callers to their own tenant
+  IF auth.uid() IS NOT NULL
+     AND (p_tenant_id IS DISTINCT FROM (SELECT get_current_tenant_id()) OR NOT (SELECT is_tenant_admin()))
+     AND NOT (SELECT is_platform_admin()) THEN
+    RAISE EXCEPTION 'seed_whatsapp_starter_templates: tenant admin required';
+  END IF;
+
   INSERT INTO whatsapp_templates (tenant_id, name, language, category, parameter_format, components, variable_map, event_key, status)
-  SELECT p_tenant_id, t.name, 'en', 'UTILITY', 'named', t.components, t.variable_map, t.event_key, 'DRAFT'
+  SELECT p_tenant_id, t.name, 'en', t.category, 'named', t.components, t.variable_map, t.event_key, 'DRAFT'
   FROM (VALUES
-    ('case_device_received', 'case.device_received',
+    ('case_device_received', 'UTILITY', 'case.device_received',
      '[{"type":"BODY","text":"Hello {{customer_name}} 👋\n\nWe''ve received your device(s) for case *{{case_number}}*:\n📦 {{device_summary}}\n\nOur engineers will begin the evaluation shortly. We''ll keep you updated at every step."},{"type":"FOOTER","text":"{{company_name}} — Data Recovery"}]'::jsonb,
      '{"customer_name":"customer.name","case_number":"case.number","device_summary":"device.summary","company_name":"company.name"}'::jsonb),
-    ('quote_ready', 'quote.sent',
+    ('quote_ready', 'UTILITY', 'quote.sent',
      '[{"type":"BODY","text":"Good news {{customer_name}} ✅\n\nYour recovery quote *{{quote_number}}* for case *{{case_number}}* is ready:\n💰 {{quote_total}}\n⏳ Valid until {{quote_valid_until}}\n\nReply here or contact us with any questions."},{"type":"FOOTER","text":"{{company_name}}"}]'::jsonb,
-     '{"customer_name":"customer.name","quote_number":"quote.number","case_number":"case.number","quote_total":"quote.total","quote_valid_until":"quote.valid_until","company_name":"company.name"}'::jsonb),
-    ('recovery_started', 'case.phase_changed:recovery',
+     '{"customer_name":"customer.name","quote_number":"quote.number","case_number":"case.number","quote_total":"quote.total","quote_valid_until":"quote.expiry_date","company_name":"company.name"}'::jsonb),
+    ('recovery_started', 'UTILITY', 'case.phase_changed:recovery',
      '[{"type":"BODY","text":"Hi {{customer_name}} 🔧\n\nRecovery work has started on case *{{case_number}}*. Our cleanroom engineers are on it — we''ll notify you the moment there''s an outcome."},{"type":"FOOTER","text":"{{company_name}}"}]'::jsonb,
      '{"customer_name":"customer.name","case_number":"case.number","company_name":"company.name"}'::jsonb),
-    ('ready_for_collection', 'case.phase_changed:ready',
+    ('ready_for_collection', 'UTILITY', 'case.phase_changed:ready',
      '[{"type":"BODY","text":"Great news {{customer_name}} 🎉\n\nCase *{{case_number}}* is complete and your data is ready for collection.\n\n📍 Please visit us or reply to arrange delivery."},{"type":"FOOTER","text":"{{company_name}}"}]'::jsonb,
      '{"customer_name":"customer.name","case_number":"case.number","company_name":"company.name"}'::jsonb),
-    ('payment_received', 'payment.received.customer',
+    ('payment_received', 'UTILITY', 'payment.received.customer',
      '[{"type":"BODY","text":"Thank you {{customer_name}} 🙏\n\nWe''ve received your payment for invoice *{{invoice_number}}*. A receipt has been issued on your account."},{"type":"FOOTER","text":"{{company_name}}"}]'::jsonb,
-     '{"customer_name":"customer.name","invoice_number":"invoice.number","company_name":"company.name"}'::jsonb)
-  ) AS t(name, event_key, components, variable_map)
+     '{"customer_name":"customer.name","invoice_number":"invoice.number","company_name":"company.name"}'::jsonb),
+    ('review_request', 'MARKETING', 'case.review_request',
+     '[{"type":"BODY","text":"Hi {{customer_name}} 🌟\n\nWe hope you''re happy with the recovery on case *{{case_number}}*. A short review helps other people find trustworthy data recovery:\n\n⭐ {{review_link}}\n\nThank you!"},{"type":"FOOTER","text":"{{company_name}}"},{"type":"BUTTONS","buttons":[{"type":"QUICK_REPLY","text":"Unsubscribe"}]}]'::jsonb,
+     '{"customer_name":"customer.name","case_number":"case.number","review_link":"case.tracking_link","company_name":"company.name"}'::jsonb)
+  ) AS t(name, category, event_key, components, variable_map)
   WHERE NOT EXISTS (
     SELECT 1 FROM whatsapp_templates w
     WHERE w.tenant_id = p_tenant_id AND w.name = t.name AND w.language = 'en' AND w.deleted_at IS NULL)
@@ -3349,7 +4028,9 @@ npm run geo:test                     # edge-function pure-module suites green
 bash scripts/check-tsc.sh            # CI parity
 ```
 
-Plus the SQL gates: `scripts/check-rls-initplan.sql` (new policies must pass), `scripts/check-tenant-table-requirements.sql` (all 7 tenant tables), schema-drift check (types regenerated in Tasks 3/17).
+Plus the SQL gates: `scripts/check-rls-initplan.sql` (new policies must pass), `scripts/check-tenant-table-requirements.sql` (the 7 fully-kitted tenant tables), schema-drift check (types regenerated in Tasks 3/17).
+
+**CI exclusion (required or the gate fails):** `whatsapp_webhook_events` deliberately has a nullable `tenant_id`, no RESTRICTIVE policy, and no audit trigger (it is a platform-scoped provider ledger whose tenant is resolved post-hoc; service role is the only writer). The tenant-table check auto-detects ANY table with a `tenant_id` column, so append `whatsapp_webhook_events` to the exclusion list in `scripts/check-tenant-table-requirements.sql` with a comment explaining exactly this, mirroring the existing platform-table exclusions.
 
 - [ ] **Step 2: E2E pilot script (staging tenant + Meta test number)** — execute and record evidence:
   1. Connect credentials → Test Connection all green.
@@ -3361,7 +4042,11 @@ Plus the SQL gates: `scripts/check-rls-initplan.sql` (new policies must pass), `
   7. Revoke the token in Meta → Test Connection fails; integration flips `token_invalid`; queue holds; re-paste token → held messages drain.
   8. Feature toggle off mid-queue → dispatcher stops enqueueing (existing pending rows still honor their state).
 
-- [ ] **Step 3: Docs** — update `docs/data-recovery-workflow.md` (stage 1/7/12-14 communication touchpoints now automated), add `docs/whatsapp-tenant-onboarding.md` (lab-facing Meta setup guide: Business verification, System User + token steps, webhook paste, display-name tips, template category guidance), and append the two migration rows to `supabase/migrations.manifest.md` if not already done.
+- [ ] **Step 3: Docs** — update `docs/data-recovery-workflow.md` (stage 1/7/12-14 communication touchpoints now automated), add `docs/whatsapp-tenant-onboarding.md` (lab-facing Meta setup guide: Business verification, System User + token steps, webhook paste, display-name tips, template category guidance), and append the three migration rows to `supabase/migrations.manifest.md` if not already done.
+
+- [ ] **Step 3b: CLAUDE.md** — the conventions file is canonical and MUST absorb this feature: add a `whatsapp_*` row to the Table Prefixes table (Tenant | WhatsApp communication automation), list the 8 new tables in the Domain Model section (new "WhatsApp Communications (Tenant-scoped)" subsection), add the 3 edge functions to the Edge Functions table, and record the release as the next entry in Database Migration History (migrations: `whatsapp_core_tables`, `whatsapp_dispatch_and_emitters`, `whatsapp_gdpr_and_seeds`).
+
+- [ ] **Step 3c: Migration PRs** — schema changes must use the migration PR template: open the PR with `.github/PULL_REQUEST_TEMPLATE/migration.md`, enumerating the three migrations, the regenerated `database.types.ts`, and every updated caller (CLAUDE.md Migration discipline item 4).
 
 - [ ] **Step 4: Final commit + push**
 
@@ -3392,8 +4077,8 @@ Phases 0–1 are fully dormant in production until a tenant connects; Phase 2+ c
 
 | Requirement (task brief) | Where |
 |---|---|
-| Tenant Meta config + encrypted storage + Test Connection + status surface | Tasks 1, 7, 11 (Vault RPCs, 3-probe test, status card) |
-| Per-event automation toggles (20+ events) | Tasks 2, 3, 12 (rules table, catalog, matrix UI) |
+| Tenant Meta config + encrypted storage + Test Connection + status surface | Tasks 1, 7, 11 (Vault RPCs, 3-probe test, status card incl. name_status) |
+| Per-event automation toggles (22-event catalog incl. parts ordered, progress updates, no-solution, cancellation; warranty reminder deferred — no warranty entity, documented custom-follow-up preset instead) | Tasks 2, 3, 12 (rules table, catalog, matrix UI) |
 | One-click/zero-touch sending, branding, emoji, placeholders, languages | Tasks 2, 6, 17 (dispatcher→queue→worker; starter pack; language resolver) |
 | Template engine (Meta templates, variables, preview, multi-language, versioning, fallback) | Tasks 1, 7, 13 (registry, sync/submit, studio + preview, `is_fallback`, `superseded_by`) |
 | Automation rules (instant/scheduled/delayed/reminders/conditions/retries/failure notices/business hours/timezone) | Tasks 2, 6 (delay+window+reminder_config+conditions; classifier+backoff; `whatsapp.message_failed`) |

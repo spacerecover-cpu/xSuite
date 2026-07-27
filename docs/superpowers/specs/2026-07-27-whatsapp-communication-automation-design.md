@@ -82,13 +82,16 @@ Every automation maps to the 16-stage lifecycle (CLAUDE.md). Events marked ● a
 | 7 | Quote Approved (confirmation) | 7 Approval | `quote.approved` | ○ trigger on `quotes.status → accepted` | UTILITY |
 | 8 | Quote Rejected (acknowledgement) | 7 Approval | `quote.rejected` | ○ trigger on `quotes.status → rejected` | UTILITY |
 | 9 | Recovery Started | 8 Recovery | `case.phase_changed:recovery` | ● | UTILITY |
-| 10 | Recovery In Progress (milestone update) | 8 Recovery | `case.milestone` | ○ manual/milestone emit (Phase 3) | UTILITY |
+| 10 | Recovery In Progress (milestone update) | 8 Recovery | `case.milestone` | staff "Send progress update" action (SendMessageModal preloaded with the rule's template) | UTILITY |
+| 10b | Parts Ordered | 8 Recovery | `case.parts_ordered` | ○ trigger AFTER INSERT `inventory_parts_usage` (case-linked donor/part allocation; one message/day) | UTILITY |
 | 11 | Recovery Completed | 8/11 | `case.recovery_outcome` | ○ trigger on `cases.recovery_outcome` change | UTILITY |
 | 12 | QA Passed / Ready for Collection | 11–13 Ready | `case.phase_changed:ready` | ● (status `Ready for Delivery` is customer-visible) | UTILITY |
 | 13 | Invoice Issued | 14 Billing | `invoice.issued` | ○ trigger on `invoices` insert/issue | UTILITY |
 | 14 | Payment Received (receipt) | 14 Billing | `payment.received.customer` | ● trigger on `payments` | UTILITY |
 | 15 | Device Collected (checkout confirmation) | 13 Checkout | `case.checked_out` | ○ trigger on `case_job_history` action `checkout` | UTILITY |
 | 16 | Case Closed | 15 Closure | `case.phase_changed:closed` | ● | UTILITY |
+| 16b | No Solution — Follow-up Plan | no_solution | `case.phase_changed:no_solution` | ● (base phase event; the v1.4.0 no_solution edge sets no recovery_outcome, so the outcome event alone would miss it) | UTILITY |
+| 16c | Case Cancelled | cancelled | `case.phase_changed:cancelled` | ● | UTILITY |
 | 17 | Follow-up Reminder | 16 | `case.follow_up_due` | ● (extend `case_follow_ups.channel` with `whatsapp`) | UTILITY |
 | 18 | Pickup / Appointment Reminder | 13 | `case.follow_up_due` (`follow_up_type='pickup_reminder'`) | ● | UTILITY |
 | 19 | Feedback Request | post-15 | `case.feedback_request` | ○ scheduled (delivered + N days) | **MARKETING** |
@@ -97,9 +100,12 @@ Every automation maps to the 16-stage lifecycle (CLAUDE.md). Events marked ● a
 | 22 | Custom / Manual | any | staff-initiated template send from Case/Customer | UI action | per template |
 
 Notes:
-- Phase-change automations key on `case.phase_changed:<to_phase>` — the dispatcher expands the base event using `payload->>'to_phase'`. Manual overrides (`set_case_status`) also emit `case.phase_changed`, so overridden statuses still notify (correct for a lab: the customer cares about the state, not how it was set). Rules can optionally exclude `manual_override` events.
+- Phase-change automations key on `case.phase_changed:<to_phase>` — the dispatcher expands the base event using `payload->>'to_phase'`, and **handles only the base event** (customer-visible transitions also emit `case.phase_changed.customer`; consuming both would double-send). Manual overrides (`set_case_status`) also emit `case.phase_changed`, so overridden statuses still notify (correct for a lab: the customer cares about the state, not how it was set). Rules can optionally exclude `manual_override` events.
+- "Recovery Outcome Recorded" (`case.recovery_outcome`) uses ONE outcome-neutral template rendering `{{recovery_outcome}}` — celebratory copy on an unrecoverable case is a domain violation. Per-outcome template overrides (distinct copy for full/partial/unrecoverable/declined) are a roadmap item (§17).
 - "Warranty Reminder" has no warranty entity in the platform; it ships as a documented **custom scheduled follow-up** preset (roadmap: warranty entity).
-- Multi-device jobs: messages are **case-scoped**; device-level detail is rendered in variables (e.g. `{{device_summary}}` = "3 of 12 drives recovered"). A 12-drive RAID never fans out to 12 customer messages.
+- **Custom events, v1 answer:** tenant-defined *automation rules* are not supported in v1. The supported custom surfaces are (a) custom scheduled follow-ups (`case_follow_ups` → the `case.follow_up_due` automation) and (b) manual template sends from Case/Customer (incl. the `case.milestone` progress update). Tenant-defined event rules are a roadmap item.
+- Multi-device jobs: messages are **case-scoped**; device-level detail is rendered in variables (e.g. `{{device_summary}}` = "3 of 12 drives recovered"). A 12-drive RAID never fans out to 12 customer messages — each device insert emits an event, but the dispatcher's per-case-per-day dedup plus the rule's 15-minute default delay debounce them into ONE receipt rendered at send time with every device present.
+- Follow-up automations (17/18/21) ride existing `channel='internal'` follow-up rows — `process_due_case_follow_ups` already emits `case.follow_up_due` for those; no follow-up schema change is needed.
 
 ---
 
@@ -154,7 +160,7 @@ Tenant isolation: every new table is tenant-scoped with the full CLAUDE.md kit (
 New tables (prefix `whatsapp_*`, all tenant-scoped unless noted):
 
 ### `whatsapp_integrations` — one row per tenant
-Connection identity + health. `app_id`, `waba_id`, `phone_number_id`, `display_phone_number`, `verified_name`, `integration_mode ('byo'|'tech_provider')`, `webhook_verify_token` (per-tenant, random), `graph_api_version`, `is_enabled`, `connection_status ('disconnected'|'connected'|'error'|'token_invalid')`, `webhook_status ('unverified'|'verified'|'receiving')`, `quality_rating`, `messaging_limit_tier`, `name_status`, `token_valid`, `token_expires_at` (0/never surfaced as NULL), `last_health_check_at`, `last_webhook_at`, `health_errors jsonb`, **`access_token_secret_id uuid` / `app_secret_secret_id uuid`** (Supabase Vault secret ids — the tokens themselves never touch a table). Column grants on the secret-id columns are REVOKEd from `authenticated`; reveal only via SECURITY DEFINER RPC executable by `service_role`.
+Connection identity + health. `app_id`, `waba_id`, `phone_number_id`, `display_phone_number`, `verified_name`, `integration_mode ('byo'|'tech_provider')`, `webhook_verify_token` (per-tenant, random), `graph_api_version`, `is_enabled`, `connection_status ('disconnected'|'connected'|'error'|'token_invalid'|'quality_paused')`, `webhook_status ('unverified'|'verified'|'receiving')`, `quality_rating`, `messaging_limit_tier`, `name_status`, `token_valid`, `token_expires_at` (0/never surfaced as NULL), `last_health_check_at`, `last_webhook_at`, `health_errors jsonb`, **`access_token_secret_id uuid` / `app_secret_secret_id uuid`** (Supabase Vault secret ids — the tokens themselves never touch a table). Column grants on the secret-id columns are REVOKEd from `authenticated`; reveal only via SECURITY DEFINER RPC executable by `service_role`.
 
 ### `whatsapp_templates` — Meta template registry
 `meta_template_id`, `name`, `language`, `category`, `parameter_format`, `components jsonb` (as stored at Meta), `status ('DRAFT'|'PENDING'|'APPROVED'|'REJECTED'|'PAUSED'|'DISABLED')`, `quality_score`, `rejection_reason`, `variable_map jsonb` (named param → context key, e.g. `{"customer_name":"customer.name","case_number":"case.number"}`), `event_key` (nullable — which automation uses it), `is_fallback boolean` (per event: language-fallback template), `version int` + `superseded_by` (versioning: edits create a new row, Meta name+language stays), `last_synced_at`. Unique `(tenant_id, name, language, version)`.
@@ -163,7 +169,7 @@ Connection identity + health. `app_id`, `waba_id`, `phone_number_id`, `display_p
 `event_key` (catalog §3), `enabled`, `template_id → whatsapp_templates`, `delay_minutes int default 0`, `send_window ('any'|'business_hours')`, `business_hours jsonb` (`{"start":"08:30","end":"18:00"}`, tenant timezone; weekends from tenant config), `conditions jsonb` (payload matchers, e.g. `{"exclude_manual_override": true}`), `reminder_config jsonb` (for scheduled events: `{"after_days":3,"repeat_max":2,"repeat_every_days":4}`). Unique `(tenant_id, event_key)`. Seeded from the code catalog on first Settings visit; **absent row = disabled** (dispatcher only fires on an existing enabled rule).
 
 ### `whatsapp_messages` — queue + permanent delivery ledger (one table)
-Queue fields: `status ('pending'|'processing'|'sent'|'delivered'|'read'|'failed'|'cancelled'|'skipped')`, `scheduled_for`, `attempt_count`, `next_attempt_at`, `last_error_code int`, `last_error text`, `dedup_key` (unique per tenant, NULLs distinct).
+Queue fields: `status ('pending'|'processing'|'sent'|'delivered'|'read'|'failed'|'cancelled'|'skipped')`, `priority smallint` (1 = staff manual sends, 5 = automation), `scheduled_for`, `attempt_count`, `next_attempt_at`, `last_error_code int`, `last_error text`, `dedup_key` (unique per tenant, NULLs distinct; value = stable business identity `wa:<event_key>:<entity>:<day>` — never the source event's key).
 Payload fields: `event_key`, `notification_event_id`, `template_id`, `template_name`, `template_language`, `rendered_params jsonb` (frozen at send), `body_preview text` (rendered human-readable body for the log/case tab), `message_kind ('template'|'session_text'|'session_media')`.
 Recipient/context: `customer_id`, `to_phone_e164`, `wa_id`, `case_id`, `quote_id`, `invoice_id`, `contact_id → whatsapp_contacts`.
 Delivery: `wamid` (unique, nullable), `sent_at`, `delivered_at`, `read_at`, `failed_at`, `pricing_billable`, `pricing_category`, `pricing_type`, `conversation_id`, `initiated_by uuid` (staff manual sends).
@@ -200,7 +206,7 @@ RPCs (SECURITY DEFINER, locked EXECUTE): `whatsapp_store_credentials`, `whatsapp
 3. **Outbound Graph calls** attach `appsecret_proof = HMAC_SHA256(app_secret, access_token)` — blocks token replay from other IPs if the tenant enables "Require app secret".
 4. **Webhook authentication.** GET handshake: per-tenant verify token (random 32 bytes, generated by us, shown once to paste into Meta). POST: `X-Hub-Signature-256` HMAC-SHA256 over the **raw body bytes** with the tenant's app secret, timing-safe compare, before any parsing; tenant resolved by URL param `?t=<integration public id>` cross-checked against `metadata.phone_number_id`. Signature mismatch ⇒ 401 (logged); unresolvable-but-valid ⇒ 200 + parked (Meta must not retry forever).
 5. **RLS.** Full tenant kit on every table; secret-id columns additionally REVOKEd; `whatsapp_webhook_events` writable only by service role. All policy helper calls `(SELECT ...)`-wrapped per the InitPlan rule.
-6. **Feature + entitlement gates, server-side.** Dispatcher checks `tenant_feature_enabled(tenant_id, 'automation.whatsapp')` (client flags fail open by design); module entitlements can layer on top later.
+6. **Feature + entitlement gates, server-side.** The dispatcher reads `tenants.feature_flags->>'automation.whatsapp'` with **default-FALSE** semantics (an explicit opt-in is required). It deliberately does NOT use `tenant_feature_enabled()`, which fails OPEN on missing keys — correct for legacy default-on features, wrong for a default-off one. Module entitlements can layer on top later.
 7. **Edge-function tiers** follow house conventions exactly: `whatsapp-webhook` public + self-verifying (`verify_jwt=false` in config.toml); `whatsapp-send` service-role-bearer-only; `whatsapp-admin` user-JWT dual-client with role + tenant gates.
 8. **PII discipline.** Message bodies contain case/customer data → same protection class as `case_communications`. `body_preview` is the only rendered copy kept; webhook raw payloads age out (90-day scheduled purge of `whatsapp_webhook_events.payload`, keeping the skeleton row). GDPR erasure cascades (§11).
 
@@ -214,7 +220,9 @@ All emitters are AFTER-triggers calling `emit_notification_event()` with day/hou
 |---|---|---|
 | `trg_emit_case_created` AFTER INSERT ON `cases` | `case.created` | Skips imports; payload: case_number, customer_id, priority, service_type |
 | `trg_emit_device_received` AFTER INSERT ON `case_devices` | `case.device_received` | Same hook point as the custody trigger (proven); payload: device model/serial, case totals |
-| `trg_emit_quote_events` AFTER INSERT OR UPDATE ON `quotes` | `quote.created` / `quote.sent` / `quote.approved` / `quote.rejected` | Status-watch (`IS DISTINCT FROM`); INSERT ⇒ created; `sent_at` stamped DB-side when status→sent (closes the client-side best-effort hole) |
+| `trg_stamp_quote_sent_at` BEFORE INSERT OR UPDATE ON `quotes` | — | Unconditional `sent_at` stamp on status→sent, for EVERY tenant (independent of WhatsApp) |
+| `trg_emit_quote_events` AFTER INSERT OR UPDATE ON `quotes` | `quote.created` / `quote.sent` / `quote.approved` / `quote.rejected` | AFTER (not BEFORE — the dispatcher's in-transaction enqueue references `quotes.id` via FK); status-watch (`IS DISTINCT FROM`); INSERT with status `sent` ⇒ `quote.sent` |
+| `trg_emit_parts_ordered` AFTER INSERT ON `inventory_parts_usage` | `case.parts_ordered` | Case-linked part allocations; one message per case per tenant-local day |
 | `trg_emit_invoice_issued` AFTER INSERT OR UPDATE ON `invoices` | `invoice.issued` | Fires on insert with status `sent` or on draft→sent flip (`issue_tax_document` path) |
 | `trg_emit_recovery_outcome` AFTER UPDATE ON `cases` | `case.recovery_outcome` | `recovery_outcome IS DISTINCT FROM` + value non-null; dedup by (case, outcome) — absorbs the triple-writer problem |
 | `trg_emit_case_checkout` AFTER INSERT ON `case_job_history` | `case.checked_out` | `action='checkout'` rows (fires even when the best-effort phase transitions are blocked) |
@@ -226,11 +234,34 @@ All emitters are AFTER-triggers calling `emit_notification_event()` with day/hou
 
 ## 8. Queue design — pacing, ordering, scale
 
-- **Fairness:** the scanner claims `LIMIT 50` per tick ordered by `(scheduled_for, priority)` but never more than 10 per tenant per tick (window function) — one noisy tenant cannot starve others.
+Message lifecycle (all `whatsapp_messages` transitions and their owners):
+
+```
+                    dispatcher / SendMessageModal
+                                │ insert
+                                ▼
+   ┌─────────── pending ◄──────────────────────────────┐
+   │  scanner/    │  claim (worker, atomic)            │ release: retry-with-backoff
+   │  poke        ▼                                    │ (attempt counted) or infra
+   │          processing ──────────────────────────────┘ hold (attempt refunded);
+   │              │ Graph 200 + wamid                    stuck >5min → scanner resets
+   │              ▼
+   │            sent ──► delivered ──► read        (status webhooks; monotonic)
+   │              │
+   │              └──► failed  (webhook failure, terminal error class,
+   │                            or scanner caps attempt_count ≥ 5)
+   │                     │  staff Retry (failed→pending only, guard-trigger enforced)
+   │                     └──────────────────────────────► pending
+   ├──► skipped   (worker policy gate: consent_missing / opted_out / unreachable /
+   │               us_marketing_paused / no_phone / no_template / unsupported_header)
+   └──► cancelled (staff, pending rows only)
+```
+
+- **Fairness:** the scanner claims `LIMIT 50` per tick ordered by `(priority, scheduled_for)` — manual staff sends (priority 1) outrank automations (priority 5) — but never more than 10 per tenant per tick (window ranking wrapped OUTSIDE the locking subquery; `FOR UPDATE` cannot share a SELECT level with window functions) — one noisy tenant cannot starve others.
 - **Pair pacing:** worker refuses to send if `whatsapp_contacts.last_outbound_at > now() - interval '6 seconds'`; reschedules +10s. Prevents 131056 and preserves per-recipient ordering (a case's messages to one customer serialize naturally).
 - **Ordering:** Meta does not guarantee order; for multi-message moments we send one message. Where sequence matters (rare), the rule engine chains on the `delivered` status of the predecessor (roadmap; Phase 1 has no multi-message sequences).
 - **Throughput math:** 1-min tick × 50 batch = 3,000 msg/hour baseline per project — three orders of magnitude above a large lab's real volume (a 500-case/month lab sends ~2–3k messages/month). Instant path (pg_net poke on enqueue) keeps p50 latency < 2s. Scale levers, in order: batch size ↑, tick to 30s (second cron entry offset), worker accepts message-id arrays, then (only if the platform outgrows Postgres-as-queue) swap the scanner for pgmq/SQS behind the same worker contract — the `whatsapp_messages` row remains the source of truth in every variant.
-- **Backoff:** `next_attempt_at = now() + LEAST(2^attempt * 1 min, 12h)` for retryable codes; attempt cap 5 → `failed` + failure notification. Non-retryable codes fail immediately with a human-readable reason. 131048 (quality pause) additionally pauses the *integration* sends for 1h; 190 marks the integration `token_invalid` and cancels nothing (messages wait as `pending` until reconnection).
+- **Backoff:** `next_attempt_at = now() + LEAST(2^attempt * 1 min, 12h)` for retryable codes, re-shifted into the rule's business-hours window when one applies; attempt cap 5 → `failed` + failure notification (the scanner also sweeps capped rows to `failed` so no pending zombies survive). **Attempts are consumed only by real Graph calls** — infra holds (integration down, quality pause, token dead, pair pacing, marketing suppression) refund the claim's increment. Non-retryable codes fail immediately with a human-readable reason. 131048 (quality pause) additionally pauses the *integration* sends for 1h; 190 marks the integration `token_invalid` and cancels nothing (messages wait as `pending` until reconnection).
 - **At-most-once send:** claim-before-send conditional UPDATE (house pattern); a crashed worker leaves `processing` rows that the sweeper returns to `pending` after 5 min (send may have succeeded → the wamid-less retry is accepted; template duplicates are tolerable and rare — documented trade-off, same as SMTP path).
 
 ## 9. Webhook flow
@@ -264,7 +295,7 @@ Meta retries failed deliveries with backoff for ~7 days, then the event is gone 
 - **Failure notifications:** terminal failures emit `whatsapp.message_failed` into `notification_events` → staff in-app/email via the existing stack; integration-level states surface as a persistent Settings banner + dashboard chip.
 - **Health:** weekly + on-demand health check (`debug_token`, `health_status`, `subscribed_apps`) persisted on the integration row; `last_webhook_at` staleness (>48h with sends outstanding) raises a "webhook silent" warning — the known silent-death mode (e.g. tenant edited their app, mTLS CA change).
 - **Ops surfaces:** Message Log page (filter by status/error), integration health card, DLQ semantics: `whatsapp_messages` IS the DLQ (`failed` rows retryable by staff, mirroring `notificationDLQService.retryEvent`); platform-admin cross-tenant view rides the existing NotificationDLQ console pattern.
-- **Metrics to watch (rollout):** send success rate, delivery rate, p50 enqueue→sent, failure code distribution, webhook lag (`last_webhook_at`), per-tenant volume vs messaging tier.
+- **Metrics to watch (rollout):** send success rate, delivery rate, p50 enqueue→sent, failure code distribution, webhook lag (`last_webhook_at`), per-tenant volume vs messaging tier, and **queue age** — `max(now() - scheduled_for)` over due `pending` rows. Queue age > 10 min means the sweep itself is dead (pg_cron stopped, scanner erroring): this is the single alarm that catches a silently stalled scheduler, checked via `cron.job_run_details` staleness for the `process-whatsapp-messages` job.
 
 ## 11. Consent, compliance, GDPR
 
@@ -276,7 +307,8 @@ Meta retries failed deliveries with backoff for ~7 days, then the event is gone 
 
 ## 12. Template engine & UX
 
-- **Authoring:** Template Studio tab — name (auto-slugged), language(s), category with plain-language guidance ("promotional wording in a UTILITY template gets recategorized by Meta"), body editor with variable chips (named params bound to `master_template_variables` context keys), optional header (text or tenant-logo image), footer, buttons (quick reply / URL with dynamic suffix / phone). Live WhatsApp-style preview (chat bubble, sample context) — reusing `templateEngine` + sample payloads. Submit → `whatsapp-admin` → Meta; status chip tracks PENDING→APPROVED via webhook.
+- **Authoring:** Template Studio tab — name (auto-slugged), language(s), category with plain-language guidance ("promotional wording in a UTILITY template gets recategorized by Meta"), body editor with variable chips (named params bound to `master_template_variables` context keys), optional header (text or tenant-logo image via `company_settings.branding.logo_url`), footer, buttons (quick reply / URL with dynamic suffix / phone; MARKETING templates get a default Unsubscribe quick-reply). Live WhatsApp-style preview (chat bubble, sample context) — reusing `templateEngine` + sample payloads. Submit → `whatsapp-admin` → Meta; status chip tracks PENDING→APPROVED via webhook.
+- **Variable vocabulary (chips = worker context, kept in lockstep):** the house catalog (`company.*`, `customer.*`, `case.*`, `quote.*` incl. `quote.expiry_date`, `invoice.*`) plus the WhatsApp additions `device.summary`, `device.count`, `case.recovery_outcome`, `case.engineer`, `case.tracking_link` (portal URL), `case.collection_date` (scheduled pickup follow-up), `branch.name`, `invoice.balance_due`, and `customer.custom.<key>` passthrough from `customers_enhanced.metadata`. Money/dates are formatted with the tenant's denormalized currency/locale config (never hardcoded symbols or decimals).
 - **Versioning:** editing an APPROVED template creates version n+1 (Meta edit limits: 10/30d, 1/24h — surfaced in UI); prior row `superseded_by`-linked; automation rules always point at the template family head.
 - **Languages:** one template row per language; the send-time resolver walks customer `preferred_language` → tenant default → `en`, using only APPROVED rows; per-event fallback template (`is_fallback`) guarantees delivery when a language is missing (no Meta-side fallback exists).
 - **Starter pack:** seeded DRAFT templates for all §3 utility events (EN + tenant secondary language), professionally written with emoji + placeholders, one click to submit — the "beautiful by default" requirement.
@@ -292,7 +324,7 @@ All surfaces follow DESIGN.md tokens (no new tokens), lucide icons, `StatCard`/`
 2. **Case Detail → Communications tab:** WhatsApp thread (outbound bubbles with ✓/✓✓/✓✓-blue ticks from statuses, inbound bubbles, failures with reason + retry), Send-template action (window-aware: free-form reply enabled only while the 24h window is open, with countdown).
 3. **Customer Profile:** WhatsApp panel — `whatsapp_number` capture (E.164-normalized `PhoneInput`), consent state + history, opt-out button.
 4. **CreateCaseWizard:** consent checkbox block at intake (§11).
-5. **Analytics → Message Analytics** (route `/analytics/messages` or dashboard tab): KpiRow (sent, delivered %, read %, replied %, failed, est. cost), Recharts time-series (volume by status), failure-code bar, per-event success table, date-range preset filter (tenant-timezone `tenantToday` pattern), CSV export.
+5. **Analytics → Message Analytics** (route `/analytics/messages` or dashboard tab): KpiRow (sent, delivered %, read %, replied %, avg response time, failed, billable messages — precise cost estimation needs Meta's per-market rate card and is a roadmap item), Recharts time-series (volume by status), failure-code bar, per-event success table, date-range preset filter (tenant-timezone `tenantToday` pattern), CSV export. All aggregates computed server-side (`whatsapp_analytics_summary` RPC) — raw-row selects truncate at PostgREST's 1,000-row cap.
 6. **Message Log** (within settings module or analytics page): virtualized table, filters, per-row detail drawer (params, timeline, error, raw status trail), retry action.
 
 ## 14. Testing strategy
@@ -318,6 +350,7 @@ Rollback: edge functions are independently re-deployable; migrations are additiv
 - **Webhook outage:** Meta retries ~7 days; ledger-insert-before-processing means a receiver bug loses nothing already ACKed; recovery = fix, clear `processed_at`, reprocess. For gaps beyond 7 days, a reconciliation job re-pulls message statuses (`GET` per wamid is not available — statuses are webhook-only; document that delivery data older than the gap is best-effort; sends themselves are never lost, only receipt granularity).
 - **Vault:** secret loss = tenants re-paste credentials (recoverable by design); Vault key management is Supabase-side; the offline-escrow note from the C2 design applies if self-hosting ever happens.
 - **Meta-side outage (131016/131057):** queue backs off and drains on recovery — no action needed; status page link surfaced in Settings banner.
+- **Scheduler failure (pg_cron down / scanner erroring):** pokes still deliver instant sends, but delayed/retry messages stall silently — detected by the queue-age alarm (§10) and `cron.job_run_details` staleness; recovery = re-run the idempotent cron-schedule block from the Task 2 migration.
 - **Token mass-invalidation** (tenant security event at Meta): integration flips `token_invalid`, queue holds `pending` (no data loss), admin walked through re-connect.
 
 ## 17. Future roadmap
@@ -331,3 +364,7 @@ Rollback: edge functions are independently re-deployable; migrations are additiv
 7. **WhatsApp Flows** for structured intake (address capture for device return shipping).
 8. **Warranty entity** + warranty-reminder automation; appointment entity + reminders.
 9. **EU Local Storage** request path for EU tenants (via Meta setting) + regional analytics.
+10. **Customer-timezone send windows** — v1 windows use the tenant timezone (lab customers are overwhelmingly local, and no per-customer timezone exists in the platform); the roadmap derives a recipient timezone from the phone's E.164 country prefix via `geo_countries` and stores it on `whatsapp_contacts`.
+11. **Per-outcome recovery templates** — rule-level template overrides keyed on `recovery_outcome` (distinct copy for full/partial/unrecoverable/declined) replacing the v1 outcome-neutral template.
+12. **Tenant-defined custom automation events** — a rule builder over arbitrary `notification_events` keys (v1 ships the fixed 22-event catalog + custom follow-up presets + manual sends).
+13. **Precise cost analytics** — per-market rate-card ingestion (Meta CSV) turning the billable-messages KPI into currency amounts, plus `pricing_analytics` API sync.
