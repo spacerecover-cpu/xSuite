@@ -36,6 +36,7 @@ import type {
 } from '../../templateConfig';
 import { BUILT_IN_TEMPLATE_CONFIGS } from '../../templateConfig';
 import { formatDate, safeString } from '../../utils';
+import { missingValue } from './missingValue';
 import type { TranslationContext } from '../../types';
 import type {
   CustodyLogBlock,
@@ -560,13 +561,23 @@ function buildReportSummary(data: ReportData, ctx: TranslationContext): ReportSu
 }
 
 /** The two-column General | Device info region. */
-function buildReportInfoColumns(data: ReportData, ctx: TranslationContext): ReportInfoColumnsBlock {
+function buildReportInfoColumns(
+  data: ReportData,
+  config: DocumentTemplateConfig,
+  ctx: TranslationContext,
+): ReportInfoColumnsBlock {
   const { caseData, customerData, deviceData, report, preparedByName } = data;
 
-  const customerName = customerData?.customer_name || caseData?.customer_name || 'N/A';
+  // TBL-10: these are row VALUES, not labels — they never pass through the
+  // bilingual join, so a Latin 'N/A' would print inside an Arabic field block.
+  // `ctx` is deliberately NOT used for this: `ctx.t` CONCATENATES ("N/A | …")
+  // rather than replacing, which would leave the Latin abbreviation on the page.
+  // English-only documents keep 'N/A' byte-for-byte.
+  const na = missingValue(config.language);
+  const customerName = customerData?.customer_name || caseData?.customer_name || na;
   const companyNameValue = customerData?.company_name || caseData?.company_name || caseData?.customer_company;
-  const customerEmail = customerData?.email || caseData?.customer_email || 'N/A';
-  const customerPhone = customerData?.mobile_number || caseData?.customer_phone || 'N/A';
+  const customerEmail = customerData?.email || caseData?.customer_email || na;
+  const customerPhone = customerData?.mobile_number || caseData?.customer_phone || na;
 
   const generalRows: ReportInfoColumnsBlock['general']['rows'] = [
     { label: lt(ctx.t('name', 'Name')), value: safeString(customerName) },
@@ -577,7 +588,7 @@ function buildReportInfoColumns(data: ReportData, ctx: TranslationContext): Repo
     { label: lt(ctx.t('service', 'Service')), value: safeString(caseData?.service_type) },
     { label: lt(ctx.t('priority', 'Priority')), value: caseData?.priority ? humanize(safeString(caseData.priority)) : '-' },
     { label: lt(ctx.t('date', 'Date')), value: formatDate(report.created_at, 'dd MMM yyyy') },
-    { label: lt(ctx.t('technician', 'Technician')), value: preparedByName || caseData?.assigned_engineer || 'N/A' },
+    { label: lt(ctx.t('technician', 'Technician')), value: preparedByName || caseData?.assigned_engineer || na },
   ];
 
   const general = { title: lt(ctx.t('generalDetails', 'General Details')), rows: generalRows };
@@ -702,7 +713,7 @@ export function toEngineData(
     docRef,
     reportHeader: buildReportHeader(data, ctx),
     reportSummary: buildReportSummary(data, ctx),
-    reportInfoColumns: buildReportInfoColumns(data, ctx),
+    reportInfoColumns: buildReportInfoColumns(data, config, ctx),
     reportSections: buildReportSections(data, ctx),
     reportFooter: buildReportFooter(data, ctx),
     ...(custodyLog ? { custodyLog } : {}),

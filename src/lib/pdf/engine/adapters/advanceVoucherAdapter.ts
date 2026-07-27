@@ -2,6 +2,7 @@ import type { DocumentTemplateConfig } from '../../templateConfig';
 import type { CompanySettingsData } from '../../types';
 import { formatEngineMoney, safeString } from '../../utils';
 import { fmtDateWithConfig } from '../../configDate';
+import { missingValue } from './missingValue';
 import type { EngineDocData, LabelText, PartyBlock } from '../types';
 
 export interface AdvanceVoucherDocumentData {
@@ -43,7 +44,7 @@ export function toAdvanceVoucherEngineData(
 
   const to: PartyBlock = {
     title: { en: 'Customer Information', ar: 'معلومات العميل' },
-    name: v.customer_name ?? v.company_name ?? 'N/A',
+    name: v.customer_name ?? v.company_name ?? missingValue(config.language),
     rows: [],
   };
 

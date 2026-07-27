@@ -20,7 +20,7 @@ import { getGeneralIconSvg } from '../../../deviceIconMapper';
 import type { CompanySettingsData } from '../../types';
 import type { EngineContext, EngineDocData, SectionRenderer } from '../types';
 import { resolveColors, resolveFooter, resolvePresentation } from '../branding';
-import { contentWidth, footerContentWidth } from '../pageGeometry';
+import { contentWidth, footerBlockMargin, footerContentWidth } from '../pageGeometry';
 import { qrContentNode } from './qr';
 
 /**
@@ -146,11 +146,16 @@ export const renderFooter: SectionRenderer = (
  * Returns `null` when there is nothing to show (no tagline, no website/socials,
  * no QR) so generic documents without those sections get no page footer.
  *
- * Layout parity with the legacy builder:
+ * Layout:
  * - With a QR: a divider rule, then a row of [QR + caption | spacer | tagline +
- *   website right-aligned], with page-edge margins `[35, 0, 35, 25]`.
+ *   website right-aligned], with page-edge margins `[inset, 0, inset, 25]`.
  * - Without a QR: a divider rule, then a centered tagline + website stack,
- *   margins `[35, 10, 35, 25]`.
+ *   margins `[inset, 10, inset, 25]`.
+ *
+ * The side inset comes from {@link footerBlockMargin}, which derives it from the
+ * configured paper margins (RND-03) — it used to be a flat 35pt that ignored
+ * `config.paper.margins` entirely, so a 20pt or 60pt template got a footer
+ * detached from its text column. The default margins still resolve to 35.
  */
 export function buildPageFooter(
   engine: EngineContext,
@@ -172,6 +177,11 @@ export function buildPageFooter(
     (!!online.website || !!online.facebook || !!online.twitter || !!online.linkedin || !!online.instagram);
   const hasQr = !!qr || !!zatca || !!data.qrPayload;
   if (!tagline && !hasSocial && !hasQr && !fcfg?.customText) return null;
+
+  // Side inset + rule width both come from the page geometry, so the divider can
+  // never be wider or narrower than the block it is drawn in.
+  const qrBlockMargin = footerBlockMargin(engine.config.paper, 0, 25);
+  const textBlockMargin = footerBlockMargin(engine.config.paper, 10, 25);
 
   const premium = resolvePresentation(engine.config).footerSocialIcons;
   const dividerLine: Content = {
@@ -211,10 +221,10 @@ export function buildPageFooter(
               ],
             },
           ],
-          margin: [35, 0, 35, 25],
+          margin: qrBlockMargin,
         };
       }
-      return { stack: [dividerLine, { stack: lines }], margin: [35, 10, 35, 25] };
+      return { stack: [dividerLine, { stack: lines }], margin: textBlockMargin };
     }
 
     // Premium finish: accent tagline + website + social glyph row, centered
@@ -242,11 +252,11 @@ export function buildPageFooter(
               ],
             },
           ],
-          margin: [35, 0, 35, 25],
+          margin: qrBlockMargin,
         };
       }
       if (premiumStack) {
-        return { stack: [dividerLine, premiumStack], margin: [35, 10, 35, 25] };
+        return { stack: [dividerLine, premiumStack], margin: textBlockMargin };
       }
     }
 
@@ -292,7 +302,7 @@ export function buildPageFooter(
             ],
           },
         ],
-        margin: [35, 0, 35, 25],
+        margin: qrBlockMargin,
       };
     }
 
@@ -306,7 +316,7 @@ export function buildPageFooter(
 
     return {
       stack: [dividerLine, { stack: footerLines }],
-      margin: [35, 10, 35, 25],
+      margin: textBlockMargin,
     };
   };
 }

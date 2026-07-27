@@ -60,10 +60,14 @@ describe('derived widths', () => {
     expect(contentWidth(paper({ orientation: 'landscape', margins: [30, 35, 30, 35] }))).toBe(772);
   });
 
-  it('footerContentWidth uses the footer inset, not the page margins', () => {
-    // Independent of the configured margins — the footer block sets its own 35pt.
-    expect(footerContentWidth(paper({ margins: [30, 120, 30, 120] }))).toBe(525);
+  it('footerContentWidth uses the footer inset derived from the page margins', () => {
+    // The footer block sits FOOTER_OUTDENT (5pt) outside the text column, so the
+    // built-in 40pt margins reproduce the legacy 35pt inset — 595.28 - 70 = 525.
+    // (RND-03 made the inset track the margins; it used to be a flat 35pt that
+    // ignored them entirely.)
+    expect(footerContentWidth(paper({ margins: [30, 40, 30, 40] }))).toBe(525);
     expect(footerContentWidth(paper({ size: 'Letter' }))).toBe(542);
+    expect(footerContentWidth(paper({ margins: [30, 120, 30, 120] }))).toBe(365);
   });
 });
 

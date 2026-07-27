@@ -19,7 +19,7 @@ import type { Content, DynamicContent } from 'pdfmake/interfaces';
 import { PDF_COLORS } from '../../styles';
 import type { EngineContext, EngineDocData, ReportFooterBlock, SectionRenderer } from '../types';
 import { resolveLabel } from '../labels';
-import { contentWidth, footerContentWidth } from '../pageGeometry';
+import { contentWidth, footerBlockMargin, footerContentWidth } from '../pageGeometry';
 
 /** Build the stacked footer lines (divider + confidentiality + copyright + report id). */
 function footerLines(
@@ -83,5 +83,8 @@ export function buildReportPageFooter(
   const block = data.reportFooter;
   if (!block) return null;
   const lines = footerLines(block, engine.config.language, footerContentWidth(engine.config.paper));
-  return (): Content => ({ stack: lines, margin: [35, 6, 35, 22] });
+  // Side inset derived from the configured paper margins (RND-03); the default
+  // margins still resolve to the legacy 35pt.
+  const margin = footerBlockMargin(engine.config.paper, 6, 22);
+  return (): Content => ({ stack: lines, margin });
 }

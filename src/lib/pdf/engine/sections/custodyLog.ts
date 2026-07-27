@@ -36,6 +36,7 @@ import type {
 } from '../types';
 import { isBilingualMode, en, ar, resolveLabel } from '../labels';
 import { engineLayoutDirection, mirrorColumns } from '../rtl';
+import { cellSoftWrapper, normalizeColumnWidths, tableContentWidth } from './lineItemTable';
 
 /**
  * Action-category fill colours, mirroring the legacy `categoryColors` map in
@@ -143,21 +144,36 @@ export const renderCustodyLog: SectionRenderer = (
 
   const body: TableCell[][] = [headerRow];
 
-  log.rows.forEach((row, index) => {
+  // Long unbroken tokens get soft break opportunities so they wrap inside their
+  // column instead of overlapping the neighbour — except the copy-exact
+  // identifier columns (see COPY_EXACT_COLUMN_KEYS in lineItemTable).
+  const wrap = cellSoftWrapper(engine);
+
+  // NO ROW CAP HERE — deliberately, and unlike every other data table.
+  // Completeness IS this document: the legal-notice box above asserts that the
+  // ledger is whole and immutable, and a chain-of-custody report is produced for
+  // legal/insurance purposes. Dropping ledger rows would contradict the notice
+  // printed beside them, and CLAUDE.md treats `chain_of_custody` as append-only
+  // forensic evidence. The preview row cap (TBL-08) exists to protect the 15s
+  // preview timeout on unbounded collections; for this table a slow preview is
+  // the acceptable failure and an incomplete record is not.
+  const dataRows = log.rows;
+
+  dataRows.forEach((row, index) => {
     // Zebra striping matches the legacy entries table (white / subtle bg).
     const bgColor = index % 2 === 0 ? PDF_COLORS.white : PDF_COLORS.background;
     body.push(
       columns.map((col): TableCell => {
         const raw = row[col.key];
-        const text = raw === undefined || raw === null ? '' : String(raw);
+        const value = raw === undefined || raw === null ? '' : String(raw);
         const align = col.align ?? 'left';
         if (col.key === 'actionCategory') {
           // Badge cell carries its own fill; still sit it on the zebra row bg.
-          return { ...(categoryBadgeCell(text, align) as object), fillColor: bgColor } as TableCell;
+          return { ...(categoryBadgeCell(value, align) as object), fillColor: bgColor } as TableCell;
         }
         const style =
           align === 'right' ? 'tableCellRight' : align === 'center' ? 'tableCellCenter' : 'tableCell';
-        return { text, style, fillColor: bgColor };
+        return { text: wrap(col.key, value), style, fillColor: bgColor };
       }),
     );
   });
@@ -198,7 +214,14 @@ export const renderCustodyLog: SectionRenderer = (
 
   stack.push(heading);
   stack.push({
-    table: { headerRows: 1, dontBreakRows: true, widths, body },
+    table: {
+      headerRows: 1,
+      dontBreakRows: true,
+      // Tenant-configured fixed widths are normalized against the real printable
+      // width so a wide column set cannot overflow (TBL-07).
+      widths: normalizeColumnWidths(widths, tableContentWidth(engine), 8),
+      body,
+    },
     layout: {
       hLineWidth: (i: number) => (i <= 1 ? 1 : 0.5),
       vLineWidth: () => 0.5,

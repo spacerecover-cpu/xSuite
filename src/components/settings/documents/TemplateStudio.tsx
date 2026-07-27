@@ -6,6 +6,7 @@ import {
   LayoutGrid,
   LayoutPanelTop,
   Loader2,
+  Printer,
   RotateCcw,
   Save,
   Settings2,
@@ -58,6 +59,11 @@ import { fetchCompanySettings } from '../../../lib/pdf/dataFetcher';
 import type { CompanySettingsData } from '../../../lib/pdf/types';
 import { reportConfigForSubtype } from '../../../lib/pdf/engine/adapters/reportAdapter';
 import { REPORT_TYPES } from '../../../lib/reportTypes';
+import {
+  describePreviewFailure,
+  previewDownloadFilename,
+  type PreviewFailure,
+} from './previewStudioHelpers';
 import { GeneralTab } from './tabs/GeneralTab';
 import { HeaderFooterTab } from './tabs/HeaderFooterTab';
 import { TransactionTab } from './tabs/TransactionTab';
@@ -192,8 +198,9 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   // one the exact way generation resolves it (subtype base + this override).
   const [previewSubtype, setPreviewSubtype] = useState<string>(reportSubtype ?? 'evaluation');
   const showSubtypePicker = docType === 'report' && !reportSubtype;
-  const recordPreviewSupported =
-    docType === 'invoice' || docType === 'quote' || docType === 'payment_receipt';
+  // "Print view": drop the stand-in logo box so the preview predicts the printed
+  // layout exactly. Only meaningful while a placeholder is actually in play.
+  const [printView, setPrintView] = useState(false);
 
   const heading = titleLabel ?? DOC_TYPE_LABELS[docType];
 
@@ -214,7 +221,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   // ---- Live preview (debounced, real pdfmake artifact) --------------------
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(true);
-  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewFailure, setPreviewFailure] = useState<PreviewFailure | null>(null);
   const [tenantLogo, setTenantLogo] = useState<BrandingImage | null>(null);
   const [tenantStamp, setTenantStamp] = useState<BrandingImage | null>(null);
   const [tenantSignature, setTenantSignature] = useState<BrandingImage | null>(null);
@@ -222,16 +229,26 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
   const lastUrlRef = useRef<string | null>(null);
 
+  // A logo stand-in is only ever drawn when the tenant has none — that is the
+  // only case where "Print view" changes anything, so the toggle stays hidden
+  // otherwise rather than offering a no-op.
+  const logoIsPlaceholder = tenantLogo !== null && tenantLogo.kind === 'none';
+
   useEffect(() => {
     let cancelled = false;
     setPreviewLoading(true);
-    setPreviewError(null);
+    setPreviewFailure(null);
     const timer = setTimeout(async () => {
       try {
         const { preloadAllFonts } = await import('../../../lib/pdf/fonts');
         await preloadAllFonts();
         let url: string;
         let warnings: string[] = [];
+        // ONE branding resolution for both data sources: the tenant logo/stamp/
+        // signature resolved once above feed the sample path and the record path
+        // alike, so flipping the picker changes only the DATA. `logoPlaceholder`
+        // travels with them so the stand-in treatment matches too.
+        const logoPlaceholder = !printView;
         if (dataSource === 'sample') {
           const { previewTemplate } = await import('../../../lib/pdf/engine/previewTemplate');
           // Pass the tenant's real company settings so the sample preview shows the
@@ -246,11 +263,19 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
             tenantSignature,
             companySettings ?? undefined,
             languageExplicit,
-            docType === 'report' ? { reportSubtype: previewSubtype } : undefined,
+            {
+              ...(docType === 'report' ? { reportSubtype: previewSubtype } : {}),
+              logoPlaceholder,
+            },
           ));
         } else {
           const { previewDocumentForRecord } = await import('../../../lib/pdf/previewRecord');
-          ({ url, warnings } = await previewDocumentForRecord(docType, dataSource, resolved, languageExplicit));
+          ({ url, warnings } = await previewDocumentForRecord(docType, dataSource, resolved, languageExplicit, {
+            logo: tenantLogo,
+            stamp: tenantStamp,
+            signature: tenantSignature,
+            logoPlaceholder,
+          }));
         }
         if (cancelled) {
           URL.revokeObjectURL(url);
@@ -263,7 +288,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       } catch (err) {
         if (cancelled) return;
         logger.error('[TemplateStudio] preview failed:', err);
-        setPreviewError('Could not render the preview. Try adjusting a setting.');
+        setPreviewFailure(describePreviewFailure(err));
       } finally {
         if (!cancelled) setPreviewLoading(false);
       }
@@ -272,15 +297,16 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [resolved, languageExplicit, dataSource, docType, previewSubtype, tenantLogo, tenantStamp, tenantSignature, companySettings]);
+  }, [resolved, languageExplicit, dataSource, docType, previewSubtype, tenantLogo, tenantStamp, tenantSignature, companySettings, printView]);
 
   useEffect(() => () => {
     if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
   }, []);
 
-  // Resolve the real tenant logo, stamp, and signature once so the sample
-  // preview can draw them (and so a missing/broken logo surfaces a non-blocking
-  // warning chip).
+  // Resolve the real tenant logo, stamp, and signature ONCE. This is the single
+  // branding-resolution step: both preview data sources consume this state, so
+  // the sample and record previews can never disagree about the letterhead, and
+  // the record path no longer re-fetches the same three images per render.
   useEffect(() => {
     let cancelled = false;
     fetchCompanySettings()
@@ -301,13 +327,14 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
     return () => { cancelled = true; };
   }, []);
 
-  // Load recent records for the data-source picker (financial doc types only).
+  // Load recent records for the data-source picker. `listPreviewRecords` is the
+  // single authority on which doc types have real records — it returns [] for
+  // the ones that do not, and the picker hides itself when the list is empty.
+  // (The old hardcoded invoice/quote/receipt gate is gone: reports, checkout
+  // forms, custody logs, payslips, credit notes and case labels are supported.)
   useEffect(() => {
-    if (!recordPreviewSupported) {
-      setRecords([]);
-      return;
-    }
     let cancelled = false;
+    setDataSource('sample');
     import('../../../lib/pdf/previewRecord')
       .then(({ listPreviewRecords }) => listPreviewRecords(docType))
       .then((r) => {
@@ -319,7 +346,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [docType, recordPreviewSupported]);
+  }, [docType]);
 
   // ---- Mutators -----------------------------------------------------------
   const api: StudioApi = useMemo(() => {
@@ -676,9 +703,10 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
                 {previewUrl && (
                   <a
                     href={previewUrl}
-                    download={`${heading}${
-                      dataSource !== 'sample' ? `-${records.find((r) => r.id === dataSource)?.label ?? ''}` : ''
-                    }.pdf`.replace(/[^\w.\-]+/g, '-')}
+                    download={previewDownloadFilename(
+                      heading,
+                      dataSource !== 'sample' ? records.find((r) => r.id === dataSource)?.label : null,
+                    )}
                     title="Download the rendered PDF"
                     aria-label="Download the rendered PDF"
                     className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -701,7 +729,24 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
                     ))}
                   </select>
                 )}
-                {recordPreviewSupported && records.length > 0 && (
+                {logoIsPlaceholder && (
+                  <button
+                    type="button"
+                    onClick={() => setPrintView((v) => !v)}
+                    aria-pressed={printView}
+                    title="Hide the placeholder logo box and lay the header out exactly as the printed document will"
+                    className={[
+                      'inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      printView
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+                    ].join(' ')}
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                    Print view
+                  </button>
+                )}
+                {records.length > 0 && (
                   <select
                     aria-label="Preview data source"
                     value={dataSource}
@@ -737,9 +782,19 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
               </div>
             )}
             <div className="relative h-[calc(100vh-12rem)] min-h-[480px] bg-slate-200">
-              {previewError ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
-                  <p className="text-sm text-danger">{previewError}</p>
+              {previewFailure ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+                  <p className="max-w-md text-sm text-danger">{previewFailure.message}</p>
+                  {previewFailure.detail && (
+                    <details className="max-w-md text-left">
+                      <summary className="cursor-pointer text-xs font-medium text-slate-600 hover:text-slate-900">
+                        Technical details
+                      </summary>
+                      <p className="mt-1.5 break-words rounded-md bg-slate-100 px-2 py-1.5 font-mono text-xs text-slate-700">
+                        {previewFailure.detail}
+                      </p>
+                    </details>
+                  )}
                 </div>
               ) : previewUrl ? (
                 // PDF open-parameters strip the native viewer's toolbar + thumbnail
@@ -758,7 +813,8 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
             </div>
           </Card>
           <p className="mt-2 text-xs text-slate-500">
-            Preview uses sample data. PDFs stay neutral unless you opt colors in.
+            {dataSource === 'sample' ? 'Preview uses sample data.' : 'Preview uses a real record.'} PDFs stay neutral
+            unless you opt colors in.
           </p>
         </div>
       </div>

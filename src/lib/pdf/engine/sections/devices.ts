@@ -39,6 +39,13 @@ import { isBilingualMode, en, ar, resolveLabel } from '../labels';
 import { resolveSectionFill, resolvePresentation } from '../branding';
 import { readableTextOn } from '../palette';
 import { engineLayoutDirection, mirrorColumns } from '../rtl';
+import {
+  capRows,
+  cellSoftWrapper,
+  continuationRow,
+  normalizeColumnWidths,
+  tableContentWidth,
+} from './lineItemTable';
 
 /** Build the coloured role-badge cell used for the `role` column. */
 function roleBadgeCell(rawRole: string, align: 'left' | 'center' | 'right'): TableCell {
@@ -136,29 +143,41 @@ export const renderDevices: SectionRenderer = (
 
   const body: TableCell[][] = [headerRow];
 
-  for (const row of dev.rows) {
+  // Long unbroken tokens get soft break opportunities so they wrap inside their
+  // column instead of overlapping the neighbouring cell (TBL-09). The `serial`
+  // column is EXCLUDED (COPY_EXACT_COLUMN_KEYS): it is the identifier that ties
+  // this physical device to its custody chain, and a copied serial carrying an
+  // invisible U+200B no longer matches `case_devices.serial_number`. Badge/icon
+  // lookups keep the RAW value either way.
+  const wrap = cellSoftWrapper(engine);
+  // PREVIEW-ONLY row cap so a pathological device array cannot trip the 15s
+  // preview timeout; generation passes no cap and renders every device, so a
+  // multi-device job can never collapse to a partial list.
+  const { visible: dataRows, total, truncated } = capRows(dev.rows, engine);
+
+  for (const row of dataRows) {
     body.push(
       columns.map((col): TableCell => {
         const raw = row[col.key];
-        const text = raw === undefined || raw === null ? '' : String(raw);
+        const value = raw === undefined || raw === null ? '' : String(raw);
         const align = col.align ?? 'left';
         if (col.key === 'role') {
-          return roleBadgeCell(text, align);
+          return roleBadgeCell(value, align);
         }
         const style =
           align === 'right' ? 'tableCellRight' : align === 'center' ? 'tableCellCenter' : 'tableCell';
         // Premium: draw the device-type icon beside the type cell (reference look).
-        if (col.key === 'type' && presentation.deviceIcons && text && text !== '-') {
+        if (col.key === 'type' && presentation.deviceIcons && value && value !== '-') {
           return {
             columns: [
-              { svg: getDeviceIconSvg(text), width: 11, height: 11, margin: [0, 0.5, 0, 0] },
-              { text, style },
+              { svg: getDeviceIconSvg(value), width: 11, height: 11, margin: [0, 0.5, 0, 0] },
+              { text: wrap(col.key, value), style },
             ],
             columnGap: 5,
             margin: [2, 3, 2, 3],
           } as TableCell;
         }
-        return { text, style };
+        return { text: wrap(col.key, value), style };
       }),
     );
   }
@@ -166,6 +185,8 @@ export const renderDevices: SectionRenderer = (
   // Column widths: explicit point widths where given, else star-sized so the
   // table fits the printable width regardless of how many columns are visible.
   const widths = columns.map((col) => (col.width !== undefined ? col.width : '*'));
+
+  if (truncated) body.push(continuationRow(dataRows.length, total, widths.length, language));
 
   // The light finish separates the header with a slightly stronger rule and
   // pads cells more generously; the legacy grid is unchanged otherwise.
@@ -192,7 +213,14 @@ export const renderDevices: SectionRenderer = (
     stack: [
       heading,
       {
-        table: { headerRows: 1, dontBreakRows: true, widths, body },
+        table: {
+          headerRows: 1,
+          dontBreakRows: true,
+          // Tenant-configured fixed widths are normalized against the real
+          // printable width so a wide column set cannot overflow (TBL-07).
+          widths: normalizeColumnWidths(widths, tableContentWidth(engine), light ? 12 : 8),
+          body,
+        },
         layout,
         margin: [0, 0, 0, 8],
       },

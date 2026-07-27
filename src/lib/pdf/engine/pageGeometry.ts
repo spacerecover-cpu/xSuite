@@ -13,23 +13,67 @@
  * renderers — sections importing back from `renderTemplate` would be circular.
  */
 
-import type { DocumentTemplateConfig } from '../templateConfig';
+import type { DocumentTemplateConfig, PaperConfig } from '../templateConfig';
 
-/** Point dimensions of the predefined sheets, portrait. */
-export const SHEET_POINTS: Record<'A4' | 'LETTER', [number, number]> = {
+/**
+ * Point dimensions of pdfmake's predefined sheets, portrait. Keyed by the name
+ * pdfmake itself uses (`LETTER`/`LEGAL` uppercase, the ISO A sizes as-is), and
+ * copied from pdfmake's own `standardPageSizes` table so the clamp and the
+ * derived rule widths agree with the box pdfmake actually lays out.
+ */
+export const SHEET_POINTS: Record<'A3' | 'A4' | 'A5' | 'LEGAL' | 'LETTER', [number, number]> = {
+  A3: [841.89, 1190.55],
   A4: [595.28, 841.89],
+  A5: [419.53, 595.28],
+  LEGAL: [612, 1008],
   LETTER: [612, 792],
+};
+
+/**
+ * Config `paper.size` → the pdfmake predefined sheet name (which doubles as the
+ * {@link SHEET_POINTS} key). The one place the two vocabularies are bridged —
+ * `renderTemplate` reads it for `pageSize`, this module for the page box, so a
+ * new sheet cannot be added to one and forgotten in the other.
+ */
+export const PREDEFINED_SHEET: Record<
+  Exclude<PaperConfig['size'], 'custom'>,
+  keyof typeof SHEET_POINTS
+> = {
+  A3: 'A3',
+  A4: 'A4',
+  A5: 'A5',
+  Legal: 'LEGAL',
+  Letter: 'LETTER',
 };
 
 /** Minimum printable content box we refuse to shrink below (1 inch each way). */
 export const MIN_CONTENT_POINTS = 72;
 
 /**
- * The inset the page footer blocks apply on each side (`margin: [35, …, 35, …]`
- * in `sections/footer.ts` / `reportFooter.ts`). Exported so the divider width
- * inside those blocks is derived from the same number rather than re-guessed.
+ * The inset the page-footer blocks applied on each side before RND-03
+ * (`margin: [35, …, 35, …]` in `sections/footer.ts` / `reportFooter.ts`).
+ * Retained as the calibration point for {@link FOOTER_OUTDENT}, not as a
+ * hardcoded geometry constant.
  */
 export const FOOTER_SIDE_INSET = 35;
+
+/** The engine's built-in A4 side margin, which the 35pt inset was paired with. */
+const LEGACY_PAGE_SIDE_MARGIN = 40;
+
+/**
+ * How far OUTSIDE the body text column the page-footer block sits, in points.
+ *
+ * The page footer used to inset a flat 35pt while the engine's page margins
+ * default to 40 — a 5pt outdent that no config could influence, so a 20pt or
+ * 60pt template got a footer visibly detached from its text column (RND-03), and
+ * the case-label sheet (16pt margins) was out by 19pt.
+ *
+ * The inset now TRACKS the configured margins while preserving that 5pt
+ * relationship, rather than re-aligning flush. That keeps the default template
+ * byte-identical (40 − 5 = 35, divider 525) instead of silently nudging the
+ * footer of every document already in the field by 5pt.
+ */
+export const FOOTER_OUTDENT = LEGACY_PAGE_SIDE_MARGIN - FOOTER_SIDE_INSET;
 
 type PaperLike = Pick<DocumentTemplateConfig['paper'], 'size' | 'orientation' | 'margins' | 'dimensions'>;
 
@@ -41,7 +85,8 @@ type PaperLike = Pick<DocumentTemplateConfig['paper'], 'size' | 'orientation' | 
 export function resolvePageBox(paper: PaperLike): { width: number; height: number } {
   const dims = paper.size === 'custom' ? paper.dimensions : undefined;
   const valid = dims && dims[0] > 0 && dims[1] > 0 ? dims : undefined;
-  const [sheetW, sheetH] = valid ?? SHEET_POINTS[paper.size === 'Letter' ? 'LETTER' : 'A4'];
+  const sheet = paper.size === 'custom' ? 'A4' : (PREDEFINED_SHEET[paper.size] ?? 'A4');
+  const [sheetW, sheetH] = valid ?? SHEET_POINTS[sheet];
   return paper.orientation === 'landscape'
     ? { width: sheetH, height: sheetW }
     : { width: sheetW, height: sheetH };
@@ -77,22 +122,58 @@ export function clampPageMargins(
   return [left, top, right, bottom];
 }
 
+/** The clamped `[left, right]` page margins in points, from the CSS-order tuple. */
+export function sideMargins(paper: PaperLike): [number, number] {
+  const box = resolvePageBox(paper);
+  const css = paper.margins;
+  const [left, , right] = clampPageMargins([css[3], css[0], css[1], css[2]], box.width, box.height);
+  return [left, right];
+}
+
 /**
  * Width available to BODY content — the page minus its (clamped) side margins.
  * Use for rules drawn in the content stream, e.g. the header's brand divider.
  */
 export function contentWidth(paper: PaperLike): number {
   const box = resolvePageBox(paper);
-  const css = paper.margins;
-  const [left, , right] = clampPageMargins([css[3], css[0], css[1], css[2]], box.width, box.height);
+  const [left, right] = sideMargins(paper);
   return Math.max(1, Math.round(box.width - left - right));
 }
 
 /**
- * Width available INSIDE a page-footer block, which applies its own fixed
- * {@link FOOTER_SIDE_INSET} rather than the page margins.
+ * The `[left, right]` inset a page-footer block applies — the page margins
+ * carrying the constant {@link FOOTER_OUTDENT}. Default margins reproduce the
+ * legacy `[35, 35]` exactly.
+ */
+export function footerSideInsets(paper: PaperLike): [number, number] {
+  const [left, right] = sideMargins(paper);
+  return [
+    Math.max(0, Math.round(left - FOOTER_OUTDENT)),
+    Math.max(0, Math.round(right - FOOTER_OUTDENT)),
+  ];
+}
+
+/**
+ * The full pdfmake `margin` tuple for a page-footer block: the resolved side
+ * insets with the block's own vertical padding. Both footer builders go through
+ * this so the block and its divider rule can never disagree.
+ */
+export function footerBlockMargin(
+  paper: PaperLike,
+  top: number,
+  bottom: number,
+): [number, number, number, number] {
+  const [left, right] = footerSideInsets(paper);
+  return [left, top, right, bottom];
+}
+
+/**
+ * Width available INSIDE a page-footer block — the page minus
+ * {@link footerSideInsets}. Kept in lockstep with {@link footerBlockMargin} so
+ * the divider rule always spans exactly the block it is drawn in.
  */
 export function footerContentWidth(paper: PaperLike): number {
   const box = resolvePageBox(paper);
-  return Math.max(1, Math.round(box.width - FOOTER_SIDE_INSET * 2));
+  const [left, right] = footerSideInsets(paper);
+  return Math.max(1, Math.round(box.width - left - right));
 }
