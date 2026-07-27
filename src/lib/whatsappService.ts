@@ -26,6 +26,38 @@ export function diffRulesToSeed(
   }));
 }
 
+export interface GoLiveGate { key: string; ok: boolean; label: string; fix: string }
+
+/**
+ * Pure: every gate standing between "credentials stored" and "a customer
+ * actually receives a message". `whatsapp_tenant_active()` ANDs is_enabled with
+ * connection_status, and the dispatch trigger additionally reads the tenant's
+ * `automation.whatsapp` flag — so a connected integration with the send switch
+ * off is silently inert. Keep all four here; that silence is the failure mode.
+ */
+export function whatsappGoLiveGates(input: {
+  connectionStatus?: string | null;
+  isEnabled?: boolean | null;
+  webhookStatus?: string | null;
+  featureEnabled: boolean;
+}): GoLiveGate[] {
+  const connected = input.connectionStatus === 'connected';
+  return [
+    { key: 'credentials', ok: connected,
+      label: 'Credentials verified with Meta',
+      fix: 'Enter the five values below and press Connect.' },
+    { key: 'sending', ok: connected && input.isEnabled === true,
+      label: 'Sending armed',
+      fix: 'Turn on the sending switch above — automations stay queued until then.' },
+    { key: 'webhook', ok: input.webhookStatus === 'verified' || input.webhookStatus === 'receiving',
+      label: 'Webhook verified by Meta',
+      fix: 'Paste the callback URL + verify token into Meta → WhatsApp → Configuration, then subscribe to the six fields listed there.' },
+    { key: 'feature', ok: input.featureEnabled,
+      label: 'WhatsApp Automation feature on',
+      fix: 'Settings → Features & Modules → WhatsApp Automation.' },
+  ];
+}
+
 /** Pure: consent-state rows → { utility, marketing } booleans. */
 export function summarizeConsent(rows: ConsentStateRow[]): { utility: boolean; marketing: boolean } {
   const get = (scope: string) => rows.find((r) => r.scope === scope)?.opted_in ?? false;
@@ -57,6 +89,19 @@ export async function getIntegration(): Promise<WhatsAppIntegrationView | null> 
     .select(INTEGRATION_COLUMNS).is('deleted_at', null).maybeSingle();
   if (error) throw error;
   return (data as WhatsAppIntegrationView | null) ?? null;
+}
+
+/**
+ * Master send switch. `whatsapp_tenant_active()` requires `is_enabled AND
+ * connection_status = 'connected'`, so storing credentials alone never sends
+ * anything — an admin has to arm it here. `is_enabled` is one of only three
+ * columns `authenticated` may UPDATE on this table, so the patch must name it
+ * alone (a wider patch is rejected by the column grants).
+ */
+export async function setIntegrationEnabled(id: string, enabled: boolean): Promise<void> {
+  const { error } = await supabase.from('whatsapp_integrations')
+    .update({ is_enabled: enabled }).eq('id', id);
+  if (error) throw error;
 }
 
 export async function listRules(): Promise<WhatsAppRule[]> {
