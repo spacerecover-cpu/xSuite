@@ -35,6 +35,7 @@ import {
   resolveWatermarkSettings,
 } from './branding';
 import { contrastRatio, readableTextOn } from './palette';
+import { clampPageMargins, resolvePageBox } from './pageGeometry';
 
 /** Spacing/size multiplier per density preset (comfortable = identity/legacy). */
 const DENSITY_SCALE: Record<'comfortable' | 'compact' | 'dense', number> = {
@@ -76,46 +77,6 @@ function watermarkImageNode(
   if (logo.kind === 'raster') return { image: logo.dataUrl };
   if (logo.kind === 'svg') return { svg: logo.markup };
   return null; // kind === 'none'
-}
-
-/** Point dimensions of the predefined sheets, portrait. */
-const SHEET_POINTS: Record<'A4' | 'LETTER', [number, number]> = {
-  A4: [595.28, 841.89],
-  LETTER: [612, 792],
-};
-
-/** Minimum printable content box we refuse to shrink below (1 inch each way). */
-const MIN_CONTENT_POINTS = 72;
-
-/**
- * Clamp `[left, top, right, bottom]` so the content box can never collapse.
- *
- * Margins are tenant-configurable and also arrive from stored configs, the
- * gallery and hand-edited JSON — not just the Studio inputs — so the guard lives
- * here rather than only in the UI. Without it, a margin pair wider than the
- * sheet yields a zero/negative content width and pdfmake emits a blank or
- * broken page (surfaced to the user only as a generic "could not render").
- * Each axis is scaled down proportionally so the layout keeps its intended
- * balance instead of one side absorbing the whole correction.
- */
-function clampPageMargins(
-  margins: [number, number, number, number],
-  pageWidth: number,
-  pageHeight: number,
-): [number, number, number, number] {
-  const fit = (near: number, far: number, extent: number): [number, number] => {
-    const a = Math.max(0, Number.isFinite(near) ? near : 0);
-    const b = Math.max(0, Number.isFinite(far) ? far : 0);
-    const budget = extent - MIN_CONTENT_POINTS;
-    if (budget <= 0) return [0, 0];
-    const total = a + b;
-    if (total <= budget) return [a, b];
-    const scale = budget / total;
-    return [Math.floor(a * scale), Math.floor(b * scale)];
-  };
-  const [left, right] = fit(margins[0], margins[2], pageWidth);
-  const [top, bottom] = fit(margins[1], margins[3], pageHeight);
-  return [left, top, right, bottom];
 }
 
 /** Substitute `{page}` / `{pages}` tokens in a page-number format string. */
@@ -168,14 +129,7 @@ export function renderTemplate(
   // to its own side (without this, Top→Left, Right→Top, … rotate).
   const cssMargins = config.paper.margins;
   // Resolve the page box in points so the margins can be clamped against it.
-  // `pageSize` is either a literal {width,height} (custom) or a predefined name;
-  // landscape swaps the axes, matching how pdfmake lays the sheet out.
-  const [sheetW, sheetH] =
-    typeof pageSize === 'object'
-      ? [pageSize.width as number, pageSize.height as number]
-      : SHEET_POINTS[pageSize === 'LETTER' ? 'LETTER' : 'A4'];
-  const [pageW, pageH] =
-    pageOrientation === 'landscape' ? [sheetH, sheetW] : [sheetW, sheetH];
+  const { width: pageW, height: pageH } = resolvePageBox(config.paper);
 
   let pageMargins: [number, number, number, number] = clampPageMargins(
     [

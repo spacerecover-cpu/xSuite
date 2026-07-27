@@ -20,6 +20,7 @@ import { getGeneralIconSvg } from '../../../deviceIconMapper';
 import type { CompanySettingsData } from '../../types';
 import type { EngineContext, EngineDocData, SectionRenderer } from '../types';
 import { resolveColors, resolveFooter, resolvePresentation } from '../branding';
+import { contentWidth, footerContentWidth } from '../pageGeometry';
 import { qrContentNode } from './qr';
 
 /**
@@ -95,7 +96,7 @@ export const renderFooter: SectionRenderer = (
         type: 'line',
         x1: 0,
         y1: 0,
-        x2: 525,
+        x2: contentWidth(engine.config.paper),
         y2: 0,
         lineWidth: 0.5,
         lineColor: premium ? PDF_COLORS.border : PDF_COLORS.primary,
@@ -179,7 +180,7 @@ export function buildPageFooter(
         type: 'line',
         x1: 0,
         y1: 0,
-        x2: 525,
+        x2: footerContentWidth(engine.config.paper),
         y2: 0,
         lineWidth: 0.5,
         lineColor: premium ? PDF_COLORS.border : PDF_COLORS.primary,

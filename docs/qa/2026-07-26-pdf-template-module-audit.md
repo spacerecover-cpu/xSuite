@@ -84,6 +84,9 @@ Pass 2 adds the table/page-break layer, where the dominant theme is **multi-page
 - **Suggested fix:** Implement the image branch, or remove the field from the config type + docs until it is implemented. Also note the Studio never exposes an upload control for it (see STU-04), so today it is entirely unreachable dead config.
 
 ### RND-02 — Divider rules hardcoded to A4-portrait content width (`x2: 525`)
+- **Status:** ✅ **FIXED** — new `engine/pageGeometry.ts` owns page-box resolution and the widths derived from it (`resolvePageBox`, `contentWidth`, `footerContentWidth`, plus `clampPageMargins` moved here from `renderTemplate`). It is a separate module because `renderTemplate` imports the section renderers, so sections importing back from it would be circular. All four sites now derive their width: `header.ts` and the in-content footer use the page **content** width; `buildPageFooter` and `reportFooter`'s page-footer path use the **footer inset** width (those blocks apply their own 35pt inset rather than the page margins), threaded into `footerLines` as a parameter. Covered by `pageGeometry.test.ts` (9 cases incl. an A4 parity case asserting the rules still come out at exactly 525).
+  **Scope note:** the same literal appears 16 times in `src/lib/pdf/documents/*` and is **deliberately untouched** — every legacy builder hardcodes `pageSize: 'A4'` with `pageMargins: [35, 30, 35, …]`, so 595.28 − 70 = 525 is exactly their content width. The constant was only wrong in the engine, where the page is configurable.
+  **Evidence the bug was live:** updating the OM/SA compliance snapshots showed `x2: 525 → 515` — those templates use 40pt side margins, so the rule had been overflowing the text column by 10pt on every page.
 - **Severity:** High · **Priority:** P1
 - **Description:** 525pt is A4 width (595) minus the hardcoded 35pt side margins. It is baked into four separate renderers:
   - `sections/footer.ts:98`, `sections/footer.ts:182`
@@ -379,12 +382,14 @@ Two passes found **36 issues against a target of 50+**. I am reporting the numbe
 | **STU-01** margin bounds | ✅ Fixed — UI `max` + `clampPageMargins` backstop (finding corrected) |
 | **STU-02** Reset has no confirmation | ✅ Fixed — `useConfirm` danger dialog |
 | **STU-03** no unsaved-changes guard | ✅ Fixed — dirty tracking + confirm on back + `beforeunload` |
+| **RND-02** hardcoded `x2: 525` dividers | ✅ Fixed — `pageGeometry` helpers across all 4 engine sites |
+| **RND-07** custom dimensions unvalidated | ✅ Partly fixed — `resolvePageBox` degrades a zero/negative box to A4 |
 
 **Remaining, in recommended order:**
 
-1. **RND-02** (hardcoded `x2: 525`) — one shared helper resolves all four sites.
-2. **TBL-05/06/07** (S/N column side under RTL, empty line-item table, column-width overflow).
-3. **RND-07** (custom page dimensions unvalidated) — partly mitigated: `clampPageMargins` now guards the *margins* against a custom box, but a zero/negative `dimensions` pair still reaches pdfmake.
+1. **TBL-05/06/07** (S/N column side under RTL, empty line-item table, column-width overflow).
+2. **RND-03/04/05** (footer + page-number geometry: hardcoded 35pt footer inset and `[40,4,40,0]` number-line margins still ignore the configured paper margins; the page number also ignores the colour palette). `pageGeometry` now provides the primitives these need.
+3. **RND-06** (watermark colour not configurable), **RND-08** (A3/A5/Legal unsupported), **TBL-02** (no `pageBreak` control), **TBL-08/09/10** (row caps, long-token overflow, localized `N/A`).
 4. **STU-04** partially addressed by the RND-01 fix (the sub-controls no longer hide behind a non-empty `text`); a dedicated watermark-image *upload* remains unimplemented — today the fix reuses the company logo.
 
 ### Note on verification limits for the table fixes
