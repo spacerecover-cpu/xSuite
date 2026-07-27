@@ -404,3 +404,16 @@ export const einvoiceReadinessKeys = {
   all: ['einvoice-readiness'] as const,
   tenant: () => [...einvoiceReadinessKeys.all, 'tenant'] as const,
 };
+
+export const whatsappKeys = {
+  all: ['whatsapp'] as const,
+  integration: () => [...whatsappKeys.all, 'integration'] as const,
+  rules: () => [...whatsappKeys.all, 'rules'] as const,
+  templates: (filters?: Record<string, unknown>) => [...whatsappKeys.all, 'templates', filters] as const,
+  messages: (filters?: Record<string, unknown>) => [...whatsappKeys.all, 'messages', filters] as const,
+  byCase: (caseId: string) => [...whatsappKeys.all, 'case', caseId] as const,
+  byCustomer: (customerId: string) => [...whatsappKeys.all, 'customer', customerId] as const,
+  consents: (customerId: string) => [...whatsappKeys.all, 'consents', customerId] as const,
+  analytics: (filters: Record<string, unknown>) => [...whatsappKeys.all, 'analytics', filters] as const,
+  stats: () => [...whatsappKeys.all, 'stats'] as const,
+};
