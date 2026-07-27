@@ -9,6 +9,7 @@ import {
   Inbox,
   StickyNote,
   CalendarClock,
+  Activity,
 } from 'lucide-react';
 import { Card } from '../../ui/Card';
 import { Badge } from '../../ui/Badge';
@@ -16,10 +17,12 @@ import { Button } from '../../ui/Button';
 import { Skeleton } from '../../ui/Skeleton';
 import { formatDateTime } from '../../../lib/format';
 import { listCaseCommunications } from '../../../lib/communicationsService';
-import { communicationKeys } from '../../../lib/queryKeys';
+import { communicationKeys, whatsappKeys } from '../../../lib/queryKeys';
+import { getIntegration } from '../../../lib/whatsappService';
 import { EmailDocumentModal } from '../EmailDocumentModal';
 import { SendMessageModal } from '../../communications/SendMessageModal';
 import { FollowUpFormModal } from '../../communications/FollowUpFormModal';
+import { WhatsAppThread } from './WhatsAppThread';
 import { useTenantFeature } from '../../../contexts/TenantConfigContext';
 
 interface CaseCommunicationsTabProps {
@@ -51,13 +54,22 @@ export const CaseCommunicationsTab: React.FC<CaseCommunicationsTabProps> = ({
   const queryClient = useQueryClient();
   const [showEmail, setShowEmail] = useState(false);
   const [messageChannel, setMessageChannel] = useState<'whatsapp' | 'sms' | null>(null);
+  const [milestoneMode, setMilestoneMode] = useState(false);
   const [showFollowUp, setShowFollowUp] = useState(false);
   const followUpsEnabled = useTenantFeature('automation.case_follow_ups');
+  const whatsappEnabled = useTenantFeature('automation.whatsapp');
 
   const { data: communications = [], isLoading } = useQuery({
     queryKey: communicationKeys.byCase(caseId),
     queryFn: () => listCaseCommunications(caseId),
   });
+
+  const { data: waIntegration } = useQuery({
+    queryKey: whatsappKeys.integration(),
+    queryFn: getIntegration,
+    enabled: whatsappEnabled,
+  });
+  const waConnected = whatsappEnabled && waIntegration?.connection_status === 'connected';
 
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: communicationKeys.byCase(caseId) });
@@ -90,6 +102,19 @@ export const CaseCommunicationsTab: React.FC<CaseCommunicationsTabProps> = ({
               <MessageSquare className="w-4 h-4 mr-2" />
               SMS
             </Button>
+            {waConnected && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setMilestoneMode(true);
+                  setMessageChannel('whatsapp');
+                }}
+              >
+                <Activity className="w-4 h-4 mr-2" />
+                Send Progress Update
+              </Button>
+            )}
             {followUpsEnabled && (
               <Button size="sm" onClick={() => setShowFollowUp(true)}>
                 <CalendarClock className="w-4 h-4 mr-2" />
@@ -98,6 +123,8 @@ export const CaseCommunicationsTab: React.FC<CaseCommunicationsTabProps> = ({
             )}
           </div>
         </div>
+
+        {waConnected && <WhatsAppThread caseId={caseId} />}
 
         {isLoading ? (
           <div className="space-y-3">
@@ -190,13 +217,17 @@ export const CaseCommunicationsTab: React.FC<CaseCommunicationsTabProps> = ({
       {messageChannel && (
         <SendMessageModal
           isOpen={!!messageChannel}
-          onClose={() => setMessageChannel(null)}
+          onClose={() => {
+            setMessageChannel(null);
+            setMilestoneMode(false);
+          }}
           channel={messageChannel}
           caseId={caseId}
           customerId={customerId ?? undefined}
           defaultPhone={customerPhone ?? ''}
           contextRefs={{ caseId, customerId: customerId ?? undefined }}
           onLogged={refresh}
+          defaultEventKey={milestoneMode ? 'case.milestone' : undefined}
         />
       )}
 

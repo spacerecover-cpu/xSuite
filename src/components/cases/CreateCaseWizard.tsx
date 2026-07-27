@@ -1094,10 +1094,13 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
           </UsageLimitGuard>
         </div>
 
+      {/* New customers created mid-intake capture WhatsApp consent inside the
+          shared modal; rows are stamped with the intake_form source. */}
       <CustomerFormModal
         isOpen={isCustomerModalOpen}
         onClose={() => setIsCustomerModalOpen(false)}
         onSuccess={handleCustomerCreated}
+        consentSource="intake_form"
       />
 
       <ServerBulkDrivesModal

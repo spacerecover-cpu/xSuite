@@ -130,11 +130,28 @@ const EVENT_GROUPS: EventGroup[] = [
       },
     ],
   },
+  {
+    id: 'whatsapp',
+    title: 'WhatsApp',
+    events: [
+      {
+        eventType: 'whatsapp.reply_received',
+        label: 'WhatsApp reply received',
+        description: 'A customer replied on WhatsApp (case or customer thread)',
+      },
+      {
+        eventType: 'whatsapp.message_failed',
+        label: 'WhatsApp delivery failure',
+        description:
+          'An automated or manual WhatsApp message could not be delivered',
+      },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------
-// Channels — only in_app and email are interactive today. The rest render as
-// disabled "Coming soon" cells.
+// Channels — in_app, email, and whatsapp are interactive today. The rest
+// render as disabled "Coming soon" cells.
 // ---------------------------------------------------------------------------
 interface ChannelDefinition {
   channel: NotificationChannel;
@@ -147,12 +164,7 @@ const CHANNELS: ChannelDefinition[] = [
   { channel: 'in_app', label: 'In-App', icon: Bell },
   { channel: 'email', label: 'Email', icon: Mail },
   { channel: 'sms', label: 'SMS', icon: MessageSquare, comingSoon: true },
-  {
-    channel: 'whatsapp',
-    label: 'WhatsApp',
-    icon: MessageCircle,
-    comingSoon: true,
-  },
+  { channel: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
   { channel: 'push', label: 'Push', icon: Smartphone, comingSoon: true },
 ];
 

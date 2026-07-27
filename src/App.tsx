@@ -186,6 +186,10 @@ const router = createBrowserRouter(
         <Route path="clone-drives" lazy={page(() => import('./pages/resources/CloneDrivesList'), 'CloneDrivesList')} />
         <Route path="procedures" lazy={page(() => import('./pages/kb/KBCenterPage'), 'KBCenterPage')} />
         <Route path="procedures/:id" lazy={page(() => import('./pages/kb/KBArticleDetailPage'), 'KBArticleDetailPage')} />
+        <Route element={<FeatureRoute featureKey="automation.whatsapp" />}>
+          <Route path="communications/whatsapp" lazy={page(() => import('./pages/communications/WhatsAppMessageLog'), 'WhatsAppMessageLog')} />
+          <Route path="communications/whatsapp/analytics" lazy={page(() => import('./pages/communications/WhatsAppAnalytics'), 'WhatsAppAnalytics')} />
+        </Route>
         <Route path="profile" lazy={page(() => import('./pages/users/UserProfile'), 'UserProfile')} />
         {/* Integrations route removed - not yet implemented */}
 
@@ -268,6 +272,7 @@ const router = createBrowserRouter(
             <Route path="security" lazy={page(() => import('./pages/settings/SecuritySettingsPage'), 'SecuritySettingsPage')} />
             <Route path="gdpr" lazy={page(() => import('./pages/settings/GDPRCompliancePage'), 'GDPRCompliancePage')} />
             <Route path="inventory" lazy={page(() => import('./pages/settings/InventorySettingsPage'), 'default')} />
+            <Route path="communications" lazy={page(() => import('./pages/settings/CommunicationSettings'), 'CommunicationSettings')} />
             <Route path=":categoryId" lazy={page(() => import('./pages/settings/CategoryDetail'), 'CategoryDetail')} />
           </Route>
           <Route element={<ProtectedRoute allowedRoles={FINANCE_ROLES} />}>

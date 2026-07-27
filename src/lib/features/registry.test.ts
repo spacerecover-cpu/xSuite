@@ -48,9 +48,26 @@ describe('feature registry integrity', () => {
 });
 
 describe('isFeatureEnabled (bound to the real registry)', () => {
+  // Net-new features that require an explicit tenant opt-in. Everything that existed
+  // before the flag system must default ON (backward compatible); a brand-new
+  // outbound channel defaulting OFF is the same guarantee — existing tenants see
+  // no behavior change when it ships. The server side mirrors this: the WhatsApp
+  // dispatcher reads feature_flags with default-FALSE semantics.
+  const DEFAULT_OFF_FEATURES = new Set(['automation.whatsapp']);
+
   it('defaults everything on for a tenant with no overrides (backward compatible)', () => {
     for (const f of FEATURE_REGISTRY) {
-      expect(isFeatureEnabled({}, f.key), `${f.key} should default on`).toBe(true);
+      const expected = !DEFAULT_OFF_FEATURES.has(f.key);
+      expect(isFeatureEnabled({}, f.key), `${f.key} should default ${expected ? 'on' : 'off'}`).toBe(expected);
+    }
+  });
+
+  it('default-off features are opt-in (never core, honor an explicit enable)', () => {
+    for (const key of DEFAULT_OFF_FEATURES) {
+      const def = FEATURES_BY_KEY[key];
+      expect(def, `${key} missing from registry`).toBeTruthy();
+      expect(def.core, `${key} must not be core`).toBeFalsy();
+      expect(isFeatureEnabled({ [key]: true }, key)).toBe(true);
     }
   });
 

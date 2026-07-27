@@ -21,7 +21,10 @@ import { generatePortalLoginUrl, generateCustomerPortalCredentialsText } from '.
 import { generateSecurePassword } from '../../lib/passwordUtils';
 import { ManageCompaniesModal } from '../../components/customers/ManageCompaniesModal';
 import { CustomerFormModal, type CustomerEditData } from '../../components/customers/CustomerFormModal';
+import { recordConsent, getConsentState, summarizeConsent } from '../../lib/whatsappService';
+import { whatsappKeys } from '../../lib/queryKeys';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTenantFeature } from '../../contexts/TenantConfigContext';
 import { CustomerPurchasesTab } from '../../components/customers/CustomerPurchasesTab';
 import { CustomerCasesTab } from '../../components/customers/CustomerCasesTab';
 import { CustomerFinancialTab } from '../../components/customers/CustomerFinancialTab';
@@ -42,6 +45,7 @@ interface Customer {
   email: string | null;
   mobile_number: string | null;
   phone: string | null;
+  whatsapp_number: string | null;
   customer_group_id: string | null;
   country_id: string | null;
   city_id: string | null;
@@ -163,6 +167,65 @@ export const CustomerProfilePage: React.FC = () => {
     },
     enabled: !!id,
   });
+
+  const tenantId = profile?.tenant_id ?? null;
+  const whatsappEnabled = useTenantFeature('automation.whatsapp');
+  const { data: consentRows } = useQuery({
+    queryKey: whatsappKeys.consents(id ?? 'none'),
+    queryFn: () => getConsentState(tenantId!, id!),
+    enabled: Boolean(id && tenantId && whatsappEnabled),
+  });
+  const consentSummary = consentRows
+    ? summarizeConsent(consentRows)
+    : { utility: false, marketing: false };
+
+  const { data: consentHistory = [] } = useQuery({
+    queryKey: [...whatsappKeys.consents(id ?? 'none'), 'history'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('whatsapp_consents')
+        .select('id, action, scope, source, occurred_at')
+        .eq('customer_id', id!)
+        .is('deleted_at', null)
+        .order('occurred_at', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: Boolean(id && whatsappEnabled),
+  });
+
+  const optOutMutation = useMutation({
+    mutationFn: async () => {
+      if (!id || !tenantId) throw new Error('Missing tenant context');
+      const scopes = (['utility', 'marketing'] as const).filter((s) => consentSummary[s]);
+      for (const scope of scopes) {
+        await recordConsent({
+          tenant_id: tenantId,
+          customer_id: id,
+          scope,
+          action: 'opt_out',
+          source: 'staff',
+          phone_e164: customer?.whatsapp_number ?? customer?.mobile_number ?? null,
+        });
+      }
+    },
+    onSuccess: () => {
+      if (id) queryClient.invalidateQueries({ queryKey: whatsappKeys.consents(id) });
+    },
+  });
+
+  const handleRecordOptOut = async () => {
+    const ok = await confirm({
+      title: 'Record WhatsApp Opt-Out',
+      message:
+        'Record an explicit opt-out for every WhatsApp consent this customer currently holds? Automated WhatsApp messages will stop immediately.',
+      confirmLabel: 'Record Opt-Out',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    optOutMutation.mutate();
+  };
 
   React.useEffect(() => {
     const loadPortalUrl = async () => {
@@ -481,6 +544,7 @@ export const CustomerProfilePage: React.FC = () => {
               email: customer.email,
               mobile_number: customer.mobile_number,
               phone: customer.phone,
+              whatsapp_number: customer.whatsapp_number,
               customer_group_id: customer.customer_group_id,
               country_id: customer.country_id,
               city_id: customer.city_id,
@@ -692,6 +756,7 @@ export const CustomerProfilePage: React.FC = () => {
           )}
         </div>
 
+        <div className="space-y-6">
         <Card className="p-4 h-fit">
           <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider mb-4">
             Customer Portal
@@ -814,6 +879,93 @@ export const CustomerProfilePage: React.FC = () => {
             </div>
           )}
         </Card>
+
+        {whatsappEnabled && (
+        <Card className="p-4 h-fit">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+              <MessageCircle className="w-4 h-4" />
+              WhatsApp
+            </h3>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="text-danger hover:bg-danger-muted"
+              onClick={handleRecordOptOut}
+              disabled={
+                optOutMutation.isPending ||
+                (!consentSummary.utility && !consentSummary.marketing)
+              }
+            >
+              {optOutMutation.isPending ? 'Recording…' : 'Record opt-out'}
+            </Button>
+          </div>
+
+          <div className="mb-3 text-sm">
+            {customer.whatsapp_number || customer.mobile_number ? (
+              <span className="font-mono text-slate-900">
+                {customer.whatsapp_number || customer.mobile_number}
+              </span>
+            ) : (
+              <span className="text-slate-500">No WhatsApp number on file</span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2 mb-4">
+            {(['utility', 'marketing'] as const).map((scope) => (
+              <span
+                key={scope}
+                className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
+                  consentSummary[scope]
+                    ? 'bg-success-muted text-success'
+                    : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {scope === 'utility' ? 'Utility' : 'Marketing'}
+                {consentSummary[scope] ? ' · Opted in' : ' · Not opted in'}
+              </span>
+            ))}
+          </div>
+
+          <div className="pt-3 border-t border-slate-200">
+            <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
+              Consent History
+            </p>
+            {consentHistory.length === 0 ? (
+              <p className="text-sm text-slate-500">No consent events recorded.</p>
+            ) : (
+              <div className="space-y-2 max-h-56 overflow-y-auto">
+                {consentHistory.map((ev) => (
+                  <div
+                    key={ev.id}
+                    className="flex items-center justify-between gap-2 text-xs"
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span
+                        className={`rounded px-1.5 py-0.5 font-medium ${
+                          ev.action === 'opt_in'
+                            ? 'bg-success-muted text-success'
+                            : 'bg-danger-muted text-danger'
+                        }`}
+                      >
+                        {ev.action === 'opt_in' ? 'Opt-in' : 'Opt-out'}
+                      </span>
+                      <span className="text-slate-700 capitalize">{ev.scope}</span>
+                      <span className="text-slate-400 truncate">
+                        via {ev.source.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <span className="text-slate-500 shrink-0">
+                      {formatDate(ev.occurred_at)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
+        )}
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200">

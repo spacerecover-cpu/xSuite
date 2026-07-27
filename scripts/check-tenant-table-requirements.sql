@@ -19,7 +19,12 @@ WITH tenant_tables AS (
                               -- NOT-NULL / RESTRICTIVE-isolation / audit-trigger rules cannot
                               -- apply to mixed system+tenant tables.
                               'master_case_report_templates', 'report_section_library',
-                              'report_section_presets', 'report_template_section_mappings')
+                              'report_section_presets', 'report_template_section_mappings',
+                              -- provider webhook ledger (20260727093836): tenant_id is nullable
+                              -- BY DESIGN (resolved post-hoc from phone_number_id; unresolvable
+                              -- events are parked), service role is the only writer, and reads
+                              -- are platform-admin-only — the full tenant kit cannot apply
+                              'whatsapp_webhook_events')
 ),
 violations AS (
   SELECT

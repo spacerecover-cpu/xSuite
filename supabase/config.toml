@@ -28,3 +28,8 @@ verify_jwt = false
 # has no JWT yet.
 [functions.portal-login]
 verify_jwt = false
+
+# Called by Meta's servers; the handler verifies X-Hub-Signature-256 +
+# hub.verify_token itself.
+[functions.whatsapp-webhook]
+verify_jwt = false

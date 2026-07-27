@@ -38,6 +38,8 @@ import {
   CalendarClock,
   SlidersHorizontal,
   Database,
+  MessageCircle,
+  MessageSquare,
 } from 'lucide-react';
 
 /** Live badge counters surfaced by `useSidebarBadges`. */
@@ -132,6 +134,21 @@ export const NAV_SECTIONS: NavSectionConfig[] = [
       { to: '/companies', icon: Building2, label: 'Companies' },
       { to: '/suppliers', icon: Truck, label: 'Suppliers' },
       { to: '/purchase-orders', icon: ShoppingCart, label: 'Purchase Orders' },
+    ],
+  },
+  {
+    key: 'communications',
+    title: 'Communications',
+    icon: MessageCircle,
+    gate: ({ hasModuleAccess, isEnabled }) =>
+      hasModuleAccess('cases') && isEnabled('automation.whatsapp'),
+    items: [
+      // No ROUTE_TO_MODULE_KEY entries exist for /communications/* — piggyback on
+      // the 'cases' module key (WhatsApp traffic is case communication; whoever
+      // sees Cases may see the message ledger), mirroring the Import/Export
+      // pattern in the Financial section above.
+      { to: '/communications/whatsapp', icon: MessageSquare, label: 'WhatsApp Log', moduleKey: 'cases' },
+      { to: '/communications/whatsapp/analytics', icon: BarChart3, label: 'WhatsApp Analytics', moduleKey: 'cases' },
     ],
   },
   {

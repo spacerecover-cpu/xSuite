@@ -89,8 +89,9 @@ export const FEATURE_REGISTRY: FeatureDef[] = [
   // ── Customer Portal ── (also enforced server-side via tenant_feature_enabled)
   { key: 'portal.customer', label: 'Customer Portal', description: 'The external customer portal (login + all portal pages).', category: 'portal', defaultEnabled: true, routes: ['/portal'] },
 
-  // ── Automation ── (nascent; only the follow-up surface exists today)
+  // ── Automation ──
   { key: 'automation.case_follow_ups', label: 'Case Follow-ups', description: 'Scheduled case follow-up reminders.', category: 'automation', defaultEnabled: true },
+  { key: 'automation.whatsapp', label: 'WhatsApp Automation', description: 'Automated WhatsApp customer notifications via the Meta Cloud API connection.', category: 'automation', defaultEnabled: false },
 ];
 
 export const FEATURES_BY_KEY: Record<string, FeatureDef> = Object.fromEntries(
