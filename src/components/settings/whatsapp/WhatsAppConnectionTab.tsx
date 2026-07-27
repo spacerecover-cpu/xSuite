@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { whatsappKeys } from '../../../lib/queryKeys';
 import {
-  getIntegration, setIntegrationEnabled, whatsappAdmin, whatsappGoLiveGates,
+  getIntegration, parseHealthErrors, setIntegrationEnabled, whatsappAdmin, whatsappGoLiveGates,
 } from '../../../lib/whatsappService';
 import { useTenantConfig, useTenantFeature } from '../../../contexts/TenantConfigContext';
 import { Input, NO_AUTOFILL } from '../../ui/Input';
@@ -126,11 +126,13 @@ export function WhatsAppConnectionTab() {
 
   const readiness = whatsappGoLiveGates({
     connectionStatus: integration?.connection_status,
+    tokenValid: integration?.token_valid,
     isEnabled: integration?.is_enabled,
     webhookStatus: integration?.webhook_status,
     featureEnabled,
   });
   const blockers = readiness.filter((r) => !r.ok);
+  const healthErrors = parseHealthErrors(integration?.health_errors);
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -204,12 +206,35 @@ export function WhatsAppConnectionTab() {
             <div><dt className="text-xs text-slate-400">Token expiry</dt><dd className="text-slate-700">{integration.token_expires_at ? new Date(integration.token_expires_at).toLocaleDateString() : 'Never'}</dd></div>
           </dl>
         )}
+        {/* Meta's own words for WHY the account is blocked. Without this the
+            admin sees "BLOCKED" with no cause and no next step. */}
+        {healthErrors.length > 0 && (
+          <div className="mt-4 rounded-lg border border-danger/30 bg-danger-muted p-3">
+            <p className="flex items-center gap-2 text-sm font-medium text-danger">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              Meta reports {healthErrors.length === 1 ? 'an issue' : `${healthErrors.length} issues`} with this account
+            </p>
+            <ul className="mt-2 space-y-2">
+              {healthErrors.map((e, i) => (
+                <li key={e.code ?? i} className="text-sm text-danger/90">
+                  <span className="font-medium">{e.description}</span>
+                  {e.code && <span className="ml-1 text-xs opacity-70">(code {e.code})</span>}
+                  {e.solution && <p className="mt-0.5 text-xs opacity-80">{e.solution}</p>}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-danger/70">
+              These are resolved in Meta Business Manager, not here. Re-run Test Connection once fixed.
+            </p>
+          </div>
+        )}
         {checks && (
           <ul className="mt-4 space-y-1 border-t border-slate-100 pt-4">
             <Check ok={checks.token} label="Access token valid" />
             <Check ok={checks.phone} label="Phone number reachable" detail={checks.displayPhoneNumber} />
             <Check ok={checks.canSendMessage === 'AVAILABLE'} label="Account can send messages" detail={checks.canSendMessage} />
-            <Check ok={checks.webhookSubscribed} label="App subscribed to WABA webhooks" />
+            <Check ok={checks.webhookSubscribed} label="App subscribed to WABA webhooks"
+              detail={checks.webhookSubscribed ? null : 'setting the callback URL is not enough — subscribe the app to the WABA'} />
             <Check ok={checks.webhookVerified} label="Webhook endpoint verified" detail={checks.lastWebhookAt ? `last event ${new Date(checks.lastWebhookAt).toLocaleString()}` : null} />
           </ul>
         )}
