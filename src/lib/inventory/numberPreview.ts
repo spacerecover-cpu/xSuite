@@ -10,34 +10,65 @@
 // prefix saw "BIG-…" while the row was written "H35-0043". This mirrors the
 // allocator's precedence exactly so the two can never disagree again.
 //
-// Deliberately kept free of supabase imports so it is unit-testable without env.
+// Deliberately free of supabase imports so it is unit-testable without env
+// (renderNumberTemplate is a pure formatter with no imports of its own).
 
-export interface PrefixSequence { scope: string; prefix: string | null }
-export interface PrefixDeviceType { id: string; inventory_prefix: string | null }
+import { renderNumberTemplate } from '../numbering/templates';
 
-function tenantPrefix(sequences: readonly PrefixSequence[] | undefined, typeId: string): string | null {
-  const row = sequences?.find((s) => s.scope === `inventory:${typeId}`);
-  const prefix = row?.prefix?.trim();
-  return prefix ? prefix : null;
+export interface PrefixSequence {
+  scope: string;
+  prefix: string | null;
+  current_value?: number | null;
+  padding?: number | null;
+  format_template?: string | null;
+  fiscal_year_anchor?: string | null;
+}
+
+export interface PrefixDeviceType {
+  id: string;
+  inventory_prefix: string | null;
+  inventory_padding?: number | null;
 }
 
 /**
- * `PREFIX-…` for the badge, or '' when no prefix can be resolved.
+ * The number the next item will receive, e.g. `H35-0050`.
  *
- * The trailing ellipsis is deliberate: the real number is allocated by the DB
- * at insert, so showing a concrete next value would promise something two
- * concurrent users cannot both receive.
+ * Non-consuming: it renders `current_value + 1` without touching the counter,
+ * matching what get_next_number would return. Two people adding items at once
+ * therefore see the same value and only one will get it — acceptable for a
+ * preview, and the reason the DB never takes a client-supplied number here.
+ *
+ * Template-aware: a sequence carrying a v2 format_template previews through the
+ * same {FY}/{SEQ:n} rendering the DB uses, rather than assuming `PREFIX-NNNN`.
+ *
+ * Returns '' when no prefix or template can be resolved.
  */
 export function inventoryNumberPreview(
   sequences: readonly PrefixSequence[] | undefined,
   deviceTypes: readonly PrefixDeviceType[] | undefined,
   typeId: string,
+  today?: Date,
 ): string {
   if (!typeId) return '';
-  const prefix = tenantPrefix(sequences, typeId)
-    ?? deviceTypes?.find((d) => d.id === typeId)?.inventory_prefix?.trim()
-    ?? '';
-  return prefix ? `${prefix}-…` : '';
+
+  const seq = sequences?.find((s) => s.scope === `inventory:${typeId}`);
+  const seqPrefix = seq?.prefix?.trim();
+  const template = seq?.format_template?.trim();
+
+  if (seq && (seqPrefix || template)) {
+    const next = (seq.current_value ?? 0) + 1;
+    if (template) {
+      return renderNumberTemplate(template, next, seq.fiscal_year_anchor ?? null, today);
+    }
+    return `${seqPrefix}-${String(next).padStart(seq.padding ?? 4, '0')}`;
+  }
+
+  // No tenant sequence yet: get_next_inventory_number lazy-seeds from the
+  // catalog at current_value 0, so the first item lands on 1.
+  const dt = deviceTypes?.find((d) => d.id === typeId);
+  const catalogPrefix = dt?.inventory_prefix?.trim();
+  if (!catalogPrefix) return '';
+  return `${catalogPrefix}-${String(1).padStart(dt?.inventory_padding ?? 4, '0')}`;
 }
 
 /**

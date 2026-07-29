@@ -521,11 +521,8 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
       closeOnBackdrop={false}
       headerAction={
         itemNumber ? (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-info-muted border border-info/30 rounded-lg">
-            <Hash className="w-3.5 h-3.5 text-info" />
-            <span className="text-xs font-medium text-slate-600">
-              {isEdit ? 'Item Number:' : 'Number Pattern:'}
-            </span>
+          <div className="flex items-center gap-1 px-3 py-1.5 bg-info-muted border border-info/30 rounded-lg whitespace-nowrap">
+            <Hash className="w-3.5 h-3.5 shrink-0 text-info" />
             <span className="text-sm font-bold text-info font-mono">{itemNumber}</span>
           </div>
         ) : undefined
@@ -579,13 +576,12 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                     <p className="mt-1.5 flex items-start gap-1.5 text-xs text-warning">
                       <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
                       <span>
-                        Saving reissues the item number into the{' '}
-                        <span className="font-medium">
-                          {inventoryNumberPreview(sequences, deviceTypes, form.device_type_id as string)
-                            .replace('-…', '')}
+                        Saving reissues the item number as{' '}
+                        <span className="font-mono font-medium">
+                          {inventoryNumberPreview(sequences, deviceTypes, form.device_type_id as string)}
                         </span>{' '}
-                        series (was <span className="font-mono">{itemNumber}</span>). The barcode and QR
-                        follow, so the printed label must be replaced.
+                        (was <span className="font-mono">{itemNumber}</span>). The barcode and QR follow,
+                        so the printed label must be replaced.
                       </span>
                     </p>
                   )}
