@@ -8109,6 +8109,8 @@ export type Database = {
           is_donor: boolean | null
           item_category_id: string | null
           item_number: string | null
+          item_number_device_type_id: string | null
+          item_number_reissued_at: string | null
           legacy_case_ref: string | null
           location_id: string | null
           min_quantity: number | null
@@ -8117,6 +8119,7 @@ export type Database = {
           notes: string | null
           pcb_number: string | null
           photos: string[] | null
+          previous_item_number: string | null
           purchase_date: string | null
           purchase_price: number | null
           qr_value: string | null
@@ -8153,6 +8156,8 @@ export type Database = {
           is_donor?: boolean | null
           item_category_id?: string | null
           item_number?: string | null
+          item_number_device_type_id?: string | null
+          item_number_reissued_at?: string | null
           legacy_case_ref?: string | null
           location_id?: string | null
           min_quantity?: number | null
@@ -8161,6 +8166,7 @@ export type Database = {
           notes?: string | null
           pcb_number?: string | null
           photos?: string[] | null
+          previous_item_number?: string | null
           purchase_date?: string | null
           purchase_price?: number | null
           qr_value?: string | null
@@ -8197,6 +8203,8 @@ export type Database = {
           is_donor?: boolean | null
           item_category_id?: string | null
           item_number?: string | null
+          item_number_device_type_id?: string | null
+          item_number_reissued_at?: string | null
           legacy_case_ref?: string | null
           location_id?: string | null
           min_quantity?: number | null
@@ -8205,6 +8213,7 @@ export type Database = {
           notes?: string | null
           pcb_number?: string | null
           photos?: string[] | null
+          previous_item_number?: string | null
           purchase_date?: string | null
           purchase_price?: number | null
           qr_value?: string | null
@@ -8274,6 +8283,13 @@ export type Database = {
             columns: ["item_category_id"]
             isOneToOne: false
             referencedRelation: "master_inventory_item_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_items_item_number_device_type_id_fkey"
+            columns: ["item_number_device_type_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_device_types"
             referencedColumns: ["id"]
           },
           {
@@ -20629,6 +20645,8 @@ export type Database = {
           is_donor: boolean | null
           item_category_id: string | null
           item_number: string | null
+          item_number_device_type_id: string | null
+          item_number_reissued_at: string | null
           legacy_case_ref: string | null
           location_id: string | null
           min_quantity: number | null
@@ -20637,6 +20655,7 @@ export type Database = {
           notes: string | null
           pcb_number: string | null
           photos: string[] | null
+          previous_item_number: string | null
           purchase_date: string | null
           purchase_price: number | null
           qr_value: string | null

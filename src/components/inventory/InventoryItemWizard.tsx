@@ -41,6 +41,8 @@ import { logger } from '../../lib/logger';
 import type { DeviceFamily } from '../../lib/devices/deviceFamily';
 import type { CatalogOption } from '../../lib/devices/deviceCatalogQueries';
 import { getDonorParts } from '../../lib/inventory/donorParts';
+import { inventoryNumberPreview, willReissueNumber } from '../../lib/inventory/numberPreview';
+import { useInventorySequences } from '../../lib/inventory/inventorySequenceService';
 import { getItemDonorParts, setItemDonorParts } from '../../lib/inventory/donorPartsService';
 import type { DonorPartInput } from '../../lib/inventory/donorPartsService';
 import { Wrench, Check } from 'lucide-react';
@@ -133,12 +135,6 @@ function buildCatalogOptions(
   return out;
 }
 
-function numberPreview(deviceTypes: ReturnType<typeof useInventoryDeviceTypes>['data'], typeId: string): string {
-  if (!typeId || !deviceTypes) return '';
-  const dt = deviceTypes.find(d => d.id === typeId);
-  if (!dt?.inventory_prefix) return '';
-  return `${dt.inventory_prefix}-…`;
-}
 
 // catalog_device_types.family stores a canonical DeviceFamily KEY (underscore
 // form, e.g. 'head_stack', 'memory_card') — backfilled by migration
@@ -183,6 +179,9 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [itemNumber, setItemNumber] = useState<string>('');
+  // inventory_items.item_number_device_type_id — which series issued this number.
+  // NULL means the number is outside the managed scheme and the DB will not reissue it.
+  const [numberIssuedByTypeId, setNumberIssuedByTypeId] = useState<string | null>(null);
   const [autoLocationHint, setAutoLocationHint] = useState<string>('');
   const locationUserChanged = useRef(false);
 
@@ -255,6 +254,7 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
     return familyFromDeviceType(deviceTypes.find(d => d.id === typeId));
   }, [deviceTypes]);
 
+  const { data: sequences } = useInventorySequences();
   const family = resolveFamily(form.device_type_id as string);
   const familyConfig = getDeviceFamilyConfig(family);
 
@@ -263,8 +263,8 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
   useEffect(() => {
     const typeId = form.device_type_id as string;
     if (!typeId || isEdit) return;
-    setItemNumber(numberPreview(deviceTypes, typeId));
-  }, [form.device_type_id, deviceTypes, isEdit]);
+    setItemNumber(inventoryNumberPreview(sequences, deviceTypes, typeId));
+  }, [form.device_type_id, sequences, deviceTypes, isEdit]);
 
   // When device type is selected, auto-populate category_id from default_category_id
   const handleDeviceTypeChange = useCallback((typeId: string) => {
@@ -323,6 +323,7 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
         const item = await getInventoryItemById(itemId);
         if (!item) return;
         setItemNumber(item.item_number ?? '');
+        setNumberIssuedByTypeId(item.item_number_device_type_id ?? null);
 
         const itemFamily = familyFromDeviceType(
           deviceTypes?.find(d => d.id === item.device_type_id),
@@ -567,6 +568,27 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
                     placeholder="Select device type"
                     usePortal
                   />
+                  {/* These prefixes are warehouse rack families, so a number left
+                      in the old series means the drive is filed in the wrong rack.
+                      The DB reissues on save — warn first, because the printed
+                      label on the physical device still carries the old number. */}
+                  {isEdit && willReissueNumber({
+                    issuedByDeviceTypeId: numberIssuedByTypeId,
+                    selectedDeviceTypeId: form.device_type_id as string,
+                  }) && (
+                    <p className="mt-1.5 flex items-start gap-1.5 text-xs text-warning">
+                      <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+                      <span>
+                        Saving reissues the item number into the{' '}
+                        <span className="font-medium">
+                          {inventoryNumberPreview(sequences, deviceTypes, form.device_type_id as string)
+                            .replace('-…', '')}
+                        </span>{' '}
+                        series (was <span className="font-mono">{itemNumber}</span>). The barcode and QR
+                        follow, so the printed label must be replaced.
+                      </span>
+                    </p>
+                  )}
                 </div>
 
                 <div>
