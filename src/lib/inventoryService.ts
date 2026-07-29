@@ -164,7 +164,7 @@ export async function getInventoryItems(filters?: InventoryFilters) {
       status_type:master_inventory_status_types(id, name, color_code, is_available_status),
       condition_type:master_inventory_condition_types(id, rating, name, color_code),
       brand:catalog_device_brands(id, name),
-      device_type:catalog_device_types(id, name),
+      device_type:catalog_device_types!inventory_items_device_type_id_fkey(id, name),
       capacity:catalog_device_capacities(id, name, gb_value),
       storage_location:inventory_locations(id, name),
       interface:catalog_interfaces(id, name)
@@ -197,7 +197,7 @@ export async function getInventoryItemsPage(filters?: InventoryFilters & { page?
       status_type:master_inventory_status_types(id, name, color_code, is_available_status),
       condition_type:master_inventory_condition_types(id, rating, name, color_code),
       brand:catalog_device_brands(id, name),
-      device_type:catalog_device_types(id, name),
+      device_type:catalog_device_types!inventory_items_device_type_id_fkey(id, name),
       capacity:catalog_device_capacities(id, name, gb_value),
       storage_location:inventory_locations(id, name),
       interface:catalog_interfaces(id, name)
@@ -294,7 +294,7 @@ export async function getInventoryItemById(id: string) {
       status_type:master_inventory_status_types(id, name, color_code),
       condition_type:master_inventory_condition_types(id, rating, name, color_code),
       brand:catalog_device_brands(id, name),
-      device_type:catalog_device_types(id, name),
+      device_type:catalog_device_types!inventory_items_device_type_id_fkey(id, name),
       capacity:catalog_device_capacities(id, name, gb_value),
       storage_location:inventory_locations(id, name),
       interface:catalog_interfaces(id, name)
