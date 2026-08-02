@@ -135,7 +135,7 @@ Deno.serve(async (req: Request) => {
     // Verify caller is an admin
     const { data: callerProfile } = await supabase
       .from("profiles")
-      .select("role, tenant_id")
+      .select("role, tenant_id, email")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -170,9 +170,9 @@ Deno.serve(async (req: Request) => {
 
     const { data: tenant, error: tenantError } = await supabase
       .from("tenants")
-      .select("name, contact_email")
+      .select("name")
       .eq("id", tenantId)
-      .single();
+      .maybeSingle();
 
     if (tenantError || !tenant) {
       throw new Error("Tenant not found");
@@ -254,6 +254,10 @@ Deno.serve(async (req: Request) => {
     const defaultReturnUrl = `${req.headers.get("origin") || "http://localhost:5173"}/settings/billing?success=true`;
     const defaultCancelUrl = `${req.headers.get("origin") || "http://localhost:5173"}/settings/billing?cancelled=true`;
 
+    // `tenants` holds no contact email — the billing contact is the admin who
+    // initiated the subscription (profiles.email, falling back to the auth user).
+    const subscriberEmail = (callerProfile.email as string | null) || user.email || "noreply@xsuite.space";
+
     const subscriptionPayload = {
       plan_id: paypalPlanId,
       subscriber: {
@@ -261,7 +265,7 @@ Deno.serve(async (req: Request) => {
           given_name: tenant.name.split(' ')[0] || tenant.name,
           surname: tenant.name.split(' ').slice(1).join(' ') || tenant.name,
         },
-        email_address: tenant.contact_email || "noreply@xsuite.space",
+        email_address: subscriberEmail,
       },
       custom_id: tenantId,
       application_context: {

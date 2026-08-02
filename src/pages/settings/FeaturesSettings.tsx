@@ -23,6 +23,19 @@ const CATEGORY_ORDER: FeatureCategory[] = [
   'automation',
 ];
 
+/**
+ * Merge the editable draft over the tenant's stored flag map instead of replacing it.
+ * `tenants.feature_flags` also carries keys this screen never renders — core features
+ * and server-side flags the DB gates on (e.g. `business_unit_isolation`) — so a save
+ * here must PATCH the map, never rebuild it from the client-side registry.
+ */
+export function buildFeatureFlagsPayload(
+  stored: Record<string, boolean>,
+  draft: Record<string, boolean>,
+): Record<string, boolean> {
+  return { ...stored, ...draft };
+}
+
 interface SwitchProps {
   checked: boolean;
   disabled?: boolean;
@@ -112,7 +125,7 @@ export const FeaturesSettings: React.FC = () => {
     if (!tenantId || !dirty || saving) return;
     setSaving(true);
     try {
-      await updateTenantFeatureFlags(tenantId, draft);
+      await updateTenantFeatureFlags(tenantId, buildFeatureFlagsPayload(config.featureFlags, draft));
       await refreshConfig();
       toast.success('Feature settings saved.');
     } catch {

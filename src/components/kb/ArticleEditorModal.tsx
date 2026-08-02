@@ -41,12 +41,23 @@ export const ArticleEditorModal: React.FC<ArticleEditorModalProps> = ({ isOpen, 
   const [newTagInput, setNewTagInput] = useState('');
   const [isCreatingTag, setIsCreatingTag] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
+  const seededKeyRef = useRef<string | null>(null);
   const categoryId_a11y = useId();
 
   const { data: categories = [] } = useQuery({ queryKey: kbKeys.categories(), queryFn: getKBCategories, enabled: isOpen });
   const { data: allTags = [] } = useQuery({ queryKey: kbKeys.tags(), queryFn: getKBTags, enabled: isOpen });
 
+  // `article` is a query result, so its identity changes on every refetch. Seed the form
+  // once per opened record (id, or 'new') so a background refetch never wipes unsaved edits.
   useEffect(() => {
+    if (!isOpen) {
+      seededKeyRef.current = null;
+      return;
+    }
+    const seedKey = article?.id ?? 'new';
+    if (seededKeyRef.current === seedKey) return;
+    seededKeyRef.current = seedKey;
+
     if (article) {
       setTitle(article.title || '');
       setContent(article.content || '');

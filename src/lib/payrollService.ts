@@ -464,13 +464,18 @@ export const payrollService = {
 
     // Loan repayments are collected here and posted only AFTER payroll_records
     // are committed (below), so a failed records insert can never leave loans
-    // deducted with no payroll record behind them.
+    // deducted with no payroll record behind them. The employee label rides
+    // along so a failed posting can be reported against a human-identifiable
+    // employee (see the reconciliation error after the posting loop).
     const pendingLoanRepayments: Array<{
-      loan_id: string;
-      amount: number;
-      payment_date: string;
-      payment_method: string;
-      notes: string;
+      employeeLabel: string;
+      repayment: {
+        loan_id: string;
+        amount: number;
+        payment_date: string;
+        payment_method: string;
+        notes: string;
+      };
     }> = [];
 
     for (const employee of employees || []) {
@@ -521,13 +526,21 @@ export const payrollService = {
         status: 'calculated',
       });
 
+      const employeeLabel =
+        employee.employee_number ||
+        [employee.first_name, employee.last_name].filter(Boolean).join(' ') ||
+        employee.id;
+
       for (const loan of activeLoans) {
         pendingLoanRepayments.push({
-          loan_id: loan.id,
-          amount: scheduledLoanDeduction(loan),
-          payment_date: period.end_date,
-          payment_method: 'payroll_deduction',
-          notes: `Automatic deduction for ${period.period_name}`,
+          employeeLabel,
+          repayment: {
+            loan_id: loan.id,
+            amount: scheduledLoanDeduction(loan),
+            payment_date: period.end_date,
+            payment_method: 'payroll_deduction',
+            notes: `Automatic deduction for ${period.period_name}`,
+          },
         });
       }
     }
@@ -594,8 +607,47 @@ export const payrollService = {
       // Post loan repayments now that the period is claimed and payroll_records
       // are committed, so neither a records-insert failure nor a retry can
       // deduct loans without a backing record.
-      for (const repayment of pendingLoanRepayments) {
-        await this.recordLoanRepayment(repayment);
+      //
+      // These postings are NOT in the same transaction as the records insert
+      // (that needs a SECURITY DEFINER RPC — see cross-file notes), and the
+      // period has already left 'draft', so this run cannot be retried. Every
+      // installment here was ALREADY docked from a committed net_salary, so one
+      // transient failure must not abort the loop: aborting would strand every
+      // later employee's loan too, silently. Post them all, collect the
+      // failures, and fail loudly afterwards naming exactly which loans an
+      // operator must post by hand to reconcile the ledger.
+      const failedRepayments: Array<{ employeeLabel: string; loanId: string; amount: number; reason: string }> = [];
+      for (const pending of pendingLoanRepayments) {
+        try {
+          await this.recordLoanRepayment(pending.repayment);
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          failedRepayments.push({
+            employeeLabel: pending.employeeLabel,
+            loanId: pending.repayment.loan_id,
+            amount: pending.repayment.amount,
+            reason,
+          });
+          logger.error('payroll: loan repayment posting failed after payroll records were committed', {
+            employee: pending.employeeLabel,
+            loanId: pending.repayment.loan_id,
+            amount: pending.repayment.amount,
+            periodId,
+            reason,
+          });
+        }
+      }
+
+      if (failedRepayments.length > 0) {
+        const detail = failedRepayments
+          .map(f => `${f.employeeLabel} — loan ${f.loanId}, installment ${f.amount} (${f.reason})`)
+          .join('; ');
+        throw new Error(
+          `Payroll was processed and ${createdRecords?.length ?? records.length} payroll record(s) committed, but ` +
+          `${failedRepayments.length} loan repayment(s) could NOT be posted. These employees have already been ` +
+          `docked the installment in their payslip while their loan balance still shows it as owed — record the ` +
+          `repayment manually on each loan to reconcile: ${detail}`,
+        );
       }
 
       return {

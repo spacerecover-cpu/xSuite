@@ -78,7 +78,10 @@ export async function computeStockSaleTax(input: StockSaleTaxInput): Promise<Tax
     .lte('registered_from', taxPointDate)
     .or(`registered_to.is.null,registered_to.gte.${taxPointDate}`);
 
-  const { data: rates } = await supabase
+  // A failed rate read must abort the sale: swallowing it would leave `rates`
+  // empty, and an empty rate set is indistinguishable from a genuinely untaxed
+  // sale — the POS would persist a zero-tax taxable sale and understate output tax.
+  const { data: rates, error: ratesError } = await supabase
     .from('geo_country_tax_rates')
     .select('*')
     .eq('country_id', seller.country_id)
@@ -86,6 +89,9 @@ export async function computeStockSaleTax(input: StockSaleTaxInput): Promise<Tax
     .lte('valid_from', taxPointDate)
     .or(`valid_to.is.null,valid_to.gte.${taxPointDate}`)
     .order('sort_order');
+  if (ratesError) {
+    throw new Error(`computeStockSaleTax: tax rates could not be loaded — ${ratesError.message}`);
+  }
 
   const rateContext = await resolveRateContext(undefined, taxPointDate, null); // tenant base
 

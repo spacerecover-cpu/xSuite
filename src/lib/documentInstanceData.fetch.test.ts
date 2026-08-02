@@ -4,7 +4,16 @@ import { describe, it, expect, vi } from 'vitest';
 // throws without VITE_* env. Mock it — the aggregation helper never touches it.
 vi.mock('./supabaseClient', () => ({ supabase: {} }));
 
-import { aggregateRecoverability } from './documentInstanceData.fetch';
+import { aggregateRecoverability, CASE_DEVICE_SELECT } from './documentInstanceData.fetch';
+
+describe('CASE_DEVICE_SELECT', () => {
+  it('embeds the table each case_devices FK actually references', () => {
+    // case_devices_interface_id_fkey → catalog_interfaces (database.types.ts);
+    // embedding catalog_device_interfaces makes PostgREST fail to resolve it.
+    expect(CASE_DEVICE_SELECT).toContain('catalog_interfaces!interface_id(name)');
+    expect(CASE_DEVICE_SELECT).not.toContain('catalog_device_interfaces');
+  });
+});
 
 describe('aggregateRecoverability', () => {
   it('returns null when no device has a recovery_result (donors / pre-diagnosis)', () => {

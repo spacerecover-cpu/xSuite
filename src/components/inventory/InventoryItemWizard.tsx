@@ -184,6 +184,9 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
   const [numberIssuedByTypeId, setNumberIssuedByTypeId] = useState<string | null>(null);
   const [autoLocationHint, setAutoLocationHint] = useState<string>('');
   const locationUserChanged = useRef(false);
+  // Bumped on every edit-mode load (and on close / switch to Add) so a slow,
+  // superseded response can never overwrite a newer form.
+  const loadRequestIdRef = useRef(0);
 
   // Donor parts state: maps part_type → { checked, quantity, condition_id }
   const [donorPartChecked, setDonorPartChecked] = useState<Record<string, boolean>>({});
@@ -317,11 +320,14 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
 
   // Load existing item in edit mode
   useEffect(() => {
+    // Bump before the early return too: closing the modal or switching to Add
+    // must also invalidate a load that is still in flight.
+    const requestId = ++loadRequestIdRef.current;
     if (!isOpen || !itemId) return;
     (async () => {
       try {
         const item = await getInventoryItemById(itemId);
-        if (!item) return;
+        if (!item || loadRequestIdRef.current !== requestId) return;
         setItemNumber(item.item_number ?? '');
         setNumberIssuedByTypeId(item.item_number_device_type_id ?? null);
 
@@ -359,6 +365,7 @@ export function InventoryItemWizard({ isOpen, onClose, onSuccess, itemId }: Prop
         if (item.is_donor) {
           try {
             const existingParts = await getItemDonorParts(itemId);
+            if (loadRequestIdRef.current !== requestId) return;
             const checkedMap: Record<string, boolean> = {};
             const qtyMap: Record<string, number> = {};
             const condMap: Record<string, string> = {};

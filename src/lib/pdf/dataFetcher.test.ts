@@ -10,7 +10,7 @@ vi.mock('../companySettingsService', () => ({ getOrCreateCompanySettings: vi.fn(
 
 import { supabase } from '../supabaseClient';
 import { getOrCreateCompanySettings } from '../companySettingsService';
-import { toQuoteData, toInvoiceData, toCaseData, toPaymentReceiptData, toPayslipData, toQuoteItems, toInvoiceItems, currencyToBlock, resolveDocumentCurrency, fetchDocumentTaxLines, fetchCompanySettings } from './dataFetcher';
+import { toQuoteData, toInvoiceData, toCaseData, toPaymentReceiptData, toPayslipData, toQuoteItems, toInvoiceItems, currencyToBlock, resolveDocumentCurrency, fetchDocumentTaxLines, fetchCompanySettings, fetchCaseDevices } from './dataFetcher';
 
 // Wires supabase.from('document_tax_lines').select(...).eq(...).eq(...).is(...).order(...)
 // to resolve with `result`, and returns the spies so callers can assert on args.
@@ -631,6 +631,47 @@ describe('toPayslipData — column mapping + relation contract', () => {
     });
     expect(result.employee).toEqual({ first_name: 'Sam', last_name: 'Lee', employee_number: 'E-1' });
     expect(result.payroll_period.period_name).toBe('Jan 2026');
+  });
+});
+
+// Fake case_devices query chain that actually APPLIES the filters it is given, so
+// a missing `.is('deleted_at', null)` shows up as a soft-deleted row in the output
+// rather than a silently-passing assertion.
+function mockCaseDevicesQuery(rows: Array<Record<string, unknown>>) {
+  const filters: Array<(row: Record<string, unknown>) => boolean> = [];
+  const chain = {
+    select: vi.fn(() => chain),
+    eq: vi.fn((column: string, value: unknown) => {
+      filters.push(row => row[column] === value);
+      return chain;
+    }),
+    is: vi.fn((column: string, value: unknown) => {
+      filters.push(row => row[column] === value);
+      return chain;
+    }),
+    order: vi.fn(() =>
+      Promise.resolve({ data: rows.filter(row => filters.every(f => f(row))), error: null }),
+    ),
+  };
+  const from = vi.fn(() => chain);
+  (supabase as unknown as { from: typeof from }).from = from;
+  return { from, chain };
+}
+
+describe('fetchCaseDevices — soft-deleted devices never print on custody documents', () => {
+  const LIVE = { id: 'd1', case_id: 'case-1', model: 'ST4000', serial_number: 'SN-LIVE', deleted_at: null };
+  const REMOVED = { id: 'd2', case_id: 'case-1', model: 'WD2000', serial_number: 'SN-REMOVED', deleted_at: '2026-07-30T10:00:00.000Z' };
+
+  it('excludes a device that was removed from the case (soft-deleted)', async () => {
+    mockCaseDevicesQuery([LIVE, REMOVED]);
+    const devices = await fetchCaseDevices('case-1');
+    expect(devices.map(d => d.serial_number)).toEqual(['SN-LIVE']);
+  });
+
+  it('applies the deleted_at IS NULL filter on the case_devices query', async () => {
+    const { chain } = mockCaseDevicesQuery([LIVE]);
+    await fetchCaseDevices('case-1');
+    expect(chain.is).toHaveBeenCalledWith('deleted_at', null);
   });
 });
 

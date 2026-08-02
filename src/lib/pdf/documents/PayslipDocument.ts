@@ -27,9 +27,27 @@ export function buildPayslipDocument(
   const earnings = payslipData.items?.filter((item) => item.component_type !== 'deduction') || [];
 
   // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single payroll_record = one employee/period in one currency; payroll_record_items has no amount_base shadow
-  const totalEarnings = earnings.reduce((sum, item) => sum + Number(item.amount), 0);
+  const itemEarnings = earnings.reduce((sum, item) => sum + Number(item.amount), 0);
   // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single payroll_record = one employee/period in one currency; payroll_record_items has no amount_base shadow
-  const totalDeductions = deductions.reduce((sum, item) => sum + Number(item.amount), 0);
+  const itemDeductions = deductions.reduce((sum, item) => sum + Number(item.amount), 0);
+
+  // The per-component breakdown (payroll_record_items) is OPTIONAL — processPayroll
+  // computes pay straight onto payroll_records and writes no item rows — so summing
+  // items alone prints 0.00 totals next to a real Net Salary box. The record columns
+  // are the authoritative money (gross_salary = payroll_records.total_earnings, and
+  // net = gross − deductions by construction in computeEmployeePay), so fall back to
+  // them for whichever side has no component rows.
+  // Fall back to the authoritative payroll_records columns, NOT to arithmetic:
+  // net_salary is nullable, so `gross - net` would print the whole gross as
+  // deductions for any record with a null net.
+  const totalEarnings =
+    earnings.length > 0 || payslipData.gross_salary == null
+      ? itemEarnings
+      : Number(payslipData.gross_salary);
+  const totalDeductions =
+    deductions.length > 0 || payslipData.total_deductions == null
+      ? itemDeductions
+      : Number(payslipData.total_deductions);
 
   const thinTableLayout = {
     hLineWidth: () => 0.5,

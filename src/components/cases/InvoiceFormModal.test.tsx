@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { useState } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -238,5 +239,72 @@ describe('InvoiceFormModal — quote conversion carries discount type and tax ra
     // Tax rate follows the quote (10% of the $1700 net), not the invoice default of 0%.
     expect(screen.getByText('$170.00')).toBeInTheDocument();
     expect(screen.getByText('$1870.00')).toBeInTheDocument();
+  });
+});
+
+describe('InvoiceFormModal — discount clamping', () => {
+  it('never previews or saves a fixed discount larger than the line subtotal', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <InvoiceFormModal isOpen onClose={() => {}} onSave={onSave} caseId="case-1" />
+      </QueryClientProvider>,
+    );
+
+    await user.type(screen.getByPlaceholderText('e.g., Data Recovery Services Invoice'), 'SSD Recovery');
+    await user.type(screen.getByPlaceholderText('Describe the service or item'), 'Logical recovery');
+    const price = screen.getByPlaceholderText('Price');
+    await user.clear(price);
+    await user.type(price, '300');
+
+    const discount = await screen.findByLabelText(/^Discount \(/);
+    await user.clear(discount);
+    await user.type(discount, '500');
+
+    // Preview stops at the subtotal — no negative net amount.
+    expect(screen.getByText('-$300.00')).toBeInTheDocument();
+    expect(screen.queryByText('$-200.00')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /create invoice/i }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+
+    // The clamped value is what reaches computeDocumentTotals, not the raw 500.
+    const [payload] = onSave.mock.calls[0] as [Record<string, unknown>];
+    expect(payload.discount_amount).toBe(300);
+  });
+});
+
+describe('InvoiceFormModal — edits survive a parent re-render', () => {
+  it('does not re-seed the form when the caller rebuilds initialData', async () => {
+    const user = userEvent.setup();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    // Mirrors the real callers, which pass toInvoiceEditInitialData(...) — a
+    // fresh object on every render of the page.
+    const Harness = () => {
+      const [tick, setTick] = useState(0);
+      return (
+        <QueryClientProvider client={client}>
+          <button type="button" onClick={() => setTick((t) => t + 1)}>
+            force parent render {tick}
+          </button>
+          <InvoiceFormModal
+            isOpen onClose={() => {}} onSave={vi.fn().mockResolvedValue(undefined)}
+            caseId="case-1" initialData={{ ...initialData }}
+          />
+        </QueryClientProvider>
+      );
+    };
+    render(<Harness />);
+
+    const ref = screen.getByPlaceholderText(REF_PLACEHOLDER);
+    await user.clear(ref);
+    await user.type(ref, 'PO-EDITED');
+
+    await user.click(screen.getByRole('button', { name: /force parent render/i }));
+
+    expect(screen.getByPlaceholderText(REF_PLACEHOLDER)).toHaveValue('PO-EDITED');
   });
 });

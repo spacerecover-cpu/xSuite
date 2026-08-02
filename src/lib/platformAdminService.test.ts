@@ -13,6 +13,8 @@ import {
   getTenantDetails,
   getDashboardStats,
   getTenantsList,
+  getSupportTickets,
+  getTicketDetails,
   suspendTenant,
   reactivateTenant,
 } from './platformAdminService';
@@ -174,6 +176,7 @@ function makeScopedQuery(result: {
     gte: vi.fn(() => builder),
     in: vi.fn(() => builder),
     is: vi.fn(() => builder),
+    or: vi.fn(() => builder),
     order: vi.fn(() => builder),
     limit: vi.fn(() => builder),
     maybeSingle: vi.fn(() =>
@@ -385,5 +388,105 @@ describe('tenant scoping (bugs 60/61/62 — platform admin bypasses RLS)', () =>
     await recordHealthMetrics('tenant-1');
     expectAllScoped(byTable['cases'], 'tenant-1');
     expectAllScoped(byTable['payments'], 'tenant-1');
+  });
+});
+
+/**
+ * Regression — the platform-admin queries must name columns and embeds that actually
+ * exist. `tenants` has no company_name/email column, and support_tickets carries no FK
+ * to platform_admins, so both shapes raised PostgREST 400s that were swallowed into a
+ * permanently empty tenant search / ticket list.
+ */
+function makeErroringSelect() {
+  const builder: Record<string, unknown> = {
+    select: vi.fn(() => builder),
+    eq: vi.fn(() => builder),
+    in: vi.fn(() => builder),
+    is: vi.fn(() => builder),
+    or: vi.fn(() => builder),
+    order: vi.fn(() => builder),
+    maybeSingle: vi.fn(() =>
+      Promise.resolve({ data: null, error: { message: 'column does not exist' }, count: null }),
+    ),
+    then: (resolve: (v: { data: unknown; count: null; error: { message: string } }) => void) =>
+      resolve({ data: null, count: null, error: { message: 'column does not exist' } }),
+  };
+  return builder;
+}
+
+const TICKET_ROW = {
+  id: 'tk1',
+  customer_id: 'c1',
+  assigned_to: 'a1',
+  tenant_id: 'tn1',
+  tenants: { id: 'tn1', name: 'Acme Recovery' },
+};
+
+/** Route the ticket query, the assignee lookup and the customer lookup to captured builders. */
+function wireTickets() {
+  const tickets = makeScopedQuery({ data: [TICKET_ROW], single: TICKET_ROW });
+  const admins = makeScopedQuery({ data: [{ id: 'a1', full_name: 'Root Admin' }] });
+  from.mockImplementation((table: string) => {
+    switch (table) {
+      case 'support_tickets':
+        return tickets;
+      case 'platform_admins':
+        return admins;
+      case 'profiles':
+        return makeScopedQuery({ data: [{ id: 'c1', email: 'c@x.io', full_name: 'Cust' }] });
+      default:
+        return makeScopedQuery({ data: [] });
+    }
+  });
+  return { tickets, admins };
+}
+
+describe('platform-admin queries reference real columns and resolvable embeds', () => {
+  it('getTenantsList searches real tenants columns, not company_name/email', async () => {
+    let tenantsQuery: Record<string, unknown> | undefined;
+    from.mockImplementation((table: string) => {
+      if (table === 'tenants') return (tenantsQuery = makeScopedQuery({ data: [] }));
+      return makeScopedQuery({ data: [] });
+    });
+
+    await getTenantsList({ search: 'acme' });
+
+    const filter = (tenantsQuery!.or as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(filter).not.toMatch(/company_name|email\.ilike/);
+    expect(filter).toContain('name.ilike.%acme%');
+    expect(filter).toContain('slug.ilike.%acme%');
+  });
+
+  it('getTenantsList surfaces a failed query instead of returning an empty list', async () => {
+    from.mockImplementation(() => makeErroringSelect());
+    await expect(getTenantsList({ search: 'acme' })).rejects.toBeTruthy();
+  });
+
+  it('getSupportTickets selects tenants.name and resolves the assignee without an embed', async () => {
+    const { tickets: ticketsQuery } = wireTickets();
+
+    const tickets = await getSupportTickets();
+
+    const select = (ticketsQuery.select as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(select).not.toMatch(/company_name|platform_admins/);
+    expect(select).toContain('tenants(id, name)');
+    expect(tickets[0].tenant).toEqual({ id: 'tn1', company_name: 'Acme Recovery' });
+    expect(tickets[0].assigned_admin).toEqual({ id: 'a1', full_name: 'Root Admin' });
+  });
+
+  it('getSupportTickets surfaces a failed query instead of returning an empty list', async () => {
+    from.mockImplementation(() => makeErroringSelect());
+    await expect(getSupportTickets()).rejects.toBeTruthy();
+  });
+
+  it('getTicketDetails selects tenants.name and resolves the assignee without an embed', async () => {
+    const { tickets: ticketsQuery } = wireTickets();
+
+    const ticket = await getTicketDetails('tk1');
+
+    const select = (ticketsQuery.select as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(select).not.toMatch(/company_name|platform_admins/);
+    expect(ticket!.tenant).toEqual({ id: 'tn1', company_name: 'Acme Recovery' });
+    expect(ticket!.assigned_admin).toEqual({ id: 'a1', full_name: 'Root Admin' });
   });
 });

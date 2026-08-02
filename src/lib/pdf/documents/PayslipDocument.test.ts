@@ -27,6 +27,7 @@ function makePayslipData(): PayslipDocumentData {
       payroll_period: { period_name: 'June 2026', start_date: '2026-06-01', end_date: '2026-06-30' },
       payment_date: '2026-07-01',
       gross_salary: 1350,
+      total_deductions: 100,
       net_salary: 1250,
       items: [
         { component_code: 'BASIC', component_name: 'Basic Salary', component_type: 'earning', amount: 1000, calculation_basis: 'Monthly' },
@@ -82,5 +83,50 @@ describe('buildPayslipDocument — earnings classification', () => {
 
     // Net Salary box stays consistent: 1350 − 100 = 1250.
     expect(joined).toContain('1,250.00 AED');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: processPayroll writes payroll_records only — it never inserts
+// payroll_record_items — so a real payslip arrives with items: []. Summing items
+// alone printed "Total Earnings 0.00 / Total Deductions 0.00" beside a correct
+// Net Salary box. Both totals must fall back to the record columns.
+// ---------------------------------------------------------------------------
+
+describe('buildPayslipDocument — totals when no component breakdown was stored', () => {
+  it('derives Total Earnings and Total Deductions from the payroll record', () => {
+    const data = makePayslipData();
+    data.payslipData.items = [];
+
+    const texts: string[] = [];
+    collectTexts(buildPayslipDocument(data, englishCtx).content, texts);
+    const joined = texts.join('|');
+
+    // Total Earnings = gross_salary 1350 (was 0.00 before the fix).
+    expect(joined).toContain('1,350.00 AED');
+    // Total Deductions = payroll_records.total_deductions (was 0.00 before the fix).
+    // Deliberately NOT gross − net: net_salary is nullable, so that arithmetic
+    // would print the whole gross as deductions for a record with a null net.
+    expect(joined).toContain('100.00 AED');
+    expect(joined).toContain('1,250.00 AED');
+  });
+
+  it('prefers component rows over the record column when both exist', () => {
+    const data = makePayslipData();
+    // Earnings rows present, deductions missing → earnings from items, deductions
+    // from the record column. gross_salary is skewed away from the item sum so the
+    // assertion actually pins which side won: summing items gives 1,350 while the
+    // record column would give 9,999.
+    data.payslipData.gross_salary = 9999;
+    data.payslipData.items = data.payslipData.items.filter((i) => i.component_type !== 'deduction');
+
+    const texts: string[] = [];
+    collectTexts(buildPayslipDocument(data, englishCtx).content, texts);
+    const joined = texts.join('|');
+
+    expect(joined).toContain('Basic Salary');
+    expect(joined).toContain('1,350.00 AED');   // items won
+    expect(joined).not.toContain('9,999.00 AED');
+    expect(joined).toContain('100.00 AED');     // record column supplied deductions
   });
 });

@@ -164,11 +164,14 @@ export async function getTenantsList(filters?: {
   }
 
   if (filters?.search) {
+    // tenants has no company_name/email column — the searchable identifiers are
+    // name, slug, tenant_code and domain.
     const s = sanitizeFilterValue(filters.search);
-    query = query.or(`company_name.ilike.%${s}%,email.ilike.%${s}%,tenant_code.ilike.%${s}%`);
+    query = query.or(`name.ilike.%${s}%,slug.ilike.%${s}%,tenant_code.ilike.%${s}%,domain.ilike.%${s}%`);
   }
 
-  const { data: tenants } = await query;
+  const { data: tenants, error } = await query;
+  if (error) throw error;
   if (!tenants) return [];
 
   const tenantIds = tenants.map(t => t.id);
@@ -385,6 +388,32 @@ async function fetchCustomerProfiles(
   return map;
 }
 
+// support_tickets.assigned_to holds a platform_admins.id but carries no FK, so
+// PostgREST cannot embed the admin either. Fetch the assignees directly by id.
+async function fetchAssignedAdmins(
+  adminIds: Array<string | null | undefined>,
+): Promise<Map<string, { id: string; full_name: string }>> {
+  const ids = [...new Set(adminIds.filter((id): id is string => !!id))];
+  const map = new Map<string, { id: string; full_name: string }>();
+  if (ids.length === 0) return map;
+
+  const { data } = await supabase
+    .from('platform_admins')
+    .select('id, full_name')
+    .in('id', ids);
+
+  (data || []).forEach(a => {
+    map.set(a.id, { id: a.id, full_name: a.full_name });
+  });
+
+  return map;
+}
+
+// tenants exposes the lab name as `name`; TicketWithDetails keeps the company_name key.
+function mapTicketTenant(tenants: { id: string; name: string } | null | undefined) {
+  return tenants ? { id: tenants.id, company_name: tenants.name } : undefined;
+}
+
 export async function getSupportTickets(filters?: {
   status?: string;
   priority?: string;
@@ -396,8 +425,7 @@ export async function getSupportTickets(filters?: {
     .from('support_tickets')
     .select(`
       *,
-      tenants(id, company_name),
-      platform_admins(id, full_name)
+      tenants(id, name)
     `)
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
@@ -419,42 +447,47 @@ export async function getSupportTickets(filters?: {
     query = query.or(`ticket_number.ilike.%${ts}%,subject.ilike.%${ts}%`);
   }
 
-  const { data } = await query;
+  const { data, error } = await query;
+  if (error) throw error;
 
   const rows = data || [];
-  const customerProfiles = await fetchCustomerProfiles(
-    rows.map((ticket: any) => ticket.customer_id),
-  );
+  const [customerProfiles, assignedAdmins] = await Promise.all([
+    fetchCustomerProfiles(rows.map((ticket: any) => ticket.customer_id)),
+    fetchAssignedAdmins(rows.map((ticket: any) => ticket.assigned_to)),
+  ]);
 
   return rows.map((ticket: any) => ({
     ...ticket,
     customer: customerProfiles.get(ticket.customer_id),
-    tenant: ticket.tenants,
-    assigned_admin: ticket.platform_admins,
+    tenant: mapTicketTenant(ticket.tenants),
+    assigned_admin: assignedAdmins.get(ticket.assigned_to),
   }));
 }
 
 export async function getTicketDetails(ticketId: string): Promise<TicketWithDetails | null> {
-  const { data: ticket } = await supabase
+  const { data: ticket, error } = await supabase
     .from('support_tickets')
     .select(`
       *,
-      tenants(id, company_name),
-      platform_admins(id, full_name)
+      tenants(id, name)
     `)
     .eq('id', ticketId)
     .is('deleted_at', null)
     .maybeSingle();
 
+  if (error) throw error;
   if (!ticket) return null;
 
-  const customerProfiles = await fetchCustomerProfiles([(ticket as any).customer_id]);
+  const [customerProfiles, assignedAdmins] = await Promise.all([
+    fetchCustomerProfiles([(ticket as any).customer_id]),
+    fetchAssignedAdmins([(ticket as any).assigned_to]),
+  ]);
 
   return {
     ...(ticket as any),
     customer: customerProfiles.get((ticket as any).customer_id),
-    tenant: (ticket as any).tenants,
-    assigned_admin: (ticket as any).platform_admins,
+    tenant: mapTicketTenant((ticket as any).tenants),
+    assigned_admin: assignedAdmins.get((ticket as any).assigned_to),
   };
 }
 

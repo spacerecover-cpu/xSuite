@@ -121,7 +121,12 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
 
   const subtotal = invoice.subtotal || 0;
   const discountAmount = invoice.discount_amount || 0;
-  const discountedSubtotal = subtotal - discountAmount;
+  // `discount_type` ('amount' | 'percentage') decides whether discount_amount is an
+  // absolute figure or a percent of subtotal — resolved exactly like the pdfmake
+  // invoice adapter so the preview can never print a raw percent as currency.
+  const discountType = invoice.discount_type || 'amount';
+  const discountValue = discountType === 'percentage' ? (subtotal * discountAmount) / 100 : discountAmount;
+  const discountedSubtotal = subtotal - discountValue;
   // Tax rows come from document_tax_lines (via useDocumentCompliance) — no
   // render-time (subtotal - discount) * rate recompute (AD-3).
   // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency: summing this ONE document's own tax-component rows, not a cross-document rollup
@@ -338,13 +343,14 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
                 {formatMoney(invoice.subtotal)}
               </span>
             </div>
-            {invoice.discount_amount > 0 && (
+            {discountAmount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-slate-700 font-medium">
-                  {t('discount', 'Discount')}:
+                  {t('discount', 'Discount')}
+                  {discountType === 'percentage' ? ` (${discountAmount}%)` : ''}:
                 </span>
                 <span className="font-semibold text-red-600 text-right">
-                  - {formatMoney(invoice.discount_amount)}
+                  - {formatMoney(discountValue)}
                 </span>
               </div>
             )}
