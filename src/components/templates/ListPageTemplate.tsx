@@ -3,7 +3,7 @@ import React from 'react';
 import { cn } from '../../lib/utils';
 import { PageHeaderSlot } from '../layout/PageHeaderSlot';
 import { Pager } from '../ui/Pager';
-import { ListPageSkeleton } from './ListPageSkeleton';
+import { ListPageBodySkeleton } from './ListPageSkeleton';
 import { CollapsibleKpis } from './CollapsibleKpis';
 import type { PagerSlotProps } from '../../hooks/useListPage';
 
@@ -24,6 +24,12 @@ export interface ListPageTemplateProps {
   footer?: React.ReactNode;
   /** Modals / deep-link effects — page-owned. */
   children?: React.ReactNode;
+  /**
+   * Replaces the RESULTS REGION while loading (not the whole page) — the KPI
+   * row and toolbar stay mounted so the search input keeps focus. Supply a
+   * rows-only placeholder; a full-page skeleton here would duplicate the
+   * chrome that is now always rendered.
+   */
   loadingFallback?: React.ReactNode;
   /** Skip the white table-card wrapper (table supplies its own surface). */
   unstyledBody?: boolean;
@@ -52,23 +58,27 @@ export const ListPageTemplate: React.FC<ListPageTemplateProps> = ({
 }) => (
   <div className="px-6 py-5 max-w-[1800px] 2xl:max-w-[2400px] mx-auto">
     <PageHeaderSlot title={title} actions={headerActions} />
+    {/*
+      KPIs and toolbar render OUTSIDE the loading swap and stay mounted across
+      fetches. They used to sit inside it, so every refetch unmounted the whole
+      body — including the toolbar's search input. Typing a character triggered
+      a fetch, React tore the input out of the DOM, and the remounted input came
+      back empty of focus and cursor position, forcing a click before the next
+      keystroke. Only the results region may swap.
+    */}
+    {kpis && <CollapsibleKpis>{kpis}</CollapsibleKpis>}
+    {toolbar}
     {loading ? (
-      loadingFallback ?? <ListPageSkeleton />
+      loadingFallback ?? <ListPageBodySkeleton />
+    ) : isEmpty ? (
+      empty
     ) : (
-      <>
-        {kpis && <CollapsibleKpis>{kpis}</CollapsibleKpis>}
-        {toolbar}
-        {isEmpty ? (
-          empty
-        ) : (
-          <div className={cn(!unstyledBody && 'bg-white rounded-xl border border-slate-200 overflow-hidden')}>
-            {table}
-            {pager && <Pager {...pager} />}
-          </div>
-        )}
-        {footer}
-      </>
+      <div className={cn(!unstyledBody && 'bg-white rounded-xl border border-slate-200 overflow-hidden')}>
+        {table}
+        {pager && <Pager {...pager} />}
+      </div>
     )}
+    {footer}
     {children}
   </div>
 );

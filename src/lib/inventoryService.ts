@@ -94,13 +94,19 @@ function applyInventoryFilters(
 
   if (filters.search) {
     const s = sanitizeFilterValue(filters.search);
+    // pcb_number_search is a generated column mirroring the PCB number the list
+    // view displays. Engineers hunting a donor read a fragment off the board
+    // silkscreen ("771590" of "2060771590 001 REV A"), so it must be reachable
+    // from the quick box, not only Advanced Search. It is a plain column, not a
+    // JSON path: a malformed entry in this or() fails EVERY quick search.
     q = q.or(
       `name.ilike.%${s}%,` +
       `item_number.ilike.%${s}%,` +
       `serial_number.ilike.%${s}%,` +
       `model.ilike.%${s}%,` +
       `legacy_case_ref.ilike.%${s}%,` +
-      `barcode.ilike.%${s}%`
+      `barcode.ilike.%${s}%,` +
+      `pcb_number_search.ilike.%${s}%`
     );
   }
 
@@ -124,7 +130,9 @@ function applyInventoryFilters(
   // ALL spec filters must target technical_details, not the legacy columns.
   if (filters.pcb_number) {
     const v = sanitizeFilterValue(filters.pcb_number);
-    q = q.ilike('technical_details->>pcb_number', `%${v}%`);
+    // Generated mirror of technical_details->>pcb_number, so this is the same
+    // match as before but trigram-indexed instead of a full scan.
+    q = q.ilike('pcb_number_search', `%${v}%`);
   }
 
   if (filters.firmware) {
