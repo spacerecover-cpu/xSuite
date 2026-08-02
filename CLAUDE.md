@@ -298,19 +298,20 @@ The schema-drift detector (`scripts/check-schema-drift.sh`) regenerates types an
 `geo_countries`, `geo_cities`
 
 ### Master Data (Global)
-`master_industries`, `master_currency_codes`, `master_case_priorities`, `master_case_statuses`, `master_case_no_solution_reasons`, `master_case_report_templates`, `master_invoice_statuses`, `master_quote_statuses`, `master_purchase_order_statuses`, `master_leave_types`, `master_payment_methods`, `master_expense_categories`, `master_transaction_categories`, `master_template_categories`, `master_template_types`, `master_template_variables`, `master_modules`, `master_inventory_categories`, `master_inventory_condition_types`, `master_inventory_item_categories`, `master_inventory_status_types`, `master_supplier_categories`, `master_supplier_payment_terms`, `master_payroll_components`
+`master_industries`, `master_currency_codes`, `master_case_priorities`, `master_case_statuses`, `master_case_no_solution_reasons`, `master_report_sections`, `master_report_section_presets`, `master_invoice_statuses`, `master_quote_statuses`, `master_purchase_order_statuses`, `master_leave_types`, `master_payment_methods`, `master_expense_categories`, `master_transaction_categories`, `master_template_categories`, `master_template_types`, `master_template_variables`, `master_modules`, `master_inventory_categories`, `master_inventory_condition_types`, `master_inventory_item_categories`, `master_inventory_status_types`, `master_supplier_categories`, `master_supplier_payment_terms`, `master_payroll_components`
 
 ### Device & Service Catalogs (Global)
 `catalog_device_brands`, `catalog_device_types`, `catalog_device_capacities`, `catalog_device_encryption`, `catalog_device_form_factors`, `catalog_device_interfaces`, `catalog_device_made_in`, `catalog_device_head_counts`, `catalog_device_platter_counts`, `catalog_device_roles`, `catalog_device_conditions`, `catalog_device_component_statuses`, `catalog_interfaces`, `catalog_accessories`, `catalog_donor_compatibility_matrix`, `catalog_service_types`, `catalog_service_locations`, `catalog_service_problems`, `catalog_service_categories`, `catalog_service_line_items`
 
 ### System (Global)
-`system_settings`, `system_seed_status`, `report_section_library`, `report_section_presets`, `report_template_section_mappings`
+`system_settings`, `system_seed_status`
+(The pre-1.0.0 names `report_section_library` / `report_section_presets` / `report_template_section_mappings` / `master_case_report_templates` / `case_reports` / `case_report_sections` are BANNED legacy tables — see `eslint-rules/banned-tables.js`. Report section templates live in `master_report_sections` + `master_report_section_presets` (global) and `report_section_templates` (tenant); authored reports live in `document_instances` + `document_instance_sections`.)
 
 ### Platform & Subscription
 `tenants`, `profiles`, `platform_admins`, `platform_audit_logs`, `platform_announcements`, `platform_metrics`, `tenant_impersonation_sessions`, `subscription_plans`, `plan_features`, `tenant_subscriptions`, `tenant_payment_methods`, `tenant_activity_log`, `tenant_health_metrics`, `billing_invoices`, `billing_invoice_items`, `billing_events`, `billing_coupons`, `coupon_redemptions`, `usage_records`, `usage_snapshots`, `support_tickets`, `support_ticket_messages`, `announcement_dismissals`, `onboarding_progress`, `signup_otps`
 
 ### Cases (Tenant-scoped)
-`cases`, `case_devices`, `case_attachments`, `case_communications`, `case_diagnostics`, `case_engineers`, `case_follow_ups`, `case_internal_notes`, `case_job_history`, `case_milestones`, `case_portal_visibility`, `case_qa_checklists`, `case_recovery_attempts`, `case_quotes`, `case_quote_items`, `case_reports`, `case_report_sections`
+`cases`, `case_devices`, `case_attachments`, `case_communications`, `case_diagnostics`, `case_engineers`, `case_follow_ups`, `case_internal_notes`, `case_job_history`, `case_milestones`, `case_portal_visibility`, `case_qa_checklists`, `case_recovery_attempts`, `case_quotes`, `case_quote_items`; authored case reports/certificates live in `document_instances` + `document_instance_sections` (Document Studio)
 
 ### Chain of Custody (Tenant-scoped)
 `chain_of_custody`, `chain_of_custody_access_log`, `chain_of_custody_integrity_checks`, `chain_of_custody_transfers`
@@ -338,7 +339,7 @@ The schema-drift detector (`scripts/check-schema-drift.sh`) regenerates types an
 `asset_categories`, `assets`, `asset_assignments`, `asset_depreciation`, `asset_maintenance`
 
 ### Documents & Templates (Tenant-scoped)
-`document_templates`, `templates`, `template_versions`, `number_sequences`, `number_sequences_audit`, `role_module_permissions`
+`document_templates`, `templates`, `template_versions`, `report_section_templates`, `number_sequences`, `number_sequences_audit`, `role_module_permissions`
 
 ### System & Logs (Tenant-scoped)
 `system_logs`, `audit_trails`, `database_backups`, `pdf_generation_logs`, `user_preferences`, `user_sidebar_preferences`, `user_activity_sessions`, `user_activity_logs`, `user_sessions`, `branches`
@@ -695,6 +696,16 @@ const formatted = formatCurrencyWithConfig(amount, currency);
 - **Event pipeline**: 7 new DB emitters (case created/device received/quote lifecycle incl. DB-side `quotes.sent_at` stamping/invoice issued/recovery outcome/checkout/parts ordered) → `notification_events` via `whatsapp_safe_emit(tenant,…)` (direct insert — the emit RPC requires session tenant context that pg_cron lacks) → `dispatch_notification_event_whatsapp` trigger (consumes base `case.phase_changed` only; default-FALSE read of `feature_flags->>'automation.whatsapp'`; inlined consent check; stable `wa:<event>:<entity>:<day>` dedup with pending-row schedule bump for multi-device intake debounce) → `whatsapp_messages` queue → pg_cron scanners (1-min queue sweep with SKIP-LOCKED innermost locking + per-tenant fairness; 15-min reminders with repeat_max enforcement; daily payload purge) → `whatsapp-send` edge worker (attempt budget consumed only by real Graph calls; error-classified backoff/suppression) → `whatsapp-webhook` receiver (two-phase ledger, tenant-scoped wamid updates, STOP/START consent automation, 24h-window tracking).
 - **22-event automation catalog** (`src/lib/whatsapp/events.ts`), Communications settings module (connection/automations/template studio), consent capture (customer modal + intake wizard + profile), case-thread WhatsApp timeline with delivery ticks, message log + analytics (server-side aggregate RPCs), GDPR anonymize/export cascade with the consent-ledger Art. 17(3)(e) carve-out. Feature default-OFF via registry `automation.whatsapp` (mirrored server-side).
 - `whatsapp_webhook_events` is excluded from `check-tenant-table-requirements` by design (nullable tenant, service-role writer). `database.types.ts` regenerated.
+
+### Version 1.7.0 — Report Section Templates (Predefined per Report Type, Tenant-Customizable)
+**Date**: 2026-08-02
+**Migrations**: `report_section_templates_and_presets` (20260802154014), `rename_report_section_globals_to_master_prefix` (20260802160517)
+
+- **Predefined section templates per report type, tenant-choosable and customizable** (spec: `docs/superpowers/specs/2026-08-02-report-section-templates-design.md`). New global master data: **`master_report_sections`** (catalog of the 35 canonical report sections — key/title/authoring guidance/tone/kind; SELECT for authenticated, writes platform-admin only) and **`master_report_section_presets`** (12 predefined templates across the 8 report types — one **Standard** default per type mirroring the previously hardcoded `reportSubtypeSections()` lists, plus **Compact** variants for evaluation/service/server/malware; ordered `sections` JSONB; unique default per type). New tenant table **`report_section_templates`** (full tenant kit mirroring `document_templates_pdf`) stores customized templates: rename/add/remove/reorder sections, per-type default (unique partial index), clone-from-preset provenance (`source_preset_id`), soft deletes.
+- **Resolution chain** (`reportSectionTemplateService.resolveEffectiveTemplate`, never throws): explicit picker choice → tenant default → default preset → built-in list; `createReportInstance` seeds `document_instance_sections` from it (document automation inherits the tenant default automatically).
+- **UI**: Case Detail → Reports → New Document now opens `NewReportModal` (template radio cards with System/Custom/effective-Default badges + per-document section composer: include-toggle, reorder, inline rename, add-from-library, add-custom, "save as team template"); Settings → **Report Sections** (`/settings/report-sections`, `report-sections` category) manages presets (duplicate-to-customize) and tenant templates (edit/set default/delete) via the shared `ReportSectionComposer`.
+- **PDF fix**: `buildReportSections` (reportAdapter) is now instance-driven — authored rows render in stored order, so customized/renamed/custom sections actually print (previously any section outside the hardcoded subtype list was silently dropped). Legacy-ALIASED keys keep the canonical multilingual title; direct-key renames win verbatim; a `data_destruction` report always renders its Certificate of Destruction section (operator/witness/approver slots) even if no authored row exists.
+- The original migration shipped the two global tables under pre-1.0.0 BANNED names (`report_section_library`/`report_section_presets` — stale CLAUDE.md rows); the follow-up migration renamed them in place to the `master_*` forms (data/RLS/FK preserved). `database.types.ts` regenerated.
 
 ### Future Migration Guidelines
 

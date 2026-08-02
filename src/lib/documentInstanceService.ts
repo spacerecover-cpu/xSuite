@@ -20,7 +20,10 @@ import {
   buildDocumentPdfPath,
   type DocumentInstanceType,
 } from './pdf/contentHash';
-import { reportSubtypeSections } from './pdf/engine/adapters/reportAdapter';
+import {
+  resolveEffectiveTemplate,
+  type TemplateSectionDescriptor,
+} from './reportSectionTemplateService';
 
 type DocumentInstanceRow = Database['public']['Tables']['document_instances']['Row'];
 type DocumentInstanceInsert = Database['public']['Tables']['document_instances']['Insert'];
@@ -219,12 +222,19 @@ export interface CreateReportInstanceParams {
   caseId: string;
   reportSubtype: string;
   title: string;
+  /**
+   * Sections chosen/customized in the template picker. Absent/empty → the
+   * tenant's effective template for the subtype (tenant default → default
+   * preset → built-in list) decides the seed.
+   */
+  sections?: TemplateSectionDescriptor[];
 }
 
 /**
- * Create a draft report document_instance and seed its sections from the subtype's
- * canonical prose section list (so the engineer opens a structured, near-complete draft).
- * Number scope mirrors the legacy report numbering: `report_<subtype>`.
+ * Create a draft report document_instance and seed its sections from the chosen
+ * template (or the subtype's effective default), so the engineer opens a
+ * structured, near-complete draft. Number scope mirrors the legacy report
+ * numbering: `report_<subtype>`.
  */
 export async function createReportInstance(params: CreateReportInstanceParams): Promise<DocumentInstanceRow> {
   const tenantId = await resolveTenantId();
@@ -243,7 +253,9 @@ export async function createReportInstance(params: CreateReportInstanceParams): 
     documentNumber: (number as string) ?? null,
   });
 
-  const seeds = reportSubtypeSections(params.reportSubtype);
+  const seeds = params.sections?.length
+    ? params.sections
+    : (await resolveEffectiveTemplate(params.reportSubtype)).sections;
   if (seeds.length > 0) {
     const rows = seeds.map((s, i) => ({
       tenant_id: tenantId,
