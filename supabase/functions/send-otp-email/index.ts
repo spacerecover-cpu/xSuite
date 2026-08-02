@@ -107,11 +107,23 @@ Deno.serve(async (req: Request) => {
         return jsonResponse({ error: "Too many requests. Please wait a few minutes before trying again." }, 429);
       }
 
-      await supabase
+      // Retire any codes still outstanding for this address before issuing a new
+      // one. `consumed_at` is the single-use marker (migration 20260615200307)
+      // that provision-tenant already gates on — signup_otps has no deleted_at,
+      // so the previous filter raised 42703 and this invalidation never ran,
+      // leaving every earlier code valid until it expired.
+      const { error: invalidateError } = await supabase
         .from('signup_otps')
-        .update({ deleted_at: new Date().toISOString() })
+        .update({ consumed_at: new Date().toISOString() })
         .eq('email', email.toLowerCase())
-        .is('deleted_at', null);
+        .is('consumed_at', null);
+
+      // Fail closed: issuing a second live code while the previous ones are
+      // still valid is exactly the weakness this call exists to prevent.
+      if (invalidateError) {
+        console.error('Failed to invalidate previous OTPs:', invalidateError);
+        return jsonResponse({ error: "Failed to generate verification code" }, 500);
+      }
 
       const otp = generateOtp();
 
@@ -183,7 +195,7 @@ Deno.serve(async (req: Request) => {
         .from('signup_otps')
         .select('*')
         .eq('email', email.toLowerCase())
-        .is('deleted_at', null)
+        .is('consumed_at', null)
         .eq('verified', false)
         .gte('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
@@ -207,7 +219,7 @@ Deno.serve(async (req: Request) => {
       if ((otpRecord.attempts || 0) >= 5) {
         await supabase
           .from('signup_otps')
-          .update({ deleted_at: new Date().toISOString() })
+          .update({ consumed_at: new Date().toISOString() })
           .eq('id', otpRecord.id);
         return jsonResponse({ error: "Too many failed attempts. Please request a new code." }, 400);
       }
