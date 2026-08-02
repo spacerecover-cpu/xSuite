@@ -267,19 +267,13 @@ export const PaymentsList: React.FC = () => {
     }
   };
 
+  // Results-only. The KPI row and toolbar now stay mounted while loading (so the
+  // search input keeps focus), so this must not repeat that chrome.
   const loadingFallback = (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-24 w-full rounded-2xl" />
-        ))}
-      </div>
-      <Skeleton className="h-20 w-full rounded-2xl" />
-      <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-12 w-full rounded-lg" />
-        ))}
-      </div>
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-3">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Skeleton key={i} className="h-12 w-full rounded-lg" />
+      ))}
     </div>
   );
 
