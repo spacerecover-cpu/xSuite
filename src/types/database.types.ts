@@ -8118,6 +8118,7 @@ export type Database = {
           name: string
           notes: string | null
           pcb_number: string | null
+          pcb_number_search: string | null
           photos: string[] | null
           previous_item_number: string | null
           purchase_date: string | null
@@ -8165,6 +8166,7 @@ export type Database = {
           name: string
           notes?: string | null
           pcb_number?: string | null
+          pcb_number_search?: string | null
           photos?: string[] | null
           previous_item_number?: string | null
           purchase_date?: string | null
@@ -8212,6 +8214,7 @@ export type Database = {
           name?: string
           notes?: string | null
           pcb_number?: string | null
+          pcb_number_search?: string | null
           photos?: string[] | null
           previous_item_number?: string | null
           purchase_date?: string | null
@@ -20654,6 +20657,7 @@ export type Database = {
           name: string
           notes: string | null
           pcb_number: string | null
+          pcb_number_search: string | null
           photos: string[] | null
           previous_item_number: string | null
           purchase_date: string | null
