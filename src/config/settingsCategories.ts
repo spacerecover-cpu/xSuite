@@ -16,6 +16,7 @@ import {
   SlidersHorizontal,
   Columns3,
   FileStack,
+  ClipboardList,
   ListChecks,
   Workflow,
   Receipt,
@@ -254,6 +255,16 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     description: 'Customize how invoices, quotes, and receipts look when printed or emailed.',
   },
   {
+    id: 'report-sections',
+    title: 'Report Sections',
+    icon: ClipboardList,
+    backgroundColor: '#0369a1',
+    borderColor: '#0369a1',
+    tables: [],
+    actionLabel: 'Manage Templates',
+    description: 'Predefined section templates per report type — duplicate, customize, and set defaults.',
+  },
+  {
     id: 'labels',
     title: 'Label Studio',
     icon: Tags,
@@ -356,7 +367,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   { id: 'workspace', label: 'Workspace', accent: '#475569', categoryIds: ['appearance', 'preferences', 'table-columns', 'features', 'general-settings', 'notifications', 'communications'] },
   { id: 'operations', label: 'Operations', accent: '#1d4ed8', categoryIds: ['device-media', 'inventory-settings', 'case-service', 'case-lifecycle', 'procurement'] },
   { id: 'finance', label: 'Client & Finance', accent: '#0f766e', categoryIds: ['client-financial', 'localization', 'tax-registration'] },
-  { id: 'documents', label: 'Documents & Reports', accent: '#be185d', categoryIds: ['templates', 'documents', 'labels'] },
+  { id: 'documents', label: 'Documents & Reports', accent: '#be185d', categoryIds: ['templates', 'documents', 'report-sections', 'labels'] },
   { id: 'system', label: 'System & Data', accent: '#0369a1', categoryIds: ['system-numbers', 'import-export', 'client-portal'] },
   { id: 'compliance', label: 'Security & Compliance', accent: '#047857', categoryIds: ['security', 'gdpr'] },
 ];

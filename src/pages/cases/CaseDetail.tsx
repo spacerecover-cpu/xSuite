@@ -59,6 +59,7 @@ import { useCaseQueries } from '../../components/cases/detail/useCaseQueries';
 import { useCaseMutations } from '../../components/cases/detail/useCaseMutations';
 import { isDocStudioEnabled } from '../../lib/featureFlags';
 import { DocumentDraftReview } from '../../components/cases/DocumentDraftReview';
+import { NewReportModal } from '../../components/cases/NewReportModal';
 import { DocumentViewerModal } from '../../components/cases/DocumentViewerModal';
 import { REPORT_TYPES, type ReportType } from '../../lib/reportTypes';
 import { documentInstanceKeys } from '../../lib/queryKeys';
@@ -1540,21 +1541,28 @@ export const CaseDetail: React.FC = () => {
             </div>
           </Dialog>
 
-          {/* Draft Review modal — create (docCreateSubtype set) or edit (editingDocumentId set) */}
+          {/* Template picker/composer — choose a predefined template for the
+              picked subtype and customize its sections, then create the draft. */}
+          {modals.docCreateSubtype && (
+            <NewReportModal
+              isOpen={!!modals.docCreateSubtype}
+              onClose={() => modals.setDocCreateSubtype(null)}
+              caseId={id!}
+              reportSubtype={modals.docCreateSubtype as ReportType}
+              onCreated={(instanceId) => {
+                modals.setDocCreateSubtype(null);
+                modals.setEditingDocumentId(instanceId);
+                queryClient.invalidateQueries({ queryKey: documentInstanceKeys.byCase(id!) });
+              }}
+            />
+          )}
+
+          {/* Draft Review modal — edit the created/selected draft */}
           <DocumentDraftReview
-            isOpen={!!(modals.editingDocumentId || modals.docCreateSubtype)}
-            onClose={() => {
-              modals.setEditingDocumentId(null);
-              modals.setDocCreateSubtype(null);
-            }}
+            isOpen={!!modals.editingDocumentId}
+            onClose={() => modals.setEditingDocumentId(null)}
             caseId={id!}
             instanceId={modals.editingDocumentId ?? undefined}
-            newSubtype={modals.docCreateSubtype ?? undefined}
-            newTitle={
-              modals.docCreateSubtype
-                ? REPORT_TYPES[modals.docCreateSubtype as ReportType]?.name
-                : undefined
-            }
             onSaved={() =>
               queryClient.invalidateQueries({ queryKey: documentInstanceKeys.byCase(id!) })
             }
