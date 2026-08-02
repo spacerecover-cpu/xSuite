@@ -58,6 +58,14 @@ export const documentInstanceKeys = {
   sections: (id: string) => [...documentInstanceKeys.all, 'sections', id] as const,
 };
 
+export const reportSectionTemplateKeys = {
+  all: ['report-section-templates'] as const,
+  choices: (reportType: string) =>
+    [...reportSectionTemplateKeys.all, 'choices', reportType] as const,
+  manage: () => [...reportSectionTemplateKeys.all, 'manage'] as const,
+  library: () => [...reportSectionTemplateKeys.all, 'library'] as const,
+};
+
 export const documentComplianceKeys = {
   all: ['documentCompliance'] as const,
   inputs: () => [...documentComplianceKeys.all, 'inputs'] as const,
