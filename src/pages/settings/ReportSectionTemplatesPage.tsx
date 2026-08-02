@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Copy, Pencil, Plus, Star, Trash2 } from 'lucide-react';
+import { CheckCircle2, Copy, Pencil, Plus, Star, StarOff, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
@@ -13,6 +13,7 @@ import { useConfirm } from '../../hooks/useConfirm';
 import { REPORT_TYPES, type ReportType } from '../../lib/reportTypes';
 import { reportSectionTemplateKeys } from '../../lib/queryKeys';
 import {
+  clearDefaultReportSectionTemplate,
   listReportSectionPresets,
   listSectionLibrary,
   listTenantReportSectionTemplates,
@@ -86,6 +87,15 @@ export const ReportSectionTemplatesPage: React.FC = () => {
       invalidate();
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to delete template'),
+  });
+
+  const clearDefaultMutation = useMutation({
+    mutationFn: (reportType: string) => clearDefaultReportSectionTemplate(reportType),
+    onSuccess: () => {
+      toast.success('Back to the system default');
+      invalidate();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to clear default'),
   });
 
   const byType = useMemo(() => {
@@ -237,7 +247,7 @@ export const ReportSectionTemplatesPage: React.FC = () => {
                         </div>
                         {canEdit && (
                           <div className="flex shrink-0 items-center gap-1">
-                            {!t.is_default && (
+                            {!t.is_default ? (
                               <Button
                                 variant="secondary"
                                 size="sm"
@@ -249,6 +259,17 @@ export const ReportSectionTemplatesPage: React.FC = () => {
                                 }
                               >
                                 <Star className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                aria-label={`Stop using ${t.name} as default`}
+                                title="Revert to the system default template"
+                                disabled={clearDefaultMutation.isPending}
+                                onClick={() => clearDefaultMutation.mutate(typeKey)}
+                              >
+                                <StarOff className="h-4 w-4" />
                               </Button>
                             )}
                             <Button

@@ -347,3 +347,11 @@ export async function setDefaultReportSectionTemplate(
     throw error;
   }
 }
+
+/**
+ * Remove the tenant default for a type WITHOUT deleting the template, so
+ * resolution falls back to the system default preset.
+ */
+export async function clearDefaultReportSectionTemplate(reportType: string): Promise<void> {
+  await clearDefaultsForType(reportType);
+}

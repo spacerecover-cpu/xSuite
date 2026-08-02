@@ -7,6 +7,7 @@ const svc = vi.hoisted(() => ({
   listReportSectionPresets: vi.fn(),
   listSectionLibrary: vi.fn(),
   setDefaultReportSectionTemplate: vi.fn(),
+  clearDefaultReportSectionTemplate: vi.fn(),
   softDeleteReportSectionTemplate: vi.fn(),
   normalizeSections: (input: unknown) => (Array.isArray(input) ? input : []),
   createReportSectionTemplate: vi.fn(),
@@ -87,6 +88,29 @@ describe('ReportSectionTemplatesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Set Our Evaluation as default' }));
     await waitFor(() =>
       expect(svc.setDefaultReportSectionTemplate).toHaveBeenCalledWith('t1', 'evaluation'),
+    );
+  });
+
+  it('clears the tenant default so the system default applies again', async () => {
+    svc.listTenantReportSectionTemplates.mockResolvedValue([
+      {
+        id: 't1',
+        report_type: 'evaluation',
+        name: 'Our Evaluation',
+        description: null,
+        sections: [{ key: 'executive_summary', title: 'Executive Summary' }],
+        is_default: true,
+        is_active: true,
+      },
+    ]);
+    svc.clearDefaultReportSectionTemplate.mockResolvedValue(undefined);
+    renderPage();
+    await screen.findByText('Our Evaluation');
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Stop using Our Evaluation as default' }),
+    );
+    await waitFor(() =>
+      expect(svc.clearDefaultReportSectionTemplate).toHaveBeenCalledWith('evaluation'),
     );
   });
 });
