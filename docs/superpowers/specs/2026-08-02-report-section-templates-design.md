@@ -57,6 +57,14 @@ Stored as an ordered JSONB array on presets and tenant templates; array order IS
 
 ### Tables
 
+> **Naming amendment (implementation)**: the two global tables ship as
+> **`master_report_sections`** and **`master_report_section_presets`** — the names originally
+> spec'd below (`report_section_library` / `report_section_presets`) turned out to be on the
+> pre-1.0.0 BANNED legacy list (`eslint-rules/banned-tables.js`); CLAUDE.md's System (Global) row
+> listing them was stale documentation of dropped tables, not an implementation target. Global
+> reference data carries the `master_*` prefix. Everything else about the two tables is as
+> designed.
+
 **`report_section_library`** (global catalog; RLS: SELECT `true` to authenticated, writes
 `(SELECT is_platform_admin())`): one row per canonical section — `section_key` unique, `title`,
 `guidance`, `tone` (neutral/info/success/warning/danger), `kind` (prose/custody/

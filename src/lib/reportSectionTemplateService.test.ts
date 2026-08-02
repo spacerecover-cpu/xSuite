@@ -86,7 +86,7 @@ describe('resolveEffectiveTemplate', () => {
   it('falls back to the default preset when there is no tenant default', async () => {
     from.mockImplementation((table: string) => {
       if (table === 'report_section_templates') return chain({ data: null, error: null });
-      if (table === 'report_section_presets') {
+      if (table === 'master_report_section_presets') {
         return chain({ data: { id: 'p-1', name: 'Standard Evaluation', sections: [{ key: 'executive_summary', title: 'Executive Summary' }] }, error: null });
       }
       throw new Error(`unexpected table ${table}`);
@@ -105,7 +105,7 @@ describe('resolveEffectiveTemplate', () => {
   it('skips a tenant default whose sections are empty', async () => {
     from.mockImplementation((table: string) => {
       if (table === 'report_section_templates') return chain({ data: { id: 't-1', name: 'Broken', sections: [] }, error: null });
-      if (table === 'report_section_presets') return chain({ data: { id: 'p-1', name: 'Standard', sections: [{ key: 'findings', title: 'Findings' }] }, error: null });
+      if (table === 'master_report_section_presets') return chain({ data: { id: 'p-1', name: 'Standard', sections: [{ key: 'findings', title: 'Findings' }] }, error: null });
       throw new Error(`unexpected table ${table}`);
     });
     const r = await resolveEffectiveTemplate('service');
@@ -135,7 +135,7 @@ describe('setDefaultReportSectionTemplate', () => {
 
 describe('createReportSectionTemplate', () => {
   it('normalizes sections and inserts with the resolved tenant id', async () => {
-    let inserted: Record<string, unknown> | null = null;
+    let inserted: unknown = null;
     from.mockImplementation((table: string) => {
       if (table === 'profiles') return chain({ data: { tenant_id: 't1' }, error: null });
       if (table === 'report_section_templates') {

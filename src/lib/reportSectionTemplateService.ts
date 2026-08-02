@@ -1,7 +1,8 @@
 /**
  * reportSectionTemplateService — predefined report-section templates per report
- * type (global `report_section_presets` seeded from `report_section_library`)
- * plus tenant-customized templates (`report_section_templates`).
+ * type (global `master_report_section_presets`, seeded from the
+ * `master_report_sections` catalog) plus tenant-customized templates
+ * (`report_section_templates`).
  *
  * The resolver feeds report creation: chosen template → tenant default →
  * default preset → the built-in `reportSubtypeSections` list. Resolution NEVER
@@ -19,9 +20,9 @@ import { reportSubtypeSections } from './pdf/engine/adapters/reportAdapter';
 export type ReportSectionTemplateRow =
   Database['public']['Tables']['report_section_templates']['Row'];
 export type ReportSectionPresetRow =
-  Database['public']['Tables']['report_section_presets']['Row'];
+  Database['public']['Tables']['master_report_section_presets']['Row'];
 export type ReportSectionLibraryRow =
-  Database['public']['Tables']['report_section_library']['Row'];
+  Database['public']['Tables']['master_report_sections']['Row'];
 
 /** One ordered section inside a template/preset (stored as JSONB array items). */
 export interface TemplateSectionDescriptor {
@@ -107,7 +108,7 @@ async function resolveTenantId(): Promise<string> {
 /** The section catalog for the "Add section" picker (active, ordered). */
 export async function listSectionLibrary(): Promise<ReportSectionLibraryRow[]> {
   const { data, error } = await supabase
-    .from('report_section_library')
+    .from('master_report_sections')
     .select('*')
     .eq('is_active', true)
     .order('sort_order', { ascending: true });
@@ -146,7 +147,7 @@ export async function listReportTemplateChoices(
       .is('deleted_at', null)
       .order('created_at', { ascending: true }),
     supabase
-      .from('report_section_presets')
+      .from('master_report_section_presets')
       .select('id, report_type, name, description, sections, is_default')
       .eq('report_type', reportType)
       .eq('is_active', true)
@@ -184,7 +185,7 @@ export async function listTenantReportSectionTemplates(): Promise<ReportSectionT
 /** Every active preset (all types) for the Settings management page. */
 export async function listReportSectionPresets(): Promise<ReportSectionPresetRow[]> {
   const { data, error } = await supabase
-    .from('report_section_presets')
+    .from('master_report_section_presets')
     .select('*')
     .eq('is_active', true)
     .order('report_type', { ascending: true })
@@ -219,7 +220,7 @@ export async function resolveEffectiveTemplate(reportType: string): Promise<Effe
   }
   try {
     const { data, error } = await supabase
-      .from('report_section_presets')
+      .from('master_report_section_presets')
       .select('id, name, sections')
       .eq('report_type', reportType)
       .eq('is_default', true)
@@ -286,7 +287,7 @@ export async function updateReportSectionTemplate(
   id: string,
   patch: UpdateReportSectionTemplateParams,
 ): Promise<void> {
-  const update: Record<string, unknown> = {};
+  const update: Database['public']['Tables']['report_section_templates']['Update'] = {};
   if (patch.name !== undefined) update.name = patch.name.trim();
   if (patch.description !== undefined) update.description = patch.description?.trim() || null;
   if (patch.isActive !== undefined) update.is_active = patch.isActive;
