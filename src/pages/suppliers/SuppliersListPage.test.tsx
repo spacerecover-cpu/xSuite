@@ -32,9 +32,13 @@ vi.mock('../../lib/supabaseClient', () => {
   // captured so we can assert the query widened to include total_amount_base.
   const thenableChain = (result: unknown) => {
     const chain: Record<string, unknown> = {};
-    for (const m of ['select', 'is', 'or', 'eq', 'order', 'range', 'gte', 'lte', 'ilike', 'in']) {
+    for (const m of ['select', 'is', 'or', 'eq', 'order', 'range', 'gte', 'lte', 'ilike', 'in', 'limit', 'insert', 'update', 'upsert']) {
       chain[m] = vi.fn(() => chain);
     }
+    // Terminal for zero-or-one-row reads (e.g. getOrCreateCompanySettings via
+    // the stat-card style hook, which renders alongside this page; its
+    // create-defaults insert path chains through the same builder).
+    chain.maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
     chain.then = (resolve: (v: unknown) => void) => resolve(result);
     return chain;
   };
@@ -46,6 +50,9 @@ vi.mock('../../lib/supabaseClient', () => {
     const chain: Record<string, unknown> = {};
     chain.select = poSelectSpy.mockReturnValue(chain);
     chain.is = poIsSpy.mockReturnValue(chain);
+    // The spend KPI pages through explicit ranges (db-max-rows safety); the
+    // two-row resolution below is a short batch, so one .range() call ends it.
+    chain.range = vi.fn(() => chain);
     chain.then = (resolve: (v: unknown) => void) =>
       resolve({
         data: [
@@ -63,6 +70,8 @@ vi.mock('../../lib/supabaseClient', () => {
         if (table === 'master_supplier_categories') return thenableChain({ data: [], error: null });
         return thenableChain({ data: [], count: 0, error: null });
       }),
+      // uiPrefsService (collapsible-KPI preference) reads the session user.
+      auth: { getUser: vi.fn(async () => ({ data: { user: null } })) },
     },
   };
 });
@@ -89,9 +98,11 @@ describe('SuppliersListPage — Total Spend must sum base currency', () => {
   it('sums total_amount_base across mixed-currency POs, never the raw native total', async () => {
     renderPage();
 
-    // base total = 38 + 50 = 88 (the native sum 100 + 50 = 150 would be wrong)
-    await waitFor(() => expect(screen.getByText('88')).toBeInTheDocument());
-    expect(screen.queryByText('150')).not.toBeInTheDocument();
+    // base total = 38 + 50 = 88 (the native sum 100 + 50 = 150 would be wrong).
+    // The KPI renders currency-formatted (e.g. "$88.00" via useCurrency), so
+    // match the number inside the formatted string rather than a bare "88".
+    await waitFor(() => expect(screen.getByText(/\b88(\.00)?\b/)).toBeInTheDocument());
+    expect(screen.queryByText(/\b150(\.00)?\b/)).not.toBeInTheDocument();
   });
 
   it('selects the total_amount_base shadow column (fix is a no-op otherwise)', async () => {

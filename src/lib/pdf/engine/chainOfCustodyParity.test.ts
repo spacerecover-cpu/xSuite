@@ -158,9 +158,12 @@ describe('chain of custody parity — engine output matches the legacy builder',
       expect(legacy.some((t) => t.includes(probe))).toBe(true);
       expect(engine.some((t) => t.includes(probe))).toBe(true);
     }
-    // Formatted date/time (dd/MM/yyyy HH:mm).
-    expect(legacy.some((t) => t.includes('13/06/2026'))).toBe(true);
-    expect(engine.some((t) => t.includes('13/06/2026'))).toBe(true);
+    // Formatted date/time: BOTH builders render entry timestamps through
+    // formatDateTimeWithConfig (v1.2.0 audit-stamp decision) — the unambiguous
+    // month-name forensic format, never numeric day/month (whose order varies
+    // by locale and can misread evidence timestamps).
+    expect(legacy.some((t) => t.includes('Jun 13, 2026'))).toBe(true);
+    expect(engine.some((t) => t.includes('Jun 13, 2026'))).toBe(true);
   });
 
   it('renders the humanized action-category badge text in both', () => {
@@ -217,9 +220,11 @@ describe('chain of custody parity — engine output matches the legacy builder',
     // value is its own text leaf ("3").
     const legacyJoined = legacy.join('|');
     const engineJoined = engine.join('|');
-    // Date range first→last (both ends are the 13/06/2026 day in the fixture).
-    expect(legacyJoined).toContain('13/06/2026');
-    expect(engineJoined).toContain('13/06/2026');
+    // Date range first→last (both ends are the 13 Jun 2026 day in the fixture),
+    // month-name forensic format in BOTH builders (formatDateTimeWithConfig —
+    // see the entry-row test).
+    expect(legacyJoined).toContain('Jun 13, 2026');
+    expect(engineJoined).toContain('Jun 13, 2026');
     // Total entries value (3) present in both summary boxes.
     expect(legacy.some((t) => t.includes('Total Entries:') || t.trim() === '3')).toBe(true);
     expect(engine.some((t) => t.includes('Total Entries:') || t.trim() === '3')).toBe(true);
