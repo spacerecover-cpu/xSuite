@@ -74,9 +74,13 @@ function makeData(overrides: Partial<ReportData> = {}): ReportData {
         section_order: 2,
       },
       {
+        // Blank title = legacy row without a stored title: resolves to the
+        // canonical multilingual title. (A NON-blank differing title on a
+        // direct canonical key is now a tenant RENAME and wins verbatim —
+        // covered by reportAdapter.sections.test.ts.)
         id: 'sec-4',
         section_key: 'recommendations',
-        section_title: 'Recommendations',
+        section_title: '',
         section_content: 'Replace head stack in cleanroom and re-image.',
         section_order: 3,
       },

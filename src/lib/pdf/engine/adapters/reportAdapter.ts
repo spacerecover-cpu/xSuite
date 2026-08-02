@@ -616,42 +616,67 @@ function buildReportInfoColumns(
   return { general, device };
 }
 
-/** Build the ordered toned prose sections for the subtype, sourced from authored content. */
+/**
+ * Build the ordered toned prose sections from the AUTHORED instance sections,
+ * in their stored order. Templates decide the structure (tenant-choosable and
+ * customizable), so iteration is instance-driven — the old hardcoded subtype
+ * key list silently dropped any section outside it, which would have erased
+ * customized/renamed/custom sections from the delivered PDF.
+ *
+ * Per row: canonical metadata (status tone / kind / multilingual title via
+ * `ctx.t`) attaches by `canonicalKey(section_key)`. Title precedence: a row
+ * whose key is LEGACY-ALIASED (old vocabulary) always gets the canonical
+ * multilingual title — that normalization is the owner-approved 2026-07
+ * presentation for migrated reports. A DIRECT canonical-keyed row whose
+ * authored title differs from the canonical English title is a tenant rename
+ * and wins verbatim (blank / unchanged titles keep the `ctx.t` multilingual
+ * resolution). Unknown keys render as neutral prose titled by the authored
+ * title (fallback: the humanized key). Empty prose sections are skipped —
+ * except the destruction certificate, whose signature slots are meaningful
+ * regardless; a data_destruction report ALWAYS carries the certificate section
+ * even when no authored row exists (a certificate without its attestation +
+ * operator/witness slots is not a certificate). The forensic custody EVENTS
+ * table stays the separate `custodyLog` block; a `chain_of_custody_notes`
+ * section here is the engineer's authored narrative.
+ */
 function buildReportSections(data: ReportData, ctx: TranslationContext): ReportSectionsBlock {
-  // Forensic reports seed an editable `chain_of_custody_notes` narrative (seals,
-  // storage, transfers) the engineer authors as legally-relevant context for the
-  // custody ledger. Render it as a toned prose section in the subtype's section
-  // order — it precedes the auto-generated custody events table (the separate
-  // `custodyLog` block). Previously this key was filtered out here, so any
-  // content the engineer typed was silently dropped from the delivered PDF.
-  const proseKeys = proseSectionKeysForSubtype(data.report.report_type);
-
-  // Index authored sections by canonical key (last write wins for duplicates).
-  const authored = new Map<string, string>();
-  for (const s of data.sections) {
-    const key = canonicalKey(s.section_key);
-    const content = stripHtmlTags(s.section_content);
-    if (content) authored.set(key, content);
-  }
-
   const sections: ReportSectionsBlock['sections'] = [];
   let order = 0;
-  for (const key of proseKeys) {
+  for (const s of data.sections) {
+    const rawKey = (s.section_key || '').trim().toLowerCase();
+    const key = canonicalKey(s.section_key);
+    const isAliased = rawKey !== key;
     const canonical = CANONICAL_SECTIONS[key];
-    const content = authored.get(key) ?? '';
+    const content = stripHtmlTags(s.section_content);
     const isCert = canonical?.kind === 'destruction_certificate';
-    // Skip empty prose sections (no authored content) UNLESS it is the
-    // destruction certificate, whose signature slots are meaningful regardless.
     if (!content && !isCert) continue;
-    // Resolve the section title via `ctx.t` (multilingual); unknown keys degrade
-    // to the humanized section key.
-    const title = canonical ? lt(ctx.t(canonical.tkey, canonical.en)) : lt(humanize(key));
+    const authoredTitle = (s.section_title || '').trim();
+    const renamed =
+      !isAliased && !!authoredTitle && (!canonical || authoredTitle !== canonical.en);
+    const title = renamed
+      ? lt(authoredTitle)
+      : canonical
+        ? lt(ctx.t(canonical.tkey, canonical.en))
+        : lt(humanize(key));
     sections.push({
       title,
       content,
       order: order++,
       ...(canonical?.tone ? { tone: canonical.tone } : {}),
       ...(isCert ? { kind: 'destruction_certificate' as const } : {}),
+    });
+  }
+  if (
+    data.report.report_type === 'data_destruction' &&
+    !data.sections.some((s) => canonicalKey(s.section_key) === 'destruction_certificate')
+  ) {
+    const cert = CANONICAL_SECTIONS.destruction_certificate;
+    sections.push({
+      title: lt(ctx.t(cert.tkey, cert.en)),
+      content: '',
+      order: order++,
+      tone: cert.tone,
+      kind: 'destruction_certificate',
     });
   }
   return { sections };

@@ -8118,6 +8118,7 @@ export type Database = {
           name: string
           notes: string | null
           pcb_number: string | null
+          pcb_number_search: string | null
           photos: string[] | null
           previous_item_number: string | null
           purchase_date: string | null
@@ -8165,6 +8166,7 @@ export type Database = {
           name: string
           notes?: string | null
           pcb_number?: string | null
+          pcb_number_search?: string | null
           photos?: string[] | null
           previous_item_number?: string | null
           purchase_date?: string | null
@@ -8212,6 +8214,7 @@ export type Database = {
           name?: string
           notes?: string | null
           pcb_number?: string | null
+          pcb_number_search?: string | null
           photos?: string[] | null
           previous_item_number?: string | null
           purchase_date?: string | null
@@ -10787,6 +10790,84 @@ export type Database = {
           is_active?: boolean
           name?: string
           sort_order?: number | null
+        }
+        Relationships: []
+      }
+      master_report_section_presets: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          is_default: boolean
+          name: string
+          report_type: string
+          sections: Json
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name: string
+          report_type: string
+          sections?: Json
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name?: string
+          report_type?: string
+          sections?: Json
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      master_report_sections: {
+        Row: {
+          created_at: string
+          guidance: string | null
+          id: string
+          is_active: boolean
+          kind: string
+          section_key: string
+          sort_order: number
+          title: string
+          tone: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          guidance?: string | null
+          id?: string
+          is_active?: boolean
+          kind?: string
+          section_key: string
+          sort_order?: number
+          title: string
+          tone?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          guidance?: string | null
+          id?: string
+          is_active?: boolean
+          kind?: string
+          section_key?: string
+          sort_order?: number
+          title?: string
+          tone?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -14652,6 +14733,72 @@ export type Database = {
           },
           {
             foreignKeyName: "recruitment_jobs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_section_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          is_default: boolean
+          name: string
+          report_type: string
+          sections: Json
+          source_preset_id: string | null
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name: string
+          report_type: string
+          sections?: Json
+          source_preset_id?: string | null
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name?: string
+          report_type?: string
+          sections?: Json
+          source_preset_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_section_templates_source_preset_id_fkey"
+            columns: ["source_preset_id"]
+            isOneToOne: false
+            referencedRelation: "master_report_section_presets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_section_templates_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -20654,6 +20801,7 @@ export type Database = {
           name: string
           notes: string | null
           pcb_number: string | null
+          pcb_number_search: string | null
           photos: string[] | null
           previous_item_number: string | null
           purchase_date: string | null
