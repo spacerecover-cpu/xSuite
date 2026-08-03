@@ -29,15 +29,35 @@ export function computeBackoff(attempt: number): number {
 }
 
 /**
- * Best-effort E.164. Strips separators; converts leading 00 to +; promotes BARE
- * digit strings only when they cannot be a local number (10-15 digits, no leading
- * 0 — a leading 0 means local format with unknown country → null, never guess).
+ * Best-effort E.164. Strips separators and converts a leading 00 to +.
+ *
+ * A BARE digit string is ambiguous, and length does not disambiguate it: ten
+ * digits is a COMPLETE national number in the NANP, India and many other plans,
+ * so unconditionally prefixing '+' does not normalize the number — it invents a
+ * country code (2125551234 → +212…, Morocco) and sends the customer's case
+ * details to a stranger abroad. Bare numbers are therefore qualified with the
+ * tenant's own dial code (national trunk 0 dropped), and refused outright when
+ * no dial code is known. A refusal surfaces as a visible `no_phone` failure on
+ * the message row; a wrong-country send is silent.
+ *
  * E.164 country codes never start with 0.
  */
-export function normalizeToE164(raw: string): string | null {
+export function normalizeToE164(raw: string, defaultDialCode?: string | null): string | null {
   let v = (raw ?? '').replace(/[\s\-().]/g, '');
   if (v.startsWith('00')) v = '+' + v.slice(2);
-  if (/^[1-9]\d{9,14}$/.test(v)) v = '+' + v;
+
+  if (!v.startsWith('+')) {
+    const dial = (defaultDialCode ?? '').replace(/\D/g, '');
+    if (!dial) return null;
+    const local = v.replace(/^0+/, '');
+    if (!/^\d+$/.test(local)) return null;
+    // Already carries the country code (and enough digits after it to be a real
+    // subscriber number) → take it as-is rather than doubling the prefix.
+    v = local.startsWith(dial) && local.length > dial.length + 4
+      ? '+' + local
+      : '+' + dial + local;
+  }
+
   if (!/^\+[1-9]\d{7,14}$/.test(v)) return null;
   return v;
 }

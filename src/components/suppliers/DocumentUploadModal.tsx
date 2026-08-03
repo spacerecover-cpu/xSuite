@@ -72,7 +72,6 @@ export default function DocumentUploadModal({ isOpen, onClose, onSuccess, suppli
 
       const tenantId = await resolveTenantId();
 
-      // Map UI fields to actual DB columns (name, file_url, file_type, file_size, uploaded_by)
       const { error: dbError } = await supabase
         .from('supplier_documents')
         .insert({
@@ -83,9 +82,15 @@ export default function DocumentUploadModal({ isOpen, onClose, onSuccess, suppli
           file_type: selectedFile.type || null,
           file_size: selectedFile.size,
           uploaded_by: user.id,
+          document_type: formData.document_type,
+          description: formData.description.trim() || null,
         });
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        // The row never landed, so don't leave the object orphaned in the bucket.
+        await supabase.storage.from('supplier-documents').remove([filePath]);
+        throw dbError;
+      }
 
       toast.success('Document uploaded successfully');
       onSuccess();

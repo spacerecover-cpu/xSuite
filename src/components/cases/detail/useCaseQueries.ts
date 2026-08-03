@@ -328,6 +328,9 @@ export function useCaseQueries(id: string | undefined) {
           created_at
         `)
         .eq('case_id', id)
+        // Removals are soft (the assignment history is auditable) — without this
+        // filter a removed engineer keeps rendering on the case.
+        .is('deleted_at', null)
         .order('created_at');
 
       if (error) throw error;

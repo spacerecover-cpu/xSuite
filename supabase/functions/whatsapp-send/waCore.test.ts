@@ -37,14 +37,34 @@ describe('normalizeToE164', () => {
   it.each([
     ['+971 501234567', '+971501234567'],
     ['00971-50-123-4567', '+971501234567'],
-    ['971501234567', '+971501234567'],   // bare international digits, no leading 0
-    ['(501) 234-567', null],             // 9 digits, no country prefix → ambiguous → null
-    ['0501234567', null],                // leading 0 = local format, country unknown → null
+    ['971501234567', null],   // bare digits, no dial code → ambiguous, never guess
+    ['(501) 234-567', null],  // 9 digits, no country prefix → ambiguous → null
+    ['0501234567', null],     // leading 0 = local format, country unknown → null
   ])('%s → %s', (input, expected) => {
     expect(normalizeToE164(input)).toBe(expected);
   });
+
+  it('qualifies bare local numbers with the tenant dial code', () => {
+    expect(normalizeToE164('0501234567', '+971')).toBe('+971501234567');
+    expect(normalizeToE164('50 123 4567', '971')).toBe('+971501234567');
+    expect(normalizeToE164('971501234567', '+971')).toBe('+971501234567'); // already qualified
+  });
+
+  it('does not invent a country code for a complete national number', () => {
+    // The bug this guards: '+' + '2125551234' parses as +212 (Morocco) 5551234,
+    // a real number belonging to someone else entirely.
+    expect(normalizeToE164('212-555-1234')).toBeNull();
+    expect(normalizeToE164('212-555-1234', '+1')).toBe('+12125551234');
+  });
+
+  it('keeps an explicit + prefix authoritative over the dial code', () => {
+    expect(normalizeToE164('+12125551234', '+971')).toBe('+12125551234');
+    expect(normalizeToE164('0044 20 7946 0000', '+971')).toBe('+442079460000');
+  });
+
   it('rejects garbage', () => {
     expect(normalizeToE164('abc')).toBeNull();
+    expect(normalizeToE164('abc', '+971')).toBeNull();
     expect(normalizeToE164('+12')).toBeNull();     // too short
     expect(normalizeToE164('+0501234567')).toBeNull(); // E.164 never starts with 0
   });

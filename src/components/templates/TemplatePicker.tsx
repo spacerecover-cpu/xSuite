@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Eye, FileText, Settings2, X as XIcon } from 'lucide-react';
 import {
   listTemplates,
+  pickDefaultTemplate,
   recordTemplateUsage,
   type DocumentTemplate,
   type TemplateTypeCode,
@@ -103,8 +104,12 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
   useEffect(() => {
     if (!autoApplyDefault || autoAppliedRef.current) return;
     if (templates.length === 0 || context === undefined) return;
+    // NOT templates[0]: with a documentType, listTemplates re-sorts to
+    // [...pinned, ...generic] and drops the is_default ordering, so the head of
+    // the list is merely the first pinned template, not the tenant default.
+    const defaultTemplate = pickDefaultTemplate(templates, documentType);
+    if (!defaultTemplate) return;
     autoAppliedRef.current = true;
-    const defaultTemplate = templates[0]; // listTemplates orders default-first
     setSelectedId(defaultTemplate.id);
     applyTemplate(defaultTemplate);
     // eslint-disable-next-line react-hooks/exhaustive-deps

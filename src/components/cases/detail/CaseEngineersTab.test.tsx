@@ -2,15 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-// The case_engineers DELETE policy is admin-only (has_role('admin')). A policy
-// miss returns no error, only zero rows, so these tests pin the two behaviours
-// that keep a blocked removal from reading as a success: the control is hidden
-// for non-admins, and a zero-row delete surfaces as a failure.
-const { toastSuccess, toastError, role, deleteRows } = vi.hoisted(() => ({
+// Removal is a SOFT delete (assignment history is auditable), authorized to
+// owner|admin by trg_guard_case_engineer_removal. A tenant-isolation miss returns
+// no error, only zero rows, so these tests pin the behaviours that keep a blocked
+// removal from reading as a success: the control is hidden for non-admins, a
+// zero-row update surfaces as a failure, and the write sets deleted_at rather
+// than issuing a DELETE.
+const { toastSuccess, toastError, role, deleteRows, calls } = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
   role: { current: 'admin' as string },
   deleteRows: { current: [] as { id: string }[] },
+  calls: { current: [] as string[] },
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({
@@ -33,7 +36,10 @@ vi.mock('@/lib/supabaseClient', () => {
   const chainFor = (result: () => unknown) => {
     const chain: Record<string, unknown> = {};
     for (const m of ['select', 'eq', 'in', 'is', 'order', 'delete', 'insert', 'update']) {
-      chain[m] = () => chain;
+      chain[m] = (...args: unknown[]) => {
+        calls.current.push(`${m}:${JSON.stringify(args[0] ?? null)}`);
+        return chain;
+      };
     }
     chain.then = (resolve: (v: unknown) => unknown) => Promise.resolve(result()).then(resolve);
     return chain;
@@ -72,9 +78,10 @@ describe('CaseEngineersTab — engineer removal', () => {
     toastError.mockReset();
     role.current = 'admin';
     deleteRows.current = [];
+    calls.current = [];
   });
 
-  it('hides the remove control for roles the DELETE policy rejects', async () => {
+  it('hides the remove control for roles the removal guard rejects', async () => {
     role.current = 'technician';
     renderTab();
 
@@ -89,7 +96,7 @@ describe('CaseEngineersTab — engineer removal', () => {
     expect(screen.getByTitle('Remove engineer')).toBeInTheDocument();
   });
 
-  it('reports a failure when the delete matches zero rows instead of a success toast', async () => {
+  it('reports a failure when the removal matches zero rows instead of a success toast', async () => {
     renderTab();
 
     fireEvent.click(await screen.findByTitle('Remove engineer'));
@@ -99,7 +106,7 @@ describe('CaseEngineersTab — engineer removal', () => {
     expect(toastSuccess).not.toHaveBeenCalled();
   });
 
-  it('reports success when the delete actually removes the assignment', async () => {
+  it('reports success when the removal actually clears the assignment', async () => {
     deleteRows.current = [{ id: 'assign-1' }];
     renderTab();
 
@@ -107,6 +114,20 @@ describe('CaseEngineersTab — engineer removal', () => {
 
     await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Engineer removed from case'));
     expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('soft-removes by stamping deleted_at, never issuing a hard delete', async () => {
+    deleteRows.current = [{ id: 'assign-1' }];
+    renderTab();
+
+    fireEvent.click(await screen.findByTitle('Remove engineer'));
+
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
+    expect(calls.current.some((c) => c.startsWith('delete:'))).toBe(false);
+    const update = calls.current.find((c) => c.startsWith('update:'));
+    expect(update).toBeDefined();
+    expect(update).toMatch(/deleted_at/);
+    expect(update).toMatch(/removed_at/);
   });
 });
 

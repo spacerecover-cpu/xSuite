@@ -709,7 +709,17 @@ function DocumentsTab({
                 <div className="flex items-start gap-3">
                   <FileText className="w-8 h-8 text-primary" />
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-slate-900 truncate">{doc.name}</h4>
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="font-medium text-slate-900 truncate">{doc.name}</h4>
+                      {doc.document_type && (
+                        <span className="flex-shrink-0 rounded bg-primary/10 px-2 py-0.5 text-xs font-medium capitalize text-primary">
+                          {doc.document_type}
+                        </span>
+                      )}
+                    </div>
+                    {doc.description && (
+                      <p className="mt-1 text-sm text-slate-600">{doc.description}</p>
+                    )}
                     {doc.file_type && (
                       <p className="text-sm text-slate-500 mt-1">{doc.file_type}</p>
                     )}

@@ -6,7 +6,7 @@ import { formatDate } from '../../lib/format';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
-import { format } from 'date-fns';
+import { format, startOfDay, subDays, subMonths, subYears } from 'date-fns';
 import { useListPageSize } from '../../hooks/useListPageSize';
 import { statusToBadgeVariant } from '../../lib/ui/variants';
 import { baseAmount } from '../../lib/financialMath';
@@ -65,25 +65,28 @@ export const TransactionsList: React.FC = () => {
   const [page, setPage] = useState(0);
   const pageSize = useListPageSize();
 
+  // date-fns sub* helpers clamp to the end of a shorter target month (31 Mar − 1
+  // month = 28 Feb, not 3 Mar) and return a new Date, unlike the setMonth/setDate
+  // setters, which overflow AND mutate the shared `now` for every later branch.
   const getDateFromFilter = () => {
     if (dateRange === 'all') return undefined;
     const now = new Date();
     let startDate: Date;
     switch (dateRange) {
       case 'today':
-        startDate = new Date(now.setHours(0, 0, 0, 0));
+        startDate = startOfDay(now);
         break;
       case 'week':
-        startDate = new Date(now.setDate(now.getDate() - 7));
+        startDate = subDays(now, 7);
         break;
       case 'month':
-        startDate = new Date(now.setMonth(now.getMonth() - 1));
+        startDate = subMonths(now, 1);
         break;
       case 'quarter':
-        startDate = new Date(now.setMonth(now.getMonth() - 3));
+        startDate = subMonths(now, 3);
         break;
       case 'year':
-        startDate = new Date(now.setFullYear(now.getFullYear() - 1));
+        startDate = subYears(now, 1);
         break;
       default:
         return undefined;

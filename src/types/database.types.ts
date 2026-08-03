@@ -16302,6 +16302,8 @@ export type Database = {
         Row: {
           created_at: string
           deleted_at: string | null
+          description: string | null
+          document_type: string | null
           file_size: number | null
           file_type: string | null
           file_url: string
@@ -16315,6 +16317,8 @@ export type Database = {
         Insert: {
           created_at?: string
           deleted_at?: string | null
+          description?: string | null
+          document_type?: string | null
           file_size?: number | null
           file_type?: string | null
           file_url: string
@@ -16328,6 +16332,8 @@ export type Database = {
         Update: {
           created_at?: string
           deleted_at?: string | null
+          description?: string | null
+          document_type?: string | null
           file_size?: number | null
           file_type?: string | null
           file_url?: string
@@ -19718,6 +19724,7 @@ export type Database = {
         Args: { p_lookback?: string }
         Returns: undefined
       }
+      assert_gdpr_operator: { Args: never; Returns: undefined }
       assign_inventory_to_case: {
         Args: { p_case_id: string; p_item_id: string; p_notes?: string }
         Returns: {

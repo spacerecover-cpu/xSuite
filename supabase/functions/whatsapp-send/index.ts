@@ -260,7 +260,20 @@ Deno.serve(async (req: Request) => {
     }
 
     // ---- recipient + policy gates ----
-    const phone = normalizeToE164(String(claimed.to_phone_e164 ?? ""));
+    const rawPhone = String(claimed.to_phone_e164 ?? "");
+    let phone = normalizeToE164(rawPhone);
+    if (!phone) {
+      // Bare local digits are ambiguous — normalizeToE164 refuses to guess a
+      // country. Retry with the tenant's own dial code (one extra pair of reads,
+      // only on this path; already-E.164 numbers never reach it).
+      const { data: tenantRow } = await db.from("tenants")
+        .select("country_id").eq("id", claimed.tenant_id).maybeSingle();
+      if (tenantRow?.country_id) {
+        const { data: country } = await db.from("geo_countries")
+          .select("phone_code").eq("id", tenantRow.country_id).maybeSingle();
+        phone = normalizeToE164(rawPhone, country?.phone_code ?? null);
+      }
+    }
     if (!phone) {
       await failMessage(message_id, null, "no valid phone", "no_phone");
       return new Response(JSON.stringify({ ok: false }), { status: 200 });
