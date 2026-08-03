@@ -496,6 +496,9 @@ export interface PayslipData {
   regular_hours?: number;
   overtime_hours?: number;
   gross_salary?: number;
+  /** payroll_records.total_deductions — authoritative when the optional
+   *  payroll_record_items breakdown is absent. */
+  total_deductions?: number;
   net_salary: number;
   items: Array<{
     component_code: string;

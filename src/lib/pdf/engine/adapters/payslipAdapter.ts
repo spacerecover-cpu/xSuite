@@ -64,9 +64,23 @@ export function toEngineData(
   const earningItems = items.filter((i) => i.component_type !== 'deduction');
 
   // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency (within-document: component items of one payroll record, no amount_base shadow on payslip line items)
-  const totalEarnings = earningItems.reduce((sum, i) => sum + Number(i.amount), 0);
+  const itemEarnings = earningItems.reduce((sum, i) => sum + Number(i.amount), 0);
   // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- single-currency (within-document: component items of one payroll record, no amount_base shadow on payslip line items)
-  const totalDeductions = deductionItems.reduce((sum, i) => sum + Number(i.amount), 0);
+  const itemDeductions = deductionItems.reduce((sum, i) => sum + Number(i.amount), 0);
+
+  // payroll_record_items is OPTIONAL — processPayroll writes pay straight onto
+  // payroll_records and no item rows — so summing items alone prints 0.00 totals
+  // beside a real Net Salary box. .env.production enables this engine renderer
+  // for payslips, so this fallback must mirror PayslipDocument.ts or production
+  // keeps printing zeros.
+  const totalEarnings =
+    earningItems.length > 0 || payslipData.gross_salary == null
+      ? itemEarnings
+      : Number(payslipData.gross_salary);
+  const totalDeductions =
+    deductionItems.length > 0 || payslipData.total_deductions == null
+      ? itemDeductions
+      : Number(payslipData.total_deductions);
 
   // ---- Payslip info header (employee + period + attendance) ----------------
   // Merges the legacy "Employee Information" and "Attendance Summary" boxes into

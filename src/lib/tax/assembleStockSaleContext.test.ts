@@ -18,7 +18,8 @@ import { computeStockSaleTax } from './assembleStockSaleContext';
 /** Thenable query builder covering every chain shape this module issues
  *  (array reads end the chain on .is/.or/.order; the single tenant read ends
  *  on .maybeSingle()). */
-function makeQuery(data: unknown) {
+function makeQuery(data: unknown, error: { message: string } | null = null) {
+  const result = { data: error ? null : data, error };
   const builder: Record<string, unknown> = {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
@@ -26,8 +27,8 @@ function makeQuery(data: unknown) {
     lte: vi.fn(() => builder),
     or: vi.fn(() => builder),
     order: vi.fn(() => builder),
-    maybeSingle: vi.fn(() => Promise.resolve({ data, error: null })),
-    then: (resolve: (v: { data: unknown; error: null }) => void) => resolve({ data, error: null }),
+    maybeSingle: vi.fn(() => Promise.resolve(result)),
+    then: (resolve: (v: typeof result) => void) => resolve(result),
   };
   return builder;
 }
@@ -73,6 +74,45 @@ describe('computeStockSaleTax (kernel parity for POS sales)', () => {
     expect(comp.rollups).toHaveLength(1);
     expect(comp.rollups[0]).toMatchObject({ componentCode: 'VAT', rate: 5, taxAmount: 0.5 });
     expect(comp.totals.grandTotal).toBe(10.5);
+  });
+
+  /** A failed rate read must abort the sale — never fall through to an empty
+   *  rate set, which the kernel treats as an untaxed (out-of-scope) sale and
+   *  would persist zero output tax on a taxable counter sale. */
+  it('throws when the tax rate lookup errors instead of computing a zero-tax sale', async () => {
+    const legalEntitiesQuery = makeQuery([
+      {
+        id: 'le-1', tenant_id: 'tenant-1', country_id: 'om', subdivision_id: null,
+        tax_identifier: 'OM-TAX-1', is_primary: true,
+      },
+    ]);
+    const tenantQuery = makeQuery({
+      id: 'tenant-1', timezone: 'Asia/Muscat', base_currency_code: 'OMR',
+      resolved_country_config: {
+        'regime.tax': 'simple_vat',
+        'tax.rounding_policy': { mode: 'half_up', level: 'document' },
+      },
+    });
+    const registrationsQuery = makeQuery([]);
+    const ratesQuery = makeQuery(null, { message: 'permission denied for table geo_country_tax_rates' });
+    from.mockImplementation((table: string) => {
+      switch (table) {
+        case 'legal_entities': return legalEntitiesQuery;
+        case 'tenants': return tenantQuery;
+        case 'legal_entity_tax_registrations': return registrationsQuery;
+        case 'geo_country_tax_rates': return ratesQuery;
+        default: throw new Error(`unexpected table: ${table}`);
+      }
+    });
+
+    await expect(
+      computeStockSaleTax({
+        lines: [{ lineItemId: null, description: 'SATA cable', quantity: 2, unitPrice: 5,
+          lineDiscount: 0, unitCode: 'C62', itemCode: null, treatment: 'standard', treatmentReasonCode: null }],
+        documentDiscount: 0,
+        taxInclusive: false,
+      }),
+    ).rejects.toThrow(/tax rates could not be loaded/);
   });
 
   /** India multi-slab pack (in_gst). Regression for the slab + place-of-supply

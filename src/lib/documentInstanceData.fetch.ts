@@ -104,6 +104,12 @@ function mapCompanySettingsToReportData(cs: CompanySettings): ReportData['compan
   };
 }
 
+// Device embeds must name the table each FK actually points at: `interface_id`
+// references `catalog_interfaces`, not the `catalog_device_*` sibling the other
+// columns use — PostgREST cannot resolve the embed otherwise.
+export const CASE_DEVICE_SELECT =
+  'catalog_device_types!device_type_id(name), catalog_device_brands!brand_id(name), catalog_device_capacities!capacity_id(name), catalog_interfaces!interface_id(name), catalog_device_conditions!condition_id(name), is_primary, model, serial_number, recovery_result';
+
 /** Case/customer/device/custody/recoverability lookup for the report context. */
 async function fetchCaseContext(caseId: string): Promise<Partial<ReportData>> {
   type CustomerEmbed = { customer_name: string | null; email: string | null; mobile_number: string | null } | null;
@@ -134,7 +140,7 @@ async function fetchCaseContext(caseId: string): Promise<Partial<ReportData>> {
     catalog_device_types: NameEmbed;
     catalog_device_brands: NameEmbed;
     catalog_device_capacities: NameEmbed;
-    catalog_device_interfaces: NameEmbed;
+    catalog_interfaces: NameEmbed;
     catalog_device_conditions: NameEmbed;
     is_primary: boolean | null;
     model: string | null;
@@ -147,7 +153,7 @@ async function fetchCaseContext(caseId: string): Promise<Partial<ReportData>> {
   // created first. Recoverability, however, is aggregated across the whole array.
   const { data: devices } = await supabase
     .from('case_devices')
-    .select('catalog_device_types!device_type_id(name), catalog_device_brands!brand_id(name), catalog_device_capacities!capacity_id(name), catalog_device_interfaces!interface_id(name), catalog_device_conditions!condition_id(name), is_primary, model, serial_number, recovery_result')
+    .select(CASE_DEVICE_SELECT)
     .eq('case_id', caseId)
     .is('deleted_at', null)
     .order('is_primary', { ascending: false, nullsFirst: false })
@@ -207,7 +213,7 @@ async function fetchCaseContext(caseId: string): Promise<Partial<ReportData>> {
           model: dev.model ?? undefined,
           serial_number: dev.serial_number ?? undefined,
           capacity: dev.catalog_device_capacities?.name ?? undefined,
-          interface: dev.catalog_device_interfaces?.name ?? undefined,
+          interface: dev.catalog_interfaces?.name ?? undefined,
           condition: dev.catalog_device_conditions?.name ?? undefined,
         }
       : undefined,

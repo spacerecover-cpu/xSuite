@@ -14,15 +14,21 @@ vi.mock('../../lib/stockService', () => ({
 }));
 
 // The modal now reads already-received quantities from purchase_order_items.
-// This thenable stub returns a partially-received line (4 of 10 received).
+// The thenable stub defaults to a partially-received line (4 of 10 received);
+// `receivedQueryResult` lets a test simulate a failed reconciliation fetch.
+const { receivedQueryResult } = vi.hoisted(() => ({
+  receivedQueryResult: {
+    current: { data: [{ id: 'poi-1', received_quantity: 4 }], error: null } as unknown,
+  },
+}));
+
 vi.mock('../../lib/supabaseClient', () => {
   const makeChain = () => {
     const chain: Record<string, unknown> = {};
     for (const m of ['select', 'eq', 'is']) {
       chain[m] = vi.fn(() => chain);
     }
-    chain.then = (resolve: (v: unknown) => unknown) =>
-      resolve({ data: [{ id: 'poi-1', received_quantity: 4 }], error: null });
+    chain.then = (resolve: (v: unknown) => unknown) => resolve(receivedQueryResult.current);
     return chain;
   };
   return { supabase: { from: vi.fn(() => makeChain()) } };
@@ -50,6 +56,7 @@ function renderModal() {
 describe('ReceiveStockModal — outstanding-quantity default', () => {
   beforeEach(() => {
     vi.mocked(receiveStockFromPO).mockClear();
+    receivedQueryResult.current = { data: [{ id: 'poi-1', received_quantity: 4 }], error: null };
   });
 
   it('pre-fills Qty Received with the remaining outstanding quantity, not the full ordered qty', async () => {
@@ -58,5 +65,14 @@ describe('ReceiveStockModal — outstanding-quantity default', () => {
     // 10 ordered, 4 already received -> remaining 6 (NOT 10).
     await waitFor(() => expect(qtyInput).toHaveValue(6));
     expect(screen.getByText(/Already received: 4/)).toBeInTheDocument();
+  });
+
+  it('blocks receiving when the already-received quantities cannot be loaded', async () => {
+    receivedQueryResult.current = { data: null, error: { message: 'network down' } };
+    renderModal();
+
+    const receiveButton = await screen.findByRole('button', { name: /Receive/ });
+    await waitFor(() => expect(receiveButton).toBeDisabled());
+    expect(screen.getByRole('alert')).toHaveTextContent(/Receiving is blocked/);
   });
 });

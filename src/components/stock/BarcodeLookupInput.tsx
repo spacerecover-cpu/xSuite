@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Search, Scan, X } from 'lucide-react';
-import { getStockItemByBarcode, getSerialNumberByBarcode, type StockItemWithCategory, type StockSerialNumber } from '../../lib/stockService';
+import { getStockItem, getStockItemByBarcode, getSerialNumberByBarcode, type StockItemWithCategory, type StockSerialNumber } from '../../lib/stockService';
 import { useToast } from '../../hooks/useToast';
 
 interface LookupResult {
@@ -48,7 +48,7 @@ export const BarcodeLookupInput: React.FC<Props> = ({
 
       if (serial && onSerialFound) {
         if (!item && serial.item_id) {
-          const itemForSerial = await getStockItemByBarcode(barcode).catch(() => null);
+          const itemForSerial = await getStockItem(serial.item_id).catch(() => null);
           onSerialFound(serial, itemForSerial);
         } else {
           onSerialFound(serial, item);

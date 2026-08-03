@@ -93,6 +93,19 @@ export const buildGeneralSettingsPayload = (
   return payload;
 };
 
+// Scope every company_settings write to a single row. A platform admin's RLS lets
+// them see (and therefore UPDATE) other tenants' rows, so a match-everything
+// predicate would write this form over every visible tenant's settings. Prefer the
+// loaded row's id; fall back to the caller's tenant_id when no row exists yet.
+export const resolveCompanySettingsScope = (
+  settingsId: string | null | undefined,
+  tenantId: string | null | undefined,
+): { column: 'id' | 'tenant_id'; value: string } | null => {
+  if (settingsId) return { column: 'id', value: settingsId };
+  if (tenantId) return { column: 'tenant_id', value: tenantId };
+  return null;
+};
+
 // Coerce arbitrary JSON values to a string for text-input display.
 const toStr = (v: unknown): string => {
   if (v === null || v === undefined) return '';
@@ -348,7 +361,7 @@ export const GeneralSettings: React.FC = () => {
       // Verify user has admin role
       const { data: userProfile, error: profileError } = await supabase
         .from('profiles')
-        .select('role, is_active')
+        .select('role, is_active, tenant_id')
         .eq('id', activeSession.user.id)
         .maybeSingle();
 
@@ -370,15 +383,20 @@ export const GeneralSettings: React.FC = () => {
       }
 
       // Drop the local-only `id` field; supabase generates uuid for us on insert,
-      // and updates are scoped by .not('id', 'is', null) below.
+      // and updates are scoped to this tenant's own row below.
       const { id: _omitId, ...updatePayload } = updates;
       void _omitId;
+
+      const scope = resolveCompanySettingsScope(settings?.id, userProfile.tenant_id);
+      if (!scope) {
+        throw new Error('Could not determine which company settings row to update.');
+      }
 
       // Try update first
       const { data: updateData, error: updateError } = await supabase
         .from('company_settings')
         .update(updatePayload as CompanySettingsUpdate)
-        .not('id', 'is', null)
+        .eq(scope.column, scope.value)
         .select();
 
       if (updateError) {
@@ -392,19 +410,13 @@ export const GeneralSettings: React.FC = () => {
       }
 
       // No row exists yet — insert a new one with tenant_id
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('tenant_id')
-        .eq('id', activeSession.user.id)
-        .maybeSingle();
-
-      if (!profile?.tenant_id) {
+      if (!userProfile.tenant_id) {
         throw new Error('Cannot create company settings without a tenant_id.');
       }
 
       const insertPayload: CompanySettingsInsert = {
         ...(updatePayload as CompanySettingsUpdate),
-        tenant_id: profile.tenant_id,
+        tenant_id: userProfile.tenant_id,
       };
 
       const { data: insertData, error: insertError } = await supabase
@@ -479,10 +491,23 @@ export const GeneralSettings: React.FC = () => {
   // save mutation's update-then-insert fallback so a tenant with no company_settings
   // row yet actually gets one instead of silently updating 0 rows.
   const persistBranding = async (updatedBranding: JsonObject): Promise<boolean> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', user?.id ?? '')
+      .maybeSingle();
+
+    const scope = resolveCompanySettingsScope(settings?.id, profile?.tenant_id);
+    if (!scope) {
+      logger.error('Branding persist: could not resolve the company settings row to update');
+      return false;
+    }
+
     const { data: updateData, error: updateError } = await supabase
       .from('company_settings')
       .update({ branding: updatedBranding } as CompanySettingsUpdate)
-      .not('id', 'is', null)
+      .eq(scope.column, scope.value)
       .select();
 
     if (updateError) {
@@ -491,12 +516,6 @@ export const GeneralSettings: React.FC = () => {
     }
     if (updateData && updateData.length > 0) return true;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('tenant_id')
-      .eq('id', user?.id ?? '')
-      .maybeSingle();
     if (!profile?.tenant_id) return false;
 
     const { error: insertError } = await supabase

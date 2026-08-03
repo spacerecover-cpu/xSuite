@@ -462,6 +462,76 @@ describe('processPayroll is idempotent under retry/concurrency (bug #19)', () =>
   });
 });
 
+describe('processPayroll surfaces un-posted loan repayments for reconciliation', () => {
+  // payroll_records are committed with net_salary already net of the installment,
+  // and the period has left 'draft' so the run cannot be retried. A single failing
+  // recordLoanRepayment must therefore NOT abort the remaining postings (that would
+  // silently strand every later employee's loan too) — all are attempted and the
+  // failures are reported by employee.
+  function arrangeLoanPosting(captured: { attempted: string[] }) {
+    vi.spyOn(payrollService, 'getPayrollPeriod').mockResolvedValue(
+      { id: 'period-1', status: 'draft', start_date: '2026-06-01', end_date: '2026-06-30', period_name: 'Jun 2026' } as never,
+    );
+    vi.spyOn(payrollService, 'getPayrollSettings').mockResolvedValue(
+      { working_days_per_month: 22, working_hours_per_day: 8, overtime_rate_multiplier: { regular: 1.5, weekend: 1.5, holiday: 2 }, payment_day: 28, social_security_rate: undefined } as never,
+    );
+    vi.spyOn(payrollService, 'getEmployeeAttendance').mockResolvedValue(
+      { daysWorked: 22, daysAbsent: 0, daysLeave: 0, regularHours: 176, overtimeHours: 0 } as never,
+    );
+    vi.spyOn(payrollService, 'getActiveLoans').mockImplementation((employeeId: string) =>
+      Promise.resolve([
+        { id: `loan-${employeeId}`, installment_amount: 100, remaining_amount: 500, total_amount: 500 },
+      ] as never),
+    );
+    vi.spyOn(payrollService, 'recordLoanRepayment').mockImplementation((r: { loan_id: string }) => {
+      captured.attempted.push(r.loan_id);
+      if (r.loan_id === 'loan-emp-2') return Promise.reject(new Error('transient db error'));
+      return Promise.resolve(null as never);
+    });
+
+    from.mockImplementation((table: string) => {
+      if (table === 'employees') {
+        return makeQuery([
+          { id: 'emp-1', tenant_id: 't-1', basic_salary: 1000, employee_number: 'EMP-001', first_name: 'Ada', last_name: 'L' },
+          { id: 'emp-2', tenant_id: 't-1', basic_salary: 1000, employee_number: 'EMP-002', first_name: 'Bo', last_name: 'K' },
+          { id: 'emp-3', tenant_id: 't-1', basic_salary: 1000, employee_number: 'EMP-003', first_name: 'Cy', last_name: 'M' },
+        ]);
+      }
+      if (table === 'payroll_periods') return makeQuery({ id: 'period-1', status: 'processing' });
+      if (table === 'payroll_records') {
+        return {
+          insert: (rows: unknown) => ({ select: () => Promise.resolve({ data: rows, error: null }) }),
+        } as unknown as ReturnType<typeof makeQuery>;
+      }
+      return makeQuery(null);
+    });
+  }
+
+  it('posts every remaining repayment past a failure and names the un-decremented loans', async () => {
+    const captured = { attempted: [] as string[] };
+    arrangeLoanPosting(captured);
+
+    await expect(payrollService.processPayroll('period-1')).rejects.toThrow(/EMP-002/);
+
+    // emp-3's loan must still have been posted — the old loop aborted on emp-2.
+    expect(captured.attempted).toEqual(['loan-emp-1', 'loan-emp-2', 'loan-emp-3']);
+  });
+
+  it('does not throw when every repayment posts', async () => {
+    const captured = { attempted: [] as string[] };
+    arrangeLoanPosting(captured);
+    vi.spyOn(payrollService, 'recordLoanRepayment').mockImplementation((r: { loan_id: string }) => {
+      captured.attempted.push(r.loan_id);
+      return Promise.resolve(null as never);
+    });
+
+    const result = await payrollService.processPayroll('period-1');
+
+    expect(result.success).toBe(true);
+    expect(captured.attempted).toHaveLength(3);
+  });
+});
+
 describe('getEmployeeAttendance excludes soft-deleted rows (bug #59)', () => {
   it('filters attendance_records on deleted_at IS NULL so cancelled absences never drive pay', async () => {
     const attQuery = makeQuery([]);

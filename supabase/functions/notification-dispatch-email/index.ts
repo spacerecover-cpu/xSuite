@@ -62,6 +62,7 @@ interface NotificationEvent {
   entity_id: string;
   payload: Record<string, unknown>;
   actor_user_id: string | null;
+  processing_attempts: number;
 }
 
 interface EmailSubscription {
@@ -170,6 +171,32 @@ async function logNotification(
   });
 }
 
+// Attempts allowed before an event stops being released back to the queue.
+// At the cap the claim is kept (dead-lettered) so a permanently-broken event
+// cannot be re-dispatched forever; the DLQ still surfaces it via
+// processing_attempts/last_error for a manual retry.
+const MAX_PROCESSING_ATTEMPTS = 5;
+
+// Undoes the processed_at claim so a later invocation can dispatch the event
+// again, and records the failure for the DLQ. Without this, any failure between
+// the claim and a successful send would leave the event marked processed with
+// nothing sent — silently dropped and never retried.
+async function recordProcessingFailure(
+  supabase: ReturnType<typeof createClient>,
+  event: NotificationEvent,
+  message: string,
+): Promise<void> {
+  const attempts = (event.processing_attempts ?? 0) + 1;
+  await supabase
+    .from("notification_events")
+    .update({
+      processing_attempts: attempts,
+      last_error: message.slice(0, 2000),
+      processed_at: attempts >= MAX_PROCESSING_ATTEMPTS ? new Date().toISOString() : null,
+    })
+    .eq("id", event.id);
+}
+
 Deno.serve(async (req: Request) => {
   const CORS = corsHeaders(req);
 
@@ -239,10 +266,13 @@ Deno.serve(async (req: Request) => {
   const event = eventRow as unknown as NotificationEvent;
 
   // 1b. Idempotency guard: atomically claim the event by stamping processed_at
-  // only if it is still NULL. A retry/replay of the same event_id finds
-  // processed_at already set, matches zero rows here, and no-ops — so an event
-  // dispatches AT MOST ONCE (no duplicate emails, no duplicate notification_log
-  // rows) even under pg_net retries or a double invocation.
+  // only if it is still NULL. A concurrent retry/replay of the same event_id
+  // finds processed_at already set, matches zero rows here, and no-ops — so an
+  // event dispatches AT MOST ONCE (no duplicate emails, no duplicate
+  // notification_log rows) even under pg_net retries or a double invocation.
+  // The claim is released again by recordProcessingFailure() whenever nothing
+  // was actually sent, so a failure downstream of here is retryable rather than
+  // a permanent silent drop.
   const { data: claimed, error: claimErr } = await supabase
     .from("notification_events")
     .update({ processed_at: new Date().toISOString() })
@@ -275,6 +305,7 @@ Deno.serve(async (req: Request) => {
     .eq("frequency", "immediate")
     .is("deleted_at", null);
   if (subsErr) {
+    await recordProcessingFailure(supabase, event, subsErr.message);
     return new Response(JSON.stringify({ error: subsErr.message }), {
       status: 500,
       headers: { ...CORS, "Content-Type": "application/json" },
@@ -291,6 +322,9 @@ Deno.serve(async (req: Request) => {
   // 3. Load template once (locale fixed to 'en' for v1; future: pick by recipient locale).
   const template = await findTemplate(supabase, event.tenant_id, event.event_type, "en");
   if (!template) {
+    // Recoverable: the template may be missing/renamed/inactive right now but
+    // restored later, so release the claim instead of dropping the event.
+    await recordProcessingFailure(supabase, event, "no_template");
     return new Response(JSON.stringify({ ok: true, deliveries: 0, reason: "no_template" }), {
       headers: { ...CORS, "Content-Type": "application/json" },
     });
@@ -378,12 +412,33 @@ Deno.serve(async (req: Request) => {
         });
       }
     }
+  } catch (loopErr) {
+    // Unexpected failure outside the per-recipient handler (e.g. SMTP connect,
+    // recipient lookup). Release the claim so the event stays dispatchable.
+    const message = (loopErr as UnknownErrorMessage)?.message ?? String(loopErr);
+    // Release the claim ONLY if nothing was delivered. Releasing after a partial
+    // success would let a retry re-email the recipients who already received it —
+    // the same invariant the sent===0 branch below relies on.
+    if (sent === 0) {
+      await recordProcessingFailure(supabase, event, message);
+    }
+    return new Response(JSON.stringify({ error: message, event_id: event.id }), {
+      status: 500,
+      headers: { ...CORS, "Content-Type": "application/json" },
+    });
   } finally {
     try {
       await smtp.close();
     } catch {
       // closing errors are non-fatal
     }
+  }
+
+  // Nothing got through: safe to release the claim (no recipient was emailed, so
+  // a retry cannot duplicate). A partial success keeps the claim — the failed
+  // recipients are recorded in notification_log for the DLQ.
+  if (sent === 0 && failed > 0) {
+    await recordProcessingFailure(supabase, event, `all_deliveries_failed (${failed})`);
   }
 
   return new Response(

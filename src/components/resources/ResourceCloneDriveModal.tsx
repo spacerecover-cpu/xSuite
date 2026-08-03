@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Modal } from '../ui/Modal';
@@ -52,6 +52,18 @@ const EMPTY_FORM: FormState = {
 const toFormString = (value: unknown): string =>
   typeof value === 'string' ? value : value == null ? '' : String(value);
 
+export const driveToFormState = (drive?: EditingDrive | null): FormState => ({
+  label: toFormString(drive?.label ?? drive?.clone_id),
+  serial_number: toFormString(drive?.serial_number),
+  brand_id: toFormString(drive?.brand_id),
+  capacity_id: toFormString(drive?.capacity_id),
+  interface_id: toFormString(drive?.interface_id),
+  status: toFormString(drive?.status) || EMPTY_FORM.status,
+  condition: toFormString(drive?.condition),
+  location: toFormString(drive?.location),
+  notes: toFormString(drive?.notes),
+});
+
 export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = ({
   isOpen,
   onClose,
@@ -65,17 +77,17 @@ export const ResourceCloneDriveModal: React.FC<ResourceCloneDriveModalProps> = (
   const editingId: string | null = typeof editingDrive?.id === 'string' ? editingDrive.id : null;
   const cloneIdLabel: string = toFormString(editingDrive?.clone_id ?? editingDrive?.label);
 
-  const [formData, setFormData] = useState<FormState>(() => ({
-    label: toFormString(editingDrive?.label ?? editingDrive?.clone_id),
-    serial_number: toFormString(editingDrive?.serial_number),
-    brand_id: toFormString(editingDrive?.brand_id),
-    capacity_id: toFormString(editingDrive?.capacity_id),
-    interface_id: toFormString(editingDrive?.interface_id),
-    status: toFormString(editingDrive?.status) || 'available',
-    condition: toFormString(editingDrive?.condition),
-    location: toFormString(editingDrive?.location),
-    notes: toFormString(editingDrive?.notes),
-  }));
+  const [formData, setFormData] = useState<FormState>(() => driveToFormState(editingDrive));
+
+  // The parent keeps this modal mounted across open/close, so the state
+  // initializer only ever runs for the first (Add) mount. Re-seed on every open
+  // and whenever the edited record changes — otherwise Edit shows a blank form
+  // and the update wipes the stored metadata.
+  useEffect(() => {
+    if (!isOpen) return;
+    setFormData(driveToFormState(editingDrive));
+    setError(null);
+  }, [isOpen, editingDrive]);
 
   const { data: brands = [] } = useQuery({
     queryKey: ['catalog_device_brands'],

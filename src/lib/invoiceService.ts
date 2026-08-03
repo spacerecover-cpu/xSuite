@@ -1225,6 +1225,14 @@ export interface BulkSendInvoiceResult {
   error?: string;
 }
 
+const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+// One window-slice between send attempts (60s / 5 = 12s). Derived from the
+// transport's own limit so the two can never drift apart.
+const EMAIL_SEND_INTERVAL_MS = Math.ceil(
+  RATE_LIMITS.EMAIL_SEND.windowMs / RATE_LIMITS.EMAIL_SEND.maxRequests,
+);
+
 // Sequentially email each selected invoice to its customer's address.
 // Sequential because:
 //   1. The client-side rate limiter caps email send at 5/min — parallel
@@ -1232,6 +1240,11 @@ export interface BulkSendInvoiceResult {
 //      cluster, leaving partial state.
 //   2. PDF generation is heavy. Serializing keeps memory predictable
 //      and gives the progress callback meaningful "done of total" steps.
+// Sequential alone is NOT enough: the gate rejects rather than queues, so an
+// unpaced loop drains the whole window on the first 5 rows and reports every
+// remaining invoice as a rate-limit "failure". The loop therefore throttles
+// itself to EMAIL_SEND_INTERVAL_MS between actual send attempts, which is the
+// "~N minute(s)" the bulk-send confirm dialog promises the user.
 // Returns one result per invoice; never throws for a single-row
 // failure (callers want the summary). Throws only if the initial
 // fetch fails.
@@ -1259,6 +1272,10 @@ export async function bulkSendInvoiceEmails(
   const results: BulkSendInvoiceResult[] = [];
   const total = rows?.length ?? 0;
   let done = 0;
+  // Timestamp of the last completed send attempt; null until the first one.
+  // Only real send attempts are paced — rows skipped for a missing email, or
+  // failing PDF generation, never reach the transport and so consume no slot.
+  let lastSendAt: number | null = null;
 
   for (const inv of rows ?? []) {
     const customer = inv.customers_enhanced as {
@@ -1292,6 +1309,13 @@ export async function bulkSendInvoiceEmails(
             companyName: '',
             documentType: 'invoice',
           });
+          // Measured from the PREVIOUS send's completion, so the (heavy) PDF
+          // build above already counts toward the interval and we only sleep
+          // for whatever is left of it.
+          if (lastSendAt !== null) {
+            const waitMs = EMAIL_SEND_INTERVAL_MS - (Date.now() - lastSendAt);
+            if (waitMs > 0) await delay(waitMs);
+          }
           const send = await sendDocumentEmail({
             to: email,
             subject: template.subject,
@@ -1301,6 +1325,7 @@ export async function bulkSendInvoiceEmails(
             caseId: inv.case_id || undefined,
             documentType: 'invoice',
           });
+          lastSendAt = Date.now();
           if (send.success) {
             // Mark sent. Don't fail the whole row if the status update
             // errors — the email already went out; surfacing a noisy

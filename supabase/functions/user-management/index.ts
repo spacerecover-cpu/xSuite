@@ -128,11 +128,13 @@ Deno.serve(async (req: Request) => {
 
     const { data: callerProfile } = await supabaseClient
       .from("profiles")
-      .select("role, tenant_id")
+      .select("role, tenant_id, is_active")
       .eq("id", user.id)
       .maybeSingle();
 
-    if (!callerProfile || !["owner", "admin"].includes(callerProfile.role)) {
+    // A deactivated admin keeps a valid JWT until it expires — authorize on
+    // is_active as well as role so revocation takes effect immediately.
+    if (!callerProfile || callerProfile.is_active !== true || !["owner", "admin"].includes(callerProfile.role)) {
       return new Response(
         JSON.stringify({ error: "Forbidden: Admin access required" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -155,19 +157,65 @@ Deno.serve(async (req: Request) => {
       const body: CreateUserRequest = await req.json();
       console.log(`[CREATE USER] ${body.email}`);
 
-      const { data: existingProfile } = await supabaseClient
+      // Scope the existing-profile lookup to the caller's own tenant. An unscoped
+      // match let a tenant admin recover an email belonging to another tenant and
+      // overwrite that foreign profile's role/is_active below.
+      const { data: emailProfiles, error: emailLookupError } = await supabaseClient
         .from("profiles")
-        .select("id, email, role")
-        .eq("email", body.email)
-        .maybeSingle();
+        .select("id, role, tenant_id")
+        .eq("email", body.email);
+
+      if (emailLookupError) {
+        throw new Error(`Failed to look up existing profile: ${emailLookupError.message}`);
+      }
+
+      type ProfileMatch = { id: string; role: string | null; tenant_id: string | null };
+      const profilesForEmail = (emailProfiles ?? []) as ProfileMatch[];
+      // A platform admin has tenant_id NULL and legitimately administers every
+      // tenant; matching on equality would pair them only with other NULL-tenant
+      // profiles and 409 every real-tenant email.
+      const isPlatformAdmin = callerProfile.tenant_id === null;
+      const existingProfile = isPlatformAdmin
+        ? profilesForEmail[0]
+        : profilesForEmail.find((p) => p.tenant_id === callerProfile.tenant_id);
 
       if (existingProfile?.role) {
         throw new Error("A user with this email already exists");
       }
 
+      if (!existingProfile && profilesForEmail.length > 0) {
+        return new Response(
+          JSON.stringify({ error: "This email is already registered to another tenant" }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       const existingAuthUser = await findAuthUserByEmail(supabaseClient, body.email);
 
       if (existingAuthUser) {
+        // The auth lookup is global; re-verify by id that the profile we are about
+        // to overwrite is inside the caller's tenant (the auth account's email may
+        // differ from the profile row's email).
+        const { data: authUserProfile, error: authProfileError } = await supabaseClient
+          .from("profiles")
+          .select("tenant_id")
+          .eq("id", existingAuthUser.id)
+          .maybeSingle();
+
+        // Fail CLOSED: swallowing this error would leave authUserProfile null,
+        // skip the tenant guard below, and let the cross-tenant UPDATE proceed —
+        // degrading the security check into a no-op exactly when it matters.
+        if (authProfileError) {
+          throw new Error(`Failed to verify existing account tenant: ${authProfileError.message}`);
+        }
+
+        if (authUserProfile && !isPlatformAdmin && authUserProfile.tenant_id !== callerProfile.tenant_id) {
+          return new Response(
+            JSON.stringify({ error: "This email is already registered to another tenant" }),
+            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
         console.log(`[CREATE USER] Orphaned auth user found, updating profile for ${body.email}`);
         const { error: updateError } = await supabaseClient
           .from("profiles")
@@ -186,14 +234,25 @@ Deno.serve(async (req: Request) => {
         }
 
         try {
-          await supabaseClient.rpc("log_audit_trail", {
+          const { error: auditError } = await supabaseClient.rpc("log_audit_trail", {
             p_action_type: "create",
             p_table_name: "profiles",
             p_record_id: existingAuthUser.id,
             p_old_values: {},
             p_new_values: { full_name: body.full_name, role: body.role, email: body.email },
           });
-        } catch (_) {}
+          if (auditError) {
+            console.error(
+              `[CREATE USER] Audit trail write failed for profile ${existingAuthUser.id} (${body.email}):`,
+              auditError.message
+            );
+          }
+        } catch (auditException) {
+          console.error(
+            `[CREATE USER] Audit trail write threw for profile ${existingAuthUser.id} (${body.email}):`,
+            auditException
+          );
+        }
 
         return new Response(
           JSON.stringify({ success: true, user: existingAuthUser }),
@@ -258,14 +317,25 @@ Deno.serve(async (req: Request) => {
       }
 
       try {
-        await supabaseClient.rpc("log_audit_trail", {
+        const { error: auditError } = await supabaseClient.rpc("log_audit_trail", {
           p_action_type: "create",
           p_table_name: "profiles",
           p_record_id: authData.user.id,
           p_old_values: {},
           p_new_values: { full_name: body.full_name, role: body.role, email: body.email },
         });
-      } catch (_) {}
+        if (auditError) {
+          console.error(
+            `[CREATE USER] Audit trail write failed for profile ${authData.user.id} (${body.email}):`,
+            auditError.message
+          );
+        }
+      } catch (auditException) {
+        console.error(
+          `[CREATE USER] Audit trail write threw for profile ${authData.user.id} (${body.email}):`,
+          auditException
+        );
+      }
 
       return new Response(
         JSON.stringify({ success: true, user: authData.user }),
@@ -314,14 +384,25 @@ Deno.serve(async (req: Request) => {
       if (profileError) throw new Error(`Failed to update profile: ${profileError.message}`);
 
       try {
-        await supabaseClient.rpc("log_audit_trail", {
+        const { error: auditError } = await supabaseClient.rpc("log_audit_trail", {
           p_action_type: "update",
           p_table_name: "profiles",
           p_record_id: body.userId,
           p_old_values: {},
           p_new_values: { password_reset_initiated: true },
         });
-      } catch (_) {}
+        if (auditError) {
+          console.error(
+            `[RESET PASSWORD] Audit trail write failed for profile ${body.userId}:`,
+            auditError.message
+          );
+        }
+      } catch (auditException) {
+        console.error(
+          `[RESET PASSWORD] Audit trail write threw for profile ${body.userId}:`,
+          auditException
+        );
+      }
 
       return new Response(
         JSON.stringify({ success: true }),

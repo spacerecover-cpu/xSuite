@@ -437,11 +437,15 @@ async function fetchCaseData(caseId: string): Promise<CaseData> {
   });
 }
 
-async function fetchCaseDevices(caseId: string): Promise<DeviceData[]> {
+export async function fetchCaseDevices(caseId: string): Promise<DeviceData[]> {
   const { data, error } = await supabase
     .from('case_devices')
     .select('*')
     .eq('case_id', caseId)
+    // Soft-deleted devices must never reach a printed custody document (receipt,
+    // checkout form, device label) — the paper would assert the lab holds hardware
+    // it removed from the case.
+    .is('deleted_at', null)
     .order('created_at', { ascending: true });
 
   if (error) {
@@ -1129,6 +1133,7 @@ export function toPayslipData(
     regular_hours: undefined,
     overtime_hours: recordRow.overtime_hours ?? undefined,
     gross_salary: recordRow.total_earnings ?? undefined,
+    total_deductions: recordRow.total_deductions ?? undefined,
     net_salary: recordRow.net_salary ?? 0,
     items: extras.items ?? [],
     accounting_locales: currencyToBlock(extras.currency),

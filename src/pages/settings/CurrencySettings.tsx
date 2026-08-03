@@ -39,7 +39,12 @@ export function TenantCurrenciesSection() {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+    // `toast` is a fresh object on every render (useToast returns a literal), so
+    // depending on it would re-create `refresh` each render and make the effect
+    // below re-fetch forever. The toast helpers are stateless module wrappers,
+    // so the captured value never goes stale.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     refresh();

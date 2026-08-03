@@ -6,6 +6,7 @@ vi.mock('../../lib/supabaseClient', () => ({ supabase: { from: vi.fn(), auth: {}
 
 import {
   buildGeneralSettingsPayload,
+  resolveCompanySettingsScope,
   GENERAL_SETTINGS_OWNED_SECTIONS,
 } from './GeneralSettings';
 
@@ -51,5 +52,28 @@ describe('buildGeneralSettingsPayload', () => {
   it('omits owned sections that are absent rather than writing undefined', () => {
     const payload = buildGeneralSettingsPayload({ basic_info: { company_name: 'X' } });
     expect(Object.keys(payload)).toEqual(['basic_info']);
+  });
+});
+
+describe('resolveCompanySettingsScope', () => {
+  it('scopes the write to the loaded settings row', () => {
+    expect(resolveCompanySettingsScope('row-1', 'tenant-1')).toEqual({
+      column: 'id',
+      value: 'row-1',
+    });
+  });
+
+  it('falls back to the caller tenant when no row is loaded yet', () => {
+    expect(resolveCompanySettingsScope(null, 'tenant-1')).toEqual({
+      column: 'tenant_id',
+      value: 'tenant-1',
+    });
+  });
+
+  it('refuses to produce a scope for a platform admin with no row and no tenant', () => {
+    // Without a scope the caller must abort — a platform admin's RLS spans every
+    // tenant, so an unscoped update would overwrite other tenants' settings.
+    expect(resolveCompanySettingsScope(null, null)).toBeNull();
+    expect(resolveCompanySettingsScope(undefined, undefined)).toBeNull();
   });
 });

@@ -59,13 +59,26 @@ async function loadTenantFormat(tenantId: string): Promise<TenantFormatConfig> {
     uiLanguage: t?.ui_language ?? null,
   };
 }
-function fmtMoney(v: unknown, cfg: TenantFormatConfig): string {
-  const n = Number(v);
-  if (!Number.isFinite(n)) return "—";
-  const num = new Intl.NumberFormat(cfg.localeCode, {
+function fmtAmount(n: number, cfg: TenantFormatConfig): string {
+  return new Intl.NumberFormat(cfg.localeCode, {
     minimumFractionDigits: cfg.decimalPlaces, maximumFractionDigits: cfg.decimalPlaces,
   }).format(n);
-  return `${cfg.currencySymbol} ${num}`.trim();
+}
+/** A document renders in ITS OWN currency; the tenant symbol is only the fallback for
+ *  rows carrying none — a USD quote must never go out labelled with an AED tenant symbol. */
+function fmtMoney(v: unknown, cfg: TenantFormatConfig, recordCurrency?: string | null): string {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  const code = String(recordCurrency ?? "").trim().toUpperCase();
+  if (code && code !== cfg.currencyCode.toUpperCase()) {
+    try {
+      return new Intl.NumberFormat(cfg.localeCode, { style: "currency", currency: code }).format(n);
+    } catch {
+      // unknown/non-ISO code: still label with the record's own code, never the tenant's
+      return `${code} ${fmtAmount(n, cfg)}`;
+    }
+  }
+  return `${cfg.currencySymbol} ${fmtAmount(n, cfg)}`.trim();
 }
 function fmtDate(v: unknown, cfg: TenantFormatConfig): string {
   if (!v) return "—";
@@ -142,15 +155,15 @@ async function buildContext(
     const { data: q } = await db.from("quotes")
       .select("quote_number, total_amount, currency, valid_until").eq("id", msg.quote_id).maybeSingle();
     ctx["quote.number"] = String(q?.quote_number ?? "");
-    ctx["quote.total"] = fmtMoney(q?.total_amount, cfg);
+    ctx["quote.total"] = fmtMoney(q?.total_amount, cfg, q?.currency);
     ctx["quote.expiry_date"] = fmtDate(q?.valid_until, cfg);
   }
   if (msg.invoice_id) {
     const { data: inv } = await db.from("invoices")
       .select("invoice_number, total_amount, balance_due, currency, due_date").eq("id", msg.invoice_id).maybeSingle();
     ctx["invoice.number"] = String(inv?.invoice_number ?? "");
-    ctx["invoice.total"] = fmtMoney(inv?.total_amount, cfg);
-    ctx["invoice.balance_due"] = fmtMoney(inv?.balance_due, cfg);
+    ctx["invoice.total"] = fmtMoney(inv?.total_amount, cfg, inv?.currency);
+    ctx["invoice.balance_due"] = fmtMoney(inv?.balance_due, cfg, inv?.currency);
     ctx["invoice.due_date"] = fmtDate(inv?.due_date, cfg);
   }
   return ctx;

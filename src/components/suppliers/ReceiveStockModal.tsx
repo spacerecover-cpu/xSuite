@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PackageCheck } from 'lucide-react';
 import { Modal } from '../ui/Modal';
@@ -65,7 +65,12 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
   // the modal must default each line to what is still outstanding (ordered minus
   // already received) — re-confirming a fully/partly received line at the full
   // ordered qty would otherwise double-count on-hand stock.
-  const { data: receivedByItem = {} } = useQuery({
+  const {
+    data: receivedByItem,
+    isError: receivedLoadFailed,
+    refetch: refetchReceived,
+    isFetching: receivedFetching,
+  } = useQuery({
     queryKey: ['po-received-quantities', purchaseOrderId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -83,11 +88,24 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
     enabled: isOpen,
   });
 
-  const reconciledRef = useRef(false);
+  // Receiving is blocked until the already-received map has actually loaded.
+  // Treating a failed/pending fetch — or a result that carries none of this PO's
+  // lines — as "nothing received yet" would leave every line defaulted to the
+  // full ordered qty and let the user receive it a second time.
+  const receivedDataReady =
+    !receivedLoadFailed &&
+    receivedByItem !== undefined &&
+    (rows.length === 0 || Object.keys(receivedByItem).length > 0);
+
+  // Latch only once the map has REALLY loaded. Keying the latch on
+  // `receivedByItem !== undefined` instead would fire on an empty map — which
+  // means "none of this PO's lines were visible", not "nothing received yet" —
+  // pinning every row at the full ordered qty. A later successful retry could
+  // then never re-apply, and receiving that stale form double-counts stock.
+  const [reconciled, setReconciled] = useState(false);
   useEffect(() => {
-    if (reconciledRef.current) return;
-    if (Object.keys(receivedByItem).length === 0) return;
-    reconciledRef.current = true;
+    if (reconciled || !receivedDataReady || receivedByItem === undefined) return;
+    setReconciled(true);
     setRows((prev) =>
       prev.map((r) => {
         const received = receivedByItem[r.poItemId] ?? 0;
@@ -95,7 +113,12 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
         return { ...r, receivedQty: received, quantity: String(remaining) };
       })
     );
-  }, [receivedByItem]);
+  }, [reconciled, receivedDataReady, receivedByItem]);
+
+  // Once reconciled, stay unblocked: TanStack keeps the last good data when a
+  // background refetch fails, so keying purely off isError would spuriously
+  // re-block a form that already holds correct outstanding quantities.
+  const reconciliationReady = reconciled || receivedDataReady;
 
   const { data: stockItems = [] } = useQuery({
     queryKey: ['stock-items-all'],
@@ -118,6 +141,9 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
 
   const mutation = useMutation({
     mutationFn: async () => {
+      if (!reconciliationReady) {
+        throw new Error('Already-received quantities could not be loaded — receiving is blocked to avoid double-counting stock.');
+      }
       const validRows = rows.filter(
         (r) => r.stockItemId && Number(r.quantity) > 0 && r.orderedQty - r.receivedQty > 0
       );
@@ -156,6 +182,22 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
         <p className="text-sm text-slate-600">
           Match each line item to a stock item and confirm quantities received. Items without a linked stock item will be skipped.
         </p>
+
+        {!reconciliationReady && !receivedFetching && (
+          <div role="alert" className="flex items-start justify-between gap-3 rounded-lg border border-danger/30 bg-danger-muted px-3 py-2 text-sm text-danger">
+            <span>
+              Could not load the quantities already received against this purchase order. Receiving is
+              blocked until they load, so stock is not counted twice.
+            </span>
+            <button
+              type="button"
+              onClick={() => refetchReceived()}
+              className="flex-shrink-0 font-medium underline"
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
         <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
           {rows.map((row, index) => {
@@ -242,7 +284,7 @@ export const ReceiveStockModal: React.FC<ReceiveStockModalProps> = ({
           </Button>
           <Button
             onClick={() => mutation.mutate()}
-            disabled={validCount === 0 || mutation.isPending}
+            disabled={validCount === 0 || !reconciliationReady || mutation.isPending}
           >
             <PackageCheck className="w-4 h-4 mr-2" />
             {mutation.isPending

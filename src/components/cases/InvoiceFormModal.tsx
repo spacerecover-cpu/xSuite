@@ -213,7 +213,12 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
     } else if (clientReference) {
       setInvoiceData(prev => ({ ...prev, client_reference: clientReference }));
     }
-  }, [clientReference, initialData]);
+    // Re-seed only when the edited document (or the open state) changes: callers
+    // rebuild `initialData` on every render (toInvoiceEditInitialData(...)), so
+    // depending on its identity re-ran this effect on any parent re-render and
+    // wiped whatever the user was typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientReference, isOpen, (initialData as { id?: string } | undefined)?.id]);
 
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>(
     initialData?.invoice_line_items || [
@@ -484,9 +489,17 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
     return sum + item.quantity * item.unit_price;
   }, 0);
 
+  // Clamp the discount so it can never exceed the subtotal (fixed) or 100%
+  // (percentage). Without this an over-large discount drives net/tax/total
+  // negative in the preview and hands computeDocumentTotals a documentDiscount
+  // larger than the line subtotal on save.
+  const clampedDiscountAmount = invoiceData.discount_type === 'percentage'
+    ? Math.min(Math.max(invoiceData.discount_amount, 0), 100)
+    : Math.min(Math.max(invoiceData.discount_amount, 0), subtotal);
+
   const discountValue = invoiceData.discount_type === 'percentage'
-    ? (subtotal * invoiceData.discount_amount) / 100
-    : invoiceData.discount_amount;
+    ? (subtotal * clampedDiscountAmount) / 100
+    : clampedDiscountAmount;
 
   // Apply discount to subtotal first, then calculate VAT on discounted amount
   const discountedSubtotal = subtotal - discountValue;
@@ -520,6 +533,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
 
       const invoicePayload = {
         ...invoiceData,
+        discount_amount: clampedDiscountAmount,
         id: editingId,
         case_id: activeCaseId,
         customer_id: customerId || selectedCase?.customer_id || null,
@@ -925,6 +939,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
                       setInvoiceData({ ...invoiceData, discount_amount: parseFloat(e.target.value) || 0 })
                     }
                     min="0"
+                    max={invoiceData.discount_type === 'percentage' ? 100 : undefined}
                     step="0.01"
                   />
                 </div>
