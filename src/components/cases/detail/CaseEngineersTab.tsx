@@ -88,19 +88,33 @@ export const CaseEngineersTab: React.FC<CaseEngineersTabProps> = ({ caseId, case
       setRoleText('');
     },
     onError: (err: unknown) => {
-      toast.error(`Failed to assign engineer: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      // uq_case_engineers_case_user_active — the DB backstop for the client-side
+      // guard in handleAdd, which a stale prop list or a concurrent tab can race.
+      const code = (err as { code?: string } | null)?.code;
+      toast.error(
+        code === '23505'
+          ? 'That engineer is already assigned to this case'
+          : `Failed to assign engineer: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      );
     },
   });
 
   const removeEngineerMutation = useMutation({
     mutationFn: async (assignmentId: string) => {
-      // The DELETE policy is admin-only; a policy miss returns no error, just zero
-      // rows. Select the id back so a blocked removal surfaces as a failure rather
-      // than a success toast followed by the row reappearing on refetch.
+      // Soft-remove: who worked a case and when is part of its audit trail, so the
+      // row is retained and filtered out of the reader instead of deleted. The
+      // admin-only authorization the DELETE policy carried now lives on the
+      // deleted_at column itself (trg_guard_case_engineer_removal raises 42501),
+      // since the UPDATE policy alone would let any staff user remove an engineer.
+      // A tenant-isolation miss returns no error, just zero rows — select the id
+      // back so a blocked removal surfaces as a failure rather than a success
+      // toast followed by the row reappearing on refetch.
+      const now = new Date().toISOString();
       const { data, error } = await supabase
         .from('case_engineers')
-        .delete()
+        .update({ deleted_at: now, removed_at: now })
         .eq('id', assignmentId)
+        .is('deleted_at', null)
         .select('id');
       if (error) throw error;
       if ((data ?? []).length === 0) {

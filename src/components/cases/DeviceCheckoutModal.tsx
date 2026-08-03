@@ -3,7 +3,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { SearchableSelect } from '../ui/SearchableSelect';
-import { Package, User, Printer, FileText, PackageCheck, Loader2 } from 'lucide-react';
+import { Package, User, Printer, FileText, PackageCheck, Loader2, ShieldAlert } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { logger } from '../../lib/logger';
 import {
@@ -60,6 +60,23 @@ function deviceRoleLabel(device: Device, index: number): string | null {
   return index === 0 ? 'Patient' : null;
 }
 
+// Media the LAB owns: donor stock bought for harvesting, and lab-supplied
+// backup/clone/spare/target drives. A role-less intake device is the patient
+// (customer property) by convention, matching deviceRoleLabel above.
+//
+// These are still listed and still selectable — the DB close gate requires EVERY
+// case_device to carry checked_out_at, so hiding one would make the case
+// unclosable — but handing lab property to a customer is a custody transfer of
+// someone else's asset, so it has to be an acknowledged act rather than an
+// unremarkable tick alongside the patient drive.
+const LAB_PROPERTY_ROLE_TOKENS = ['donor', 'backup', 'clone', 'spare', 'target'] as const;
+
+function isLabProperty(device: Device): boolean {
+  const role = device.device_role?.name?.toLowerCase();
+  if (!role) return false;
+  return LAB_PROPERTY_ROLE_TOKENS.some((token) => role.includes(token));
+}
+
 /** Compact "Returned · 20 Jun 2026" badge date for an already-collected device. */
 function formatReturned(iso: string | null | undefined): string {
   if (!iso) return '';
@@ -114,6 +131,7 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
   const [error, setError] = useState('');
   const [declaredValues, setDeclaredValues] = useState<Record<string, string>>({});
   const [labSuppliedIds, setLabSuppliedIds] = useState<string[]>([]);
+  const [labPropertyAck, setLabPropertyAck] = useState(false);
   const [checkoutDone, setCheckoutDone] = useState(false);
   const firstFieldRef = useRef<HTMLInputElement>(null);
 
@@ -146,6 +164,8 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
   useEffect(() => {
     if (isOpen) setRecoveryOutcome(seedRecoveryOutcome(currentRecoveryOutcome));
   }, [isOpen, currentRecoveryOutcome]);
+
+  const selectedLabProperty = devices.filter((d) => selectedDevices.includes(d.id) && isLabProperty(d));
 
   const challanEligibleSelected = selectedDevices.filter((id) => !labSuppliedIds.includes(id));
   const declaredTotal = challanEligibleSelected.reduce(
@@ -198,6 +218,10 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
       }
       if (relationship !== 'self' && !collectorId.trim()) {
         setError('A National ID / passport is required when someone collects on behalf of the customer.');
+        return;
+      }
+      if (selectedLabProperty.length > 0 && !labPropertyAck) {
+        setError('Confirm the lab-owned media release before checking these devices out to the customer.');
         return;
       }
     }
@@ -277,6 +301,7 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
       setError('');
       setDeclaredValues({});
       setLabSuppliedIds([]);
+      setLabPropertyAck(false);
       setCheckoutDone(false);
       onClose();
     }
@@ -349,6 +374,31 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
               );
             })}
           </div>
+
+          {selectedLabProperty.length > 0 && !checkoutDone && (
+            <div className="mt-3 rounded-lg border border-warning/40 bg-warning-muted p-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-warning-foreground">
+                <ShieldAlert className="h-4 w-4 flex-shrink-0" />
+                <span>Lab-owned media selected</span>
+              </div>
+              <p className="mt-1 text-xs text-slate-600">
+                {selectedLabProperty
+                  .map((d) => `${getSimpleRoleLabel(d.device_role?.name)}${d.serial_number ? ` · S/N ${d.serial_number}` : ''}`)
+                  .join(', ')}{' '}
+                — donor stock and lab-supplied backup/clone media are the lab's property, not the
+                customer's. Release them only when the customer paid for or supplied the media.
+              </p>
+              <label className="mt-2 flex items-start gap-2 text-xs font-medium text-warning-foreground">
+                <input
+                  type="checkbox"
+                  checked={labPropertyAck}
+                  onChange={(e) => setLabPropertyAck(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 flex-shrink-0"
+                />
+                <span>I confirm the customer is entitled to take the lab-owned media listed above.</span>
+              </label>
+            </div>
+          )}
         </div>
 
         <div className="bg-success-muted border border-success/30 rounded-lg p-4">

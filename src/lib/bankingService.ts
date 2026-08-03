@@ -118,6 +118,20 @@ export interface ReconciliationSession {
   created_at: string;
 }
 
+/**
+ * The UI vocabulary is bank | cash | mobile, but `bank_accounts.account_type` is a
+ * nullable free-text column defaulting to 'checking' — so toBankAccount folds
+ * everything that is not cash/mobile into the 'bank' bucket. Every bank-side
+ * filter must widen exactly the same way, or the Bank tab hides accounts the Bank
+ * balance tile still counts. Kept as one predicate so the two cannot drift.
+ */
+function isBankBucket(accountType: string | null | undefined): boolean {
+  return accountType !== 'cash' && accountType !== 'mobile';
+}
+
+/** PostgREST form of `isBankBucket` (NULL is a bank account too). */
+const BANK_BUCKET_OR_FILTER = 'account_type.is.null,account_type.not.in.(cash,mobile)';
+
 function toBankAccount(row: BankAccountRow & {
   currency_ref?: { code: string; symbol: string; name: string } | null;
   employee?: { id: string; full_name: string | null } | null;
@@ -162,7 +176,9 @@ export const bankingService = {
       .order('name');
 
     if (filters?.account_type) {
-      query = query.eq('account_type', filters.account_type);
+      query = filters.account_type === 'bank'
+        ? query.or(BANK_BUCKET_OR_FILTER)
+        : query.eq('account_type', filters.account_type);
     }
 
     if (filters?.is_active !== undefined) {
@@ -719,7 +735,7 @@ export const bankingService = {
       .is('deleted_at', null);
 
     const bankBalance = sumBankBalanceBase(
-      (accounts ?? []).filter((a) => a.account_type === 'bank' || a.account_type === 'checking' || a.account_type === 'savings'),
+      (accounts ?? []).filter((a) => isBankBucket(a.account_type)),
       'current_balance',
     );
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Users, Briefcase, UserPlus, UserCheck, ClipboardList, Calendar, RefreshCw } from 'lucide-react';
+import { Users, Briefcase, UserPlus, UserCheck, ClipboardList, Calendar, RefreshCw, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { KpiRow } from '../../components/templates/KpiRow';
@@ -14,29 +14,40 @@ export const HRDashboard: React.FC = () => {
     pendingReviews: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     loadStats();
   }, []);
 
   const loadStats = async () => {
+    setLoading(true);
     try {
-      const [employeesResult, jobsResult, reviewsResult] = await Promise.all([
-        supabase.from('employees').select('employment_status', { count: 'exact' }).is('deleted_at', null),
-        supabase.from('recruitment_jobs').select('status', { count: 'exact' }).eq('status', 'open').is('deleted_at', null),
-        supabase.from('performance_reviews').select('status', { count: 'exact' }).eq('status', 'draft').is('deleted_at', null),
+      // Every tile is a head-only exact count. Deriving the active count by
+      // filtering a returned row set would cap it at the PostgREST page size
+      // while Total Employees used the exact count — two tiles, two populations.
+      const [employeesResult, activeResult, jobsResult, reviewsResult] = await Promise.all([
+        supabase.from('employees').select('id', { count: 'exact', head: true }).is('deleted_at', null),
+        supabase.from('employees').select('id', { count: 'exact', head: true }).eq('employment_status', 'active').is('deleted_at', null),
+        supabase.from('recruitment_jobs').select('id', { count: 'exact', head: true }).eq('status', 'open').is('deleted_at', null),
+        supabase.from('performance_reviews').select('id', { count: 'exact', head: true }).eq('status', 'draft').is('deleted_at', null),
       ]);
 
-      const activeCount = employeesResult.data?.filter(e => e.employment_status === 'active').length || 0;
+      // supabase-js resolves rather than throws, so an unchecked error would
+      // render 0 as if it were a real count.
+      const failed = [employeesResult, activeResult, jobsResult, reviewsResult].find(r => r.error);
+      if (failed?.error) throw failed.error;
 
       setStats({
-        totalEmployees: employeesResult.count || 0,
-        activeEmployees: activeCount,
-        openPositions: jobsResult.count || 0,
-        pendingReviews: reviewsResult.count || 0,
+        totalEmployees: employeesResult.count ?? 0,
+        activeEmployees: activeResult.count ?? 0,
+        openPositions: jobsResult.count ?? 0,
+        pendingReviews: reviewsResult.count ?? 0,
       });
+      setLoadError(null);
     } catch (error) {
       logger.error('Error loading stats:', error);
+      setLoadError(error instanceof Error ? error.message : 'Failed to load HR statistics');
     } finally {
       setLoading(false);
     }
@@ -61,13 +72,26 @@ export const HRDashboard: React.FC = () => {
         }
       />
 
+      {loadError && (
+        <div
+          role="alert"
+          className="mb-4 flex items-start gap-3 rounded-xl border border-danger/30 bg-danger-muted px-4 py-3"
+        >
+          <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-danger" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-danger">Statistics unavailable</p>
+            <p className="mt-0.5 text-sm text-slate-600">{loadError}</p>
+          </div>
+        </div>
+      )}
+
       <KpiRow
         cols="grid-cols-1 md:grid-cols-4"
         stats={[
-          { label: 'Total Employees', value: stats.totalEmployees, tone: 'info', icon: Users, loading },
-          { label: 'Active Employees', value: stats.activeEmployees, tone: 'success', icon: UserCheck, loading },
-          { label: 'Open Positions', value: stats.openPositions, tone: 'warning', icon: Briefcase, loading },
-          { label: 'Pending Reviews', value: stats.pendingReviews, tone: 'danger', icon: ClipboardList, loading },
+          { label: 'Total Employees', value: loadError ? '—' : stats.totalEmployees, tone: 'info', icon: Users, loading },
+          { label: 'Active Employees', value: loadError ? '—' : stats.activeEmployees, tone: 'success', icon: UserCheck, loading },
+          { label: 'Open Positions', value: loadError ? '—' : stats.openPositions, tone: 'warning', icon: Briefcase, loading },
+          { label: 'Pending Reviews', value: loadError ? '—' : stats.pendingReviews, tone: 'danger', icon: ClipboardList, loading },
         ]}
       />
 

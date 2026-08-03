@@ -309,11 +309,31 @@ export async function updateCompanySettings(updates: Partial<CompanySettings>): 
       throw new Error('Your account is inactive. Please contact your administrator.');
     }
 
+    // Resolve the caller's own settings row first. RLS scopes the read, but the
+    // write must still name a single id — an unfiltered update fans out across
+    // every row the caller can see (a platform admin sees every tenant's).
+    const { data: existing, error: existingError } = await supabase
+      .from('company_settings')
+      .select('id')
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) {
+      logger.error('Error resolving company settings row:', existingError);
+      throw new Error(`Database error: ${existingError.message}`);
+    }
+
+    const settingsId = existing?.id ?? (await getOrCreateCompanySettings()).id;
+
+    if (!settingsId) {
+      throw new Error('Failed to save: company settings record not found. Please refresh the page and try again.');
+    }
+
     // Perform the update
     const { data, error } = await supabase
       .from('company_settings')
       .update(updates)
-      .not('id', 'is', null)
+      .eq('id', settingsId)
       .select();
 
     if (error) {

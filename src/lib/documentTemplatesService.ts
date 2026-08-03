@@ -129,15 +129,17 @@ export async function listTemplates(
 }
 
 /**
- * Default-resolution chain: default pinned to the document type → default
- * generic → first pinned → first generic → null. Callers fall back to their
- * own hardcoded system default (emailTemplates.ts) on null.
+ * Default-resolution chain over an already-loaded list: default pinned to the
+ * document type → default generic → first pinned → first generic → null.
+ *
+ * Callers must not shortcut this to `templates[0]`: listTemplates only returns
+ * default-first when no documentType is given — with one, it re-sorts to
+ * `[...pinned, ...generic]`, which discards the is_default ordering.
  */
-export async function getDefaultTemplate(
-  typeCode: TemplateTypeCode,
+export function pickDefaultTemplate(
+  templates: DocumentTemplate[],
   documentType?: string
-): Promise<DocumentTemplate | null> {
-  const templates = await listTemplates(typeCode, { documentType });
+): DocumentTemplate | null {
   if (templates.length === 0) return null;
 
   if (documentType) {
@@ -147,6 +149,17 @@ export async function getDefaultTemplate(
     if (pinnedDefault) return pinnedDefault;
   }
   return templates.find((t) => t.isDefault) ?? templates[0];
+}
+
+/**
+ * Fetching form of `pickDefaultTemplate`. Callers fall back to their own
+ * hardcoded system default (emailTemplates.ts) on null.
+ */
+export async function getDefaultTemplate(
+  typeCode: TemplateTypeCode,
+  documentType?: string
+): Promise<DocumentTemplate | null> {
+  return pickDefaultTemplate(await listTemplates(typeCode, { documentType }), documentType);
 }
 
 /** Fire-and-forget usage tracking; a lost increment is acceptable. */

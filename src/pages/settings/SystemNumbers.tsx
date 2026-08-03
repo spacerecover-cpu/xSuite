@@ -306,13 +306,18 @@ export const SystemNumbers: React.FC = () => {
     // reusing the legacy prefix+padding form here would advertise a next number
     // the DB will never mint, so surface a neutral marker instead of a lie.
     if (seq.format_template) return 'Templated';
+    if (!seq.prefix) return `#${seq.current_value + 1}`;
     const nextNum = seq.current_value + 1;
-    return seq.prefix + '-' + nextNum.toString().padStart(seq.padding, '0');
+    return seq.prefix + '-' + nextNum.toString().padStart(seq.padding ?? 4, '0');
   };
 
   const formatCurrentNumber = (seq: NumberSequence) => {
     if (seq.current_value === 0) return 'Not assigned';
-    return seq.prefix + '-' + seq.current_value.toString().padStart(seq.padding, '0');
+    // Same reasoning as formatNumber: a templated (or prefix-less) sequence never
+    // minted a PREFIX-NNNN string, so composing one here invents a number that was
+    // never issued — literally "null-7" when prefix is NULL. Show the raw counter.
+    if (seq.format_template || !seq.prefix) return `#${seq.current_value}`;
+    return seq.prefix + '-' + seq.current_value.toString().padStart(seq.padding ?? 4, '0');
   };
 
   // Registry ∪ live rows: a live scope absent from the registry (e.g. a dynamic

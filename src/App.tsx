@@ -19,6 +19,7 @@ import { PermissionsProvider } from './contexts/PermissionsContext';
 import { ConfirmProvider } from './hooks/useConfirm';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { FeatureRoute } from './components/FeatureRoute';
+import { ModuleRoute } from './components/ModuleRoute';
 import { ProtectedPortalRoute } from './components/ProtectedPortalRoute';
 import { ProtectedPlatformAdminRoute } from './components/ProtectedPlatformAdminRoute';
 import { RequireTenantWorkspace } from './components/RequireTenantWorkspace';
@@ -160,32 +161,48 @@ const router = createBrowserRouter(
       >
         <Route index lazy={page(() => import('./pages/dashboard/Dashboard'), 'Dashboard')} />
         <Route path="notifications" lazy={page(() => import('./pages/notifications/NotificationsHistory'), 'NotificationsHistory')} />
-        <Route path="cases" lazy={page(() => import('./pages/cases/CasesList'), 'CasesList')} />
-        <Route path="cases/:id" lazy={page(() => import('./pages/cases/CaseDetail'), 'CaseDetail')} />
+        <Route element={<ModuleRoute moduleKey="cases" />}>
+          <Route path="cases" lazy={page(() => import('./pages/cases/CasesList'), 'CasesList')} />
+          <Route path="cases/:id" lazy={page(() => import('./pages/cases/CaseDetail'), 'CaseDetail')} />
+        </Route>
         <Route path="clients" lazy={page(() => import('./pages/clients/ClientsList'), 'ClientsList')} />
-        <Route path="customers" lazy={page(() => import('./pages/customers/CustomersListPage'), 'CustomersListPage')} />
-        <Route path="customers/:id" lazy={page(() => import('./pages/customers/CustomerProfilePage'), 'CustomerProfilePage')} />
-        <Route path="companies" lazy={page(() => import('./pages/companies/CompaniesListPage'), 'CompaniesListPage')} />
-        <Route path="companies/:id" lazy={page(() => import('./pages/companies/CompanyProfilePage'), 'CompanyProfilePage')} />
-        <Route path="quotes" lazy={page(() => import('./pages/quotes/QuotesListPage'), 'default')} />
-        <Route path="quotes/recycle-bin" lazy={page(() => import('./pages/quotes/QuotesRecycleBin'), 'default')} />
-        <Route path="quotes/:id" lazy={page(() => import('./pages/quotes/QuoteDetailPage'), 'default')} />
+        <Route element={<ModuleRoute moduleKey="customers" />}>
+          <Route path="customers" lazy={page(() => import('./pages/customers/CustomersListPage'), 'CustomersListPage')} />
+          <Route path="customers/:id" lazy={page(() => import('./pages/customers/CustomerProfilePage'), 'CustomerProfilePage')} />
+        </Route>
+        <Route element={<ModuleRoute moduleKey="companies" />}>
+          <Route path="companies" lazy={page(() => import('./pages/companies/CompaniesListPage'), 'CompaniesListPage')} />
+          <Route path="companies/:id" lazy={page(() => import('./pages/companies/CompanyProfilePage'), 'CompanyProfilePage')} />
+        </Route>
+        <Route element={<ModuleRoute moduleKey="quotes" />}>
+          <Route path="quotes" lazy={page(() => import('./pages/quotes/QuotesListPage'), 'default')} />
+          <Route path="quotes/recycle-bin" lazy={page(() => import('./pages/quotes/QuotesRecycleBin'), 'default')} />
+          <Route path="quotes/:id" lazy={page(() => import('./pages/quotes/QuoteDetailPage'), 'default')} />
+        </Route>
         {/* Assets route removed - not yet implemented */}
-        <Route path="stock" lazy={page(() => import('./pages/stock/StockListPage'), 'default')} />
-        <Route path="stock/categories" lazy={page(() => import('./pages/stock/StockCategoriesPage'), 'default')} />
-        <Route path="stock/sales" lazy={page(() => import('./pages/stock/StockSalesPage'), 'default')} />
-        <Route path="stock/sales/:id" lazy={page(() => import('./pages/stock/StockSaleDetailPage'), 'default')} />
-        <Route path="stock/adjustments" lazy={page(() => import('./pages/stock/StockAdjustmentsPage'), 'default')} />
-        <Route path="stock/reports" lazy={page(() => import('./pages/stock/StockReportsPage'), 'default')} />
-        <Route path="stock/locations" lazy={page(() => import('./pages/stock/StockLocationsPage'), 'default')} />
-        <Route path="stock/:id" lazy={page(() => import('./pages/stock/StockItemDetail'), 'default')} />
-        <Route path="inventory" lazy={page(() => import('./pages/inventory/InventoryListPage'), 'default')} />
-        <Route path="inventory/locations" lazy={page(() => import('./pages/inventory/InventoryLocationsPage'), 'default')} />
-        <Route path="inventory/donor-search" lazy={page(() => import('./pages/inventory/DonorSearchPage'), 'default')} />
-        <Route path="tools" lazy={page(() => import('./pages/inventory/InventoryListPage'), 'default')} />
-        <Route path="clone-drives" lazy={page(() => import('./pages/resources/CloneDrivesList'), 'CloneDrivesList')} />
-        <Route path="procedures" lazy={page(() => import('./pages/kb/KBCenterPage'), 'KBCenterPage')} />
-        <Route path="procedures/:id" lazy={page(() => import('./pages/kb/KBArticleDetailPage'), 'KBArticleDetailPage')} />
+        <Route element={<ModuleRoute moduleKey="stock" />}>
+          <Route path="stock" lazy={page(() => import('./pages/stock/StockListPage'), 'default')} />
+          <Route path="stock/categories" lazy={page(() => import('./pages/stock/StockCategoriesPage'), 'default')} />
+          <Route path="stock/sales" lazy={page(() => import('./pages/stock/StockSalesPage'), 'default')} />
+          <Route path="stock/sales/:id" lazy={page(() => import('./pages/stock/StockSaleDetailPage'), 'default')} />
+          <Route path="stock/adjustments" lazy={page(() => import('./pages/stock/StockAdjustmentsPage'), 'default')} />
+          <Route path="stock/reports" lazy={page(() => import('./pages/stock/StockReportsPage'), 'default')} />
+          <Route path="stock/locations" lazy={page(() => import('./pages/stock/StockLocationsPage'), 'default')} />
+          <Route path="stock/:id" lazy={page(() => import('./pages/stock/StockItemDetail'), 'default')} />
+        </Route>
+        <Route element={<ModuleRoute moduleKey="inventory" />}>
+          <Route path="inventory" lazy={page(() => import('./pages/inventory/InventoryListPage'), 'default')} />
+          <Route path="inventory/locations" lazy={page(() => import('./pages/inventory/InventoryLocationsPage'), 'default')} />
+          <Route path="inventory/donor-search" lazy={page(() => import('./pages/inventory/DonorSearchPage'), 'default')} />
+          <Route path="tools" lazy={page(() => import('./pages/inventory/InventoryListPage'), 'default')} />
+        </Route>
+        <Route element={<ModuleRoute moduleKey="clone-drives" />}>
+          <Route path="clone-drives" lazy={page(() => import('./pages/resources/CloneDrivesList'), 'CloneDrivesList')} />
+        </Route>
+        <Route element={<ModuleRoute moduleKey="kb-center" />}>
+          <Route path="procedures" lazy={page(() => import('./pages/kb/KBCenterPage'), 'KBCenterPage')} />
+          <Route path="procedures/:id" lazy={page(() => import('./pages/kb/KBArticleDetailPage'), 'KBArticleDetailPage')} />
+        </Route>
         <Route element={<FeatureRoute featureKey="automation.whatsapp" />}>
           <Route path="communications/whatsapp" lazy={page(() => import('./pages/communications/WhatsAppMessageLog'), 'WhatsAppMessageLog')} />
           <Route path="communications/whatsapp/analytics" lazy={page(() => import('./pages/communications/WhatsAppAnalytics'), 'WhatsAppAnalytics')} />
@@ -194,20 +211,40 @@ const router = createBrowserRouter(
         {/* Integrations route removed - not yet implemented */}
 
         <Route element={<ProtectedRoute allowedRoles={FINANCE_ROLES} />}>
-          <Route path="finance" lazy={page(() => import('./pages/financial/RevenueDashboard'), 'RevenueDashboard')} />
-          <Route path="invoices/:id" lazy={page(() => import('./pages/financial/InvoiceDetailPage'), 'default')} />
-          <Route path="transactions" lazy={page(() => import('./pages/financial/TransactionsList'), 'TransactionsList')} />
-          <Route path="banking" lazy={page(() => import('./pages/financial/BankingPage'), 'BankingPage')} />
-          <Route path="vat-audit" lazy={page(() => import('./pages/financial/VATAuditPage'), 'VATAuditPage')} />
-          <Route path="suppliers" lazy={page(() => import('./pages/suppliers/SuppliersListPage'), 'default')} />
-          <Route path="suppliers/:id" lazy={page(() => import('./pages/suppliers/SupplierProfilePage'), 'default')} />
-          <Route path="purchase-orders" lazy={page(() => import('./pages/suppliers/PurchaseOrdersListPage'), 'default')} />
-          <Route path="purchase-orders/:id" lazy={page(() => import('./pages/suppliers/PurchaseOrderDetailPage'), 'default')} />
+          <Route element={<ModuleRoute moduleKey="revenue" />}>
+            <Route path="finance" lazy={page(() => import('./pages/financial/RevenueDashboard'), 'RevenueDashboard')} />
+          </Route>
+          <Route element={<ModuleRoute moduleKey="invoices" />}>
+            <Route path="invoices/:id" lazy={page(() => import('./pages/financial/InvoiceDetailPage'), 'default')} />
+          </Route>
+          <Route element={<ModuleRoute moduleKey="transactions" />}>
+            <Route path="transactions" lazy={page(() => import('./pages/financial/TransactionsList'), 'TransactionsList')} />
+          </Route>
+          <Route element={<ModuleRoute moduleKey="banking" />}>
+            <Route path="banking" lazy={page(() => import('./pages/financial/BankingPage'), 'BankingPage')} />
+          </Route>
+          <Route element={<ModuleRoute moduleKey="vat-audit" />}>
+            <Route path="vat-audit" lazy={page(() => import('./pages/financial/VATAuditPage'), 'VATAuditPage')} />
+          </Route>
+          <Route element={<ModuleRoute moduleKey="suppliers" />}>
+            <Route path="suppliers" lazy={page(() => import('./pages/suppliers/SuppliersListPage'), 'default')} />
+            <Route path="suppliers/:id" lazy={page(() => import('./pages/suppliers/SupplierProfilePage'), 'default')} />
+            <Route path="purchase-orders" lazy={page(() => import('./pages/suppliers/PurchaseOrdersListPage'), 'default')} />
+            <Route path="purchase-orders/:id" lazy={page(() => import('./pages/suppliers/PurchaseOrderDetailPage'), 'default')} />
+          </Route>
           <Route element={<FeatureRoute featureKey="nav.financial" />}>
-            <Route path="invoices" lazy={page(() => import('./pages/financial/InvoicesListPage'), 'default')} />
-            <Route path="payments" lazy={page(() => import('./pages/financial/PaymentsList'), 'PaymentsList')} />
-            <Route path="expenses" lazy={page(() => import('./pages/financial/ExpensesList'), 'ExpensesList')} />
-            <Route path="reports" lazy={page(() => import('./pages/financial/ReportsDashboard'), 'ReportsDashboard')} />
+            <Route element={<ModuleRoute moduleKey="invoices" />}>
+              <Route path="invoices" lazy={page(() => import('./pages/financial/InvoicesListPage'), 'default')} />
+            </Route>
+            <Route element={<ModuleRoute moduleKey="payments" />}>
+              <Route path="payments" lazy={page(() => import('./pages/financial/PaymentsList'), 'PaymentsList')} />
+            </Route>
+            <Route element={<ModuleRoute moduleKey="expenses" />}>
+              <Route path="expenses" lazy={page(() => import('./pages/financial/ExpensesList'), 'ExpensesList')} />
+            </Route>
+            <Route element={<ModuleRoute moduleKey="reports" />}>
+              <Route path="reports" lazy={page(() => import('./pages/financial/ReportsDashboard'), 'ReportsDashboard')} />
+            </Route>
           </Route>
         </Route>
 
@@ -229,26 +266,50 @@ const router = createBrowserRouter(
 
         <Route element={<ProtectedRoute allowedRoles={HR_ROLES} />}>
           <Route path="hr">
-            <Route index lazy={page(() => import('./pages/hr/HRDashboard'), 'HRDashboard')} />
-            <Route path="employees" lazy={page(() => import('./pages/hr/EmployeesList'), 'EmployeesList')} />
-            <Route path="employees/:id" lazy={page(() => import('./pages/hr/EmployeeProfilePage'), 'EmployeeProfilePage')} />
-            <Route path="recruitment" lazy={page(() => import('./pages/hr/RecruitmentPage'), 'RecruitmentPage')} />
-            <Route path="onboarding" lazy={page(() => import('./pages/hr/EmployeeOnboardingPage'), 'EmployeeOnboardingPage')} />
-            <Route path="performance" lazy={page(() => import('./pages/hr/PerformanceReviewsPage'), 'PerformanceReviewsPage')} />
+            <Route element={<ModuleRoute moduleKey="hr-dashboard" />}>
+              <Route index lazy={page(() => import('./pages/hr/HRDashboard'), 'HRDashboard')} />
+            </Route>
+            <Route element={<ModuleRoute moduleKey="employees" />}>
+              <Route path="employees" lazy={page(() => import('./pages/hr/EmployeesList'), 'EmployeesList')} />
+              <Route path="employees/:id" lazy={page(() => import('./pages/hr/EmployeeProfilePage'), 'EmployeeProfilePage')} />
+            </Route>
+            <Route element={<ModuleRoute moduleKey="recruitment" />}>
+              <Route path="recruitment" lazy={page(() => import('./pages/hr/RecruitmentPage'), 'RecruitmentPage')} />
+            </Route>
+            <Route element={<ModuleRoute moduleKey="onboarding" />}>
+              <Route path="onboarding" lazy={page(() => import('./pages/hr/EmployeeOnboardingPage'), 'EmployeeOnboardingPage')} />
+            </Route>
+            <Route element={<ModuleRoute moduleKey="performance" />}>
+              <Route path="performance" lazy={page(() => import('./pages/hr/PerformanceReviewsPage'), 'PerformanceReviewsPage')} />
+            </Route>
           </Route>
           <Route path="payroll">
-            <Route index lazy={page(() => import('./pages/payroll/PayrollDashboard'), 'PayrollDashboard')} />
-            <Route path="process" lazy={page(() => import('./pages/payroll/ProcessPayrollPage'), 'default')} />
-            <Route path="components" lazy={page(() => import('./pages/payroll/SalaryComponentsPage'), 'default')} />
-            <Route path="history" lazy={page(() => import('./pages/payroll/PayrollHistoryPage'), 'default')} />
-            <Route path="periods/:id" lazy={page(() => import('./pages/payroll/PayrollPeriodDetailPage'), 'default')} />
-            <Route path="adjustments" lazy={page(() => import('./pages/payroll/PayrollAdjustmentsPage'), 'default')} />
-            <Route path="loans" lazy={page(() => import('./pages/payroll/EmployeeLoansPage'), 'EmployeeLoansPage')} />
-            <Route path="settings" lazy={page(() => import('./pages/payroll/PayrollSettingsPage'), 'PayrollSettingsPage')} />
+            <Route element={<ModuleRoute moduleKey="payroll-dashboard" />}>
+              <Route index lazy={page(() => import('./pages/payroll/PayrollDashboard'), 'PayrollDashboard')} />
+              <Route path="periods/:id" lazy={page(() => import('./pages/payroll/PayrollPeriodDetailPage'), 'default')} />
+              <Route path="adjustments" lazy={page(() => import('./pages/payroll/PayrollAdjustmentsPage'), 'default')} />
+              <Route path="loans" lazy={page(() => import('./pages/payroll/EmployeeLoansPage'), 'EmployeeLoansPage')} />
+              <Route path="settings" lazy={page(() => import('./pages/payroll/PayrollSettingsPage'), 'PayrollSettingsPage')} />
+            </Route>
+            <Route element={<ModuleRoute moduleKey="process-payroll" />}>
+              <Route path="process" lazy={page(() => import('./pages/payroll/ProcessPayrollPage'), 'default')} />
+            </Route>
+            <Route element={<ModuleRoute moduleKey="salary-components" />}>
+              <Route path="components" lazy={page(() => import('./pages/payroll/SalaryComponentsPage'), 'default')} />
+            </Route>
+            <Route element={<ModuleRoute moduleKey="payroll-history" />}>
+              <Route path="history" lazy={page(() => import('./pages/payroll/PayrollHistoryPage'), 'default')} />
+            </Route>
           </Route>
-          <Route path="attendance" lazy={page(() => import('./pages/employee-management/AttendanceDashboard'), 'AttendanceDashboard')} />
-          <Route path="leave" lazy={page(() => import('./pages/employee-management/LeaveManagement'), 'LeaveManagement')} />
-          <Route path="timesheets" lazy={page(() => import('./pages/employee-management/TimesheetManagement'), 'TimesheetManagement')} />
+          <Route element={<ModuleRoute moduleKey="attendance" />}>
+            <Route path="attendance" lazy={page(() => import('./pages/employee-management/AttendanceDashboard'), 'AttendanceDashboard')} />
+          </Route>
+          <Route element={<ModuleRoute moduleKey="leave" />}>
+            <Route path="leave" lazy={page(() => import('./pages/employee-management/LeaveManagement'), 'LeaveManagement')} />
+          </Route>
+          <Route element={<ModuleRoute moduleKey="timesheets" />}>
+            <Route path="timesheets" lazy={page(() => import('./pages/employee-management/TimesheetManagement'), 'TimesheetManagement')} />
+          </Route>
         </Route>
 
         <Route path="settings">
