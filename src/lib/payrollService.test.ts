@@ -574,3 +574,130 @@ describe('period status cascades onto payroll_records (bug #60)', () => {
     expect(recordsQuery.eq).toHaveBeenCalledWith('period_id', 'period-1');
   });
 });
+
+describe('processPayroll never collects a loan twice for one month (overlapping periods)', () => {
+  // payroll_periods has no overlap constraint, so two 'monthly' periods can cover
+  // the same month. The draft->processing claim only guards the SAME period, so
+  // without a repayment-window check each run docks a full installment again.
+  function arrangeOverlap(
+    existingRepayments: unknown,
+    captured: { records?: Array<Record<string, unknown>>; posted: string[] },
+  ) {
+    vi.spyOn(payrollService, 'getPayrollPeriod').mockResolvedValue(
+      { id: 'period-1', status: 'draft', start_date: '2026-08-01', end_date: '2026-08-31', period_name: 'Aug 2026' } as never,
+    );
+    vi.spyOn(payrollService, 'getPayrollSettings').mockResolvedValue(
+      { working_days_per_month: 22, working_hours_per_day: 8, overtime_rate_multiplier: { regular: 1.5, weekend: 1.5, holiday: 1.5 }, payment_day: 28, social_security_rate: undefined } as never,
+    );
+    vi.spyOn(payrollService, 'getEmployeeAttendance').mockResolvedValue(
+      { daysWorked: 22, daysAbsent: 0, daysLeave: 0, regularHours: 176, overtimeHours: 0 } as never,
+    );
+    vi.spyOn(payrollService, 'getActiveLoans').mockResolvedValue(
+      [{ id: 'loan-1', installment_amount: 100, remaining_amount: 500, total_amount: 500 }] as never,
+    );
+    vi.spyOn(payrollService, 'recordLoanRepayment').mockImplementation((r: { loan_id: string }) => {
+      captured.posted.push(r.loan_id);
+      return Promise.resolve(null as never);
+    });
+
+    from.mockImplementation((table: string) => {
+      if (table === 'employees') {
+        return makeQuery([{ id: 'emp-1', tenant_id: 't-1', basic_salary: 1000, employee_number: 'EMP-001' }]);
+      }
+      if (table === 'payroll_periods') return makeQuery({ id: 'period-1', status: 'processing' });
+      if (table === 'loan_repayments') return makeQuery(existingRepayments);
+      if (table === 'payroll_records') {
+        return {
+          insert: (rows: Array<Record<string, unknown>>) => {
+            captured.records = rows;
+            return { select: () => Promise.resolve({ data: rows, error: null }) };
+          },
+        } as unknown as ReturnType<typeof makeQuery>;
+      }
+      return makeQuery(null);
+    });
+  }
+
+  it('skips a loan already deducted by another period covering the same window', async () => {
+    const captured = { posted: [] as string[] } as { records?: Array<Record<string, unknown>>; posted: string[] };
+    arrangeOverlap([{ loan_id: 'loan-1' }], captured);
+
+    await payrollService.processPayroll('period-1');
+
+    expect(captured.records![0].total_deductions).toBe(0); // not a second 100 installment
+    expect(captured.records![0].net_salary).toBe(1000);
+    expect(captured.posted).toEqual([]);                   // and no duplicate ledger row
+  });
+
+  it('still collects the installment when nothing was posted in the window', async () => {
+    const captured = { posted: [] as string[] } as { records?: Array<Record<string, unknown>>; posted: string[] };
+    arrangeOverlap([], captured);
+
+    await payrollService.processPayroll('period-1');
+
+    expect(captured.records![0].total_deductions).toBe(100);
+    expect(captured.records![0].net_salary).toBe(900);
+    expect(captured.posted).toEqual(['loan-1']);
+  });
+});
+
+describe('getDashboardStats excludes soft-deleted employees from headcount', () => {
+  it('filters the employees count on deleted_at IS NULL so avgSalary is not diluted', async () => {
+    const employeesQuery = makeQuery([{}, {}]);
+    from.mockImplementation((table: string) => {
+      if (table === 'employees') return employeesQuery;
+      if (table === 'payroll_periods') return makeQuery({ id: 'period-1', payment_date: '2020-01-28' });
+      if (table === 'payroll_records') return makeQuery([{ net_salary: 100, net_salary_base: 100, status: 'paid' }]);
+      return makeQuery(null);
+    });
+
+    const stats = await payrollService.getDashboardStats();
+
+    expect(employeesQuery.is).toHaveBeenCalledWith('deleted_at', null);
+    expect(stats.employeeCount).toBe(2);
+    expect(stats.avgSalary).toBe(50);
+  });
+});
+
+describe('overtime day-type premium is not silently dropped', () => {
+  function arrangeOvertime(multipliers: { regular: number; weekend: number; holiday: number }) {
+    vi.spyOn(payrollService, 'getPayrollPeriod').mockResolvedValue(
+      { id: 'period-1', status: 'draft', start_date: '2026-06-01', end_date: '2026-06-30', period_name: 'Jun 2026' } as never,
+    );
+    vi.spyOn(payrollService, 'getPayrollSettings').mockResolvedValue(
+      { working_days_per_month: 22, working_hours_per_day: 8, overtime_rate_multiplier: multipliers, payment_day: 28, social_security_rate: 0 } as never,
+    );
+    vi.spyOn(payrollService, 'getEmployeeAttendance').mockResolvedValue(
+      { daysWorked: 22, daysAbsent: 0, daysLeave: 0, regularHours: 176, overtimeHours: 8 } as never,
+    );
+    vi.spyOn(payrollService, 'getActiveLoans').mockResolvedValue([] as never);
+
+    from.mockImplementation((table: string) => {
+      if (table === 'employees') return makeQuery([{ id: 'emp-1', tenant_id: 't-1', basic_salary: 1000 }]);
+      if (table === 'payroll_periods') return makeQuery({ id: 'period-1', status: 'processing' });
+      if (table === 'payroll_records') {
+        return { insert: (rows: unknown) => ({ select: () => Promise.resolve({ data: rows, error: null }) }) } as never;
+      }
+      return makeQuery(null);
+    });
+
+    // logger is a module-factory mock, so its calls survive restoreAllMocks.
+    vi.mocked(logger.warn).mockClear();
+  }
+
+  it('warns when a weekend/holiday premium is configured but cannot be honoured', async () => {
+    arrangeOvertime({ regular: 1.25, weekend: 1.5, holiday: 2 });
+
+    await payrollService.processPayroll('period-1');
+
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringMatching(/weekend\/holiday overtime/i));
+  });
+
+  it('stays quiet when every overtime multiplier is the regular rate', async () => {
+    arrangeOvertime({ regular: 1.25, weekend: 1.25, holiday: 1.25 });
+
+    await payrollService.processPayroll('period-1');
+
+    expect(logger.warn).not.toHaveBeenCalledWith(expect.stringMatching(/weekend\/holiday overtime/i));
+  });
+});

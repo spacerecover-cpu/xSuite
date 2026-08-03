@@ -429,6 +429,15 @@ export const getNextInvoiceNumber = async (invoiceType?: 'proforma' | 'tax_invoi
   return (data ?? '') as string;
 };
 
+// Statuses a PROFORMA may be created with. A proforma can never take a payment
+// (recordPayment/canRecordPayment reject non-tax invoices), so the settlement
+// states ('paid'/'partial'/'overdue') describe money that cannot exist against it.
+// The edit form offers the full list, so clamp anything outside this set to 'draft'.
+const PROFORMA_CREATE_STATUSES = new Set(['draft', 'sent', 'cancelled']);
+
+export const normalizeProformaCreateStatus = (status?: string | null): string =>
+  status && PROFORMA_CREATE_STATUSES.has(status) ? status : 'draft';
+
 export const createInvoice = async (invoice: Partial<Invoice>, items: InvoiceItem[]) => {
   if (!invoice.case_id) {
     throw new Error('Case ID is required for invoice');
@@ -496,8 +505,9 @@ export const createInvoice = async (invoice: Partial<Invoice>, items: InvoiceIte
     is_proforma: invoiceType === 'proforma',
     case_id: invoice.case_id,
     // Tax invoices are created as drafts and made payable only via issueInvoice
-    // (issue_tax_document draft→sent). Proformas honour the caller's status.
-    status: invoiceType === 'tax_invoice' ? 'draft' : (invoice.status || 'draft'),
+    // (issue_tax_document draft→sent). Proformas honour the caller's status, minus
+    // the settlement states they can never legitimately reach.
+    status: invoiceType === 'tax_invoice' ? 'draft' : normalizeProformaCreateStatus(invoice.status),
     subtotal,
     tax_rate: invoiceTaxRate,
     tax_amount: taxAmount,
@@ -1255,19 +1265,29 @@ export async function bulkSendInvoiceEmails(
   // Lazy-load the email transport + template helpers so this code
   // path doesn't drag them into the invoice-service main bundle.
   // Templates are tiny but emailDocumentService also pulls rateLimiter.
-  const [{ sendDocumentEmail }, { getEmailTemplate }] = await Promise.all([
+  const [{ sendDocumentEmail }, { getEmailTemplate }, { getOrCreateCompanySettings }] = await Promise.all([
     import('./emailDocumentService'),
     import('./emailTemplates'),
+    import('./companySettingsService'),
   ]);
 
+  // Company recipients are first-class: an invoice may be billed to a company with
+  // no customer_id at all, so the company's own address has to be resolvable here
+  // or every company-only invoice is reported as "no email" and never sent.
+  // `cases.case_no` feeds the {{caseNumber}} placeholder in the subject line.
   const { data: rows, error } = await supabase
     .from('invoices')
     .select(
-      'id, invoice_number, status, invoice_type, case_id, customers_enhanced:customer_id(customer_name, email)',
+      'id, invoice_number, status, invoice_type, case_id, customers_enhanced:customer_id(customer_name, email), companies:company_id(name, company_name, email), cases:case_id(case_no)',
     )
     .in('id', invoiceIds)
     .is('deleted_at', null);
   if (error) throw error;
+
+  // The email templates sign off with "{{companyName}} Team" — that is the TENANT's
+  // own name, not the recipient's. Resolved once for the batch (the service caches
+  // and never throws; it falls back to its defaults on any failure).
+  const senderName = (await getOrCreateCompanySettings()).basic_info?.company_name ?? '';
 
   const results: BulkSendInvoiceResult[] = [];
   const total = rows?.length ?? 0;
@@ -1282,7 +1302,14 @@ export async function bulkSendInvoiceEmails(
       customer_name?: string;
       email?: string | null;
     } | null;
-    const email = customer?.email?.trim();
+    const company = inv.companies as {
+      name?: string | null;
+      company_name?: string | null;
+      email?: string | null;
+    } | null;
+    // Customer address wins when both are present (the named contact); the company
+    // address is the fallback that keeps company-only invoices sendable.
+    const email = customer?.email?.trim() || company?.email?.trim();
     let result: BulkSendInvoiceResult;
 
     if (!email) {
@@ -1290,7 +1317,7 @@ export async function bulkSendInvoiceEmails(
         invoiceId: inv.id,
         invoiceNumber: inv.invoice_number,
         status: 'skipped',
-        error: 'Customer has no email',
+        error: 'No customer or company email on file',
       };
     } else {
       try {
@@ -1303,10 +1330,15 @@ export async function bulkSendInvoiceEmails(
             error: pdfResult.error || 'PDF generation failed',
           };
         } else {
+          const caseNo = (inv.cases as { case_no?: string | null } | null)?.case_no;
           const template = getEmailTemplate('invoice', {
-            customerName: customer?.customer_name || 'Valued Customer',
-            caseNumber: '',
-            companyName: '',
+            customerName:
+              customer?.customer_name || company?.company_name || company?.name || 'Valued Customer',
+            // getEmailTemplate substitutes literally, so an empty caseNumber ships a
+            // subject of "Invoice - " with no identifier at all. Fall back to the
+            // invoice number when the row carries no case.
+            caseNumber: caseNo || inv.invoice_number || '',
+            companyName: senderName,
             documentType: 'invoice',
           });
           // Measured from the PREVIOUS send's completion, so the (heavy) PDF

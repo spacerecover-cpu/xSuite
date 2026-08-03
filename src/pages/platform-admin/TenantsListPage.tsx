@@ -93,10 +93,14 @@ export const TenantsListPage: React.FC = () => {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
           >
+            {/* Values must match the tenants_status_check vocabulary
+                (trial|active|suspended|cancelled|deleted) — the filter is an
+                exact .eq('status', …), so any other value matches no rows. */}
             <option value="">All Statuses</option>
+            <option value="trial">Trial</option>
             <option value="active">Active</option>
             <option value="suspended">Suspended</option>
-            <option value="pending">Pending</option>
+            <option value="cancelled">Cancelled</option>
           </select>
 
           <select

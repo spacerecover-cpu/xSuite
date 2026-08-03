@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Send, Building2, Calendar, AlertCircle, CheckCircle, XCircle, Trash2 } from 'lucide-react';
@@ -16,6 +16,7 @@ import {
   updateTicketStatus,
 } from '../../lib/platformAdminService';
 import { platformAdminKeys } from '../../lib/queryKeys';
+import { supabase } from '../../lib/supabaseClient';
 import { usePlatformAdmin } from '../../contexts/PlatformAdminContext';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '../../hooks/useToast';
@@ -47,6 +48,28 @@ export const TicketDetailPage: React.FC = () => {
     refetchInterval: 10000,
   });
 
+  // A support reply is attributed to whoever wrote it: support_ticket_messages.sender_id
+  // holds the author's platform_admins.user_id, so names are resolved per message
+  // rather than taken from the admin currently viewing the ticket.
+  const supportSenderIds = useMemo(
+    () =>
+      [...new Set(messages.filter((m) => m.sender_type === 'support').map((m) => m.sender_id))].sort(),
+    [messages]
+  );
+
+  const { data: supportSenderNames } = useQuery({
+    queryKey: [...platformAdminKeys.tickets(), 'support-senders', supportSenderIds],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('platform_admins')
+        .select('user_id, full_name')
+        .in('user_id', supportSenderIds);
+      if (error) throw error;
+      return new Map((data ?? []).map((a) => [a.user_id, a.full_name]));
+    },
+    enabled: supportSenderIds.length > 0,
+  });
+
   const replyMutation = useMutation({
     mutationFn: () => {
       if (!admin) throw new Error('Not authenticated');
@@ -75,6 +98,25 @@ export const TicketDetailPage: React.FC = () => {
     },
     onError: () => {
       showError('Failed to update status');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    // Soft delete only — the ticket readers all filter `deleted_at is null`.
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('support_tickets')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id!);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: platformAdminKeys.tickets() });
+      showSuccess('Ticket deleted successfully');
+      navigate('/platform-admin/tickets');
+    },
+    onError: () => {
+      showError('Failed to delete ticket');
     },
   });
 
@@ -175,7 +217,11 @@ export const TicketDetailPage: React.FC = () => {
                     key={message.id}
                     message={{
                       ...message,
-                      sender_name: message.sender_type === 'support' ? admin?.name : ticket.customer?.full_name,
+                      sender_name:
+                        message.sender_type === 'support'
+                          ? supportSenderNames?.get(message.sender_id) ??
+                            (message.sender_id === admin?.user_id ? admin?.name : undefined)
+                          : ticket.customer?.full_name,
                     }}
                   />
                 ))
@@ -349,6 +395,7 @@ export const TicketDetailPage: React.FC = () => {
               <Button
                 variant="ghost"
                 className="w-full justify-start border border-danger/40 text-danger hover:bg-danger-muted"
+                disabled={deleteMutation.isPending}
                 onClick={() => setShowDeleteDialog(true)}
               >
                 <Trash2 className="w-4 h-4 mr-2" />
@@ -383,8 +430,8 @@ export const TicketDetailPage: React.FC = () => {
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={() => {
-          navigate('/platform-admin/tickets');
           setShowDeleteDialog(false);
+          deleteMutation.mutate();
         }}
         title="Delete Ticket"
         message="Are you sure you want to delete this ticket? This action cannot be undone."

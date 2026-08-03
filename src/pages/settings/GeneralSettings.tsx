@@ -106,6 +106,34 @@ export const resolveCompanySettingsScope = (
   return null;
 };
 
+// Replacement ordering for a branding asset (logo / stamp / signature / QR code):
+// upload first, persist second, and only then remove the superseded storage object.
+// Deleting up front left company_settings.branding pointing at a deleted file
+// whenever the upload or the write afterwards failed, and the old file is gone
+// for good. Returns whether the new branding was persisted.
+export const replaceBrandingAsset = async ({
+  newPath,
+  persist,
+  deletePrevious,
+}: {
+  newPath: string;
+  persist: () => Promise<{ persisted: boolean; previousPath: unknown }>;
+  deletePrevious: ((path: string) => Promise<unknown>) | null;
+}): Promise<boolean> => {
+  const { persisted, previousPath } = await persist();
+  if (!persisted) return false;
+
+  if (
+    deletePrevious &&
+    typeof previousPath === 'string' &&
+    previousPath &&
+    previousPath !== newPath
+  ) {
+    await deletePrevious(previousPath);
+  }
+  return true;
+};
+
 // Coerce arbitrary JSON values to a string for text-input display.
 const toStr = (v: unknown): string => {
   if (v === null || v === undefined) return '';
@@ -171,6 +199,19 @@ export const GeneralSettings: React.FC = () => {
   useEffect(() => {
     hasUnsavedChangesRef.current = hasUnsavedChanges;
   }, [hasUnsavedChanges]);
+  // Uploads persist branding on the spot and can overlap (an admin can pick a
+  // favicon while the logo is still uploading). Both handlers therefore merge into
+  // the latest branding via this ref instead of the render-time formData snapshot,
+  // and chain their writes so the last one cannot erase the earlier one's fields.
+  const brandingRef = useRef<JsonObject>({});
+  const brandingWriteQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const brandingWritesInFlight = useRef(0);
+  useEffect(() => {
+    // While a write is in flight the ref is ahead of any refetched row — re-seeding
+    // from it would drop a concurrent upload's fields from the next merge.
+    if (brandingWritesInFlight.current > 0) return;
+    brandingRef.current = (formData?.branding ?? {}) as JsonObject;
+  }, [formData?.branding]);
   const [openSections, setOpenSections] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('generalSettings_openSections');
     return saved ? new Set(JSON.parse(saved)) : new Set(['basic_info']);
@@ -528,6 +569,27 @@ export const GeneralSettings: React.FC = () => {
     return true;
   };
 
+  // Merge a branding patch into the latest branding, mirror it into formData and
+  // queue the write behind any in-flight branding write. Returns the branding the
+  // patch was merged into (so the caller can find the file it superseded).
+  const commitBranding = async (
+    buildPatch: (current: JsonObject) => JsonObject,
+  ): Promise<{ persisted: boolean; previous: JsonObject }> => {
+    const previous = brandingRef.current;
+    const merged: JsonObject = { ...previous, ...buildPatch(previous) };
+    brandingRef.current = merged;
+    setFormData((prev) => (prev ? { ...prev, branding: merged } : prev));
+
+    brandingWritesInFlight.current += 1;
+    const write = brandingWriteQueue.current.then(() => persistBranding(merged));
+    brandingWriteQueue.current = write.catch(() => undefined);
+    try {
+      return { persisted: await write, previous };
+    } finally {
+      brandingWritesInFlight.current -= 1;
+    }
+  };
+
   const handleLogoUpload = async (
     file: File | null,
     _previewUrl: string | null,
@@ -539,23 +601,6 @@ export const GeneralSettings: React.FC = () => {
     setUploadingFiles(prev => new Set(prev).add(uploadKey));
 
     try {
-      const branding = formData.branding ?? {};
-      const oldFilePathRaw =
-        type === 'primary'
-          ? branding.logo_file_path
-          : type === 'light'
-          ? branding.logo_light_file_path
-          : type === 'stamp'
-          ? branding.stamp_file_path
-          : type === 'signature'
-          ? branding.signature_file_path
-          : branding.favicon_file_path;
-      const oldFilePath = typeof oldFilePathRaw === 'string' ? oldFilePathRaw : '';
-
-      if (oldFilePath && (type === 'primary' || type === 'light' || type === 'favicon')) {
-        await deleteLogo(oldFilePath);
-      }
-
       const result =
         type === 'stamp'
           ? await uploadStamp(file)
@@ -591,31 +636,34 @@ export const GeneralSettings: React.FC = () => {
             ? 'signature_metadata'
             : 'logo_metadata';
 
-        const existingMetadata =
-          branding[metadataField] && typeof branding[metadataField] === 'object'
-            ? (branding[metadataField] as Record<string, unknown>)
-            : {};
-
-        const updatedBranding: JsonObject = {
-          ...branding,
-          [urlField]: result.publicUrl,
-          [pathField]: result.filePath,
-          [metadataField]: {
-            ...existingMetadata,
-            width: result.metadata?.width,
-            height: result.metadata?.height,
-            size_bytes: result.metadata?.size,
-            format: result.metadata?.format,
-            uploaded_at: new Date().toISOString(),
+        const persisted = await replaceBrandingAsset({
+          newPath: result.filePath,
+          persist: async () => {
+            const { persisted: ok, previous } = await commitBranding((current) => {
+              const existingMetadata =
+                current[metadataField] && typeof current[metadataField] === 'object'
+                  ? (current[metadataField] as Record<string, unknown>)
+                  : {};
+              return {
+                [urlField]: result.publicUrl,
+                [pathField]: result.filePath,
+                [metadataField]: {
+                  ...existingMetadata,
+                  width: result.metadata?.width,
+                  height: result.metadata?.height,
+                  size_bytes: result.metadata?.size,
+                  format: result.metadata?.format,
+                  uploaded_at: new Date().toISOString(),
+                },
+              };
+            });
+            return { persisted: ok, previousPath: previous[pathField] };
           },
-        };
-
-        setFormData({
-          ...formData,
-          branding: updatedBranding,
+          // Stamps and signatures were never cleaned up here; leave that as-is.
+          deletePrevious:
+            type === 'primary' || type === 'light' || type === 'favicon' ? deleteLogo : null,
         });
 
-        const persisted = await persistBranding(updatedBranding);
         if (persisted) {
           queryClient.invalidateQueries({ queryKey: ['company_settings'] });
         } else {
@@ -647,41 +695,35 @@ export const GeneralSettings: React.FC = () => {
     setUploadingFiles(prev => new Set(prev).add(uploadKey));
 
     try {
-      const branding = formData.branding ?? {};
-      const oldFilePathRaw = branding[`qr_code_${type}_file_path`];
-      const oldFilePath = typeof oldFilePathRaw === 'string' ? oldFilePathRaw : '';
-
-      if (oldFilePath) {
-        await deleteQRCode(oldFilePath);
-      }
-
+      const pathField = `qr_code_${type}_file_path`;
       const result = await uploadQRCode(file, type);
 
       if (result.success && result.filePath && result.publicUrl) {
-        const existingQrMetadata =
-          branding.qr_metadata && typeof branding.qr_metadata === 'object'
-            ? (branding.qr_metadata as Record<string, unknown>)
-            : {};
-
-        const updatedBranding: JsonObject = {
-          ...branding,
-          [`qr_code_${type}_url`]: result.publicUrl,
-          [`qr_code_${type}_file_path`]: result.filePath,
-          qr_metadata: {
-            ...existingQrMetadata,
-            [type]: {
-              uploaded_at: new Date().toISOString(),
-              size_bytes: result.metadata?.size,
-            },
+        const persisted = await replaceBrandingAsset({
+          newPath: result.filePath,
+          persist: async () => {
+            const { persisted: ok, previous } = await commitBranding((current) => {
+              const existingQrMetadata =
+                current.qr_metadata && typeof current.qr_metadata === 'object'
+                  ? (current.qr_metadata as Record<string, unknown>)
+                  : {};
+              return {
+                [`qr_code_${type}_url`]: result.publicUrl,
+                [pathField]: result.filePath,
+                qr_metadata: {
+                  ...existingQrMetadata,
+                  [type]: {
+                    uploaded_at: new Date().toISOString(),
+                    size_bytes: result.metadata?.size,
+                  },
+                },
+              };
+            });
+            return { persisted: ok, previousPath: previous[pathField] };
           },
-        };
-
-        setFormData({
-          ...formData,
-          branding: updatedBranding,
+          deletePrevious: deleteQRCode,
         });
 
-        const persisted = await persistBranding(updatedBranding);
         if (persisted) {
           queryClient.invalidateQueries({ queryKey: ['company_settings'] });
         } else {

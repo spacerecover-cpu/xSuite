@@ -300,6 +300,7 @@ export const InvoiceFormModal: React.FC<InvoiceFormModalProps> = ({
       const { data, error } = await supabase
         .from('cases')
         .select('id, case_no, title, customer_id, company_id')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
         .limit(100);
 

@@ -433,6 +433,9 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
                 ...customers.map((c) => ({
                   id: c.id,
                   name: `${c.customer_name}${c.email ? ` (${c.email})` : ''}`,
+                  // SearchableSelect re-filters the server rows client-side; without
+                  // these the mobile/number matches the server found are hidden again.
+                  keywords: `${c.email ?? ''} ${c.mobile_number ?? ''} ${c.customer_number ?? ''}`,
                 })),
               ]}
               placeholder="No contact"
@@ -448,7 +451,9 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
             shrinkDefaultValue
             value={formData.country_id}
             onChange={(value) => {
-              setFormData({ ...formData, country_id: value, city_id: '' });
+              // Both city and subdivision belong to the old country — keeping either
+              // would persist an id that mismatches the saved country_id.
+              setFormData({ ...formData, country_id: value, city_id: '', subdivision_id: null });
             }}
             options={[{ id: '', name: 'Not specified' }, ...countries.map((c) => ({ id: c.id, name: c.name }))]}
             placeholder="Select country"

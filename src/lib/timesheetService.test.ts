@@ -6,7 +6,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // reviewer note must be appended, never overwrite it.
 
 const captured: { update?: Record<string, unknown> } = {};
-const state: { existingNotes: string | null } = { existingNotes: null };
+const state: { existingNotes: string | null; notesSelectError: { message: string } | null } = {
+  existingNotes: null,
+  notesSelectError: null,
+};
 
 vi.mock('./supabaseClient', () => {
   const makeChain = () => {
@@ -23,7 +26,9 @@ vi.mock('./supabaseClient', () => {
     chain.eq = vi.fn(() => chain);
     chain.maybeSingle = vi.fn(() => {
       if (isSelectOnly) {
-        return Promise.resolve({ data: { notes: state.existingNotes }, error: null });
+        return state.notesSelectError
+          ? Promise.resolve({ data: null, error: state.notesSelectError })
+          : Promise.resolve({ data: { notes: state.existingNotes }, error: null });
       }
       return Promise.resolve({ data: { id: 'ts-1' }, error: null });
     });
@@ -42,6 +47,7 @@ describe('timesheetService — approve/reject preserve the employee note', () =>
   beforeEach(() => {
     captured.update = undefined;
     state.existingNotes = null;
+    state.notesSelectError = null;
   });
 
   it('does not overwrite the employee note when the reviewer leaves notes blank', async () => {
@@ -64,5 +70,14 @@ describe('timesheetService — approve/reject preserve the employee note', () =>
     state.existingNotes = null;
     await timesheetService.approveTimesheet('ts-1', 'mgr-1', 'Looks good');
     expect(captured.update?.notes).toBe('[Approved] Looks good');
+  });
+
+  it('aborts instead of overwriting the employee note when the notes read fails', async () => {
+    state.existingNotes = 'Overtime due to 12-drive RAID rebuild';
+    state.notesSelectError = { message: 'network error' };
+    await expect(
+      timesheetService.approveTimesheet('ts-1', 'mgr-1', 'Looks good'),
+    ).rejects.toMatchObject({ message: 'network error' });
+    expect(captured.update).toBeUndefined();
   });
 });

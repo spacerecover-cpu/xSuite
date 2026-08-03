@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTenantFeature } from '@/contexts/TenantConfigContext';
 import { useToast } from '@/hooks/useToast';
 import { formatDate } from '@/lib/format';
+import { supabase } from '@/lib/supabaseClient';
 import { caseQualityService } from '@/lib/caseQualityService';
 import {
   RECOVERY_RESULTS,
@@ -27,6 +28,22 @@ const RESULT_LABEL: Record<string, string> = {
   no_data: 'No data recoverable',
   passed: 'Passed',
 };
+
+interface AttemptDevice {
+  id: string;
+  model: string | null;
+  serial_number: string | null;
+  device_type: { name: string } | null;
+  brand: { name: string } | null;
+}
+
+function deviceLabel(device: AttemptDevice): string {
+  const head = [device.device_type?.name, device.brand?.name, device.model]
+    .filter(Boolean)
+    .join(' ');
+  const base = head || 'Device';
+  return device.serial_number ? `${base} · S/N ${device.serial_number}` : base;
+}
 
 function ReadinessPill({ ok, label }: { ok: boolean; label: string }) {
   return (
@@ -62,7 +79,35 @@ export const CaseRecoveryQaTab: React.FC<{ caseId: string }> = ({ caseId }) => {
     enabled: !!caseId,
   });
 
+  // Recovery evidence is device-level: a multi-device job (a 12-drive RAID, a
+  // patient + donor pair) must attribute each attempt to the physical drive it
+  // ran on, otherwise every row lands with device_id = null and the case rolls
+  // up to a single outcome with no per-device provenance.
+  // Distinct from the page-level ['case_devices', caseId] key — that cache entry
+  // holds CaseDetail's much richer row shape and must not be overwritten here.
+  const { data: devices = [] } = useQuery({
+    queryKey: ['case_recovery_attempt_devices', caseId],
+    queryFn: async (): Promise<AttemptDevice[]> => {
+      const { data, error } = await supabase
+        .from('case_devices')
+        .select('id, model, serial_number, device_type:catalog_device_types(name), brand:catalog_device_brands(name)')
+        .eq('case_id', caseId)
+        .is('deleted_at', null)
+        .order('is_primary', { ascending: false })
+        .order('created_at');
+      if (error) throw error;
+      return (data ?? []) as AttemptDevice[];
+    },
+    enabled: !!caseId,
+  });
+
   const readiness = evaluateReleaseReadiness({ recoveryAttempts: attempts, qaChecklists });
+
+  const [deviceId, setDeviceId] = useState('');
+  // A single-device case has nothing to disambiguate — attribute automatically
+  // rather than making the engineer restate the obvious.
+  const effectiveDeviceId = deviceId || (devices.length === 1 ? devices[0].id : '');
+  const deviceLabelById = new Map(devices.map((d) => [d.id, deviceLabel(d)]));
 
   const [method, setMethod] = useState('');
   const [toolUsed, setToolUsed] = useState('');
@@ -73,7 +118,11 @@ export const CaseRecoveryQaTab: React.FC<{ caseId: string }> = ({ caseId }) => {
   const recordRecovery = useMutation({
     mutationFn: () => {
       if (!profile?.tenant_id) throw new Error('No active session');
+      if (devices.length > 1 && !effectiveDeviceId) {
+        throw new Error('Select the device this attempt was performed on');
+      }
       return caseQualityService.recordRecoveryAttempt(caseId, profile.tenant_id, profile.id ?? null, {
+        deviceId: effectiveDeviceId || null,
         method: method.trim() || null,
         toolUsed: toolUsed.trim() || null,
         result,
@@ -89,6 +138,7 @@ export const CaseRecoveryQaTab: React.FC<{ caseId: string }> = ({ caseId }) => {
       // recovery_outcome seeds the Device Checkout dropdown (clobbering the DB on
       // passive checkout) and drives the wrong Rule 51 refund gate.
       queryClient.invalidateQueries({ queryKey: ['case', caseId] });
+      setDeviceId('');
       setMethod('');
       setToolUsed('');
       setResult('success');
@@ -146,6 +196,24 @@ export const CaseRecoveryQaTab: React.FC<{ caseId: string }> = ({ caseId }) => {
 
           <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 mb-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {devices.length > 0 && (
+                <div className="sm:col-span-2">
+                  <label htmlFor="recovery-attempt-device" className="block text-xs font-medium text-slate-600 mb-1">
+                    Device{devices.length > 1 ? ' *' : ''}
+                  </label>
+                  <select
+                    id="recovery-attempt-device"
+                    className={inputClass}
+                    value={effectiveDeviceId}
+                    onChange={(e) => setDeviceId(e.target.value)}
+                  >
+                    <option value="">Select the device this attempt ran on…</option>
+                    {devices.map((d) => (
+                      <option key={d.id} value={d.id}>{deviceLabel(d)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Method</label>
                 <input className={inputClass} value={method} onChange={(e) => setMethod(e.target.value)} placeholder="e.g. Head swap, imaging" />
@@ -193,6 +261,11 @@ export const CaseRecoveryQaTab: React.FC<{ caseId: string }> = ({ caseId }) => {
                       {a.method && <span className="text-slate-700 font-medium">{a.method}</span>}
                       {a.tool_used && <span className="text-slate-500">· {a.tool_used}</span>}
                     </div>
+                    {a.device_id && (
+                      <p className="text-slate-500 mt-1">
+                        Device: {deviceLabelById.get(a.device_id) ?? a.device_id}
+                      </p>
+                    )}
                     {a.data_recovered && <p className="text-slate-600 mt-1">Recovered: {a.data_recovered}</p>}
                     {a.notes && <p className="text-slate-600 mt-1 whitespace-pre-wrap">{a.notes}</p>}
                   </div>

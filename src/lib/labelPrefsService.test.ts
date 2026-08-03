@@ -1,11 +1,34 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   DEFAULT_LABEL_PRINTING_PREFS,
   normalizeLabelPrintingPrefs,
   labelEntityConfig,
   defaultLabelFields,
+  getLabelPrintingPrefs,
+  setLabelPrintingPrefs,
 } from './labelPrefsService';
 import { DEFAULT_LABEL_SIZE_ID } from './pdf/labels/labelSizes';
+
+/** Stand-in for companySettingsService's stored row + its module-level cache. */
+const settingsStub = vi.hoisted(() => ({
+  row: { id: 'cs-1', metadata: {} as Record<string, unknown> },
+  cache: null as null | { id: string; metadata: Record<string, unknown> },
+}));
+
+vi.mock('./companySettingsService', () => ({
+  getOrCreateCompanySettings: async () => {
+    if (!settingsStub.cache) settingsStub.cache = JSON.parse(JSON.stringify(settingsStub.row));
+    return settingsStub.cache;
+  },
+  updateCompanySettings: async (updates: { metadata?: Record<string, unknown> }) => {
+    settingsStub.row.metadata = updates.metadata ?? {};
+    settingsStub.cache = null;
+    return settingsStub.row;
+  },
+  invalidateCompanySettingsCache: () => {
+    settingsStub.cache = null;
+  },
+}));
 
 describe('normalizeLabelPrintingPrefs', () => {
   it('returns defaults for missing or garbage metadata', () => {
@@ -176,5 +199,31 @@ describe('normalizeLabelPrintingPrefs', () => {
   it('labelEntityConfig projects idScale', () => {
     const prefs = normalizeLabelPrintingPrefs({ idScale: { inventory: 1.25 } });
     expect(labelEntityConfig(prefs, 'inventory').idScale).toBe(1.25);
+  });
+});
+
+describe('setLabelPrintingPrefs', () => {
+  beforeEach(() => {
+    settingsStub.row = { id: 'cs-1', metadata: {} };
+    settingsStub.cache = null;
+  });
+
+  it('merges onto a fresh read so a sibling metadata bucket written elsewhere survives', async () => {
+    // This tab loads company settings (populating the 5-minute cache)…
+    await getLabelPrintingPrefs();
+    // …then another admin saves table_columns straight to the row.
+    settingsStub.row.metadata = { table_columns: { cases: { locked: ['case_number'] } } };
+
+    await setLabelPrintingPrefs({
+      ...DEFAULT_LABEL_PRINTING_PREFS,
+      copies: { case: 3, stock: 1, inventory: 1 },
+    });
+
+    expect(settingsStub.row.metadata.table_columns).toEqual({
+      cases: { locked: ['case_number'] },
+    });
+    expect(
+      (settingsStub.row.metadata.label_printing as { copies: Record<string, number> }).copies.case,
+    ).toBe(3);
   });
 });

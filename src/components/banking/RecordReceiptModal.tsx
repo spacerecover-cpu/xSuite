@@ -6,9 +6,9 @@ import { Input } from '../ui/Input';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { supabase } from '../../lib/supabaseClient';
 import { bankingService } from '../../lib/bankingService';
-import { baseAmount } from '../../lib/financialMath';
-import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
+import { useCurrencyConfig, useDateTimeConfig } from '../../contexts/TenantConfigContext';
 import { formatCurrencyWithConfig } from '../../lib/format';
+import { tenantToday } from '../../lib/tenantToday';
 import {
   AlertCircle,
   Check,
@@ -87,6 +87,7 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
   invoiceId,
 }) => {
   const currencyConfig = useCurrencyConfig();
+  const { timezone } = useDateTimeConfig();
   const formatCurrencyValue = (amount: number) => formatCurrencyWithConfig(amount, currencyConfig);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string>('');
@@ -98,7 +99,7 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
   const notesId = useId();
 
   const [formData, setFormData] = useState({
-    receipt_date: new Date().toISOString().split('T')[0],
+    receipt_date: tenantToday(timezone),
     account_id: '',
     payment_method_id: '',
     amount: 0,
@@ -125,7 +126,7 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
   useEffect(() => {
     if (!isOpen) {
       setFormData({
-        receipt_date: new Date().toISOString().split('T')[0],
+        receipt_date: tenantToday(timezone),
         account_id: '',
         payment_method_id: '',
         amount: 0,
@@ -141,7 +142,7 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
       setDetailsOpen(false);
       setError('');
     }
-  }, [isOpen]);
+  }, [isOpen, timezone]);
 
   const { data: accounts = [] } = useQuery({
     queryKey: ['active_accounts'],
@@ -228,8 +229,13 @@ export const RecordReceiptModal: React.FC<RecordReceiptModalProps> = ({
     return openInvoices as PayableInvoice[];
   }, [singleInvoiceMode, singleInvoice, openInvoices]);
 
+  // Sum the RAW document-currency balance — the same figure the per-row
+  // "Outstanding" display and every allocation clamp use. baseAmount() would
+  // return the tenant-BASE snapshot (`balance_due_base`), which `outstandingAfter`
+  // below would then subtract document-currency allocations from.
   const totalOutstanding = useMemo(
-    () => round3(payable.reduce((sum, inv) => sum + baseAmount(inv, 'balance_due'), 0)),
+    // eslint-disable-next-line xsuite/no-raw-currency-aggregation -- receipt-local rollup, not a cross-document report
+    () => round3(payable.reduce((sum, inv) => sum + (inv.balance_due || 0), 0)),
     [payable]
   );
   const totalAllocated = round3(Array.from(allocations.values()).reduce((sum, val) => sum + val, 0));

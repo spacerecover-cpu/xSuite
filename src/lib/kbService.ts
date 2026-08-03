@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient';
 import type { Database } from '../types/database.types';
 import { sanitizeFilterValue } from './postgrestSanitizer';
+import { logger } from './logger';
 
 type KBArticle = Database['public']['Tables']['kb_articles']['Row'];
 type KBArticleInsert = Database['public']['Tables']['kb_articles']['Insert'];
@@ -58,23 +59,31 @@ export async function getKBCategories(): Promise<KBCategoryWithCount[]> {
 
   if (error) throw error;
 
-  const { data: articleCounts } = await supabase
-    .from('kb_articles')
-    .select('category_id')
-    .eq('status', 'published');
+  const rows = categories || [];
 
-  const countMap: Record<string, number> = {};
-  if (articleCounts) {
-    for (const a of articleCounts) {
-      if (a.category_id) {
-        countMap[a.category_id] = (countMap[a.category_id] || 0) + 1;
+  // Counted server-side per category: pulling every published `category_id` and tallying
+  // in JS is silently truncated by PostgREST's max-rows cap once the KB passes ~1000 articles.
+  const counts = await Promise.all(
+    rows.map(async (c) => {
+      const { count, error: countError } = await supabase
+        .from('kb_articles')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'published')
+        .eq('category_id', c.id);
+      // A single category's count failing must not take down the whole KB list —
+      // the previous implementation degraded to 0 here, and the finding this fix
+      // addresses was about row-cap truncation, not error semantics.
+      if (countError) {
+        logger.error('kbService: category article count failed', countError);
+        return 0;
       }
-    }
-  }
+      return count || 0;
+    })
+  );
 
-  return (categories || []).map((c) => ({
+  return rows.map((c, i) => ({
     ...c,
-    article_count: countMap[c.id] || 0,
+    article_count: counts[i],
   }));
 }
 
@@ -272,8 +281,9 @@ export async function updateKBArticle(
 ): Promise<KBArticle> {
   const current = await supabase.from('kb_articles').select('version, title, content, published_at').eq('id', id).maybeSingle();
   if (current.error) throw current.error;
+  if (!current.data) throw new Error('Article not found');
 
-  const currentVersion = current.data?.version || 1;
+  const currentVersion = current.data.version ?? 1;
   const newVersion = currentVersion + 1;
 
   const update: KBArticleUpdate = {
@@ -293,9 +303,15 @@ export async function updateKBArticle(
     }
   }
 
-  const { data, error } = await supabase.from('kb_articles').update(update).eq('id', id).select().maybeSingle();
+  // Optimistic concurrency: the write only lands while `version` still holds the value
+  // we read above. Without it two concurrent saves both read vN, both write vN+1 — the
+  // later one silently discards the earlier edit and both version rows claim vN+1.
+  const versioned = supabase.from('kb_articles').update(update).eq('id', id);
+  const guarded = current.data.version === null ? versioned.is('version', null) : versioned.eq('version', currentVersion);
+
+  const { data, error } = await guarded.select().maybeSingle();
   if (error) throw error;
-  if (!data) throw new Error('Failed to update article');
+  if (!data) throw new Error('This article was changed by someone else. Reload the page and reapply your changes.');
 
   const { error: versionError } = await supabase.from('kb_article_versions').insert({
     article_id: id,
@@ -348,18 +364,26 @@ export async function deleteKBArticle(id: string): Promise<void> {
 }
 
 export async function incrementViewCount(id: string): Promise<void> {
-  const { data } = await supabase
+  // Best-effort telemetry — never throws, so a failed count can't break article rendering.
+  // NOTE: still a read-modify-write; concurrent views can collide. An atomic increment
+  // needs a DB-side RPC (UPDATE ... SET view_count = COALESCE(view_count,0) + 1).
+  const { data, error } = await supabase
     .from('kb_articles')
     .select('view_count')
     .eq('id', id)
     .maybeSingle();
 
-  if (data) {
-    await supabase
-      .from('kb_articles')
-      .update({ view_count: (data.view_count || 0) + 1 })
-      .eq('id', id);
+  if (error) {
+    logger.warn('incrementViewCount: failed to read view_count', error);
+    return;
   }
+  if (!data) return;
+
+  const { error: updateError } = await supabase
+    .from('kb_articles')
+    .update({ view_count: (data.view_count || 0) + 1 })
+    .eq('id', id);
+  if (updateError) logger.warn('incrementViewCount: failed to write view_count', updateError);
 }
 
 export async function getKBTags(): Promise<KBTag[]> {
@@ -387,22 +411,27 @@ export async function getKBArticleVersions(articleId: string): Promise<KBArticle
 }
 
 export async function getKBStats(): Promise<KBStats> {
-  const { data, error } = await supabase.from('kb_articles').select('status, is_featured');
-  if (error) throw error;
+  // Counted server-side (head + exact): selecting every row and counting in JS froze
+  // these KPIs at PostgREST's max-rows cap (1000) once the KB grew past it.
+  const articleCount = () => supabase.from('kb_articles').select('id', { count: 'exact', head: true });
 
-  const articles = data || [];
-  const total = articles.length;
-  const published = articles.filter((a) => a.status === 'published').length;
-  const drafts = articles.filter((a) => a.status === 'draft').length;
-  const featured = articles.filter((a) => a.is_featured).length;
+  const [totalRes, publishedRes, draftsRes, featuredRes, catsRes] = await Promise.all([
+    articleCount(),
+    articleCount().eq('status', 'published'),
+    articleCount().eq('status', 'draft'),
+    articleCount().eq('is_featured', true),
+    supabase.from('kb_categories').select('id', { count: 'exact', head: true }).eq('is_active', true),
+  ]);
 
-  const { data: cats } = await supabase.from('kb_categories').select('id').eq('is_active', true);
+  for (const res of [totalRes, publishedRes, draftsRes, featuredRes, catsRes]) {
+    if (res.error) throw res.error;
+  }
 
   return {
-    total,
-    published,
-    drafts,
-    categories: cats?.length || 0,
-    featured,
+    total: totalRes.count || 0,
+    published: publishedRes.count || 0,
+    drafts: draftsRes.count || 0,
+    categories: catsRes.count || 0,
+    featured: featuredRes.count || 0,
   };
 }

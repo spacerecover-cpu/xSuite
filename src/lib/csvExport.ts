@@ -14,13 +14,27 @@ export interface ExportColumn<T> {
   format?: (value: unknown, row: T) => string;
 }
 
+// A leading =, +, -, @, tab or CR makes Excel/Sheets/LibreOffice evaluate the
+// cell as a formula, so user-controlled text (customer names, case notes) can
+// exfiltrate data or launch a process on whoever opens the export. Prefix an
+// apostrophe to force text, mirroring chainOfCustodyExport.escapeCSVCell.
+// Plain negative numbers are exempt so amount columns stay numeric in Excel.
+const FORMULA_PREFIX = /^[=+\-@\t\r]/;
+const PLAIN_NEGATIVE_NUMBER = /^-[\d,]*\d(\.\d+)?$/;
+
+function neutralizeFormula(str: string): string {
+  if (!FORMULA_PREFIX.test(str)) return str;
+  if (PLAIN_NEGATIVE_NUMBER.test(str)) return str;
+  return `'${str}`;
+}
+
 // Escape a single field. RFC 4180:
 // - If the value contains comma, quote, or newline, wrap in quotes.
 // - Embedded quotes inside a quoted field become "".
 // - Numbers, booleans, null, undefined are coerced to string predictably.
 function escapeField(value: unknown): string {
   if (value === null || value === undefined) return '';
-  const str = typeof value === 'string' ? value : String(value);
+  const str = neutralizeFormula(typeof value === 'string' ? value : String(value));
   if (/[",\r\n]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`;
   }

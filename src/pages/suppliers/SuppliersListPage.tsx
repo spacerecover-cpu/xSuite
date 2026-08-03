@@ -76,7 +76,9 @@ export default function SuppliersListPage() {
         .select(`
           *,
           category:master_supplier_categories(name),
-          payment_terms:master_supplier_payment_terms(name, days)
+          payment_terms:master_supplier_payment_terms(name, days),
+          geo_cities(name),
+          geo_countries(name)
         `, { count: 'exact' })
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
@@ -98,8 +100,9 @@ export default function SuppliersListPage() {
         name: row.name,
         email: row.email,
         phone: row.phone,
-        country: null,
-        city: null,
+        // suppliers has no city/country text columns — resolve the FK ids via the geo_* embeds.
+        country: row.geo_countries?.name ?? null,
+        city: row.geo_cities?.name ?? null,
         is_active: row.is_active,
         created_at: row.created_at,
         category_id: row.category_id,

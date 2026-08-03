@@ -70,20 +70,39 @@ export function maxNumericSuffix(itemNumbers: string[], prefix: string): number 
   return max;
 }
 
+const MAX_SUFFIX_PAGE_SIZE = 1000;
+const MAX_SUFFIX_PAGE_LIMIT = 100;
+
 /**
  * Highest suffix already used by this tenant's inventory items for a prefix —
  * the sequence editor warns when the chosen next number would duplicate one.
+ *
+ * `item_number` sorts lexically, not numerically (`INV-999` > `INV-1000`), so
+ * the max cannot be taken from a server-side ORDER BY … LIMIT 1. Every matching
+ * row is paged through instead — a single unordered page would silently return
+ * an arbitrary subset and under-report the max, disarming the duplicate warning.
+ * The `ilike` is only a coarse narrowing filter; `maxNumericSuffix` re-checks the
+ * prefix exactly, so wildcards inside `prefix` can over-match but never mis-count.
  */
 export async function fetchMaxSuffixForPrefix(prefix: string): Promise<number> {
   if (!prefix.trim()) return 0;
-  const { data, error } = await supabase
-    .from('inventory_items')
-    .select('item_number')
-    .ilike('item_number', `${prefix}-%`)
-    .is('deleted_at', null)
-    .limit(2000);
-  if (error) throw error;
-  return maxNumericSuffix((data ?? []).map((r) => r.item_number ?? ''), prefix);
+  let max = 0;
+  for (let page = 0; page < MAX_SUFFIX_PAGE_LIMIT; page++) {
+    const from = page * MAX_SUFFIX_PAGE_SIZE;
+    const { data, error } = await supabase
+      .from('inventory_items')
+      .select('item_number')
+      .ilike('item_number', `${prefix}-%`)
+      .is('deleted_at', null)
+      .order('item_number', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + MAX_SUFFIX_PAGE_SIZE - 1);
+    if (error) throw error;
+    const rows = data ?? [];
+    max = Math.max(max, maxNumericSuffix(rows.map((r) => r.item_number ?? ''), prefix));
+    if (rows.length < MAX_SUFFIX_PAGE_SIZE) break;
+  }
+  return max;
 }
 
 /** Format a next-number preview from a sequence row or catalog defaults.

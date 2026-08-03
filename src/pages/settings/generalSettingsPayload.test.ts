@@ -7,6 +7,7 @@ vi.mock('../../lib/supabaseClient', () => ({ supabase: { from: vi.fn(), auth: {}
 import {
   buildGeneralSettingsPayload,
   resolveCompanySettingsScope,
+  replaceBrandingAsset,
   GENERAL_SETTINGS_OWNED_SECTIONS,
 } from './GeneralSettings';
 
@@ -52,6 +53,58 @@ describe('buildGeneralSettingsPayload', () => {
   it('omits owned sections that are absent rather than writing undefined', () => {
     const payload = buildGeneralSettingsPayload({ basic_info: { company_name: 'X' } });
     expect(Object.keys(payload)).toEqual(['basic_info']);
+  });
+});
+
+describe('replaceBrandingAsset', () => {
+  it('removes the superseded file only after the replacement is persisted', async () => {
+    const calls: string[] = [];
+    const deletePrevious = vi.fn(async () => {
+      calls.push('delete');
+    });
+
+    const persisted = await replaceBrandingAsset({
+      newPath: 'logos/primary/2.png',
+      persist: async () => {
+        calls.push('persist');
+        return { persisted: true, previousPath: 'logos/primary/1.png' };
+      },
+      deletePrevious,
+    });
+
+    expect(persisted).toBe(true);
+    expect(calls).toEqual(['persist', 'delete']);
+    expect(deletePrevious).toHaveBeenCalledWith('logos/primary/1.png');
+  });
+
+  it('keeps the existing file when the write fails, so branding never points at a deleted object', async () => {
+    const deletePrevious = vi.fn();
+
+    const persisted = await replaceBrandingAsset({
+      newPath: 'logos/primary/2.png',
+      persist: async () => ({ persisted: false, previousPath: 'logos/primary/1.png' }),
+      deletePrevious,
+    });
+
+    expect(persisted).toBe(false);
+    expect(deletePrevious).not.toHaveBeenCalled();
+  });
+
+  it('does not delete when there is no previous file or the path is unchanged', async () => {
+    const deletePrevious = vi.fn();
+
+    await replaceBrandingAsset({
+      newPath: 'qrcodes/invoice/2.png',
+      persist: async () => ({ persisted: true, previousPath: undefined }),
+      deletePrevious,
+    });
+    await replaceBrandingAsset({
+      newPath: 'qrcodes/invoice/2.png',
+      persist: async () => ({ persisted: true, previousPath: 'qrcodes/invoice/2.png' }),
+      deletePrevious,
+    });
+
+    expect(deletePrevious).not.toHaveBeenCalled();
   });
 });
 

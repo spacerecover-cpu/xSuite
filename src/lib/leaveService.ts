@@ -96,6 +96,36 @@ async function adjustLeaveBalanceUsage(
   if (updateError) throw updateError;
 }
 
+// Approval must not silently over-allocate: adjustLeaveBalanceUsage clamps
+// used_days at 0 but imposes no ceiling, so an unchecked approval drives
+// remaining_days negative with no error. Only enforced when an allocation row
+// exists for that (employee, type, year) — a leave type with no allocated
+// balance stays unmetered, as before.
+async function assertLeaveBalanceCovers(
+  employeeId: string,
+  leaveTypeId: string,
+  year: number,
+  days: number,
+): Promise<void> {
+  if (!(days > 0) || Number.isNaN(year)) return;
+  const { data: balance, error } = await supabase
+    .from('leave_balances')
+    .select('total_days, used_days')
+    .eq('employee_id', employeeId)
+    .eq('leave_type_id', leaveTypeId)
+    .eq('year', year)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (error) throw error;
+  if (!balance) return;
+  const remaining = balance.total_days - (balance.used_days ?? 0);
+  if (days > remaining) {
+    throw new Error(
+      `Insufficient leave balance: ${days} day(s) requested but only ${remaining} remaining for ${year}.`,
+    );
+  }
+}
+
 export const leaveService = {
   async getLeaveTypes(): Promise<LeaveType[]> {
     const { data, error } = await supabase
@@ -212,6 +242,16 @@ export const leaveService = {
 
   async approveLeaveRequest(id: string, approverId: string, notes?: string): Promise<LeaveRequest> {
     const existing = await fetchLeaveRequestForBalance(id);
+    // Validated BEFORE the status flip so a blocked approval leaves the request
+    // untouched (pending) rather than approved-but-unfunded.
+    if (existing && existing.status !== 'approved') {
+      await assertLeaveBalanceCovers(
+        existing.employee_id,
+        existing.leave_type_id,
+        leaveRequestYear(existing.start_date),
+        existing.days,
+      );
+    }
     const { data, error } = await supabase
       .from('leave_requests')
       .update({

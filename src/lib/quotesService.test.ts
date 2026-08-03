@@ -49,6 +49,7 @@ vi.mock('./tenantConfigService', () => ({
 }));
 
 import { computeDocumentTotals } from './taxDocumentService';
+import { sendDocumentEmail } from './emailDocumentService';
 import { createQuote, duplicateQuote, permanentDeleteQuote, bulkSendQuoteEmails, getQuotesByCaseId, updateQuote } from './quotesService';
 
 // Kernel parity pin (M-G): locks the canonical quote shape (12 × OMR 120.000 @5%,
@@ -369,39 +370,59 @@ describe('duplicateQuote — carries title, client_reference, bank_account_id', 
   });
 });
 
-describe('updateQuote — compensates a failed item re-insert', () => {
+describe('updateQuote — item replacement is safe', () => {
+  type ItemUpdate = {
+    payload: Record<string, unknown>;
+    eqs: Array<[string, unknown]>;
+    iss: Array<[string, unknown]>;
+  };
+
+  /**
+   * quote_items mock. `clearError` is returned by the soft-delete update; `insertError`
+   * by the replacement insert. Records every update filter so the tests can assert the
+   * soft-delete is scoped to live rows.
+   */
+  const mockQuoteItems = (
+    updates: ItemUpdate[],
+    inserts: unknown[][],
+    { clearError = null as unknown, insertError = null as unknown } = {},
+  ) => {
+    const c: Record<string, unknown> = {};
+    c.select = vi.fn(() => c);
+    c.insert = vi.fn((rows: unknown[]) => {
+      inserts.push(rows);
+      return { select: vi.fn(() => Promise.resolve({ data: [{ id: 'item-1', sort_order: 0 }], error: insertError })) };
+    });
+    c.update = vi.fn((payload: Record<string, unknown>) => {
+      const eqs: Array<[string, unknown]> = [];
+      const iss: Array<[string, unknown]> = [];
+      const isDelete = payload.deleted_at !== null;
+      const filterChain: Record<string, unknown> = {
+        eq: vi.fn((col: string, val: unknown) => { eqs.push([col, val]); return filterChain; }),
+        is: vi.fn((col: string, val: unknown) => { iss.push([col, val]); return filterChain; }),
+        then: (resolve: (v: unknown) => unknown) =>
+          resolve({ error: isDelete ? clearError : null }),
+      };
+      updates.push({ payload, eqs, iss });
+      return filterChain;
+    });
+    return c;
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     resolveTenantId.mockResolvedValue('tenant-1');
   });
 
   it('restores the soft-deleted items when the replacement insert fails', async () => {
-    const itemUpdates: Array<{ payload: Record<string, unknown>; eqs: Array<[string, unknown]> }> = [];
+    const itemUpdates: ItemUpdate[] = [];
 
     from.mockImplementation((table: string) => {
       if (table === 'quotes') {
         return chain({ data: { currency: 'OMR', exchange_rate: 1, rate_source: 'derived', customer_id: 'cust-1', company_id: null }, error: null });
       }
       if (table === 'quote_items') {
-        const c: Record<string, unknown> = {};
-        c.select = vi.fn(() => c);
-        // insert fails → triggers compensation
-        c.insert = vi.fn(() => ({
-          select: vi.fn(() => Promise.resolve({ data: null, error: { message: 'insert failed' } })),
-        }));
-        c.update = vi.fn((payload: Record<string, unknown>) => {
-          const eqs: Array<[string, unknown]> = [];
-          const eqChain = {
-            eq: vi.fn((col: string, val: unknown) => {
-              eqs.push([col, val]);
-              return eqChain;
-            }),
-            then: (resolve: (v: unknown) => unknown) => resolve({ error: null }),
-          };
-          itemUpdates.push({ payload, eqs });
-          return eqChain;
-        });
-        return c;
+        return mockQuoteItems(itemUpdates, [], { insertError: { message: 'insert failed' } });
       }
       return chain({ data: null, error: null });
     });
@@ -416,5 +437,92 @@ describe('updateQuote — compensates a failed item re-insert', () => {
     const restore = itemUpdates.find((u) => u.payload.deleted_at === null);
     expect(restore).toBeTruthy();
     expect(restore!.eqs).toContainEqual(['quote_id', 'q-1']);
+  });
+
+  it('scopes the soft-delete to live rows so the restore cannot resurrect older items', async () => {
+    const itemUpdates: ItemUpdate[] = [];
+
+    from.mockImplementation((table: string) => {
+      if (table === 'quotes') {
+        return chain({ data: { currency: 'OMR', exchange_rate: 1, rate_source: 'derived', customer_id: 'cust-1', company_id: null }, error: null });
+      }
+      if (table === 'quote_items') {
+        return mockQuoteItems(itemUpdates, [], { insertError: { message: 'insert failed' } });
+      }
+      return chain({ data: null, error: null });
+    });
+
+    await expect(
+      updateQuote('q-1', { discount_type: 'fixed', discount_amount: 0, tax_rate: 5 }, [
+        { description: 'x', quantity: 1, unit_price: 100 },
+      ]),
+    ).rejects.toEqual({ message: 'insert failed' });
+
+    const softDelete = itemUpdates.find((u) => u.payload.deleted_at !== null);
+    expect(softDelete).toBeTruthy();
+    expect(softDelete!.iss).toContainEqual(['deleted_at', null]);
+  });
+
+  it('throws and never inserts replacements when the soft-delete errors', async () => {
+    const itemUpdates: ItemUpdate[] = [];
+    const itemInserts: unknown[][] = [];
+
+    from.mockImplementation((table: string) => {
+      if (table === 'quotes') {
+        return chain({ data: { currency: 'OMR', exchange_rate: 1, rate_source: 'derived', customer_id: 'cust-1', company_id: null }, error: null });
+      }
+      if (table === 'quote_items') {
+        return mockQuoteItems(itemUpdates, itemInserts, { clearError: { message: 'row-level security' } });
+      }
+      return chain({ data: null, error: null });
+    });
+
+    await expect(
+      updateQuote('q-1', { discount_type: 'fixed', discount_amount: 0, tax_rate: 5 }, [
+        { description: 'x', quantity: 1, unit_price: 100 },
+      ]),
+    ).rejects.toEqual({ message: 'row-level security' });
+
+    // Without the error check the insert runs anyway and the quote shows doubled lines.
+    expect(itemInserts).toHaveLength(0);
+  });
+});
+
+describe('bulkSendQuoteEmails — company recipients', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('falls back to the company email for a company-only quote instead of skipping it', async () => {
+    const rows = [
+      {
+        id: 'q-company',
+        quote_number: 'Q-CO',
+        status: 'draft',
+        case_id: null,
+        customers_enhanced: null,
+        companies: { name: 'Acme Ltd', company_name: 'Acme Ltd', email: 'billing@acme.example' },
+      },
+    ];
+
+    from.mockImplementation((table: string) => {
+      if (table === 'quotes') {
+        const c: Record<string, unknown> = {};
+        c.select = vi.fn(() => c);
+        c.in = vi.fn(() => c);
+        c.is = vi.fn(() => Promise.resolve({ data: rows, error: null }));
+        c.update = vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) }));
+        return c;
+      }
+      return chain({ data: null, error: null });
+    });
+
+    const results = await bulkSendQuoteEmails(['q-company']);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].status).toBe('sent');
+    expect(sendDocumentEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: 'billing@acme.example' }),
+    );
   });
 });

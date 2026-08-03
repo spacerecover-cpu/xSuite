@@ -169,6 +169,27 @@ async function buildContext(
   return ctx;
 }
 
+/** Meta's marketing pause covers US destinations, but +1 is the whole NANP. Canada and the
+ *  sovereign Caribbean NANP members are NOT paused, so they are excluded by area code.
+ *  Unrecognized +1 area codes stay blocked (fail closed), as do the US territories
+ *  (PR 787/939, USVI 340, Guam 671, AS 684, MP 670) — deliberately absent from this set. */
+const NON_US_NANP_AREA_CODES = new Set([
+  // Canada
+  "204", "226", "236", "249", "250", "263", "289", "306", "343", "354", "365", "367", "368",
+  "382", "387", "403", "416", "418", "428", "431", "437", "438", "450", "468", "474", "506",
+  "514", "519", "548", "579", "581", "584", "587", "604", "613", "639", "647", "672", "683",
+  "705", "709", "742", "753", "778", "780", "782", "807", "819", "825", "867", "873", "879",
+  "902", "905",
+  // Sovereign Caribbean / Atlantic NANP members
+  "242", "246", "264", "268", "284", "345", "441", "473", "649", "658", "664", "721", "758",
+  "767", "784", "809", "829", "849", "868", "869", "876",
+]);
+function isUsDestination(phoneE164: string): boolean {
+  if (!phoneE164.startsWith("+1")) return false;
+  const areaCode = phoneE164.slice(2, 5);
+  return areaCode.length === 3 && !NON_US_NANP_AREA_CODES.has(areaCode);
+}
+
 async function failMessage(id: string, code: number | null, error: string, skipReason?: string) {
   await db.from("whatsapp_messages").update({
     status: skipReason ? "skipped" : "failed",
@@ -284,7 +305,7 @@ Deno.serve(async (req: Request) => {
       }
     }
     if (requiredConsent === "marketing" && !isSessionMessage) {
-      if (phone.startsWith("+1")) {
+      if (isUsDestination(phone)) {
         await failMessage(message_id, null, "US marketing paused by Meta", "us_marketing_paused");
         return new Response(JSON.stringify({ ok: false }), { status: 200 });
       }

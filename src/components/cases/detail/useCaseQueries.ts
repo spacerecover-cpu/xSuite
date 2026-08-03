@@ -45,6 +45,7 @@ export function useCaseQueries(id: string | undefined) {
           no_solution_reason_id
         `)
         .eq('id', id)
+        .is('deleted_at', null)
         .maybeSingle();
 
       if (error) {

@@ -175,7 +175,9 @@ export const WhatsAppThread: React.FC<WhatsAppThreadProps> = ({ caseId }) => {
               key={`out-${item.outbound.id}`}
               message={item.outbound}
               onRetry={() => retry.mutate(item.outbound.id)}
-              retrying={retry.isPending}
+              // Only the bubble whose id is in flight spins — `retry` is one shared
+              // mutation, so `isPending` alone would light up every failed bubble.
+              retrying={retry.isPending && retry.variables === item.outbound.id}
             />
           ) : (
             <InboundBubble key={`in-${item.inbound.id}`} message={item.inbound} />

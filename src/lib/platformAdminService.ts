@@ -420,6 +420,7 @@ export async function getSupportTickets(filters?: {
   category?: string;
   assignedTo?: string;
   search?: string;
+  tenantId?: string;
 }): Promise<TicketWithDetails[]> {
   let query = supabase
     .from('support_tickets')
@@ -430,6 +431,11 @@ export async function getSupportTickets(filters?: {
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
+  // A tenant UUID is not matchable by the free-text `search` filter (which only
+  // ILIKEs ticket_number/subject), so scoping to one tenant needs its own predicate.
+  if (filters?.tenantId) {
+    query = query.eq('tenant_id', filters.tenantId);
+  }
   if (filters?.status) {
     query = query.eq('status', filters.status);
   }

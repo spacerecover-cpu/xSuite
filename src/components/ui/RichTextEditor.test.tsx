@@ -81,6 +81,27 @@ describe('RichTextEditor write-side sanitize (Phase 3)', () => {
     expect(emitted).toContain('<p>edited</p>');
   });
 
+  it('does not re-assign innerHTML when the incoming value is the echo of what it just emitted (caret regression)', () => {
+    let current = '';
+    const onChange = vi.fn((next: string) => {
+      current = next;
+    });
+    const { rerender } = render(<RichTextEditor value={current} onChange={onChange} />);
+    const editable = screen.getByRole('textbox');
+
+    // Browser-style serialization the sanitizer normalizes (trailing `;` in style).
+    editable.innerHTML = '<p><span style="font-weight: bold;">hi</span></p>';
+    const typedNode = editable.firstChild;
+    fireEvent.input(editable);
+
+    expect(onChange).toHaveBeenCalled();
+    rerender(<RichTextEditor value={current} onChange={onChange} />);
+
+    // Re-assigning innerHTML collapses the selection (caret jumps to the start),
+    // so the typed nodes must survive the value round-trip untouched.
+    expect(editable.firstChild).toBe(typedNode);
+  });
+
   it('sanitizes inbound value before rendering it into the editable region (regression)', () => {
     render(
       <RichTextEditor

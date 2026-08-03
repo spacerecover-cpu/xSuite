@@ -646,8 +646,18 @@ export const updateQuote = async (id: string, quote: Partial<Quote>, items?: Quo
     // Soft-delete the current items with a known timestamp so we can compensate
     // (restore them) if the replacement insert fails — otherwise a mid-operation
     // insert failure would strand the quote with zero live items but a stale header.
+    // Scoped to live rows: re-stamping already-deleted rows would make the
+    // compensation below resurrect items removed in earlier edits.
+    // postgrest-js surfaces DB errors in the result rather than throwing, so this
+    // update's error MUST be inspected — a silent failure (RLS/constraint denial)
+    // followed by a successful insert leaves old + new items both live (doubled lines).
     const itemsDeletedAt = new Date().toISOString();
-    await supabase.from('quote_items').update({ deleted_at: itemsDeletedAt }).eq('quote_id', id);
+    const { error: clearItemsError } = await supabase
+      .from('quote_items')
+      .update({ deleted_at: itemsDeletedAt })
+      .eq('quote_id', id)
+      .is('deleted_at', null);
+    if (clearItemsError) throw clearItemsError;
 
     const tenantId = await resolveTenantId();
     const itemsWithQuoteId: QuoteItemInsert[] = items.map((item, index) => {
@@ -973,10 +983,13 @@ export async function bulkSendQuoteEmails(
     import('./emailTemplates'),
   ]);
 
+  // Company recipients are first-class: a quote may be addressed to a company with
+  // no customer_id at all, so the company's own address has to be resolvable here
+  // or every company-only quote is reported as "no email" and never sent.
   const { data: rows, error } = await supabase
     .from('quotes')
     .select(
-      'id, quote_number, status, case_id, customers_enhanced:customer_id(customer_name, email)',
+      'id, quote_number, status, case_id, customers_enhanced:customer_id(customer_name, email), companies:company_id(name, company_name, email)',
     )
     .in('id', quoteIds)
     .is('deleted_at', null);
@@ -991,7 +1004,14 @@ export async function bulkSendQuoteEmails(
       customer_name?: string;
       email?: string | null;
     } | null;
-    const email = customer?.email?.trim();
+    const company = q.companies as {
+      name?: string | null;
+      company_name?: string | null;
+      email?: string | null;
+    } | null;
+    // Customer address wins when both are present (the named contact); the company
+    // address is the fallback that keeps company-only quotes sendable.
+    const email = customer?.email?.trim() || company?.email?.trim();
     let result: BulkSendQuoteResult;
 
     if (!email) {
@@ -999,7 +1019,7 @@ export async function bulkSendQuoteEmails(
         quoteId: q.id,
         quoteNumber: q.quote_number,
         status: 'skipped',
-        error: 'Customer has no email',
+        error: 'No customer or company email on file',
       };
     } else {
       try {
@@ -1013,7 +1033,8 @@ export async function bulkSendQuoteEmails(
           };
         } else {
           const template = getEmailTemplate('quote', {
-            customerName: customer?.customer_name || 'Valued Customer',
+            customerName:
+              customer?.customer_name || company?.company_name || company?.name || 'Valued Customer',
             caseNumber: '',
             companyName: '',
             documentType: 'quote',

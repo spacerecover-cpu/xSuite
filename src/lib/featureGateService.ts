@@ -87,7 +87,7 @@ export async function loadPlanCache(): Promise<void> {
   }
 
   try {
-    const { data: subscription } = await supabase
+    const { data: subscription, error: subscriptionError } = await supabase
       .from('tenant_subscriptions')
       .select(`
         plan_id,
@@ -100,6 +100,15 @@ export async function loadPlanCache(): Promise<void> {
       .eq('status', 'active')
       .maybeSingle();
 
+    // A FAILED read is not "no subscription". Caching a fabricated starter plan
+    // would downgrade a paying tenant for the whole TTL; leave the cache empty so
+    // the next call retries.
+    if (subscriptionError) {
+      logger.error('Failed to load tenant subscription:', subscriptionError);
+      planCache = null;
+      return;
+    }
+
     if (!subscription) {
       planCache = {
         tenantId,
@@ -111,10 +120,18 @@ export async function loadPlanCache(): Promise<void> {
       return;
     }
 
-    const { data: features } = await supabase
+    const { data: features, error: featuresError } = await supabase
       .from('plan_features')
       .select('feature_key, is_enabled, limit_value')
       .eq('plan_id', subscription.plan_id);
+
+    // Same rule: an empty feature map from a failed read would revoke every
+    // entitlement the plan grants until the TTL expired.
+    if (featuresError) {
+      logger.error('Failed to load plan features:', featuresError);
+      planCache = null;
+      return;
+    }
 
     const featureMap = new Map<string, { enabled: boolean; limit: number | null }>();
     features?.forEach((f) => {

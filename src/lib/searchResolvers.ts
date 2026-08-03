@@ -25,36 +25,46 @@ export function composeSearchOr(
   return parts.join(',');
 }
 
+/**
+ * A failed pre-resolution must NOT degrade to "no ids" — composeSearchOr drops the
+ * `<fk>.in.(...)` clause for an empty list, so the list would render "nothing found"
+ * for a customer who does have invoices. Throw so the consuming query surfaces it
+ * (same rule as buildCaseSearchOr in caseSearch.ts).
+ */
+
 /** Customers matching the term by name, email, mobile or customer number. */
 export async function resolveCustomerIds(s: string): Promise<string[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('customers_enhanced')
     .select('id')
     .or(`customer_name.ilike.%${s}%,email.ilike.%${s}%,mobile_number.ilike.%${s}%,customer_number.ilike.%${s}%`)
     .is('deleted_at', null)
     .limit(SEARCH_MATCH_LIMIT);
+  if (error) throw error;
   return (data ?? []).map((r) => r.id);
 }
 
 /** Cases matching the term by case number or client reference. */
 export async function resolveCaseIds(s: string): Promise<string[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('cases')
     .select('id')
     .or(`case_number.ilike.%${s}%,client_reference.ilike.%${s}%`)
     .is('deleted_at', null)
     .limit(SEARCH_MATCH_LIMIT);
+  if (error) throw error;
   return (data ?? []).map((r) => r.id);
 }
 
 /** Invoices matching the term by invoice number (for payment search). */
 export async function resolveInvoiceIds(s: string): Promise<string[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('invoices')
     .select('id')
     .ilike('invoice_number', `%${s}%`)
     .is('deleted_at', null)
     .limit(SEARCH_MATCH_LIMIT);
+  if (error) throw error;
   return (data ?? []).map((r) => r.id);
 }
 

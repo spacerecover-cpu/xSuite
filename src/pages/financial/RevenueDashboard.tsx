@@ -44,6 +44,38 @@ type CaseRevenueRow = {
   profit: number;
 };
 
+type RevenuePeriodRange = {
+  from: string;
+  to: string;
+  prevFrom: string | null;
+  prevTo: string | null;
+};
+
+// Period bounds are anchored on the tenant's local "today" (never the browser's
+// local midnight -> toISOString(), which shifts every boundary a day early for UTC+
+// tenants — see financialService.getFinancialYearDates + tenantToday.ts).
+// Both windows are INCLUSIVE and built with the same shift, so the baseline always
+// spans the identical number of calendar days as the current period — a fixed
+// 7/30/365-day baseline against an inclusive current window reports growth on flat
+// revenue.
+export function revenuePeriodRange(today: string, dateFilter: string): RevenuePeriodRange {
+  const shiftBack =
+    dateFilter === 'today' ? (iso: string) => addDaysIso(iso, -1)
+    : dateFilter === 'week' ? (iso: string) => addDaysIso(iso, -7)
+    : dateFilter === 'month' ? (iso: string) => addMonthsIso(iso, -1)
+    : dateFilter === 'year' ? (iso: string) => addMonthsIso(iso, -12)
+    : null;
+  // "All time" has no comparable prior window.
+  if (!shiftBack) return { from: '2020-01-01', to: today, prevFrom: null, prevTo: null };
+  const prevTo = shiftBack(today);
+  return {
+    from: addDaysIso(prevTo, 1),
+    to: today,
+    prevFrom: addDaysIso(shiftBack(prevTo), 1),
+    prevTo,
+  };
+}
+
 export const RevenueDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { formatCurrency } = useCurrency();
@@ -52,35 +84,15 @@ export const RevenueDashboard: React.FC = () => {
   const [dateFilter, setDateFilter] = useState<string>('month');
   const [viewMode, setViewMode] = useState<'invoices' | 'customers' | 'cases'>('invoices');
 
-  // Period bounds are anchored on the tenant's local "today" (never the browser's
-  // local midnight -> toISOString(), which shifts every boundary a day early for UTC+
-  // tenants — see financialService.getFinancialYearDates + tenantToday.ts).
-  const dateRange = useMemo(() => {
-    const today = tenantToday(timezone);
-    let from: string;
-    switch (dateFilter) {
-      case 'today':
-        from = today;
-        break;
-      case 'week':
-        from = addDaysIso(today, -7);
-        break;
-      case 'month':
-        from = addMonthsIso(today, -1);
-        break;
-      case 'year':
-        from = addMonthsIso(today, -12);
-        break;
-      default:
-        from = '2020-01-01';
-    }
-    return { from, to: today };
-  }, [dateFilter, timezone]);
+  const dateRange = useMemo(
+    () => revenuePeriodRange(tenantToday(timezone), dateFilter),
+    [dateFilter, timezone],
+  );
 
   const excludedStatusFilter = `(${RECEIVABLE_INVOICE_EXCLUDED_STATUSES.map((s) => `"${s}"`).join(',')})`;
 
   const { data: revenueData = [], isLoading } = useQuery<RevenueInvoiceRow[]>({
-    queryKey: ['revenue_data', dateFilter],
+    queryKey: ['revenue_data', dateRange.from, dateRange.to],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('invoices')
@@ -98,6 +110,7 @@ export const RevenueDashboard: React.FC = () => {
         .is('deleted_at', null)
         .not('status', 'in', excludedStatusFilter)
         .gte('invoice_date', dateRange.from)
+        .lte('invoice_date', dateRange.to)
         .order('invoice_date', { ascending: false });
 
       if (error) throw error;
@@ -106,30 +119,30 @@ export const RevenueDashboard: React.FC = () => {
   });
 
   const { data: customerRevenue = [] } = useQuery<CustomerRevenueRow[]>({
-    queryKey: ['revenue_by_customer', dateFilter],
+    queryKey: ['revenue_by_customer', dateRange.from, dateRange.to],
     queryFn: () => generateRevenueByCustomerReport(dateRange.from, dateRange.to),
     enabled: viewMode === 'customers',
   });
 
   const { data: caseRevenue = [] } = useQuery<CaseRevenueRow[]>({
-    queryKey: ['revenue_by_case', dateFilter],
+    queryKey: ['revenue_by_case', dateRange.from, dateRange.to],
     queryFn: () => generateRevenueByCaseReport(dateRange.from, dateRange.to),
     enabled: viewMode === 'cases',
   });
 
   const { data: prevPeriodRevenue = 0 } = useQuery<number>({
-    queryKey: ['prev_period_revenue', dateFilter],
+    queryKey: ['prev_period_revenue', dateRange.prevFrom, dateRange.prevTo],
     queryFn: async () => {
-      const periodLength = dateFilter === 'year' ? 365 : dateFilter === 'month' ? 30 : dateFilter === 'week' ? 7 : 1;
-      const prevStart = new Date(new Date(dateRange.from).getTime() - periodLength * 24 * 60 * 60 * 1000);
-      const prevEnd = new Date(dateRange.from);
-      const { data } = await supabase
+      const { prevFrom, prevTo } = dateRange;
+      if (!prevFrom || !prevTo) return 0;
+      const { data, error } = await supabase
         .from('invoices')
         .select('amount_paid, amount_paid_base')
         .is('deleted_at', null)
         .not('status', 'in', excludedStatusFilter)
-        .gte('invoice_date', prevStart.toISOString().split('T')[0])
-        .lt('invoice_date', prevEnd.toISOString().split('T')[0]);
+        .gte('invoice_date', prevFrom)
+        .lte('invoice_date', prevTo);
+      if (error) throw error;
       return (data || []).reduce<number>((sum, inv) => sum + baseAmount(inv, 'amount_paid'), 0);
     },
   });

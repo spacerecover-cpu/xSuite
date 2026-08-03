@@ -157,6 +157,18 @@ describe('invoiceAdapter compliance rendering', () => {
     expect(data.meta.find((m) => m.label.en === 'Invoice Date:')!.value).toBe('02/07/2026');
   });
 
+  it('formats payment-history dates with the same config.locale.dateFormat as the meta dates', () => {
+    // A US tenant (MM/DD/YYYY) must not get dd/MM payment rows next to an MM/dd
+    // invoice date — two mutually ambiguous orders on one document.
+    const base = omConfig();
+    const usConfig = { ...base, locale: { ...base.locale, dateFormat: 'MM/DD/YYYY' } };
+    const fixture = buildInvoiceFixture({ invoice_date: '2026-07-02' });
+    const data = toEngineData(fixture, usConfig);
+    expect(data.meta.find((m) => m.label.en === 'Invoice Date:')!.value).toBe('07/02/2026');
+    // fixture history: 2026-06-14 and 2026-06-15
+    expect(data.paymentHistory!.rows[0].date).toBe('06/14/2026');
+  });
+
   it('emits unit and itemCode row keys', () => {
     const fixture = buildInvoiceFixture({
       invoice_line_items: [

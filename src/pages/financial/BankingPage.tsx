@@ -6,7 +6,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useCurrencyConfig } from '../../contexts/TenantConfigContext';
-import { formatCurrencyWithConfig } from '../../lib/format';
+import { formatCurrencyWithConfig, formatMoneyInDocumentCurrency } from '../../lib/format';
 import { useToast } from '../../hooks/useToast';
 import { AccountFormModal } from '../../components/banking/AccountFormModal';
 import { RecordReceiptModal } from '../../components/banking/RecordReceiptModal';
@@ -36,6 +36,11 @@ import {
 export const BankingPage: React.FC = () => {
   const currencyConfig = useCurrencyConfig();
   const formatCurrencyValue = (amount: number) => formatCurrencyWithConfig(amount, currencyConfig);
+  // Per-account balances are stored in the ACCOUNT's own currency (only the KPI
+  // totals are base-converted, via sumBankBalanceBase), so a non-base account must
+  // not be rendered with the tenant's base token.
+  const formatAccountAmount = (amount: number, account: BankAccount) =>
+    formatMoneyInDocumentCurrency(amount, account.currency_ref?.code ?? account.currency, currencyConfig);
   const queryClient = useQueryClient();
   const toast = useToast();
 
@@ -438,7 +443,7 @@ export const BankingPage: React.FC = () => {
 
                               <div className="text-right">
                                 <p className={`text-base font-bold leading-none ${getBalanceColor(account.current_balance)}`}>
-                                  {formatCurrencyValue(account.current_balance)}
+                                  {formatAccountAmount(account.current_balance, account)}
                                 </p>
 
                                 {hasChange && (
@@ -451,7 +456,7 @@ export const BankingPage: React.FC = () => {
                                       <TrendingDown className="w-3 h-3" />
                                     )}
                                     <span>
-                                      {formatCurrencyValue(Math.abs(balanceChange))}
+                                      {formatAccountAmount(Math.abs(balanceChange), account)}
                                     </span>
                                   </div>
                                 )}
@@ -494,7 +499,9 @@ export const BankingPage: React.FC = () => {
                   <div className="text-right">
                     <p className="text-sm text-slate-600">Current Balance</p>
                     <p className={`text-2xl font-bold ${getBalanceColor(selectedAccountData?.current_balance || 0)}`}>
-                      {formatCurrencyValue(selectedAccountData?.current_balance || 0)}
+                      {selectedAccountData
+                        ? formatAccountAmount(selectedAccountData.current_balance || 0, selectedAccountData)
+                        : formatCurrencyValue(0)}
                     </p>
                   </div>
                 </div>

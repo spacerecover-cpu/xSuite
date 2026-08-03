@@ -454,6 +454,23 @@ export const payrollService = {
       );
     }
     const overtimeMultiplier = settings.overtime_rate_multiplier.regular;
+    // attendance_records carries ONE overtime_hours figure with no day-type
+    // breakdown (no weekend/holiday marker, and there is no holiday calendar), so
+    // every overtime hour is paid at the regular multiplier. A tenant that
+    // configured a weekend/holiday premium would otherwise be underpaying those
+    // hours silently — warn instead. Honouring the premium needs a day-typed
+    // overtime source (schema change), not a client-side guess.
+    const { weekend: weekendMultiplier, holiday: holidayMultiplier } = settings.overtime_rate_multiplier;
+    // NOTE: this fires on configuration alone, and the shipped defaults already set
+    // weekend 1.5 / holiday 2.0 above regular 1.25 — so it warns on most runs. Gating
+    // it on overtime actually being paid needs a run-level flag set inside the
+    // per-employee loop below; left as a follow-up rather than refactored here.
+    if (weekendMultiplier > overtimeMultiplier || holidayMultiplier > overtimeMultiplier) {
+      logger.warn(
+        'payroll: weekend/holiday overtime multipliers are configured but attendance has no day-type ' +
+        `breakdown — ALL overtime is paid at the regular ${overtimeMultiplier}x rate for this run.`,
+      );
+    }
 
     // Multi-currency closure (D7): freeze currency + rate + *_base on each payroll
     // record. Resolve ONE rate context per run at the tenant base currency. We
@@ -489,7 +506,18 @@ export const payrollService = {
       );
 
       const activeLoans = await this.getActiveLoans(employee.id, period.end_date);
-      const loanDeductions = activeLoans.reduce(
+      // The period-claim CAS below only stops the SAME period being processed
+      // twice. payroll_periods has no overlap constraint (see the note in
+      // getCurrentPayrollPeriod), so two periods covering the same month would
+      // each collect a full installment for one month of work. Skip loans that
+      // already have a payroll deduction inside this period's window.
+      const alreadyCollected = await this.getLoansCollectedInWindow(
+        activeLoans.map(loan => loan.id),
+        period.start_date,
+        period.end_date,
+      );
+      const collectibleLoans = activeLoans.filter(loan => !alreadyCollected.has(loan.id));
+      const loanDeductions = collectibleLoans.reduce(
         (sum, loan) => sum + scheduledLoanDeduction(loan),
         0
       );
@@ -531,7 +559,7 @@ export const payrollService = {
         [employee.first_name, employee.last_name].filter(Boolean).join(' ') ||
         employee.id;
 
-      for (const loan of activeLoans) {
+      for (const loan of collectibleLoans) {
         pendingLoanRepayments.push({
           employeeLabel,
           repayment: {
@@ -842,6 +870,31 @@ export const payrollService = {
     return data as EmployeeLoan[];
   },
 
+  /** Loan ids that already had a payroll installment collected inside
+   *  [startDate, endDate]. loan_repayments has no period_id, so the repayment
+   *  date window is the dedupe key; only payroll-posted rows (payment_method
+   *  'payroll_deduction' — what processPayroll writes) count, so a manual
+   *  repayment recorded by hand is not mistaken for this period's collection. */
+  async getLoansCollectedInWindow(
+    loanIds: string[],
+    startDate: string,
+    endDate: string,
+  ): Promise<Set<string>> {
+    if (loanIds.length === 0) return new Set<string>();
+
+    const { data, error } = await supabase
+      .from('loan_repayments')
+      .select('loan_id')
+      .in('loan_id', loanIds)
+      .eq('payment_method', 'payroll_deduction')
+      .gte('repayment_date', startDate)
+      .lte('repayment_date', endDate)
+      .is('deleted_at', null);
+
+    if (error) throw error;
+    return new Set((data ?? []).map(row => row.loan_id));
+  },
+
   async createEmployeeLoan(data: EmployeeLoanInsert) {
     const { data: nextNumber } = await supabase.rpc('get_next_number', {
       p_scope: 'loan',
@@ -1055,7 +1108,8 @@ export const payrollService = {
     const { count: employeeCount } = await supabase
       .from('employees')
       .select('*', { count: 'exact', head: true })
-      .eq('employment_status', 'active');
+      .eq('employment_status', 'active')
+      .is('deleted_at', null);
 
     const { data: pendingPeriods } = await supabase
       .from('payroll_periods')

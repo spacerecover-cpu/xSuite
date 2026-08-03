@@ -11,9 +11,44 @@ import { Textarea } from '../ui/Textarea';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useToast } from '../../hooks/useToast';
+import { roundMoney } from '../../lib/financialMath';
+import { addMonthsIso } from '../../lib/tenantToday';
 import type { Database } from '../../types/database.types';
 
 type Employee = Database['public']['Tables']['employees']['Row'];
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Pure loan maths, exported for testing.
+ *
+ * Installment N is due at start + (N - 1) months (LoanDetailModal builds the
+ * repayment schedule the same way), so the loan ends on the LAST installment's
+ * due date — start + (installments - 1) months, not one month past it.
+ * `addMonthsIso` does day-clamped calendar arithmetic on the ISO string, so a
+ * month-end start never overflows into the following month (Jan 31 + 1 month =
+ * Feb 28, not Mar 3) and no local/UTC round-trip can shift the stored day.
+ * installment_amount is rounded to the tenant currency's precision — the payroll
+ * deduction path (bug #89) assumes a rounded, exactly-payable installment.
+ */
+export function computeLoanTerms(input: {
+  principal: number;
+  interestRate: number;
+  installments: number;
+  startDate: string;
+  decimalPlaces: number;
+}): { totalAmount: number; installmentAmount: number; endDate: string } {
+  const installments = Math.max(1, Math.floor(input.installments) || 1);
+  const totalAmount = input.principal * (1 + input.interestRate / 100);
+
+  return {
+    totalAmount,
+    installmentAmount: roundMoney(totalAmount / installments, input.decimalPlaces),
+    endDate: ISO_DATE_RE.test(input.startDate)
+      ? addMonthsIso(input.startDate, installments - 1)
+      : '',
+  };
+}
 
 interface LoanFormModalProps {
   isOpen: boolean;
@@ -21,7 +56,7 @@ interface LoanFormModalProps {
 }
 
 export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose }) => {
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, currencyFormat } = useCurrency();
   const toast = useToast();
   const queryClient = useQueryClient();
 
@@ -75,25 +110,19 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
     formData.interest_rate,
     formData.installments_count,
     formData.start_date,
+    currencyFormat.decimalPlaces,
   ]);
 
   const calculateLoanDetails = () => {
-    const principal = parseFloat(formData.principal_amount) || 0;
-    const interestRate = parseFloat(formData.interest_rate) || 0;
-    const installments = parseInt(formData.installments_count) || 1;
-
-    const totalAmount = principal * (1 + interestRate / 100);
-    const installmentAmount = totalAmount / installments;
-
-    const startDate = new Date(formData.start_date);
-    const endDate = new Date(startDate);
-    endDate.setMonth(endDate.getMonth() + installments);
-
-    setCalculatedValues({
-      totalAmount,
-      installmentAmount,
-      endDate: endDate.toISOString().split('T')[0],
-    });
+    setCalculatedValues(
+      computeLoanTerms({
+        principal: parseFloat(formData.principal_amount) || 0,
+        interestRate: parseFloat(formData.interest_rate) || 0,
+        installments: parseInt(formData.installments_count) || 1,
+        startDate: formData.start_date,
+        decimalPlaces: currencyFormat.decimalPlaces,
+      }),
+    );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -127,7 +156,7 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({ isOpen, onClose })
       paid_installments: 0,
       remaining_amount: calculatedValues.totalAmount,
       start_date: formData.start_date,
-      end_date: calculatedValues.endDate,
+      end_date: calculatedValues.endDate || null,
       status: 'pending',
       notes: formData.notes || null,
     };

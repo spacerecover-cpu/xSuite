@@ -61,4 +61,32 @@ describe('LabelStudio alignment + icon', () => {
     await waitFor(() => expect(setPrefs).toHaveBeenCalled());
     expect(setPrefs.mock.calls[0][0].idScale.inventory).toBe(1.5);
   });
+
+  it('reset reverts every design field, not just size/copies/codes', async () => {
+    renderStudio();
+    fireEvent.click(await screen.findByRole('button', { name: /identifier size xl/i }));
+    fireEvent.click(screen.getByRole('button', { name: /align right/i }));
+    fireEvent.click(screen.getByRole('switch', { name: /auto-print on create/i }));
+
+    fireEvent.click(screen.getByRole('button', { name: /^reset$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /save & deploy/i }));
+
+    await waitFor(() => expect(setPrefs).toHaveBeenCalled());
+    const saved = setPrefs.mock.calls[0][0];
+    expect(saved.idScale.inventory).toBe(1);
+    expect(saved.idAlign.inventory).toBe('left');
+    expect(saved.autoPrint.inventory).toBe(false);
+    expect(saved.showIcon.inventory).toBe(false);
+    expect(saved.iconPosition.inventory).toBe('top-right');
+  });
+
+  it('reset keeps the tenant-level uploaded brand icon', async () => {
+    renderStudio();
+    const input = (await screen.findByText(/upload icon/i)).closest('label')!.querySelector('input')!;
+    fireEvent.change(input, { target: { files: [new File(['x'], 'i.png', { type: 'image/png' })] } });
+    await screen.findByAltText('Label icon');
+
+    fireEvent.click(screen.getByRole('button', { name: /^reset$/i }));
+    expect(screen.getByAltText('Label icon')).toBeInTheDocument();
+  });
 });

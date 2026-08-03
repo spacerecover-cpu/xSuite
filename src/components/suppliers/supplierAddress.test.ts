@@ -2,10 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { composeSupplierAddress } from './supplierAddress';
 
 describe('composeSupplierAddress', () => {
-  it('folds street, state, zip and country into one address string (no drop)', () => {
+  it('folds street, city, state, zip and country into one address string (no drop)', () => {
     expect(composeSupplierAddress({
-      address: '12 Main St', state: 'Muscat', zip_code: '113', country: 'Oman',
-    })).toBe('12 Main St, Muscat, 113, Oman');
+      address: '12 Main St', city: 'Dallas', state: 'Muscat', zip_code: '113', country: 'Oman',
+    })).toBe('12 Main St, Dallas, Muscat, 113, Oman');
+  });
+  it('keeps the typed city when it is the only locality part', () => {
+    expect(composeSupplierAddress({ address: '12 Main St', city: 'Dallas' }))
+      .toBe('12 Main St, Dallas');
   });
   it('skips blank parts and trims', () => {
     expect(composeSupplierAddress({ address: '12 Main St', state: '', zip_code: '113', country: '' }))
