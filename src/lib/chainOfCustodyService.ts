@@ -1183,8 +1183,10 @@ export async function logPortalApproval(params: {
 }
 
 export async function fetchCustomerTimeline(customerId: string): Promise<ActivityEntry[]> {
-  const { data: cases } = await supabase
+  const { data: cases, error: casesError } = await supabase
     .from('cases').select('id').eq('customer_id', customerId).is('deleted_at', null);
+  // A failed lookup must surface, not degrade to an empty audit timeline.
+  if (casesError) throw casesError;
   const caseIds = (cases ?? []).map((c) => c.id);
   if (caseIds.length === 0) return [];
   const { data, error } = await supabase

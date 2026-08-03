@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { rolePermissionsService, Module, RolePermissions } from '../lib/rolePermissionsService';
 import { logger } from '../lib/logger';
@@ -20,7 +20,15 @@ export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [loading, setLoading] = useState(true);
   const role = profile?.role ?? null;
 
+  // Epoch guard: a role change (or refreshPermissions) can start a second load
+  // while the first is still in flight. Without this, whichever fetch resolves
+  // LAST wins — a demoted user could keep the previous role's module set.
+  const loadEpoch = useRef(0);
+
   const loadPermissions = useCallback(async () => {
+    const epoch = ++loadEpoch.current;
+    const isStale = () => loadEpoch.current !== epoch;
+
     if (!role) {
       setPermissions(null);
       setAccessibleModules([]);
@@ -39,14 +47,16 @@ export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ c
         rolePermissionsService.getAccessibleModules(role),
       ]);
 
+      if (isStale()) return;
       setPermissions(userPermissions);
       setAccessibleModules(modules);
     } catch (error) {
+      if (isStale()) return;
       logger.error('Error loading permissions:', error);
       setPermissions(null);
       setAccessibleModules([]);
     } finally {
-      setLoading(false);
+      if (!isStale()) setLoading(false);
     }
   }, [role]);
 

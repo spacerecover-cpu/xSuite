@@ -31,6 +31,22 @@ vi.mock('@/lib/format', () => ({
   formatDate: (v: string) => v,
 }));
 
+// The tab reads the case's devices so each attempt can be attributed to the
+// physical drive it ran on. Read lazily inside the chain so the hoisted
+// vi.mock factory does not touch it before initialisation.
+const deviceRows: Array<Record<string, unknown>> = [];
+vi.mock('@/lib/supabaseClient', () => {
+  const chain: Record<string, unknown> = {};
+  const self = () => chain;
+  chain.select = self;
+  chain.eq = self;
+  chain.is = self;
+  chain.order = self;
+  chain.then = (resolve: (v: unknown) => unknown) =>
+    Promise.resolve({ data: deviceRows, error: null }).then(resolve);
+  return { supabase: { from: () => chain } };
+});
+
 import { CaseRecoveryQaTab } from './CaseRecoveryQaTab';
 
 const CASE_ID = 'case-1';
@@ -48,8 +64,19 @@ function renderTab() {
   return { invalidateSpy };
 }
 
+function makeDevice(id: string, serial: string) {
+  return {
+    id,
+    model: 'ST4000',
+    serial_number: serial,
+    device_type: { name: 'HDD' },
+    brand: { name: 'Seagate' },
+  };
+}
+
 describe('CaseRecoveryQaTab cache invalidation', () => {
   beforeEach(() => {
+    deviceRows.length = 0;
     recordRecoveryAttempt.mockReset().mockResolvedValue({ id: 'attempt-1' });
     recordQaResult.mockReset().mockResolvedValue({ id: 'qa-1' });
   });
@@ -84,5 +111,58 @@ describe('CaseRecoveryQaTab cache invalidation', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ['case_qa_checklists', CASE_ID],
     });
+  });
+});
+
+describe('CaseRecoveryQaTab device attribution', () => {
+  beforeEach(() => {
+    deviceRows.length = 0;
+    recordRecoveryAttempt.mockReset().mockResolvedValue({ id: 'attempt-1' });
+    recordQaResult.mockReset().mockResolvedValue({ id: 'qa-1' });
+  });
+
+  it('attributes the attempt to the selected drive on a multi-device case', async () => {
+    // Without a device picker every attempt on a 12-drive RAID lands with
+    // device_id = null, so there is no per-device provenance at all.
+    deviceRows.push(makeDevice('dev-1', 'SN-1'), makeDevice('dev-7', 'SN-7'));
+    renderTab();
+
+    const picker = await screen.findByLabelText(/device \*/i);
+    fireEvent.change(picker, { target: { value: 'dev-7' } });
+    fireEvent.click(screen.getByRole('button', { name: /record attempt/i }));
+
+    await waitFor(() => expect(recordRecoveryAttempt).toHaveBeenCalledTimes(1));
+    expect(recordRecoveryAttempt).toHaveBeenCalledWith(
+      CASE_ID,
+      'tenant-1',
+      'user-1',
+      expect.objectContaining({ deviceId: 'dev-7' }),
+    );
+  });
+
+  it('refuses to record an unattributed attempt when the case has several devices', async () => {
+    deviceRows.push(makeDevice('dev-1', 'SN-1'), makeDevice('dev-7', 'SN-7'));
+    renderTab();
+
+    await screen.findByLabelText(/device \*/i);
+    fireEvent.click(screen.getByRole('button', { name: /record attempt/i }));
+
+    await waitFor(() => expect(recordRecoveryAttempt).not.toHaveBeenCalled());
+  });
+
+  it('auto-attributes to the only drive on a single-device case', async () => {
+    deviceRows.push(makeDevice('dev-1', 'SN-1'));
+    renderTab();
+
+    await screen.findByLabelText(/^device$/i);
+    fireEvent.click(screen.getByRole('button', { name: /record attempt/i }));
+
+    await waitFor(() => expect(recordRecoveryAttempt).toHaveBeenCalledTimes(1));
+    expect(recordRecoveryAttempt).toHaveBeenCalledWith(
+      CASE_ID,
+      'tenant-1',
+      'user-1',
+      expect.objectContaining({ deviceId: 'dev-1' }),
+    );
   });
 });

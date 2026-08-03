@@ -44,7 +44,7 @@ export default function PurchaseOrderDetailPage() {
           .from('purchase_orders')
           .select(`
             *,
-            supplier:suppliers(*),
+            supplier:suppliers(*, geo_cities(name), geo_countries(name)),
             status:master_purchase_order_statuses(name, color)
           `)
           .eq('id', orderId)
@@ -182,19 +182,24 @@ export default function PurchaseOrderDetailPage() {
                     <span>{order.supplier.phone}</span>
                   </div>
                 )}
-                {order.supplier.address && (
+                {/* suppliers stores location as FK ids (city_id/country_id), so the
+                    names come from the embedded geo_* rows, not text columns. */}
+                {(order.supplier.address ||
+                  order.supplier.geo_cities?.name ||
+                  order.supplier.geo_countries?.name) && (
                   <div className="flex items-start gap-2 text-slate-600">
                     <MapPin className="w-4 h-4 mt-0.5" />
                     <div>
-                      <div>{order.supplier.address}</div>
-                      {order.supplier.city && (
+                      {order.supplier.address && <div>{order.supplier.address}</div>}
+                      {(order.supplier.geo_cities?.name || order.supplier.postal_code) && (
                         <div>
-                          {order.supplier.city}
-                          {order.supplier.state && `, ${order.supplier.state}`}
-                          {order.supplier.zip_code && ` ${order.supplier.zip_code}`}
+                          {order.supplier.geo_cities?.name}
+                          {order.supplier.postal_code && ` ${order.supplier.postal_code}`}
                         </div>
                       )}
-                      {order.supplier.country && <div>{order.supplier.country}</div>}
+                      {order.supplier.geo_countries?.name && (
+                        <div>{order.supplier.geo_countries.name}</div>
+                      )}
                     </div>
                   </div>
                 )}

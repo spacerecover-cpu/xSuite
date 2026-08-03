@@ -114,6 +114,7 @@ export const PaymentsList: React.FC = () => {
             invoice:invoices(invoice_number, case_id)
           )
         `, { count: 'exact' })
+        .is('deleted_at', null)
         .order('payment_date', { ascending: false })
         .range(page * pageSize, (page + 1) * pageSize - 1);
 

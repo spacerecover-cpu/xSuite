@@ -28,17 +28,20 @@ interface Props {
   onChange: (v: ConsentDraft) => void;
 }
 
-export function WhatsAppConsentBlock({ customerId, value, onChange }: Props) {
-  const { config } = useTenantConfig();
-  const companyName = useCompanyName();
-  const { data: existing } = useQuery({
-    queryKey: whatsappKeys.consents(customerId ?? 'new'),
-    queryFn: () => getConsentState(config.tenantId, customerId!),
-    enabled: Boolean(customerId && config.tenantId),
-  });
-  const current = existing ? summarizeConsent(existing) : null;
+interface RowProps {
+  scope: keyof ConsentDraft;
+  label: string;
+  hint: string;
+  value: ConsentDraft;
+  current: ConsentDraft | null;
+  onChange: (v: ConsentDraft) => void;
+}
 
-  const Row = ({ scope, label, hint }: { scope: keyof ConsentDraft; label: string; hint: string }) => (
+// Module scope on purpose: declaring this inside WhatsAppConsentBlock would give it a
+// new component type on every render, remounting the checkbox inputs (and dropping
+// focus) each time the customer form re-renders.
+function Row({ scope, label, hint, value, current, onChange }: RowProps) {
+  return (
     <label className="flex items-start gap-2 text-sm">
       <input
         type="checkbox"
@@ -55,6 +58,17 @@ export function WhatsAppConsentBlock({ customerId, value, onChange }: Props) {
       </span>
     </label>
   );
+}
+
+export function WhatsAppConsentBlock({ customerId, value, onChange }: Props) {
+  const { config } = useTenantConfig();
+  const companyName = useCompanyName();
+  const { data: existing } = useQuery({
+    queryKey: whatsappKeys.consents(customerId ?? 'new'),
+    queryFn: () => getConsentState(config.tenantId, customerId!),
+    enabled: Boolean(customerId && config.tenantId),
+  });
+  const current = existing ? summarizeConsent(existing) : null;
 
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -63,9 +77,11 @@ export function WhatsAppConsentBlock({ customerId, value, onChange }: Props) {
       </div>
       <div className="space-y-2">
         <Row scope="utility" label={utilityConsentLabel(companyName)}
-          hint="Status changes, quotes, invoices, collection reminders" />
+          hint="Status changes, quotes, invoices, collection reminders"
+          value={value} current={current} onChange={onChange} />
         <Row scope="marketing" label={marketingConsentLabel(companyName)}
-          hint="Occasional post-service messages; opt out any time by replying STOP" />
+          hint="Occasional post-service messages; opt out any time by replying STOP"
+          value={value} current={current} onChange={onChange} />
       </div>
     </div>
   );

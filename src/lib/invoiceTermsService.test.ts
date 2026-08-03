@@ -39,6 +39,25 @@ describe('resolveInvoiceTermsHtml', () => {
     expect(out).not.toContain('<script');
   });
 
+  it('keeps angle brackets coming from context values instead of sanitizing them away', async () => {
+    mockedGetDefault.mockResolvedValue(tmpl('<p>This agreement is between {{company.name}} and {{customer.company}}.</p>'));
+    mockedBuildCtx.mockResolvedValue({
+      company: { name: 'Future Space' },
+      customer: { company: 'Al-Rashid & Sons <Holdings> Trading L.L.C.' },
+    });
+    const out = await resolveInvoiceTermsHtml({ refs: {} });
+    // The customer name must survive verbatim as TEXT; template markup still renders.
+    expect(out).toContain('Al-Rashid &amp; Sons &lt;Holdings&gt; Trading L.L.C.');
+    expect(out).toContain('<p>');
+  });
+
+  it('does not let a context value inject markup into the stored terms', async () => {
+    mockedGetDefault.mockResolvedValue(tmpl('<p>{{customer.company}}</p>'));
+    mockedBuildCtx.mockResolvedValue({ customer: { company: '<strong>Injected</strong>' } });
+    const out = await resolveInvoiceTermsHtml({ refs: {} });
+    expect(out).toContain('&lt;strong&gt;Injected&lt;/strong&gt;');
+  });
+
   it('overlay invoice.* wins over fetched context', async () => {
     mockedGetDefault.mockResolvedValue(tmpl('<p>{{invoice.due_date}}</p>'));
     mockedBuildCtx.mockResolvedValue({ invoice: { due_date: 'OLD' } });

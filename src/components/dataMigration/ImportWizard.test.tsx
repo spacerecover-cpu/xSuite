@@ -168,4 +168,77 @@ describe('ImportWizard', () => {
     const importBtn = screen.queryByRole('button', { name: /^import$/i });
     expect(importBtn).toBeNull();
   });
+
+  it('CSV-escapes commas and quotes in the downloaded validation error report', async () => {
+    mocks.parseWorkbook.mockReturnValue({ companies: [], customers: [], cases: [] });
+    mocks.validateWorkbook.mockReturnValue({
+      ok: false,
+      counts: { companies: 0, customers: 0, cases: 0 },
+      issues: [{
+        entity: 'cases',
+        rowIndex: 7,
+        field: 'status',
+        message: 'Invalid status "a,b" (allowed: draft, sent, paid)',
+        severity: 'error',
+      }],
+    });
+
+    const blobs: Blob[] = [];
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      writable: true,
+      value: (b: Blob) => { blobs.push(b); return 'blob:mock'; },
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, writable: true, value: () => {} });
+
+    wrap(<ImportWizard domain="records" onClose={onClose} />);
+
+    const file = new File(['dummy'], 'bad.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(input, 'files', { value: [file] });
+    fireEvent.change(input);
+
+    fireEvent.click(await screen.findByRole('button', { name: /download error report/i }));
+
+    expect(blobs).toHaveLength(1);
+    const text = await blobs[0].text();
+    const dataLine = text.split('\r\n')[1];
+    expect(dataLine).toBe('cases,7,status,error,"Invalid status ""a,b"" (allowed: draft, sent, paid)"');
+  });
+
+  it('shows every entity bar complete while the import finalizes', async () => {
+    const parsedWb = { companies: [{ legacy_id: 'c1' }], customers: [], cases: [{ legacy_id: 'k1' }] };
+    mocks.parseWorkbook.mockReturnValue(parsedWb);
+    mocks.validateWorkbook.mockReturnValue({
+      ok: true,
+      counts: { companies: 1, customers: 0, cases: 1 },
+      issues: [],
+    });
+    // Finalize reports the LAST entity with total=0; the wizard must not read that as 0% done.
+    mocks.runImport.mockImplementation((
+      _wb: unknown,
+      _meta: unknown,
+      onProgress: (p: { entity: string; processed: number; total: number; phase: string }) => void,
+    ) => {
+      onProgress({ entity: 'cases', processed: 0, total: 0, phase: 'finalizing' });
+      return new Promise(() => {});
+    });
+
+    wrap(<ImportWizard domain="records" onClose={onClose} />);
+
+    const file = new File(['dummy'], 'lab-export.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(input, 'files', { value: [file] });
+    fireEvent.change(input);
+
+    fireEvent.click(await screen.findByRole('button', { name: /^import$/i }));
+
+    await waitFor(() => {
+      const bars = document.querySelectorAll<HTMLElement>('div.h-full.rounded-full.transition-all');
+      expect(bars).toHaveLength(3);
+      bars.forEach((bar) => expect(bar.style.width).toBe('100%'));
+    });
+  });
 });

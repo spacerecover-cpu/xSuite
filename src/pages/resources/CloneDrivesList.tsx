@@ -13,6 +13,21 @@ import { useListPageSize } from '../../hooks/useListPageSize';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { HardDrive, Search, Filter, Plus, AlertCircle, CreditCard as Edit2, MapPin, Calendar, ArrowUpDown, FileText, X } from 'lucide-react';
 
+// clone_drives rows carry an FK back to the physical resource drive they were
+// written to; the expanded-row panel must filter on it or it shows the whole
+// tenant's assignments as if they belonged to the expanded drive.
+export const assignmentsForDrive = <T extends { resource_clone_drive_id?: string | null }>(
+  assignments: T[],
+  driveId: string,
+): T[] => assignments.filter((assignment) => assignment.resource_clone_drive_id === driveId);
+
+// resource_clone_drives stores no health/condition-rating columns, so status is
+// the only persisted attention signal — never compare against absent fields.
+const ATTENTION_STATUSES = ['maintenance', 'damaged'];
+
+export const driveNeedsAttention = (drive: { status?: string | null }): boolean =>
+  ATTENTION_STATUSES.includes(drive.status ?? '');
+
 export const CloneDrivesList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [caseIdSearch, setCaseIdSearch] = useState('');
@@ -83,6 +98,7 @@ export const CloneDrivesList: React.FC = () => {
         .select(`
           id,
           case_id,
+          resource_clone_drive_id,
           drive_label,
           serial_number,
           capacity,
@@ -108,6 +124,7 @@ export const CloneDrivesList: React.FC = () => {
       const { data: caseData, error: caseError } = await supabase
         .from('cases')
         .select('id, case_no')
+        .is('deleted_at', null)
         .ilike('case_no', `%${debouncedCaseIdSearch}%`);
 
       if (caseError) throw caseError;
@@ -188,9 +205,7 @@ export const CloneDrivesList: React.FC = () => {
         const availableValue = typeof d.available_space_gb === 'number' ? d.available_space_gb : parseFloat(d.available_space_gb) || 0;
         return sum + (availableValue > 0 ? availableValue : 0);
       }, 0),
-    needsAttention: resourceCloneDrives.filter((d) =>
-      d.condition_rating < 3 || d.health_percentage < 80 || d.status === 'maintenance'
-    ).length,
+    needsAttention: resourceCloneDrives.filter(driveNeedsAttention).length,
   };
 
   const statusOptions = [
@@ -534,7 +549,9 @@ export const CloneDrivesList: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {pagedDrives.map((drive) => (
+                {pagedDrives.map((drive) => {
+                  const driveAssignments = assignmentsForDrive(cloneAssignments, drive.id);
+                  return (
                   <React.Fragment key={drive.id}>
                     <tr
                       className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer"
@@ -670,7 +687,7 @@ export const CloneDrivesList: React.FC = () => {
                                 Health Status
                               </p>
                               <p className="text-sm text-slate-900">
-                                {drive.health_percentage !== null
+                                {typeof drive.health_percentage === 'number'
                                   ? `${drive.health_percentage}%`
                                   : 'Not monitored'}
                               </p>
@@ -726,13 +743,13 @@ export const CloneDrivesList: React.FC = () => {
                                 <p className="text-sm text-slate-700">{drive.notes}</p>
                               </div>
                             )}
-                            {cloneAssignments.length > 0 && (
+                            {driveAssignments.length > 0 && (
                               <div className="col-span-4">
                                 <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">
-                                  Recent Clone Assignments ({cloneAssignments.length})
+                                  Recent Clone Assignments ({driveAssignments.length})
                                 </p>
                                 <div className="grid grid-cols-2 gap-2">
-                                  {cloneAssignments
+                                  {driveAssignments
                                     .slice(0, 6)
                                     .map((assignment: any) => (
                                       <div key={assignment.id} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded">
@@ -760,7 +777,7 @@ export const CloneDrivesList: React.FC = () => {
                                 </div>
                               </div>
                             )}
-                            {(drive.health_percentage < 80 || drive.condition_rating < 3) && (
+                            {driveNeedsAttention(drive) && (
                               <div className="col-span-4">
                                 <div className="flex items-center gap-2 p-3 bg-warning-muted border border-warning/30 rounded-lg">
                                   <AlertCircle className="w-4 h-4 text-warning flex-shrink-0" />
@@ -775,7 +792,8 @@ export const CloneDrivesList: React.FC = () => {
                       </tr>
                     )}
                   </React.Fragment>
-                ))}
+                  );
+                })}
             </tbody>
           </table>
         </div>

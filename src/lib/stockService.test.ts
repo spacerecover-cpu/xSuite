@@ -25,6 +25,7 @@ import {
   getStockItems,
   getLowStockItems,
   fetchAllStockItemsForLabels,
+  createStockItem,
 } from './stockService';
 import { MAX_BULK_LABEL_ITEMS } from './inventoryService';
 
@@ -216,6 +217,70 @@ describe("getStockStats today's-sales bound is a local-timezone instant, not a b
     const expected = new Date();
     expected.setHours(0, 0, 0, 0);
     expect(bound).toBe(expected.toISOString());
+  });
+});
+
+describe("getTodaysSales day window is a local-timezone instant, not a bare UTC date", () => {
+  it('bounds sale_date by local start-of-day and the exclusive next local midnight', async () => {
+    const query = makeQuery([]);
+    from.mockReturnValue(query);
+
+    await getTodaysSales();
+
+    const lower = (query.gte as ReturnType<typeof vi.fn>).mock.calls.find(
+      (c) => c[0] === 'sale_date',
+    )?.[1] as string;
+    // A full timestamptz instant, never a bare 'YYYY-MM-DD' (which anchors to UTC midnight
+    // and drops a whole trading day for UTC- tenants late in the day).
+    expect(lower).toMatch(/T\d{2}:\d{2}/);
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    expect(lower).toBe(start.toISOString());
+
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    expect(query.lt).toHaveBeenCalledWith('sale_date', end.toISOString());
+  });
+});
+
+describe('createStockItem must not create an item with no SKU when the sequence fails', () => {
+  function makeInsertQuery(row: Record<string, unknown> | null) {
+    const builder: Record<string, unknown> = {
+      insert: vi.fn(() => builder),
+      select: vi.fn(() => builder),
+      maybeSingle: vi.fn(() => Promise.resolve({ data: row, error: null })),
+    };
+    return builder;
+  }
+
+  beforeEach(() => rpc.mockReset());
+
+  it('throws on the get_next_number error instead of inserting a NULL sku', async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'sequence missing' } });
+    const query = makeInsertQuery({ id: 'item-1' });
+    from.mockReturnValue(query);
+
+    await expect(createStockItem({ name: 'WD 2TB', tenant_id: 'tenant-1' })).rejects.toBeTruthy();
+    expect(query.insert).not.toHaveBeenCalled();
+  });
+
+  it('throws when the sequence returns no number and the payload carries no sku', async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: null });
+    const query = makeInsertQuery({ id: 'item-1' });
+    from.mockReturnValue(query);
+
+    await expect(createStockItem({ name: 'WD 2TB', tenant_id: 'tenant-1' })).rejects.toBeTruthy();
+    expect(query.insert).not.toHaveBeenCalled();
+  });
+
+  it('inserts the minted sku on the happy path', async () => {
+    rpc.mockResolvedValueOnce({ data: 'STK-0042', error: null });
+    const query = makeInsertQuery({ id: 'item-1', sku: 'STK-0042' });
+    from.mockReturnValue(query);
+
+    await createStockItem({ name: 'WD 2TB', tenant_id: 'tenant-1' });
+
+    expect(query.insert).toHaveBeenCalledWith(expect.objectContaining({ sku: 'STK-0042' }));
   });
 });
 

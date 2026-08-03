@@ -97,10 +97,13 @@ async function resolveRecipientEmail(
     return data.user.email;
   }
   if (sub.recipient_type === "portal_customer" && sub.customer_id) {
+    // Service-role reads bypass RLS, so the soft-delete filter must be explicit —
+    // an archived customer must never receive outbound notification mail.
     const { data, error } = await supabase
       .from("customers_enhanced")
       .select("email")
       .eq("id", sub.customer_id)
+      .is("deleted_at", null)
       .maybeSingle();
     if (error) return null;
     const email = (data as { email?: string } | null)?.email;

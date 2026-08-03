@@ -64,6 +64,20 @@ export default function ContactFormModal({ isOpen, onClose, onSuccess, supplierI
     }
   }, [isOpen, contact]);
 
+  // supplier_contacts has no single-primary constraint, so the previous primary
+  // has to be demoted explicitly once the new one is written.
+  const demoteOtherPrimaries = async (contactId: string) => {
+    const { error } = await supabase
+      .from('supplier_contacts')
+      .update({ is_primary: false, updated_at: new Date().toISOString() })
+      .eq('supplier_id', supplierId)
+      .eq('is_primary', true)
+      .neq('id', contactId)
+      .is('deleted_at', null);
+
+    if (error) throw error;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -88,11 +102,12 @@ export default function ContactFormModal({ isOpen, onClose, onSuccess, supplierI
           .eq('id', contact.id);
 
         if (error) throw error;
+        if (formData.is_primary) await demoteOtherPrimaries(contact.id);
         toast.success('Contact updated successfully');
       } else {
         const tenantId = await resolveTenantId();
 
-        const { error } = await supabase
+        const { data: inserted, error } = await supabase
           .from('supplier_contacts')
           .insert({
             tenant_id: tenantId,
@@ -104,9 +119,12 @@ export default function ContactFormModal({ isOpen, onClose, onSuccess, supplierI
             mobile: formData.mobile || null,
             notes: formData.notes || null,
             is_primary: formData.is_primary,
-          });
+          })
+          .select('id')
+          .maybeSingle();
 
         if (error) throw error;
+        if (formData.is_primary && inserted?.id) await demoteOtherPrimaries(inserted.id);
         toast.success('Contact added successfully');
       }
 

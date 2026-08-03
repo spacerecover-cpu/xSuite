@@ -131,18 +131,28 @@ export const CompanyProfilePage: React.FC = () => {
     enabled: !!id,
   });
 
+  // Communications are fetched for every customer linked to this company, so the
+  // derived id list is part of the cache identity — without it the query keeps
+  // serving results computed from a stale contacts list after a contact is
+  // added/removed. Sorted so the key is stable regardless of contact ordering.
+  const contactCustomerIds = React.useMemo(
+    () =>
+      contacts
+        .map(c => c.customers_enhanced?.id)
+        .filter((v): v is string => Boolean(v))
+        .sort(),
+    [contacts]
+  );
+
   const { data: communications = [] } = useQuery({
-    queryKey: ['company_communications', id],
+    queryKey: ['company_communications', id, contactCustomerIds],
     queryFn: async () => {
-      if (!id) return [];
-      // Fetch communications for all customers linked to this company
-      const customerIds = contacts.map(c => c.customers_enhanced?.id).filter((v): v is string => Boolean(v));
-      if (customerIds.length === 0) return [];
+      if (!id || contactCustomerIds.length === 0) return [];
 
       const { data, error } = await supabase
         .from('customer_communications')
         .select('*')
-        .in('customer_id', customerIds)
+        .in('customer_id', contactCustomerIds)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -175,7 +185,7 @@ export const CompanyProfilePage: React.FC = () => {
 
       return rows;
     },
-    enabled: !!id && contacts.length > 0,
+    enabled: !!id && contactCustomerIds.length > 0,
   });
 
   const { data: companyInsights = {

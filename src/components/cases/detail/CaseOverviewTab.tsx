@@ -485,7 +485,9 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
                   </div>
                 ) : (
                   <select
-                    value={caseData.priority ?? ''}
+                    // Option values are lowercased priority names; stored priority
+                    // can be mixed-case (imports/seed), so normalize to preselect.
+                    value={caseData.priority?.toLowerCase() ?? ''}
                     onChange={(e) => { onUpdatePriority(e.target.value); setIsEditingPriority(false); }}
                     className="text-xs px-2 py-1 border border-warning/40 rounded bg-white focus:outline-none focus:ring-2 focus:ring-warning"
                     autoFocus

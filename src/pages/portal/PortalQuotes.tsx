@@ -41,6 +41,16 @@ interface QuoteItem {
   total_price: number;
 }
 
+/**
+ * The RPC failures we need to surface are PostgrestError objects (thrown by the
+ * mutationFn), which carry `message` but are not `Error` instances — so an
+ * `instanceof Error` check alone would drop the server's reason.
+ */
+const toErrorMessage = (err: unknown, fallback: string): string => {
+  const message = (err as { message?: unknown } | null | undefined)?.message;
+  return typeof message === 'string' && message.trim() ? message : fallback;
+};
+
 export const PortalQuotes: React.FC = () => {
   const { t } = useTranslation();
   const { customer } = usePortalAuth();
@@ -51,6 +61,7 @@ export const PortalQuotes: React.FC = () => {
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [response, setResponse] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = t('portal.quotes.tabTitle');
@@ -122,6 +133,19 @@ export const PortalQuotes: React.FC = () => {
       setIsApproveModalOpen(false);
       setIsDetailModalOpen(false);
       setResponse('');
+      setActionError(null);
+    },
+    onError: (err: unknown) => {
+      // Keep the approve modal open so the customer can see why their decision
+      // was not recorded and retry.
+      setActionError(
+        toErrorMessage(
+          err,
+          t('portal.quotes.approveModal.error', {
+            defaultValue: 'Could not approve this quote. Please try again.',
+          }),
+        ),
+      );
     },
   });
 
@@ -141,6 +165,17 @@ export const PortalQuotes: React.FC = () => {
       setIsRejectModalOpen(false);
       setIsDetailModalOpen(false);
       setResponse('');
+      setActionError(null);
+    },
+    onError: (err: unknown) => {
+      setActionError(
+        toErrorMessage(
+          err,
+          t('portal.quotes.rejectModal.error', {
+            defaultValue: 'Could not reject this quote. Please try again.',
+          }),
+        ),
+      );
     },
   });
 
@@ -161,17 +196,20 @@ export const PortalQuotes: React.FC = () => {
 
   const handleViewDetails = (quote: Quote) => {
     setSelectedQuote(quote);
+    setActionError(null);
     setIsDetailModalOpen(true);
   };
 
   const handleApprove = () => {
     if (selectedQuote) {
+      setActionError(null);
       approveMutation.mutate({ quoteId: selectedQuote.id });
     }
   };
 
   const handleReject = () => {
     if (selectedQuote) {
+      setActionError(null);
       rejectMutation.mutate({ quoteId: selectedQuote.id, response });
     }
   };
@@ -345,6 +383,7 @@ export const PortalQuotes: React.FC = () => {
                 <Button
                   variant="danger"
                   onClick={() => {
+                    setActionError(null);
                     setIsDetailModalOpen(false);
                     setIsRejectModalOpen(true);
                   }}
@@ -355,6 +394,7 @@ export const PortalQuotes: React.FC = () => {
                 <Button
                   variant="success"
                   onClick={() => {
+                    setActionError(null);
                     setIsDetailModalOpen(false);
                     setIsApproveModalOpen(true);
                   }}
@@ -468,6 +508,7 @@ export const PortalQuotes: React.FC = () => {
         onClose={() => {
           setIsApproveModalOpen(false);
           setResponse('');
+          setActionError(null);
         }}
         title={t('portal.quotes.approveModal.title')}
       >
@@ -475,12 +516,18 @@ export const PortalQuotes: React.FC = () => {
           <p className="text-slate-700">
             {t('portal.quotes.approveModal.body')}
           </p>
+          {actionError && (
+            <div role="alert" className="rounded-lg border border-danger/30 bg-danger-muted p-3 text-sm text-danger">
+              {actionError}
+            </div>
+          )}
           <div className="flex gap-3 justify-end pt-4 border-t">
             <Button
               variant="secondary"
               onClick={() => {
                 setIsApproveModalOpen(false);
                 setResponse('');
+                setActionError(null);
               }}
             >
               {t('portal.quotes.approveModal.cancel')}
@@ -501,6 +548,7 @@ export const PortalQuotes: React.FC = () => {
         onClose={() => {
           setIsRejectModalOpen(false);
           setResponse('');
+          setActionError(null);
         }}
         title={t('portal.quotes.rejectModal.title')}
       >
@@ -520,12 +568,18 @@ export const PortalQuotes: React.FC = () => {
               placeholder={t('portal.quotes.rejectModal.reasonPlaceholder')}
             />
           </div>
+          {actionError && (
+            <div role="alert" className="rounded-lg border border-danger/30 bg-danger-muted p-3 text-sm text-danger">
+              {actionError}
+            </div>
+          )}
           <div className="flex gap-3 justify-end pt-4 border-t">
             <Button
               variant="secondary"
               onClick={() => {
                 setIsRejectModalOpen(false);
                 setResponse('');
+                setActionError(null);
               }}
             >
               {t('portal.quotes.rejectModal.cancel')}

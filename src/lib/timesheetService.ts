@@ -44,11 +44,14 @@ export interface TimesheetSummaryRow {
 }
 
 async function appendReviewNote(id: string, label: string, reviewNote: string): Promise<string> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('timesheets')
     .select('notes')
     .eq('id', id)
     .maybeSingle();
+  // A failed read must abort the review: treating it as "no existing notes" would
+  // make the caller's UPDATE replace the employee's note with just the review line.
+  if (error) throw error;
   const existing = (data?.notes ?? '').trim();
   const line = `[${label}] ${reviewNote}`;
   return existing ? `${existing}\n\n${line}` : line;

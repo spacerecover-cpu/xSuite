@@ -99,4 +99,33 @@ describe('DeviceCheckoutModal', () => {
       expect.objectContaining({ p_recovery_outcome: 'partial' }),
     );
   });
+
+  it('labels each row with its real custody role instead of calling the first device "Patient"', () => {
+    // The list mixes customer-owned patient media with lab-supplied donor
+    // drives; labelling row 0 "Patient" unconditionally hid that distinction,
+    // so an operator could hand a donor drive to the customer unaware.
+    renderModal({
+      devices: [
+        {
+          id: 'dev-donor',
+          device_type: { name: 'HDD' },
+          brand: { name: 'Seagate' },
+          model: 'ST4000',
+          serial_number: 'DONOR-1',
+          device_role: { name: 'Donor' },
+        },
+        {
+          id: 'dev-patient',
+          device_type: { name: 'HDD' },
+          brand: { name: 'WD' },
+          model: 'WD40',
+          serial_number: 'PATIENT-1',
+          device_role: { name: 'Patient' },
+        },
+      ],
+    });
+
+    expect(screen.getByText('Donor')).toBeInTheDocument();
+    expect(screen.getByText('Patient')).toBeInTheDocument();
+  });
 });

@@ -7,6 +7,7 @@ import { Card } from '../../ui/Card';
 import { Modal } from '../../ui/Modal';
 import { EngineerSelector } from '../EngineerSelector';
 import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/useToast';
 import { useConfirm } from '../../../hooks/useConfirm';
 import { formatDate } from '@/lib/format';
@@ -31,6 +32,10 @@ export const CaseEngineersTab: React.FC<CaseEngineersTabProps> = ({ caseId, case
   const toast = useToast();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
+  const { profile } = useAuth();
+  // Mirrors the case_engineers DELETE policy (has_role('admin') => owner|admin);
+  // showing the control to anyone else only produces a removal that silently no-ops.
+  const canRemoveEngineer = ['owner', 'admin'].includes(profile?.role ?? '');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedEngineerId, setSelectedEngineerId] = useState<string | null>(null);
   const [roleText, setRoleText] = useState('');
@@ -89,8 +94,18 @@ export const CaseEngineersTab: React.FC<CaseEngineersTabProps> = ({ caseId, case
 
   const removeEngineerMutation = useMutation({
     mutationFn: async (assignmentId: string) => {
-      const { error } = await supabase.from('case_engineers').delete().eq('id', assignmentId);
+      // The DELETE policy is admin-only; a policy miss returns no error, just zero
+      // rows. Select the id back so a blocked removal surfaces as a failure rather
+      // than a success toast followed by the row reappearing on refetch.
+      const { data, error } = await supabase
+        .from('case_engineers')
+        .delete()
+        .eq('id', assignmentId)
+        .select('id');
       if (error) throw error;
+      if ((data ?? []).length === 0) {
+        throw new Error('You do not have permission to remove this assignment');
+      }
     },
     onSuccess: () => {
       toast.success('Engineer removed from case');
@@ -106,6 +121,10 @@ export const CaseEngineersTab: React.FC<CaseEngineersTabProps> = ({ caseId, case
       toast.error('Please select an engineer');
       return;
     }
+    if (caseEngineers.some((a) => a.user_id === selectedEngineerId)) {
+      toast.error('That engineer is already assigned to this case');
+      return;
+    }
     addEngineerMutation.mutate({ engineerId: selectedEngineerId, role: roleText });
   };
 
@@ -114,6 +133,9 @@ export const CaseEngineersTab: React.FC<CaseEngineersTabProps> = ({ caseId, case
     setRemovingId(assignmentId);
     try {
       await removeEngineerMutation.mutateAsync(assignmentId);
+    } catch {
+      // onError already surfaces the toast; swallow so the rejection from
+      // mutateAsync does not escape as an unhandled promise rejection.
     } finally {
       setRemovingId(null);
     }
@@ -173,19 +195,21 @@ export const CaseEngineersTab: React.FC<CaseEngineersTabProps> = ({ caseId, case
                           {resolved.role}
                         </Badge>
                       )}
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handleRemove(assignment.id, fullName)}
-                        disabled={removingId === assignment.id}
-                        title="Remove engineer"
-                      >
-                        {removingId === assignment.id ? (
-                          <div className="w-3 h-3 border border-danger border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Trash2 className="w-3 h-3 text-danger" />
-                        )}
-                      </Button>
+                      {canRemoveEngineer && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleRemove(assignment.id, fullName)}
+                          disabled={removingId === assignment.id}
+                          title="Remove engineer"
+                        >
+                          {removingId === assignment.id ? (
+                            <div className="w-3 h-3 border border-danger border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3 h-3 text-danger" />
+                          )}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 );

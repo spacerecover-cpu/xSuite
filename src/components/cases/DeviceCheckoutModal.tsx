@@ -15,6 +15,7 @@ import {
   ewayBillGuidance,
   LAB_SUPPLIED_GOODS_GUIDANCE,
 } from '../../lib/regimes/in_gst/deliveryChallan';
+import { getSimpleRoleLabel } from '../../lib/pdf/styles';
 
 interface Device {
   id: string;
@@ -27,6 +28,8 @@ interface Device {
   serial_number: string | null;
   /** Per-device checkout state — non-null when this device was already collected. */
   checked_out_at?: string | null;
+  /** catalog_device_roles embed — Patient / Backup / Donor / Clone. */
+  device_role?: { name: string } | null;
 }
 
 type CollectorRelationship = 'self' | 'authorized_agent' | 'company_rep' | 'courier';
@@ -42,6 +45,19 @@ const RECOVERY_OUTCOMES = ['full', 'partial', 'unrecoverable', 'declined'] as co
  *  unrecognized value). */
 function seedRecoveryOutcome(current?: string | null): string {
   return current && (RECOVERY_OUTCOMES as readonly string[]).includes(current) ? current : 'full';
+}
+
+/** Custody role shown on each checkout row. The list mixes customer-owned
+ *  patient media with lab-supplied donor/backup/clone drives, so the operator
+ *  must be able to tell them apart BEFORE recording a handover — labelling the
+ *  first row "Patient" unconditionally hid that distinction. A role-less intake
+ *  device is the patient by convention (mirrors isCustomerOwnedRole). Roles are
+ *  labelled, not filtered out: the DB close gate requires EVERY case_device to
+ *  carry checked_out_at, so hiding a device would make the case unclosable. */
+function deviceRoleLabel(device: Device, index: number): string | null {
+  const role = getSimpleRoleLabel(device.device_role?.name);
+  if (role !== '-') return role;
+  return index === 0 ? 'Patient' : null;
 }
 
 /** Compact "Returned · 20 Jun 2026" badge date for an already-collected device. */
@@ -283,6 +299,7 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
           <div className="space-y-2">
             {devices.map((device, index) => {
               const returned = !!device.checked_out_at;
+              const roleLabel = deviceRoleLabel(device, index);
               return (
                 <label
                   key={device.id}
@@ -304,9 +321,16 @@ export const DeviceCheckoutModal: React.FC<DeviceCheckoutModalProps> = ({
                     <div className="font-semibold text-slate-900">
                       {device.device_type?.name || 'Unknown Device'}{' '}
                       {device.brand?.name && `- ${device.brand.name}`}
-                      {index === 0 && (
-                        <span className="ml-2 text-xs bg-danger-muted text-danger px-2 py-0.5 rounded">
-                          Patient
+                      {roleLabel && (
+                        <span
+                          className={[
+                            'ml-2 text-xs px-2 py-0.5 rounded',
+                            roleLabel === 'Patient'
+                              ? 'bg-danger-muted text-danger'
+                              : 'bg-warning-muted text-warning-foreground',
+                          ].join(' ')}
+                        >
+                          {roleLabel}
                         </span>
                       )}
                       {returned && (

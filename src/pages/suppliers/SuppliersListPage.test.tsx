@@ -12,7 +12,14 @@ import SuppliersListPage from './SuppliersListPage';
 // never the raw native total_amount — otherwise a multi-currency tenant adds
 // e.g. OMR to EUR under one symbol.
 
-const { poSelectSpy, poIsSpy } = vi.hoisted(() => ({ poSelectSpy: vi.fn(), poIsSpy: vi.fn() }));
+const { poSelectSpy, poIsSpy, supplierSelectSpy, supplierRows } = vi.hoisted(() => ({
+  poSelectSpy: vi.fn(),
+  poIsSpy: vi.fn(),
+  supplierSelectSpy: vi.fn(),
+  // Mutable holder so the Location-column test can seed rows without changing
+  // what the Total Spend tests see (they rely on an empty suppliers list).
+  supplierRows: { current: [] as Record<string, unknown>[] },
+}));
 
 vi.mock('../../hooks/useToast', () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn() }),
@@ -63,11 +70,24 @@ vi.mock('../../lib/supabaseClient', () => {
       });
     return chain;
   };
+  // suppliers serves both the paged list and the head:count stat queries; the
+  // select string is captured to assert the geo_* embeds that back the Location
+  // column are actually requested.
+  const suppliersChain = () => {
+    const chain = thenableChain({
+      data: supplierRows.current,
+      count: supplierRows.current.length,
+      error: null,
+    }) as Record<string, unknown>;
+    chain.select = supplierSelectSpy.mockReturnValue(chain);
+    return chain;
+  };
   return {
     supabase: {
       from: vi.fn((table: string) => {
         if (table === 'purchase_orders') return purchaseOrdersChain();
         if (table === 'master_supplier_categories') return thenableChain({ data: [], error: null });
+        if (table === 'suppliers') return suppliersChain();
         return thenableChain({ data: [], count: 0, error: null });
       }),
       // uiPrefsService (collapsible-KPI preference) reads the session user.
@@ -93,6 +113,7 @@ describe('SuppliersListPage — Total Spend must sum base currency', () => {
   beforeEach(() => {
     poSelectSpy.mockReset();
     poIsSpy.mockReset();
+    supplierRows.current = [];
   });
 
   it('sums total_amount_base across mixed-currency POs, never the raw native total', async () => {
@@ -117,5 +138,51 @@ describe('SuppliersListPage — Total Spend must sum base currency', () => {
     renderPage();
 
     await waitFor(() => expect(poIsSpy).toHaveBeenCalledWith('deleted_at', null));
+  });
+});
+
+// suppliers stores location as FK ids (city_id/country_id), so the Location
+// column can only render if the query embeds geo_cities/geo_countries and the
+// row mapping reads the resolved names.
+describe('SuppliersListPage — Location column resolves city/country FKs', () => {
+  beforeEach(() => {
+    supplierSelectSpy.mockReset();
+    supplierRows.current = [
+      {
+        id: 'sup-1',
+        supplier_number: 'SUP-0001',
+        name: 'Gulf Components',
+        email: null,
+        phone: null,
+        is_active: true,
+        created_at: '2026-01-05T10:00:00Z',
+        category_id: null,
+        category: null,
+        payment_terms: null,
+        geo_cities: { name: 'Muscat' },
+        geo_countries: { name: 'Oman' },
+      },
+    ];
+  });
+
+  it('embeds the geo_* relations in the suppliers query', async () => {
+    renderPage();
+
+    await waitFor(() =>
+      expect(supplierSelectSpy).toHaveBeenCalledWith(
+        expect.stringContaining('geo_cities(name)'),
+        expect.anything(),
+      ),
+    );
+    expect(supplierSelectSpy).toHaveBeenCalledWith(
+      expect.stringContaining('geo_countries(name)'),
+      expect.anything(),
+    );
+  });
+
+  it('renders the resolved city and country instead of a placeholder dash', async () => {
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText('Muscat, Oman')).toBeInTheDocument());
   });
 });

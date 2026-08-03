@@ -63,6 +63,39 @@ describe('normalizeDateCell', () => {
     expect(normalizeDateCell('45 AUG 2021')).toBeNull(); // day 45
     expect(normalizeDateCell('13/2015')).toBeNull(); // month 13
   });
+
+  // Regression: a day that does not exist in its month used to be emitted verbatim
+  // ("2020-02-31"). new Date() rolls it over so the dry-run passed, then Postgres ::date
+  // rejected it at import.
+  it.each(['31/02/2020', '31 FEB 2020', '30/02/2019', '31/04/2021', '29/02/2019'])(
+    'drops impossible calendar date %p',
+    (v) => {
+      expect(normalizeDateCell(v)).toBeNull();
+    },
+  );
+
+  it('keeps a real leap day', () => {
+    expect(normalizeDateCell('29/02/2020')).toBe('2020-02-29');
+    expect(normalizeDateCell('29 FEB 2000')).toBe('2000-02-29');
+  });
+
+  // Regression: day-first-only parsing nulled US-format values (month>12 as a "day"),
+  // silently losing the date with no validation issue.
+  it.each([
+    ['12/25/2020', '2020-12-25'],
+    ['1/31/2019', '2019-01-31'],
+    ['06-15-2018', '2018-06-15'],
+  ])('falls back to month-first for %p → %p', (input, expected) => {
+    expect(normalizeDateCell(input)).toBe(expected);
+  });
+
+  it('keeps day-first when both components are plausible months', () => {
+    expect(normalizeDateCell('11/04/2021')).toBe('2021-04-11');
+  });
+
+  it('still drops a value that is impossible in both orders', () => {
+    expect(normalizeDateCell('25/25/2020')).toBeNull();
+  });
 });
 
 describe('normalizeInvoiceStatus', () => {

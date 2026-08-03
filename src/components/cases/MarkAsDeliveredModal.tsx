@@ -57,12 +57,16 @@ export const MarkAsDeliveredModal: React.FC<MarkAsDeliveredModalProps> = ({
 }) => {
   const [updateCaseStatus, setUpdateCaseStatus] = useState(casePhase !== 'delivered');
   const [deliveryNotes, setDeliveryNotes] = useState('');
-  const [retentionDays, setRetentionDays] = useState(clone?.retention_days || 180);
+  // Held as the raw string the operator typed. Coercing on every keystroke with
+  // `parseInt(v) || 180` rewrote a transient empty field — and a deliberate 0 —
+  // back to the 180-day default, so the retention countdown silently disagreed
+  // with what was entered. An out-of-range entry now blocks confirmation instead.
+  const [retentionInput, setRetentionInput] = useState(String(clone?.retention_days || 180));
   const retentionInputRef = useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (clone) {
-      setRetentionDays(clone.retention_days || 180);
+      setRetentionInput(String(clone.retention_days || 180));
     }
   }, [clone]);
 
@@ -74,10 +78,15 @@ export const MarkAsDeliveredModal: React.FC<MarkAsDeliveredModalProps> = ({
   const displaySerial = clone.resource_clone_drive?.serial_number || clone.physical_drive_serial || '';
 
   const deliveryDate = new Date();
-  const retentionDeadline = new Date(deliveryDate.getTime() + retentionDays * 24 * 60 * 60 * 1000);
+  const parsedRetentionDays = parseInt(retentionInput, 10);
+  const retentionDaysValid = Number.isFinite(parsedRetentionDays) && parsedRetentionDays >= 1;
+  const retentionDeadline = retentionDaysValid
+    ? new Date(deliveryDate.getTime() + parsedRetentionDays * 24 * 60 * 60 * 1000)
+    : null;
 
   const handleConfirm = () => {
-    onConfirm(updateCaseStatus, deliveryNotes, retentionDays);
+    if (!retentionDaysValid) return;
+    onConfirm(updateCaseStatus, deliveryNotes, parsedRetentionDays);
   };
 
   return (
@@ -197,14 +206,20 @@ export const MarkAsDeliveredModal: React.FC<MarkAsDeliveredModalProps> = ({
                       ref={retentionInputRef}
                       type="number"
                       min="1"
-                      value={retentionDays}
-                      onChange={(e) => setRetentionDays(parseInt(e.target.value) || 180)}
+                      value={retentionInput}
+                      onChange={(e) => setRetentionInput(e.target.value)}
                       disabled={isLoading}
                       className="w-full"
                     />
-                    <div className="text-xs text-warning mt-1">
-                      Eligible for deletion after: {formatDate(retentionDeadline.toISOString())}
-                    </div>
+                    {retentionDeadline ? (
+                      <div className="text-xs text-warning mt-1">
+                        Eligible for deletion after: {formatDate(retentionDeadline.toISOString())}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-danger mt-1">
+                        Enter a retention period of at least 1 day.
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -259,7 +274,7 @@ export const MarkAsDeliveredModal: React.FC<MarkAsDeliveredModalProps> = ({
             </Button>
             <Button
               onClick={handleConfirm}
-              disabled={isLoading}
+              disabled={isLoading || !retentionDaysValid}
               style={{ backgroundColor: 'rgb(var(--color-success))' }}
               className="flex items-center gap-2"
             >

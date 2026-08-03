@@ -28,9 +28,15 @@ export const BarcodeLookupInput: React.FC<Props> = ({
   const [isLooking, setIsLooking] = useState(false);
   const [lastResult, setLastResult] = useState<LookupResult | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const latestRequestRef = useRef(0);
 
   const performLookup = async (barcode: string) => {
     if (!barcode.trim()) return;
+    // A barcode gun can fire the next scan before this lookup resolves. Every
+    // result is still handed to the parent (no scan is silently dropped), but a
+    // superseded lookup must not touch input/spinner state a newer scan owns.
+    const requestId = ++latestRequestRef.current;
+    const isLatest = () => requestId === latestRequestRef.current;
     setIsLooking(true);
     try {
       const [item, serial] = await Promise.all([
@@ -38,11 +44,11 @@ export const BarcodeLookupInput: React.FC<Props> = ({
         getSerialNumberByBarcode(barcode),
       ]);
 
-      setLastResult({ item, serial });
+      if (isLatest()) setLastResult({ item, serial });
 
       if (item && onItemFound) {
         onItemFound(item);
-        setValue('');
+        if (isLatest()) setValue('');
         return;
       }
 
@@ -53,7 +59,7 @@ export const BarcodeLookupInput: React.FC<Props> = ({
         } else {
           onSerialFound(serial, item);
         }
-        setValue('');
+        if (isLatest()) setValue('');
         return;
       }
 
@@ -63,7 +69,7 @@ export const BarcodeLookupInput: React.FC<Props> = ({
     } catch (err) {
       toast.error('Lookup failed');
     } finally {
-      setIsLooking(false);
+      if (isLatest()) setIsLooking(false);
     }
   };
 

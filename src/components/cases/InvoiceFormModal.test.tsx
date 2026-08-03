@@ -276,6 +276,46 @@ describe('InvoiceFormModal — discount clamping', () => {
   });
 });
 
+describe('InvoiceFormModal — case picker excludes soft-deleted cases', () => {
+  const originalFrom = vi.mocked(supabase.from).getMockImplementation();
+  afterEach(() => {
+    if (originalFrom) vi.mocked(supabase.from).mockImplementation(originalFrom);
+  });
+
+  it('filters deleted_at on the case list query', async () => {
+    const casesFilters: unknown[][] = [];
+    const recordingChain = (table: string, list: unknown[]) => {
+      const chain: Record<string, unknown> = {};
+      for (const m of ['select', 'eq', 'order', 'limit', 'in']) chain[m] = vi.fn(() => chain);
+      chain.is = vi.fn((...args: unknown[]) => {
+        if (table === 'cases') casesFilters.push(args);
+        return chain;
+      });
+      chain.maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+      chain.then = (resolve: (v: unknown) => unknown) => resolve({ data: list, error: null });
+      return chain;
+    };
+
+    vi.mocked(supabase.from).mockImplementation(((table: string) =>
+      recordingChain(
+        table,
+        table === 'cases'
+          ? [{ id: 'case-1', case_no: 'CASE-0001', title: 'Live case', customer_id: null, company_id: null }]
+          : [],
+      )) as unknown as typeof supabase.from);
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    // No caseId: the header Case picker (and its `cases_for_invoice` query) renders.
+    render(
+      <QueryClientProvider client={client}>
+        <InvoiceFormModal isOpen onClose={() => {}} onSave={vi.fn().mockResolvedValue(undefined)} />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(casesFilters).toContainEqual(['deleted_at', null]));
+  });
+});
+
 describe('InvoiceFormModal — edits survive a parent re-render', () => {
   it('does not re-seed the form when the caller rebuilds initialData', async () => {
     const user = userEvent.setup();

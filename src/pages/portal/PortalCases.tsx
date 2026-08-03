@@ -110,7 +110,8 @@ export const PortalCases: React.FC = () => {
       const { data, error } = await supabase
         .from('case_devices')
         .select('id, model, serial_number, symptoms, diagnosis')
-        .eq('case_id', selectedCase.id);
+        .eq('case_id', selectedCase.id)
+        .is('deleted_at', null);
 
       if (error) throw error;
       return data ?? [];

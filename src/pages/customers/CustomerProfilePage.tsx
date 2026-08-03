@@ -123,6 +123,7 @@ export const CustomerProfilePage: React.FC = () => {
           geo_cities (id, name)
         `)
         .eq('id', id)
+        .is('deleted_at', null)
         .maybeSingle();
 
       if (error) throw error;

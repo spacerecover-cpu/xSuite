@@ -217,29 +217,54 @@ Deno.serve(async (req: Request) => {
         }
 
         console.log(`[CREATE USER] Orphaned auth user found, updating profile for ${body.email}`);
-        const { error: updateError } = await supabaseClient
+        // Bind the recovered account to the caller's tenant. A true orphan has
+        // tenant_id NULL, and an update that left it NULL produced a "created"
+        // user that can never log in (get_current_tenant_id() resolves nothing).
+        // A platform admin has no tenant of their own, so keep whatever tenant
+        // the account is already bound to rather than detaching it.
+        const boundTenantId = callerProfile.tenant_id ?? authUserProfile?.tenant_id ?? null;
+        // upsert, not update: an auth user with NO profile row at all made
+        // .update().eq(id) match zero rows and return no error, so the function
+        // reported success while no usable account existed.
+        const { error: upsertError } = await supabaseClient
           .from("profiles")
-          .update({
-            full_name: body.full_name,
-            role: body.role,
-            phone: body.phone || null,
-            is_active: body.is_active,
-            case_access_level: body.case_access_level || "restricted",
-            password_reset_required: false,
-          })
-          .eq("id", existingAuthUser.id);
+          .upsert(
+            {
+              id: existingAuthUser.id,
+              email: body.email,
+              tenant_id: boundTenantId,
+              full_name: body.full_name,
+              role: body.role,
+              phone: body.phone || null,
+              is_active: body.is_active,
+              case_access_level: body.case_access_level || "restricted",
+              password_reset_required: false,
+            },
+            { onConflict: "id" }
+          );
 
-        if (updateError) {
-          throw new Error(`Failed to update profile: ${updateError.message}`);
+        if (upsertError) {
+          throw new Error(`Failed to update profile: ${upsertError.message}`);
         }
 
         try {
-          const { error: auditError } = await supabaseClient.rpc("log_audit_trail", {
-            p_action_type: "create",
-            p_table_name: "profiles",
+          // log_audit_trail's parameters are p_record_type/p_record_id/p_action —
+          // p_action_type/p_table_name never existed, so every call errored out.
+          // It also has a 6-arg and an 8-arg overload sharing the same first six
+          // params, so anything short of the full 8-arg named form raises 42725
+          // "function is not unique". And it stamps tenant_id/performed_by from
+          // get_current_tenant_id()/auth.uid(), which resolve to NULL under the
+          // service-role client — so the call must go through userClient (the
+          // caller's JWT) to land a tenant-scoped, actor-stamped audit row.
+          const { error: auditError } = await userClient.rpc("log_audit_trail", {
+            p_record_type: "profiles",
             p_record_id: existingAuthUser.id,
+            p_action: "create",
             p_old_values: {},
             p_new_values: { full_name: body.full_name, role: body.role, email: body.email },
+            p_changed_fields: null,
+            p_ip_address: null,
+            p_user_agent: null,
           });
           if (auditError) {
             console.error(
@@ -300,6 +325,9 @@ Deno.serve(async (req: Request) => {
           {
             id: authData.user.id,
             email: body.email,
+            // Mirror the createUser metadata: if the trigger never ran, the insert
+            // branch of this fallback would otherwise leave the owner tenant-less.
+            tenant_id: callerProfile.tenant_id,
             full_name: body.full_name,
             role: body.role,
             phone: body.phone || null,
@@ -317,12 +345,16 @@ Deno.serve(async (req: Request) => {
       }
 
       try {
-        const { error: auditError } = await supabaseClient.rpc("log_audit_trail", {
-          p_action_type: "create",
-          p_table_name: "profiles",
+        // 8-arg named form via userClient — see the orphan-path call above.
+        const { error: auditError } = await userClient.rpc("log_audit_trail", {
+          p_record_type: "profiles",
           p_record_id: authData.user.id,
+          p_action: "create",
           p_old_values: {},
           p_new_values: { full_name: body.full_name, role: body.role, email: body.email },
+          p_changed_fields: null,
+          p_ip_address: null,
+          p_user_agent: null,
         });
         if (auditError) {
           console.error(
@@ -384,12 +416,16 @@ Deno.serve(async (req: Request) => {
       if (profileError) throw new Error(`Failed to update profile: ${profileError.message}`);
 
       try {
-        const { error: auditError } = await supabaseClient.rpc("log_audit_trail", {
-          p_action_type: "update",
-          p_table_name: "profiles",
+        // 8-arg named form via userClient — see the create-user call above.
+        const { error: auditError } = await userClient.rpc("log_audit_trail", {
+          p_record_type: "profiles",
           p_record_id: body.userId,
+          p_action: "update",
           p_old_values: {},
           p_new_values: { password_reset_initiated: true },
+          p_changed_fields: null,
+          p_ip_address: null,
+          p_user_agent: null,
         });
         if (auditError) {
           console.error(

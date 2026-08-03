@@ -239,6 +239,10 @@ export async function getLabelEntityConfig(entity: LabelEntity): Promise<LabelEn
 }
 
 export async function setLabelPrintingPrefs(next: LabelPrintingPrefs): Promise<void> {
+  // The whole metadata column is rewritten below, so the merge base must be
+  // fresh: a cached read (up to 5 min old, invalidated only in the writing tab)
+  // would resurrect sibling buckets — e.g. table_columns — changed elsewhere.
+  invalidateCompanySettingsCache();
   const settings = await getOrCreateCompanySettings();
   const metadata = {
     ...((settings.metadata ?? {}) as Record<string, unknown>),

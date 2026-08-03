@@ -67,7 +67,7 @@ export const StockListPage: React.FC = () => {
   const { formatCurrency } = useCurrency();
   const currency = useCurrencyConfig();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const toast = useToast();
 
@@ -103,11 +103,16 @@ export const StockListPage: React.FC = () => {
   const [locationName, setLocationName] = useState('');
   const [companyName, setCompanyName] = useState('');
 
+  // Deep link: /stock?filter=low-stock. The low-stock alert banner links here while
+  // this page is already mounted, so the effect must re-run on every param change —
+  // and strip the param afterwards so it can't re-assert the tab on later renders.
   useEffect(() => {
-    if (searchParams.get('filter') === 'low-stock') {
-      setActiveTab('low_stock');
-    }
-  }, []);
+    if (searchParams.get('filter') !== 'low-stock') return;
+    setActiveTab('low_stock');
+    const next = new URLSearchParams(searchParams);
+    next.delete('filter');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);

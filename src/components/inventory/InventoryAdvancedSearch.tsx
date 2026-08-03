@@ -35,6 +35,18 @@ function hasAdvancedValues(v: AdvancedSearchValues): boolean {
   return advancedKeys.some(k => Boolean(v[k]));
 }
 
+/**
+ * `inventory_search_templates` is shared with the Donor Search page and has no
+ * discriminator column. Donor templates always serialize the donor-only keys
+ * (`brand_id`/`model`), which this surface has no field for — loading one would
+ * blank every advanced criterion the operator had typed, so they are kept out of
+ * this surface's saved-search list.
+ */
+export function isDonorSearchTemplate(criteria: InventorySearchTemplate['criteria']): boolean {
+  if (!criteria || typeof criteria !== 'object' || Array.isArray(criteria)) return false;
+  return 'brand_id' in criteria || 'model' in criteria;
+}
+
 function countActiveAdvanced(v: AdvancedSearchValues): number {
   return [
     v.device_type_id, v.pcb_number, v.firmware, v.controller,
@@ -58,7 +70,7 @@ export function InventoryAdvancedSearch({ values, onChange, deviceTypes, locatio
 
   const loadTemplates = async () => {
     const data = await getInventorySearchTemplates();
-    setTemplates(data);
+    setTemplates(data.filter(t => !isDonorSearchTemplate(t.criteria)));
   };
 
   const handleField = (key: keyof AdvancedSearchValues, value: string) => {

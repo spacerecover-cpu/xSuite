@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CompanyFormModal, type CompanyEditData } from './CompanyFormModal';
 
@@ -12,7 +13,18 @@ vi.mock('../../lib/companyService', () => ({
 }));
 
 vi.mock('../../lib/pickerSearch', () => ({
-  useCustomerPickerRows: () => ({ rows: [], onSearchTermChange: vi.fn() }),
+  useCustomerPickerRows: () => ({
+    rows: [
+      {
+        id: 'cust-1',
+        customer_number: 'CUST-0142',
+        customer_name: 'John Doe',
+        email: 'john@acme.test',
+        mobile_number: '0501234567',
+      },
+    ],
+    onSearchTermChange: vi.fn(),
+  }),
 }));
 
 vi.mock('../../lib/geoSubdivisionService', () => ({
@@ -115,4 +127,22 @@ describe('CompanyFormModal — Add and Edit match', () => {
     // Add keeps the full structured-address block…
     expect(screen.getByLabelText('Address line 1')).toBeInTheDocument();
   });
+});
+
+describe('CompanyFormModal — Primary Contact picker', () => {
+  // The server searches mobile_number / customer_number, but SearchableSelect
+  // re-filters client-side against name + keywords; without keywords those
+  // server matches were dropped from the visible list.
+  it.each(['0501234567', 'CUST-0142'])(
+    'keeps a customer matched only by %s visible',
+    async (term) => {
+      const user = userEvent.setup();
+      renderModal();
+
+      await user.click(screen.getByText('No contact'));
+      await user.type(screen.getByPlaceholderText('Search...'), term);
+
+      expect(screen.getByRole('option', { name: /John Doe/ })).toBeInTheDocument();
+    },
+  );
 });

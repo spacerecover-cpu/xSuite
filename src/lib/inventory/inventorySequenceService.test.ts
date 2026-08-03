@@ -1,5 +1,15 @@
-import { describe, it, expect } from 'vitest';
-import { formatNextNumber, formatCurrentNumber, maxNumericSuffix } from './inventorySequenceService';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const { from } = vi.hoisted(() => ({ from: vi.fn() }));
+
+vi.mock('../supabaseClient', () => ({ supabase: { from } }));
+
+import {
+  formatNextNumber,
+  formatCurrentNumber,
+  maxNumericSuffix,
+  fetchMaxSuffixForPrefix,
+} from './inventorySequenceService';
 
 describe('maxNumericSuffix', () => {
   it('returns the highest numeric suffix among numbers with the prefix', () => {
@@ -13,6 +23,55 @@ describe('maxNumericSuffix', () => {
   it('returns 0 when nothing matches', () => {
     expect(maxNumericSuffix([], 'H25')).toBe(0);
     expect(maxNumericSuffix(['SSD-0001'], 'H25')).toBe(0);
+  });
+});
+
+describe('fetchMaxSuffixForPrefix', () => {
+  // Whole ordered result set, paged 1000 at a time by the service.
+  const allRows = Array.from({ length: 3500 }, (_, i) => ({
+    item_number: `INV-${String(i + 1).padStart(4, '0')}`,
+  }));
+
+  function mockPagedItems(rows: Array<{ item_number: string | null }>) {
+    const ranges: Array<[number, number]> = [];
+    const builder: Record<string, unknown> = {};
+    for (const method of ['select', 'ilike', 'is', 'order']) {
+      builder[method] = () => builder;
+    }
+    builder.range = (start: number, end: number) => {
+      ranges.push([start, end]);
+      return Promise.resolve({ data: rows.slice(start, end + 1), error: null });
+    };
+    from.mockReturnValue(builder);
+    return ranges;
+  }
+
+  beforeEach(() => from.mockReset());
+
+  it('pages past the first 1000 rows so the true max is found', async () => {
+    const ranges = mockPagedItems(allRows);
+    // Without pagination only the first page is read (max 1000).
+    await expect(fetchMaxSuffixForPrefix('INV')).resolves.toBe(3500);
+    expect(ranges.length).toBe(4);
+  });
+
+  it('stops after the first short page', async () => {
+    const ranges = mockPagedItems(allRows.slice(0, 12));
+    await expect(fetchMaxSuffixForPrefix('INV')).resolves.toBe(12);
+    expect(ranges).toEqual([[0, 999]]);
+  });
+
+  it('short-circuits an empty prefix without querying', async () => {
+    await expect(fetchMaxSuffixForPrefix('  ')).resolves.toBe(0);
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it('propagates query errors instead of reporting a max of 0', async () => {
+    const builder: Record<string, unknown> = {};
+    for (const method of ['select', 'ilike', 'is', 'order']) builder[method] = () => builder;
+    builder.range = () => Promise.resolve({ data: null, error: { message: 'boom' } });
+    from.mockReturnValue(builder);
+    await expect(fetchMaxSuffixForPrefix('INV')).rejects.toBeTruthy();
   });
 });
 

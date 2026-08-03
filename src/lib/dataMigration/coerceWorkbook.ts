@@ -47,8 +47,20 @@ function pad2(n: number): string {
   return String(n).padStart(2, '0');
 }
 
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+function daysInMonth(year: number, month: number): number {
+  if (month !== 2) return DAYS_IN_MONTH[month - 1];
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  return leap ? 29 : 28;
+}
+
 function ymd(year: number, month: number, day: number): string | null {
-  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  if (month < 1 || month > 12 || day < 1) return null;
+  // Reject impossible calendar days ("31/02/2020"). `new Date()` — which the validator's
+  // typeOk uses — rolls those over to a valid day, so they would pass the dry-run and then
+  // blow up on the Postgres `::date` cast at import (the exact silent drop this file prevents).
+  if (day > daysInMonth(year, month)) return null;
   return `${year}-${pad2(month)}-${pad2(day)}`;
 }
 
@@ -91,9 +103,15 @@ export function normalizeDateCell(value: unknown): string | null {
   m = s.match(/^(\d{4})[ \-/.]+([A-Za-z]{3,9})$/);
   if (m && MONTHS[m[2].toLowerCase()]) return ymd(+m[1], MONTHS[m[2].toLowerCase()], 1);
 
-  // DD/MM/YYYY (full numeric, day-first — matches the DD-MON-YYYY convention in these files)
+  // DD/MM/YYYY (full numeric, day-first — matches the DD-MON-YYYY convention in these files).
+  // When the second component cannot be a month (>12) the value can only be month-first
+  // (a US-configured legacy export), so retry swapped instead of dropping the date silently.
   m = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
-  if (m) return ymd(+m[3], +m[2], +m[1]);
+  if (m) {
+    const first = +m[1];
+    const second = +m[2];
+    return second > 12 && first <= 12 ? ymd(+m[3], first, second) : ymd(+m[3], second, first);
+  }
 
   // MM/YYYY  (numeric month + 4-digit year → 1st) e.g. "02/2015"
   m = s.match(/^(\d{1,2})[/\-.](\d{4})$/);

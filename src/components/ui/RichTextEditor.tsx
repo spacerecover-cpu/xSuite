@@ -102,7 +102,13 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
   useEffect(() => {
     if (editorRef.current && !isSourceMode) {
       const sanitized = sanitizeHtml(value || '');
-      if (editorRef.current.innerHTML !== sanitized) {
+      // Compare the SANITIZED form of what the browser currently holds: handleInput
+      // emits sanitizeHtml(innerHTML), so the browser's own serialization (style
+      // casing, trailing semicolons, attribute order) differs from the emitted value
+      // even when the content is identical. Comparing raw innerHTML made the echo of
+      // our own onChange look like an external change and re-assigned innerHTML,
+      // which collapses the selection and jumps the caret to the start mid-typing.
+      if (sanitizeHtml(editorRef.current.innerHTML) !== sanitized) {
         editorRef.current.innerHTML = sanitized;
       }
     }

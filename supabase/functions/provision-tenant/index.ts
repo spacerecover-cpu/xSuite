@@ -309,6 +309,19 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Un-claim the single-use OTP on every failure AFTER the claim above. The code
+    // is spent before anything is created, so without this a transient failure in
+    // the creation steps below (tenant insert, tenant code, auth user, profile,
+    // legal entity, registration, onboarding) permanently burns a code the signer
+    // legitimately earned — the retry is then rejected with "already been used".
+    // Returns the row to its exact pre-request state: consumed_at back to NULL,
+    // expires_at untouched, so an expired code stays expired and the atomic claim
+    // still blocks concurrent provisions.
+    const releaseOtp = async (): Promise<void> => {
+      if (!verifiedOtpId) return;
+      await supabase.from('signup_otps').update({ consumed_at: null }).eq('id', verifiedOtpId);
+    };
+
     // Check if user already exists — paged lookup across all auth users, not just
     // GoTrue's first-page-of-50 default (see findAuthUserByEmail).
     const existingUser = await findAuthUserByEmail(supabase, adminEmail);
@@ -350,7 +363,10 @@ Deno.serve(async (req: Request) => {
       .select()
       .single();
 
-    if (tenantError) throw tenantError;
+    if (tenantError) {
+      await releaseOtp();
+      throw tenantError;
+    }
 
     // Assign the immutable, geo-derived, platform-unique tenant code (e.g. OMA0001).
     // Fail-loud with soft-delete rollback (matching legal_entities/onboarding below):
@@ -359,6 +375,7 @@ Deno.serve(async (req: Request) => {
       .rpc('assign_tenant_code', { p_tenant_id: tenant.id });
     if (tenantCodeError) {
       await supabase.from('tenants').update({ deleted_at: new Date().toISOString() }).eq('id', tenant.id);
+      await releaseOtp();
       throw new Error(`Provisioning failed: assign_tenant_code: ${tenantCodeError.message}`);
     }
 
@@ -380,6 +397,7 @@ Deno.serve(async (req: Request) => {
       if (updateError) {
         // Soft-delete rollback (never hard delete — CLAUDE.md additive/soft rule).
         await supabase.from('tenants').update({ deleted_at: new Date().toISOString() }).eq('id', tenant.id);
+        await releaseOtp();
         throw updateError;
       }
     } else {
@@ -398,6 +416,7 @@ Deno.serve(async (req: Request) => {
       if (authError || !authData.user) {
         // Soft-delete rollback (never hard delete — CLAUDE.md additive/soft rule).
         await supabase.from('tenants').update({ deleted_at: new Date().toISOString() }).eq('id', tenant.id);
+        await releaseOtp();
         throw authError || new Error('User creation failed');
       }
       userId = authData.user.id;
@@ -421,6 +440,7 @@ Deno.serve(async (req: Request) => {
       // (get_current_tenant_id() resolves nothing) while the tenant + slug survive.
       // Roll back so the slug is freed and the owner can retry (see rollbackProvision).
       await rollbackProvision(supabase, tenant.id, userId, !existingUser);
+      await releaseOtp();
       throw new Error(`Provisioning failed: profiles upsert: ${profileError.message}`);
     }
 
@@ -516,6 +536,7 @@ Deno.serve(async (req: Request) => {
       // Detach the profile + drop the freshly-created auth user so the owner isn't
       // permanently locked out (see rollbackProvision).
       await rollbackProvision(supabase, tenant.id, userId, !existingUser);
+      await releaseOtp();
       throw new Error(`Provisioning failed: legal_entities insert: ${legalEntityError.message}`);
     }
 
@@ -562,6 +583,7 @@ Deno.serve(async (req: Request) => {
       // detach the profile + drop the freshly-created auth user (see
       // rollbackProvision) so a rejected registration doesn't lock the owner out.
       await rollbackProvision(supabase, tenant.id, userId, !existingUser);
+      await releaseOtp();
       if (regErr instanceof ProvisionGuardError) {
         return new Response(
           JSON.stringify({ error: regErr.message }),
@@ -577,6 +599,7 @@ Deno.serve(async (req: Request) => {
       if (registrationError) {
         console.error('Primary tax registration creation failed:', registrationError);
         await rollbackProvision(supabase, tenant.id, userId, !existingUser);
+        await releaseOtp();
         throw new Error(`Provisioning failed: legal_entity_tax_registrations insert: ${registrationError.message}`);
       }
     }
@@ -595,6 +618,7 @@ Deno.serve(async (req: Request) => {
       console.error('Onboarding progress creation failed:', onboardingError);
       // FAIL-LOUD: a half-provisioned tenant must not silently lose its wizard.
       await rollbackProvision(supabase, tenant.id, userId, !existingUser);
+      await releaseOtp();
       throw new Error(`Provisioning failed: onboarding_progress insert: ${onboardingError.message}`);
     }
 

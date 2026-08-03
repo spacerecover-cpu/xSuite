@@ -326,11 +326,17 @@ export async function getLowStockItems(): Promise<StockItemWithCategory[]> {
 }
 
 export async function createStockItem(data: StockItemInsert): Promise<StockItem> {
-  const sku = await supabase.rpc('get_next_number', { p_scope: 'stock' });
+  // A failed sequence mint must abort the insert: stock_items.sku is nullable and a
+  // create-form payload carries no sku of its own, so falling through would silently
+  // create an un-searchable item with a NULL SKU and still report success.
+  const { data: mintedSku, error: skuError } = await supabase.rpc('get_next_number', { p_scope: 'stock' });
+  if (skuError) throw skuError;
+  const sku = mintedSku ?? data.sku;
+  if (!sku) throw new Error('Failed to generate a stock SKU');
 
   const { data: result, error } = await supabase
     .from('stock_items')
-    .insert({ ...data, sku: sku.data ?? data.sku })
+    .insert({ ...data, sku })
     .select()
     .maybeSingle();
   if (error) throw error;
@@ -1003,12 +1009,21 @@ export interface TodaysSalesSummary {
 }
 
 export async function getTodaysSales(): Promise<TodaysSalesSummary> {
-  const today = new Date().toISOString().split('T')[0];
+  // Local start-of-day as a full timestamptz instant (parity with getStockStats): a bare
+  // UTC date string ('YYYY-MM-DD') anchors the bound to UTC midnight, so for a UTC- tenant
+  // late in the day the whole trading day falls outside the window and the widget reads 0,
+  // while a UTC+ tenant in the early hours still sees yesterday. The exclusive next-day
+  // upper bound keeps the window to exactly one day.
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfTomorrow = new Date(startOfToday);
+  startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
   const { data, error } = await supabase
     .from('stock_sales')
     .select('*, customers_enhanced(id, customer_name), stock_sale_items(*, stock_items(id, name, brand, sku))')
     .is('deleted_at', null)
-    .gte('sale_date', today)
+    .gte('sale_date', startOfToday.toISOString())
+    .lt('sale_date', startOfTomorrow.toISOString())
     .order('sale_date', { ascending: false });
   if (error) throw error;
   const sales = (data ?? []) as unknown as StockSaleWithDetails[];

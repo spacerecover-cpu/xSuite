@@ -203,6 +203,13 @@ async function handleInbound(
     }
 
     // ---- non-idempotent side effects (run exactly once per wamid) ----
+    // The contact-level flag is honoured on ANY STOP/START, matched customer or not —
+    // an opt-out from an unrecognised number is still an opt-out, and this flag is what
+    // the send worker gates on. The consent ledger needs a customer (customer_id NOT NULL),
+    // so those rows stay conditional.
+    if (kw && contactId) {
+      await db.from("whatsapp_contacts").update({ opt_out_all: kw === "stop" }).eq("id", contactId);
+    }
     if (kw && customerId) {
       await db.from("whatsapp_consents").insert({
         tenant_id: integ.tenant_id, customer_id: customerId,
@@ -215,9 +222,6 @@ async function handleInbound(
           scope: "marketing", action: "opt_out",
           source: "inbound_message", phone_e164: phoneE164, consent_text: body,
         });
-      }
-      if (contactId) {
-        await db.from("whatsapp_contacts").update({ opt_out_all: kw === "stop" }).eq("id", contactId);
       }
     }
     if (caseId) {

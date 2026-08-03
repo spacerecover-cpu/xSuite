@@ -19,6 +19,7 @@ import { fetchReferenceLists } from '../../lib/dataMigration/referenceLists';
 import { validateWorkbook, validateSchemaVersion } from '../../lib/dataMigration/importValidator';
 import { runImport } from '../../lib/dataMigration/importClient';
 import { DOMAIN_ENTITIES, DOMAIN_LABELS, SHEET_NAMES } from '../../lib/dataMigration/workbookContract';
+import { downloadCSV } from '../../lib/csvExport';
 import type { ParsedWorkbook, WorkbookDomain } from '../../lib/dataMigration/workbookContract';
 import type { ValidationReport, ValidationIssue } from '../../lib/dataMigration/importValidator';
 import type { ImportProgress, ImportSummary } from '../../lib/dataMigration/importClient';
@@ -45,17 +46,19 @@ async function downloadTemplate(domain: WorkbookDomain): Promise<void> {
 }
 
 function downloadErrorReport(issues: ValidationIssue[]): void {
-  const lines = ['Entity,Row,Field,Severity,Message'];
-  for (const iss of issues) {
-    lines.push(`${iss.entity},${iss.rowIndex},${iss.field ?? ''},${iss.severity},${iss.message}`);
-  }
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'import-validation-errors.csv';
-  a.click();
-  URL.revokeObjectURL(url);
+  // Validation messages routinely embed commas/quotes ("Invalid status (allowed: draft, sent, paid)"),
+  // so the fields must go through the RFC 4180 escaper rather than raw interpolation.
+  downloadCSV<ValidationIssue>(
+    issues,
+    [
+      { key: 'entity', label: 'Entity' },
+      { key: 'rowIndex', label: 'Row' },
+      { key: 'field', label: 'Field' },
+      { key: 'severity', label: 'Severity' },
+      { key: 'message', label: 'Message' },
+    ],
+    'import-validation-errors.csv',
+  );
 }
 
 const STEP_LABELS: Record<WizardStep, string> = {
@@ -351,10 +354,15 @@ export const ImportWizard: React.FC<Props> = ({ domain, onClose }) => {
             {/* Per-stage progress bars */}
             <div className="rounded-lg border border-slate-200 divide-y divide-slate-100">
               {domainEntities.map((entity) => {
-                const isActive = progress?.entity === entity;
-                const isDone = progress
-                  ? domainEntities.indexOf(entity) < domainEntities.indexOf(progress.entity)
-                  : false;
+                // The finalize/done phases report entity=lastEntity with total=0; keying completion
+                // off the index alone would drop that last bar back to 0% on a successful import.
+                const allDone = progress?.phase === 'finalizing' || progress?.phase === 'done';
+                const isActive = !allDone && progress?.entity === entity;
+                const isDone = allDone
+                  ? true
+                  : progress
+                    ? domainEntities.indexOf(entity) < domainEntities.indexOf(progress.entity)
+                    : false;
                 const pct = isActive && progress && progress.total > 0
                   ? Math.round((progress.processed / progress.total) * 100)
                   : isDone ? 100 : 0;

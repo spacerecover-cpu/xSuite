@@ -6,7 +6,7 @@ import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import { Skeleton } from '../ui/Skeleton';
 import { formatDate } from '../../lib/format';
-import { baseAmount } from '../../lib/financialMath';
+import { baseAmount, isReceivableInvoice } from '../../lib/financialMath';
 import { useCurrency } from '../../hooks/useCurrency';
 
 interface CustomerFinancialTabProps {
@@ -25,6 +25,8 @@ interface InvoiceRow {
   amount_paid_base: number | null;
   balance_due_base: number | null;
   status: string | null;
+  invoice_type: string | null;
+  currency: string | null;
   is_proforma: boolean | null;
   [key: string]: unknown;
 }
@@ -52,7 +54,7 @@ export function CustomerFinancialTab({ customerId, companyId }: CustomerFinancia
   const navigate = useNavigate();
   const filterCol = customerId ? 'customer_id' : 'company_id';
   const filterVal = customerId ?? companyId ?? '';
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, formatCurrencyIn } = useCurrency();
 
   const { data: invoices = [], isLoading: loadingInvoices } = useQuery({
     queryKey: ['profile-invoices', filterCol, filterVal],
@@ -60,7 +62,7 @@ export function CustomerFinancialTab({ customerId, companyId }: CustomerFinancia
       if (!filterVal) return [];
       const { data, error } = await supabase
         .from('invoices')
-        .select('id, invoice_number, invoice_date, total_amount, amount_paid, balance_due, total_amount_base, amount_paid_base, balance_due_base, status, is_proforma')
+        .select('id, invoice_number, invoice_date, total_amount, amount_paid, balance_due, total_amount_base, amount_paid_base, balance_due_base, status, invoice_type, currency, is_proforma')
         .eq(filterCol, filterVal)
         .is('deleted_at', null)
         .order('invoice_date', { ascending: false, nullsFirst: false });
@@ -86,9 +88,11 @@ export function CustomerFinancialTab({ customerId, companyId }: CustomerFinancia
     enabled: Boolean(filterVal),
   });
 
-  // Pure invoices (not proformas) drive the financial summary.
-  // Proformas live in quotes essentially; double-counting would inflate KPIs.
-  const realInvoices = invoices.filter((i) => !i.is_proforma);
+  // Only real receivables drive the financial summary — the canonical filter shared
+  // with the case Financial Summary and the invoice reports (EXP-014): a proforma and
+  // the tax invoice it became are the SAME bill, and void/cancelled invoices are not
+  // owed (their amount_paid / balance_due are never zeroed on status change).
+  const realInvoices = invoices.filter(isReceivableInvoice);
   const totals = realInvoices.reduce(
     (acc, inv) => {
       acc.invoiced += baseAmount(inv, 'total_amount');
@@ -201,11 +205,14 @@ export function CustomerFinancialTab({ customerId, companyId }: CustomerFinancia
                       <td className="py-3 text-slate-600">
                         {inv.invoice_date ? formatDate(inv.invoice_date) : '—'}
                       </td>
+                      {/* Row figures are the document's face value, so they must carry the
+                          document's own currency — the KPI tiles above are base-currency
+                          totals and are formatted with the tenant currency. */}
                       <td className="py-3 text-right font-semibold text-slate-900">
-                        {formatCurrency(inv.total_amount ?? 0)}
+                        {formatCurrencyIn(inv.total_amount ?? 0, inv.currency)}
                       </td>
                       <td className="py-3 text-right text-slate-700">
-                        {formatCurrency(inv.balance_due ?? 0)}
+                        {formatCurrencyIn(inv.balance_due ?? 0, inv.currency)}
                       </td>
                       <td className="py-3 text-center">
                         <Badge variant={invoiceStatusVariant(inv.status)} size="sm">

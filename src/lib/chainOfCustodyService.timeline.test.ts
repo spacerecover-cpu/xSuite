@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
 vi.mock('./supabaseClient', () => {
   const makeChain = (result: unknown) => {
@@ -23,6 +23,7 @@ vi.mock('./supabaseClient', () => {
 vi.mock('./logger', () => ({ logger: { error: vi.fn() } }));
 
 import { fetchCustomerTimeline } from './chainOfCustodyService';
+import { supabase } from './supabaseClient';
 
 describe('fetchCustomerTimeline', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -39,5 +40,17 @@ describe('fetchCustomerTimeline', () => {
     // 'cases' mock returns one case id, so to test the empty path, this assertion
     // is informational — keep only the first test if this one is awkward to mock.
     expect(Array.isArray(empty)).toBe(true);
+  });
+
+  it('throws when the cases lookup fails instead of returning an empty timeline', async () => {
+    const failing: Record<string, unknown> = {};
+    for (const m of ['select', 'eq', 'is', 'in', 'order']) failing[m] = vi.fn(() => failing);
+    (failing as { then: unknown }).then = (resolve: (v: unknown) => void) =>
+      resolve({ data: null, error: { message: 'permission denied for table cases' } });
+    (supabase.from as unknown as Mock).mockImplementationOnce(() => failing);
+
+    await expect(fetchCustomerTimeline('cust-1')).rejects.toMatchObject({
+      message: 'permission denied for table cases',
+    });
   });
 });

@@ -479,6 +479,17 @@ describe('platform-admin queries reference real columns and resolvable embeds', 
     await expect(getSupportTickets()).rejects.toBeTruthy();
   });
 
+  // A tenant UUID never matches the ticket_number/subject ILIKE, so per-tenant
+  // scoping must be a real tenant_id predicate rather than the free-text search.
+  it('getSupportTickets scopes to a tenant with tenant_id, not the free-text search', async () => {
+    const { tickets: ticketsQuery } = wireTickets();
+
+    await getSupportTickets({ tenantId: 'tn1' });
+
+    expect(ticketsQuery.eq).toHaveBeenCalledWith('tenant_id', 'tn1');
+    expect(ticketsQuery.or).not.toHaveBeenCalled();
+  });
+
   it('getTicketDetails selects tenants.name and resolves the assignee without an embed', async () => {
     const { tickets: ticketsQuery } = wireTickets();
 

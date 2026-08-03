@@ -12,7 +12,7 @@
 
 import type { InvoiceDocumentData } from '../../types';
 import type { DocumentTemplateConfig, ColumnConfig, TotalsLineKey } from '../../templateConfig';
-import { formatDate, safeString, formatEngineMoney, formatPartyAddressLines } from '../../utils';
+import { safeString, formatEngineMoney, formatPartyAddressLines } from '../../utils';
 import { fmtDateWithConfig } from '../../configDate';
 import { amountInWordsAr, amountInWordsEn } from '../amountInWords';
 import { resolveEInvoicingTransport } from '../../../regimes/registry';
@@ -410,7 +410,7 @@ export function toEngineData(
             balance: { en: 'Balance', ar: 'الرصيد' },
           },
           rows: rawHistory.map((p) => ({
-            date: p.payment_date ? formatDate(p.payment_date) : '-',
+            date: p.payment_date ? docDate(p.payment_date) : '-',
             document: p.doc_number || '-',
             method: p.method || '-',
             reference: p.reference || '-',

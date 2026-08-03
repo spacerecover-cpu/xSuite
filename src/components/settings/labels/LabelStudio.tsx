@@ -108,11 +108,9 @@ export const LabelStudio: React.FC<LabelStudioProps> = ({ entity, label, onBack 
 
   const handleReset = () => {
     patch({
-      sizeId: DEFAULT_LABEL_PRINTING_PREFS.sizes[entity],
-      copies: 1,
-      showQr: true,
-      showBarcode: true,
-      fields: defaultLabelFields(entity),
+      ...labelEntityConfig(DEFAULT_LABEL_PRINTING_PREFS, entity),
+      fields: defaultLabelFields(entity), // fresh map — never share the module-level default object
+      icon: cfg.icon, // the uploaded mark is tenant-level (all three labels); showIcon:false already unstamps it here
     });
     toast.info('Reverted to the default label design. Save to apply.');
   };
