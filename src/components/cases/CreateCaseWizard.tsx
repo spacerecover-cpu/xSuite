@@ -402,16 +402,13 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
           })),
       });
 
-      const { data: newCase } = await supabase
-        .from('cases').select().eq('id', result.caseId).maybeSingle();
-      if (!newCase) throw new Error('Case was created but no row was returned.');
-      return newCase;
+      return { id: result.caseId, case_no: result.caseNumber };
     },
     onSuccess: (newCase) => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
       queryClient.invalidateQueries({ queryKey: ['cases_count'] });
       queryClient.invalidateQueries({ queryKey: [CASE_COMMAND_STATS_KEY] });
-      setCreatedCase({ id: newCase.id, case_no: newCase.case_no ?? newCase.case_number ?? '' });
+      setCreatedCase({ id: newCase.id, case_no: newCase.case_no });
       setShowSuccessModal(true);
       // Direct Print Label: fire-and-forget so a printer problem never blocks intake.
       void shouldAutoPrintLabel('case').then(async (enabled) => {
