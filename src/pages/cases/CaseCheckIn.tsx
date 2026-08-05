@@ -38,7 +38,10 @@ import {
   signIntakeReceipt,
   captureIntakeConsents,
   requireDepositorId,
+  DevicesInCustodyError,
+  type CreateCaseWithDevicesResult,
 } from '../../lib/caseIntakeService';
+import { useCompanyName } from '../../components/customers/WhatsAppConsentBlock';
 import { createDocumentInstance } from '../../lib/documentInstanceService';
 import { shouldAutoPrintLabel } from '../../lib/labelPrefsService';
 import { printCustomerCopy } from '../../lib/printUtils';
@@ -47,6 +50,19 @@ import { CASE_COMMAND_STATS_KEY } from '../../hooks/useCaseCommandStats';
 interface CheckedInCase {
   caseId: string;
   caseNumber: string;
+}
+
+/**
+ * A check-in that took the devices into custody but did not finish writing its
+ * evidence. `consentOnly` splits the one recoverable case from the rest: consent
+ * is the LAST step, so its failure leaves the receipt, the depositor record and
+ * the custody event all written, and the two facts it missed each have a screen
+ * that can still record them. Every earlier failure has no such screen.
+ */
+interface StalledCheckIn extends CheckedInCase {
+  consentOnly: boolean;
+  whatsappPending: boolean;
+  destructivePending: boolean;
 }
 
 function useCatalog(table: 'catalog_device_types' | 'catalog_device_brands' | 'catalog_device_capacities' | 'catalog_device_conditions', key: string) {
@@ -81,18 +97,24 @@ export function CaseCheckIn() {
   const { profile } = useAuth();
   const toast = useToast();
   const whatsappConsentText = useIntakeWhatsAppConsentText();
+  const companyName = useCompanyName();
   const blockerId = useId();
 
   const [customerId, setCustomerId] = useState('');
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [result, setResult] = useState<CheckedInCase | null>(null);
-  // The five submit writes are not one transaction. Once the case and its
-  // devices exist, a plain retry would re-run createCaseWithDevices and append a
+  // The five submit writes are not one transaction. Once the case_devices insert
+  // has been sent, a plain retry would re-run createCaseWithDevices and append a
   // second, uncorrectable set of DEVICE_RECEIVED custody events for the same
-  // physical media — so a failure past that point must not offer one.
+  // physical media — so a failure past that point must not offer one. That
+  // includes createCaseWithDevices' OWN failures: it throws
+  // DevicesInCustodyError once the rows may have been committed.
   const createdCase = useRef<CheckedInCase | null>(null);
-  const [stalled, setStalled] = useState<CheckedInCase | null>(null);
+  // Flipped once the only writes left are the consent facts, which decides
+  // whether the stall screen can honestly offer a remedy.
+  const consentStepReached = useRef(false);
+  const [stalled, setStalled] = useState<StalledCheckIn | null>(null);
 
   const [depositor, setDepositor] = useState<DepositorValue>({
     name: '', mobile: '', nationalId: '', relationship: 'self',
@@ -127,7 +149,19 @@ export function CaseCheckIn() {
     if (depositor.relationship === 'self') {
       setDepositor((d) => ({ ...d, name: picked?.customer_name ?? '' }));
     }
+    // Switching to a customer with no mobile must drop a tick already made
+    // against the previous one — whatsapp_consents is append-only, so an opt-in
+    // row with a null phone is a permanent, undeliverable consent record.
+    if (!picked?.mobile_number) {
+      setAck((a) => (a.whatsappUtility ? { ...a, whatsappUtility: false } : a));
+    }
   }
+
+  const whatsappUnavailableReason = customer?.mobile_number
+    ? null
+    : customerId
+      ? 'No mobile number on this customer’s record — add one to their profile before opting them in.'
+      : 'Select the customer first — the opt-in is recorded against their mobile number.';
 
   const depositorDone =
     depositor.name.trim() !== '' &&
@@ -159,26 +193,38 @@ export function CaseCheckIn() {
       if (!profile?.tenant_id) throw new Error('No active tenant — please sign in again.');
       const tenantId = profile.tenant_id;
       createdCase.current = null;
+      consentStepReached.current = false;
 
-      const { caseId, caseNumber, deviceIds } = await createCaseWithDevices({
-        tenantId,
-        profileId: profile.id ?? null,
-        profileRole: profile.role ?? null,
-        customerId,
-        customerName: customer?.customer_name ?? 'Customer',
-        priority: null,
-        devices: devices.map((d, i) => ({
-          device_type_id: d.device_type_id,
-          brand_id: d.brand_id,
-          model: d.model || null,
-          serial_number: d.serial_number || null,
-          capacity_id: d.capacity_id,
-          condition_id: d.condition_id,
-          notes: d.notes || null,
-          created_by: profile.id ?? null,
-          isPrimary: i === 0,
-        })),
-      });
+      let created: CreateCaseWithDevicesResult;
+      try {
+        created = await createCaseWithDevices({
+          tenantId,
+          profileId: profile.id ?? null,
+          profileRole: profile.role ?? null,
+          customerId,
+          customerName: customer?.customer_name ?? 'Customer',
+          priority: null,
+          devices: devices.map((d, i) => ({
+            device_type_id: d.device_type_id,
+            brand_id: d.brand_id,
+            model: d.model || null,
+            serial_number: d.serial_number || null,
+            capacity_id: d.capacity_id,
+            condition_id: d.condition_id,
+            notes: d.notes || null,
+            created_by: profile.id ?? null,
+            isPrimary: i === 0,
+          })),
+        });
+      } catch (error) {
+        // The devices may already be in custody even though creation rejected —
+        // record the identity so onError lands on the stalled screen instead of
+        // letting the operator retry one physical hand-over into two cases.
+        if (error instanceof DevicesInCustodyError) createdCase.current = error.created;
+        throw error;
+      }
+
+      const { caseId, caseNumber, deviceIds } = created;
       createdCase.current = { caseId, caseNumber };
 
       const instance = await createDocumentInstance({
@@ -202,6 +248,7 @@ export function CaseCheckIn() {
         receiptInstanceId: instance.id,
       });
 
+      consentStepReached.current = true;
       await captureIntakeConsents({
         tenantId,
         customerId,
@@ -234,7 +281,16 @@ export function CaseCheckIn() {
     onError: (error: Error) => {
       logger.error('Check-in failed:', error);
       toast.error(`Check-in failed: ${error.message}`);
-      if (createdCase.current) setStalled(createdCase.current);
+      const created = createdCase.current;
+      if (!created) return;
+      const whatsappPending = consentStepReached.current && ack.whatsappUtility;
+      const destructivePending = consentStepReached.current && ack.destructiveAuthorized;
+      setStalled({
+        ...created,
+        consentOnly: whatsappPending || destructivePending,
+        whatsappPending,
+        destructivePending,
+      });
     },
   });
 
@@ -242,6 +298,7 @@ export function CaseCheckIn() {
     setResult(null);
     setStalled(null);
     createdCase.current = null;
+    consentStepReached.current = false;
     setEmailModalOpen(false);
     setCustomerId('');
     setDepositor({ name: '', mobile: '', nationalId: '', relationship: 'self' });
@@ -258,17 +315,39 @@ export function CaseCheckIn() {
             <AlertTriangle aria-hidden="true" className="h-9 w-9 text-warning" />
           </div>
           <h1 className="text-xl font-semibold text-slate-900">
-            {stalled.caseNumber} was created — its intake evidence is incomplete
+            {stalled.consentOnly
+              ? `${stalled.caseNumber} was created — its consent record is incomplete`
+              : `${stalled.caseNumber} was created — its intake evidence is incomplete`}
           </h1>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
-            The devices are in custody, but the signed receipt, depositor identity or consent step
-            did not complete. Checking in again would take the same devices into custody a second
-            time, so this check-in cannot be retried.
+            {stalled.consentOnly
+              ? 'The devices are in custody and the signed receipt, depositor identity and custody event are all recorded — only the consent step did not complete. Checking in again would take the same devices into custody a second time, so this check-in cannot be retried.'
+              : 'The devices are in custody, but the signed receipt, depositor identity or custody event did not complete. Checking in again would take the same devices into custody a second time, so this check-in cannot be retried.'}
           </p>
-          <p className="mx-auto mt-3 max-w-md text-sm text-slate-500">
-            No screen in the app can write the missing intake evidence after the fact. Keep the
-            paper receipt with the devices and escalate {stalled.caseNumber} to a lab administrator.
-          </p>
+          {stalled.consentOnly ? (
+            <div className="mx-auto mt-3 max-w-md text-start text-sm text-slate-500">
+              <p>Record what the customer agreed to at the counter from these screens instead:</p>
+              <ul className="mt-2 list-disc space-y-1 ps-5">
+                {stalled.whatsappPending && (
+                  <li>
+                    The WhatsApp opt-in — on the customer&apos;s profile, under Edit Profile →
+                    WhatsApp updates.
+                  </li>
+                )}
+                {stalled.destructivePending && (
+                  <li>
+                    The authorization for recovery attempts that may alter the media — as an
+                    internal note on {stalled.caseNumber}, before those attempts begin.
+                  </li>
+                )}
+              </ul>
+            </div>
+          ) : (
+            <p className="mx-auto mt-3 max-w-md text-sm text-slate-500">
+              No screen in the app can write the missing intake evidence after the fact. Keep the
+              paper receipt with the devices and escalate {stalled.caseNumber} to a lab administrator.
+            </p>
+          )}
 
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <Button onClick={() => navigate(`/cases/${stalled.caseId}`)}>
@@ -350,7 +429,7 @@ export function CaseCheckIn() {
           caseNumber={result.caseNumber}
           customerName={customer?.customer_name ?? 'Customer'}
           customerEmail={customer?.email ?? undefined}
-          companyName="Data Recovery"
+          companyName={companyName}
         />
       </div>
     );
@@ -439,7 +518,11 @@ export function CaseCheckIn() {
           onChange={setDevices}
         />
 
-        <AcknowledgeSection value={ack} onChange={setAck} />
+        <AcknowledgeSection
+          value={ack}
+          onChange={setAck}
+          whatsappUnavailableReason={whatsappUnavailableReason}
+        />
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-surface/95 backdrop-blur">

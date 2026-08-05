@@ -32,6 +32,13 @@ type ConsentKey = keyof Omit<AcknowledgeValue, 'signature'>;
 interface AcknowledgeSectionProps {
   value: AcknowledgeValue;
   onChange: (next: AcknowledgeValue) => void;
+  /**
+   * Why this customer cannot be opted in to WhatsApp, or null when they can.
+   * `whatsapp_consents` is append-only: an opt-in row with no phone number is a
+   * permanent record of a consent nothing can ever deliver against, so the
+   * caller — which is the only party that knows the customer — disables it here.
+   */
+  whatsappUnavailableReason?: string | null;
 }
 
 /**
@@ -40,13 +47,17 @@ interface AcknowledgeSectionProps {
  * Only the service-authorization consent blocks completion, and capturing a
  * signature stays optional so a lab with no tablet can print and wet-sign.
  */
-export function AcknowledgeSection({ value, onChange }: AcknowledgeSectionProps) {
+export function AcknowledgeSection({
+  value,
+  onChange,
+  whatsappUnavailableReason = null,
+}: AcknowledgeSectionProps) {
   const headingId = useId();
   const [signing, setSigning] = useState(false);
   const [signatureCleared, setSignatureCleared] = useState(false);
   const whatsappConsentText = useIntakeWhatsAppConsentText();
 
-  const consents: { key: ConsentKey; label: string; hint: string }[] = [
+  const consents: { key: ConsentKey; label: string; hint: string; disabled?: boolean }[] = [
     {
       key: 'termsAccepted',
       label: 'I accept the terms of service and authorize the lab to proceed.',
@@ -55,7 +66,9 @@ export function AcknowledgeSection({ value, onChange }: AcknowledgeSectionProps)
     {
       key: 'whatsappUtility',
       label: whatsappConsentText,
-      hint: 'Optional — declining does not affect the service. Reply STOP any time to opt out.',
+      hint: whatsappUnavailableReason
+        ?? 'Optional — declining does not affect the service. Reply STOP any time to opt out.',
+      disabled: Boolean(whatsappUnavailableReason),
     },
     {
       key: 'destructiveAuthorized',
@@ -91,17 +104,22 @@ export function AcknowledgeSection({ value, onChange }: AcknowledgeSectionProps)
       </p>
 
       <div className="space-y-3">
-        {consents.map(({ key, label, hint }) => (
+        {consents.map(({ key, label, hint, disabled }) => (
           <div
             key={key}
             className={`rounded-lg border p-3 transition-colors ${
-              value[key] ? 'border-primary/30 bg-primary/5' : 'border-border bg-surface'
+              disabled
+                ? 'border-border bg-surface-muted opacity-70'
+                : value[key]
+                  ? 'border-primary/30 bg-primary/5'
+                  : 'border-border bg-surface'
             }`}
           >
             <Checkbox
               label={label}
               hint={hint}
               checked={value[key]}
+              disabled={disabled}
               onChange={(e) => setConsent(key, e.target.checked)}
             />
           </div>

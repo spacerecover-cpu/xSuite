@@ -16,6 +16,7 @@ vi.mock('./pdf/contentHash', () => ({ sha256Hex }));
 import {
   captureIntakeConsents,
   createCaseWithDevices,
+  DevicesInCustodyError,
   logCaseIntake,
   requireDepositorId,
   signIntakeReceipt,
@@ -260,6 +261,53 @@ describe('createCaseWithDevices', () => {
       'Failed to insert devices: bad column',
     );
     expect(rpc).not.toHaveBeenCalledWith('promote_device_to_primary', expect.anything());
+  });
+
+  // A rejected insert and an insert whose response was lost look identical from
+  // here, and the lost-response case has already fired the DEVICE_RECEIVED
+  // custody trigger. Both must carry the case identity so no caller can retry.
+  it('carries the case identity when the device insert fails', async () => {
+    devicesChain = mockDevicesInsert({ data: null, error: { message: 'Failed to fetch' } });
+
+    await expect(createCaseWithDevices(baseInput({ devices: [device()] }))).rejects.toMatchObject({
+      name: 'DevicesInCustodyError',
+      created: { caseId: 'case-1', caseNumber: 'CASE-0042', deviceIds: [] },
+    });
+  });
+
+  it('carries the case identity when the retryable primary promotion fails', async () => {
+    rpc.mockImplementation((fn: string) => {
+      if (fn === 'get_next_number') return Promise.resolve({ data: 'CASE-0042', error: null });
+      if (fn === 'promote_device_to_primary') {
+        return Promise.resolve({ data: null, error: { code: '40001', message: 'serialization' } });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const failure = await createCaseWithDevices(
+      baseInput({ devices: [device({ isPrimary: true })] }),
+    ).catch((e: unknown) => e);
+
+    // The devices are ALREADY in custody at this point — the retry this error
+    // text invites would append a second set of DEVICE_RECEIVED events.
+    expect(failure).toBeInstanceOf(DevicesInCustodyError);
+    expect((failure as DevicesInCustodyError).message).toMatch(/please retry/i);
+    expect((failure as DevicesInCustodyError).created).toEqual({
+      caseId: 'case-1',
+      caseNumber: 'CASE-0042',
+      deviceIds: ['dev-a', 'dev-b'],
+    });
+  });
+
+  it('leaves failures before the device insert plainly retryable', async () => {
+    casesChain = mockCasesInsert({ data: null, error: { message: 'rls denied' } });
+
+    const failure = await createCaseWithDevices(
+      baseInput({ devices: [device()] }),
+    ).catch((e: unknown) => e);
+
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure).not.toBeInstanceOf(DevicesInCustodyError);
   });
 });
 

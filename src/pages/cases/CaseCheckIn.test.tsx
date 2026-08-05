@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HeaderSlotProvider } from '../../contexts/HeaderSlotContext';
+import { DevicesInCustodyError } from '../../lib/caseIntakeService';
 import { CaseCheckIn } from './CaseCheckIn';
 
 // The seam is the service layer: the four sections and the page's own
@@ -26,7 +27,7 @@ const { spies, customerRow } = vi.hoisted(() => ({
     customer_number: 'CUST-1',
     customer_name: 'Aisha Rahman',
     email: 'aisha@example.com' as string | null,
-    mobile_number: '+971500000000',
+    mobile_number: '+971500000000' as string | null,
   },
 }));
 
@@ -109,7 +110,13 @@ vi.mock('../../components/customers/CustomerFormModal', () => ({
 }));
 
 vi.mock('../../components/cases/EmailDocumentModal', () => ({
-  EmailDocumentModal: ({ isOpen }: { isOpen: boolean }) => (isOpen ? <div>email modal</div> : null),
+  EmailDocumentModal: ({ isOpen, companyName }: { isOpen: boolean; companyName: string }) =>
+    isOpen ? (
+      <div>
+        <div>email modal</div>
+        <div data-testid="email-company">{companyName}</div>
+      </div>
+    ) : null,
 }));
 
 vi.mock('../../lib/printUtils', () => ({ printCustomerCopy: vi.fn() }));
@@ -145,6 +152,7 @@ beforeEach(() => {
   calls.length = 0;
   vi.clearAllMocks();
   customerRow.email = 'aisha@example.com';
+  customerRow.mobile_number = '+971500000000';
   spies.createCaseWithDevices.mockImplementation(async () => {
     calls.push('createCaseWithDevices');
     return { caseId: 'case-1', caseNumber: 'CASE-0042', deviceIds: ['dev-1'] };
@@ -359,6 +367,114 @@ describe('CaseCheckIn', () => {
     await waitFor(() => expect(submitButton()).toBeEnabled());
     expect(screen.queryByText(/was created/i)).not.toBeInTheDocument();
     expect(spies.createDocumentInstance).not.toHaveBeenCalled();
+  });
+
+  // createCaseWithDevices itself rejects only AFTER the case_devices insert has
+  // fired DEVICE_RECEIVED — offering the retry its message asks for would put
+  // one physical hand-over into two cases with two custody ledgers.
+  it('does not offer a retry when creation itself failed with the devices already in custody', async () => {
+    spies.createCaseWithDevices.mockRejectedValue(
+      new DevicesInCustodyError('Another update is in progress — please retry.', {
+        caseId: 'case-1',
+        caseNumber: 'CASE-0042',
+        deviceIds: ['dev-1'],
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    await pickCustomer(user);
+    await fillOneDevice(user);
+    await user.click(await screen.findByLabelText(/accept the terms/i));
+    await user.click(submitButton());
+
+    expect(await screen.findByText(/CASE-0042 was created/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /complete check-in/i })).not.toBeInTheDocument();
+    expect(spies.createCaseWithDevices).toHaveBeenCalledTimes(1);
+  });
+
+  it('names the screens that can still record consent when only that step failed', async () => {
+    spies.captureIntakeConsents.mockRejectedValue(new Error('rls denied'));
+    const user = userEvent.setup();
+    renderPage();
+    await pickCustomer(user);
+    await fillOneDevice(user);
+    await user.click(await screen.findByLabelText(/accept the terms/i));
+    await user.click(await screen.findByLabelText(/on WhatsApp/i));
+    await user.click(screen.getByLabelText(/permanently alter the media/i));
+    await user.click(submitButton());
+
+    expect(await screen.findByText(/CASE-0042 was created/i)).toBeInTheDocument();
+    expect(screen.getByText(/Edit Profile → WhatsApp updates/i)).toBeInTheDocument();
+    expect(screen.getByText(/as an internal note on CASE-0042/i)).toBeInTheDocument();
+    // Both missing facts are re-recordable in-app: this screen must never send a
+    // re-tickable checkbox to an administrator as if it were unwritable.
+    expect(screen.queryByText(/escalate/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No screen in the app/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /complete check-in/i })).not.toBeInTheDocument();
+  });
+
+  it('lists only the consent the customer actually gave', async () => {
+    spies.captureIntakeConsents.mockRejectedValue(new Error('rls denied'));
+    const user = userEvent.setup();
+    renderPage();
+    await pickCustomer(user);
+    await fillOneDevice(user);
+    await user.click(await screen.findByLabelText(/accept the terms/i));
+    await user.click(await screen.findByLabelText(/on WhatsApp/i));
+    await user.click(submitButton());
+
+    expect(await screen.findByText(/Edit Profile → WhatsApp updates/i)).toBeInTheDocument();
+    expect(screen.queryByText(/as an internal note on CASE-0042/i)).not.toBeInTheDocument();
+  });
+
+  // The counterpart pin: nothing before the consent step has an in-app remedy,
+  // so that branch must keep saying so rather than promise one.
+  it('promises no in-app remedy when the missing evidence really has none', async () => {
+    spies.logCaseIntake.mockRejectedValue(new Error('custody log unavailable'));
+    const user = userEvent.setup();
+    renderPage();
+    await pickCustomer(user);
+    await fillOneDevice(user);
+    await user.click(await screen.findByLabelText(/accept the terms/i));
+    await user.click(await screen.findByLabelText(/on WhatsApp/i));
+    await user.click(submitButton());
+
+    expect(await screen.findByText(/No screen in the app can write the missing intake evidence/i))
+      .toBeInTheDocument();
+    expect(screen.getByText(/escalate CASE-0042 to a lab administrator/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Edit Profile → WhatsApp updates/i)).not.toBeInTheDocument();
+  });
+
+  it('will not write an undeliverable opt-in for a customer with no mobile number', async () => {
+    customerRow.mobile_number = null;
+    const user = userEvent.setup();
+    renderPage();
+    await pickCustomer(user);
+
+    const optIn = await screen.findByLabelText(/on WhatsApp/i);
+    expect(optIn).toBeDisabled();
+    expect(screen.getByText(/No mobile number on this customer/i)).toBeInTheDocument();
+
+    await fillOneDevice(user);
+    await user.click(screen.getByLabelText(/accept the terms/i));
+    await user.click(submitButton());
+
+    await waitFor(() => expect(spies.captureIntakeConsents).toHaveBeenCalled());
+    expect(spies.captureIntakeConsents).toHaveBeenCalledWith(
+      expect.objectContaining({ whatsappUtility: false, phoneE164: null }),
+    );
+  });
+
+  it('sends the customer copy under the tenant’s own name', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await pickCustomer(user);
+    await fillOneDevice(user);
+    await user.click(await screen.findByLabelText(/accept the terms/i));
+    await user.click(submitButton());
+
+    await user.click(await screen.findByRole('button', { name: /send to customer/i }));
+    expect(screen.getByTestId('email-company')).toHaveTextContent('Nova Data Labs');
   });
 
   it('keeps the email hand-off disabled for a WhatsApp customer with no email', async () => {

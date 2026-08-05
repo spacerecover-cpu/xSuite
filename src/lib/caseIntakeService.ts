@@ -33,6 +33,28 @@ export interface CreateCaseWithDevicesResult {
 }
 
 /**
+ * Thrown once the `case_devices` INSERT has been sent. That statement fires
+ * `trg_log_device_received_custody`, and `chain_of_custody` is append-only — so a
+ * retry past this point can only ever append a SECOND set of DEVICE_RECEIVED
+ * events for ONE physical hand-over, which nothing can correct afterwards.
+ *
+ * A rejected insert and an insert whose response was lost are indistinguishable
+ * to the client, so this is thrown for the insert error too: callers must treat
+ * it as "the devices may already be in custody", surface `created.caseNumber`,
+ * and refuse the retry. Failures BEFORE the insert stay plain Errors, because
+ * nothing was written that a retry could duplicate.
+ */
+export class DevicesInCustodyError extends Error {
+  readonly created: CreateCaseWithDevicesResult;
+
+  constructor(message: string, created: CreateCaseWithDevicesResult) {
+    super(message);
+    this.name = 'DevicesInCustodyError';
+    this.created = created;
+  }
+}
+
+/**
  * The single case-creation path, extracted verbatim from CreateCaseWizard so the
  * wizard and the front-desk check-in surface cannot drift. Order matters: the
  * guard trigger on `cases` requires a matched active intake status_id + name
@@ -98,14 +120,26 @@ export async function createCaseWithDevices(
 
     if (devicesError) {
       logger.error('Error inserting devices:', devicesError);
-      throw new Error(`Failed to insert devices: ${devicesError.message}`);
+      throw new DevicesInCustodyError(
+        `Failed to insert devices: ${devicesError.message}`,
+        { caseId: newCase.id, caseNumber, deviceIds },
+      );
     }
 
     (inserted ?? []).forEach((d) => deviceIds.push(d.id));
 
     const primaryIndex = input.devices.findIndex((d) => d.isPrimary);
     const primaryId = deviceIds[primaryIndex >= 0 ? primaryIndex : 0];
-    if (primaryId) await setPrimaryDevice(primaryId, newCase.id);
+    if (primaryId) {
+      try {
+        await setPrimaryDevice(primaryId, newCase.id);
+      } catch (error) {
+        throw new DevicesInCustodyError(
+          (error as Error).message,
+          { caseId: newCase.id, caseNumber, deviceIds },
+        );
+      }
+    }
   }
 
   return { caseId: newCase.id, caseNumber, deviceIds };

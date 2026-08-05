@@ -78,6 +78,36 @@ describe('AcknowledgeSection', () => {
     expect(await screen.findByLabelText(result.current)).toBeInTheDocument();
   });
 
+  // whatsapp_consents is append-only, so an opt-in row with no phone number is a
+  // permanent record of a consent nothing can ever deliver against.
+  it('refuses the WhatsApp opt-in when the caller says it cannot be delivered', async () => {
+    const onChange = vi.fn();
+    renderSection(
+      <AcknowledgeSection
+        {...base}
+        onChange={onChange}
+        whatsappUnavailableReason="No mobile number on this customer’s record."
+      />,
+    );
+
+    const optIn = await screen.findByLabelText(/on WhatsApp/i);
+    expect(optIn).toBeDisabled();
+    expect(screen.getByText(/No mobile number on this customer/i)).toBeInTheDocument();
+    await userEvent.click(optIn);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('leaves the other consents alone when the WhatsApp opt-in is unavailable', async () => {
+    const onChange = vi.fn();
+    renderSection(
+      <AcknowledgeSection {...base} onChange={onChange} whatsappUnavailableReason="no mobile" />,
+    );
+
+    await userEvent.click(screen.getByLabelText(/accept the terms/i));
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ termsAccepted: true }));
+    expect(screen.getByLabelText(/permanently alter the media/i)).toBeEnabled();
+  });
+
   it('clears a captured signature when the terms are withdrawn', async () => {
     const onChange = vi.fn();
     renderSection(
