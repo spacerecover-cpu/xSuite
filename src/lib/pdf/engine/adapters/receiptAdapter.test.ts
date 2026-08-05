@@ -3,6 +3,8 @@ import { depositorBlock, devicesForReceipt, toEngineData } from './receiptAdapte
 import type { CaseData, DeviceData, ReceiptData } from '../../types';
 import { BUILT_IN_TEMPLATE_CONFIGS } from '../../templateConfig';
 import type { DocumentTemplateConfig } from '../../templateConfig';
+import { renderSignature } from '../sections/signature';
+import type { EngineContext, SignatureBlockData } from '../types';
 
 const dev = (id: string, batch?: string, receivedAt?: string): DeviceData => ({
   id,
@@ -189,6 +191,26 @@ const receipt = (over: Partial<ReceiptData> = {}): ReceiptData => ({
   ...over,
 });
 
+const customerSig: SignatureBlockData = {
+  slot: 'customer',
+  name: 'Dana Reed',
+  method: 'drawn',
+  imageDataUrl: 'data:image/png;base64,AAA',
+};
+const repSig: SignatureBlockData = {
+  slot: 'lab_manager',
+  name: 'Sam Okafor',
+  method: 'typed',
+  typedValue: 'Sam Okafor',
+};
+
+const blocksFor = (captured: SignatureBlockData[]) =>
+  toEngineData(
+    receipt({ capturedSignatures: captured }),
+    BUILT_IN_TEMPLATE_CONFIGS.customer_copy,
+    'customer',
+  ).signatureBlocks;
+
 describe('toEngineData signature blocks', () => {
   it('leaves wet-ink caption lines when nothing was captured', () => {
     const out = toEngineData(receipt(), BUILT_IN_TEMPLATE_CONFIGS.customer_copy, 'customer');
@@ -197,21 +219,66 @@ describe('toEngineData signature blocks', () => {
   });
 
   it('passes captured signatures through to signatureBlocks', () => {
-    const out = toEngineData(
-      receipt({
-        capturedSignatures: [
-          {
-            slot: 'customer',
-            name: 'Dana Reed',
-            method: 'drawn',
-            imageDataUrl: 'data:image/png;base64,AAA',
-          },
-        ],
-      }),
+    const blocks = blocksFor([customerSig]);
+    expect(blocks?.[0].name).toBe('Dana Reed');
+    expect(blocks?.[0].imageDataUrl).toBe('data:image/png;base64,AAA');
+  });
+
+  it('keeps the representative wet-ink slot when only the customer signed', () => {
+    const blocks = blocksFor([customerSig]);
+    expect(blocks).toHaveLength(2);
+    expect(blocks?.[1].role).toBe('Company Representative');
+    expect(blocks?.[1].method).toBeUndefined();
+    expect(blocks?.[1].imageDataUrl).toBeUndefined();
+  });
+
+  it('keeps the customer wet-ink slot when only the representative signed', () => {
+    const blocks = blocksFor([repSig]);
+    expect(blocks).toHaveLength(2);
+    expect(blocks?.[0].role).toBe('Customer Signature');
+    expect(blocks?.[0].name).toBeUndefined();
+    expect(blocks?.[1].name).toBe('Sam Okafor');
+  });
+
+  it('emits both captured blocks when both parties signed', () => {
+    const blocks = blocksFor([customerSig, repSig]);
+    expect(blocks).toHaveLength(2);
+    expect(blocks?.map((b) => b.name)).toEqual(['Dana Reed', 'Sam Okafor']);
+  });
+
+  it('labels a captured block that carries no role of its own', () => {
+    expect(blocksFor([customerSig])?.[0].role).toBe('Customer Signature');
+    expect(blocksFor([{ ...customerSig, role: 'Depositor' }])?.[0].role).toBe('Depositor');
+  });
+
+  it('never drops a captured signature outside the two canonical slots', () => {
+    const witness: SignatureBlockData = { slot: 'witness', name: 'Ali Haddad', method: 'click_to_accept' };
+    const blocks = blocksFor([customerSig, repSig, witness]);
+    expect(blocks).toHaveLength(3);
+    expect(blocks?.[2].name).toBe('Ali Haddad');
+  });
+
+  it('renders both parties on the page when only the customer signed', () => {
+    const engine = {
+      config: { language: { mode: 'en', primary: 'en' }, signatureImages: undefined },
+      stampImage: null,
+      signatureImage: null,
+    } as unknown as EngineContext;
+    const data = toEngineData(
+      receipt({ capturedSignatures: [customerSig] }),
       BUILT_IN_TEMPLATE_CONFIGS.customer_copy,
       'customer',
     );
-    expect(out.signatureBlocks).toHaveLength(1);
-    expect(out.signatureBlocks?.[0].name).toBe('Dana Reed');
+    const texts: string[] = [];
+    const walk = (node: unknown): void => {
+      if (node == null || typeof node !== 'object') return;
+      if (Array.isArray(node)) return node.forEach(walk);
+      const o = node as Record<string, unknown>;
+      if (typeof o.text === 'string') texts.push(o.text);
+      Object.values(o).forEach(walk);
+    };
+    walk(renderSignature(engine, data));
+    expect(texts).toContain('Dana Reed');
+    expect(texts).toContain('Company Representative');
   });
 });

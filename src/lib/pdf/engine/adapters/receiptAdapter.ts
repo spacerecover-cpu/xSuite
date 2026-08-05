@@ -37,6 +37,7 @@ import type {
   LegalTermsBlock,
   PartyBlock,
   ResolvedColumn,
+  SignatureBlockData,
 } from '../types';
 
 /**
@@ -53,6 +54,52 @@ export function docRefBannerActive(config: DocumentTemplateConfig): boolean {
 
 /** Which intake variant we are producing. */
 export type ReceiptVariant = 'office' | 'customer';
+
+/**
+ * The two parties an intake receipt is signed by. The adapter owns this list —
+ * a handover document always shows BOTH acknowledgement slots, whichever of
+ * them was captured on a pad.
+ */
+const RECEIPT_SIGNATURE_SLOTS: { slot: string; caption: LabelText }[] = [
+  { slot: 'customer', caption: { en: 'Customer Signature', ar: 'توقيع العميل' } },
+  { slot: 'representative', caption: { en: 'Company Representative', ar: 'ممثل الشركة' } },
+];
+
+/**
+ * Merges the captured signatures onto the receipt's two canonical slots.
+ *
+ * `renderSignature` REPLACES the whole wet-ink row with exactly the blocks it is
+ * given, so a partial capture (customer signs at the counter, the representative
+ * does not — or the reverse) would otherwise erase the other party's line from a
+ * custody document. Every slot therefore always yields a block: the captured one
+ * when it exists, an unsigned caption-only block to sign by hand when it does
+ * not. Captured blocks outside the two slots (e.g. a witness) are kept, never
+ * dropped.
+ *
+ * Returns null when nothing was captured, so the renderer keeps its
+ * byte-identical wet-ink path.
+ */
+export function mergeReceiptSignatures(
+  captured: SignatureBlockData[] | undefined,
+): SignatureBlockData[] | null {
+  if (!captured || captured.length === 0) return null;
+
+  const unclaimed = [...captured];
+  const claim = (slot: string): SignatureBlockData | undefined => {
+    // Anything that is not the customer's signature is the lab's side of the
+    // handover, whichever staff slot (lab_manager / engineer / …) captured it.
+    const index = unclaimed.findIndex((b) =>
+      slot === 'customer' ? b.slot === 'customer' : b.slot !== 'customer',
+    );
+    return index === -1 ? undefined : unclaimed.splice(index, 1)[0];
+  };
+
+  const blocks = RECEIPT_SIGNATURE_SLOTS.map(({ slot, caption }) => {
+    const signed = claim(slot);
+    return signed ? { ...signed, role: signed.role || caption.en } : { slot, role: caption.en };
+  });
+  return [...blocks, ...unclaimed];
+}
 
 /**
  * The intake device-table columns, matching the legacy office_receipt /
@@ -308,10 +355,8 @@ export function toEngineData(
   const legalTerms: LegalTermsBlock = legalTermsBlock(companySettings, variant);
 
   // ---- Signature lines -----------------------------------------------------
-  const signatures: LabelText[] = [
-    { en: 'Customer Signature', ar: 'توقيع العميل' },
-    { en: 'Company Representative', ar: 'ممثل الشركة' },
-  ];
+  const signatures: LabelText[] = RECEIPT_SIGNATURE_SLOTS.map((s) => s.caption);
+  const mergedBlocks = mergeReceiptSignatures(data.capturedSignatures);
 
   // ---- Registered-by line (rendered only under the premium presentation) ----
   const creatorName =
@@ -330,9 +375,7 @@ export function toEngineData(
     signatures,
     // Absent/empty → the key stays off the object so the renderer takes its
     // byte-identical wet-ink path (a lab with no signature pad loses nothing).
-    ...(data.capturedSignatures && data.capturedSignatures.length > 0
-      ? { signatureBlocks: data.capturedSignatures }
-      : {}),
+    ...(mergedBlocks ? { signatureBlocks: mergedBlocks } : {}),
     preparedBy: `Registered by: ${creatorName}`,
     // Intake docs carry no money: no line items, totals, bank, or payment history.
     paymentHistory: null,
