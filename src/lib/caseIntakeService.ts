@@ -2,6 +2,8 @@ import { supabase } from './supabaseClient';
 import { logger } from './logger';
 import { getIntakeStatusForCreation } from './caseService';
 import { setPrimaryDevice } from './deviceService';
+import { uploadSignature } from './fileStorageService';
+import { sha256Hex } from './pdf/contentHash';
 import type { Database } from '../types/database.types';
 import type { CapturedSignature } from '../components/cases/SignatureCaptureModal';
 
@@ -153,6 +155,9 @@ export async function logCaseIntake(input: LogCaseIntakeInput): Promise<string> 
   return (data ?? '') as string;
 }
 
+/** company-assets bucket — uploadSignature writes to 'company-assets'/signatures/ */
+const SIGNATURE_BUCKET = 'company-assets';
+
 /** Persists a counter-captured customer signature against the receipt instance. */
 export async function signIntakeReceipt(
   instanceId: string,
@@ -160,6 +165,19 @@ export async function signIntakeReceipt(
   customerId: string,
 ): Promise<string> {
   const signerName = sig.method === 'typed' ? (sig.typedValue ?? '') : (sig.signerName ?? '');
+
+  // The drawn mark IS the proof of receipt: upload it and hash it, or the
+  // receipt prints a signer name with no signature.
+  let imagePath: string | undefined;
+  let sha: string | undefined;
+  if (sig.imageBlob && (sig.method === 'drawn' || sig.method === 'uploaded_image')) {
+    const file = new File([sig.imageBlob], `sig-${instanceId}-customer.png`, { type: 'image/png' });
+    const res = await uploadSignature(file);
+    if (!res.success || !res.filePath) throw new Error(res.error ?? 'Signature upload failed');
+    imagePath = res.filePath;
+    sha = await sha256Hex(sig.imageBlob);
+  }
+
   const { data, error } = await supabase.rpc('staff_sign_off_document', {
     p_instance_id: instanceId,
     p_slot: 'customer',
@@ -167,6 +185,9 @@ export async function signIntakeReceipt(
     p_signer_name: signerName,
     p_typed_value: sig.typedValue ?? undefined,
     p_signer_customer_id: customerId,
+    p_image_path: imagePath,
+    p_image_bucket: imagePath ? SIGNATURE_BUCKET : undefined,
+    p_signature_sha256: sha,
     p_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
   });
   if (error) {

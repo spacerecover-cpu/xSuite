@@ -20908,8 +20908,11 @@ export type Database = {
       show_trgm: { Args: { "": string }; Returns: string[] }
       staff_sign_off_document: {
         Args: {
+          p_image_bucket?: string
+          p_image_path?: string
           p_instance_id: string
           p_method: Database["public"]["Enums"]["signature_method"]
+          p_signature_sha256?: string
           p_signer_customer_id?: string
           p_signer_name: string
           p_slot: Database["public"]["Enums"]["signature_slot"]

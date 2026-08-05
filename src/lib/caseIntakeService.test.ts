@@ -1,17 +1,28 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { rpc, from } = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }));
+const { rpc, from, uploadSignature, sha256Hex } = vi.hoisted(() => ({
+  rpc: vi.fn(),
+  from: vi.fn(),
+  uploadSignature: vi.fn(),
+  sha256Hex: vi.fn(),
+}));
 vi.mock('./supabaseClient', () => ({ supabase: { rpc, from } }));
 vi.mock('./logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
+vi.mock('./fileStorageService', () => ({ uploadSignature }));
+vi.mock('./pdf/contentHash', () => ({ sha256Hex }));
 
 import {
   captureIntakeConsents,
   createCaseWithDevices,
   logCaseIntake,
   requireDepositorId,
+  signIntakeReceipt,
 } from './caseIntakeService';
+
+/** The capture session's user agent, recorded alongside every signature. */
+const expectedUserAgent = typeof navigator !== 'undefined' ? navigator.userAgent : undefined;
 
 /** Ordered log of the side effects the creation sequence performs. */
 let calls: string[] = [];
@@ -278,18 +289,125 @@ describe('logCaseIntake', () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it('calls the RPC with the full parameter set', async () => {
+  it('sends the whole depositor identity, not just the case and devices', async () => {
     rpc.mockResolvedValue({ data: 'batch-1', error: null });
 
     const batch = await logCaseIntake({
-      caseId: 'c1', deviceIds: ['d1'], depositorName: 'Dana',
-      depositorRelationship: 'self', receiptInstanceId: 'i1',
+      caseId: 'c1',
+      deviceIds: ['d1', 'd2'],
+      depositorName: 'Dana',
+      depositorMobile: '+971500000000',
+      depositorId: 'ID-9',
+      depositorRelationship: 'courier',
+      receiptInstanceId: 'i1',
     });
 
     expect(batch).toBe('batch-1');
-    expect(rpc).toHaveBeenCalledWith('log_case_intake', expect.objectContaining({
-      p_case_id: 'c1', p_device_ids: ['d1'], p_receipt_instance_id: 'i1',
+    expect(rpc).toHaveBeenCalledWith('log_case_intake', {
+      p_case_id: 'c1',
+      p_device_ids: ['d1', 'd2'],
+      p_depositor_name: 'Dana',
+      p_depositor_mobile: '+971500000000',
+      p_depositor_id: 'ID-9',
+      p_depositor_relationship: 'courier',
+      p_receipt_instance_id: 'i1',
+    });
+  });
+});
+
+describe('signIntakeReceipt', () => {
+  beforeEach(() => {
+    rpc.mockReset();
+    from.mockReset();
+    uploadSignature.mockReset();
+    sha256Hex.mockReset();
+    rpc.mockResolvedValue({ data: { ok: true, signature_id: 'sig-1' }, error: null });
+  });
+
+  it('records a typed signature in the customer slot, naming the signer from what they typed', async () => {
+    const id = await signIntakeReceipt('inst-1', { method: 'typed', typedValue: 'Dana Depositor' }, 'cust-1');
+
+    expect(id).toBe('sig-1');
+    expect(uploadSignature).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenCalledWith('staff_sign_off_document', {
+      p_instance_id: 'inst-1',
+      p_slot: 'customer',
+      p_method: 'typed',
+      p_signer_name: 'Dana Depositor',
+      p_typed_value: 'Dana Depositor',
+      p_signer_customer_id: 'cust-1',
+      p_image_path: undefined,
+      p_image_bucket: undefined,
+      p_signature_sha256: undefined,
+      p_user_agent: expectedUserAgent,
+    });
+  });
+
+  it('uploads and hashes a drawn mark so the receipt prints a signature, not just a name', async () => {
+    uploadSignature.mockResolvedValue({ success: true, filePath: 'signatures/1700000000.png' });
+    sha256Hex.mockResolvedValue('deadbeef');
+    const imageBlob = new Blob(['ink']);
+
+    const id = await signIntakeReceipt(
+      'inst-1',
+      { method: 'drawn', signerName: 'Dana Depositor', imageBlob },
+      'cust-1',
+    );
+
+    expect(id).toBe('sig-1');
+    expect(sha256Hex).toHaveBeenCalledWith(imageBlob);
+    const [uploaded] = uploadSignature.mock.calls[0] as [File];
+    expect(uploaded.type).toBe('image/png');
+    expect(rpc).toHaveBeenCalledWith('staff_sign_off_document', {
+      p_instance_id: 'inst-1',
+      p_slot: 'customer',
+      p_method: 'drawn',
+      p_signer_name: 'Dana Depositor',
+      p_typed_value: undefined,
+      p_signer_customer_id: 'cust-1',
+      p_image_path: 'signatures/1700000000.png',
+      p_image_bucket: 'company-assets',
+      p_signature_sha256: 'deadbeef',
+      p_user_agent: expectedUserAgent,
+    });
+  });
+
+  it('names a click-to-accept signer from the captured name and sends no image', async () => {
+    await signIntakeReceipt('inst-1', { method: 'click_to_accept', signerName: 'Dana Depositor' }, 'cust-1');
+
+    expect(uploadSignature).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenCalledWith('staff_sign_off_document', expect.objectContaining({
+      p_slot: 'customer',
+      p_method: 'click_to_accept',
+      p_signer_name: 'Dana Depositor',
+      p_image_path: undefined,
+      p_signature_sha256: undefined,
     }));
+  });
+
+  it('refuses to record a drawn signature whose image failed to upload', async () => {
+    uploadSignature.mockResolvedValue({ success: false, error: 'bucket denied' });
+
+    await expect(
+      signIntakeReceipt('inst-1', { method: 'drawn', signerName: 'Dana', imageBlob: new Blob(['ink']) }, 'cust-1'),
+    ).rejects.toThrow('bucket denied');
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('surfaces an RPC failure instead of reporting an unsigned receipt as signed', async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'Only staff may capture a signature' } });
+
+    await expect(
+      signIntakeReceipt('inst-1', { method: 'typed', typedValue: 'Dana' }, 'cust-1'),
+    ).rejects.toMatchObject({ message: 'Only staff may capture a signature' });
+  });
+
+  it('throws when the sign-off returns no signature id', async () => {
+    rpc.mockResolvedValue({ data: { ok: true }, error: null });
+
+    await expect(
+      signIntakeReceipt('inst-1', { method: 'typed', typedValue: 'Dana' }, 'cust-1'),
+    ).rejects.toThrow(/signature id/);
   });
 });
 
