@@ -122,6 +122,13 @@ const RELATIONSHIP_LABELS: Record<string, string> = {
  * the National ID the intake RPC gates on. All devices in an intake batch share
  * one depositor, so the first device carrying depositor state is the source.
  *
+ * A depositor recorded WITHOUT a relationship (the column is nullable, and the
+ * intake RPC only gates the National ID when a non-self relationship is given)
+ * counts as the customer only when no distinct name was captured — otherwise the
+ * receipt would print "Delivered by customer" and silently drop the name, ID and
+ * mobile of the person actually standing at the counter. Same rule as
+ * `checkoutAdapter`'s collector block.
+ *
  * Returns null when no depositor was recorded (legacy cases, template preview)
  * so the section renders nothing rather than an empty box.
  */
@@ -132,22 +139,26 @@ export function depositorBlock(
   const source = devices.find((d) => d.depositor_name || d.depositor_relationship);
   if (!source) return null;
 
-  const relationship = source.depositor_relationship ?? 'self';
+  const relationship = source.depositor_relationship ?? '';
+  const name = source.depositor_name?.trim() ?? '';
+  const isSelf = relationship === 'self' || (!relationship && (!name || name === customerName));
+
   const rows: CollectorBlock['rows'] = [
     {
       label: { en: 'Delivered by', ar: 'سُلّم بواسطة' },
-      value:
-        relationship === 'self'
-          ? 'Delivered by customer'
-          : `${safeString(source.depositor_name)} — on behalf of ${customerName}`,
+      value: isSelf
+        ? 'Delivered by customer'
+        : `${safeString(source.depositor_name)} — on behalf of ${customerName}`,
     },
   ];
 
-  if (relationship !== 'self') {
-    rows.push({
-      label: { en: 'Relationship', ar: 'الصلة' },
-      value: RELATIONSHIP_LABELS[relationship] ?? safeString(relationship),
-    });
+  if (!isSelf) {
+    if (relationship) {
+      rows.push({
+        label: { en: 'Relationship', ar: 'الصلة' },
+        value: RELATIONSHIP_LABELS[relationship] ?? safeString(relationship),
+      });
+    }
     if (source.depositor_id) {
       rows.push({ label: { en: 'National ID', ar: 'رقم الهوية' }, value: source.depositor_id });
     }

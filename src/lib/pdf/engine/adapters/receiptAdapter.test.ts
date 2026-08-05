@@ -91,6 +91,24 @@ describe('receiptAdapter.toEngineData — intake batch scoping', () => {
     expect(caseVals).toContain('Not detected');
     expect(caseVals).not.toContain('Clicking noise');
   });
+
+  it('emits the depositor handover block as the collector section', () => {
+    const deposited: DeviceData = {
+      ...latestA,
+      depositor_name: 'Sam Okafor',
+      depositor_relationship: 'courier',
+      depositor_id: 'P1234567',
+      depositor_mobile: '+441234567890',
+    };
+    const out = toEngineData(make([earlier, deposited]), CONFIG, 'office');
+    expect((out.collector?.rows ?? []).map((r) => `${r.label.en}=${r.value}`)).toEqual([
+      'Delivered by=Sam Okafor — on behalf of Satya Pratap A',
+      'Relationship=Courier',
+      'National ID=P1234567',
+      'Mobile=+441234567890',
+      'Received on=04/08/2026',
+    ]);
+  });
 });
 
 describe('depositorBlock', () => {
@@ -124,5 +142,41 @@ describe('depositorBlock', () => {
     );
     expect(block?.rows.find((r) => r.label.en === 'Relationship')?.value).toBe('Courier');
     expect(block?.rows.find((r) => r.label.en === 'National ID')?.value).toBe('P1234567');
+    expect(block?.rows.find((r) => r.label.en === 'Mobile')?.value).toBe('+441234567890');
+    expect(block?.rows.find((r) => r.label.en === 'Received on')?.value).toBe('04/08/2026');
+  });
+
+  it('still names a depositor recorded WITHOUT a relationship', () => {
+    const d: DeviceData = {
+      ...dev('a', 'b1', '2026-08-04T09:00:00Z'),
+      depositor_name: 'Sam Okafor',
+      depositor_id: 'P1234567',
+      depositor_mobile: '+441234567890',
+    };
+    const block = depositorBlock([d], 'Acme Ltd');
+    expect((block?.rows ?? []).map((r) => `${r.label.en}=${r.value}`)).toEqual([
+      'Delivered by=Sam Okafor — on behalf of Acme Ltd',
+      'National ID=P1234567',
+      'Mobile=+441234567890',
+      'Received on=04/08/2026',
+    ]);
+  });
+
+  it('treats a blank or customer-named depositor with no relationship as the customer', () => {
+    const blank: DeviceData = { ...dev('a', 'b1', '2026-08-04T09:00:00Z'), depositor_name: '  ' };
+    expect(depositorBlock([blank], 'Acme Ltd')?.rows[0].value).toBe('Delivered by customer');
+
+    const named: DeviceData = { ...dev('a', 'b1', '2026-08-04T09:00:00Z'), depositor_name: 'Acme Ltd' };
+    expect(depositorBlock([named], 'Acme Ltd')?.rows[0].value).toBe('Delivered by customer');
+  });
+
+  it('falls back to the raw relationship when it is not in the label map', () => {
+    const d: DeviceData = {
+      ...dev('a', 'b1', '2026-08-04T09:00:00Z'),
+      depositor_name: 'Sam Okafor',
+      depositor_relationship: 'neighbour',
+    };
+    const block = depositorBlock([d], 'Acme Ltd');
+    expect(block?.rows.find((r) => r.label.en === 'Relationship')?.value).toBe('neighbour');
   });
 });
