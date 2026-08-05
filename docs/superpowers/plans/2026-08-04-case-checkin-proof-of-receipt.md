@@ -188,7 +188,7 @@ BEGIN
   LOOP
     PERFORM log_chain_of_custody(
       p_case_id          => p_case_id,
-      p_action_category  => 'evidence_handling'::custody_action_category,
+      p_action_category  => 'evidence_handling',
       p_action           => 'INTAKE_RECEIPT_SIGNED',
       p_description      => 'Signed check-in receipt recorded for this device',
       p_device_id        => v_device.id,
@@ -1136,7 +1136,7 @@ export async function captureIntakeConsents(input: IntakeConsents): Promise<void
     const { error: noteError } = await supabase.from('case_internal_notes').insert({
       tenant_id: input.tenantId,
       case_id: input.caseId,
-      note: 'Customer authorized recovery attempts that may permanently alter the media (captured at check-in).',
+      content: 'Customer authorized recovery attempts that may permanently alter the media (captured at check-in).',
     });
     if (noteError) {
       logger.error('Error recording destructive-attempt authorization:', noteError);
@@ -1158,7 +1158,7 @@ export async function captureIntakeConsents(input: IntakeConsents): Promise<void
 }
 ```
 
-Check `case_internal_notes` for the actual body column name before writing this (`grep -n "case_internal_notes" src/lib/*.ts` shows existing inserts) — if it is `content` rather than `note`, use that. The insert must match the generated `Insert` type; `npm run typecheck` is the gate.
+**Verified against the live schema:** `case_internal_notes` columns are `id, tenant_id, case_id, content, created_by, created_at, updated_at, deleted_at, updated_by` — the body column is `content`. `log_chain_of_custody` takes `p_action_category` as **`text`**, not the `custody_action_category` enum, and every parameter except `p_case_id` has a default, so the named-argument call above is valid.
 
 **Import placement:** the `CapturedSignature` type import above belongs at the TOP of `caseIntakeService.ts` with the other imports, not inline where this snippet appears.
 ```
