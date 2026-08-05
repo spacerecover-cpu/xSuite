@@ -258,6 +258,19 @@ describe('toEngineData signature blocks', () => {
     expect(blocks?.[2].name).toBe('Ali Haddad');
   });
 
+  it('never lets a witness claim (and be relabelled as) the representative slot', () => {
+    const witness: SignatureBlockData = { slot: 'witness', name: 'Ali Haddad', method: 'typed', typedValue: 'Ali Haddad' };
+    const blocks = blocksFor([customerSig, witness]);
+    expect(blocks).toHaveLength(3);
+    // the lab's own acknowledgement line survives, unsigned
+    expect(blocks?.[1].role).toBe('Company Representative');
+    expect(blocks?.[1].name).toBeUndefined();
+    // the witness keeps its own slot and identity
+    expect(blocks?.[2].slot).toBe('witness');
+    expect(blocks?.[2].name).toBe('Ali Haddad');
+    expect(blocks?.[2].role).toBeUndefined();
+  });
+
   it('renders both parties on the page when only the customer signed', () => {
     const engine = {
       config: { language: { mode: 'en', primary: 'en' }, signatureImages: undefined },
@@ -280,5 +293,30 @@ describe('toEngineData signature blocks', () => {
     walk(renderSignature(engine, data));
     expect(texts).toContain('Dana Reed');
     expect(texts).toContain('Company Representative');
+  });
+
+  it('leaves the unsigned party room to sign by hand', () => {
+    const engine = {
+      config: { language: { mode: 'en', primary: 'en' }, signatureImages: undefined },
+      stampImage: null,
+      signatureImage: null,
+    } as unknown as EngineContext;
+    const data = toEngineData(
+      receipt({ capturedSignatures: [customerSig] }),
+      BUILT_IN_TEMPLATE_CONFIGS.customer_copy,
+      'customer',
+    );
+    const ys: number[] = [];
+    const walk = (node: unknown): void => {
+      if (node == null || typeof node !== 'object') return;
+      if (Array.isArray(node)) return node.forEach(walk);
+      const o = node as Record<string, unknown>;
+      if (o.type === 'line' && typeof o.y1 === 'number') ys.push(o.y1);
+      Object.values(o).forEach(walk);
+    };
+    walk(renderSignature(engine, data));
+    // customer rule sits under the captured image; the representative's rule
+    // keeps the wet-ink block's 28pt of writing room above it.
+    expect(ys).toEqual([2, 28]);
   });
 });

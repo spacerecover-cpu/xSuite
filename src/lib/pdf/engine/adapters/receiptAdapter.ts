@@ -66,6 +66,22 @@ const RECEIPT_SIGNATURE_SLOTS: { slot: string; caption: LabelText }[] = [
 ];
 
 /**
+ * The slots that may stand in for the lab on the handover — the staff-side
+ * values of the `signature_slot` enum plus the receipt's own slot id. Claimed by
+ * an allowlist, never by "not the customer": `witness` is a first-class slot too,
+ * and rewriting a third-party witness as the Company Representative would both
+ * mislabel who signed on a custody document and swallow the lab's own
+ * acknowledgement line.
+ */
+const LAB_SIGNATURE_SLOTS = new Set([
+  'representative',
+  'lab_manager',
+  'engineer',
+  'approver',
+  'qa_reviewer',
+]);
+
+/**
  * Merges the captured signatures onto the receipt's two canonical slots.
  *
  * `renderSignature` REPLACES the whole wet-ink row with exactly the blocks it is
@@ -73,8 +89,8 @@ const RECEIPT_SIGNATURE_SLOTS: { slot: string; caption: LabelText }[] = [
  * does not — or the reverse) would otherwise erase the other party's line from a
  * custody document. Every slot therefore always yields a block: the captured one
  * when it exists, an unsigned caption-only block to sign by hand when it does
- * not. Captured blocks outside the two slots (e.g. a witness) are kept, never
- * dropped.
+ * not. Captured blocks outside the two slots (e.g. a witness) are kept with
+ * their own identity, never dropped and never relabelled.
  *
  * Returns null when nothing was captured, so the renderer keeps its
  * byte-identical wet-ink path.
@@ -86,10 +102,8 @@ export function mergeReceiptSignatures(
 
   const unclaimed = [...captured];
   const claim = (slot: string): SignatureBlockData | undefined => {
-    // Anything that is not the customer's signature is the lab's side of the
-    // handover, whichever staff slot (lab_manager / engineer / …) captured it.
     const index = unclaimed.findIndex((b) =>
-      slot === 'customer' ? b.slot === 'customer' : b.slot !== 'customer',
+      slot === 'customer' ? b.slot === 'customer' : LAB_SIGNATURE_SLOTS.has(b.slot),
     );
     return index === -1 ? undefined : unclaimed.splice(index, 1)[0];
   };

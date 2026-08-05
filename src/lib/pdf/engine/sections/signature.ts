@@ -67,12 +67,24 @@ function premiumSignatureBlock(
 }
 
 /**
+ * Vertical room above the rule of a slot with nothing captured, matching
+ * `createSignatureBlock`'s wet-ink geometry so the two are interchangeable.
+ */
+const WET_INK_RULE_Y = 28;
+
+/**
  * Builds a pdfmake stack for one captured (signed) SignatureBlockData entry:
  * - drawn/uploaded_image → embedded image via buildLogoNode
  * - typed → italicised typed-name text
  * - click_to_accept → "Accepted by <name>" line
  * All variants end with a thin rule, the signer label, and (if present) the
  * signedAt timestamp.
+ *
+ * An entry with NO captured content is the unsigned half of a partly-signed
+ * handover — it is signed by hand on the printed page, so its rule keeps the
+ * wet-ink block's writing room instead of sitting flush against the content
+ * above it (pdfmake top-aligns columns, so a 2pt rule beside a signed block
+ * would also float far above its counterpart).
  */
 function capturedBlock(b: SignatureBlockData): object {
   const parts: object[] = [];
@@ -84,7 +96,8 @@ function capturedBlock(b: SignatureBlockData): object {
   } else if (b.method === 'click_to_accept') {
     parts.push({ text: `Accepted${b.name ? ` by ${b.name}` : ''}`, fontSize: 9, margin: [0, 10, 0, 2] });
   }
-  parts.push({ canvas: [{ type: 'line', x1: 0, y1: 2, x2: 160, y2: 2, lineWidth: 0.5, lineColor: PDF_COLORS.textLight }] });
+  const ruleY = parts.length === 0 ? WET_INK_RULE_Y : 2;
+  parts.push({ canvas: [{ type: 'line', x1: 0, y1: ruleY, x2: 160, y2: ruleY, lineWidth: 0.5, lineColor: PDF_COLORS.textLight }] });
   const roleLabel = b.role || b.slot;
   if (roleLabel) parts.push({ text: roleLabel, style: 'signatureLabel', margin: [0, 3, 0, 0] });
   if (b.name) parts.push({ text: b.name, fontSize: 8, color: PDF_COLORS.textLight, margin: [0, 1, 0, 0] });
