@@ -88,7 +88,7 @@ One acknowledgment step, three **independently recorded** consents. Never a sing
 |---|---|---|
 | Service authorization / T&C (the existing `legalTerms` text) | `document_signatures` — the signed receipt *is* the record | Yes — blocks completion |
 | WhatsApp `utility` notifications | `whatsapp_consents` via `recordConsent` (`src/lib/whatsappService.ts:213`) | No — declining is valid |
-| Destructive-attempt authorization | `case_internal_notes` + custody metadata | No — can be granted later |
+| Destructive-attempt authorization | `case_internal_notes` + an appended custody event | No — can be granted later |
 
 `whatsapp_consents` is append-only; capture inserts, never updates. Marketing consent is **not** solicited at intake — bundling marketing into a service-intake signature is precisely the dark pattern GDPR Art. 7(2) prohibits.
 
@@ -102,7 +102,7 @@ One acknowledgment step, three **independently recorded** consents. Never a sing
 
 - Generates one `intake_batch_id`; stamps the §1 columns on each device in `p_device_ids`.
 - **ID gate**, mirroring `log_case_checkout`: `IF p_depositor_relationship IS NOT NULL AND p_depositor_relationship <> 'self' AND coalesce(trim(p_depositor_id),'') = '' THEN RAISE`. A null relationship (legacy callers) is not gated.
-- Writes the receipt instance id + depositor relationship into the `metadata` of the `DEVICE_RECEIVED` custody events the trigger already created, linking evidence to custody.
+- **Appends** one `INTAKE_RECEIPT_SIGNED` custody event per device via `log_chain_of_custody(p_case_id, p_action_category, p_action, p_description, p_device_id, p_metadata)`, category `evidence_handling`, with `metadata` carrying `intake_batch_id`, `receipt_instance_id`, and `depositor_relationship`. **It must not UPDATE the existing `DEVICE_RECEIVED` rows** — `chain_of_custody` is append-only (REVOKE + `prevent_audit_mutation`), so enriching them in place is both rejected by the DB and forbidden by CLAUDE.md. Linking evidence by appending is also the forensically correct record: signing the receipt is its own event, at its own time.
 - Does **not** touch case status. Intake status is set by the creation path; this RPC records evidence only.
 
 ---
@@ -126,8 +126,8 @@ Per CLAUDE.md this surface is UI-facing: implementation loads `ui-ux-pro-max` + 
 
 ## 6. Custody
 
-- No new custody table, no new event category — existing `DEVICE_RECEIVED`/`in_custody` events are enriched via `metadata`.
-- Append-only guarantees (`prevent_audit_mutation`) untouched.
+- No new custody table. Evidence is recorded by **appending** an `INTAKE_RECEIPT_SIGNED` event (category `evidence_handling`) alongside the `DEVICE_RECEIVED`/`in_custody` events the trigger already writes. Existing rows are never mutated.
+- Append-only guarantees (`prevent_audit_mutation`) untouched — see §4 for why in-place enrichment was rejected.
 - A signed receipt whose case is later cancelled remains valid evidence; receipts are never soft-deleted by case lifecycle changes.
 
 ---
@@ -142,7 +142,7 @@ Per CLAUDE.md this surface is UI-facing: implementation loads `ui-ux-pro-max` + 
 ## Testing
 
 - **Service:** `createCaseWithDevices` preserves the exact original call order; wizard behavior unchanged (existing tests pass untouched).
-- **RPC:** batch id stamped on the selected subset only; ID gate fires when relationship ≠ `self` and ID blank; null relationship not gated; custody `metadata` carries the receipt instance id; case status unchanged.
+- **RPC:** batch id stamped on the selected subset only; ID gate fires when relationship ≠ `self` and ID blank; null relationship not gated; an `INTAKE_RECEIPT_SIGNED` custody event is appended carrying `intake_batch_id` + `receipt_instance_id`; the pre-existing `DEVICE_RECEIVED` rows are byte-unchanged; case status unchanged.
 - **Adapter (TDD):** receipt prints only the batch's devices — add a device post-intake and assert it does **not** appear on a re-render of the earlier receipt; depositor block shows "on behalf of" + ID when not `self`, "Delivered by customer" when `self`; captured signature renders as image/typed value while an unsigned receipt still renders the wet-ink caption line (no regression for paper labs).
 - **Signature:** `staff_sign_off_document` writes `signer_customer_id` (never `signer_user_id`) for slot `customer`; row shape matches `portal_sign_off_document` field-for-field.
 - **Consent:** each checkbox writes an independent record; declining WhatsApp still completes intake; marketing scope is never written at intake.
