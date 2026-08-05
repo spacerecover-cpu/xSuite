@@ -56,13 +56,30 @@ export function docRefBannerActive(config: DocumentTemplateConfig): boolean {
 export type ReceiptVariant = 'office' | 'customer';
 
 /**
+ * Display captions for every signature slot that can reach the page — the two
+ * canonical handover slots plus the rest of the `signature_slot` enum. A
+ * captured signature carries only a nullable free-text `signer_role`, so without
+ * a caption the renderer falls back to `b.slot` and prints the raw enum token
+ * ("witness") as the label on a custody document the customer signs.
+ */
+const SIGNATURE_SLOT_CAPTIONS: Record<string, LabelText> = {
+  customer: { en: 'Customer Signature', ar: 'توقيع العميل' },
+  representative: { en: 'Company Representative', ar: 'ممثل الشركة' },
+  witness: { en: 'Witness', ar: 'الشاهد' },
+  lab_manager: { en: 'Lab Manager', ar: 'مدير المختبر' },
+  engineer: { en: 'Engineer', ar: 'المهندس' },
+  approver: { en: 'Approver', ar: 'المعتمد' },
+  qa_reviewer: { en: 'QA Reviewer', ar: 'مراجع الجودة' },
+};
+
+/**
  * The two parties an intake receipt is signed by. The adapter owns this list —
  * a handover document always shows BOTH acknowledgement slots, whichever of
  * them was captured on a pad.
  */
 const RECEIPT_SIGNATURE_SLOTS: { slot: string; caption: LabelText }[] = [
-  { slot: 'customer', caption: { en: 'Customer Signature', ar: 'توقيع العميل' } },
-  { slot: 'representative', caption: { en: 'Company Representative', ar: 'ممثل الشركة' } },
+  { slot: 'customer', caption: SIGNATURE_SLOT_CAPTIONS.customer },
+  { slot: 'representative', caption: SIGNATURE_SLOT_CAPTIONS.representative },
 ];
 
 /**
@@ -90,7 +107,9 @@ const LAB_SIGNATURE_SLOTS = new Set([
  * custody document. Every slot therefore always yields a block: the captured one
  * when it exists, an unsigned caption-only block to sign by hand when it does
  * not. Captured blocks outside the two slots (e.g. a witness) are kept with
- * their own identity, never dropped and never relabelled.
+ * their own identity, never dropped and never relabelled as one of the two
+ * parties — but one captured without its own role label takes its slot's
+ * caption, so the page prints "Witness", not the raw `witness` enum token.
  *
  * Returns null when nothing was captured, so the renderer keeps its
  * byte-identical wet-ink path.
@@ -112,7 +131,10 @@ export function mergeReceiptSignatures(
     const signed = claim(slot);
     return signed ? { ...signed, role: signed.role || caption.en } : { slot, role: caption.en };
   });
-  return [...blocks, ...unclaimed];
+  const extras = unclaimed.map((b) =>
+    b.role ? b : { ...b, role: SIGNATURE_SLOT_CAPTIONS[b.slot]?.en ?? b.role },
+  );
+  return [...blocks, ...extras];
 }
 
 /**

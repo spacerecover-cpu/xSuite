@@ -268,7 +268,41 @@ describe('toEngineData signature blocks', () => {
     // the witness keeps its own slot and identity
     expect(blocks?.[2].slot).toBe('witness');
     expect(blocks?.[2].name).toBe('Ali Haddad');
-    expect(blocks?.[2].role).toBeUndefined();
+    expect(blocks?.[2].role).toBe('Witness');
+  });
+
+  it('captions an unlabelled extra rather than printing its raw slot token', () => {
+    const witness: SignatureBlockData = { slot: 'witness', name: 'Ali Haddad', method: 'click_to_accept' };
+    const engine = {
+      config: { language: { mode: 'en', primary: 'en' }, signatureImages: undefined },
+      stampImage: null,
+      signatureImage: null,
+    } as unknown as EngineContext;
+    const texts: string[] = [];
+    const walk = (node: unknown): void => {
+      if (node == null || typeof node !== 'object') return;
+      if (Array.isArray(node)) return node.forEach(walk);
+      const o = node as Record<string, unknown>;
+      if (typeof o.text === 'string') texts.push(o.text);
+      Object.values(o).forEach(walk);
+    };
+    walk(
+      renderSignature(
+        engine,
+        toEngineData(
+          receipt({ capturedSignatures: [customerSig, witness] }),
+          BUILT_IN_TEMPLATE_CONFIGS.customer_copy,
+          'customer',
+        ),
+      ),
+    );
+    expect(texts).toContain('Witness');
+    expect(texts).not.toContain('witness');
+  });
+
+  it('keeps an extra signature\'s own role label when it carries one', () => {
+    const witness: SignatureBlockData = { slot: 'witness', name: 'Ali Haddad', role: 'Neighbour', method: 'click_to_accept' };
+    expect(blocksFor([customerSig, witness])?.[2].role).toBe('Neighbour');
   });
 
   it('renders both parties on the page when only the customer signed', () => {
