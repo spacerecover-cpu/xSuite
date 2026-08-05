@@ -553,3 +553,140 @@ describe('captureIntakeConsents', () => {
     ).rejects.toMatchObject({ message: 'rls denied' });
   });
 });
+
+// A browser reload between the case_devices INSERT and its response used to
+// re-arm the duplicate the in-memory guard existed to prevent. Uniqueness has to
+// live in the database, so the key is what makes a resubmit return the ORIGINAL
+// case rather than append a second set of DEVICE_RECEIVED events.
+describe('createCaseWithDevices — intake idempotency', () => {
+  const EXISTING = { id: 'case-OLD', case_number: 'CASE-0001' };
+
+  function lookupChain(row: unknown) {
+    const chain: Record<string, unknown> = {};
+    chain.select = vi.fn(() => chain);
+    chain.eq = vi.fn(() => chain);
+    chain.is = vi.fn(() => chain);
+    chain.maybeSingle = vi.fn(() => {
+      calls.push('cases-lookup');
+      return Promise.resolve({ data: row, error: null });
+    });
+    return chain;
+  }
+
+  function deviceListChain(rows: unknown[]) {
+    const chain: Record<string, unknown> = {};
+    chain.select = vi.fn(() => chain);
+    chain.eq = vi.fn(() => chain);
+    chain.is = vi.fn(() => {
+      calls.push('devices-list');
+      return Promise.resolve({ data: rows, error: null });
+    });
+    return chain;
+  }
+
+  beforeEach(() => {
+    calls = [];
+    rpc.mockReset();
+    from.mockReset();
+    rpc.mockImplementation((fn: string) => {
+      if (fn === 'get_next_number') {
+        calls.push('get_next_number');
+        return Promise.resolve({ data: 'CASE-0042', error: null });
+      }
+      calls.push(`rpc:${fn}`);
+      return Promise.resolve({ data: null, error: null });
+    });
+  });
+
+  it('returns the original case instead of creating a second one when the key was already used', async () => {
+    from.mockImplementation((table: string) => {
+      if (table === 'cases') return lookupChain(EXISTING);
+      if (table === 'case_devices') return deviceListChain([{ id: 'dev-x' }, { id: 'dev-y' }]);
+      throw new Error(`unexpected table ${table}`);
+    });
+
+    const result = await createCaseWithDevices(baseInput({ idempotencyKey: 'attempt-1' }));
+
+    expect(result).toEqual({
+      caseId: 'case-OLD',
+      caseNumber: 'CASE-0001',
+      deviceIds: ['dev-x', 'dev-y'],
+      reused: true,
+    });
+    // No second case, no second custody hand-over, and no burnt case number.
+    expect(calls).not.toContain('cases-insert');
+    expect(calls).not.toContain('devices-insert');
+    expect(calls).not.toContain('get_next_number');
+  });
+
+  it('stamps the key on the case so a later resubmit can find it', async () => {
+    let inserted: Record<string, unknown> | null = null;
+    const cases: Record<string, unknown> = {};
+    cases.select = vi.fn(() => cases);
+    cases.eq = vi.fn(() => cases);
+    cases.is = vi.fn(() => cases);
+    cases.maybeSingle = vi.fn(() =>
+      Promise.resolve({ data: inserted ? { id: 'case-1' } : null, error: null }),
+    );
+    cases.insert = vi.fn((payload: Record<string, unknown>) => {
+      inserted = payload;
+      calls.push('cases-insert');
+      return cases;
+    });
+    from.mockImplementation((table: string) => {
+      if (table === 'master_case_statuses') return mockIntakeStatuses();
+      if (table === 'cases') return cases;
+      throw new Error(`unexpected table ${table}`);
+    });
+
+    await createCaseWithDevices(baseInput({ idempotencyKey: 'attempt-1' }));
+
+    expect(inserted).toMatchObject({ intake_idempotency_key: 'attempt-1' });
+  });
+
+  it('recovers the original case when a concurrent submit already won the unique index', async () => {
+    let seen = 0;
+    from.mockImplementation((table: string) => {
+      if (table === 'master_case_statuses') return mockIntakeStatuses();
+      if (table === 'case_devices') return deviceListChain([{ id: 'dev-x' }]);
+      if (table === 'cases') {
+        seen += 1;
+        if (seen === 1) return lookupChain(null);
+        if (seen === 2) {
+          const chain: Record<string, unknown> = {};
+          chain.insert = vi.fn(() => {
+            calls.push('cases-insert');
+            return chain;
+          });
+          chain.select = vi.fn(() => chain);
+          chain.maybeSingle = vi.fn(() =>
+            Promise.resolve({
+              data: null,
+              error: { code: '23505', message: 'duplicate key value violates unique constraint' },
+            }),
+          );
+          return chain;
+        }
+        return lookupChain(EXISTING);
+      }
+      throw new Error(`unexpected table ${table}`);
+    });
+
+    const result = await createCaseWithDevices(baseInput({ idempotencyKey: 'attempt-1' }));
+
+    expect(result).toMatchObject({ caseId: 'case-OLD', caseNumber: 'CASE-0001', reused: true });
+  });
+
+  it('creates normally when no key is supplied, and never looks one up', async () => {
+    from.mockImplementation((table: string) => {
+      if (table === 'master_case_statuses') return mockIntakeStatuses();
+      if (table === 'cases') return mockCasesInsert({ data: { id: 'case-1' }, error: null });
+      throw new Error(`unexpected table ${table}`);
+    });
+
+    const result = await createCaseWithDevices(baseInput());
+
+    expect(calls).not.toContain('cases-lookup');
+    expect(result).toMatchObject({ caseId: 'case-1', caseNumber: 'CASE-0042' });
+  });
+});

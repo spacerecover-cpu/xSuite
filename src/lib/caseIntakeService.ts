@@ -24,12 +24,56 @@ export interface CreateCaseWithDevicesInput {
   companyId?: string | null;
   /** Devices to insert. `isPrimary` marks the patient device. */
   devices: Array<Omit<CaseDeviceInsert, 'tenant_id' | 'case_id'> & { isPrimary?: boolean }>;
+  /**
+   * One physical check-in attempt. Survives a browser reload, so a resubmit
+   * returns the case the first submit created instead of taking a second
+   * hand-over of the same devices into an append-only custody ledger.
+   */
+  idempotencyKey?: string;
 }
 
 export interface CreateCaseWithDevicesResult {
   caseId: string;
   caseNumber: string;
   deviceIds: string[];
+  /** Set when this attempt matched an earlier one and no new case was created. */
+  reused?: true;
+}
+
+/**
+ * The case a previous submit of this same attempt already created, or null.
+ * Tenant-scoped by the caller's RLS as well as the explicit filter.
+ */
+async function findCaseByIntakeKey(
+  tenantId: string,
+  key: string,
+): Promise<CreateCaseWithDevicesResult | null> {
+  const { data, error } = await supabase
+    .from('cases')
+    .select('id, case_number')
+    .eq('tenant_id', tenantId)
+    .eq('intake_idempotency_key', key)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (error) {
+    logger.error('Error resolving intake idempotency key:', error);
+    return null;
+  }
+  if (!data) return null;
+
+  const { data: devices } = await supabase
+    .from('case_devices')
+    .select('id')
+    .eq('case_id', data.id)
+    .is('deleted_at', null);
+
+  return {
+    caseId: data.id,
+    caseNumber: data.case_number ?? '',
+    deviceIds: (devices ?? []).map((d) => d.id),
+    reused: true,
+  };
 }
 
 /**
@@ -63,6 +107,13 @@ export class DevicesInCustodyError extends Error {
 export async function createCaseWithDevices(
   input: CreateCaseWithDevicesInput,
 ): Promise<CreateCaseWithDevicesResult> {
+  // Before anything is reserved or written: this attempt may already have landed.
+  // Checking first also means a resubmit does not burn a case number.
+  if (input.idempotencyKey) {
+    const already = await findCaseByIntakeKey(input.tenantId, input.idempotencyKey);
+    if (already) return already;
+  }
+
   const { data: caseNumber, error: numberError } = await supabase
     .rpc('get_next_number', { p_scope: 'case' });
 
@@ -98,11 +149,18 @@ export async function createCaseWithDevices(
     caseData.created_by = input.profileId;
     if (input.profileRole === 'technician') caseData.assigned_to = input.profileId;
   }
+  if (input.idempotencyKey) caseData.intake_idempotency_key = input.idempotencyKey;
 
   const { data: newCase, error: caseError } = await supabase
     .from('cases').insert(caseData).select().maybeSingle();
 
   if (caseError) {
+    // 23505 on uq_cases_intake_idempotency_key means a concurrent submit of this
+    // same attempt won the race. That is the guard working, not a failure.
+    if (caseError.code === '23505' && input.idempotencyKey) {
+      const raced = await findCaseByIntakeKey(input.tenantId, input.idempotencyKey);
+      if (raced) return raced;
+    }
     logger.error('Error creating case:', caseError);
     throw new Error(`Failed to create case: ${caseError.message}`);
   }

@@ -32,6 +32,7 @@ import {
   useIntakeWhatsAppConsentText,
   type AcknowledgeValue,
 } from '../../components/cases/checkin/AcknowledgeSection';
+import { beginIntakeAttempt, clearIntakeAttempt } from '../../lib/intakeAttemptKey';
 import {
   createCaseWithDevices,
   logCaseIntake,
@@ -50,6 +51,12 @@ import { CASE_COMMAND_STATS_KEY } from '../../hooks/useCaseCommandStats';
 interface CheckedInCase {
   caseId: string;
   caseNumber: string;
+  /**
+   * This submit matched an attempt that had already landed — typically a reload
+   * after the devices were taken into custody. No second case, and crucially no
+   * second set of DEVICE_RECEIVED events, was written.
+   */
+  alreadyRecorded?: boolean;
 }
 
 /**
@@ -204,6 +211,9 @@ export function CaseCheckIn() {
           customerId,
           customerName: customer?.customer_name ?? 'Customer',
           priority: null,
+          // Survives a reload, so a resubmit of THIS hand-over returns the case
+          // the first submit created rather than taking the devices in twice.
+          idempotencyKey: beginIntakeAttempt(customerId),
           devices: devices.map((d, i) => ({
             device_type_id: d.device_type_id,
             brand_id: d.brand_id,
@@ -226,6 +236,14 @@ export function CaseCheckIn() {
 
       const { caseId, caseNumber, deviceIds } = created;
       createdCase.current = { caseId, caseNumber };
+
+      // The evidence steps below already ran on the submit that created this case.
+      // Re-running them would raise a second receipt instance and a second
+      // signature for one hand-over, so stop here and say what happened.
+      if (created.reused) {
+        clearIntakeAttempt();
+        return { caseId, caseNumber, alreadyRecorded: true };
+      }
 
       const instance = await createDocumentInstance({
         docType: 'customer_copy',
@@ -263,6 +281,7 @@ export function CaseCheckIn() {
     },
     onSuccess: (checkedIn) => {
       createdCase.current = null;
+      clearIntakeAttempt();
       queryClient.invalidateQueries({ queryKey: ['cases'] });
       queryClient.invalidateQueries({ queryKey: ['cases_count'] });
       queryClient.invalidateQueries({ queryKey: [CASE_COMMAND_STATS_KEY] });
@@ -300,6 +319,7 @@ export function CaseCheckIn() {
   });
 
   function resetForAnother() {
+    clearIntakeAttempt();
     setResult(null);
     setStalled(null);
     createdCase.current = null;
@@ -384,11 +404,23 @@ export function CaseCheckIn() {
             <CheckCircle2 aria-hidden="true" className="h-9 w-9 text-success" />
           </div>
           <h1 className="text-xl font-semibold text-slate-900">
-            {result.caseNumber} is in custody
+            {result.alreadyRecorded
+              ? `${result.caseNumber} was already checked in`
+              : `${result.caseNumber} is in custody`}
           </h1>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
-            {devices.length} device{devices.length === 1 ? '' : 's'} received from{' '}
-            {depositor.name || customer?.customer_name}. Hand the customer their copy of the receipt.
+            {result.alreadyRecorded ? (
+              <>
+                This hand-over had already been recorded, so the devices were not
+                taken in a second time and nothing you just re-entered was saved.
+                Open the case to confirm what was recorded.
+              </>
+            ) : (
+              <>
+                {devices.length} device{devices.length === 1 ? '' : 's'} received from{' '}
+                {depositor.name || customer?.customer_name}. Hand the customer their copy of the receipt.
+              </>
+            )}
           </p>
 
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
