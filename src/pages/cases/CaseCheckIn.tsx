@@ -1,0 +1,421 @@
+import { useId, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  ClipboardCheck,
+  CheckCircle2,
+  FileText,
+  Mail,
+  Plus,
+  ShieldCheck,
+} from 'lucide-react';
+import { supabase } from '../../lib/supabaseClient';
+import { logger } from '../../lib/logger';
+import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../hooks/useToast';
+import { useCustomerPickerRows } from '../../lib/pickerSearch';
+import { Button } from '../../components/ui/Button';
+import { SearchableSelect } from '../../components/ui/SearchableSelect';
+import { PageHeaderSlot } from '../../components/layout/PageHeaderSlot';
+import { CustomerFormModal } from '../../components/customers/CustomerFormModal';
+import { EmailDocumentModal } from '../../components/cases/EmailDocumentModal';
+import { DepositorSection, type DepositorValue } from '../../components/cases/checkin/DepositorSection';
+import {
+  IntakeDeviceRows,
+  emptyDevice,
+  devicesAreComplete,
+  type IntakeDeviceValue,
+} from '../../components/cases/checkin/IntakeDeviceRows';
+import {
+  AcknowledgeSection,
+  useIntakeWhatsAppConsentText,
+  type AcknowledgeValue,
+} from '../../components/cases/checkin/AcknowledgeSection';
+import {
+  createCaseWithDevices,
+  logCaseIntake,
+  signIntakeReceipt,
+  captureIntakeConsents,
+  requireDepositorId,
+} from '../../lib/caseIntakeService';
+import { createDocumentInstance } from '../../lib/documentInstanceService';
+import { shouldAutoPrintLabel } from '../../lib/labelPrefsService';
+import { printCustomerCopy } from '../../lib/printUtils';
+import { CASE_COMMAND_STATS_KEY } from '../../hooks/useCaseCommandStats';
+
+interface CheckedInCase {
+  caseId: string;
+  caseNumber: string;
+}
+
+function useCatalog(table: 'catalog_device_types' | 'catalog_device_brands' | 'catalog_device_capacities' | 'catalog_device_conditions', key: string) {
+  const { data = [] } = useQuery({
+    queryKey: [key],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from(table)
+        .select('id, name')
+        .eq('is_active', true)
+        .order('sort_order');
+      if (error) throw error;
+      return data;
+    },
+  });
+  return data;
+}
+
+
+/**
+ * Front-desk check-in. One scrolling surface rather than a stepper: counter work
+ * is interrupt-driven and must stay resumable at any point.
+ *
+ * The submit order is load-bearing evidence handling, not a preference. The
+ * receipt is signed BEFORE the custody event is appended so that event can carry
+ * the receipt instance id, and consent is captured last so a consent failure can
+ * never orphan custody evidence that is already written and append-only.
+ */
+export function CaseCheckIn() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { profile } = useAuth();
+  const toast = useToast();
+  const whatsappConsentText = useIntakeWhatsAppConsentText();
+  const blockerId = useId();
+
+  const [customerId, setCustomerId] = useState('');
+  const [customerModalOpen, setCustomerModalOpen] = useState(false);
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [result, setResult] = useState<CheckedInCase | null>(null);
+
+  const [depositor, setDepositor] = useState<DepositorValue>({
+    name: '', mobile: '', nationalId: '', relationship: 'self',
+  });
+  const [devices, setDevices] = useState<IntakeDeviceValue[]>([emptyDevice('device-0')]);
+  const [ack, setAck] = useState<AcknowledgeValue>({
+    termsAccepted: false, whatsappUtility: false, destructiveAuthorized: false, signature: null,
+  });
+
+  const { rows: customers, onSearchTermChange: onCustomerSearch } = useCustomerPickerRows(
+    customerId || undefined,
+  );
+  const customer = customers.find((c) => c.id === customerId);
+
+  const deviceTypes = useCatalog('catalog_device_types', 'device_types');
+  const brands = useCatalog('catalog_device_brands', 'brands');
+  const capacities = useCatalog('catalog_device_capacities', 'capacities');
+  const conditions = useCatalog('catalog_device_conditions', 'device_conditions');
+
+  const customerOptions = useMemo(
+    () => customers.map((c) => ({
+      id: c.id,
+      name: c.customer_name,
+      keywords: [c.customer_number, c.email, c.mobile_number].filter(Boolean).join(' '),
+    })),
+    [customers],
+  );
+
+  function handleCustomer(id: string) {
+    setCustomerId(id);
+    const picked = customers.find((c) => c.id === id);
+    if (depositor.relationship === 'self') {
+      setDepositor((d) => ({ ...d, name: picked?.customer_name ?? '' }));
+    }
+  }
+
+  const depositorDone =
+    depositor.name.trim() !== '' &&
+    (!requireDepositorId(depositor.relationship) || depositor.nationalId.trim() !== '');
+
+  // Counter work is interrupt-driven: the rail says where you got to, the
+  // sticky bar says what is still holding the check-in up.
+  const progress = [
+    { name: 'Customer', done: customerId !== '' },
+    { name: 'Depositor', done: depositorDone },
+    { name: 'Devices', done: devicesAreComplete(devices) },
+    { name: 'Acknowledge', done: ack.termsAccepted },
+  ];
+
+  const blocker = !customerId
+    ? 'Select the customer this case belongs to.'
+    : !depositor.name.trim()
+      ? 'Record who is handing the devices over.'
+      : requireDepositorId(depositor.relationship) && !depositor.nationalId.trim()
+        ? 'A National ID is required when the depositor is not the customer.'
+        : !devicesAreComplete(devices)
+          ? 'Every device needs a recorded condition before it can be accepted.'
+          : !ack.termsAccepted
+            ? 'The customer must accept the terms of service.'
+            : null;
+
+  const checkIn = useMutation({
+    mutationFn: async (): Promise<CheckedInCase> => {
+      if (!profile?.tenant_id) throw new Error('No active tenant — please sign in again.');
+      const tenantId = profile.tenant_id;
+
+      const { caseId, caseNumber, deviceIds } = await createCaseWithDevices({
+        tenantId,
+        profileId: profile.id ?? null,
+        profileRole: profile.role ?? null,
+        customerId,
+        customerName: customer?.customer_name ?? 'Customer',
+        priority: null,
+        devices: devices.map((d, i) => ({
+          device_type_id: d.device_type_id,
+          brand_id: d.brand_id,
+          model: d.model || null,
+          serial_number: d.serial_number || null,
+          capacity_id: d.capacity_id,
+          condition_id: d.condition_id,
+          notes: d.notes || null,
+          created_by: profile.id ?? null,
+          isPrimary: i === 0,
+        })),
+      });
+
+      const instance = await createDocumentInstance({
+        docType: 'customer_copy',
+        title: `Check-in receipt ${caseNumber}`,
+        caseId,
+        customerId,
+      });
+
+      if (ack.signature) {
+        await signIntakeReceipt(instance.id, ack.signature, customerId);
+      }
+
+      await logCaseIntake({
+        caseId,
+        deviceIds,
+        depositorName: depositor.name,
+        depositorMobile: depositor.mobile,
+        depositorId: depositor.nationalId,
+        depositorRelationship: depositor.relationship,
+        receiptInstanceId: instance.id,
+      });
+
+      await captureIntakeConsents({
+        tenantId,
+        customerId,
+        caseId,
+        phoneE164: customer?.mobile_number ?? null,
+        whatsappUtility: ack.whatsappUtility,
+        destructiveAuthorized: ack.destructiveAuthorized,
+        consentText: whatsappConsentText,
+      });
+
+      return { caseId, caseNumber };
+    },
+    onSuccess: (checkedIn) => {
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries({ queryKey: ['cases_count'] });
+      queryClient.invalidateQueries({ queryKey: [CASE_COMMAND_STATS_KEY] });
+      setResult(checkedIn);
+
+      // Fire-and-forget: a printer fault must never block intake or discard the
+      // evidence already written above.
+      void shouldAutoPrintLabel('case')
+        .then(async (enabled) => {
+          if (!enabled) return;
+          const { printCaseLabels } = await import('../../lib/pdf/labels/labelPrintService');
+          await printCaseLabels(checkedIn.caseId, { output: 'print' });
+        })
+        .catch((error) => logger.error('Case label print failed after check-in:', error));
+    },
+    onError: (error: Error) => {
+      logger.error('Check-in failed:', error);
+      toast.error(`Check-in failed: ${error.message}`);
+    },
+  });
+
+  function resetForAnother() {
+    setResult(null);
+    setEmailModalOpen(false);
+    setCustomerId('');
+    setDepositor({ name: '', mobile: '', nationalId: '', relationship: 'self' });
+    setDevices([emptyDevice(`device-${Date.now()}`)]);
+    setAck({ termsAccepted: false, whatsappUtility: false, destructiveAuthorized: false, signature: null });
+  }
+
+  if (result) {
+    const canSend = ack.whatsappUtility || Boolean(customer?.email);
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10">
+        <PageHeaderSlot title="Check in devices" icon={ClipboardCheck} iconColor="rgb(var(--color-primary))" />
+        <div className="rounded-xl border border-border bg-surface p-8 text-center">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-success-muted">
+            <CheckCircle2 aria-hidden="true" className="h-9 w-9 text-success" />
+          </div>
+          <h1 className="text-xl font-semibold text-slate-900">
+            {result.caseNumber} is in custody
+          </h1>
+          <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
+            {devices.length} device{devices.length === 1 ? '' : 's'} received from{' '}
+            {depositor.name || customer?.customer_name}. Hand the customer their copy of the receipt.
+          </p>
+
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+            <Button onClick={() => printCustomerCopy(result.caseId, result.caseNumber)}>
+              <FileText aria-hidden="true" className="me-2 h-4 w-4" />
+              Print customer copy
+            </Button>
+            <Button variant="secondary" disabled={!canSend} onClick={() => setEmailModalOpen(true)}>
+              <Mail aria-hidden="true" className="me-2 h-4 w-4" />
+              Send to customer
+            </Button>
+          </div>
+          {!canSend && (
+            <p className="mt-3 text-xs text-slate-500">
+              No email on file and no messaging consent — print the copy instead.
+            </p>
+          )}
+
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4 border-t border-border pt-6 text-sm">
+            <button
+              type="button"
+              onClick={() => navigate(`/cases/${result.caseId}`)}
+              className="font-medium text-primary hover:underline"
+            >
+              Open the case
+            </button>
+            <span aria-hidden="true" className="text-slate-300">·</span>
+            <button
+              type="button"
+              onClick={resetForAnother}
+              className="font-medium text-slate-600 hover:text-slate-900"
+            >
+              Check in another
+            </button>
+          </div>
+        </div>
+
+        <EmailDocumentModal
+          isOpen={emailModalOpen}
+          onClose={() => setEmailModalOpen(false)}
+          documentType="customer_copy"
+          caseId={result.caseId}
+          caseNumber={result.caseNumber}
+          customerName={customer?.customer_name ?? 'Customer'}
+          customerEmail={customer?.email ?? undefined}
+          companyName="Data Recovery"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-3xl px-4 pb-32 pt-8">
+      <PageHeaderSlot title="Check in devices" icon={ClipboardCheck} iconColor="rgb(var(--color-primary))" />
+
+      <header className="mb-8">
+        <h1 className="text-xl font-semibold text-slate-900">Check in devices</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Records the moment the lab takes custody. The receipt this produces is the
+          proof of what arrived, in what condition, and from whom.
+        </p>
+        <ol className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-medium">
+          {progress.map(({ name, done }) => (
+            <li
+              key={name}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 ${
+                done ? 'bg-success-muted text-success' : 'bg-surface-muted text-slate-500'
+              }`}
+            >
+              <CheckCircle2
+                aria-hidden="true"
+                className={`h-3.5 w-3.5 ${done ? '' : 'opacity-30'}`}
+              />
+              {name}
+              <span className="sr-only">{done ? ' — complete' : ' — outstanding'}</span>
+            </li>
+          ))}
+        </ol>
+      </header>
+
+      <div className="space-y-10">
+        <section className="space-y-6">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Customer</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              The party the recovered data will be released to.
+            </p>
+          </div>
+          <SearchableSelect
+            floatingLabel
+            label="Customer"
+            name="customer"
+            required
+            value={customerId}
+            onChange={handleCustomer}
+            options={customerOptions}
+            onSearchTermChange={onCustomerSearch}
+            placeholder="Search by name, email, mobile or number"
+            onAddNew={() => setCustomerModalOpen(true)}
+            addNewLabel="Add a new customer"
+          />
+          {customer && (
+            <dl className="grid grid-cols-1 gap-3 rounded-lg border border-border bg-surface-muted px-4 py-3 text-sm sm:grid-cols-3">
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-slate-500">Number</dt>
+                <dd className="mt-0.5 text-slate-900">{customer.customer_number ?? '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-slate-500">Mobile</dt>
+                <dd className="mt-0.5 text-slate-900">{customer.mobile_number ?? '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-slate-500">Email</dt>
+                <dd className="mt-0.5 truncate text-slate-900">{customer.email ?? '—'}</dd>
+              </div>
+            </dl>
+          )}
+        </section>
+
+        <DepositorSection
+          value={depositor}
+          customerName={customer?.customer_name ?? ''}
+          onChange={setDepositor}
+        />
+
+        <IntakeDeviceRows
+          value={devices}
+          deviceTypes={deviceTypes}
+          brands={brands}
+          capacities={capacities}
+          conditions={conditions}
+          onChange={setDevices}
+        />
+
+        <AcknowledgeSection value={ack} onChange={setAck} />
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-surface/95 backdrop-blur">
+        <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <p id={blockerId} role="status" className="flex items-center gap-2 text-sm text-slate-500">
+            <ShieldCheck aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400" />
+            {blocker ?? 'Ready — this will take the devices into custody.'}
+          </p>
+          <Button
+            onClick={() => checkIn.mutate()}
+            disabled={blocker !== null || checkIn.isPending}
+            isLoading={checkIn.isPending}
+            aria-describedby={blockerId}
+          >
+            <Plus aria-hidden="true" className="me-2 h-4 w-4" />
+            Complete check-in
+          </Button>
+        </div>
+      </div>
+
+      <CustomerFormModal
+        isOpen={customerModalOpen}
+        onClose={() => setCustomerModalOpen(false)}
+        consentSource="intake_form"
+        onSuccess={(created) => {
+          const id = (created as { id?: string }).id;
+          if (id) handleCustomer(id);
+          setCustomerModalOpen(false);
+        }}
+      />
+    </div>
+  );
+}
