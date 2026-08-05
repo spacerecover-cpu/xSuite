@@ -28,15 +28,11 @@ import {
   Layers
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { setPrimaryDevice } from '../../lib/deviceService';
-import { getIntakeStatusForCreation } from '../../lib/caseService';
+import { createCaseWithDevices } from '../../lib/caseIntakeService';
 import { logger } from '../../lib/logger';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
 import { CASE_COMMAND_STATS_KEY } from '../../hooks/useCaseCommandStats';
-import type { Database } from '../../types/database.types';
-
-type CasesInsert = Database['public']['Tables']['cases']['Insert'];
 
 interface Device {
   id: string;
@@ -348,65 +344,15 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
 
   const createCaseMutation = useMutation({
     mutationFn: async () => {
-      const { data: caseNumber, error: numberError } = await supabase
-        .rpc('get_next_number', { p_scope: 'case' });
-
-      if (numberError) {
-        logger.error('Error generating case number:', numberError);
-        if (numberError.message?.includes('not found')) {
-          throw new Error('Case numbering system is not configured. Please contact your system administrator to configure it in Settings > System & Numbers.');
-        }
-        throw new Error(`Failed to generate case number: ${numberError.message}`);
-      }
-
-      if (!caseNumber) {
-        throw new Error('Failed to generate case number. Please try again or contact support.');
-      }
-
-      const customerName = customers.find(c => c.id === formData.customer_id)?.customer_name || 'Customer';
-
       if (!profile?.tenant_id) {
         throw new Error('No active tenant — please sign in again.');
       }
       const tenantId = profile.tenant_id;
+      const customerName =
+        customers.find((c) => c.id === formData.customer_id)?.customer_name || 'Customer';
 
-      // The guard trigger on cases requires a matched active intake
-      // status_id + name pair on INSERT.
-      const intakeStatus = await getIntakeStatusForCreation();
-
-      const caseData: CasesInsert = {
-        tenant_id: tenantId,
-        case_number: caseNumber,
-        customer_id: formData.customer_id,
-        subject: `Case for ${customerName}`,
-        priority: formData.priority,
-        status: intakeStatus.name,
-        status_id: intakeStatus.id,
-        phase_entered_at: new Date().toISOString(),
-      };
-
-      if (formData.contact_id) {
-        caseData.contact_id = formData.contact_id;
-      }
-      if (formData.client_reference) {
-        caseData.client_reference = formData.client_reference;
-      }
-      if (formData.service_type_id) {
-        caseData.service_type_id = formData.service_type_id;
-      }
-      if (formData.service_location_id) {
-        caseData.service_location_id = formData.service_location_id;
-      }
-      if (profile?.id) {
-        caseData.created_by = profile.id;
-
-        // Auto-assign technicians to cases they create
-        if (profile.role === 'technician') {
-          caseData.assigned_to = profile.id;
-        }
-      }
-
-      // Auto-populate company_id from customer's company relationship
+      // Auto-populate company_id from the customer's primary company relationship.
+      let companyId: string | null = null;
       if (formData.customer_id) {
         const { data: customerCompany } = await supabase
           .from('customer_company_relationships')
@@ -416,40 +362,27 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
           .order('is_primary', { ascending: false })
           .limit(1)
           .maybeSingle();
-
-        if (customerCompany?.company_id) {
-          caseData.company_id = customerCompany.company_id;
-        }
-      }
-
-      const { data: newCase, error: caseError } = await supabase
-        .from('cases')
-        .insert(caseData)
-        .select()
-        .maybeSingle();
-
-      if (caseError) {
-        logger.error('Error creating case:', caseError);
-        throw new Error(`Failed to create case: ${caseError.message}`);
-      }
-      if (!newCase) {
-        throw new Error('Case was created but no row was returned.');
+        companyId = customerCompany?.company_id ?? null;
       }
 
       const allDevices = [...devices, ...bulkServerDrives];
+      const primaryWizardDevice = allDevices.find((d) => d.is_primary);
 
-      const primaryWizardDevice = allDevices.find(d => d.is_primary);
-
-      const devicesToInsert = allDevices
-        .filter(d => d.device_type_id || d.serial_no)
-        .map(device => {
-          const problemName = device.device_problem_id
-            ? serviceProblems.find(sp => sp.id === device.device_problem_id)?.name || null
-            : null;
-
-          return {
-            tenant_id: tenantId,
-            case_id: newCase.id,
+      const result = await createCaseWithDevices({
+        tenantId,
+        profileId: profile?.id ?? null,
+        profileRole: profile?.role ?? null,
+        customerId: formData.customer_id,
+        customerName,
+        priority: formData.priority,
+        contactId: formData.contact_id || null,
+        clientReference: formData.client_reference || null,
+        serviceTypeId: formData.service_type_id || null,
+        serviceLocationId: formData.service_location_id || null,
+        companyId,
+        devices: allDevices
+          .filter((d) => d.device_type_id || d.serial_no)
+          .map((device) => ({
             device_type_id: device.device_type_id || null,
             brand_id: device.brand_id || null,
             model: device.model || null,
@@ -457,42 +390,21 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
             capacity_id: device.capacity_id || null,
             condition_id: device.condition_id || null,
             accessories: device.accessories.length > 0 ? device.accessories : null,
-            symptoms: problemName,
+            symptoms: device.device_problem_id
+              ? serviceProblems.find((sp) => sp.id === device.device_problem_id)?.name || null
+              : null,
             notes: device.recovery_requirements || null,
             password: device.device_password || null,
             encryption_id: device.encryption_type_id || null,
             device_role_id: device.device_role_id || null,
             created_by: profile?.id || null,
-            _wizard_id: device.id,
-          };
-        });
+            isPrimary: primaryWizardDevice ? device.id === primaryWizardDevice.id : false,
+          })),
+      });
 
-      let primaryDeviceDbId: string | null = null;
-
-      if (devicesToInsert.length > 0) {
-        const { data: insertedDevices, error: devicesError } = await supabase
-          .from('case_devices')
-          .insert(devicesToInsert.map(({ _wizard_id: _w, ...rest }) => rest))
-          .select('id');
-
-        if (devicesError) {
-          logger.error('Error inserting devices:', devicesError);
-          throw new Error(`Failed to insert devices: ${devicesError.message}`);
-        }
-
-        if (primaryWizardDevice && insertedDevices && insertedDevices.length > 0) {
-          const primaryIndex = devicesToInsert.findIndex(d => d._wizard_id === primaryWizardDevice.id);
-          const matched = primaryIndex >= 0 ? insertedDevices[primaryIndex] : insertedDevices[0];
-          if (matched) primaryDeviceDbId = matched.id;
-        } else if (insertedDevices && insertedDevices.length > 0) {
-          primaryDeviceDbId = insertedDevices[0].id;
-        }
-      }
-
-      if (primaryDeviceDbId) {
-        await setPrimaryDevice(primaryDeviceDbId, newCase.id);
-      }
-
+      const { data: newCase } = await supabase
+        .from('cases').select().eq('id', result.caseId).maybeSingle();
+      if (!newCase) throw new Error('Case was created but no row was returned.');
       return newCase;
     },
     onSuccess: (newCase) => {
