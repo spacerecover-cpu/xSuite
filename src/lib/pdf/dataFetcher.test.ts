@@ -751,19 +751,47 @@ function mockTables(tables: Record<string, Array<Record<string, unknown>>>) {
   const calls: string[] = [];
   const makeChain = (rows: Array<Record<string, unknown>>) => {
     const filters: Array<(row: Record<string, unknown>) => boolean> = [];
-    const matched = () => rows.filter(row => filters.every(f => f(row)));
+    let sort: { column: string; ascending: boolean } | null = null;
+    let take: number | null = null;
+    const matched = () => {
+      let out = rows.filter(row => filters.every(f => f(row)));
+      if (sort) {
+        const { column, ascending } = sort;
+        out = [...out].sort((a, b) =>
+          String(a[column] ?? '').localeCompare(String(b[column] ?? '')) * (ascending ? 1 : -1),
+        );
+      }
+      return take === null ? out : out.slice(0, take);
+    };
     const chain = {
       select: vi.fn(() => chain),
       eq: vi.fn((column: string, value: unknown) => {
         filters.push(row => row[column] === value);
         return chain;
       }),
+      in: vi.fn((column: string, values: unknown[]) => {
+        filters.push(row => values.includes(row[column]));
+        return chain;
+      }),
       is: vi.fn((column: string, value: unknown) => {
         filters.push(row => row[column] === value);
         return chain;
       }),
-      order: vi.fn(() => Promise.resolve({ data: matched(), error: null })),
+      // Chainable so `.order().limit().maybeSingle()` works, and thenable so the
+      // existing `await ….order(…)` terminal callers keep resolving.
+      order: vi.fn((column: string, opts?: { ascending?: boolean }) => {
+        sort = { column, ascending: opts?.ascending !== false };
+        return chain;
+      }),
+      limit: vi.fn((n: number) => {
+        take = n;
+        return chain;
+      }),
       maybeSingle: vi.fn(() => Promise.resolve({ data: matched()[0] ?? null, error: null })),
+      then: (
+        resolve: (v: { data: unknown; error: null }) => unknown,
+        reject?: (e: unknown) => unknown,
+      ) => Promise.resolve({ data: matched(), error: null }).then(resolve, reject),
     };
     return chain;
   };
@@ -822,11 +850,98 @@ describe('fetchReceiptData — signatures captured at the counter reach the rece
     ]);
   });
 
-  it('never queries signatures without an instance id — preview and legacy callers keep wet-ink lines', async () => {
+  it('keeps wet-ink lines when the case has raised no receipt instance', async () => {
     const { calls } = mockTables({ cases: [RECEIPT_CASE], case_devices: [], document_signatures: [TYPED_SIG] });
     const data = await fetchReceiptData('case-1');
     expect(calls).not.toContain('document_signatures');
     expect(data.capturedSignatures).toBeUndefined();
+  });
+
+  // The print route, the email blob and the office copy all call fetchReceiptData
+  // with a case id only — there is no channel to pass an instance id through
+  // /print/customer-copy/:caseId. Resolving the receipt instance from the case is
+  // what makes the captured signature reach the paper the customer is handed.
+  const RECEIPT_INSTANCE = {
+    id: 'inst-1',
+    case_id: 'case-1',
+    doc_type: 'customer_copy',
+    created_at: '2026-08-04T09:00:00.000Z',
+    deleted_at: null,
+  };
+
+  it('resolves the case receipt instance when the caller passes no instance id', async () => {
+    mockTables({
+      cases: [RECEIPT_CASE],
+      case_devices: [],
+      document_instances: [RECEIPT_INSTANCE],
+      document_signatures: [TYPED_SIG],
+    });
+    const data = await fetchReceiptData('case-1');
+    expect(data.capturedSignatures?.map(s => s.name)).toEqual(['Ali Hassan']);
+  });
+
+  it('resolves the office copy of a check-in too, not only the customer copy', async () => {
+    mockTables({
+      cases: [RECEIPT_CASE],
+      case_devices: [],
+      document_instances: [{ ...RECEIPT_INSTANCE, doc_type: 'office_receipt' }],
+      document_signatures: [TYPED_SIG],
+    });
+    const data = await fetchReceiptData('case-1');
+    expect(data.capturedSignatures?.map(s => s.name)).toEqual(['Ali Hassan']);
+  });
+
+  it('resolves the most recent receipt instance when a case has several', async () => {
+    mockTables({
+      cases: [RECEIPT_CASE],
+      case_devices: [],
+      document_instances: [
+        { ...RECEIPT_INSTANCE, id: 'inst-OLD', created_at: '2026-08-01T09:00:00.000Z' },
+        { ...RECEIPT_INSTANCE, id: 'inst-1', created_at: '2026-08-04T09:00:00.000Z' },
+      ],
+      document_signatures: [
+        TYPED_SIG,
+        { ...TYPED_SIG, id: 's-old', document_instance_id: 'inst-OLD', signer_name: 'Stale Signer' },
+      ],
+    });
+    const data = await fetchReceiptData('case-1');
+    expect(data.capturedSignatures?.map(s => s.name)).toEqual(['Ali Hassan']);
+  });
+
+  it('ignores a soft-deleted receipt instance', async () => {
+    mockTables({
+      cases: [RECEIPT_CASE],
+      case_devices: [],
+      document_instances: [{ ...RECEIPT_INSTANCE, deleted_at: '2026-08-04T10:00:00.000Z' }],
+      document_signatures: [TYPED_SIG],
+    });
+    const data = await fetchReceiptData('case-1');
+    expect(data.capturedSignatures).toBeUndefined();
+  });
+
+  it('does not borrow another case\'s receipt instance', async () => {
+    mockTables({
+      cases: [RECEIPT_CASE],
+      case_devices: [],
+      document_instances: [{ ...RECEIPT_INSTANCE, case_id: 'case-OTHER' }],
+      document_signatures: [TYPED_SIG],
+    });
+    const data = await fetchReceiptData('case-1');
+    expect(data.capturedSignatures).toBeUndefined();
+  });
+
+  it('lets an explicit instance id win over the resolved one', async () => {
+    mockTables({
+      cases: [RECEIPT_CASE],
+      case_devices: [],
+      document_instances: [{ ...RECEIPT_INSTANCE, id: 'inst-RESOLVED' }],
+      document_signatures: [
+        TYPED_SIG,
+        { ...TYPED_SIG, id: 's-res', document_instance_id: 'inst-RESOLVED', signer_name: 'Resolved Signer' },
+      ],
+    });
+    const data = await fetchReceiptData('case-1', 'inst-1');
+    expect(data.capturedSignatures?.map(s => s.name)).toEqual(['Ali Hassan']);
   });
 
   it('scopes signatures to the rendered instance and excludes revoked (soft-deleted) rows', async () => {

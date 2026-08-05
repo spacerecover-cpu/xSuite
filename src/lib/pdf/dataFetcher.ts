@@ -368,11 +368,16 @@ export function toCaseData(
  * callers pass nothing and keep the wet-ink signature lines.
  */
 export async function fetchReceiptData(caseId: string, instanceId?: string): Promise<ReceiptData> {
+  // /print/customer-copy/:caseId carries no instance id, so an explicit one is the
+  // exception rather than the rule: resolve the case's own receipt instance or the
+  // signature the customer gave at the counter never reaches the paper.
+  const resolvedInstanceId = instanceId ?? (await findCaseReceiptInstanceId(caseId));
+
   const [caseResult, devicesResult, settingsResult, capturedSignatures] = await Promise.all([
     fetchCaseData(caseId),
     fetchCaseDevices(caseId),
     fetchCompanySettings(),
-    fetchCapturedSignatures(instanceId),
+    fetchCapturedSignatures(resolvedInstanceId),
   ]);
 
   return {
@@ -388,6 +393,33 @@ export async function fetchReceiptData(caseId: string, instanceId?: string): Pro
 // print: the document falls back to wet-ink lines, which stays a truthful artifact
 // (an unsigned line is signed by hand) rather than asserting a signature it could
 // not read.
+/**
+ * The check-in receipt instance raised against this case, newest first. Both intake
+ * variants are eligible: the customer signs the check-in once, and that signature
+ * belongs on the lab's retained copy as much as on the customer's.
+ *
+ * Failure is non-fatal for the same reason a failed signature lookup is — an
+ * unsigned wet-ink line is a truthful artifact; a receipt the counter cannot print
+ * is not.
+ */
+async function findCaseReceiptInstanceId(caseId: string): Promise<string | undefined> {
+  try {
+    const { data } = await supabase
+      .from('document_instances')
+      .select('id')
+      .eq('case_id', caseId)
+      .in('doc_type', ['customer_copy', 'office_receipt'])
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return data?.id ?? undefined;
+  } catch (error) {
+    console.error('Error resolving receipt instance:', error);
+    return undefined;
+  }
+}
+
 async function fetchCapturedSignatures(instanceId?: string): Promise<SignatureBlockData[]> {
   if (!instanceId) return [];
   try {
