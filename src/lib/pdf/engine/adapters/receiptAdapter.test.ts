@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { devicesForReceipt, toEngineData } from './receiptAdapter';
+import { depositorBlock, devicesForReceipt, toEngineData } from './receiptAdapter';
 import type { CaseData, DeviceData, ReceiptData } from '../../types';
 import type { DocumentTemplateConfig } from '../../templateConfig';
 
@@ -90,5 +90,39 @@ describe('receiptAdapter.toEngineData — intake batch scoping', () => {
     const caseVals = (out.caseInfo?.rows ?? []).map((r) => r.value);
     expect(caseVals).toContain('Not detected');
     expect(caseVals).not.toContain('Clicking noise');
+  });
+});
+
+describe('depositorBlock', () => {
+  it('returns null when no depositor was recorded', () => {
+    expect(depositorBlock([dev('a')], 'Acme Ltd')).toBeNull();
+  });
+
+  it('reads "Delivered by customer" when the depositor is the customer', () => {
+    const d: DeviceData = {
+      ...dev('a', 'b1', '2026-08-04T09:00:00Z'),
+      depositor_name: 'Dana Reed',
+      depositor_relationship: 'self',
+    };
+    const block = depositorBlock([d], 'Dana Reed');
+    expect(block?.rows.find((r) => r.label.en === 'Delivered by')?.value).toBe(
+      'Delivered by customer',
+    );
+  });
+
+  it('names the agent and the customer when the depositor is not the customer', () => {
+    const d: DeviceData = {
+      ...dev('a', 'b1', '2026-08-04T09:00:00Z'),
+      depositor_name: 'Sam Okafor',
+      depositor_relationship: 'courier',
+      depositor_id: 'P1234567',
+      depositor_mobile: '+441234567890',
+    };
+    const block = depositorBlock([d], 'Acme Ltd');
+    expect(block?.rows.find((r) => r.label.en === 'Delivered by')?.value).toBe(
+      'Sam Okafor — on behalf of Acme Ltd',
+    );
+    expect(block?.rows.find((r) => r.label.en === 'Relationship')?.value).toBe('Courier');
+    expect(block?.rows.find((r) => r.label.en === 'National ID')?.value).toBe('P1234567');
   });
 });

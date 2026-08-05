@@ -29,6 +29,7 @@ import { formatDate, formatCapacity, safeString } from '../../utils';
 import { missingValue } from './missingValue';
 import type {
   CaseInfoBlock,
+  CollectorBlock,
   DevicesBlock,
   DocRefBlock,
   EngineDocData,
@@ -99,6 +100,70 @@ function deviceRow(device: DeviceData): Record<string, string> {
     // simple label + badge colours (or a '-' dash cell when empty).
     role: device.role ?? '',
   };
+}
+
+/**
+ * Depositor relationship → display string. Values (unlike labels) bypass the
+ * bilingual join in every info-box renderer, so these stay English — the same
+ * rule `checkoutAdapter`'s collector block follows.
+ */
+const RELATIONSHIP_LABELS: Record<string, string> = {
+  self: 'Customer',
+  authorized_agent: 'Authorized agent',
+  company_rep: 'Company representative',
+  courier: 'Courier',
+};
+
+/**
+ * Who physically handed the devices over, expressed as the generic
+ * {@link CollectorBlock} the shared `collector` section already renders — no new
+ * renderer. Mirrors the checkout collector block: `self` reads "Delivered by
+ * customer"; anyone else is NAMED alongside the customer they acted for, with
+ * the National ID the intake RPC gates on. All devices in an intake batch share
+ * one depositor, so the first device carrying depositor state is the source.
+ *
+ * Returns null when no depositor was recorded (legacy cases, template preview)
+ * so the section renders nothing rather than an empty box.
+ */
+export function depositorBlock(
+  devices: DeviceData[],
+  customerName: string,
+): CollectorBlock | null {
+  const source = devices.find((d) => d.depositor_name || d.depositor_relationship);
+  if (!source) return null;
+
+  const relationship = source.depositor_relationship ?? 'self';
+  const rows: CollectorBlock['rows'] = [
+    {
+      label: { en: 'Delivered by', ar: 'سُلّم بواسطة' },
+      value:
+        relationship === 'self'
+          ? 'Delivered by customer'
+          : `${safeString(source.depositor_name)} — on behalf of ${customerName}`,
+    },
+  ];
+
+  if (relationship !== 'self') {
+    rows.push({
+      label: { en: 'Relationship', ar: 'الصلة' },
+      value: RELATIONSHIP_LABELS[relationship] ?? safeString(relationship),
+    });
+    if (source.depositor_id) {
+      rows.push({ label: { en: 'National ID', ar: 'رقم الهوية' }, value: source.depositor_id });
+    }
+    if (source.depositor_mobile) {
+      rows.push({ label: { en: 'Mobile', ar: 'الجوال' }, value: source.depositor_mobile });
+    }
+  }
+
+  if (source.received_at) {
+    rows.push({
+      label: { en: 'Received on', ar: 'تاريخ الاستلام' },
+      value: formatDate(source.received_at),
+    });
+  }
+
+  return { title: { en: 'Handover Information', ar: 'معلومات التسليم' }, rows };
 }
 
 /**
@@ -249,6 +314,7 @@ export function toEngineData(
     docRef,
     caseInfo,
     devices: devicesBlock,
+    collector: depositorBlock(devices, to.name ?? ''),
     legalTerms,
     signatures,
     preparedBy: `Registered by: ${creatorName}`,
