@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { CurrencyConfig } from '../../types/tenantConfig';
 
 // dataFetcher imports the Supabase client at module load; stub it so the pure
@@ -10,7 +10,7 @@ vi.mock('../companySettingsService', () => ({ getOrCreateCompanySettings: vi.fn(
 
 import { supabase } from '../supabaseClient';
 import { getOrCreateCompanySettings } from '../companySettingsService';
-import { toQuoteData, toInvoiceData, toCaseData, toPaymentReceiptData, toPayslipData, toQuoteItems, toInvoiceItems, currencyToBlock, resolveDocumentCurrency, fetchDocumentTaxLines, fetchCompanySettings, fetchCaseDevices } from './dataFetcher';
+import { toQuoteData, toInvoiceData, toCaseData, toPaymentReceiptData, toPayslipData, toQuoteItems, toInvoiceItems, currencyToBlock, resolveDocumentCurrency, fetchDocumentTaxLines, fetchCompanySettings, fetchCaseDevices, fetchReceiptData } from './dataFetcher';
 
 // Wires supabase.from('document_tax_lines').select(...).eq(...).eq(...).is(...).order(...)
 // to resolve with `result`, and returns the spies so callers can assert on args.
@@ -694,5 +694,193 @@ describe('fetchCompanySettings — metadata round-trip (WP-L5 review: the reserv
     mockGet.mockRejectedValueOnce(new Error('boom'));
     const result = await fetchCompanySettings();
     expect(result.metadata).toBeNull();
+  });
+});
+
+describe('fetchCaseDevices — per-device intake state reaches the receipt', () => {
+  const RECEIVED = {
+    id: 'd1',
+    case_id: 'case-1',
+    serial_number: 'SN-RECEIVED',
+    deleted_at: null,
+    received_at: '2026-08-04T09:15:00.000Z',
+    intake_batch_id: 'batch-1',
+    depositor_name: 'Ali Hassan',
+    depositor_mobile: '+96890000000',
+    depositor_id: 'ID-9',
+    depositor_relationship: 'family_member',
+  };
+  const NOT_RECEIVED = {
+    id: 'd2',
+    case_id: 'case-1',
+    serial_number: 'SN-PENDING',
+    deleted_at: null,
+    received_at: null,
+    intake_batch_id: null,
+    depositor_name: null,
+    depositor_mobile: null,
+    depositor_id: null,
+    depositor_relationship: null,
+  };
+
+  it('maps received_at, the intake batch and the depositor columns onto the device', async () => {
+    mockCaseDevicesQuery([RECEIVED]);
+    const [device] = await fetchCaseDevices('case-1');
+    expect(device.received_at).toBe('2026-08-04T09:15:00.000Z');
+    expect(device.intake_batch_id).toBe('batch-1');
+    expect(device.depositor_name).toBe('Ali Hassan');
+    expect(device.depositor_mobile).toBe('+96890000000');
+    expect(device.depositor_id).toBe('ID-9');
+    expect(device.depositor_relationship).toBe('family_member');
+  });
+
+  it('leaves the intake fields undefined for a device with no recorded intake', async () => {
+    mockCaseDevicesQuery([NOT_RECEIVED]);
+    const [device] = await fetchCaseDevices('case-1');
+    expect(device.received_at).toBeUndefined();
+    expect(device.intake_batch_id).toBeUndefined();
+    expect(device.depositor_name).toBeUndefined();
+    expect(device.depositor_relationship).toBeUndefined();
+  });
+});
+
+// Routes supabase.from(<table>) to a FRESH filter-applying chain per call, so the
+// multi-table fetchReceiptData path runs end to end and a missing filter surfaces
+// as an extra row instead of a silently-passing assertion.
+function mockTables(tables: Record<string, Array<Record<string, unknown>>>) {
+  const calls: string[] = [];
+  const makeChain = (rows: Array<Record<string, unknown>>) => {
+    const filters: Array<(row: Record<string, unknown>) => boolean> = [];
+    const matched = () => rows.filter(row => filters.every(f => f(row)));
+    const chain = {
+      select: vi.fn(() => chain),
+      eq: vi.fn((column: string, value: unknown) => {
+        filters.push(row => row[column] === value);
+        return chain;
+      }),
+      is: vi.fn((column: string, value: unknown) => {
+        filters.push(row => row[column] === value);
+        return chain;
+      }),
+      order: vi.fn(() => Promise.resolve({ data: matched(), error: null })),
+      maybeSingle: vi.fn(() => Promise.resolve({ data: matched()[0] ?? null, error: null })),
+    };
+    return chain;
+  };
+  const from = vi.fn((table: string) => {
+    calls.push(table);
+    return makeChain(tables[table] ?? []);
+  });
+  (supabase as unknown as { from: typeof from }).from = from;
+  return { from, calls };
+}
+
+function mockSignatureStorage(signedUrl: string | null) {
+  const createSignedUrl = vi.fn().mockResolvedValue({
+    data: signedUrl ? { signedUrl } : null,
+    error: null,
+  });
+  const storageFrom = vi.fn(() => ({ createSignedUrl }));
+  (supabase as unknown as { storage: { from: typeof storageFrom } }).storage = { from: storageFrom };
+  return { storageFrom, createSignedUrl };
+}
+
+describe('fetchReceiptData — signatures captured at the counter reach the receipt', () => {
+  const RECEIPT_CASE = { id: 'case-1', case_no: 'CASE-42', created_at: '2026-08-04', status: 'intake' };
+  const TYPED_SIG = {
+    id: 's1',
+    document_instance_id: 'inst-1',
+    slot: 'customer',
+    signer_name: 'Ali Hassan',
+    signer_role: null,
+    method: 'typed',
+    typed_value: 'Ali Hassan',
+    signed_at: '2026-08-04T09:20:00.000Z',
+    signature_image_bucket: null,
+    signature_image_path: null,
+    deleted_at: null,
+  };
+
+  beforeEach(() => {
+    vi.mocked(getOrCreateCompanySettings).mockResolvedValue({
+      id: 'cs1',
+      basic_info: { company_name: 'Lab' },
+    } as never);
+  });
+
+  it('carries the signatures captured against the receipt instance', async () => {
+    mockTables({ cases: [RECEIPT_CASE], case_devices: [], document_signatures: [TYPED_SIG] });
+    const data = await fetchReceiptData('case-1', 'inst-1');
+    expect(data.capturedSignatures).toEqual([
+      expect.objectContaining({
+        slot: 'customer',
+        name: 'Ali Hassan',
+        method: 'typed',
+        typedValue: 'Ali Hassan',
+        signedAt: '2026-08-04T09:20:00.000Z',
+      }),
+    ]);
+  });
+
+  it('never queries signatures without an instance id — preview and legacy callers keep wet-ink lines', async () => {
+    const { calls } = mockTables({ cases: [RECEIPT_CASE], case_devices: [], document_signatures: [TYPED_SIG] });
+    const data = await fetchReceiptData('case-1');
+    expect(calls).not.toContain('document_signatures');
+    expect(data.capturedSignatures).toBeUndefined();
+  });
+
+  it('scopes signatures to the rendered instance and excludes revoked (soft-deleted) rows', async () => {
+    mockTables({
+      cases: [RECEIPT_CASE],
+      case_devices: [],
+      document_signatures: [
+        TYPED_SIG,
+        { ...TYPED_SIG, id: 's2', document_instance_id: 'inst-OTHER', signer_name: 'Other Case' },
+        { ...TYPED_SIG, id: 's3', signer_name: 'Revoked', deleted_at: '2026-08-04T10:00:00.000Z' },
+      ],
+    });
+    const data = await fetchReceiptData('case-1', 'inst-1');
+    expect(data.capturedSignatures?.map(s => s.name)).toEqual(['Ali Hassan']);
+  });
+
+  it('omits capturedSignatures entirely when the instance has no signatures yet', async () => {
+    mockTables({ cases: [RECEIPT_CASE], case_devices: [], document_signatures: [] });
+    const data = await fetchReceiptData('case-1', 'inst-1');
+    expect(data.capturedSignatures).toBeUndefined();
+  });
+
+  it('resolves a drawn signature image out of its storage bucket', async () => {
+    mockTables({
+      cases: [RECEIPT_CASE],
+      case_devices: [],
+      document_signatures: [
+        {
+          ...TYPED_SIG,
+          method: 'drawn',
+          typed_value: null,
+          signature_image_bucket: 'company-assets',
+          signature_image_path: 'signatures/sig-inst-1-customer.png',
+        },
+      ],
+    });
+    const { storageFrom, createSignedUrl } = mockSignatureStorage(null);
+    const data = await fetchReceiptData('case-1', 'inst-1');
+    expect(storageFrom).toHaveBeenCalledWith('company-assets');
+    expect(createSignedUrl).toHaveBeenCalledWith('signatures/sig-inst-1-customer.png', 300);
+    expect(data.capturedSignatures?.[0].method).toBe('drawn');
+  });
+
+  it('degrades to wet-ink lines when the signature lookup fails, rather than blocking the receipt', async () => {
+    mockTables({ cases: [RECEIPT_CASE], case_devices: [] });
+    const from = vi.mocked((supabase as unknown as { from: (t: string) => unknown }).from);
+    const passthrough = from.getMockImplementation()!;
+    from.mockImplementation((table: string) =>
+      table === 'document_signatures'
+        ? { select: () => ({ eq: () => ({ is: () => ({ order: () => Promise.resolve({ data: null, error: new Error('rls denied') }) }) }) }) }
+        : passthrough(table),
+    );
+    const data = await fetchReceiptData('case-1', 'inst-1');
+    expect(data.capturedSignatures).toBeUndefined();
+    expect(data.caseData.case_no).toBe('CASE-42');
   });
 });
