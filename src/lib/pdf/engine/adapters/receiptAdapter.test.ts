@@ -4,6 +4,7 @@ import type { CaseData, DeviceData, ReceiptData } from '../../types';
 import { BUILT_IN_TEMPLATE_CONFIGS } from '../../templateConfig';
 import type { DocumentTemplateConfig } from '../../templateConfig';
 import { renderSignature } from '../sections/signature';
+import { resolveLabel } from '../labels';
 import type { EngineContext, SignatureBlockData } from '../types';
 
 const dev = (id: string, batch?: string, receivedAt?: string): DeviceData => ({
@@ -204,6 +205,11 @@ const repSig: SignatureBlockData = {
   typedValue: 'Sam Okafor',
 };
 
+const BILINGUAL: DocumentTemplateConfig = {
+  ...BUILT_IN_TEMPLATE_CONFIGS.customer_copy,
+  language: { mode: 'bilingual_sidebyside', primary: 'en' },
+};
+
 const blocksFor = (captured: SignatureBlockData[]) =>
   toEngineData(
     receipt({ capturedSignatures: captured }),
@@ -303,6 +309,24 @@ describe('toEngineData signature blocks', () => {
   it('keeps an extra signature\'s own role label when it carries one', () => {
     const witness: SignatureBlockData = { slot: 'witness', name: 'Ali Haddad', role: 'Neighbour', method: 'click_to_accept' };
     expect(blocksFor([customerSig, witness])?.[2].role).toBe('Neighbour');
+  });
+
+  it('captions captured slots in the document language, exactly as the wet-ink lines do', () => {
+    const wetInk = toEngineData(receipt(), BILINGUAL, 'customer');
+    const captured = toEngineData(receipt({ capturedSignatures: [customerSig] }), BILINGUAL, 'customer');
+    const lines = (wetInk.signatures ?? []).map((l) => resolveLabel(l, BILINGUAL.language));
+    expect(lines).toEqual(['Customer Signature | توقيع العميل', 'Company Representative | ممثل الشركة']);
+    expect(captured.signatureBlocks?.map((b) => b.role)).toEqual(lines);
+  });
+
+  it('captions an unlabelled extra in the document language too', () => {
+    const witness: SignatureBlockData = { slot: 'witness', name: 'Ali Haddad', method: 'click_to_accept' };
+    const out = toEngineData(
+      receipt({ capturedSignatures: [customerSig, witness] }),
+      BILINGUAL,
+      'customer',
+    );
+    expect(out.signatureBlocks?.[2].role).toBe('Witness | الشاهد');
   });
 
   it('renders both parties on the page when only the customer signed', () => {

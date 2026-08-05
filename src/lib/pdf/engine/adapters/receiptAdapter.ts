@@ -24,8 +24,9 @@
  */
 
 import type { CaseData, DeviceData, ReceiptData } from '../../types';
-import type { DocumentTemplateConfig } from '../../templateConfig';
+import type { DocumentTemplateConfig, LanguageConfig } from '../../templateConfig';
 import { formatDate, formatCapacity, safeString } from '../../utils';
+import { resolveLabel } from '../labels';
 import { missingValue } from './missingValue';
 import type {
   CaseInfoBlock,
@@ -111,13 +112,24 @@ const LAB_SIGNATURE_SLOTS = new Set([
  * parties — but one captured without its own role label takes its slot's
  * caption, so the page prints "Witness", not the raw `witness` enum token.
  *
+ * `SignatureBlockData.role` is a plain string the renderer prints verbatim, so
+ * every caption is resolved HERE through the document's language — the same
+ * `resolveLabel` the wet-ink lines take. Otherwise the identical caption would
+ * fall back to English-only the moment the pad was used, on the customer-facing
+ * custody copy. `language` is optional because adapters are called with partial
+ * config literals in tests and from legacy call sites (mirrors `missingValue`).
+ *
  * Returns null when nothing was captured, so the renderer keeps its
  * byte-identical wet-ink path.
  */
 export function mergeReceiptSignatures(
   captured: SignatureBlockData[] | undefined,
+  language?: LanguageConfig | null,
 ): SignatureBlockData[] | null {
   if (!captured || captured.length === 0) return null;
+
+  const caption = (label: LabelText): string =>
+    language ? resolveLabel(label, language) : label.en;
 
   const unclaimed = [...captured];
   const claim = (slot: string): SignatureBlockData | undefined => {
@@ -127,13 +139,16 @@ export function mergeReceiptSignatures(
     return index === -1 ? undefined : unclaimed.splice(index, 1)[0];
   };
 
-  const blocks = RECEIPT_SIGNATURE_SLOTS.map(({ slot, caption }) => {
+  const blocks = RECEIPT_SIGNATURE_SLOTS.map(({ slot, caption: label }) => {
     const signed = claim(slot);
-    return signed ? { ...signed, role: signed.role || caption.en } : { slot, role: caption.en };
+    const role = caption(label);
+    return signed ? { ...signed, role: signed.role || role } : { slot, role };
   });
-  const extras = unclaimed.map((b) =>
-    b.role ? b : { ...b, role: SIGNATURE_SLOT_CAPTIONS[b.slot]?.en ?? b.role },
-  );
+  const extras = unclaimed.map((b) => {
+    if (b.role) return b;
+    const label = SIGNATURE_SLOT_CAPTIONS[b.slot];
+    return label ? { ...b, role: caption(label) } : b;
+  });
   return [...blocks, ...extras];
 }
 
@@ -392,7 +407,7 @@ export function toEngineData(
 
   // ---- Signature lines -----------------------------------------------------
   const signatures: LabelText[] = RECEIPT_SIGNATURE_SLOTS.map((s) => s.caption);
-  const mergedBlocks = mergeReceiptSignatures(data.capturedSignatures);
+  const mergedBlocks = mergeReceiptSignatures(data.capturedSignatures, config.language);
 
   // ---- Registered-by line (rendered only under the premium presentation) ----
   const creatorName =
