@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../ui/Button';
@@ -18,6 +19,7 @@ import {
   Users,
   HardDrive,
   AlertCircle,
+  AlertTriangle,
   CheckCircle,
   FolderPlus,
   X,
@@ -28,7 +30,7 @@ import {
   Layers
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { createCaseWithDevices } from '../../lib/caseIntakeService';
+import { createCaseWithDevices, DevicesInCustodyError } from '../../lib/caseIntakeService';
 import { logger } from '../../lib/logger';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
@@ -58,6 +60,7 @@ interface CreateCaseWizardProps {
 
 export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onSuccess }) => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { profile } = useAuth();
   const toast = useToast();
   const confirm = useConfirm();
@@ -65,6 +68,10 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [createdCase, setCreatedCase] = useState<{ id: string; case_no: string } | null>(null);
+  // A creation that failed with the devices already sent to the custody ledger.
+  // Holding the identity is what lets this surface drop its Submit instead of
+  // inviting a second physical intake.
+  const [stalledCase, setStalledCase] = useState<{ id: string; case_no: string } | null>(null);
   const [isBulkDrivesModalOpen, setIsBulkDrivesModalOpen] = useState(false);
   const [bulkServerDrives, setBulkServerDrives] = useState<Device[]>([]);
 
@@ -420,6 +427,17 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
     onError: (error) => {
       logger.error('Case creation error:', error);
       toast.error(`Failed to create case: ${error.message}`);
+      // createCaseWithDevices rejects this way only once the case_devices insert
+      // has been sent, and that insert fires trg_log_device_received_custody into
+      // the append-only chain_of_custody. Submitting again would put ONE physical
+      // hand-over into two cases with two DEVICE_RECEIVED ledgers, which nothing
+      // can correct afterwards — so the case exists, and the retry must go.
+      if (error instanceof DevicesInCustodyError) {
+        queryClient.invalidateQueries({ queryKey: ['cases'] });
+        queryClient.invalidateQueries({ queryKey: ['cases_count'] });
+        queryClient.invalidateQueries({ queryKey: [CASE_COMMAND_STATS_KEY] });
+        setStalledCase({ id: error.created.caseId, case_no: error.created.caseNumber });
+      }
     },
   });
 
@@ -475,6 +493,45 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
     : (primaryDevice.serial_no && primaryDevice.device_problem_id);
 
   const isFormValid = isStep1Valid && isStep2Valid && isPrimaryDeviceValid;
+
+  if (stalledCase) {
+    return (
+      <Dialog
+        open={true}
+        onClose={onClose}
+        label="Case created — devices may already be in custody"
+        closeOnBackdrop={false}
+        closeOnEscape={false}
+        className="bg-white rounded-2xl shadow-2xl w-[90vw] max-w-md p-8 text-center"
+      >
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-warning-muted">
+          <AlertTriangle aria-hidden="true" className="h-9 w-9 text-warning" />
+        </div>
+        <h2 className="text-lg font-semibold text-slate-900">
+          {stalledCase.case_no} was created — its devices may already be in custody
+        </h2>
+        <p className="mt-2 text-sm text-slate-500">
+          Creating the case did not finish, but its devices had already been sent to the custody
+          ledger. Creating it again would take the same devices into custody a second time, so this
+          case cannot be created again. Open it to check which devices were recorded and which one
+          is the patient device.
+        </p>
+        <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+          <Button
+            onClick={() => {
+              navigate(`/cases/${stalledCase.id}`);
+              onClose();
+            }}
+          >
+            Open the case
+          </Button>
+          <Button variant="secondary" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog
