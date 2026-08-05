@@ -1774,6 +1774,10 @@ export type Database = {
           data_recovered_size: string | null
           dcm: string | null
           deleted_at: string | null
+          depositor_id: string | null
+          depositor_mobile: string | null
+          depositor_name: string | null
+          depositor_relationship: string | null
           device_role_id: number | null
           device_type_id: string | null
           diagnosis: string | null
@@ -1783,6 +1787,7 @@ export type Database = {
           form_factor_id: string | null
           head_count_id: string | null
           id: string
+          intake_batch_id: string | null
           interface_id: string | null
           is_primary: boolean | null
           made_in_id: string | null
@@ -1794,6 +1799,8 @@ export type Database = {
           photos: string[] | null
           physical_damage: string | null
           platter_count_id: string | null
+          received_at: string | null
+          received_by: string | null
           recovery_result: string | null
           role_notes: string | null
           serial_number: string | null
@@ -1823,6 +1830,10 @@ export type Database = {
           data_recovered_size?: string | null
           dcm?: string | null
           deleted_at?: string | null
+          depositor_id?: string | null
+          depositor_mobile?: string | null
+          depositor_name?: string | null
+          depositor_relationship?: string | null
           device_role_id?: number | null
           device_type_id?: string | null
           diagnosis?: string | null
@@ -1832,6 +1843,7 @@ export type Database = {
           form_factor_id?: string | null
           head_count_id?: string | null
           id?: string
+          intake_batch_id?: string | null
           interface_id?: string | null
           is_primary?: boolean | null
           made_in_id?: string | null
@@ -1843,6 +1855,8 @@ export type Database = {
           photos?: string[] | null
           physical_damage?: string | null
           platter_count_id?: string | null
+          received_at?: string | null
+          received_by?: string | null
           recovery_result?: string | null
           role_notes?: string | null
           serial_number?: string | null
@@ -1872,6 +1886,10 @@ export type Database = {
           data_recovered_size?: string | null
           dcm?: string | null
           deleted_at?: string | null
+          depositor_id?: string | null
+          depositor_mobile?: string | null
+          depositor_name?: string | null
+          depositor_relationship?: string | null
           device_role_id?: number | null
           device_type_id?: string | null
           diagnosis?: string | null
@@ -1881,6 +1899,7 @@ export type Database = {
           form_factor_id?: string | null
           head_count_id?: string | null
           id?: string
+          intake_batch_id?: string | null
           interface_id?: string | null
           is_primary?: boolean | null
           made_in_id?: string | null
@@ -1892,6 +1911,8 @@ export type Database = {
           photos?: string[] | null
           physical_damage?: string | null
           platter_count_id?: string | null
+          received_at?: string | null
+          received_by?: string | null
           recovery_result?: string | null
           role_notes?: string | null
           serial_number?: string | null
@@ -20096,6 +20117,10 @@ export type Database = {
           data_recovered_size: string | null
           dcm: string | null
           deleted_at: string | null
+          depositor_id: string | null
+          depositor_mobile: string | null
+          depositor_name: string | null
+          depositor_relationship: string | null
           device_role_id: number | null
           device_type_id: string | null
           diagnosis: string | null
@@ -20105,6 +20130,7 @@ export type Database = {
           form_factor_id: string | null
           head_count_id: string | null
           id: string
+          intake_batch_id: string | null
           interface_id: string | null
           is_primary: boolean | null
           made_in_id: string | null
@@ -20116,6 +20142,8 @@ export type Database = {
           photos: string[] | null
           physical_damage: string | null
           platter_count_id: string | null
+          received_at: string | null
+          received_by: string | null
           recovery_result: string | null
           role_notes: string | null
           serial_number: string | null
@@ -20314,6 +20342,18 @@ export type Database = {
           p_old_value?: string
         }
         Returns: undefined
+      }
+      log_case_intake: {
+        Args: {
+          p_case_id: string
+          p_depositor_id?: string
+          p_depositor_mobile?: string
+          p_depositor_name?: string
+          p_depositor_relationship?: string
+          p_device_ids: string[]
+          p_receipt_instance_id?: string
+        }
+        Returns: string
       }
       log_chain_of_custody: {
         Args: {
@@ -20866,6 +20906,18 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      staff_sign_off_document: {
+        Args: {
+          p_instance_id: string
+          p_method: Database["public"]["Enums"]["signature_method"]
+          p_signer_customer_id?: string
+          p_signer_name: string
+          p_slot: Database["public"]["Enums"]["signature_slot"]
+          p_typed_value?: string
+          p_user_agent?: string
+        }
+        Returns: Json
+      }
       submit_country_pack_for_review: {
         Args: { p_pack_version_id: string }
         Returns: undefined
