@@ -13,7 +13,7 @@ import { CaseCheckIn } from './CaseCheckIn';
 
 const calls: string[] = [];
 
-const { spies, customerRow } = vi.hoisted(() => ({
+const { spies, toastSpy, customerRow } = vi.hoisted(() => ({
   spies: {
     createCaseWithDevices: vi.fn(),
     logCaseIntake: vi.fn(),
@@ -21,6 +21,15 @@ const { spies, customerRow } = vi.hoisted(() => ({
     captureIntakeConsents: vi.fn(),
     createDocumentInstance: vi.fn(),
     shouldAutoPrintLabel: vi.fn(),
+  },
+  toastSpy: {
+    success: vi.fn(),
+    error: vi.fn(),
+    loading: vi.fn(),
+    warning: vi.fn(),
+    info: vi.fn(),
+    dismiss: vi.fn(),
+    dismissAll: vi.fn(),
   },
   customerRow: {
     id: 'cust-1',
@@ -49,6 +58,8 @@ vi.mock('../../lib/documentInstanceService', () => ({
 vi.mock('../../lib/labelPrefsService', () => ({
   shouldAutoPrintLabel: spies.shouldAutoPrintLabel,
 }));
+
+vi.mock('../../hooks/useToast', () => ({ useToast: () => toastSpy }));
 
 const catalogRows: Record<string, { id: string; name: string }[]> = {
   catalog_device_types: [{ id: 'dt-1', name: 'HDD' }],
@@ -367,6 +378,7 @@ describe('CaseCheckIn', () => {
     await waitFor(() => expect(submitButton()).toBeEnabled());
     expect(screen.queryByText(/was created/i)).not.toBeInTheDocument();
     expect(spies.createDocumentInstance).not.toHaveBeenCalled();
+    expect(toastSpy.error).toHaveBeenCalledWith(expect.stringContaining('network unreachable'));
   });
 
   // createCaseWithDevices itself rejects only AFTER the case_devices insert has
@@ -390,6 +402,28 @@ describe('CaseCheckIn', () => {
     expect(await screen.findByText(/CASE-0042 was created/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /complete check-in/i })).not.toBeInTheDocument();
     expect(spies.createCaseWithDevices).toHaveBeenCalledTimes(1);
+  });
+
+  // The 40001 message this rejects with is literally 'please retry'. Raising it
+  // beside a screen that says the check-in cannot be retried would send the
+  // operator back to a physical hand-over the ledger can no longer take twice.
+  it('raises no toast beside the screen that refuses the retry', async () => {
+    spies.createCaseWithDevices.mockRejectedValue(
+      new DevicesInCustodyError('Another update is in progress — please retry.', {
+        caseId: 'case-1',
+        caseNumber: 'CASE-0042',
+        deviceIds: ['dev-1'],
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    await pickCustomer(user);
+    await fillOneDevice(user);
+    await user.click(await screen.findByLabelText(/accept the terms/i));
+    await user.click(submitButton());
+
+    expect(await screen.findByText(/CASE-0042 was created/i)).toBeInTheDocument();
+    expect(toastSpy.error).not.toHaveBeenCalled();
   });
 
   it('names the screens that can still record consent when only that step failed', async () => {

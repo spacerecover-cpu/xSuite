@@ -10,10 +10,19 @@ import { CreateCaseWizard } from './CreateCaseWizard';
 // failure handling run for real, so the assertions are about what the operator
 // is actually offered after a failure.
 
-const { spies, customerRow } = vi.hoisted(() => ({
+const { spies, toastSpy, customerRow } = vi.hoisted(() => ({
   spies: {
     createCaseWithDevices: vi.fn(),
     shouldAutoPrintLabel: vi.fn(),
+  },
+  toastSpy: {
+    success: vi.fn(),
+    error: vi.fn(),
+    loading: vi.fn(),
+    warning: vi.fn(),
+    info: vi.fn(),
+    dismiss: vi.fn(),
+    dismissAll: vi.fn(),
   },
   customerRow: {
     id: 'cust-1',
@@ -32,6 +41,8 @@ vi.mock('../../lib/caseIntakeService', async (importOriginal) => {
 vi.mock('../../lib/labelPrefsService', () => ({
   shouldAutoPrintLabel: spies.shouldAutoPrintLabel,
 }));
+
+vi.mock('../../hooks/useToast', () => ({ useToast: () => toastSpy }));
 
 vi.mock('../../lib/printUtils', () => ({
   printReceipt: vi.fn(),
@@ -168,6 +179,26 @@ describe('CreateCaseWizard', () => {
     expect(spies.createCaseWithDevices).toHaveBeenCalledTimes(1);
   });
 
+  // The 40001 message this rejects with is literally 'please retry'. Raising it
+  // beside a panel that says the case cannot be created again would send the
+  // operator back to a physical hand-over the ledger can no longer take twice.
+  it('raises no toast beside the panel that refuses the retry', async () => {
+    spies.createCaseWithDevices.mockRejectedValue(
+      new DevicesInCustodyError('Another update is in progress — please retry.', {
+        caseId: 'case-1',
+        caseNumber: 'CASE-0042',
+        deviceIds: ['dev-1'],
+      }),
+    );
+    const user = userEvent.setup();
+    renderWizard();
+    await fillValidCase(user);
+    await user.click(submitButton());
+
+    expect(await screen.findByText(/CASE-0042 was created/i)).toBeInTheDocument();
+    expect(toastSpy.error).not.toHaveBeenCalled();
+  });
+
   it('still offers a retry when the failure landed before any device entered custody', async () => {
     spies.createCaseWithDevices.mockRejectedValue(new Error('network unreachable'));
     const user = userEvent.setup();
@@ -177,5 +208,6 @@ describe('CreateCaseWizard', () => {
 
     await waitFor(() => expect(submitButton()).toBeEnabled());
     expect(screen.queryByText(/was created/i)).not.toBeInTheDocument();
+    expect(toastSpy.error).toHaveBeenCalledWith(expect.stringContaining('network unreachable'));
   });
 });

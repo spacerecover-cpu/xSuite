@@ -426,18 +426,22 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
     },
     onError: (error) => {
       logger.error('Case creation error:', error);
-      toast.error(`Failed to create case: ${error.message}`);
       // createCaseWithDevices rejects this way only once the case_devices insert
       // has been sent, and that insert fires trg_log_device_received_custody into
       // the append-only chain_of_custody. Submitting again would put ONE physical
       // hand-over into two cases with two DEVICE_RECEIVED ledgers, which nothing
       // can correct afterwards — so the case exists, and the retry must go.
+      // The panel below is the whole account of this failure: no toast beside it,
+      // because these messages ask for the retry (the 40001 one says so verbatim)
+      // that the panel exists to refuse.
       if (error instanceof DevicesInCustodyError) {
         queryClient.invalidateQueries({ queryKey: ['cases'] });
         queryClient.invalidateQueries({ queryKey: ['cases_count'] });
         queryClient.invalidateQueries({ queryKey: [CASE_COMMAND_STATS_KEY] });
         setStalledCase({ id: error.created.caseId, case_no: error.created.caseNumber });
+        return;
       }
+      toast.error(`Failed to create case: ${error.message}`);
     },
   });
 

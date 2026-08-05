@@ -280,9 +280,14 @@ export function CaseCheckIn() {
     },
     onError: (error: Error) => {
       logger.error('Check-in failed:', error);
-      toast.error(`Check-in failed: ${error.message}`);
       const created = createdCase.current;
-      if (!created) return;
+      // Once the devices are in custody the stalled screen is the whole account
+      // of this failure: no toast beside it, because these messages ask for the
+      // retry (the 40001 one says so verbatim) that the screen exists to refuse.
+      if (!created) {
+        toast.error(`Check-in failed: ${error.message}`);
+        return;
+      }
       const whatsappPending = consentStepReached.current && ack.whatsappUtility;
       const destructivePending = consentStepReached.current && ack.destructiveAuthorized;
       setStalled({
