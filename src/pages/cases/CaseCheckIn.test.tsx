@@ -347,6 +347,20 @@ describe('CaseCheckIn', () => {
     expect(spies.createCaseWithDevices).toHaveBeenCalledTimes(1);
   });
 
+  it('still offers a retry when the failure landed before any device entered custody', async () => {
+    spies.createCaseWithDevices.mockRejectedValue(new Error('network unreachable'));
+    const user = userEvent.setup();
+    renderPage();
+    await pickCustomer(user);
+    await fillOneDevice(user);
+    await user.click(await screen.findByLabelText(/accept the terms/i));
+    await user.click(submitButton());
+
+    await waitFor(() => expect(submitButton()).toBeEnabled());
+    expect(screen.queryByText(/was created/i)).not.toBeInTheDocument();
+    expect(spies.createDocumentInstance).not.toHaveBeenCalled();
+  });
+
   it('keeps the email hand-off disabled for a WhatsApp customer with no email', async () => {
     customerRow.email = null;
     const user = userEvent.setup();

@@ -258,12 +258,16 @@ export function CaseCheckIn() {
             <AlertTriangle aria-hidden="true" className="h-9 w-9 text-warning" />
           </div>
           <h1 className="text-xl font-semibold text-slate-900">
-            {stalled.caseNumber} was created — finish it on the case
+            {stalled.caseNumber} was created — its intake evidence is incomplete
           </h1>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
-            The devices are in custody, but the receipt, custody log or consent step did not
-            complete. Checking in again would take the same devices into custody a second time —
-            open the case and finish the outstanding step there.
+            The devices are in custody, but the signed receipt, depositor identity or consent step
+            did not complete. Checking in again would take the same devices into custody a second
+            time, so this check-in cannot be retried.
+          </p>
+          <p className="mx-auto mt-3 max-w-md text-sm text-slate-500">
+            No screen in the app can write the missing intake evidence after the fact. Keep the
+            paper receipt with the devices and escalate {stalled.caseNumber} to a lab administrator.
           </p>
 
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
