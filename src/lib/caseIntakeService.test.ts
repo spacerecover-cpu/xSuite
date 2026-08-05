@@ -337,7 +337,7 @@ describe('captureIntakeConsents', () => {
       customer_id: 'cust-1',
       scope: 'utility',
       action: 'opt_in',
-      source: 'intake_checkin',
+      source: 'intake_form',
       phone_e164: '+971500000000',
       consent_text: baseConsents.consentText,
     });

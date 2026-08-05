@@ -1122,7 +1122,7 @@ export async function captureIntakeConsents(input: IntakeConsents): Promise<void
       customer_id: input.customerId,
       scope: 'utility',
       action: 'opt_in',
-      source: 'intake_checkin',
+      source: 'intake_form',
       phone_e164: input.phoneE164 ?? null,
       consent_text: input.consentText,
     });
