@@ -2830,6 +2830,7 @@ export type Database = {
           discount_amount: number | null
           estimated_completion: string | null
           id: string
+          intake_idempotency_key: string | null
           internal_notes: string | null
           is_urgent: boolean | null
           is_warranty: boolean | null
@@ -2882,6 +2883,7 @@ export type Database = {
           discount_amount?: number | null
           estimated_completion?: string | null
           id?: string
+          intake_idempotency_key?: string | null
           internal_notes?: string | null
           is_urgent?: boolean | null
           is_warranty?: boolean | null
@@ -2934,6 +2936,7 @@ export type Database = {
           discount_amount?: number | null
           estimated_completion?: string | null
           id?: string
+          intake_idempotency_key?: string | null
           internal_notes?: string | null
           is_urgent?: boolean | null
           is_warranty?: boolean | null
