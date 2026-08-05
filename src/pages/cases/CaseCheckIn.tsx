@@ -1,7 +1,8 @@
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AlertTriangle,
   ClipboardCheck,
   CheckCircle2,
   FileText,
@@ -86,6 +87,12 @@ export function CaseCheckIn() {
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [result, setResult] = useState<CheckedInCase | null>(null);
+  // The five submit writes are not one transaction. Once the case and its
+  // devices exist, a plain retry would re-run createCaseWithDevices and append a
+  // second, uncorrectable set of DEVICE_RECEIVED custody events for the same
+  // physical media — so a failure past that point must not offer one.
+  const createdCase = useRef<CheckedInCase | null>(null);
+  const [stalled, setStalled] = useState<CheckedInCase | null>(null);
 
   const [depositor, setDepositor] = useState<DepositorValue>({
     name: '', mobile: '', nationalId: '', relationship: 'self',
@@ -151,6 +158,7 @@ export function CaseCheckIn() {
     mutationFn: async (): Promise<CheckedInCase> => {
       if (!profile?.tenant_id) throw new Error('No active tenant — please sign in again.');
       const tenantId = profile.tenant_id;
+      createdCase.current = null;
 
       const { caseId, caseNumber, deviceIds } = await createCaseWithDevices({
         tenantId,
@@ -171,6 +179,7 @@ export function CaseCheckIn() {
           isPrimary: i === 0,
         })),
       });
+      createdCase.current = { caseId, caseNumber };
 
       const instance = await createDocumentInstance({
         docType: 'customer_copy',
@@ -206,6 +215,7 @@ export function CaseCheckIn() {
       return { caseId, caseNumber };
     },
     onSuccess: (checkedIn) => {
+      createdCase.current = null;
       queryClient.invalidateQueries({ queryKey: ['cases'] });
       queryClient.invalidateQueries({ queryKey: ['cases_count'] });
       queryClient.invalidateQueries({ queryKey: [CASE_COMMAND_STATS_KEY] });
@@ -224,11 +234,14 @@ export function CaseCheckIn() {
     onError: (error: Error) => {
       logger.error('Check-in failed:', error);
       toast.error(`Check-in failed: ${error.message}`);
+      if (createdCase.current) setStalled(createdCase.current);
     },
   });
 
   function resetForAnother() {
     setResult(null);
+    setStalled(null);
+    createdCase.current = null;
     setEmailModalOpen(false);
     setCustomerId('');
     setDepositor({ name: '', mobile: '', nationalId: '', relationship: 'self' });
@@ -236,8 +249,45 @@ export function CaseCheckIn() {
     setAck({ termsAccepted: false, whatsappUtility: false, destructiveAuthorized: false, signature: null });
   }
 
+  if (stalled) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10">
+        <PageHeaderSlot title="Check in devices" icon={ClipboardCheck} iconColor="rgb(var(--color-primary))" />
+        <div className="rounded-xl border border-border bg-surface p-8 text-center">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-warning-muted">
+            <AlertTriangle aria-hidden="true" className="h-9 w-9 text-warning" />
+          </div>
+          <h1 className="text-xl font-semibold text-slate-900">
+            {stalled.caseNumber} was created — finish it on the case
+          </h1>
+          <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
+            The devices are in custody, but the receipt, custody log or consent step did not
+            complete. Checking in again would take the same devices into custody a second time —
+            open the case and finish the outstanding step there.
+          </p>
+
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+            <Button onClick={() => navigate(`/cases/${stalled.caseId}`)}>
+              Open the case
+            </Button>
+          </div>
+
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4 border-t border-border pt-6 text-sm">
+            <button
+              type="button"
+              onClick={resetForAnother}
+              className="font-medium text-slate-600 hover:text-slate-900"
+            >
+              Check in another
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (result) {
-    const canSend = ack.whatsappUtility || Boolean(customer?.email);
+    const canSend = Boolean(customer?.email);
     return (
       <div className="mx-auto max-w-3xl px-4 py-10">
         <PageHeaderSlot title="Check in devices" icon={ClipboardCheck} iconColor="rgb(var(--color-primary))" />
@@ -265,7 +315,7 @@ export function CaseCheckIn() {
           </div>
           {!canSend && (
             <p className="mt-3 text-xs text-slate-500">
-              No email on file and no messaging consent — print the copy instead.
+              No email on file — print the copy instead.
             </p>
           )}
 

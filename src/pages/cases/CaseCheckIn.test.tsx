@@ -12,7 +12,7 @@ import { CaseCheckIn } from './CaseCheckIn';
 
 const calls: string[] = [];
 
-const { spies } = vi.hoisted(() => ({
+const { spies, customerRow } = vi.hoisted(() => ({
   spies: {
     createCaseWithDevices: vi.fn(),
     logCaseIntake: vi.fn(),
@@ -20,6 +20,13 @@ const { spies } = vi.hoisted(() => ({
     captureIntakeConsents: vi.fn(),
     createDocumentInstance: vi.fn(),
     shouldAutoPrintLabel: vi.fn(),
+  },
+  customerRow: {
+    id: 'cust-1',
+    customer_number: 'CUST-1',
+    customer_name: 'Aisha Rahman',
+    email: 'aisha@example.com' as string | null,
+    mobile_number: '+971500000000',
   },
 }));
 
@@ -70,15 +77,7 @@ vi.mock('../../lib/supabaseClient', () => ({
 
 vi.mock('../../lib/pickerSearch', () => ({
   useCustomerPickerRows: () => ({
-    rows: [
-      {
-        id: 'cust-1',
-        customer_number: 'CUST-1',
-        customer_name: 'Aisha Rahman',
-        email: 'aisha@example.com',
-        mobile_number: '+971500000000',
-      },
-    ],
+    rows: [customerRow],
     isLoading: false,
     onSearchTermChange: vi.fn(),
   }),
@@ -145,6 +144,7 @@ const submitButton = () => screen.getByRole('button', { name: /complete check-in
 beforeEach(() => {
   calls.length = 0;
   vi.clearAllMocks();
+  customerRow.email = 'aisha@example.com';
   spies.createCaseWithDevices.mockImplementation(async () => {
     calls.push('createCaseWithDevices');
     return { caseId: 'case-1', caseNumber: 'CASE-0042', deviceIds: ['dev-1'] };
@@ -322,11 +322,43 @@ describe('CaseCheckIn', () => {
     await fillOneDevice(user);
     await user.click(await screen.findByLabelText(/accept the terms/i));
     await user.selectOptions(screen.getByLabelText(/relationship/i), 'courier');
+    // Name first: switching off `self` clears it, and an empty name blocks submit
+    // on its own — which would make the National ID assertion below vacuous.
+    await user.type(screen.getByLabelText(/full name/i), 'Sam Okafor');
 
+    expect(screen.getByLabelText(/national id/i)).toHaveValue('');
     expect(submitButton()).toBeDisabled();
 
     await user.type(screen.getByLabelText(/national id/i), 'P1234567');
-    await user.type(screen.getByLabelText(/full name/i), 'Sam Okafor');
     await waitFor(() => expect(submitButton()).toBeEnabled());
+  });
+
+  it('does not offer a retry once the case exists but a later step failed', async () => {
+    spies.logCaseIntake.mockRejectedValue(new Error('custody log unavailable'));
+    const user = userEvent.setup();
+    renderPage();
+    await pickCustomer(user);
+    await fillOneDevice(user);
+    await user.click(await screen.findByLabelText(/accept the terms/i));
+    await user.click(submitButton());
+
+    expect(await screen.findByText(/CASE-0042 was created/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /complete check-in/i })).not.toBeInTheDocument();
+    expect(spies.createCaseWithDevices).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the email hand-off disabled for a WhatsApp customer with no email', async () => {
+    customerRow.email = null;
+    const user = userEvent.setup();
+    renderPage();
+    await pickCustomer(user);
+    await fillOneDevice(user);
+    await user.click(await screen.findByLabelText(/accept the terms/i));
+    await user.click(await screen.findByLabelText(/on WhatsApp/i));
+    await user.click(submitButton());
+
+    await screen.findByRole('button', { name: /check in another/i });
+    expect(screen.getByRole('button', { name: /send to customer/i })).toBeDisabled();
+    expect(screen.getByText(/no email on file/i)).toBeInTheDocument();
   });
 });
