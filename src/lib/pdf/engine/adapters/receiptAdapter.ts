@@ -73,6 +73,21 @@ function intakeDeviceColumns(): ResolvedColumn[] {
   ];
 }
 
+/**
+ * The devices a receipt covers: the LATEST intake batch only. Devices added to
+ * the case after that handover must never appear on a re-render of the earlier
+ * receipt. Mirrors the checkout adapter's latest-batch rule. Falls back to all
+ * devices when no batch has been recorded (legacy cases, template preview).
+ */
+export function devicesForReceipt(devices: DeviceData[]): DeviceData[] {
+  const batched = devices.filter((d) => d.intake_batch_id);
+  if (batched.length === 0) return devices;
+  const latest = batched.reduce((a, b) =>
+    (a.received_at ?? '') >= (b.received_at ?? '') ? a : b,
+  );
+  return devices.filter((d) => d.intake_batch_id === latest.intake_batch_id);
+}
+
 /** Stringify one device into the intake-table row shape (keys ↔ columns). */
 function deviceRow(device: DeviceData): Record<string, string> {
   return {
@@ -182,7 +197,8 @@ export function toEngineData(
   config: DocumentTemplateConfig,
   variant: ReceiptVariant,
 ): EngineDocData {
-  const { caseData, devices, companySettings } = data;
+  const { caseData, companySettings } = data;
+  const devices = devicesForReceipt(data.devices);
 
   // ---- Title ---------------------------------------------------------------
   // Both intake variants share the DEVICE CHECK-IN RECEIPT title (matching the

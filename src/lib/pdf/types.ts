@@ -65,6 +65,13 @@ export interface DeviceData {
   checkout_collector_mobile?: string;
   checkout_collector_id?: string;
   checkout_collector_relationship?: string;
+  /** Per-device intake state (Stage 3). `received_at` null = not yet recorded. */
+  received_at?: string;
+  intake_batch_id?: string;
+  depositor_name?: string;
+  depositor_mobile?: string;
+  depositor_id?: string;
+  depositor_relationship?: string;
 }
 
 export interface CompanySettingsData {
