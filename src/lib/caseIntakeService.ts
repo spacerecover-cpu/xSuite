@@ -3,6 +3,7 @@ import { logger } from './logger';
 import { getIntakeStatusForCreation } from './caseService';
 import { setPrimaryDevice } from './deviceService';
 import type { Database } from '../types/database.types';
+import type { CapturedSignature } from '../components/cases/SignatureCaptureModal';
 
 type CasesInsert = Database['public']['Tables']['cases']['Insert'];
 type CaseDeviceInsert = Database['public']['Tables']['case_devices']['Insert'];
@@ -106,4 +107,133 @@ export async function createCaseWithDevices(
   }
 
   return { caseId: newCase.id, caseNumber, deviceIds };
+}
+
+export type DepositorRelationship = 'self' | 'authorized_agent' | 'company_rep' | 'courier';
+
+/** Client-side mirror of the log_case_intake ID gate. */
+export function requireDepositorId(relationship: DepositorRelationship): boolean {
+  return relationship !== 'self';
+}
+
+export interface LogCaseIntakeInput {
+  caseId: string;
+  deviceIds: string[];
+  depositorName?: string | null;
+  depositorMobile?: string | null;
+  depositorId?: string | null;
+  depositorRelationship?: DepositorRelationship | null;
+  receiptInstanceId?: string | null;
+}
+
+/** Stamps per-device intake state and appends the INTAKE_RECEIPT_SIGNED custody event. */
+export async function logCaseIntake(input: LogCaseIntakeInput): Promise<string> {
+  if (
+    input.depositorRelationship &&
+    requireDepositorId(input.depositorRelationship) &&
+    (input.depositorId ?? '').trim() === ''
+  ) {
+    throw new Error('National ID is required when the depositor is not the customer');
+  }
+
+  const { data, error } = await supabase.rpc('log_case_intake', {
+    p_case_id: input.caseId,
+    p_device_ids: input.deviceIds,
+    p_depositor_name: input.depositorName ?? undefined,
+    p_depositor_mobile: input.depositorMobile ?? undefined,
+    p_depositor_id: input.depositorId ?? undefined,
+    p_depositor_relationship: input.depositorRelationship ?? undefined,
+    p_receipt_instance_id: input.receiptInstanceId ?? undefined,
+  });
+
+  if (error) {
+    logger.error('Error logging case intake:', error);
+    throw error;
+  }
+  return (data ?? '') as string;
+}
+
+/** Persists a counter-captured customer signature against the receipt instance. */
+export async function signIntakeReceipt(
+  instanceId: string,
+  sig: CapturedSignature,
+  customerId: string,
+): Promise<string> {
+  const signerName = sig.method === 'typed' ? (sig.typedValue ?? '') : (sig.signerName ?? '');
+  const { data, error } = await supabase.rpc('staff_sign_off_document', {
+    p_instance_id: instanceId,
+    p_slot: 'customer',
+    p_method: sig.method,
+    p_signer_name: signerName,
+    p_typed_value: sig.typedValue ?? undefined,
+    p_signer_customer_id: customerId,
+    p_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+  });
+  if (error) {
+    logger.error('Error signing intake receipt:', error);
+    throw error;
+  }
+  const result = data as { signature_id?: string } | null;
+  if (!result?.signature_id) throw new Error('Sign-off did not return a signature id');
+  return result.signature_id;
+}
+
+export interface IntakeConsents {
+  tenantId: string;
+  customerId: string;
+  caseId: string;
+  phoneE164?: string | null;
+  /** WhatsApp utility notifications. Declining is valid and must not block intake. */
+  whatsappUtility: boolean;
+  /** Authorization for recovery attempts that may permanently alter the media. */
+  destructiveAuthorized: boolean;
+  consentText: string;
+}
+
+/**
+ * Records consent as separable facts, each independently provable. Marketing
+ * scope is deliberately never written at intake — bundling it into a service
+ * signature is the dark pattern GDPR Art. 7(2) prohibits.
+ * whatsapp_consents is append-only: insert, never update.
+ */
+export async function captureIntakeConsents(input: IntakeConsents): Promise<void> {
+  if (input.whatsappUtility) {
+    const { error } = await supabase.from('whatsapp_consents').insert({
+      tenant_id: input.tenantId,
+      customer_id: input.customerId,
+      scope: 'utility',
+      action: 'opt_in',
+      source: 'intake_checkin',
+      phone_e164: input.phoneE164 ?? null,
+      consent_text: input.consentText,
+    });
+    if (error) {
+      logger.error('Error recording intake consent:', error);
+      throw error;
+    }
+  }
+
+  if (input.destructiveAuthorized) {
+    const { error: noteError } = await supabase.from('case_internal_notes').insert({
+      tenant_id: input.tenantId,
+      case_id: input.caseId,
+      content: 'Customer authorized recovery attempts that may permanently alter the media (captured at check-in).',
+    });
+    if (noteError) {
+      logger.error('Error recording destructive-attempt authorization:', noteError);
+      throw noteError;
+    }
+
+    const { error: custodyError } = await supabase.rpc('log_chain_of_custody', {
+      p_case_id: input.caseId,
+      p_action_category: 'evidence_handling',
+      p_action: 'DESTRUCTIVE_ATTEMPT_AUTHORIZED',
+      p_description: 'Customer authorized potentially destructive recovery attempts at check-in',
+      p_metadata: { source: 'intake_checkin' },
+    });
+    if (custodyError) {
+      logger.error('Error logging destructive-attempt custody event:', custodyError);
+      throw custodyError;
+    }
+  }
 }

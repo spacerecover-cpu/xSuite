@@ -6,7 +6,12 @@ vi.mock('./logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
-import { createCaseWithDevices } from './caseIntakeService';
+import {
+  captureIntakeConsents,
+  createCaseWithDevices,
+  logCaseIntake,
+  requireDepositorId,
+} from './caseIntakeService';
 
 /** Ordered log of the side effects the creation sequence performs. */
 let calls: string[] = [];
@@ -244,5 +249,122 @@ describe('createCaseWithDevices', () => {
       'Failed to insert devices: bad column',
     );
     expect(rpc).not.toHaveBeenCalledWith('promote_device_to_primary', expect.anything());
+  });
+});
+
+describe('requireDepositorId', () => {
+  it('is false for the customer themselves', () => {
+    expect(requireDepositorId('self')).toBe(false);
+  });
+
+  it('is true for every other relationship', () => {
+    expect(requireDepositorId('courier')).toBe(true);
+    expect(requireDepositorId('authorized_agent')).toBe(true);
+    expect(requireDepositorId('company_rep')).toBe(true);
+  });
+});
+
+describe('logCaseIntake', () => {
+  beforeEach(() => {
+    rpc.mockReset();
+    from.mockReset();
+  });
+
+  it('rejects a non-self depositor with no ID before hitting the network', async () => {
+    await expect(logCaseIntake({
+      caseId: 'c1', deviceIds: ['d1'], depositorName: 'Sam',
+      depositorRelationship: 'courier', depositorId: '  ',
+    })).rejects.toThrow(/National ID is required/);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('calls the RPC with the full parameter set', async () => {
+    rpc.mockResolvedValue({ data: 'batch-1', error: null });
+
+    const batch = await logCaseIntake({
+      caseId: 'c1', deviceIds: ['d1'], depositorName: 'Dana',
+      depositorRelationship: 'self', receiptInstanceId: 'i1',
+    });
+
+    expect(batch).toBe('batch-1');
+    expect(rpc).toHaveBeenCalledWith('log_case_intake', expect.objectContaining({
+      p_case_id: 'c1', p_device_ids: ['d1'], p_receipt_instance_id: 'i1',
+    }));
+  });
+});
+
+describe('captureIntakeConsents', () => {
+  /** Records every table written and the row it received. */
+  let writes: Array<{ table: string; row: Record<string, unknown> }>;
+
+  const baseConsents = {
+    tenantId: 't1',
+    customerId: 'cust-1',
+    caseId: 'case-1',
+    phoneE164: '+971500000000',
+    whatsappUtility: false,
+    destructiveAuthorized: false,
+    consentText: 'I agree to receive case updates on WhatsApp.',
+  };
+
+  beforeEach(() => {
+    writes = [];
+    rpc.mockReset();
+    from.mockReset();
+    rpc.mockResolvedValue({ data: 'coc-1', error: null });
+    from.mockImplementation((table: string) => ({
+      insert: (row: Record<string, unknown>) => {
+        writes.push({ table, row });
+        return Promise.resolve({ data: null, error: null });
+      },
+    }));
+  });
+
+  it('writes nothing and does not throw when the customer declines everything', async () => {
+    await expect(captureIntakeConsents(baseConsents)).resolves.toBeUndefined();
+
+    expect(writes).toEqual([]);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('appends a utility opt-in and never a marketing scope', async () => {
+    await captureIntakeConsents({ ...baseConsents, whatsappUtility: true });
+
+    expect(writes).toHaveLength(1);
+    expect(writes[0].table).toBe('whatsapp_consents');
+    expect(writes[0].row).toEqual({
+      tenant_id: 't1',
+      customer_id: 'cust-1',
+      scope: 'utility',
+      action: 'opt_in',
+      source: 'intake_checkin',
+      phone_e164: '+971500000000',
+      consent_text: baseConsents.consentText,
+    });
+  });
+
+  it('records destructive-attempt authorization as both an internal note and a custody event', async () => {
+    await captureIntakeConsents({ ...baseConsents, destructiveAuthorized: true });
+
+    expect(writes.map((w) => w.table)).toEqual(['case_internal_notes']);
+    expect(writes[0].row).toEqual(
+      expect.objectContaining({ tenant_id: 't1', case_id: 'case-1' }),
+    );
+    expect(writes[0].row.content).toEqual(expect.any(String));
+    expect(rpc).toHaveBeenCalledWith('log_chain_of_custody', expect.objectContaining({
+      p_case_id: 'case-1',
+      p_action_category: 'evidence_handling',
+      p_action: 'DESTRUCTIVE_ATTEMPT_AUTHORIZED',
+    }));
+  });
+
+  it('surfaces a consent write failure instead of silently losing the record', async () => {
+    from.mockImplementation(() => ({
+      insert: () => Promise.resolve({ data: null, error: { message: 'rls denied' } }),
+    }));
+
+    await expect(
+      captureIntakeConsents({ ...baseConsents, whatsappUtility: true }),
+    ).rejects.toMatchObject({ message: 'rls denied' });
   });
 });
