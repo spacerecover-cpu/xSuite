@@ -1,16 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { rpc, from, uploadSignature, sha256Hex } = vi.hoisted(() => ({
+const { rpc, from, uploadSignature, uploadDocumentSignature, sha256Hex } = vi.hoisted(() => ({
   rpc: vi.fn(),
   from: vi.fn(),
   uploadSignature: vi.fn(),
+  uploadDocumentSignature: vi.fn(),
   sha256Hex: vi.fn(),
 }));
 vi.mock('./supabaseClient', () => ({ supabase: { rpc, from } }));
 vi.mock('./logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
-vi.mock('./fileStorageService', () => ({ uploadSignature }));
+vi.mock('./fileStorageService', () => ({ uploadSignature, uploadDocumentSignature }));
 vi.mock('./pdf/contentHash', () => ({ sha256Hex }));
 
 import {
@@ -368,6 +369,7 @@ describe('signIntakeReceipt', () => {
     rpc.mockReset();
     from.mockReset();
     uploadSignature.mockReset();
+    uploadDocumentSignature.mockReset();
     sha256Hex.mockReset();
     rpc.mockResolvedValue({ data: { ok: true, signature_id: 'sig-1' }, error: null });
   });
@@ -392,7 +394,7 @@ describe('signIntakeReceipt', () => {
   });
 
   it('uploads and hashes a drawn mark so the receipt prints a signature, not just a name', async () => {
-    uploadSignature.mockResolvedValue({ success: true, filePath: 'signatures/1700000000.png' });
+    uploadDocumentSignature.mockResolvedValue({ success: true, filePath: 'signatures/inst-1/1700000000.png' });
     sha256Hex.mockResolvedValue('deadbeef');
     const imageBlob = new Blob(['ink']);
 
@@ -404,7 +406,7 @@ describe('signIntakeReceipt', () => {
 
     expect(id).toBe('sig-1');
     expect(sha256Hex).toHaveBeenCalledWith(imageBlob);
-    const [uploaded] = uploadSignature.mock.calls[0] as [File];
+    const [uploaded] = uploadDocumentSignature.mock.calls[0] as [File];
     expect(uploaded.type).toBe('image/png');
     expect(rpc).toHaveBeenCalledWith('staff_sign_off_document', {
       p_instance_id: 'inst-1',
@@ -413,17 +415,34 @@ describe('signIntakeReceipt', () => {
       p_signer_name: 'Dana Depositor',
       p_typed_value: undefined,
       p_signer_customer_id: 'cust-1',
-      p_image_path: 'signatures/1700000000.png',
-      p_image_bucket: 'company-assets',
+      p_image_path: 'signatures/inst-1/1700000000.png',
+      p_image_bucket: 'document-signatures',
       p_signature_sha256: 'deadbeef',
       p_user_agent: expectedUserAgent,
     });
   });
 
+  // company-assets is a PUBLIC bucket that legitimately holds branding art. A
+  // customer's handwritten signature on a proof-of-receipt must never land there.
+  it('never writes a customer signature to the public branding bucket', async () => {
+    uploadDocumentSignature.mockResolvedValue({ success: true, filePath: 'signatures/inst-1/1700000000.png' });
+    sha256Hex.mockResolvedValue('deadbeef');
+
+    await signIntakeReceipt(
+      'inst-1',
+      { method: 'drawn', signerName: 'Dana Depositor', imageBlob: new Blob(['ink']) },
+      'cust-1',
+    );
+
+    expect(uploadSignature).not.toHaveBeenCalled();
+    const [, params] = rpc.mock.calls[0] as [string, { p_image_bucket?: string }];
+    expect(params.p_image_bucket).not.toBe('company-assets');
+  });
+
   it('names a click-to-accept signer from the captured name and sends no image', async () => {
     await signIntakeReceipt('inst-1', { method: 'click_to_accept', signerName: 'Dana Depositor' }, 'cust-1');
 
-    expect(uploadSignature).not.toHaveBeenCalled();
+    expect(uploadDocumentSignature).not.toHaveBeenCalled();
     expect(rpc).toHaveBeenCalledWith('staff_sign_off_document', expect.objectContaining({
       p_slot: 'customer',
       p_method: 'click_to_accept',
@@ -434,7 +453,7 @@ describe('signIntakeReceipt', () => {
   });
 
   it('refuses to record a drawn signature whose image failed to upload', async () => {
-    uploadSignature.mockResolvedValue({ success: false, error: 'bucket denied' });
+    uploadDocumentSignature.mockResolvedValue({ success: false, error: 'bucket denied' });
 
     await expect(
       signIntakeReceipt('inst-1', { method: 'drawn', signerName: 'Dana', imageBlob: new Blob(['ink']) }, 'cust-1'),

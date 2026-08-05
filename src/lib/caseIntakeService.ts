@@ -2,7 +2,7 @@ import { supabase } from './supabaseClient';
 import { logger } from './logger';
 import { getIntakeStatusForCreation } from './caseService';
 import { setPrimaryDevice } from './deviceService';
-import { uploadSignature } from './fileStorageService';
+import { uploadDocumentSignature } from './fileStorageService';
 import { sha256Hex } from './pdf/contentHash';
 import type { Database } from '../types/database.types';
 import type { CapturedSignature } from '../components/cases/SignatureCaptureModal';
@@ -189,8 +189,8 @@ export async function logCaseIntake(input: LogCaseIntakeInput): Promise<string> 
   return (data ?? '') as string;
 }
 
-/** company-assets bucket — uploadSignature writes to 'company-assets'/signatures/ */
-const SIGNATURE_BUCKET = 'company-assets';
+/** Private bucket — a customer's handwritten mark is not public branding art. */
+const SIGNATURE_BUCKET = 'document-signatures';
 
 /** Persists a counter-captured customer signature against the receipt instance. */
 export async function signIntakeReceipt(
@@ -206,7 +206,7 @@ export async function signIntakeReceipt(
   let sha: string | undefined;
   if (sig.imageBlob && (sig.method === 'drawn' || sig.method === 'uploaded_image')) {
     const file = new File([sig.imageBlob], `sig-${instanceId}-customer.png`, { type: 'image/png' });
-    const res = await uploadSignature(file);
+    const res = await uploadDocumentSignature(file, instanceId);
     if (!res.success || !res.filePath) throw new Error(res.error ?? 'Signature upload failed');
     imagePath = res.filePath;
     sha = await sha256Hex(sig.imageBlob);

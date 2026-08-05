@@ -2,7 +2,7 @@ import { supabase } from './supabaseClient';
 import type { Database } from '../types/database.types';
 import { logger } from './logger';
 import { sha256Hex } from './pdf/contentHash';
-import { uploadSignature } from './fileStorageService';
+import { uploadDocumentSignature } from './fileStorageService';
 import { loadImageAsBase64 } from './pdf/utils';
 import type { SignatureBlockData } from './pdf/engine/types';
 
@@ -41,11 +41,11 @@ export async function captureStaffSignature(p: CaptureStaffSignatureParams): Pro
 
   let imagePath: string | null = null;
   let sha: string | null = null;
-  // company-assets bucket — uploadSignature writes to 'company-assets'/signatures/
-  const SIGNATURE_BUCKET = 'company-assets';
+  // Private bucket — a signature on a legal document is not public branding art.
+  const SIGNATURE_BUCKET = 'document-signatures';
   if (p.imageBlob && (p.method === 'drawn' || p.method === 'uploaded_image')) {
     const file = new File([p.imageBlob], `sig-${p.instanceId}-${p.slot}.png`, { type: 'image/png' });
-    const res = await uploadSignature(file);
+    const res = await uploadDocumentSignature(file, p.instanceId);
     if (!res.success || !res.filePath) throw new Error(res.error ?? 'Signature upload failed');
     imagePath = res.filePath;
     sha = await sha256Hex(p.imageBlob);
