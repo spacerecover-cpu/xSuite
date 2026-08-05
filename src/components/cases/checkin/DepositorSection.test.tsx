@@ -9,6 +9,13 @@ const base = {
   onChange: vi.fn(),
 };
 
+const courier = {
+  name: 'Ali Courier',
+  mobile: '+968 9111 1111',
+  nationalId: 'ID-42',
+  relationship: 'courier' as const,
+};
+
 describe('DepositorSection', () => {
   it('hides the National ID field when the customer collects for themselves', () => {
     render(<DepositorSection {...base} />);
@@ -24,10 +31,43 @@ describe('DepositorSection', () => {
 
   it('clears the customer prefill when switching off self', async () => {
     const onChange = vi.fn();
-    render(<DepositorSection {...base} onChange={onChange} />);
-    await userEvent.selectOptions(screen.getByLabelText(/relationship/i), 'courier');
-    expect(onChange).toHaveBeenCalledWith(
-      expect.objectContaining({ relationship: 'courier', name: '', nationalId: '' }),
+    render(
+      <DepositorSection
+        {...base}
+        value={{ name: 'Dana Reed', mobile: '+968 9000 0000', nationalId: 'STALE-ID', relationship: 'self' }}
+        onChange={onChange}
+      />,
     );
+    await userEvent.selectOptions(screen.getByLabelText(/relationship/i), 'courier');
+    expect(onChange).toHaveBeenCalledWith({
+      relationship: 'courier',
+      name: '',
+      mobile: '',
+      nationalId: '',
+    });
+  });
+
+  it('clears the courier identity when switching back to self', async () => {
+    const onChange = vi.fn();
+    render(<DepositorSection {...base} value={courier} onChange={onChange} />);
+    await userEvent.selectOptions(screen.getByLabelText(/relationship/i), 'self');
+    expect(onChange).toHaveBeenCalledWith({
+      relationship: 'self',
+      name: 'Dana Reed',
+      mobile: '',
+      nationalId: '',
+    });
+  });
+
+  it('keeps the depositor identity when relabelling between non-self relationships', async () => {
+    const onChange = vi.fn();
+    render(<DepositorSection {...base} value={courier} onChange={onChange} />);
+    await userEvent.selectOptions(screen.getByLabelText(/relationship/i), 'authorized_agent');
+    expect(onChange).toHaveBeenCalledWith({
+      relationship: 'authorized_agent',
+      name: 'Ali Courier',
+      mobile: '+968 9111 1111',
+      nationalId: 'ID-42',
+    });
   });
 });

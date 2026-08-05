@@ -24,20 +24,27 @@ const RELATIONSHIPS: { value: DepositorRelationship; label: string }[] = [
 ];
 
 /**
- * Who physically handed the devices over. Switching off `self` clears the
- * customer prefill so staff cannot leave a stale name attached to a courier,
- * and makes National ID required — mirroring the log_case_intake gate.
+ * Who physically handed the devices over. Crossing the `self` boundary in
+ * either direction resets the identity fields, so neither a stale customer
+ * prefill nor a courier's own contact details can end up printed on the
+ * receipt as the other party. Relabelling between two non-self relationships
+ * keeps what staff typed at the counter. Non-self also makes National ID
+ * required — mirroring the log_case_intake gate.
  */
 export function DepositorSection({ value, customerName, onChange }: DepositorSectionProps) {
   const headingId = useId();
   const idRequired = requireDepositorId(value.relationship);
 
   function handleRelationship(relationship: DepositorRelationship) {
-    onChange(
-      relationship === 'self'
-        ? { relationship, name: customerName, mobile: value.mobile, nationalId: '' }
-        : { relationship, name: '', mobile: '', nationalId: '' },
-    );
+    if (relationship === 'self') {
+      onChange({ relationship, name: customerName, mobile: '', nationalId: '' });
+      return;
+    }
+    if (value.relationship === 'self') {
+      onChange({ relationship, name: '', mobile: '', nationalId: '' });
+      return;
+    }
+    onChange({ ...value, relationship });
   }
 
   return (
