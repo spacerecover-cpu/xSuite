@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { depositorBlock, devicesForReceipt, toEngineData } from './receiptAdapter';
 import type { CaseData, DeviceData, ReceiptData } from '../../types';
+import { BUILT_IN_TEMPLATE_CONFIGS } from '../../templateConfig';
 import type { DocumentTemplateConfig } from '../../templateConfig';
 
 const dev = (id: string, batch?: string, receivedAt?: string): DeviceData => ({
@@ -178,5 +179,39 @@ describe('depositorBlock', () => {
     };
     const block = depositorBlock([d], 'Acme Ltd');
     expect(block?.rows.find((r) => r.label.en === 'Relationship')?.value).toBe('neighbour');
+  });
+});
+
+const receipt = (over: Partial<ReceiptData> = {}): ReceiptData => ({
+  caseData: { case_no: 'CASE-0042' } as ReceiptData['caseData'],
+  devices: [dev('a')],
+  companySettings: {} as ReceiptData['companySettings'],
+  ...over,
+});
+
+describe('toEngineData signature blocks', () => {
+  it('leaves wet-ink caption lines when nothing was captured', () => {
+    const out = toEngineData(receipt(), BUILT_IN_TEMPLATE_CONFIGS.customer_copy, 'customer');
+    expect(out.signatureBlocks).toBeUndefined();
+    expect(out.signatures?.[0].en).toBe('Customer Signature');
+  });
+
+  it('passes captured signatures through to signatureBlocks', () => {
+    const out = toEngineData(
+      receipt({
+        capturedSignatures: [
+          {
+            slot: 'customer',
+            name: 'Dana Reed',
+            method: 'drawn',
+            imageDataUrl: 'data:image/png;base64,AAA',
+          },
+        ],
+      }),
+      BUILT_IN_TEMPLATE_CONFIGS.customer_copy,
+      'customer',
+    );
+    expect(out.signatureBlocks).toHaveLength(1);
+    expect(out.signatureBlocks?.[0].name).toBe('Dana Reed');
   });
 });

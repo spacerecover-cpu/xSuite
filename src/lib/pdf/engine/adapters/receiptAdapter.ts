@@ -328,6 +328,11 @@ export function toEngineData(
     collector: depositorBlock(devices, to.name ?? ''),
     legalTerms,
     signatures,
+    // Absent/empty → the key stays off the object so the renderer takes its
+    // byte-identical wet-ink path (a lab with no signature pad loses nothing).
+    ...(data.capturedSignatures && data.capturedSignatures.length > 0
+      ? { signatureBlocks: data.capturedSignatures }
+      : {}),
     preparedBy: `Registered by: ${creatorName}`,
     // Intake docs carry no money: no line items, totals, bank, or payment history.
     paymentHistory: null,
