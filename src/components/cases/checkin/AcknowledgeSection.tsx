@@ -1,12 +1,24 @@
 import { useId, useState } from 'react';
-import { CheckCircle2, PenLine } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, PenLine } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { Checkbox } from '../../ui/Checkbox';
 import { SignatureCaptureModal } from '../SignatureCaptureModal';
 import type { CapturedSignature } from '../SignatureCaptureModal';
+import { useCompanyName, utilityConsentLabel } from '../../customers/WhatsAppConsentBlock';
 
+/** Receipt/signature attestation only — never the WhatsApp consent text. */
 export const INTAKE_CONSENT_TEXT =
   'I confirm that I am the owner or authorized representative of the device(s) listed on this receipt and authorize the lab to proceed with the service.';
+
+/**
+ * The exact WhatsApp opt-in sentence rendered to the customer. `whatsapp_consents`
+ * is append-only, so the caller writing the ledger row MUST take its `consent_text`
+ * from this same hook — a ledger row quoting a statement the customer never saw
+ * cannot be corrected later.
+ */
+export function useIntakeWhatsAppConsentText(): string {
+  return utilityConsentLabel(useCompanyName());
+}
 
 export interface AcknowledgeValue {
   termsAccepted: boolean;
@@ -22,24 +34,6 @@ interface AcknowledgeSectionProps {
   onChange: (next: AcknowledgeValue) => void;
 }
 
-const CONSENTS: { key: ConsentKey; label: string; hint: string }[] = [
-  {
-    key: 'termsAccepted',
-    label: 'I accept the terms of service and authorize the lab to proceed.',
-    hint: 'Required — this is what the signed receipt records.',
-  },
-  {
-    key: 'whatsappUtility',
-    label: 'Send me WhatsApp updates about this case.',
-    hint: 'Optional — declining does not affect the service.',
-  },
-  {
-    key: 'destructiveAuthorized',
-    label: 'I authorize recovery attempts that may permanently alter the media.',
-    hint: 'Optional — can also be authorized later, before those attempts begin.',
-  },
-];
-
 /**
  * Three INDEPENDENT consents plus the signature. They are never bundled into a
  * single "I agree": bundling is what makes each consent individually unprovable.
@@ -49,6 +43,37 @@ const CONSENTS: { key: ConsentKey; label: string; hint: string }[] = [
 export function AcknowledgeSection({ value, onChange }: AcknowledgeSectionProps) {
   const headingId = useId();
   const [signing, setSigning] = useState(false);
+  const [signatureCleared, setSignatureCleared] = useState(false);
+  const whatsappConsentText = useIntakeWhatsAppConsentText();
+
+  const consents: { key: ConsentKey; label: string; hint: string }[] = [
+    {
+      key: 'termsAccepted',
+      label: 'I accept the terms of service and authorize the lab to proceed.',
+      hint: 'Required — this is what the signed receipt records.',
+    },
+    {
+      key: 'whatsappUtility',
+      label: whatsappConsentText,
+      hint: 'Optional — declining does not affect the service. Reply STOP any time to opt out.',
+    },
+    {
+      key: 'destructiveAuthorized',
+      label: 'I authorize recovery attempts that may permanently alter the media.',
+      hint: 'Optional — can also be authorized later, before those attempts begin.',
+    },
+  ];
+
+  // A signature attests to the terms; withdrawing the terms voids it.
+  function setConsent(key: ConsentKey, checked: boolean) {
+    if (key === 'termsAccepted' && !checked && value.signature) {
+      setSignatureCleared(true);
+      onChange({ ...value, termsAccepted: false, signature: null });
+      return;
+    }
+    if (key === 'termsAccepted' && checked) setSignatureCleared(false);
+    onChange({ ...value, [key]: checked });
+  }
 
   return (
     <section aria-labelledby={headingId} className="space-y-6">
@@ -66,7 +91,7 @@ export function AcknowledgeSection({ value, onChange }: AcknowledgeSectionProps)
       </p>
 
       <div className="space-y-3">
-        {CONSENTS.map(({ key, label, hint }) => (
+        {consents.map(({ key, label, hint }) => (
           <div
             key={key}
             className={`rounded-lg border p-3 transition-colors ${
@@ -77,7 +102,7 @@ export function AcknowledgeSection({ value, onChange }: AcknowledgeSectionProps)
               label={label}
               hint={hint}
               checked={value[key]}
-              onChange={(e) => onChange({ ...value, [key]: e.target.checked })}
+              onChange={(e) => setConsent(key, e.target.checked)}
             />
           </div>
         ))}
@@ -93,6 +118,11 @@ export function AcknowledgeSection({ value, onChange }: AcknowledgeSectionProps)
             <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
             Signature captured
           </span>
+        ) : signatureCleared ? (
+          <span className="inline-flex items-center gap-1.5 text-sm font-medium text-warning">
+            <AlertTriangle aria-hidden="true" className="h-4 w-4" />
+            Signature cleared — it attested to the terms that were just declined.
+          </span>
         ) : (
           <p className="text-sm text-slate-500">
             {value.termsAccepted
@@ -107,7 +137,10 @@ export function AcknowledgeSection({ value, onChange }: AcknowledgeSectionProps)
         onClose={() => setSigning(false)}
         title="Customer signature"
         allowedMethods={['drawn', 'typed', 'click_to_accept']}
-        onCapture={(sig) => onChange({ ...value, signature: sig })}
+        onCapture={(sig) => {
+          setSignatureCleared(false);
+          onChange({ ...value, signature: sig });
+        }}
       />
     </section>
   );
