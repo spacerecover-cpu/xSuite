@@ -60,3 +60,81 @@ describe('TEMPLATE_PRESETS', () => {
     expect(categoriesFor('quote').length).toBeGreaterThan(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The Premium Lab intake presets reorder every intake section by key
+// (PREMIUM_INTAKE_ORDERS). A key missing from that map keeps its BASE order and
+// silently collides with whichever section already holds that slot — so the
+// depositor handover box lands in an ambiguous position instead of between the
+// device table and the consent text. These tests pin the depositor block's
+// visibility AND its position for both intake doc types.
+// ---------------------------------------------------------------------------
+
+const INTAKE_DOC_TYPES = ['office_receipt', 'customer_copy'] as const;
+
+/** A minimal depositor handover block, as `receiptAdapter` emits it. */
+const dataWithCollector: EngineDocData = {
+  ...data,
+  collector: {
+    title: { en: 'Handover Information', ar: 'معلومات التسليم' },
+    rows: [{ label: { en: 'Delivered by' }, value: 'Sam Okafor — on behalf of Jane Client' }],
+  },
+};
+
+/** Every leaf `text` string in a pdfmake content tree. */
+function collectTexts(node: unknown, out: string[]): void {
+  if (node == null) return;
+  if (typeof node === 'string') {
+    out.push(node);
+    return;
+  }
+  if (Array.isArray(node)) {
+    for (const child of node) collectTexts(child, out);
+    return;
+  }
+  if (typeof node === 'object') {
+    const obj = node as Record<string, unknown>;
+    if ('text' in obj) collectTexts(obj.text, out);
+    for (const key of Object.keys(obj)) {
+      if (key === 'text') continue;
+      collectTexts(obj[key], out);
+    }
+  }
+}
+
+describe('Premium Lab intake presets keep the depositor handover block', () => {
+  const premiumIntake = (docType: (typeof INTAKE_DOC_TYPES)[number]) => {
+    const preset = TEMPLATE_PRESETS[docType].find((p) => p.id === `${docType}-premium-lab`);
+    expect(preset, `${docType} must ship a Premium Lab preset`).toBeDefined();
+    return resolveTemplateConfig(BUILT_IN_TEMPLATE_CONFIGS[docType], undefined, preset!.config);
+  };
+
+  it.each(INTAKE_DOC_TYPES)('%s resolves a visible collector section', (docType) => {
+    const collector = premiumIntake(docType).sections.find((s) => s.key === 'collector');
+    expect(collector, `${docType} premium preset must keep a collector section`).toBeDefined();
+    expect(collector?.visible).toBe(true);
+  });
+
+  it.each(INTAKE_DOC_TYPES)('%s orders collector between devices and legalTerms', (docType) => {
+    const sections = premiumIntake(docType).sections;
+    const orderOf = (key: string) => sections.find((s) => s.key === key)?.order;
+    const devices = orderOf('devices');
+    const collector = orderOf('collector');
+    const legalTerms = orderOf('legalTerms');
+
+    expect(devices).toBeDefined();
+    expect(collector).toBeDefined();
+    expect(legalTerms).toBeDefined();
+    expect(collector!).toBeGreaterThan(devices!);
+    expect(collector!).toBeLessThan(legalTerms!);
+  });
+
+  it.each(INTAKE_DOC_TYPES)('%s renders the handover box onto the page', (docType) => {
+    const def = renderTemplate(premiumIntake(docType), dataWithCollector, ctx, 'LOGO', 'QR');
+    const texts: string[] = [];
+    collectTexts(def.content, texts);
+    const joined = texts.join('|');
+    expect(joined).toContain('Handover Information');
+    expect(joined).toContain('Sam Okafor — on behalf of Jane Client');
+  });
+});

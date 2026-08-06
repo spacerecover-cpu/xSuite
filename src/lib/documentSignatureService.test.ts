@@ -4,7 +4,7 @@ const { from, getUser } = vi.hoisted(() => ({ from: vi.fn(), getUser: vi.fn() })
 vi.mock('./supabaseClient', () => ({ supabase: { from, auth: { getUser } } }));
 vi.mock('./logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() } }));
 vi.mock('./fileStorageService', () => ({
-  uploadSignature: vi.fn(async () => ({ success: true, filePath: 'company-assets/signatures/sig.png' })),
+  uploadDocumentSignature: vi.fn(async () => ({ success: true, filePath: 'signatures/inst-1/sig.png' })),
 }));
 vi.mock('./pdf/contentHash', () => ({ sha256Hex: vi.fn(async () => 'deadbeef') }));
 
@@ -45,12 +45,13 @@ describe('captureStaffSignature', () => {
     expect(inserted).toMatchObject({
       document_instance_id: 'di-1', slot: 'approver', method: 'drawn',
       signer_user_id: 'u1', signer_name: 'Tech A', tenant_id: 't1',
-      signature_image_path: 'company-assets/signatures/sig.png', signature_sha256: 'deadbeef',
+      signature_image_path: 'signatures/inst-1/sig.png', signature_sha256: 'deadbeef',
+      signature_image_bucket: 'document-signatures',
     });
   });
 
   it('inserts a typed signature with typed_value and no upload', async () => {
-    const { uploadSignature } = await import('./fileStorageService');
+    const { uploadDocumentSignature } = await import('./fileStorageService');
     let inserted: Record<string, unknown> | null = null;
     from.mockImplementation((table: string) => {
       if (table === 'profiles') return chain({ data: { tenant_id: 't1' }, error: null });
@@ -60,7 +61,7 @@ describe('captureStaffSignature', () => {
     });
     const id = await captureStaffSignature({ instanceId: 'di-1', slot: 'approver', method: 'typed', signerName: 'Tech A', typedValue: 'Tech A' });
     expect(id).toBe('sig-2');
-    expect(uploadSignature).not.toHaveBeenCalled();
+    expect(uploadDocumentSignature).not.toHaveBeenCalled();
     expect(inserted).toMatchObject({ method: 'typed', typed_value: 'Tech A', signature_image_path: null });
   });
 

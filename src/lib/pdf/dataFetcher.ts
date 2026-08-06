@@ -1,6 +1,8 @@
 import { supabase, resolveTenantId } from '../supabaseClient';
 import { fetchInvoicePaymentLedger } from '../paymentLedger';
 import { getOrCreateCompanySettings } from '../companySettingsService';
+import { resolveSignatureBlocks } from '../documentSignatureService';
+import type { SignatureBlockData } from './engine/types';
 import type {
   CaseData,
   DeviceData,
@@ -360,18 +362,72 @@ export function toCaseData(
   } satisfies CaseData;
 }
 
-export async function fetchReceiptData(caseId: string): Promise<ReceiptData> {
-  const [caseResult, devicesResult, settingsResult] = await Promise.all([
+/**
+ * `instanceId` is the receipt's document instance, present only once the receipt
+ * has been raised against a case (the counter check-in flow). Preview and legacy
+ * callers pass nothing and keep the wet-ink signature lines.
+ */
+export async function fetchReceiptData(caseId: string, instanceId?: string): Promise<ReceiptData> {
+  // /print/customer-copy/:caseId carries no instance id, so an explicit one is the
+  // exception rather than the rule: resolve the case's own receipt instance or the
+  // signature the customer gave at the counter never reaches the paper.
+  const resolvedInstanceId = instanceId ?? (await findCaseReceiptInstanceId(caseId));
+
+  const [caseResult, devicesResult, settingsResult, capturedSignatures] = await Promise.all([
     fetchCaseData(caseId),
     fetchCaseDevices(caseId),
     fetchCompanySettings(),
+    fetchCapturedSignatures(resolvedInstanceId),
   ]);
 
   return {
     caseData: caseResult,
     devices: devicesResult,
     companySettings: settingsResult,
+    // Empty → the key stays off the object so the adapter takes its wet-ink path.
+    ...(capturedSignatures.length > 0 ? { capturedSignatures } : {}),
   };
+}
+
+// A failed signature lookup must not block the receipt the counter is waiting to
+// print: the document falls back to wet-ink lines, which stays a truthful artifact
+// (an unsigned line is signed by hand) rather than asserting a signature it could
+// not read.
+/**
+ * The check-in receipt instance raised against this case, newest first. Both intake
+ * variants are eligible: the customer signs the check-in once, and that signature
+ * belongs on the lab's retained copy as much as on the customer's.
+ *
+ * Failure is non-fatal for the same reason a failed signature lookup is — an
+ * unsigned wet-ink line is a truthful artifact; a receipt the counter cannot print
+ * is not.
+ */
+async function findCaseReceiptInstanceId(caseId: string): Promise<string | undefined> {
+  try {
+    const { data } = await supabase
+      .from('document_instances')
+      .select('id')
+      .eq('case_id', caseId)
+      .in('doc_type', ['customer_copy', 'office_receipt'])
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return data?.id ?? undefined;
+  } catch (error) {
+    console.error('Error resolving receipt instance:', error);
+    return undefined;
+  }
+}
+
+async function fetchCapturedSignatures(instanceId?: string): Promise<SignatureBlockData[]> {
+  if (!instanceId) return [];
+  try {
+    return await resolveSignatureBlocks(instanceId);
+  } catch (error) {
+    console.error('Error fetching captured signatures:', error);
+    return [];
+  }
 }
 
 async function fetchCaseData(caseId: string): Promise<CaseData> {
@@ -500,6 +556,12 @@ export async function fetchCaseDevices(caseId: string): Promise<DeviceData[]> {
     checkout_collector_mobile: device.checkout_collector_mobile ?? undefined,
     checkout_collector_id: device.checkout_collector_id ?? undefined,
     checkout_collector_relationship: device.checkout_collector_relationship ?? undefined,
+    received_at: device.received_at ?? undefined,
+    intake_batch_id: device.intake_batch_id ?? undefined,
+    depositor_name: device.depositor_name ?? undefined,
+    depositor_mobile: device.depositor_mobile ?? undefined,
+    depositor_id: device.depositor_id ?? undefined,
+    depositor_relationship: device.depositor_relationship ?? undefined,
   }));
 }
 

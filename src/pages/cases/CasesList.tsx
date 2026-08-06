@@ -7,7 +7,7 @@ import { sanitizeFilterValue } from '../../lib/postgrestSanitizer';
 import { buildCaseSearchOr, applyCaseListFilters } from '../../lib/caseSearch';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { Button } from '../../components/ui/Button';
-import { Plus, Search, Filter, Briefcase, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Archive, Download } from 'lucide-react';
+import { Plus, Search, Filter, Briefcase, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Archive, Download, ClipboardCheck } from 'lucide-react';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { BulkActionsBar, BulkActionButton } from '../../components/shared/BulkActionsBar';
 import { useBulkSelection } from '../../hooks/useBulkSelection';
@@ -125,6 +125,9 @@ export const CasesList: React.FC = () => {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const selection = useBulkSelection();
   const canBulkArchive = profile?.role === 'owner' || profile?.role === 'admin';
+  // Mirrors the STAFF_ROLES guard on /cases/check-in — a viewer offered the
+  // button would only be bounced by the route.
+  const canCheckIn = Boolean(profile?.role) && profile?.role !== 'viewer';
   const [isArchiving, setIsArchiving] = useState(false);
 
   // Command-palette deep-link: /cases?new=1 opens the create wizard.
@@ -620,6 +623,12 @@ export const CasesList: React.FC = () => {
         }
         actions={
           <>
+            {canCheckIn && (
+              <Button variant="secondary" onClick={() => navigate('/cases/check-in')}>
+                <ClipboardCheck className="w-4 h-4 mr-2" />
+                Check In Devices
+              </Button>
+            )}
             <Button onClick={handleCreateCase}>
               <Plus className="w-4 h-4 mr-2" />
               Create Case

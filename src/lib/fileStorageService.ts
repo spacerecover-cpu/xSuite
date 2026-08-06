@@ -27,6 +27,8 @@ const BUCKETS = {
   ASSETS: 'company-assets',
   QRCODES: 'company-qrcodes',
   CUSTOMER_PHOTOS: 'customer-profile-photos',
+  // Private. Signatures on legal documents are not branding art.
+  DOCUMENT_SIGNATURES: 'document-signatures',
 } as const;
 
 const ALLOWED_MIME_TYPES = [
@@ -42,7 +44,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 export const uploadCompanyAsset = async (
   file: File,
-  bucketName: 'company-assets' | 'company-qrcodes' | 'customer-profile-photos',
+  bucketName: 'company-assets' | 'company-qrcodes' | 'customer-profile-photos' | 'document-signatures',
   folder: string = '',
   metadata?: Partial<FileMetadata>
 ): Promise<UploadResult> => {
@@ -173,8 +175,22 @@ export const deleteLogo = async (
 export const uploadStamp = async (file: File, metadata?: Partial<FileMetadata>): Promise<UploadResult> =>
   uploadCompanyAsset(file, BUCKETS.ASSETS, 'stamps', metadata);
 
+/** Company branding signature art — public, rendered on templates. */
 export const uploadSignature = async (file: File, metadata?: Partial<FileMetadata>): Promise<UploadResult> =>
   uploadCompanyAsset(file, BUCKETS.ASSETS, 'signatures', metadata);
+
+/**
+ * A signature captured against a document instance — a person's handwritten mark
+ * on a legal record, so it goes to the PRIVATE bucket and is read back through a
+ * short-lived signed URL. Foldered per instance so a path is not guessable from a
+ * timestamp alone.
+ */
+export const uploadDocumentSignature = async (
+  file: File,
+  instanceId: string,
+  metadata?: Partial<FileMetadata>,
+): Promise<UploadResult> =>
+  uploadCompanyAsset(file, BUCKETS.DOCUMENT_SIGNATURES, `signatures/${instanceId}`, metadata);
 
 export const deleteStamp = async (filePath: string): Promise<{ success: boolean; error?: string }> =>
   deleteCompanyAsset(filePath, BUCKETS.ASSETS);

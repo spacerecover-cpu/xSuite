@@ -24,11 +24,13 @@
  */
 
 import type { CaseData, DeviceData, ReceiptData } from '../../types';
-import type { DocumentTemplateConfig } from '../../templateConfig';
+import type { DocumentTemplateConfig, LanguageConfig } from '../../templateConfig';
 import { formatDate, formatCapacity, safeString } from '../../utils';
+import { resolveLabel } from '../labels';
 import { missingValue } from './missingValue';
 import type {
   CaseInfoBlock,
+  CollectorBlock,
   DevicesBlock,
   DocRefBlock,
   EngineDocData,
@@ -36,6 +38,7 @@ import type {
   LegalTermsBlock,
   PartyBlock,
   ResolvedColumn,
+  SignatureBlockData,
 } from '../types';
 
 /**
@@ -52,6 +55,102 @@ export function docRefBannerActive(config: DocumentTemplateConfig): boolean {
 
 /** Which intake variant we are producing. */
 export type ReceiptVariant = 'office' | 'customer';
+
+/**
+ * Display captions for every signature slot that can reach the page — the two
+ * canonical handover slots plus the rest of the `signature_slot` enum. A
+ * captured signature carries only a nullable free-text `signer_role`, so without
+ * a caption the renderer falls back to `b.slot` and prints the raw enum token
+ * ("witness") as the label on a custody document the customer signs.
+ */
+const SIGNATURE_SLOT_CAPTIONS: Record<string, LabelText> = {
+  customer: { en: 'Customer Signature', ar: 'توقيع العميل' },
+  representative: { en: 'Company Representative', ar: 'ممثل الشركة' },
+  witness: { en: 'Witness', ar: 'الشاهد' },
+  lab_manager: { en: 'Lab Manager', ar: 'مدير المختبر' },
+  engineer: { en: 'Engineer', ar: 'المهندس' },
+  approver: { en: 'Approver', ar: 'المعتمد' },
+  qa_reviewer: { en: 'QA Reviewer', ar: 'مراجع الجودة' },
+};
+
+/**
+ * The two parties an intake receipt is signed by. The adapter owns this list —
+ * a handover document always shows BOTH acknowledgement slots, whichever of
+ * them was captured on a pad.
+ */
+const RECEIPT_SIGNATURE_SLOTS: { slot: string; caption: LabelText }[] = [
+  { slot: 'customer', caption: SIGNATURE_SLOT_CAPTIONS.customer },
+  { slot: 'representative', caption: SIGNATURE_SLOT_CAPTIONS.representative },
+];
+
+/**
+ * The slots that may stand in for the lab on the handover — the staff-side
+ * values of the `signature_slot` enum plus the receipt's own slot id. Claimed by
+ * an allowlist, never by "not the customer": `witness` is a first-class slot too,
+ * and rewriting a third-party witness as the Company Representative would both
+ * mislabel who signed on a custody document and swallow the lab's own
+ * acknowledgement line.
+ */
+const LAB_SIGNATURE_SLOTS = new Set([
+  'representative',
+  'lab_manager',
+  'engineer',
+  'approver',
+  'qa_reviewer',
+]);
+
+/**
+ * Merges the captured signatures onto the receipt's two canonical slots.
+ *
+ * `renderSignature` REPLACES the whole wet-ink row with exactly the blocks it is
+ * given, so a partial capture (customer signs at the counter, the representative
+ * does not — or the reverse) would otherwise erase the other party's line from a
+ * custody document. Every slot therefore always yields a block: the captured one
+ * when it exists, an unsigned caption-only block to sign by hand when it does
+ * not. Captured blocks outside the two slots (e.g. a witness) are kept with
+ * their own identity, never dropped and never relabelled as one of the two
+ * parties — but one captured without its own role label takes its slot's
+ * caption, so the page prints "Witness", not the raw `witness` enum token.
+ *
+ * `SignatureBlockData.role` is a plain string the renderer prints verbatim, so
+ * every caption is resolved HERE through the document's language — the same
+ * `resolveLabel` the wet-ink lines take. Otherwise the identical caption would
+ * fall back to English-only the moment the pad was used, on the customer-facing
+ * custody copy. `language` is optional because adapters are called with partial
+ * config literals in tests and from legacy call sites (mirrors `missingValue`).
+ *
+ * Returns null when nothing was captured, so the renderer keeps its
+ * byte-identical wet-ink path.
+ */
+export function mergeReceiptSignatures(
+  captured: SignatureBlockData[] | undefined,
+  language?: LanguageConfig | null,
+): SignatureBlockData[] | null {
+  if (!captured || captured.length === 0) return null;
+
+  const caption = (label: LabelText): string =>
+    language ? resolveLabel(label, language) : label.en;
+
+  const unclaimed = [...captured];
+  const claim = (slot: string): SignatureBlockData | undefined => {
+    const index = unclaimed.findIndex((b) =>
+      slot === 'customer' ? b.slot === 'customer' : LAB_SIGNATURE_SLOTS.has(b.slot),
+    );
+    return index === -1 ? undefined : unclaimed.splice(index, 1)[0];
+  };
+
+  const blocks = RECEIPT_SIGNATURE_SLOTS.map(({ slot, caption: label }) => {
+    const signed = claim(slot);
+    const role = caption(label);
+    return signed ? { ...signed, role: signed.role || role } : { slot, role };
+  });
+  const extras = unclaimed.map((b) => {
+    if (b.role) return b;
+    const label = SIGNATURE_SLOT_CAPTIONS[b.slot];
+    return label ? { ...b, role: caption(label) } : b;
+  });
+  return [...blocks, ...extras];
+}
 
 /**
  * The intake device-table columns, matching the legacy office_receipt /
@@ -73,6 +172,21 @@ function intakeDeviceColumns(): ResolvedColumn[] {
   ];
 }
 
+/**
+ * The devices a receipt covers: the LATEST intake batch only. Devices added to
+ * the case after that handover must never appear on a re-render of the earlier
+ * receipt. Mirrors the checkout adapter's latest-batch rule. Falls back to all
+ * devices when no batch has been recorded (legacy cases, template preview).
+ */
+export function devicesForReceipt(devices: DeviceData[]): DeviceData[] {
+  const batched = devices.filter((d) => d.intake_batch_id);
+  if (batched.length === 0) return devices;
+  const latest = batched.reduce((a, b) =>
+    (a.received_at ?? '') >= (b.received_at ?? '') ? a : b,
+  );
+  return devices.filter((d) => d.intake_batch_id === latest.intake_batch_id);
+}
+
 /** Stringify one device into the intake-table row shape (keys ↔ columns). */
 function deviceRow(device: DeviceData): Record<string, string> {
   return {
@@ -84,6 +198,81 @@ function deviceRow(device: DeviceData): Record<string, string> {
     // simple label + badge colours (or a '-' dash cell when empty).
     role: device.role ?? '',
   };
+}
+
+/**
+ * Depositor relationship → display string. Values (unlike labels) bypass the
+ * bilingual join in every info-box renderer, so these stay English — the same
+ * rule `checkoutAdapter`'s collector block follows.
+ */
+const RELATIONSHIP_LABELS: Record<string, string> = {
+  self: 'Customer',
+  authorized_agent: 'Authorized agent',
+  company_rep: 'Company representative',
+  courier: 'Courier',
+};
+
+/**
+ * Who physically handed the devices over, expressed as the generic
+ * {@link CollectorBlock} the shared `collector` section already renders — no new
+ * renderer. Mirrors the checkout collector block: `self` reads "Delivered by
+ * customer"; anyone else is NAMED alongside the customer they acted for, with
+ * the National ID the intake RPC gates on. All devices in an intake batch share
+ * one depositor, so the first device carrying depositor state is the source.
+ *
+ * A depositor recorded WITHOUT a relationship (the column is nullable, and the
+ * intake RPC only gates the National ID when a non-self relationship is given)
+ * counts as the customer only when no distinct name was captured — otherwise the
+ * receipt would print "Delivered by customer" and silently drop the name, ID and
+ * mobile of the person actually standing at the counter. Same rule as
+ * `checkoutAdapter`'s collector block.
+ *
+ * Returns null when no depositor was recorded (legacy cases, template preview)
+ * so the section renders nothing rather than an empty box.
+ */
+export function depositorBlock(
+  devices: DeviceData[],
+  customerName: string,
+): CollectorBlock | null {
+  const source = devices.find((d) => d.depositor_name || d.depositor_relationship);
+  if (!source) return null;
+
+  const relationship = source.depositor_relationship ?? '';
+  const name = source.depositor_name?.trim() ?? '';
+  const isSelf = relationship === 'self' || (!relationship && (!name || name === customerName));
+
+  const rows: CollectorBlock['rows'] = [
+    {
+      label: { en: 'Delivered by', ar: 'سُلّم بواسطة' },
+      value: isSelf
+        ? 'Delivered by customer'
+        : `${safeString(source.depositor_name)} — on behalf of ${customerName}`,
+    },
+  ];
+
+  if (!isSelf) {
+    if (relationship) {
+      rows.push({
+        label: { en: 'Relationship', ar: 'الصلة' },
+        value: RELATIONSHIP_LABELS[relationship] ?? safeString(relationship),
+      });
+    }
+    if (source.depositor_id) {
+      rows.push({ label: { en: 'National ID', ar: 'رقم الهوية' }, value: source.depositor_id });
+    }
+    if (source.depositor_mobile) {
+      rows.push({ label: { en: 'Mobile', ar: 'الجوال' }, value: source.depositor_mobile });
+    }
+  }
+
+  if (source.received_at) {
+    rows.push({
+      label: { en: 'Received on', ar: 'تاريخ الاستلام' },
+      value: formatDate(source.received_at),
+    });
+  }
+
+  return { title: { en: 'Handover Information', ar: 'معلومات التسليم' }, rows };
 }
 
 /**
@@ -182,7 +371,8 @@ export function toEngineData(
   config: DocumentTemplateConfig,
   variant: ReceiptVariant,
 ): EngineDocData {
-  const { caseData, devices, companySettings } = data;
+  const { caseData, companySettings } = data;
+  const devices = devicesForReceipt(data.devices);
 
   // ---- Title ---------------------------------------------------------------
   // Both intake variants share the DEVICE CHECK-IN RECEIPT title (matching the
@@ -216,10 +406,8 @@ export function toEngineData(
   const legalTerms: LegalTermsBlock = legalTermsBlock(companySettings, variant);
 
   // ---- Signature lines -----------------------------------------------------
-  const signatures: LabelText[] = [
-    { en: 'Customer Signature', ar: 'توقيع العميل' },
-    { en: 'Company Representative', ar: 'ممثل الشركة' },
-  ];
+  const signatures: LabelText[] = RECEIPT_SIGNATURE_SLOTS.map((s) => s.caption);
+  const mergedBlocks = mergeReceiptSignatures(data.capturedSignatures, config.language);
 
   // ---- Registered-by line (rendered only under the premium presentation) ----
   const creatorName =
@@ -233,8 +421,12 @@ export function toEngineData(
     docRef,
     caseInfo,
     devices: devicesBlock,
+    collector: depositorBlock(devices, to.name ?? ''),
     legalTerms,
     signatures,
+    // Absent/empty → the key stays off the object so the renderer takes its
+    // byte-identical wet-ink path (a lab with no signature pad loses nothing).
+    ...(mergedBlocks ? { signatureBlocks: mergedBlocks } : {}),
     preparedBy: `Registered by: ${creatorName}`,
     // Intake docs carry no money: no line items, totals, bank, or payment history.
     paymentHistory: null,

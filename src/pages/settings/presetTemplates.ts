@@ -196,10 +196,11 @@ const PREMIUM_INTAKE_ORDERS: Record<string, number> = {
   parties: 2,
   caseInfo: 3,
   devices: 4,
-  legalTerms: 5,
-  signature: 6,
-  qr: 7,
-  footer: 8,
+  collector: 5,
+  legalTerms: 6,
+  signature: 7,
+  qr: 8,
+  footer: 9,
 };
 
 const PREMIUM_CHECKOUT_ORDERS: Record<string, number> = {

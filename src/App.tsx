@@ -44,6 +44,9 @@ type StaffRoles = NonNullable<ComponentProps<typeof ProtectedRoute>['allowedRole
 const FINANCE_ROLES: StaffRoles = ['owner', 'admin', 'accounts'];
 const HR_ROLES: StaffRoles = ['owner', 'admin', 'hr'];
 const ADMIN_ROLES: StaffRoles = ['owner', 'admin'];
+// Mirrors is_staff_user() — every role except the read-only `viewer`. Taking
+// physical custody of a customer's media is a write act, never a viewer's.
+const STAFF_ROLES: StaffRoles = ['owner', 'admin', 'manager', 'technician', 'sales', 'accounts', 'hr'];
 
 // Root layout route: providers + global chrome. Everything lives under the
 // data router so navigation state (useNavigation) is observable app-wide.
@@ -163,6 +166,9 @@ const router = createBrowserRouter(
         <Route path="notifications" lazy={page(() => import('./pages/notifications/NotificationsHistory'), 'NotificationsHistory')} />
         <Route element={<ModuleRoute moduleKey="cases" />}>
           <Route path="cases" lazy={page(() => import('./pages/cases/CasesList'), 'CasesList')} />
+          <Route element={<ProtectedRoute allowedRoles={STAFF_ROLES} />}>
+            <Route path="cases/check-in" lazy={page(() => import('./pages/cases/CaseCheckIn'), 'CaseCheckIn')} />
+          </Route>
           <Route path="cases/:id" lazy={page(() => import('./pages/cases/CaseDetail'), 'CaseDetail')} />
         </Route>
         <Route path="clients" lazy={page(() => import('./pages/clients/ClientsList'), 'ClientsList')} />

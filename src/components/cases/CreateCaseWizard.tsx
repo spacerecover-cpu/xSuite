@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../ui/Button';
@@ -18,6 +19,7 @@ import {
   Users,
   HardDrive,
   AlertCircle,
+  AlertTriangle,
   CheckCircle,
   FolderPlus,
   X,
@@ -28,15 +30,11 @@ import {
   Layers
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { setPrimaryDevice } from '../../lib/deviceService';
-import { getIntakeStatusForCreation } from '../../lib/caseService';
+import { createCaseWithDevices, DevicesInCustodyError } from '../../lib/caseIntakeService';
 import { logger } from '../../lib/logger';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
 import { CASE_COMMAND_STATS_KEY } from '../../hooks/useCaseCommandStats';
-import type { Database } from '../../types/database.types';
-
-type CasesInsert = Database['public']['Tables']['cases']['Insert'];
 
 interface Device {
   id: string;
@@ -62,6 +60,7 @@ interface CreateCaseWizardProps {
 
 export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onSuccess }) => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { profile } = useAuth();
   const toast = useToast();
   const confirm = useConfirm();
@@ -69,6 +68,10 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [createdCase, setCreatedCase] = useState<{ id: string; case_no: string } | null>(null);
+  // A creation that failed with the devices already sent to the custody ledger.
+  // Holding the identity is what lets this surface drop its Submit instead of
+  // inviting a second physical intake.
+  const [stalledCase, setStalledCase] = useState<{ id: string; case_no: string } | null>(null);
   const [isBulkDrivesModalOpen, setIsBulkDrivesModalOpen] = useState(false);
   const [bulkServerDrives, setBulkServerDrives] = useState<Device[]>([]);
 
@@ -348,65 +351,15 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
 
   const createCaseMutation = useMutation({
     mutationFn: async () => {
-      const { data: caseNumber, error: numberError } = await supabase
-        .rpc('get_next_number', { p_scope: 'case' });
-
-      if (numberError) {
-        logger.error('Error generating case number:', numberError);
-        if (numberError.message?.includes('not found')) {
-          throw new Error('Case numbering system is not configured. Please contact your system administrator to configure it in Settings > System & Numbers.');
-        }
-        throw new Error(`Failed to generate case number: ${numberError.message}`);
-      }
-
-      if (!caseNumber) {
-        throw new Error('Failed to generate case number. Please try again or contact support.');
-      }
-
-      const customerName = customers.find(c => c.id === formData.customer_id)?.customer_name || 'Customer';
-
       if (!profile?.tenant_id) {
         throw new Error('No active tenant — please sign in again.');
       }
       const tenantId = profile.tenant_id;
+      const customerName =
+        customers.find((c) => c.id === formData.customer_id)?.customer_name || 'Customer';
 
-      // The guard trigger on cases requires a matched active intake
-      // status_id + name pair on INSERT.
-      const intakeStatus = await getIntakeStatusForCreation();
-
-      const caseData: CasesInsert = {
-        tenant_id: tenantId,
-        case_number: caseNumber,
-        customer_id: formData.customer_id,
-        subject: `Case for ${customerName}`,
-        priority: formData.priority,
-        status: intakeStatus.name,
-        status_id: intakeStatus.id,
-        phase_entered_at: new Date().toISOString(),
-      };
-
-      if (formData.contact_id) {
-        caseData.contact_id = formData.contact_id;
-      }
-      if (formData.client_reference) {
-        caseData.client_reference = formData.client_reference;
-      }
-      if (formData.service_type_id) {
-        caseData.service_type_id = formData.service_type_id;
-      }
-      if (formData.service_location_id) {
-        caseData.service_location_id = formData.service_location_id;
-      }
-      if (profile?.id) {
-        caseData.created_by = profile.id;
-
-        // Auto-assign technicians to cases they create
-        if (profile.role === 'technician') {
-          caseData.assigned_to = profile.id;
-        }
-      }
-
-      // Auto-populate company_id from customer's company relationship
+      // Auto-populate company_id from the customer's primary company relationship.
+      let companyId: string | null = null;
       if (formData.customer_id) {
         const { data: customerCompany } = await supabase
           .from('customer_company_relationships')
@@ -416,40 +369,27 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
           .order('is_primary', { ascending: false })
           .limit(1)
           .maybeSingle();
-
-        if (customerCompany?.company_id) {
-          caseData.company_id = customerCompany.company_id;
-        }
-      }
-
-      const { data: newCase, error: caseError } = await supabase
-        .from('cases')
-        .insert(caseData)
-        .select()
-        .maybeSingle();
-
-      if (caseError) {
-        logger.error('Error creating case:', caseError);
-        throw new Error(`Failed to create case: ${caseError.message}`);
-      }
-      if (!newCase) {
-        throw new Error('Case was created but no row was returned.');
+        companyId = customerCompany?.company_id ?? null;
       }
 
       const allDevices = [...devices, ...bulkServerDrives];
+      const primaryWizardDevice = allDevices.find((d) => d.is_primary);
 
-      const primaryWizardDevice = allDevices.find(d => d.is_primary);
-
-      const devicesToInsert = allDevices
-        .filter(d => d.device_type_id || d.serial_no)
-        .map(device => {
-          const problemName = device.device_problem_id
-            ? serviceProblems.find(sp => sp.id === device.device_problem_id)?.name || null
-            : null;
-
-          return {
-            tenant_id: tenantId,
-            case_id: newCase.id,
+      const result = await createCaseWithDevices({
+        tenantId,
+        profileId: profile?.id ?? null,
+        profileRole: profile?.role ?? null,
+        customerId: formData.customer_id,
+        customerName,
+        priority: formData.priority,
+        contactId: formData.contact_id || null,
+        clientReference: formData.client_reference || null,
+        serviceTypeId: formData.service_type_id || null,
+        serviceLocationId: formData.service_location_id || null,
+        companyId,
+        devices: allDevices
+          .filter((d) => d.device_type_id || d.serial_no)
+          .map((device) => ({
             device_type_id: device.device_type_id || null,
             brand_id: device.brand_id || null,
             model: device.model || null,
@@ -457,49 +397,25 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
             capacity_id: device.capacity_id || null,
             condition_id: device.condition_id || null,
             accessories: device.accessories.length > 0 ? device.accessories : null,
-            symptoms: problemName,
+            symptoms: device.device_problem_id
+              ? serviceProblems.find((sp) => sp.id === device.device_problem_id)?.name || null
+              : null,
             notes: device.recovery_requirements || null,
             password: device.device_password || null,
             encryption_id: device.encryption_type_id || null,
             device_role_id: device.device_role_id || null,
             created_by: profile?.id || null,
-            _wizard_id: device.id,
-          };
-        });
+            isPrimary: primaryWizardDevice ? device.id === primaryWizardDevice.id : false,
+          })),
+      });
 
-      let primaryDeviceDbId: string | null = null;
-
-      if (devicesToInsert.length > 0) {
-        const { data: insertedDevices, error: devicesError } = await supabase
-          .from('case_devices')
-          .insert(devicesToInsert.map(({ _wizard_id: _w, ...rest }) => rest))
-          .select('id');
-
-        if (devicesError) {
-          logger.error('Error inserting devices:', devicesError);
-          throw new Error(`Failed to insert devices: ${devicesError.message}`);
-        }
-
-        if (primaryWizardDevice && insertedDevices && insertedDevices.length > 0) {
-          const primaryIndex = devicesToInsert.findIndex(d => d._wizard_id === primaryWizardDevice.id);
-          const matched = primaryIndex >= 0 ? insertedDevices[primaryIndex] : insertedDevices[0];
-          if (matched) primaryDeviceDbId = matched.id;
-        } else if (insertedDevices && insertedDevices.length > 0) {
-          primaryDeviceDbId = insertedDevices[0].id;
-        }
-      }
-
-      if (primaryDeviceDbId) {
-        await setPrimaryDevice(primaryDeviceDbId, newCase.id);
-      }
-
-      return newCase;
+      return { id: result.caseId, case_no: result.caseNumber };
     },
     onSuccess: (newCase) => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
       queryClient.invalidateQueries({ queryKey: ['cases_count'] });
       queryClient.invalidateQueries({ queryKey: [CASE_COMMAND_STATS_KEY] });
-      setCreatedCase({ id: newCase.id, case_no: newCase.case_no ?? newCase.case_number ?? '' });
+      setCreatedCase({ id: newCase.id, case_no: newCase.case_no });
       setShowSuccessModal(true);
       // Direct Print Label: fire-and-forget so a printer problem never blocks intake.
       void shouldAutoPrintLabel('case').then(async (enabled) => {
@@ -510,6 +426,21 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
     },
     onError: (error) => {
       logger.error('Case creation error:', error);
+      // createCaseWithDevices rejects this way only once the case_devices insert
+      // has been sent, and that insert fires trg_log_device_received_custody into
+      // the append-only chain_of_custody. Submitting again would put ONE physical
+      // hand-over into two cases with two DEVICE_RECEIVED ledgers, which nothing
+      // can correct afterwards — so the case exists, and the retry must go.
+      // The panel below is the whole account of this failure: no toast beside it,
+      // because these messages ask for the retry (the 40001 one says so verbatim)
+      // that the panel exists to refuse.
+      if (error instanceof DevicesInCustodyError) {
+        queryClient.invalidateQueries({ queryKey: ['cases'] });
+        queryClient.invalidateQueries({ queryKey: ['cases_count'] });
+        queryClient.invalidateQueries({ queryKey: [CASE_COMMAND_STATS_KEY] });
+        setStalledCase({ id: error.created.caseId, case_no: error.created.caseNumber });
+        return;
+      }
       toast.error(`Failed to create case: ${error.message}`);
     },
   });
@@ -566,6 +497,45 @@ export const CreateCaseWizard: React.FC<CreateCaseWizardProps> = ({ onClose, onS
     : (primaryDevice.serial_no && primaryDevice.device_problem_id);
 
   const isFormValid = isStep1Valid && isStep2Valid && isPrimaryDeviceValid;
+
+  if (stalledCase) {
+    return (
+      <Dialog
+        open={true}
+        onClose={onClose}
+        label="Case created — devices may already be in custody"
+        closeOnBackdrop={false}
+        closeOnEscape={false}
+        className="bg-white rounded-2xl shadow-2xl w-[90vw] max-w-md p-8 text-center"
+      >
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-warning-muted">
+          <AlertTriangle aria-hidden="true" className="h-9 w-9 text-warning" />
+        </div>
+        <h2 className="text-lg font-semibold text-slate-900">
+          {stalledCase.case_no} was created — its devices may already be in custody
+        </h2>
+        <p className="mt-2 text-sm text-slate-500">
+          Creating the case did not finish, but its devices had already been sent to the custody
+          ledger. Creating it again would take the same devices into custody a second time, so this
+          case cannot be created again. Open it to check which devices were recorded and which one
+          is the patient device.
+        </p>
+        <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+          <Button
+            onClick={() => {
+              navigate(`/cases/${stalledCase.id}`);
+              onClose();
+            }}
+          >
+            Open the case
+          </Button>
+          <Button variant="secondary" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog

@@ -224,6 +224,82 @@ describe('office receipt parity — engine output matches the legacy builder', (
   });
 });
 
+// ---------------------------------------------------------------------------
+// Depositor handover block — CONFIG WIRING regression guard.
+//
+// `receiptAdapter.toEngineData` building a `collector` block is NOT enough to
+// put it on the page: `renderTemplate` only renders section keys the CONFIG
+// lists, so an intake config without `section('collector', …)` silently throws
+// the depositor away (built, never rendered — no error, no blank box). These
+// tests fail if `intakeSections()` in `templateConfig.ts` stops listing a
+// visible `collector` section for either intake doc type.
+// ---------------------------------------------------------------------------
+
+const INTAKE_DOC_TYPES: Array<['office_receipt' | 'customer_copy', ReceiptVariant]> = [
+  ['office_receipt', 'office'],
+  ['customer_copy', 'customer'],
+];
+
+/** The same intake job, handed over at the counter by a named courier. */
+function makeReceiptDataWithDepositor(): ReceiptData {
+  const data = makeReceiptData();
+  return {
+    ...data,
+    devices: data.devices.map((d) => ({
+      ...d,
+      received_at: '2026-06-13T09:30:00Z',
+      depositor_name: 'Sam Okafor',
+      depositor_relationship: 'courier',
+      depositor_id: 'P1234567',
+      depositor_mobile: '+971 55 111 2222',
+    })),
+  };
+}
+
+describe('depositor handover block reaches the intake page', () => {
+  it.each(INTAKE_DOC_TYPES)('%s config lists a visible collector section', (docType) => {
+    const collector = BUILT_IN_TEMPLATE_CONFIGS[docType].sections.find((s) => s.key === 'collector');
+    expect(collector, `${docType} config must list a collector section`).toBeDefined();
+    expect(collector?.visible).toBe(true);
+  });
+
+  it.each(INTAKE_DOC_TYPES)('%s prints the depositor identity', (docType, variant) => {
+    const texts = allTexts(renderEngine(makeReceiptDataWithDepositor(), docType, variant));
+    const joined = texts.join('|');
+
+    // The box itself, then every depositor field the adapter emits.
+    expect(joined).toContain('Handover Information');
+    expect(joined).toContain('Sam Okafor — on behalf of Jane Client');
+    expect(joined).toContain('Courier');
+    expect(joined).toContain('P1234567');
+    expect(joined).toContain('+971 55 111 2222');
+  });
+
+  it.each(INTAKE_DOC_TYPES)('%s reads "Delivered by customer" for a self drop-off', (docType, variant) => {
+    const data = makeReceiptDataWithDepositor();
+    const selfDropOff: ReceiptData = {
+      ...data,
+      devices: data.devices.map((d) => ({
+        ...d,
+        depositor_name: 'Jane Client',
+        depositor_relationship: 'self',
+        depositor_id: undefined,
+        depositor_mobile: undefined,
+      })),
+    };
+    const joined = allTexts(renderEngine(selfDropOff, docType, variant)).join('|');
+    expect(joined).toContain('Handover Information');
+    expect(joined).toContain('Delivered by customer');
+  });
+
+  // Negative control: proves the assertions above track the DEPOSITOR DATA and
+  // are not just matching a title the template prints unconditionally.
+  it.each(INTAKE_DOC_TYPES)('%s omits the box when no depositor was recorded', (docType, variant) => {
+    const joined = allTexts(renderEngine(makeReceiptData(), docType, variant)).join('|');
+    expect(joined).not.toContain('Handover Information');
+  });
+});
+
 describe('customer copy parity — engine output matches the legacy builder', () => {
   it('renders the title + customer acknowledgement (variant-specific consent)', () => {
     const data = makeReceiptData();

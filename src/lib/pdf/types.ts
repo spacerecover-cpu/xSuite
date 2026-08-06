@@ -1,3 +1,5 @@
+import type { SignatureBlockData } from './engine/types';
+
 export interface CaseData {
   id: string;
   case_no: string;
@@ -65,6 +67,13 @@ export interface DeviceData {
   checkout_collector_mobile?: string;
   checkout_collector_id?: string;
   checkout_collector_relationship?: string;
+  /** Per-device intake state (Stage 3). `received_at` null = not yet recorded. */
+  received_at?: string;
+  intake_batch_id?: string;
+  depositor_name?: string;
+  depositor_mobile?: string;
+  depositor_id?: string;
+  depositor_relationship?: string;
 }
 
 export interface CompanySettingsData {
@@ -134,6 +143,11 @@ export interface ReceiptData {
   caseData: CaseData;
   devices: DeviceData[];
   companySettings: CompanySettingsData;
+  /**
+   * Signatures captured at the counter (Stage 3). Absent/empty → the receipt
+   * keeps its wet-ink caption lines, so paper-only labs are unaffected.
+   */
+  capturedSignatures?: SignatureBlockData[];
 }
 
 export interface DocumentOptions {

@@ -976,9 +976,13 @@ function financialSections(): SectionConfig[] {
 
 /**
  * An intake document base section set (office_receipt / customer_copy):
- * case-info header + device-intake table + consent box, not money. Uses the
- * case-doc section keys (`caseInfo`, `devices`, `legalTerms`) and ends with the
- * signature lines, then `qr` + `footer` (promoted to the repeating page footer).
+ * case-info header + device-intake table + handover box + consent box, not
+ * money. Uses the case-doc section keys (`caseInfo`, `devices`, `collector`,
+ * `legalTerms`) and ends with the signature lines, then `qr` + `footer`
+ * (promoted to the repeating page footer). `collector` carries the depositor
+ * handover block (who physically handed the devices over) — the intake mirror of
+ * the checkout form's collection box; it renders nothing when no depositor was
+ * recorded.
  */
 function intakeSections(): SectionConfig[] {
   return [
@@ -986,10 +990,11 @@ function intakeSections(): SectionConfig[] {
     section('parties', 1),
     section('caseInfo', 2),
     section('devices', 3),
-    section('legalTerms', 4),
-    section('signature', 5),
-    section('qr', 6),
-    section('footer', 7),
+    section('collector', 4),
+    section('legalTerms', 5),
+    section('signature', 6),
+    section('qr', 7),
+    section('footer', 8),
   ];
 }
 

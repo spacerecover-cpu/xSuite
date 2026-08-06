@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderSignature } from './signature';
+import { createSignatureBlock } from '../../styles';
 import type { EngineContext } from '../types';
 
 // Minimal engine context — language english, no stamp/sig company images.
@@ -16,6 +17,14 @@ function flatten(node: unknown, out: string[]): void {
   if (typeof o.text === 'string') out.push(o.text);
   if (typeof o.image === 'string') out.push(`IMG:${o.image.slice(0, 16)}`);
   for (const v of Object.values(o)) flatten(v, out);
+}
+
+function collectRuleYs(node: unknown, out: number[]): void {
+  if (node == null || typeof node !== 'object') return;
+  if (Array.isArray(node)) { for (const c of node) collectRuleYs(c, out); return; }
+  const o = node as Record<string, unknown>;
+  if (o.type === 'line' && typeof o.y1 === 'number') out.push(o.y1);
+  for (const v of Object.values(o)) collectRuleYs(v, out);
 }
 
 describe('renderSignature — captured signatureBlocks', () => {
@@ -36,6 +45,22 @@ describe('renderSignature — captured signatureBlocks', () => {
     const texts: string[] = [];
     flatten(def, texts);
     expect(texts).toContain('Tech A');
+  });
+
+  it('gives a slot with nothing captured the wet-ink block\'s writing room', () => {
+    const def = renderSignature(engine, {
+      signatureBlocks: [
+        { slot: 'customer', name: 'Dana Reed', method: 'drawn', imageDataUrl: 'data:image/png;base64,AAAABBBBCCCC' },
+        { slot: 'representative', role: 'Company Representative' },
+      ],
+    } as never);
+    const ys: number[] = [];
+    collectRuleYs(def, ys);
+    const wetInk: number[] = [];
+    collectRuleYs(createSignatureBlock('Company Representative'), wetInk);
+    // signed slot keeps its rule tight under the image; unsigned slot matches
+    // the hand-signed block so there is somewhere to actually write.
+    expect(ys).toEqual([2, wetInk[0]]);
   });
 
   it('with no signatureBlocks renders the default wet-ink labels (unchanged)', () => {
