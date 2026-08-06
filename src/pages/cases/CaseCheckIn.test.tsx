@@ -122,14 +122,18 @@ vi.mock('../../components/customers/CustomerFormModal', () => ({
 }));
 
 vi.mock('../../components/cases/EmailDocumentModal', () => ({
-  EmailDocumentModal: ({ isOpen, companyName }: { isOpen: boolean; companyName: string }) =>
+  EmailDocumentModal: ({ isOpen, companyName, blob, filename }: { isOpen: boolean; companyName: string; blob?: Blob; filename?: string }) =>
     isOpen ? (
       <div>
         <div>email modal</div>
         <div data-testid="email-company">{companyName}</div>
+        <div data-testid="email-attachment">{blob ? (filename ?? 'unnamed') : 'none'}</div>
       </div>
     ) : null,
 }));
+
+const generateCustomerCopyAsBlob = vi.fn();
+vi.mock('../../lib/pdf/pdfService', () => ({ generateCustomerCopyAsBlob }));
 
 vi.mock('../../lib/printUtils', () => ({ printCustomerCopy: vi.fn() }));
 
@@ -154,6 +158,15 @@ async function pickCustomer(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByText('Aisha Rahman'));
 }
 
+
+async function completeCheckIn(user: ReturnType<typeof userEvent.setup>) {
+  await pickCustomer(user);
+  await fillOneDevice(user);
+  await user.click(await screen.findByLabelText(/accept the terms/i));
+  await user.click(submitButton());
+  await screen.findByRole('button', { name: /check in another/i });
+}
+
 async function fillOneDevice(user: ReturnType<typeof userEvent.setup>) {
   await user.selectOptions(screen.getByLabelText(/condition/i), 'cond-1');
 }
@@ -161,6 +174,7 @@ async function fillOneDevice(user: ReturnType<typeof userEvent.setup>) {
 const submitButton = () => screen.getByRole('button', { name: /complete check-in/i });
 
 beforeEach(() => {
+    generateCustomerCopyAsBlob.mockResolvedValue({ success: true, blob: new Blob(['pdf']), filename: 'receipt.pdf' });
   calls.length = 0;
   vi.clearAllMocks();
   customerRow.email = 'aisha@example.com';
@@ -327,7 +341,7 @@ describe('CaseCheckIn', () => {
 
     await checkInOnce();
     await user.click(screen.getByRole('button', { name: /send to customer/i }));
-    expect(screen.getByText('email modal')).toBeInTheDocument();
+    expect(await screen.findByText('email modal')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /check in another/i }));
     await checkInOnce();
@@ -449,6 +463,9 @@ describe('CaseCheckIn', () => {
     expect(await screen.findByText(/CASE-0042 was created/i)).toBeInTheDocument();
     expect(screen.getByText(/Edit Profile → WhatsApp updates/i)).toBeInTheDocument();
     expect(screen.getByText(/its internal note is missing/i)).toBeInTheDocument();
+    // Wet-ink path: no signature was captured, so the screen must not tell the
+    // operator a signed receipt is on file.
+    expect(screen.queryByText(/signed receipt/i)).not.toBeInTheDocument();
     // Both missing facts are re-recordable in-app: this screen must never send a
     // re-tickable checkbox to an administrator as if it were unwritable.
     expect(screen.queryByText(/escalate/i)).not.toBeInTheDocument();
@@ -557,5 +574,40 @@ describe('CaseCheckIn', () => {
     await screen.findByRole('button', { name: /check in another/i });
     expect(screen.getByRole('button', { name: /send to customer/i })).toBeDisabled();
     expect(screen.getByText(/no email on file/i)).toBeInTheDocument();
+  });
+});
+
+// The templated body says "please find attached". Opening the modal with no blob
+// sends a promise of an attachment the customer never receives, while the lab
+// holds an email record implying proof of receipt was delivered.
+describe('sending the customer copy', () => {
+  it('attaches the generated receipt before opening the email modal', async () => {
+    generateCustomerCopyAsBlob.mockResolvedValue({
+      success: true,
+      blob: new Blob(['pdf']),
+      filename: 'check-in-receipt-CASE-0042.pdf',
+    });
+    const user = userEvent.setup();
+    renderPage();
+    await completeCheckIn(user);
+
+    await user.click(await screen.findByRole('button', { name: /send to customer/i }));
+
+    expect(await screen.findByText('email modal')).toBeInTheDocument();
+    expect(screen.getByTestId('email-attachment')).toHaveTextContent(
+      'check-in-receipt-CASE-0042.pdf',
+    );
+  });
+
+  it('does not open the modal when the receipt could not be generated', async () => {
+    generateCustomerCopyAsBlob.mockResolvedValue({ success: false, error: 'render failed' });
+    const user = userEvent.setup();
+    renderPage();
+    await completeCheckIn(user);
+
+    await user.click(await screen.findByRole('button', { name: /send to customer/i }));
+
+    await waitFor(() => expect(toastSpy.error).toHaveBeenCalled());
+    expect(screen.queryByText('email modal')).not.toBeInTheDocument();
   });
 });

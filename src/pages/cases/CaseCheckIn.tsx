@@ -120,6 +120,10 @@ export function CaseCheckIn() {
   const [customerId, setCustomerId] = useState('');
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [emailModalOpen, setEmailModalOpen] = useState(false);
+  // The templated body says "please find attached", so the modal must not open
+  // until the receipt actually exists as a blob.
+  const [emailAttachment, setEmailAttachment] = useState<{ blob: Blob; filename: string } | null>(null);
+  const [preparingEmail, setPreparingEmail] = useState(false);
   const [result, setResult] = useState<CheckedInCase | null>(null);
   // The five submit writes are not one transaction. Once the case_devices insert
   // has been sent, a plain retry would re-run createCaseWithDevices and append a
@@ -349,6 +353,7 @@ export function CaseCheckIn() {
     createdCase.current = null;
     consentStepReached.current = false;
     setEmailModalOpen(false);
+    setEmailAttachment(null);
     setCustomerId('');
     setDepositor({ name: '', mobile: '', nationalId: '', relationship: 'self' });
     setDevices([emptyDevice(`device-${Date.now()}`)]);
@@ -370,7 +375,7 @@ export function CaseCheckIn() {
           </h1>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
             {stalled.consentOnly
-              ? 'The devices are in custody and the signed receipt, depositor identity and custody event are all recorded — only the consent step did not complete. Checking in again would take the same devices into custody a second time, so this check-in cannot be retried.'
+              ? `The devices are in custody and the ${ack.signature ? 'signed receipt' : 'receipt'}, depositor identity and custody event are all recorded — only the consent step did not complete. Checking in again would take the same devices into custody a second time, so this check-in cannot be retried.`
               : stalled.devicesConfirmed
                 ? 'The devices are in custody, but the signed receipt, depositor identity or custody event did not complete. Checking in again would take the same devices into custody a second time, so this check-in cannot be retried.'
                 : `${stalled.caseNumber} was created, but the devices may or may not have been recorded against it — the request failed at exactly the point that is impossible to tell apart from the outside. Checking in again could take the same devices into custody twice, so this check-in cannot be retried.`}
@@ -462,7 +467,28 @@ export function CaseCheckIn() {
               <FileText aria-hidden="true" className="me-2 h-4 w-4" />
               Print customer copy
             </Button>
-            <Button variant="secondary" disabled={!canSend} onClick={() => setEmailModalOpen(true)}>
+            <Button
+              variant="secondary"
+              disabled={!canSend || preparingEmail}
+              onClick={async () => {
+                setPreparingEmail(true);
+                try {
+                  const { generateCustomerCopyAsBlob } = await import('../../lib/pdf/pdfService');
+                  const pdf = await generateCustomerCopyAsBlob(result.caseId);
+                  if (!pdf.success || !pdf.blob) {
+                    toast.error(pdf.error ?? 'Could not prepare the receipt to send.');
+                    return;
+                  }
+                  setEmailAttachment({
+                    blob: pdf.blob,
+                    filename: pdf.filename ?? `check-in-receipt-${result.caseNumber}.pdf`,
+                  });
+                  setEmailModalOpen(true);
+                } finally {
+                  setPreparingEmail(false);
+                }
+              }}
+            >
               <Mail aria-hidden="true" className="me-2 h-4 w-4" />
               Send to customer
             </Button>
@@ -495,6 +521,8 @@ export function CaseCheckIn() {
         <EmailDocumentModal
           isOpen={emailModalOpen}
           onClose={() => setEmailModalOpen(false)}
+          blob={emailAttachment?.blob}
+          filename={emailAttachment?.filename}
           documentType="customer_copy"
           caseId={result.caseId}
           caseNumber={result.caseNumber}
